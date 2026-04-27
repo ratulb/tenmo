@@ -4,6 +4,7 @@ from std.memory import memcpy
 from .shapes import Shape
 from .buffers import Buffer
 from .ndbuffer import NDBuffer
+from .gradbox import Gradbox
 
 
 fn numpy_dtype(dtype: DType) raises -> PythonObject:
@@ -44,7 +45,7 @@ fn ndarray_ptr[
 
 
 fn to_ndarray[dtype: DType, //](tensor: Tensor[dtype]) raises -> PythonObject:
-    np = Python.import_module("numpy")
+    _="""np = Python.import_module("numpy")
     shape_tuple = list_to_tuple(tensor.shape().tolist())
     ndarray = np.zeros(shape_tuple, dtype=numpy_dtype(tensor.dtype))
     if tensor.is_contiguous():
@@ -57,7 +58,29 @@ fn to_ndarray[dtype: DType, //](tensor: Tensor[dtype]) raises -> PythonObject:
         for coord in tensor.shape():
             flat[idx] = tensor[coord]
             idx += 1
+    return ndarray"""
+    return to_ndarray(tensor.buffer)
+
+fn to_ndarray[dtype: DType, //](gradbox: Gradbox[dtype]) raises -> PythonObject:
+    return to_ndarray(gradbox.buffer)
+
+fn to_ndarray[dtype: DType, //](ndb: NDBuffer[dtype]) raises -> PythonObject:
+    np = Python.import_module("numpy")
+    shape_tuple = list_to_tuple(ndb.shape.tolist())
+    ndarray = np.zeros(shape_tuple, dtype=numpy_dtype(ndb.dtype))
+    if ndb.is_contiguous():
+        dst_ptr = ndarray_ptr[dtype](ndarray)
+        buffer_ptr = ndb.data_ptr() + ndb.offset
+        memcpy(dest=dst_ptr, src=buffer_ptr, count=ndb.numels())
+    else:
+        flat = ndarray.flat
+        idx = 0
+        for coord in ndb.shape:
+            flat[idx] = ndb[coord]
+            idx += 1
     return ndarray
+
+
 
 
 fn from_ndarray[
@@ -105,6 +128,24 @@ fn load[
     tenmo_tensor = from_ndarray[dtype](ndarray, requires_grad=requires_grad)
     # print(ndarray)
     return tenmo_tensor^
+
+
+fn as_nested_list[dtype: DType, //](self: Tensor[dtype]) raises -> PythonObject:
+    """Convert tensor to a nested Python list retaining shape structure."""
+    var ndarray = to_ndarray(self)
+    return ndarray.tolist()
+
+fn as_nested_list[dtype: DType, //](self: Gradbox[dtype]) raises -> PythonObject:
+    """Convert Gradbox to a nested Python list retaining shape structure."""
+    var ndarray = to_ndarray(self)
+    return ndarray.tolist()
+
+
+fn as_nested_list[dtype: DType, //](self: NDBuffer[dtype]) raises -> PythonObject:
+    """Convert NDBuffer to a nested Python list retaining shape structure."""
+    var ndarray = to_ndarray(self)
+    return ndarray.tolist()
+
 
 
 fn test_to_ndarray() raises:

@@ -4,7 +4,7 @@ from tenmo.ndbuffer import NDBuffer
 from tenmo.reduction_kernel import ProductArg
 from tenmo.intarray import IntArray
 from std.testing import assert_true
-
+from tenmo.numpy_interop import test_to_ndarray
 
 fn main_1() raises:
     # whatever quick test you want
@@ -57,4 +57,5 @@ fn test_prd_cpu_bwd_all_positive_1d_orig() raises:
 
 fn main() raises:
     # test_prd_cpu_bwd_all_positive_1d()
-    test_prd_cpu_bwd_all_positive_1d()
+    #test_prd_cpu_bwd_all_positive_1d()
+    test_to_ndarray()
