@@ -3,7 +3,7 @@ clear
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No example specified"
-    echo "Usage: $0 [binary_mnist|mnist|xor|spiral|cifar_10|mnist_conv2d]"
+    echo "Usage: $0 [binary_mnist|mnist|mnist_gpu|xor|spiral|cifar_10|mnist_conv2d]"
     exit 1
 fi
 
@@ -19,7 +19,7 @@ case $1 in
         mojo -I . $DEBUG_MODE examples/binary_mnist.mojo
         ;;
     mnist_gpu)
-        echo "Running mnist training loop"
+        echo "Running mnist gpu training loop"
         mojo -I . $DEBUG_MODE examples/mnist_gpu.mojo
         ;;
     mnist)
