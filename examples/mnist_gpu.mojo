@@ -234,7 +234,7 @@ fn train_mnist() raises:
     # stop_grad=True: CPU tensors become new leaves — no backward
     # node registered for the transfer.
     print("Transferring trained model parameters back to CPU...")
-    model = model.to_cpu(stop_grad=True)
+    model = model.to_cpu()
     print("  Model weights saved to CPU")
     print("=" * 80)
 
