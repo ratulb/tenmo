@@ -10,7 +10,7 @@ from tenmo.crossentropy import CrossEntropyLoss
 from std.python import Python
 from tenmo.numpy_interop import from_ndarray, numpy_dtype
 from tenmo.dataloader import NumpyDataset
-from time import perf_counter_ns
+from std.time import perf_counter_ns
 
 
 fn train_cifar_10() raises:
@@ -179,7 +179,7 @@ fn train_cifar_10() raises:
             train_optimizer_time += Float64(t1 - t0) / 1e9
 
             # Accumulate loss
-            train_loss += loss.item() * batch.batch_size
+            train_loss += loss.item() * Float32(batch.batch_size)
 
             # Accuracy computation
             t0 = perf_counter_ns()
@@ -210,7 +210,7 @@ fn train_cifar_10() raises:
             t1 = perf_counter_ns()
             val_forward_time += Float64(t1 - t0) / 1e9
 
-            val_loss += loss.item() * batch.batch_size
+            val_loss += loss.item() * Float32(batch.batch_size)
 
             t0 = perf_counter_ns()
             val_correct += compute_accuracy(pred, batch.labels)
@@ -223,10 +223,10 @@ fn train_cifar_10() raises:
         var epoch_end = perf_counter_ns()
         var epoch_time = Float64(epoch_end - epoch_start) / 1e9
 
-        var avg_train_loss = train_loss / train_total
-        var train_acc = 100.0 * Float64(train_correct) / train_total
-        var avg_val_loss = val_loss / val_total
-        var val_acc = 100.0 * Float64(val_correct) / val_total
+        var avg_train_loss = train_loss / Float32(train_total)
+        var train_acc = 100.0 * Float64(train_correct) / Float64(train_total)
+        var avg_val_loss = val_loss / Float32(val_total)
+        var val_acc = 100.0 * Float64(val_correct) / Float64(val_total)
 
         print(
             "Epoch",
@@ -261,7 +261,7 @@ fn train_cifar_10() raises:
     var total_time = Float64(perf_counter_ns() - training_start) / 1e9
     print("\n" + "=" * 80)
     print("Training completed in", total_time, "seconds")
-    print("Average time per epoch:", total_time / num_epochs, "seconds")
+    print("Average time per epoch:", total_time / Float64(num_epochs), "seconds")
     print("=" * 80)
 
 
