@@ -985,7 +985,7 @@ struct Tensor[dtype: DType](
         for parent in parents:
             if not parent.buffer.shared():
                 var parent_copy = parent.copy()
-                var parent_view = parent_copy.into_view()
+                var parent_view = parent_copy.into_view[track_grad=False]()
                 ancestors.append(parent_view^)
 
             else:
@@ -3208,6 +3208,9 @@ struct Tensor[dtype: DType](
         Returns:
             A view tensor sharing the underlying buffer.
         """
+        if self.shared():
+            log_warning("Tensor → into_view: already shared")
+            return self.copy()
         var shape, strides, offset = self.shape(), self.strides(), self.offset()
         grad_required = requires_grad.or_else(self.requires_grad)
         return View[Self.dtype].forward[track_grad](
