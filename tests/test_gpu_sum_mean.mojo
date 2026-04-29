@@ -11,11 +11,9 @@ comptime dtype = DType.float32
 # ============================================================
 # GPU SUM TESTS — forward + backward, all reduction patterns
 # ============================================================
+
+
 fn test_gpu_sum_full_reduction_scalar_grad() raises:
-    print("test_gpu_sum_full_reduction_scalar_grad")
-
-
-fn main_1() raises:
     print("test_gpu_sum_full_reduction_scalar_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
