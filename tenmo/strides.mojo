@@ -154,7 +154,7 @@ struct Strides(
             String representation in the format '(s0, s1, ..., sn)'
         """
         var s = self.data.__str__()
-        return "(" + s[byte=1:len(s)-1] + ")"
+        return "(" + s[byte = 1 : len(s) - 1] + ")"
 
     fn __repr__(self) -> String:
         """Get official string representation of the strides.
@@ -200,6 +200,12 @@ struct Strides(
 
         Returns:
              New Strides instance with dimensions reordered according to axes
+
+        Example:
+            ```mojo
+            var s = Strides([12, 4, 1])
+            var permuted = s.permute([2, 0, 1])  # Returns (1, 12, 4)
+            ```
         """
         var result = IntArray.with_capacity(len(axes))
         for i in range(len(axes)):
@@ -242,6 +248,13 @@ struct Strides(
         Note:
             A layout is contiguous if elements are stored in memory without gaps,
             following the C-contiguous (row-major) ordering convention.
+
+        Example:
+            ```mojo
+            var shape = Shape([2, 3, 4])
+            var cont = Strides([12, 4, 1])    # True - C-contiguous
+            var noncont = Strides([1, 12, 4]) # False - transposed layout
+            ```
         """
         if shape.rank() == 0:
             return True
@@ -268,5 +281,3 @@ struct Strides(
             how many dimensions you'll need.
         """
         return Strides(IntArray.with_capacity(capacity))
-
-

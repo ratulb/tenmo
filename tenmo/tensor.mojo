@@ -983,7 +983,13 @@ struct Tensor[dtype: DType](
 
         ref ancestors = self.ancestors.value()
         for parent in parents:
-            ancestors.append(parent)
+            if not parent.buffer.shared():
+                var parent_copy = parent.copy()
+                var parent_view = parent_copy.into_view()
+                ancestors.append(parent_view^)
+
+            else:
+                ancestors.append(parent)
 
     fn has_ancestry(self) -> Bool:
         """Check if this tensor has registered parent dependencies.
@@ -3202,13 +3208,10 @@ struct Tensor[dtype: DType](
         Returns:
             A view tensor sharing the underlying buffer.
         """
-        if self.shared():
-            log_warning("Tensor → into_view: already shared")
-            return self.copy()
-        shape, strides = self.shape(), self.strides()
+        var shape, strides, offset = self.shape(), self.strides(), self.offset()
         grad_required = requires_grad.or_else(self.requires_grad)
         return View[Self.dtype].forward[track_grad](
-            self, shape, strides, 0, grad_required, validated=True
+            self, shape, strides, offset, grad_required, validated=True
         )
 
     fn transpose[
