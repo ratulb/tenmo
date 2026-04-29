@@ -1,4 +1,4 @@
-from time import perf_counter_ns
+from std.time import perf_counter_ns
 from std.random import random_float64
 from .tensor import Tensor
 from .shapes import Shape

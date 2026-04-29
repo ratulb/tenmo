@@ -22,8 +22,8 @@ fn make_synthetic_mnist_dataset(
 
     for i in range(n_samples):
         # Pick class
-        label = Tensor[DType.int32].rand([1], 0, num_classes).item()
-        y[i] = label.__int__()
+        label = Tensor[DType.int32].rand([1], 0, Int32(num_classes)).item()
+        y[i] = Int32(label)
 
         # Create blank canvas
         var img = Tensor[DType.float32](Shape([height, width]))
@@ -139,7 +139,7 @@ fn main():
             "Epoch",
             epoch,
             "Loss:",
-            epoch_loss / total,
+            epoch_loss / Float32(total),
             "Accuracy:",
             Float32(correct) / Float32(total),
         )

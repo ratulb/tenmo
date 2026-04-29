@@ -1455,11 +1455,9 @@ struct NDBuffer[dtype: DType](
         comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
-                    var (_, productArg) = Reduction[
-                        Self.dtype
-                    ].launch_product[store_excl_product=True](
-                        self, normalized_axes, keepdims
-                    )
+                    var (_, productArg) = Reduction[Self.dtype].launch_product[
+                        store_excl_product=True
+                    ](self, normalized_axes, keepdims)
                     return productArg.excl_product.value()
                 except e:
                     panic(

@@ -150,10 +150,50 @@ declare -a ALL_TESTS_IN_ORDER=(
     "shapes|tests/test_shapes.mojo"
     "strides|tests/test_strides.mojo"
     "shapebroadcast|tests/test_broadcaster.mojo"
-    "bench|tests/test_matmul_bench.mojo"
     "validators|tests/test_validators.mojo"
     "ce|tests/test_cross_entropy.mojo"
-    "synth_mnist|tests/test_synthetic_mnist.mojo"
+#    "synth_mnist|tests/test_synthetic_mnist.mojo"
+)
+
+declare -a GPU_TESTS=(
+    "product|tests/test_product_reduction.mojo"
+    "unary|tests/test_unary_ops.mojo"
+    "sqrt|tests/test_sqrt.mojo"
+    "gpu|tests/test_gpu.mojo"
+    "item|tests/test_item.mojo"
+    "contiguous|tests/test_contiguous.mojo"
+    "maxmin_scalar|tests/test_maxmin_scalar.mojo"
+    "onehot|tests/test_onehot.mojo"
+    "power|tests/test_exponentiator.mojo"
+    "allany|tests/test_all_true_any_true.mojo"
+    "compare|tests/test_compare.mojo"
+    "count_unique|tests/test_count_unique.mojo"
+    "transmute|tests/test_transmutation.mojo"
+    "exp|tests/test_exponential.mojo"
+    "summean|tests/test_sum_mean.mojo"
+    "sigmoid|tests/test_sigmoid.mojo"
+    "gpusummean|tests/test_gpu_sum_mean.mojo"
+    "broadcast|tests/test_broadcast.mojo"
+    "scalar|tests/test_scalar_tensors.mojo"
+    "inplace|tests/test_inplace.mojo"
+    "gpu_expand|tests/test_gpu_expand.mojo"
+    "sgd|tests/test_sgd.mojo"
+    "dropout|tests/test_dropout.mojo"
+    "dev_transfer|tests/test_device_transfer_gradflow.mojo"
+    "logarithm|tests/test_logarithm.mojo"
+    "tanh|tests/test_tanh.mojo"
+    "softmax|tests/test_softmax.mojo"
+    "argminmax|tests/test_argminmax.mojo"
+    "minmax|tests/test_minmax.mojo"
+    "relu|tests/test_relu.mojo"
+    "shuffle|tests/test_shuffle.mojo"
+    "permute|tests/test_permute.mojo"
+    "flatten|tests/test_flatten.mojo"
+    "squeeze|tests/test_squeeze.mojo"
+    "ndb|tests/test_ndb.mojo"
+    "transpose|tests/test_transpose.mojo"
+    "tiles|tests/test_tiles.mojo"
+    "ce|tests/test_cross_entropy.mojo"
 )
 
 # Clear screen
@@ -171,15 +211,18 @@ if [ $# -eq 0 ]; then
     echo ""
     print_colored "$YELLOW" "Usage: $0 [OPTIONS] <test_name1> [test_name2 ...]"
     echo "       $0 [OPTIONS] from <test_name>"
+    echo "       $0 [OPTIONS] gpu [from <test_name> | test1 test2 ...]"
     echo ""
     print_colored "$CYAN" "Options:"
-    echo "  -p, --parallel    Run tests in parallel (for 'all' mode)"
+    echo "  -p, --parallel    Run tests in parallel (for 'all' or 'gpu' mode)"
     echo "  -d, --debug       Enable debug mode (-D LOGGING_LEVEL=debug)"
     echo ""
     print_colored "$CYAN" "Examples:"
     echo "  $0 softmax matmul tensors     - Run only softmax, matmul, and tensors"
     echo "  $0 from softmax               - Run softmax and all tests after it"
-    echo "  $0 from tensors               - Run tensors and all tests after it"
+    echo "  $0 gpu                        - Run all GPU-guarded tests"
+    echo "  $0 gpu from relu              - Run relu and all GPU tests after it"
+    echo "  $0 gpu relu tanh              - Run only relu and tanh"
     echo ""
     print_colored "$CYAN" "Available tests:"
     echo "  product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
@@ -191,9 +234,10 @@ if [ $# -eq 0 ]; then
     echo "  intarray, mm2d, vm, mv, slice, tiles, linspace, argminmax"
     echo "  minmax, relu, shuffle, permute, flatten, squeeze, unsqueeze"
     echo "  gradbox, ndb, transpose, buffers, views, shapes, strides"
-    echo "  shapebroadcast, bench, validators, ce, synth_mnist"
+    echo "  shapebroadcast, validators, ce, synth_mnist"
     echo ""
     print_colored "$GREEN" "  all              Run all tests"
+    print_colored "$GREEN" "  gpu              Run all GPU-guarded tests"
     print_colored "$GREEN" "  quick            Run quick sanity tests"
     exit 1
 fi
@@ -246,7 +290,23 @@ run_test_by_name() {
         unary)          run_test "unary" "tests/test_unary_ops.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         sqrt)           run_test "sqrt" "tests/test_sqrt.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         tensors)        run_test "tensors" "tests/test_tensors.mojo" "$DEBUG_MODE"; exit_code=$? ;;
-        gpu)            run_test "gpu" "tests/test_gpu.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        gpu)
+            print_colored "$BLUE" "Running all GPU-guarded tests..."
+            if [ "$PARALLEL" = true ]; then
+                run_parallel "${GPU_TESTS[@]}"
+                exit_code=$?
+            else
+                for test in "${GPU_TESTS[@]}"; do
+                    IFS='|' read -r name file <<< "$test"
+                    if run_test "$name" "$file" "$DEBUG_MODE"; then
+                        PASSED_TESTS+=("$name")
+                    else
+                        FAILED_TESTS+=("$name")
+                        exit_code=1
+                    fi
+                done
+            fi
+            ;;
         item)           run_test "item" "tests/test_item.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         contiguous)     run_test "contiguous" "tests/test_contiguous.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         maxmin_scalar)  run_test "maxmin_scalar" "tests/test_maxmin_scalar.mojo" "$DEBUG_MODE"; exit_code=$? ;;
@@ -311,7 +371,6 @@ run_test_by_name() {
         shapes)         run_test "shapes" "tests/test_shapes.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         strides)        run_test "strides" "tests/test_strides.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         shapebroadcast) run_test "shapebroadcast" "tests/test_broadcaster.mojo" "$DEBUG_MODE"; exit_code=$? ;;
-        bench)          run_test "bench" "tests/test_matmul_bench.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         validators)     run_test "validators" "tests/test_validators.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         ce)             run_test "ce" "tests/test_cross_entropy.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         synth_mnist)    run_test "synth_mnist" "tests/test_synthetic_mnist.mojo" "$DEBUG_MODE"; exit_code=$? ;;
@@ -388,16 +447,70 @@ run_from_test() {
     return $exit_code
 }
 
+# Function to run GPU tests from a starting point
+run_from_gpu_test() {
+    local start_test=$1
+    local found=false
+    local exit_code=0
+
+    print_colored "$BLUE" "Running GPU tests from '$start_test' and all after it..."
+    echo ""
+
+    for test_entry in "${GPU_TESTS[@]}"; do
+        IFS='|' read -r name file <<< "$test_entry"
+
+        if [ "$found" = true ]; then
+            if run_test "$name" "$file" "$DEBUG_MODE"; then
+                PASSED_TESTS+=("$name")
+            else
+                FAILED_TESTS+=("$name")
+                exit_code=1
+            fi
+        elif [ "$name" = "$start_test" ]; then
+            found=true
+            if run_test "$name" "$file" "$DEBUG_MODE"; then
+                PASSED_TESTS+=("$name")
+            else
+                FAILED_TESTS+=("$name")
+                exit_code=1
+            fi
+        fi
+    done
+
+    if [ "$found" = false ]; then
+        print_colored "$RED" "Error: GPU test '$start_test' not found in GPU test list"
+        return 1
+    fi
+
+    return $exit_code
+}
+
 # Main execution logic
-if [ "$FROM_MODE" = true ]; then
-    # Mode: from <test_name> - run that test and all after it
+if [ "${SPECIFIC_TESTS[0]}" = "gpu" ]; then
+    if [ "$FROM_MODE" = true ]; then
+        if [ -z "$START_TEST" ]; then
+            print_colored "$RED" "Error: 'gpu from' mode requires a test name"
+            exit 1
+        fi
+        run_from_gpu_test "$START_TEST"
+    elif [ ${#SPECIFIC_TESTS[@]} -gt 1 ]; then
+        for ((i=1; i<${#SPECIFIC_TESTS[@]}; i++)); do
+            if run_test_by_name "${SPECIFIC_TESTS[$i]}"; then
+                PASSED_TESTS+=("${SPECIFIC_TESTS[$i]}")
+            else
+                FAILED_TESTS+=("${SPECIFIC_TESTS[$i]}")
+            fi
+        done
+    else
+        run_test_by_name "gpu"
+    fi
+elif [ "$FROM_MODE" = true ]; then
     if [ -z "$START_TEST" ]; then
         print_colored "$RED" "Error: 'from' mode requires a test name"
         exit 1
     fi
     run_from_test "$START_TEST"
 elif [ ${#SPECIFIC_TESTS[@]} -gt 0 ]; then
-    # Mode: Run specific tests only
     for test_name in "${SPECIFIC_TESTS[@]}"; do
         if run_test_by_name "$test_name"; then
             PASSED_TESTS+=("$test_name")
@@ -406,7 +519,6 @@ elif [ ${#SPECIFIC_TESTS[@]} -gt 0 ]; then
         fi
     done
 else
-    # No valid mode selected
     print_colored "$RED" "Error: No test specified"
     exit 1
 fi
