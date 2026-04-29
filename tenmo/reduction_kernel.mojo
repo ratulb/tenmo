@@ -846,25 +846,29 @@ struct Reduction[dtype: DType = DType.float32](
             "launch[op_code] only accepts SUM or MEAN — use launch_product for"
             " PRODUCT"
         )
-
+        print("In Reduction - 1")
         var shape_A = A.shape
         var strides_A = A.strides
         var output_shape = shape_A.compute_output_shape(
             normalized_axes, keepdims, validated=True
         )
 
+        print("In Reduction - 2", output_shape)
         var normalized_axes_copy = normalized_axes
         if len(normalized_axes_copy) == 0:
             normalized_axes_copy = IntArray(len(shape_A))
             for i in range(len(shape_A)):
                 normalized_axes_copy[i] = i
 
+        print("In Reduction - 3", normalized_axes)
         var reduction_axes: Array = Array(normalized_axes_copy)
         var reduced_shape = shape_A.reduced_shape(normalized_axes)
         var in_shape: Array = shape_A.array()
         var in_strides: Array = strides_A.array()
         var total_output: Int = output_shape.product()
         var reduced_volume: Int = reduced_shape.product()
+
+        print("In Reduction - 4", total_output, reduced_volume)
 
         var (threads_per_block, num_blocks) = Self.launch_config[
             max_block_width
@@ -876,6 +880,9 @@ struct Reduction[dtype: DType = DType.float32](
         var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
             total_output
         )
+
+        print("In Reduction - 5")
+        print(result_buffer)
         ref A_buffer = A_device_state.device_buffer()
 
         var compiled_func = device_context.compile_function[
@@ -883,6 +890,7 @@ struct Reduction[dtype: DType = DType.float32](
             reduce[Self.dtype, max_block_width, op_code],
         ]()
 
+        print("In Reduction - 6", "compiled fn")
         device_context.enqueue_function(
             compiled_func,
             result_buffer,
@@ -896,11 +904,14 @@ struct Reduction[dtype: DType = DType.float32](
             block_dim=threads_per_block,
         )
 
+        print("In Reduction - 7", "enqueued")
         device_context.synchronize()
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        print("In Reduction - 8", "returning")
         return NDBuffer[Self.dtype].with_device_state(
             device_state^, output_shape
         )
+
 
     # ── PRODUCT ───────────────────────────────────────────────────────────────
 
