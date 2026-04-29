@@ -8,10 +8,12 @@ from tenmo.numpy_interop import test_to_ndarray
 from tenmo.common_utils import *
 from tenmo.strides import Strides
 from tenmo.mnemonics import *
+from tenmo.reduction_kernel import Reduction
 
-fn main_1() raises:
+fn main() raises:
     # whatever quick test you want
-    var t = Tensor[DType.float32].ones(3, 3)
+    var t = Tensor[DType.float32].scalar(3)
+    assert_true(t.all_close(Tensor[DType.float32].scalar(3)))
     t.print()
 
 
@@ -281,7 +283,7 @@ fn test_tensor_dot() raises:
     d.backward()
     assert_true(a.grad().all_close(Tensor[dtype].d1([0, 0, 0, 0, 0, 3, 0, 4, 0, 5])))
 
-fn main() raises:
+fn main_1() raises:
     test_complex_mixed_ops_backward()
     test_contig_cpu_1d_slice_view()
     test_expand_1d_to_2d_new_batch_dim()
