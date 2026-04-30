@@ -864,8 +864,6 @@ fn test_vmnd_batched_2d_v_3d_M() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         # result_cpu = gpu_result.to_cpu()
-        cpu_result.print()
-        gpu_result.print()
         assert_true(close_enough(cpu_result, gpu_result))
     print("test_vmnd_batched_2d_v_3d_M passed")
 
@@ -1995,7 +1993,6 @@ fn test_backward_grad_A_fidelity() raises:
 
     C_gpu.backward()
 
-    A_gpu.grad().print()
     assert_true(AA.grad().to_gpu().reshape(Shape(9, 30)).all_close(A_gpu.grad() * 2))
     print("PASSED: GPU backward grad_A == CPU backward grad_A")
 
