@@ -70,7 +70,8 @@ fn arithmetic_ops_both_contiguous[
                 elif op_code == SQRT_BACKWARD:
                     vec_result = vec_b * (
                         SIMD[dtype, simd_width](0.5)
-                        * rsqrt(vec_a + epsilon)
+                        #* rsqrt(vec_a + epsilon)
+                        * rsqrt(max(vec_a, SIMD[dtype, simd_width](0)))
                         # / (epsilon + SIMD[dtype, simd_width](2) * sqrt(vec_a))
                     )
 
@@ -100,7 +101,8 @@ fn arithmetic_ops_both_contiguous[
                     elif op_code == SQRT_BACKWARD:
                         res = b * (
                             Scalar[dtype](0.5)
-                            * rsqrt(a + epsilon)
+                            #* rsqrt(a + epsilon)
+                            * rsqrt(max(a, Scalar[dtype](0)))
                             # / (epsilon + Scalar[dtype](2) * sqrt(a))
                         )
 
@@ -174,7 +176,8 @@ fn arithmetic_ops_A_contiguous[
                     elif op_code == SQRT_BACKWARD:
                         vec_result[lane] = B[b_idx] * (
                             Scalar[dtype](0.5)
-                            * rsqrt(vec_a[lane] + epsilon)
+                            #* rsqrt(vec_a[lane] + epsilon)
+                            * rsqrt(max(vec_a[lane], Scalar[dtype](0)))
                             # / (epsilon + Scalar[dtype](2) * sqrt(vec_a[lane]))
                         )
 
@@ -213,7 +216,8 @@ fn arithmetic_ops_A_contiguous[
                     elif op_code == SQRT_BACKWARD:
                         res = b * (
                             Scalar[dtype](0.5)
-                            * rsqrt(a + epsilon)
+                            #* rsqrt(a + epsilon)
+                            * rsqrt(max(a, Scalar[dtype](0)))
                             # / (epsilon + Scalar[dtype](2) * sqrt(a))
                         )
 
@@ -288,7 +292,8 @@ fn arithmetic_ops_B_contiguous[
                     elif op_code == SQRT_BACKWARD:
                         vec_result[lane] = vec_b[lane] * (
                             Scalar[dtype](0.5)
-                            * rsqrt(A[a_idx] + epsilon)
+                            #* rsqrt(A[a_idx] + epsilon)
+                            * rsqrt(max(A[a_idx], Scalar[dtype](0)))
                             # / (epsilon + Scalar[dtype](2) * sqrt(A[a_idx]))
                         )
 
@@ -327,7 +332,8 @@ fn arithmetic_ops_B_contiguous[
                     elif op_code == SQRT_BACKWARD:
                         res = b * (
                             Scalar[dtype](0.5)
-                            * rsqrt(a + epsilon)
+                            #* rsqrt(a + epsilon)
+                            * rsqrt(max(a, Scalar[dtype](0)))
                             # / (epsilon + Scalar[dtype](2) * sqrt(a))
                         )
 
@@ -407,7 +413,8 @@ fn arithmetic_ops_both_strided[
                             / (epsilon + Scalar[dtype](2) * sqrt(A[a_idx]))
                         )"""
                         vec_result[lane] = B[b_idx] * (
-                            Scalar[dtype](0.5) * rsqrt(A[a_idx] + epsilon)
+                            #Scalar[dtype](0.5) * rsqrt(A[a_idx] + epsilon)
+                            Scalar[dtype](0.5) * rsqrt(max(A[a_idx], Scalar[dtype](0)))
                         )
 
                     else:  # Log backward
@@ -447,7 +454,8 @@ fn arithmetic_ops_both_strided[
                     elif op_code == SQRT_BACKWARD:
                         res = b * (
                             Scalar[dtype](0.5)
-                            * rsqrt(a + epsilon)
+                            #* rsqrt(a + epsilon)
+                            * rsqrt(max(a, Scalar[dtype](0)))
                             # / (epsilon + Scalar[dtype](2) * sqrt(a))
                         )
 
