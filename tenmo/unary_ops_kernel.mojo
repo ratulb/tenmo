@@ -89,7 +89,7 @@ fn unary_ops[
                 var vec_result: SIMD[dtype, simd_width]
 
                 comptime if op_code == SQRT:
-                    vec_result = rsqrt(vec_a)
+                    vec_result = SIMD[dtype, simd_width](1)/rsqrt(epsilon + vec_a)
                 elif op_code == NEGATE:
                     vec_result = -vec_a
                 elif op_code == INVERT:
@@ -108,7 +108,7 @@ fn unary_ops[
                     var res: Scalar[dtype]
 
                     comptime if op_code == SQRT:
-                        res = rsqrt(val)
+                        res = Scalar[dtype](1)/rsqrt(epsilon + val)
                     elif op_code == NEGATE:
                         res = -val
                     elif op_code == INVERT:
