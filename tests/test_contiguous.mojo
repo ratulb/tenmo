@@ -412,9 +412,6 @@ fn test_contig_gpu_2d_transpose_non_contiguous() raises:
         var t = a_gpu.transpose()
         var c = t.contiguous()
         assert_true(c.shape() == Shape(3, 2))
-        print("c gpu")
-        c.print()
-        c.to_cpu().print()
         assert_true(
             c.to_cpu().all_close(
                 Tensor[dtype].d2([[1.0, 4.0], [2.0, 5.0], [3.0, 6.0]])

@@ -79,12 +79,14 @@ def train_epoch(model, device, train_loader, optimizer, criterion, epoch):
     correct = 0
     total = 0
     batch_time = 0
+    data_transfer_time = 0
 
     pbar = tqdm(train_loader, desc=f'Epoch {epoch}')
     for batch_idx, (data, target) in enumerate(pbar):
         start_time = time.time()
 
         data, target = data.to(device), target.to(device)
+        data_transfer_time += time.time() - start_time
 
         # Forward pass
         optimizer.zero_grad()
@@ -110,7 +112,7 @@ def train_epoch(model, device, train_loader, optimizer, criterion, epoch):
             'Acc': f'{100.*correct/total:.2f}%',
             'Time': f'{batch_time:.3f}s/batch'
         })
-
+    print("Epoch data transfer time: ", data_transfer_time, "s")
     avg_loss = train_loss / len(train_loader)
     accuracy = 100. * correct / total
     return avg_loss, accuracy

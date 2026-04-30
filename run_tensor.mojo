@@ -9,11 +9,17 @@ from tenmo.common_utils import *
 from tenmo.strides import Strides
 from tenmo.mnemonics import *
 from tenmo.reduction_kernel import Reduction
+from tenmo.unary_ops_kernel import UnaryOpsKernel
 
 fn main() raises:
     # whatever quick test you want
-    var t = Tensor[DType.float32].scalar(3)
+    comptime dtype = DType.float32
+    var t = Tensor[dtype].scalar(3)
     assert_true(t.all_close(Tensor[DType.float32].scalar(3)))
+    print(max(SIMD[dtype, 3](0), SIMD[dtype, 3](-9, 2, -32)))
+    var srt = UnaryOpsKernel.launch[SQRT](NDBuffer[dtype](1, -9, 25))
+    srt.print()
+
     t.print()
 
 
