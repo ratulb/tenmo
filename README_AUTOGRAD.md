@@ -370,8 +370,7 @@ a.grad().print()  # Gradients flow back to original CPU tensor
 
 ### What's NOT Done (WIP)
 
-- **Module layers on GPU**: `Linear`, `LinearBLAS`, `Conv2d` etc. still run on CPU. Parameters are CPU tensors. GPU training needs module-level GPU support.
-- **GPU gradient accumulation**: Currently, `backward()` on a GPU tensor flows gradients all the way back to the original CPU tensor.
+- **Module layers on GPU**: `Conv2d`, `MaxPool2d` etc. still run on CPU.
 
 ---
 
