@@ -198,7 +198,7 @@ fn main():
 ```bash
 curl -fsSL https://pixi.sh/install.sh | sh
 source ~/.bashrc
-git clone https://github.com/ratulb/tenmo -b development
+git clone https://github.com/ratulb/tenmo -b main
 cd tenmo
 pixi shell
 ./execute.sh all
