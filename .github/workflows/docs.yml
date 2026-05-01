@@ -2,9 +2,9 @@ name: Docs
 
 on:
   push:
-    branches: [document]
+    branches: [main]
   pull_request:
-    branches: [document]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -46,7 +46,7 @@ jobs:
           path: target/doc
 
   deploy:
-    if: github.ref == 'refs/heads/document' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
 
