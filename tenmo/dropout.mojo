@@ -1,5 +1,5 @@
 from std.random.philox import Random as PhiloxRandom
-from std.random import seed as set_seed, random_float64
+from std.random import seed as set_seed, random_float64, random_ui64
 from std.sys import simd_width_of, has_accelerator
 
 from .tensor import Tensor
@@ -91,7 +91,8 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self.training = True
         self.p = p
         self.scale = Scalar[Self.dtype](1.0) / (Scalar[Self.dtype](1.0) - p)
-        self.seed = 42
+        set_seed()
+        self.seed = random_ui64(0, 1000)
 
     fn __copyinit__(out self, copy: Self):
         self.training = copy.training
