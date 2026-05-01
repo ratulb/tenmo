@@ -130,7 +130,7 @@ From `tenmo/addition.mojo`:
 fn forward[track_grad: Bool = True](self, other) -> Tensor:
     var out = Tensor(self.buffer.arithmetic_ops[Add](other.buffer), requires_grad=False)
 
-    if track_grad:
+    comptime if track_grad:
         if self.requires_grad or other.requires_grad:
             out.requires_grad_(True)
             if self.shape() == other.shape():
