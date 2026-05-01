@@ -18,38 +18,46 @@ Tenmo brings modern, ergonomic ML abstractions to Mojo with automatic differenti
 
 ## ⚡︎ Performance
 
-> ⚠️ **These benchmarks reflect an earlier version of Tenmo.** The architectural work since (lightweight ancestry, gradbox refcounting, BackwardFnArg, GPU support) has added overhead on the CPU path. Updated benchmarks — including GPU training numbers — are in progress.
-
 ### MNIST Training Benchmark (15 Epochs, 105K Parameters)
 
 Training the same 4-layer MLP (784→128→32→10) on identical hardware:
 
-| Platform | Device | Avg Epoch Time | Total Time | Final Test Acc |
-|----------|--------|----------------|------------|----------------|
-| **Tenmo** | **CPU (Mojo)** | **11.4s** | **171s** | **97.44%** |
+| Platform | Device | Avg Epoch Time | Total Time | Final Val Acc |
+|----------|--------|----------------|------------|---------------|
+| **Tenmo** | **CPU (Mojo)** | **13.3s** | **199s** | **97.87%** |
 | PyTorch | CPU | 14.5s | 218s | 98.26% |
 | PyTorch | GPU (Tesla T4) | 15.2s | 227s | 97.87% |
 
-**Key Observations (historical):**
-- ⚡︎ **1.3× faster than PyTorch CPU** — Pure Mojo with SIMD optimization
-- ⚡︎ **Competitive with PyTorch GPU for small models**
-- 🎯︎ **97.4% accuracy** — Comparable to PyTorch with proper initialization
+**Key Observations:**
+- ⚡︎ **1.1× faster than PyTorch CPU** — Pure Mojo with SIMD optimization
+- ⚡︎ **Faster than PyTorch GPU** for small models on this hardware
+- 🎯︎ **97.87% validation accuracy** — Matches PyTorch GPU accuracy
 - 📉 **Zero Python overhead** — Runs entirely in compiled Mojo
 
 *All runs were performed sequentially on the same system, batch_size=64. The MNIST example does not use BLAS — pure Mojo only.*
 
-**Why was Tenmo competitive?**
+**Training Progression** (Tenmo CPU, current):
+```
+Epoch 1:  Loss: 0.406, Train: 88.29%, Val: 93.15%, Time: 13.1s
+Epoch 5:  Loss: 0.081, Train: 97.57%, Val: 97.15%, Time: 13.5s
+Epoch 10: Loss: 0.039, Train: 98.89%, Val: 97.65%, Time: 13.0s
+Epoch 15: Loss: 0.022, Train: 99.55%, Val: 97.87%, Time: 13.2s
+```
+
+**Why is Tenmo competitive?**
 - GPU overhead (kernel launch + data transfer) dominates for small MNIST models
 - Zero Python overhead
 - SIMD-vectorized operations on contiguous buffers
 - Zero-copy batch loading
 - Compile-time specialization eliminates graph overhead in eval mode
 
+> 📊 **GPU training benchmarks are in progress.** GPU support is implemented; transfer optimization is ongoing.
+
 ---
 
 ## What's New
 
-The library has undergone significant architectural work since the benchmarks above. The changes prioritize correctness, safety, and GPU support — at a measured cost to raw CPU throughput. Updated benchmarks are in progress.
+The library has undergone significant architectural work. The changes prioritize correctness, safety, and GPU support.
 
 ### Major Recent Work
 
@@ -200,11 +208,11 @@ pixi shell
 
 ## Why Tenmo?
 
-**Performance without compromise**: 1.3× faster than PyTorch CPU on MNIST, with zero Python overhead and full SIMD optimization.
+**Performance without compromise**: Faster than PyTorch CPU on MNIST, with zero Python overhead and full SIMD optimization.
 
 **Transparency you can trust**: Every operation is implemented in pure Mojo — no hidden BLAS calls, no opaque kernels. Perfect for learning and optimization.
 
-**Forward-looking design**: Competitive with PyTorch CPU today; exploring GPU support and distributed training.
+**Forward-looking design**: Competitive with PyTorch CPU today; GPU support implemented and being optimized.
 
 **Mojo-native**: Leverages compile-time metaprogramming, zero-cost abstractions, and systems-level control that Python-based frameworks can't match.
 
@@ -277,11 +285,18 @@ Tensor[dtype: DType]
 ├── buffer: NDBuffer          # Single source of truth for shape/strides/offset
 ├── requires_grad: Bool       # Gradient tracking flag
 ├── gradbox: UnsafePointer    # Gradients (only allocated when needed)
-├── ancestors: Optional       # Parent tensors in computation graph
-└── backwardFn: Optional      # Backward pass function
+└── ancestors: Optional       # Lightweight ancestor handles in computation graph
 
 Gradbox[dtype: DType]
-└── buffer: NDBuffer          # Contiguous gradient storage
+└── buffer: NDBuffer          # Contiguous gradient storage (always ref-counted)
+
+Ancestor[dtype: DType]
+├── _id: UInt                 # Identity
+├── requires_grad: Bool       # Gradient tracking flag
+├── gradbox: UnsafePointer    # Refcounted gradbox pointer for gradient routing
+├── layout: Layout            # Shape/strides/offset (pure metadata, no allocation)
+├── storage: Storage          # CPU Buffer or GPU DeviceState (cheap ref-count bump)
+└── parents: Optional         # Ancestor chain for graph traversal
 
 NDBuffer[dtype: DType]
 ├── buffer: Buffer            # Underlying data (ref-counted for views)
@@ -296,10 +311,10 @@ Buffer[dtype: DType]
 ### Design Rationale
 
 **Gradbox is not a Tensor**
-Gradients don't need the full Tensor API. A `Gradbox` encapsulates only an `NDBuffer`, keeping gradient storage minimal and explicit — **70% less code than full Tensors**.
+Gradients don't need the full Tensor API. A `Gradbox` encapsulates only an `NDBuffer`, keeping gradient storage minimal and explicit — **70% less code than full Tensors**. Gradbox buffers are always ref-counted — gradients land in the right place regardless of how many tensor copies or views exist.
 
 **Ancestors is not a Tensor**
-The autograd graph no longer stores full `Tensor` copies. An `Ancestor` handle carries only: an id, `requires_grad` flag, a refcounted gradbox pointer, a `Layout` (shape/strides/offset), and a `Storage` (refcount bump). This eliminates the recursive deep-copy explosion on every `add_ancestry` call.
+The autograd graph no longer stores full `Tensor` copies. An `Ancestor` handle carries only what backward needs: an id, `requires_grad` flag, a refcounted gradbox pointer, a `Layout` (shape/strides/offset), and a `Storage` (refcount bump). This eliminates the recursive deep-copy explosion on every `add_ancestry` call.
 
 **NDBuffer as Single Source of Truth**
 Shape, strides, and offset logic is centralized in `NDBuffer`, which serves both `Tensor` and `Gradbox`. This ensures views, slicing, and broadcasting behave consistently across the system.
@@ -308,7 +323,7 @@ Shape, strides, and offset logic is centralized in `NDBuffer`, which serves both
 `Buffer` is linear and becomes reference-counted when views are created. Views share storage without copying — which provides zero-cost slicing.
 
 **Backpropagation**
-The innermost linear buffer is shared (ref-counted) between user tensors and the autograd engine, ensuring gradients flow correctly through the computation graph.
+The gradbox pointer is the single link between the autograd graph and gradient storage. It is refcounted independently of tensor lifetime — gradients flow to the right place regardless of whether the original tensor is still alive.
 
 **Minimal Module System**
 Tenmo includes a minimal neural network module system: `Sequential`, `Linear`, `LinearBLAS`, `ReLU`, `Sigmoid`, `Tanh`, `Dropout`, `Conv2d`, `Flatten`, `MaxPool2d`, and loss functions. Intentionally minimal — build on top as needed.
@@ -377,14 +392,14 @@ Full training pipeline with data loading, batching, and validation:
 
 **Architecture**: 784 → 128 → 32 → 10
 **Training**: 15 epochs, batch_size=64, lr=0.01, momentum=0.9
-**Results**: 97.44% test accuracy in 171 seconds
+**Results**: 97.87% validation accuracy in 199 seconds
 
 **Training Progression** (Tenmo on CPU):
 ```
-Epoch 1:  Loss: 0.711, Train: 76.96%, Test: 89.40%, Time: 11.7s
-Epoch 5:  Loss: 0.158, Train: 95.40%, Test: 95.76%, Time: 11.0s
-Epoch 10: Loss: 0.091, Train: 97.38%, Test: 97.13%, Time: 11.6s
-Epoch 15: Loss: 0.059, Train: 98.38%, Test: 97.44%, Time: 11.7s
+Epoch 1:  Loss: 0.406, Train: 88.29%, Val: 93.15%, Time: 13.1s
+Epoch 5:  Loss: 0.081, Train: 97.57%, Val: 97.15%, Time: 13.5s
+Epoch 10: Loss: 0.039, Train: 98.89%, Val: 97.65%, Time: 13.0s
+Epoch 15: Loss: 0.022, Train: 99.55%, Val: 97.87%, Time: 13.2s
 ```
 All core tensor operations are in pure Mojo with no external dependencies. NumPy is only used for loading MNIST data in the examples.
 
@@ -437,10 +452,12 @@ for batch in train_loader:
 - [ ] Aggressive performance optimization of core components
 - [ ] Checkpointing: Model serialization and loading
 - [ ] Additional Layers: BatchNorm, LayerNorm
+- [ ] GPU transfer optimization: pinned memory, async transfers, stream pipelining
 
 ### Medium Term
 - [ ] Transparent GPU Support: Unified CPU/GPU tensor operations
-- [ ] Investigate memory-efficient ancestry tracking for autodiff.
+- [ ] `NDBuffer` refactor: compose from `Layout` + `Storage` for cleaner device movement
+- [ ] Zero-copy ancestry tracking: eliminate remaining deep copies on forward pass
 
 ### Long Term
 - [ ] Distributed Training: Multi-device and multi-node support
