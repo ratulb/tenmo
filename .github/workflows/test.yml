@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 8
       matrix:
         test:
           - sigmoid
@@ -105,7 +106,10 @@ jobs:
 
       - name: Run test — ${{ matrix.test }} (with retry)
         id: run_test
+        env:
+          MOJO_STACK_SIZE: 67108864   # 64MB — default is 8MB
         run: |
+          ulimit -s unlimited
           attempt=0
           exit_code=0
           while [ $attempt -le ${{ env.MAX_RETRIES }} ]; do
