@@ -459,7 +459,7 @@ model = model.to_cpu(stop_grad=True)
 
 ### What's NOT Done (WIP)
 
-- **Module layers on GPU**: `Conv2d`, `MaxPool2d` etc. still run on CPU.
+- **Module layers on GPU**: `Conv2d`, `MaxPool2d` etc. being migrated to GPU.
 
 ---
 
