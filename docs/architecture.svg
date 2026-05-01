@@ -161,7 +161,7 @@
 <!-- DeviceState -->
 <rect x="264" y="486" width="198" height="54" rx="8" stroke-width="0.5" class="b-green"/>
 <text class="th t-green" x="363" y="508" text-anchor="middle" dominant-baseline="central">DeviceState[dtype]</text>
-<text class="ts s-green" x="363" y="525" text-anchor="middle" dominant-baseline="central">DeviceBuffer[uint8] · GPU</text>
+<text class="ts s-green" x="363" y="525" text-anchor="middle" dominant-baseline="central">DeviceBuffer · GPU</text>
 
 <!-- Backward.invoke -->
 <rect x="478" y="486" width="162" height="54" rx="8" stroke-width="0.5" class="b-amber"/>
