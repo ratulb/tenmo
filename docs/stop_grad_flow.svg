@@ -1,0 +1,267 @@
+<svg width="680" viewBox="0 0 680 860" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Gradient flow with and without stop_grad</title>
+<desc>Two side-by-side diagrams showing how stop_grad=False lets gradients cross device boundaries transparently, while stop_grad=True severs the graph and creates a new leaf on the target device. A third section shows multi-hop chains.</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+<style>
+  text { font-family: ui-sans-serif, system-ui, sans-serif; }
+  .th   { font-size: 13px; font-weight: 500; fill: #1a1a2e; }
+  .ts   { font-size: 11px; font-weight: 400; fill: #444466; }
+  .tc   { font-size: 10px; font-weight: 400; fill: #666688; }
+  .head { font-size: 12px; font-weight: 600; fill: #1a1a2e; }
+  .slbl { font-size: 11px; font-weight: 500; fill: #888899; }
+
+  .b-leaf { fill: #EEEDFE; stroke: #534AB7; }
+  .b-gpu  { fill: #EAF3DE; stroke: #3B6D11; }
+  .b-ops  { fill: #F1EFE8; stroke: #5F5E5A; }
+  .b-loss { fill: #FAEEDA; stroke: #854F0B; }
+  .b-cut  { fill: #FAECE7; stroke: #993C1D; }
+
+  .t-leaf { fill: #3C3489; }
+  .t-gpu  { fill: #27500A; }
+  .t-ops  { fill: #2C2C2A; }
+  .t-loss { fill: #633806; }
+  .t-cut  { fill: #712B13; }
+
+  .t-ok  { fill: #27500A; }
+  .t-no  { fill: #712B13; }
+  .b-ok  { fill: #EAF3DE; stroke: #3B6D11; }
+  .b-no  { fill: #FAECE7; stroke: #993C1D; }
+
+  .fwd      { stroke: #888780; stroke-width: 1;   fill: none; }
+  .bwd      { stroke: #534AB7; stroke-width: 1.5; fill: none; }
+  .bwd-cut  { stroke: #993C1D; stroke-width: 1.5; fill: none; stroke-dasharray: 5 3; }
+  .boundary { stroke: #aaaacc; stroke-width: 0.5; stroke-dasharray: 4 3; fill: none; }
+  .sep      { stroke: #ccccdd; stroke-width: 0.5; stroke-dasharray: 4 4; }
+
+  @media (prefers-color-scheme: dark) {
+    .th   { fill: #e8e8f8; }
+    .ts   { fill: #b0b0cc; }
+    .tc   { fill: #9090aa; }
+    .head { fill: #e8e8f8; }
+    .slbl { fill: #666688; }
+
+    .b-leaf { fill: #26215C; stroke: #AFA9EC; }
+    .b-gpu  { fill: #173404; stroke: #97C459; }
+    .b-ops  { fill: #2C2C2A; stroke: #B4B2A9; }
+    .b-loss { fill: #412402; stroke: #EF9F27; }
+    .b-cut  { fill: #4A1B0C; stroke: #F0997B; }
+
+    .t-leaf { fill: #CECBF6; }
+    .t-gpu  { fill: #C0DD97; }
+    .t-ops  { fill: #D3D1C7; }
+    .t-loss { fill: #FAC775; }
+    .t-cut  { fill: #F5C4B3; }
+
+    .t-ok  { fill: #C0DD97; }
+    .t-no  { fill: #F5C4B3; }
+    .b-ok  { fill: #173404; stroke: #97C459; }
+    .b-no  { fill: #4A1B0C; stroke: #F0997B; }
+
+    .fwd      { stroke: #666660; }
+    .bwd      { stroke: #AFA9EC; }
+    .bwd-cut  { stroke: #F0997B; }
+    .boundary { stroke: #444466; }
+    .sep      { stroke: #444466; }
+  }
+</style>
+</defs>
+
+<!-- ══════════════════════════
+     COLUMN HEADERS
+     ══════════════════════════ -->
+<text class="head" x="170" y="26" text-anchor="middle">stop_grad=False (default)</text>
+<text class="head" x="510" y="26" text-anchor="middle">stop_grad=True</text>
+<line x1="340" y1="36" x2="340" y2="500" class="sep"/>
+
+<!-- ══════════════════════════
+     LEFT — stop_grad=False
+     ══════════════════════════ -->
+
+<!-- A CPU leaf -->
+<rect x="96" y="44" width="148" height="40" rx="6" stroke-width="0.5" class="b-leaf"/>
+<text class="th t-leaf" x="170" y="60" text-anchor="middle" dominant-baseline="central">A</text>
+<text class="ts t-leaf" x="170" y="76" text-anchor="middle" dominant-baseline="central">CPU leaf · requires_grad</text>
+
+<line x1="170" y1="84" x2="170" y2="108" class="fwd" marker-end="url(#arrow)"/>
+<text class="tc" x="180" y="101">fwd</text>
+
+<!-- CPU→GPU boundary -->
+<text class="slbl" x="50" y="126" text-anchor="start">CPU → GPU</text>
+<line x1="44" y1="132" x2="296" y2="132" class="boundary"/>
+
+<!-- B = A.to_gpu() -->
+<rect x="96" y="140" width="148" height="44" rx="6" stroke-width="0.5" class="b-gpu"/>
+<text class="th t-gpu" x="170" y="157" text-anchor="middle" dominant-baseline="central">B = A.to_gpu()</text>
+<text class="ts t-gpu" x="170" y="173" text-anchor="middle" dominant-baseline="central">GPU · transfer node ✓</text>
+
+<line x1="170" y1="184" x2="170" y2="208" class="fwd" marker-end="url(#arrow)"/>
+
+<!-- ops -->
+<rect x="96" y="215" width="148" height="40" rx="6" stroke-width="0.5" class="b-ops"/>
+<text class="th t-ops" x="170" y="231" text-anchor="middle" dominant-baseline="central">C = ops(B)</text>
+<text class="ts t-ops" x="170" y="247" text-anchor="middle" dominant-baseline="central">GPU ops</text>
+
+<line x1="170" y1="255" x2="170" y2="279" class="fwd" marker-end="url(#arrow)"/>
+
+<!-- loss -->
+<rect x="113" y="286" width="114" height="36" rx="6" stroke-width="0.5" class="b-loss"/>
+<text class="th t-loss" x="170" y="304" text-anchor="middle" dominant-baseline="central">loss = C.sum()</text>
+
+<!-- backward arrows — full chain purple -->
+<line x1="144" y1="286" x2="144" y2="260" class="bwd" marker-end="url(#arrow)"/>
+<text class="tc" x="129" y="277">∂</text>
+<line x1="144" y1="215" x2="144" y2="190" class="bwd" marker-end="url(#arrow)"/>
+<text class="tc" x="129" y="207">∂</text>
+<!-- crosses CPU/GPU boundary -->
+<line x1="144" y1="140" x2="144" y2="94" class="bwd" marker-end="url(#arrow)"/>
+<text class="tc" x="129" y="122">∂</text>
+
+<!-- result tag -->
+<rect x="72" y="348" width="196" height="26" rx="5" stroke-width="0.5" class="b-ok"/>
+<text class="ts t-ok" x="170" y="361" text-anchor="middle" dominant-baseline="central">A.grad ✓ — grad crosses boundary</text>
+
+<!-- ══════════════════════════
+     RIGHT — stop_grad=True
+     ══════════════════════════ -->
+
+<!-- A CPU leaf -->
+<rect x="436" y="44" width="148" height="40" rx="6" stroke-width="0.5" class="b-leaf"/>
+<text class="th t-leaf" x="510" y="60" text-anchor="middle" dominant-baseline="central">A</text>
+<text class="ts t-leaf" x="510" y="76" text-anchor="middle" dominant-baseline="central">CPU leaf · requires_grad</text>
+
+<line x1="510" y1="84" x2="510" y2="108" class="fwd" marker-end="url(#arrow)"/>
+<text class="tc" x="520" y="101">fwd</text>
+
+<!-- CPU→GPU boundary -->
+<text class="slbl" x="390" y="126" text-anchor="start">CPU → GPU</text>
+<line x1="384" y1="132" x2="636" y2="132" class="boundary"/>
+
+<!-- B = A.to_gpu(stop_grad=True) -->
+<rect x="416" y="140" width="188" height="44" rx="6" stroke-width="0.5" class="b-cut"/>
+<text class="th t-cut" x="510" y="157" text-anchor="middle" dominant-baseline="central">B = A.to_gpu(stop_grad=True)</text>
+<text class="ts t-cut" x="510" y="173" text-anchor="middle" dominant-baseline="central">GPU leaf · no transfer node</text>
+
+<line x1="510" y1="184" x2="510" y2="208" class="fwd" marker-end="url(#arrow)"/>
+
+<!-- ops -->
+<rect x="436" y="215" width="148" height="40" rx="6" stroke-width="0.5" class="b-ops"/>
+<text class="th t-ops" x="510" y="231" text-anchor="middle" dominant-baseline="central">C = ops(B)</text>
+<text class="ts t-ops" x="510" y="247" text-anchor="middle" dominant-baseline="central">GPU ops</text>
+
+<line x1="510" y1="255" x2="510" y2="279" class="fwd" marker-end="url(#arrow)"/>
+
+<!-- loss -->
+<rect x="453" y="286" width="114" height="36" rx="6" stroke-width="0.5" class="b-loss"/>
+<text class="th t-loss" x="510" y="304" text-anchor="middle" dominant-baseline="central">loss = C.sum()</text>
+
+<!-- backward — stops at B -->
+<line x1="484" y1="286" x2="484" y2="260" class="bwd" marker-end="url(#arrow)"/>
+<text class="tc" x="469" y="277">∂</text>
+<line x1="484" y1="215" x2="484" y2="190" class="bwd" marker-end="url(#arrow)"/>
+<text class="tc" x="469" y="207">∂</text>
+<!-- dashed cut line -->
+<line x1="484" y1="140" x2="484" y2="108" class="bwd-cut"/>
+<!-- X marker -->
+<line x1="473" y1="118" x2="485" y2="130" stroke="#993C1D" stroke-width="1.8"/>
+<line x1="485" y1="118" x2="473" y2="130" stroke="#993C1D" stroke-width="1.8"/>
+
+<!-- result tags -->
+<rect x="390" y="344" width="112" height="26" rx="5" stroke-width="0.5" class="b-ok"/>
+<text class="ts t-ok" x="446" y="357" text-anchor="middle" dominant-baseline="central">B.grad ✓ GPU leaf</text>
+
+<rect x="514" y="344" width="112" height="26" rx="5" stroke-width="0.5" class="b-no"/>
+<text class="ts t-no" x="570" y="357" text-anchor="middle" dominant-baseline="central">A.grad — untouched</text>
+
+<!-- ══════════════════════════
+     SECTION 2 — Multi-hop
+     ══════════════════════════ -->
+<line x1="40" y1="404" x2="640" y2="404" class="sep"/>
+<text class="head" x="340" y="424" text-anchor="middle">Multi-hop: A(CPU) → GPU → ops → CPU(stop_grad=True) → loss</text>
+
+<!-- 5 nodes in a row -->
+<!-- A -->
+<rect x="40" y="444" width="88" height="48" rx="6" stroke-width="0.5" class="b-leaf"/>
+<text class="th t-leaf" x="84" y="461" text-anchor="middle" dominant-baseline="central">A</text>
+<text class="ts t-leaf" x="84" y="477" text-anchor="middle" dominant-baseline="central">CPU leaf</text>
+
+<line x1="128" y1="468" x2="148" y2="468" class="fwd" marker-end="url(#arrow)"/>
+
+<!-- B to_gpu stop_grad=False -->
+<rect x="150" y="444" width="120" height="48" rx="6" stroke-width="0.5" class="b-gpu"/>
+<text class="th t-gpu" x="210" y="461" text-anchor="middle" dominant-baseline="central">B = to_gpu()</text>
+<text class="ts t-gpu" x="210" y="477" text-anchor="middle" dominant-baseline="central">stop_grad=False</text>
+
+<line x1="270" y1="468" x2="288" y2="468" class="fwd" marker-end="url(#arrow)"/>
+
+<!-- ops -->
+<rect x="290" y="444" width="80" height="48" rx="6" stroke-width="0.5" class="b-ops"/>
+<text class="th t-ops" x="330" y="461" text-anchor="middle" dominant-baseline="central">ops(B)</text>
+<text class="ts t-ops" x="330" y="477" text-anchor="middle" dominant-baseline="central">GPU</text>
+
+<line x1="370" y1="468" x2="388" y2="468" class="fwd" marker-end="url(#arrow)"/>
+
+<!-- D to_cpu stop_grad=True -->
+<rect x="390" y="444" width="130" height="48" rx="6" stroke-width="0.5" class="b-cut"/>
+<text class="th t-cut" x="455" y="461" text-anchor="middle" dominant-baseline="central">D = to_cpu()</text>
+<text class="ts t-cut" x="455" y="477" text-anchor="middle" dominant-baseline="central">stop_grad=True · new leaf</text>
+
+<line x1="520" y1="468" x2="538" y2="468" class="fwd" marker-end="url(#arrow)"/>
+
+<!-- loss -->
+<rect x="540" y="452" width="76" height="32" rx="6" stroke-width="0.5" class="b-loss"/>
+<text class="th t-loss" x="578" y="468" text-anchor="middle" dominant-baseline="central">loss</text>
+
+<!-- backward arc under the row -->
+<path d="M578 484 Q578 544 455 544 Q332 544 210 544" class="bwd" marker-end="url(#arrow)"/>
+<!-- cut continues dashed past D toward B, stops with X -->
+<line x1="210" y1="544" x2="174" y2="544" class="bwd-cut"/>
+<line x1="164" y1="534" x2="176" y2="546" stroke="#993C1D" stroke-width="1.8"/>
+<line x1="176" y1="534" x2="164" y2="546" stroke="#993C1D" stroke-width="1.8"/>
+
+<!-- annotations -->
+<rect x="396" y="562" width="98" height="24" rx="4" stroke-width="0.5" class="b-ok"/>
+<text class="ts t-ok" x="445" y="574" text-anchor="middle" dominant-baseline="central">D.grad ✓</text>
+
+<rect x="506" y="562" width="130" height="24" rx="4" stroke-width="0.5" class="b-no"/>
+<text class="ts t-no" x="571" y="574" text-anchor="middle" dominant-baseline="central">B.grad, A.grad — cut</text>
+
+<!-- ══════════════════════════
+     LEGEND
+     ══════════════════════════ -->
+<line x1="40" y1="608" x2="640" y2="608" class="sep"/>
+<text class="slbl" x="340" y="626" text-anchor="middle">Legend</text>
+
+<!-- fwd -->
+<line x1="60" y1="652" x2="110" y2="652" class="fwd" marker-end="url(#arrow)"/>
+<text class="ts" x="118" y="656" dominant-baseline="central">forward pass</text>
+
+<!-- bwd -->
+<line x1="240" y1="652" x2="290" y2="652" class="bwd" marker-end="url(#arrow)"/>
+<text class="ts" x="298" y="656" dominant-baseline="central">backward (grad flows)</text>
+
+<!-- cut -->
+<line x1="460" y1="652" x2="510" y2="652" class="bwd-cut"/>
+<line x1="500" y1="642" x2="512" y2="654" stroke="#993C1D" stroke-width="1.8"/>
+<line x1="512" y1="642" x2="500" y2="654" stroke="#993C1D" stroke-width="1.8"/>
+<text class="ts" x="520" y="656" dominant-baseline="central">grad severed</text>
+
+<!-- color key -->
+<rect x="48" y="676" width="84" height="22" rx="4" stroke-width="0.5" class="b-leaf"/>
+<text class="ts t-leaf" x="90" y="687" text-anchor="middle" dominant-baseline="central">CPU leaf</text>
+
+<rect x="148" y="676" width="84" height="22" rx="4" stroke-width="0.5" class="b-gpu"/>
+<text class="ts t-gpu" x="190" y="687" text-anchor="middle" dominant-baseline="central">GPU tensor</text>
+
+<rect x="248" y="676" width="84" height="22" rx="4" stroke-width="0.5" class="b-cut"/>
+<text class="ts t-cut" x="290" y="687" text-anchor="middle" dominant-baseline="central">graph cut</text>
+
+<rect x="348" y="676" width="84" height="22" rx="4" stroke-width="0.5" class="b-ops"/>
+<text class="ts t-ops" x="390" y="687" text-anchor="middle" dominant-baseline="central">op / ops</text>
+
+<rect x="448" y="676" width="84" height="22" rx="4" stroke-width="0.5" class="b-loss"/>
+<text class="ts t-loss" x="490" y="687" text-anchor="middle" dominant-baseline="central">loss</text>
+
+</svg>
