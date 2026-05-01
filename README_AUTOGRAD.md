@@ -368,6 +368,95 @@ loss.backward()
 a.grad().print()  # Gradients flow back to original CPU tensor
 ```
 
+### Gradient Flow Across Device Boundaries
+
+The `stop_grad` parameter on `to_gpu()` and `to_cpu()` controls whether a device
+transfer registers a backward node in the compute graph. This lets you choose
+between full cross-device grad flow and GPU-native training where weights live
+permanently on the GPU.
+
+![Gradient flow with and without stop_grad](docs/stop_grad_flow.svg)
+
+#### `stop_grad=False` (default) — transparent boundaries
+
+The transfer registers a `DeviceTransferBackward` node. Gradients tunnel through
+device boundaries as if no transfer happened. The origin tensor receives its
+gradient exactly as it would from a same-device computation.
+
+```mojo
+var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)  # CPU leaf
+var b = a.to_gpu()          # stop_grad=False — transfer node registered
+var loss = (b * 2).sum()
+loss.backward()
+# grad flows: loss → ops → b → DeviceTransferBackward → a
+a.grad().print()            # ✓ [2.0, 2.0, 2.0]
+```
+
+#### `stop_grad=True` — new leaf on target device
+
+No backward node is registered. The destination tensor becomes a new independent
+leaf on the target device. Gradients accumulate there and never cross back.
+
+```mojo
+var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)  # CPU leaf
+var b = a.to_gpu(stop_grad=True)   # B is a new GPU leaf — graph severed
+var loss = (b * 2).sum()
+loss.backward()
+b.grad().print()   # ✓ [2.0, 2.0, 2.0]  grad stays on GPU
+a.grad().print()   # untouched — backward never crossed the boundary
+```
+
+#### Multi-hop chains — each boundary is independent
+
+Every transfer independently applies its own `stop_grad` rule. Grad flow is only
+as wide as the narrowest `stop_grad=True` cut in the entire chain.
+
+```mojo
+# CPU → GPU (transparent) → ops → CPU (stop_grad=True, new CPU leaf) → loss
+var a = Tensor.ones(Shape(4), requires_grad=True)
+var b = a.to_gpu()                    # stop_grad=False — transparent
+var c = b * 3.0                       # GPU op
+var d = c.to_cpu(stop_grad=True)      # D becomes new CPU leaf — chain cut here
+var loss = d.sum()
+loss.backward()
+d.grad().print()   # ✓ [3.0, 3.0, 3.0]
+a.grad().print()   # untouched — cut at to_cpu boundary
+```
+
+#### Grad flow rules summary
+
+| Scenario | `stop_grad` | Grad destination |
+|---|---|---|
+| `A → to_gpu() → ops → loss` | `False` | `A.grad` (CPU origin) |
+| `A → to_gpu(stop_grad=True) → ops → loss` | `True` | `B.grad` (GPU leaf) |
+| `A → to_gpu() → ops → to_cpu() → loss` | both `False` | `A.grad` (crosses both) |
+| `A → to_gpu(stop_grad=True) → ops → to_cpu() → loss` | first `True` | `B.grad` (GPU leaf) |
+| `A → to_gpu() → ops → to_cpu(stop_grad=True) → loss` | second `True` | `D.grad` (CPU leaf) |
+
+#### Recommended training pattern
+
+Transfer model weights to GPU once with `stop_grad=True`, making them permanent
+GPU leaves. Run the entire training loop on GPU — gradients accumulate on the
+GPU parameters directly, with no cross-device transfer on every backward pass.
+Transfer weights back to CPU after training to persist them.
+
+```mojo
+# Setup — weights become GPU leaves, no backward node registered
+model = model.to_gpu(stop_grad=True)
+var optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
+
+# Training loop — everything on GPU
+for epoch in range(epochs):
+    var x_gpu = batch.features.to_gpu()   # batch transfer, stop_grad=False
+    var loss = criterion(model(x_gpu), batch.labels.to_gpu())
+    optimizer.zero_grad()
+    loss.backward()       # grads stay on GPU — no device hop
+    optimizer.step()
+
+# Persist — weights come back to CPU as new CPU leaves
+model = model.to_cpu(stop_grad=True)
+```
+
 ### What's NOT Done (WIP)
 
 - **Module layers on GPU**: `Conv2d`, `MaxPool2d` etc. still run on CPU.
