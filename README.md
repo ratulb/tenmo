@@ -241,7 +241,7 @@ Tenmo provides a broad set of tensor operations. Below is a representative (not 
 - `ReLU`, `Sigmoid`, `Tanh` - Standard activations
 - `Flatten` - Spatial to vector conversion
 - `MaxPool2d` - 2D max pooling with stride/padding support
-- `Conv2d` - 2D convolution (functional, optimization in progress)
+- `Conv2d` - 2D convolution
 - `Dropout` - Regularization layer
 - `Sequential` - Layer composition container
 
