@@ -27,7 +27,7 @@ No hidden CUDA kernels. No opaque `torch.autograd.Function`. Every backward pass
 `model.eval()` switches off gradient tracking at compile time. No runtime `if requires_grad:` branches. Pure forward binary.
 
 **4. GPU-native from day one.**
-Every op works on GPU. Gradient flow crosses CPU↔GPU boundaries automatically.
+Gradient flow crosses CPU↔GPU boundaries automatically.
 
 If you want to *understand* autograd — not just use it — this document walks through the real implementation.
 
