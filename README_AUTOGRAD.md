@@ -26,7 +26,7 @@ No hidden CUDA kernels. No opaque `torch.autograd.Function`. Every backward pass
 **3. Zero overhead in inference.**
 `model.eval()` switches off gradient tracking at compile time. No runtime `if requires_grad:` branches. Pure forward binary.
 
-**4. GPU-native from day one.**
+**4. GPU-native.**
 Gradient flow crosses CPU↔GPU boundaries automatically.
 
 If you want to *understand* autograd — not just use it — this document walks through the real implementation.
@@ -102,7 +102,7 @@ var c = a * 42 + b
 From `tenmo/multiplication.mojo`:
 
 ```mojo
-fn forward[self, factor](...) -> Tensor:
+fn forward[track_grad: Bool = True](self, factor) -> Tensor:
     var out = Tensor(self.buffer.scalar_ops[Multiply](factor), requires_grad=False)
 
     comptime if track_grad:
@@ -127,7 +127,7 @@ fn forward[self, factor](...) -> Tensor:
 From `tenmo/addition.mojo`:
 
 ```mojo
-fn forward[self, other](...) -> Tensor:
+fn forward[track_grad: Bool = True](self, other) -> Tensor:
     var out = Tensor(self.buffer.arithmetic_ops[Add](other.buffer), requires_grad=False)
 
     if track_grad:
