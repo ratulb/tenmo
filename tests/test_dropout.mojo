@@ -2,6 +2,10 @@ from tenmo.tensor import Tensor
 from std.random import seed
 from std.testing import assert_true
 from tenmo.net import Dropout
+from std.sys import has_accelerator
+from std.random import seed
+from tenmo.shapes import Shape
+
 
 # ============================================================================
 # FORWARD PASS TESTS
@@ -582,7 +586,737 @@ fn main() raises:
     print("\n--- EDGE CASES ---")
     test_dropout_zero_probability_backward()
     test_dropout_large_tensor_backward()
+    # ── Forward CPU ──
+    test_dropout2_fwd_cpu_eval_is_identity()
+    test_dropout2_fwd_cpu_p0_is_identity()
+    test_dropout2_fwd_cpu_high_p_many_zeros_1d()
+    test_dropout2_fwd_cpu_scale_correct_1d()
+    test_dropout2_fwd_cpu_scale_correct_2d()
+    test_dropout2_fwd_cpu_scale_correct_3d()
+    test_dropout2_fwd_cpu_different_masks_per_call()
+    test_dropout2_fwd_cpu_output_shape_preserved_1d()
+    test_dropout2_fwd_cpu_output_shape_preserved_2d()
+    test_dropout2_fwd_cpu_output_shape_preserved_3d()
+
+    # ── Backward CPU ──
+    test_dropout2_bwd_cpu_grad_zero_where_dropped_1d()
+    test_dropout2_bwd_cpu_grad_zero_where_dropped_2d()
+    test_dropout2_bwd_cpu_grad_zero_where_dropped_3d()
+    test_dropout2_bwd_cpu_no_grad_leaf_unaffected()
+    test_dropout2_bwd_cpu_high_p_grad_flow()
+    test_dropout2_bwd_cpu_chained_with_linear_op()
+    test_dropout2_bwd_cpu_eval_grad_is_ones()
+    test_dropout2_bwd_cpu_multiple_calls_different_grads()
+
+    # ── Grad flow CPU ──
+    test_dropout2_gradflow_cpu_mask_consistent_fwd_bwd()
+    test_dropout2_gradflow_cpu_sum_of_grads_matches_nonzero_count()
+
+    # ── Forward GPU ──
+    test_dropout2_fwd_gpu_eval_is_identity()
+    test_dropout2_fwd_gpu_output_shape_preserved_1d()
+    test_dropout2_fwd_gpu_output_shape_preserved_2d()
+    test_dropout2_fwd_gpu_output_shape_preserved_3d()
+    test_dropout2_fwd_gpu_high_p_many_zeros()
+    test_dropout2_fwd_gpu_scale_correct_1d()
+    test_dropout2_fwd_gpu_scale_correct_2d()
+    test_dropout2_fwd_gpu_scale_correct_3d()
+    test_dropout2_fwd_gpu_different_masks_per_call()
+
+    # ── Backward GPU ──
+    test_dropout2_bwd_gpu_grad_zero_where_dropped_1d()
+    test_dropout2_bwd_gpu_grad_zero_where_dropped_2d()
+    test_dropout2_bwd_gpu_grad_zero_where_dropped_3d()
+    test_dropout2_bwd_gpu_no_grad_leaf_unaffected()
+    test_dropout2_bwd_gpu_high_p_grad_flow()
+    test_dropout2_bwd_gpu_chained_with_linear_op()
+    test_dropout2_bwd_gpu_eval_grad_is_ones()
+
+    # ── Grad flow GPU ──
+    test_dropout2_gradflow_gpu_mask_consistent_fwd_bwd()
+    test_dropout2_gradflow_gpu_sum_of_grads_matches_nonzero_count()
+
+    # ── Parity ──
+    test_dropout2_parity_eval_cpu_gpu_match()
+    test_dropout2_parity_scale_value_matches()
+    test_dropout2_parity_bwd_grad_scale_matches()
+
+
+
 
     print("\n" + "=" * 80)
     print("ALL TESTS PASSED! ✓")
     print("=" * 80)
+
+
+#=========
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
+
+fn count_zeros[dtype: DType](t: Tensor[dtype]) -> Int:
+    var count = 0
+    for i in range(t.numels()):
+        if t.get(i) == 0.0:
+            count += 1
+    return count
+
+fn count_nonzeros[dtype: DType](t: Tensor[dtype]) -> Int:
+    return t.numels() - count_zeros(t)
+
+fn all_nonzero_close[dtype: DType](
+    t: Tensor[dtype], expected_val: Scalar[dtype], atol: Scalar[dtype]
+) -> Bool:
+    for i in range(t.numels()):
+        var v = t.get(i)
+        if v != 0.0:
+            if abs(v - expected_val) > atol:
+                return False
+    return True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. FORWARD — CPU
+# ─────────────────────────────────────────────────────────────────────────────
+
+fn test_dropout2_fwd_cpu_eval_is_identity() raises:
+    print("test_dropout2_fwd_cpu_eval_is_identity")
+    comptime dtype = DType.float32
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.eval()
+    var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])
+    var out = dropout(x)
+    assert_true(out.all_close(x))
+
+
+fn test_dropout2_fwd_cpu_p0_is_identity() raises:
+    print("test_dropout2_fwd_cpu_p0_is_identity")
+    comptime dtype = DType.float32
+    var dropout = Dropout[dtype](p=0.0)
+    dropout.train()
+    var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])
+    var out = dropout(x)
+    assert_true(out.all_close(x))
+
+
+fn test_dropout2_fwd_cpu_high_p_many_zeros_1d() raises:
+    print("test_dropout2_fwd_cpu_high_p_many_zeros_1d")
+    comptime dtype = DType.float32
+    seed(100)
+    var dropout = Dropout[dtype](p=0.9)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(200))
+    var out = dropout(x)
+    # ~90% zeros expected — check at least 75%
+    assert_true(count_zeros(out) > 150)
+
+
+fn test_dropout2_fwd_cpu_scale_correct_1d() raises:
+    print("test_dropout2_fwd_cpu_scale_correct_1d")
+    comptime dtype = DType.float32
+    seed(200)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(200))
+    var out = dropout(x)
+    # Non-zero values must be exactly 2.0 (= 1 / (1 - 0.5))
+    assert_true(all_nonzero_close(out, 2.0, 1e-5))
+
+
+fn test_dropout2_fwd_cpu_scale_correct_2d() raises:
+    print("test_dropout2_fwd_cpu_scale_correct_2d")
+    comptime dtype = DType.float32
+    seed(300)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(10, 10))
+    var out = dropout(x)
+    assert_true(all_nonzero_close(out, 2.0, 1e-5))
+
+
+fn test_dropout2_fwd_cpu_scale_correct_3d() raises:
+    print("test_dropout2_fwd_cpu_scale_correct_3d")
+    comptime dtype = DType.float32
+    seed(400)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(4, 4, 4))
+    var out = dropout(x)
+    assert_true(all_nonzero_close(out, 2.0, 1e-5))
+
+
+fn test_dropout2_fwd_cpu_different_masks_per_call() raises:
+    print("test_dropout2_fwd_cpu_different_masks_per_call")
+    comptime dtype = DType.float32
+    seed(500)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(100))
+    var out1 = dropout(x)
+    var out2 = dropout(x)
+    # With 100 elements and p=0.5, masks should differ with overwhelming prob
+    var same = True
+    for i in range(100):
+        if out1.get(i) != out2.get(i):
+            same = False
+            break
+    assert_true(not same)
+
+
+fn test_dropout2_fwd_cpu_output_shape_preserved_1d() raises:
+    print("test_dropout2_fwd_cpu_output_shape_preserved_1d")
+    comptime dtype = DType.float32
+    seed(600)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(8))
+    var out = dropout(x)
+    assert_true(out.shape() == Shape(8))
+
+
+fn test_dropout2_fwd_cpu_output_shape_preserved_2d() raises:
+    print("test_dropout2_fwd_cpu_output_shape_preserved_2d")
+    comptime dtype = DType.float32
+    seed(700)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(4, 6))
+    var out = dropout(x)
+    assert_true(out.shape() == Shape(4, 6))
+
+
+fn test_dropout2_fwd_cpu_output_shape_preserved_3d() raises:
+    print("test_dropout2_fwd_cpu_output_shape_preserved_3d")
+    comptime dtype = DType.float32
+    seed(800)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(2, 3, 4))
+    var out = dropout(x)
+    assert_true(out.shape() == Shape(2, 3, 4))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. BACKWARD — CPU
+# ─────────────────────────────────────────────────────────────────────────────
+
+fn test_dropout2_bwd_cpu_grad_zero_where_dropped_1d() raises:
+    print("test_dropout2_bwd_cpu_grad_zero_where_dropped_1d")
+    comptime dtype = DType.float32
+    seed(1000)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(64), requires_grad=True)
+    var out = dropout(x)
+    var loss = out.sum()
+    loss.backward()
+    # Where out==0, grad must be 0; where out!=0, grad must be scale=2.0
+    for i in range(64):
+        if out.get(i) == 0.0:
+            assert_true(abs(x.grad().get(i)) < 1e-6)
+        else:
+            assert_true(abs(x.grad().get(i) - 2.0) < 1e-5)
+
+
+fn test_dropout2_bwd_cpu_grad_zero_where_dropped_2d() raises:
+    print("test_dropout2_bwd_cpu_grad_zero_where_dropped_2d")
+    comptime dtype = DType.float32
+    seed(1100)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(8, 8), requires_grad=True)
+    var out = dropout(x)
+    var loss = out.sum()
+    loss.backward()
+    for i in range(64):
+        if out.get(i) == 0.0:
+            assert_true(abs(x.grad().get(i)) < 1e-6)
+        else:
+            assert_true(abs(x.grad().get(i) - 2.0) < 1e-5)
+
+
+fn test_dropout2_bwd_cpu_grad_zero_where_dropped_3d() raises:
+    print("test_dropout2_bwd_cpu_grad_zero_where_dropped_3d")
+    comptime dtype = DType.float32
+    seed(1200)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(2, 4, 8), requires_grad=True)
+    var out = dropout(x)
+    var loss = out.sum()
+    loss.backward()
+    for i in range(x.numels()):
+        if out.get(i) == 0.0:
+            assert_true(abs(x.grad().get(i)) < 1e-6)
+        else:
+            assert_true(abs(x.grad().get(i) - 2.0) < 1e-5)
+
+
+fn test_dropout2_bwd_cpu_no_grad_leaf_unaffected() raises:
+    print("test_dropout2_bwd_cpu_no_grad_leaf_unaffected")
+    comptime dtype = DType.float32
+    seed(1300)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+    # x has no requires_grad — dropout should return early, no ancestry
+    var x = Tensor[dtype].ones(Shape(16))
+    var out = dropout(x)
+    assert_true(not out.requires_grad)
+
+
+fn test_dropout2_bwd_cpu_high_p_grad_flow() raises:
+    print("test_dropout2_bwd_cpu_high_p_grad_flow")
+    comptime dtype = DType.float32
+    seed(1400)
+    var dropout = Dropout[dtype](p=0.9)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(200), requires_grad=True)
+    var out = dropout(x)
+    var loss = out.sum()
+    loss.backward()
+    # Non-zero grads must equal scale = 10.0
+    for i in range(200):
+        if out.get(i) != 0.0:
+            assert_true(abs(x.grad().get(i) - 10.0) < 1e-4)
+        else:
+            assert_true(abs(x.grad().get(i)) < 1e-6)
+
+
+fn test_dropout2_bwd_cpu_chained_with_linear_op() raises:
+    # dropout -> * 3 -> sum -> backward
+    print("test_dropout2_bwd_cpu_chained_with_linear_op")
+    comptime dtype = DType.float32
+    seed(1500)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(32), requires_grad=True)
+    var out = dropout(x)
+    var scaled = out * Tensor[dtype].full_like(out, 3.0)
+    var loss = scaled.sum()
+    loss.backward()
+    # grad = mask * 3; mask is either 0 or scale(=2), so grad is 0 or 6
+    for i in range(32):
+        var g = x.grad().get(i)
+        assert_true(abs(g) < 1e-6 or abs(g - 6.0) < 1e-5)
+
+
+fn test_dropout2_bwd_cpu_eval_grad_is_ones() raises:
+    # In eval mode dropout is identity — grad must be 1
+    print("test_dropout2_bwd_cpu_eval_grad_is_ones")
+    comptime dtype = DType.float32
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.eval()
+    var x = Tensor[dtype].ones(Shape(16), requires_grad=True)
+    var out = dropout(x)
+    var loss = out.sum()
+    loss.backward()
+    assert_true(x.grad().all_close[atol=1e-5](Tensor.ones_like(x)))
+
+
+fn test_dropout2_bwd_cpu_multiple_calls_different_grads() raises:
+    print("test_dropout2_bwd_cpu_multiple_calls_different_grads")
+    comptime dtype = DType.float32
+    seed(1600)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+
+    var x1 = Tensor[dtype].ones(Shape(32), requires_grad=True)
+    var out1 = dropout(x1)
+    var loss1 = out1.sum()
+    loss1.backward()
+
+    var x2 = Tensor[dtype].ones(Shape(32), requires_grad=True)
+    var out2 = dropout(x2)
+    var loss2 = out2.sum()
+    loss2.backward()
+
+    var different = False
+    for i in range(32):
+        if x1.grad().get(i) != x2.grad().get(i):
+            different = True
+            break
+    assert_true(different)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. GRAD FLOW VERIFICATION — CPU
+# ─────────────────────────────────────────────────────────────────────────────
+
+fn test_dropout2_gradflow_cpu_mask_consistent_fwd_bwd() raises:
+    # The mask used in forward must be the same one used in backward.
+    # Verify: wherever out==0, grad==0; wherever out!=0, grad==scale.
+    print("test_dropout2_gradflow_cpu_mask_consistent_fwd_bwd")
+    comptime dtype = DType.float32
+    seed(1700)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(128), requires_grad=True)
+    var out = dropout(x)
+    var loss = out.sum()
+    loss.backward()
+    var consistent = True
+    for i in range(128):
+        var dropped = out.get(i) == 0.0
+        var grad_zero = abs(x.grad().get(i)) < 1e-6
+        if dropped != grad_zero:
+            consistent = False
+            break
+    assert_true(consistent)
+
+
+fn test_dropout2_gradflow_cpu_sum_of_grads_matches_nonzero_count() raises:
+    print("test_dropout2_gradflow_cpu_sum_of_grads_matches_nonzero_count")
+    comptime dtype = DType.float32
+    seed(1800)
+    var dropout = Dropout[dtype](p=0.5)
+    dropout.train()
+    var x = Tensor[dtype].ones(Shape(128), requires_grad=True)
+    var out = dropout(x)
+    var loss = out.sum()
+    loss.backward()
+    # sum(grad) == count_nonzero(out) * scale
+    var grad_sum = Scalar[dtype](0)
+    for i in range(128):
+        grad_sum += x.grad().get(i)
+    var expected = Scalar[dtype](count_nonzeros(out)) * Scalar[dtype](2.0)
+    assert_true(abs(grad_sum - expected) < 1e-3)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. FORWARD — GPU
+# ─────────────────────────────────────────────────────────────────────────────
+
+fn test_dropout2_fwd_gpu_eval_is_identity() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_fwd_gpu_eval_is_identity")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.eval()
+        var x_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])
+        var x_gpu = x_cpu.to_gpu()
+        var out = dropout(x_gpu)
+        assert_true(out.to_cpu().all_close(x_cpu))
+
+
+fn test_dropout2_fwd_gpu_output_shape_preserved_1d() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_fwd_gpu_output_shape_preserved_1d")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.train()
+        var x = Tensor[dtype].ones(Shape(64)).to_gpu()
+        var out = dropout(x)
+        assert_true(out.shape() == Shape(64))
+
+
+fn test_dropout2_fwd_gpu_output_shape_preserved_2d() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_fwd_gpu_output_shape_preserved_2d")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.train()
+        var x = Tensor[dtype].ones(Shape(8, 8)).to_gpu()
+        var out = dropout(x)
+        assert_true(out.shape() == Shape(8, 8))
+
+
+fn test_dropout2_fwd_gpu_output_shape_preserved_3d() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_fwd_gpu_output_shape_preserved_3d")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.train()
+        var x = Tensor[dtype].ones(Shape(2, 4, 8)).to_gpu()
+        var out = dropout(x)
+        assert_true(out.shape() == Shape(2, 4, 8))
+
+
+fn test_dropout2_fwd_gpu_high_p_many_zeros() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_fwd_gpu_high_p_many_zeros")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.9)
+        dropout.train()
+        var x = Tensor[dtype].ones(Shape(200)).to_gpu()
+        var out = dropout(x).to_cpu()
+        assert_true(count_zeros(out) > 150)
+
+
+fn test_dropout2_fwd_gpu_scale_correct_1d() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_fwd_gpu_scale_correct_1d")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.train()
+        var x = Tensor[dtype].ones(Shape(200)).to_gpu()
+        var out = dropout(x).to_cpu()
+        assert_true(all_nonzero_close(out, 2.0, 1e-5))
+
+
+fn test_dropout2_fwd_gpu_scale_correct_2d() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_fwd_gpu_scale_correct_2d")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.train()
+        var x = Tensor[dtype].ones(Shape(10, 10)).to_gpu()
+        var out = dropout(x).to_cpu()
+        assert_true(all_nonzero_close(out, 2.0, 1e-5))
+
+
+fn test_dropout2_fwd_gpu_scale_correct_3d() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_fwd_gpu_scale_correct_3d")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.train()
+        var x = Tensor[dtype].ones(Shape(2, 4, 8)).to_gpu()
+        var out = dropout(x).to_cpu()
+        assert_true(all_nonzero_close(out, 2.0, 1e-5))
+
+
+fn test_dropout2_fwd_gpu_different_masks_per_call() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_fwd_gpu_different_masks_per_call")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.train()
+        var x = Tensor[dtype].ones(Shape(100)).to_gpu()
+        var out1 = dropout(x).to_cpu()
+        var out2 = dropout(x).to_cpu()
+        var same = True
+        for i in range(100):
+            if out1.get(i) != out2.get(i):
+                same = False
+                break
+        assert_true(not same)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. BACKWARD — GPU
+# ─────────────────────────────────────────────────────────────────────────────
+
+fn test_dropout2_bwd_gpu_grad_zero_where_dropped_1d() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_bwd_gpu_grad_zero_where_dropped_1d")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.train()
+        var x_cpu = Tensor[dtype].ones(Shape(64), requires_grad=True)
+        var x_gpu = x_cpu.to_gpu()
+        var out = dropout(x_gpu)
+        var out_cpu = out.to_cpu()
+        var loss = out.sum()
+        loss.backward()
+        for i in range(64):
+            if out_cpu.get(i) == 0.0:
+                assert_true(abs(x_cpu.grad().get(i)) < 1e-6)
+            else:
+                assert_true(abs(x_cpu.grad().get(i) - 2.0) < 1e-5)
+
+
+fn test_dropout2_bwd_gpu_grad_zero_where_dropped_2d() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_bwd_gpu_grad_zero_where_dropped_2d")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.train()
+        var x_cpu = Tensor[dtype].ones(Shape(8, 8), requires_grad=True)
+        var x_gpu = x_cpu.to_gpu()
+        var out = dropout(x_gpu)
+        var out_cpu = out.to_cpu()
+        var loss = out.sum()
+        loss.backward()
+        for i in range(64):
+            if out_cpu.get(i) == 0.0:
+                assert_true(abs(x_cpu.grad().get(i)) < 1e-6)
+            else:
+                assert_true(abs(x_cpu.grad().get(i) - 2.0) < 1e-5)
+
+
+fn test_dropout2_bwd_gpu_grad_zero_where_dropped_3d() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_bwd_gpu_grad_zero_where_dropped_3d")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.train()
+        var x_cpu = Tensor[dtype].ones(Shape(2, 4, 8), requires_grad=True)
+        var x_gpu = x_cpu.to_gpu()
+        var out = dropout(x_gpu)
+        var out_cpu = out.to_cpu()
+        var loss = out.sum()
+        loss.backward()
+        for i in range(x_cpu.numels()):
+            if out_cpu.get(i) == 0.0:
+                assert_true(abs(x_cpu.grad().get(i)) < 1e-6)
+            else:
+                assert_true(abs(x_cpu.grad().get(i) - 2.0) < 1e-5)
+
+
+fn test_dropout2_bwd_gpu_no_grad_leaf_unaffected() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_bwd_gpu_no_grad_leaf_unaffected")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.train()
+        var x = Tensor[dtype].ones(Shape(16)).to_gpu()
+        var out = dropout(x)
+        assert_true(not out.requires_grad)
+
+
+fn test_dropout2_bwd_gpu_high_p_grad_flow() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_bwd_gpu_high_p_grad_flow")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.9)
+        dropout.train()
+        var x_cpu = Tensor[dtype].ones(Shape(200), requires_grad=True)
+        var x_gpu = x_cpu.to_gpu()
+        var out = dropout(x_gpu)
+        var out_cpu = out.to_cpu()
+        var loss = out.sum()
+        loss.backward()
+        for i in range(200):
+            if out_cpu.get(i) != 0.0:
+                assert_true(abs(x_cpu.grad().get(i) - 10.0) < 1e-4)
+            else:
+                assert_true(abs(x_cpu.grad().get(i)) < 1e-6)
+
+
+fn test_dropout2_bwd_gpu_chained_with_linear_op() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_bwd_gpu_chained_with_linear_op")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.train()
+        var x_cpu = Tensor[dtype].ones(Shape(32), requires_grad=True)
+        var x_gpu = x_cpu.to_gpu()
+        var out = dropout(x_gpu)
+        var scaled = out * Tensor[dtype].full_like(out, 3.0)
+        var loss = scaled.sum()
+        loss.backward()
+        for i in range(32):
+            var g = x_cpu.grad().get(i)
+            assert_true(abs(g) < 1e-6 or abs(g - 6.0) < 1e-5)
+
+
+fn test_dropout2_bwd_gpu_eval_grad_is_ones() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_bwd_gpu_eval_grad_is_ones")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.eval()
+        var x_cpu = Tensor[dtype].ones(Shape(16), requires_grad=True)
+        var x_gpu = x_cpu.to_gpu()
+        var out = dropout(x_gpu)
+        var loss = out.sum()
+        loss.backward()
+        assert_true(x_cpu.grad().all_close[atol=1e-5](Tensor.ones_like(x_cpu)))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. GRAD FLOW VERIFICATION — GPU
+# ─────────────────────────────────────────────────────────────────────────────
+
+fn test_dropout2_gradflow_gpu_mask_consistent_fwd_bwd() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_gradflow_gpu_mask_consistent_fwd_bwd")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.train()
+        var x_cpu = Tensor[dtype].ones(Shape(128), requires_grad=True)
+        var x_gpu = x_cpu.to_gpu()
+        var out = dropout(x_gpu)
+        var out_cpu = out.to_cpu()
+        var loss = out.sum()
+        loss.backward()
+        var consistent = True
+        for i in range(128):
+            var dropped = out_cpu.get(i) == 0.0
+            var grad_zero = abs(x_cpu.grad().get(i)) < 1e-6
+            if dropped != grad_zero:
+                consistent = False
+                break
+        assert_true(consistent)
+
+
+fn test_dropout2_gradflow_gpu_sum_of_grads_matches_nonzero_count() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_gradflow_gpu_sum_of_grads_matches_nonzero_count")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.train()
+        var x_cpu = Tensor[dtype].ones(Shape(128), requires_grad=True)
+        var x_gpu = x_cpu.to_gpu()
+        var out = dropout(x_gpu)
+        var out_cpu = out.to_cpu()
+        var loss = out.sum()
+        loss.backward()
+        var grad_sum = Scalar[dtype](0)
+        for i in range(128):
+            grad_sum += x_cpu.grad().get(i)
+        var expected = Scalar[dtype](count_nonzeros(out_cpu)) * Scalar[dtype](2.0)
+        assert_true(abs(grad_sum - expected) < 1e-3)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. CPU / GPU PARITY
+# ─────────────────────────────────────────────────────────────────────────────
+
+fn test_dropout2_parity_eval_cpu_gpu_match() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_parity_eval_cpu_gpu_match")
+        comptime dtype = DType.float32
+        var dropout = Dropout[dtype](p=0.5)
+        dropout.eval()
+        var x_cpu = Tensor[dtype].arange(1.0, 17.0).reshape(4, 4)
+        var cpu_out = dropout(x_cpu)
+        var gpu_out = dropout(x_cpu.to_gpu()).to_cpu()
+        assert_true(cpu_out.all_close[atol=1e-5](gpu_out))
+
+
+fn test_dropout2_parity_scale_value_matches() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_parity_scale_value_matches")
+        comptime dtype = DType.float32
+        # Both CPU and GPU non-zero outputs must be exactly input * scale
+        var dropout_cpu = Dropout[dtype](p=0.5)
+        var dropout_gpu = Dropout[dtype](p=0.5)
+        dropout_cpu.train()
+        dropout_gpu.train()
+        var x = Tensor[dtype].ones(Shape(200))
+        var cpu_out = dropout_cpu(x)
+        var gpu_out = dropout_gpu(x.to_gpu()).to_cpu()
+        # Both should have scale=2.0 on non-zero elements
+        assert_true(all_nonzero_close(cpu_out, 2.0, 1e-5))
+        assert_true(all_nonzero_close(gpu_out, 2.0, 1e-5))
+
+
+fn test_dropout2_parity_bwd_grad_scale_matches() raises:
+    comptime if has_accelerator():
+        print("test_dropout2_parity_bwd_grad_scale_matches")
+        comptime dtype = DType.float32
+        var dropout_cpu = Dropout[dtype](p=0.5)
+        var dropout_gpu = Dropout[dtype](p=0.5)
+        dropout_cpu.train()
+        dropout_gpu.train()
+
+        var x_cpu_leaf = Tensor[dtype].ones(Shape(64), requires_grad=True)
+        var out_cpu = dropout_cpu(x_cpu_leaf)
+        var loss_cpu = out_cpu.sum()
+        loss_cpu.backward()
+
+        var x_gpu_leaf = Tensor[dtype].ones(Shape(64), requires_grad=True)
+        var out_gpu = dropout_gpu(x_gpu_leaf.to_gpu())
+        var loss_gpu = out_gpu.sum()
+        loss_gpu.backward()
+
+        # Both: non-zero grads must be 2.0, zero grads must be 0.0
+        for i in range(64):
+            var gc = x_cpu_leaf.grad().get(i)
+            var gg = x_gpu_leaf.grad().get(i)
+            assert_true(abs(gc) < 1e-6 or abs(gc - 2.0) < 1e-5)
+            assert_true(abs(gg) < 1e-6 or abs(gg - 2.0) < 1e-5)

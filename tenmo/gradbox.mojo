@@ -747,6 +747,20 @@ struct Gradbox[dtype: DType](
         """
         return self.buffer
 
+    fn get(self, index: Int) -> Scalar[Self.dtype]:
+        """Get element at a flat index with bounds checking.
+
+        Args:
+            index: Flat (linear) index into the gradbox's memory.
+
+        Returns:
+            The scalar value at that index.
+
+        Raises:
+            Panic if index is out of bounds.
+        """
+        return self.buffer.get(index)
+
     @always_inline
     fn index_iterator(
         self,
