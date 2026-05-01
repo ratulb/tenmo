@@ -1,4 +1,4 @@
-<svg width="680" viewBox="0 0 680 860" xmlns="http://www.w3.org/2000/svg" role="img">
+<svg width="680" viewBox="0 0 680 728" xmlns="http://www.w3.org/2000/svg" role="img">
 <title>Gradient flow with and without stop_grad</title>
 <desc>Two side-by-side diagrams showing how stop_grad=False lets gradients cross device boundaries transparently, while stop_grad=True severs the graph and creates a new leaf on the target device. A third section shows multi-hop chains.</desc>
 <defs>
