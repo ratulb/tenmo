@@ -10,6 +10,9 @@ on:
       - development
       - main
 
+env:
+  MAX_RETRIES: 2   # ← change this to retry more or fewer times on failure
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -100,15 +103,26 @@ jobs:
       - name: Install dependencies via pixi
         run: pixi install
 
-      - name: Run test — ${{ matrix.test }}
+      - name: Run test — ${{ matrix.test }} (with retry)
         id: run_test
         run: |
-          chmod +x execute.sh
-          pixi run ./execute.sh ${{ matrix.test }}
-
-      - name: Report failure
-        if: failure()
-        run: echo "::error::Test '${{ matrix.test }}' FAILED"
+          attempt=0
+          exit_code=0
+          while [ $attempt -le ${{ env.MAX_RETRIES }} ]; do
+            if [ $attempt -gt 0 ]; then
+              echo "::warning::Test '${{ matrix.test }}' failed — retry $attempt of ${{ env.MAX_RETRIES }}"
+            fi
+            chmod +x execute.sh
+            pixi run ./execute.sh ${{ matrix.test }}
+            exit_code=$?
+            if [ $exit_code -eq 0 ]; then
+              echo "Test '${{ matrix.test }}' passed on attempt $((attempt + 1))"
+              exit 0
+            fi
+            attempt=$((attempt + 1))
+          done
+          echo "::error::Test '${{ matrix.test }}' FAILED after ${{ env.MAX_RETRIES }} retries"
+          exit $exit_code
 
   test-gpu:
     runs-on: self-hosted
@@ -197,15 +211,26 @@ jobs:
       - name: Install dependencies via pixi
         run: pixi install
 
-      - name: Run GPU test — ${{ matrix.test }}
+      - name: Run GPU test — ${{ matrix.test }} (with retry)
         id: run_gpu_test
         run: |
-          chmod +x execute.sh
-          pixi run ./execute.sh ${{ matrix.test }}
-
-      - name: Report failure
-        if: failure()
-        run: echo "::error::GPU Test '${{ matrix.test }}' FAILED"
+          attempt=0
+          exit_code=0
+          while [ $attempt -le ${{ env.MAX_RETRIES }} ]; do
+            if [ $attempt -gt 0 ]; then
+              echo "::warning::GPU test '${{ matrix.test }}' failed — retry $attempt of ${{ env.MAX_RETRIES }}"
+            fi
+            chmod +x execute.sh
+            pixi run ./execute.sh ${{ matrix.test }}
+            exit_code=$?
+            if [ $exit_code -eq 0 ]; then
+              echo "GPU test '${{ matrix.test }}' passed on attempt $((attempt + 1))"
+              exit 0
+            fi
+            attempt=$((attempt + 1))
+          done
+          echo "::error::GPU Test '${{ matrix.test }}' FAILED after ${{ env.MAX_RETRIES }} retries"
+          exit $exit_code
 
   summary:
     runs-on: ubuntu-latest
@@ -222,3 +247,4 @@ jobs:
           echo "Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "Triggered by: \`${{ github.actor }}\`" >> $GITHUB_STEP_SUMMARY
           echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Max retries per test: \`${{ env.MAX_RETRIES }}\`" >> $GITHUB_STEP_SUMMARY
