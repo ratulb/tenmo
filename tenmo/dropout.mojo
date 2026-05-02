@@ -83,7 +83,7 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var training: Bool
     var p: Scalar[Self.dtype]
     var scale: Scalar[Self.dtype]
-    var seed: UInt64  # UInt64 to match PhiloxRandom.seed type
+    var seed: Optional[UInt64]  # UInt64 to match PhiloxRandom.seed type
 
     fn __init__(out self, p: Scalar[Self.dtype] = Scalar[Self.dtype](0.5)):
         if p < 0.0 or p >= 1.0:
@@ -91,8 +91,7 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self.training = True
         self.p = p
         self.scale = Scalar[Self.dtype](1.0) / (Scalar[Self.dtype](1.0) - p)
-        set_seed()
-        self.seed = random_ui64(0, 1000)
+        self.seed = None
 
     fn __copyinit__(out self, copy: Self):
         self.training = copy.training
@@ -112,11 +111,13 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         comptime if has_accelerator():
             if x.buffer.is_on_gpu():
                 try:
+                    set_seed()
+                    var seed = self.seed.or_else(random_ui64(0, 1000))
                     var result = DropoutKernel[Self.dtype].launch(
                         x.buffer,
                         self.p,
                         self.scale,
-                        self.seed,
+                        seed,
                     )
                     var out_ndb = result[0]
                     var mask_ndb = result[1]
