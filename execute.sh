@@ -120,6 +120,7 @@ declare -a ALL_TESTS_IN_ORDER=(
     "logarithm|tests/test_logarithm.mojo"
     "concat|tests/test_concat.mojo"
     "variance|tests/test_variance.mojo"
+    "variance_and_std|tests/test_variance_and_std.mojo"
     "utils|tests/test_utils.mojo"
     "indexhelper|tests/test_indexhelper.mojo"
     "losses|tests/test_losses.mojo"
@@ -194,6 +195,7 @@ declare -a GPU_TESTS=(
     "squeeze|tests/test_squeeze.mojo"
     "ndb|tests/test_ndb.mojo"
     "transpose|tests/test_transpose.mojo"
+    "variance_and_std|tests/test_variance_and_std.mojo"
     "tiles|tests/test_tiles.mojo"
     "ce|tests/test_cross_entropy.mojo"
 )
@@ -231,7 +233,7 @@ if [ $# -eq 0 ]; then
     echo "  allany, compare, count_unique, transmute, exp, summean, sigmoid"
     echo "  gpusummean, broadcast, scalar, inplace, expand, gpu_expand"
     echo "  sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout, dev_transfer"
-    echo "  std_variance, stack, logarithm, concat, variance, utils, onehot, power"
+    echo "  std_variance, stack, logarithm, concat, variance, variance_and_std, utils, onehot, power"
     echo "  indexhelper, losses, tanh, data, softmax, repeat, mmnd, attn_matmul"
     echo "  intarray, mm2d, vm, mv, slice, tiles, linspace, argminmax"
     echo "  minmax, relu, shuffle, permute, flatten, squeeze, unsqueeze"
@@ -343,6 +345,7 @@ run_test_by_name() {
         logarithm)      run_test "logarithm" "tests/test_logarithm.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         concat)         run_test "concat" "tests/test_concat.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         variance)       run_test "variance" "tests/test_variance.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        variance_and_std) run_test "variance_and_std" "tests/test_variance_and_std.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         utils)          run_test "utils" "tests/test_utils.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         indexhelper)    run_test "indexhelper" "tests/test_indexhelper.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         losses)         run_test "losses" "tests/test_losses.mojo" "$DEBUG_MODE"; exit_code=$? ;;
