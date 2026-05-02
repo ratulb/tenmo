@@ -84,6 +84,7 @@ declare -a ALL_TESTS_IN_ORDER=(
     "product|tests/test_product_reduction.mojo"
     "unary|tests/test_unary_ops.mojo"
     "sqrt|tests/test_sqrt.mojo"
+    "attn_matmul|tests/test_attn_matmul.mojo"
     "tensors|tests/test_tensors.mojo"
     "gpu|tests/test_gpu.mojo"
     "item|tests/test_item.mojo"
@@ -159,6 +160,7 @@ declare -a GPU_TESTS=(
     "product|tests/test_product_reduction.mojo"
     "unary|tests/test_unary_ops.mojo"
     "sqrt|tests/test_sqrt.mojo"
+    "attn_matmul|tests/test_attn_matmul.mojo"
     "gpu|tests/test_gpu.mojo"
     "item|tests/test_item.mojo"
     "contiguous|tests/test_contiguous.mojo"
@@ -230,7 +232,7 @@ if [ $# -eq 0 ]; then
     echo "  gpusummean, broadcast, scalar, inplace, expand, gpu_expand"
     echo "  sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout, dev_transfer"
     echo "  std_variance, stack, logarithm, concat, variance, utils, onehot, power"
-    echo "  indexhelper, losses, tanh, data, softmax, repeat, mmnd"
+    echo "  indexhelper, losses, tanh, data, softmax, repeat, mmnd, attn_matmul"
     echo "  intarray, mm2d, vm, mv, slice, tiles, linspace, argminmax"
     echo "  minmax, relu, shuffle, permute, flatten, squeeze, unsqueeze"
     echo "  gradbox, ndb, transpose, buffers, views, shapes, strides"
@@ -289,6 +291,7 @@ run_test_by_name() {
         product)        run_test "product" "tests/test_product_reduction.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         unary)          run_test "unary" "tests/test_unary_ops.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         sqrt)           run_test "sqrt" "tests/test_sqrt.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        attn_matmul)    run_test "attn_matmul" "tests/test_attn_matmul.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         tensors)        run_test "tensors" "tests/test_tensors.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         gpu)
             print_colored "$BLUE" "Running all GPU-guarded tests..."

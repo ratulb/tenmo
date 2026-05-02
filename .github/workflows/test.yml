@@ -21,6 +21,7 @@ jobs:
       max-parallel: 8
       matrix:
         test:
+          - attn_matmul
           - sigmoid
           - summean
           - exp
@@ -135,6 +136,7 @@ jobs:
       fail-fast: false
       matrix:
         test:
+          - attn_matmul
           - sigmoid
           - summean
           - exp
