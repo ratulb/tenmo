@@ -116,7 +116,7 @@ from .array import Array
 from .intarray import IntArray
 
 # =============================================================================
-# SECTION 1 — Shared index helpers (unchanged)
+# SECTION 1 — Shared index helpers
 # =============================================================================
 
 
@@ -798,9 +798,183 @@ struct ProductArg[dtype: DType](ArgumentType):
             0,
         )
 
+# =============================================================================
+# SECTION 4 — Welford kernel
+# =============================================================================
 
 # =============================================================================
-# SECTION 7 — Reduction launcher
+# DESIGN NOTES
+# =============================================================================
+#
+# Welford online algorithm — single pass, numerically stable:
+#
+#   M_0 = 0, S_0 = 0
+#   for k = 1..n:
+#       delta  = x_k - M_{k-1}
+#       M_k    = M_{k-1} + delta / k
+#       delta2 = x_k - M_k
+#       S_k    = S_{k-1} + delta * delta2
+#
+#   mean     = M_n
+#   var_pop  = S_n / n          (biased)
+#   var_samp = S_n / (n - 1)    (unbiased)
+#
+# Welford parallel merge of two accumulators (a, b):
+#
+#   combined.count = a.count + b.count
+#   delta          = b.mean - a.mean
+#   combined.mean  = a.mean + delta * b.count / combined.count
+#   combined.M2    = a.M2 + b.M2 + delta^2 * a.count * b.count / combined.count
+#
+# GPU kernel:
+#   One block per output element (same as reduce).
+#   Threads stripe across reduced_volume — each thread runs serial Welford.
+#   Three shared memory arrays: smem_mean, smem_M2, smem_count.
+#   Tree reduction using Welford merge — NOT simple addition.
+#   Returns two output buffers: mean and M2 (unscaled).
+#   Caller divides M2 by n or n-1 for variance.
+#   Std: caller takes sqrt of variance output.
+#
+# No dtype constraint at kernel level — consistent with reduce kernel.
+# Floating point arithmetic is inherent to Welford math, not enforced here.
+#
+# Index helpers reused verbatim:
+#   output_to_input_base
+#   rank_to_reduced_offset
+#
+# Launcher returns Tuple[NDBuffer, NDBuffer] — (mean_ndb, M2_ndb).
+# NDBuffer.welford() divides M2 by n/n-1 and optionally sqrts for std.
+#
+# =============================================================================
+
+
+fn welford_reduce[
+    dtype: DType,
+    max_block_size: Int = 512,
+](
+    mean_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    M2_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    in_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    in_shape: Array,
+    in_strides: Array,
+    reduction_axes: Array,
+    total_output: Int,
+    reduced_volume: Int,
+):
+    """Welford online mean + M2 reduction kernel.
+
+    One block per output element. Threads stripe across reduced_volume,
+    each running a serial Welford accumulation. Tree reduction merges
+    thread-local accumulators via the Welford parallel merge formula.
+
+    Three shared memory arrays: smem_mean, smem_M2, smem_count.
+    Outputs mean and M2 (unscaled sum of squared deviations).
+    Caller divides M2 by n or n-1 to get variance.
+
+    No dtype constraint — consistent with reduce kernel.
+
+    Args:
+        mean_buffer:     Output pointer for mean (total_output elements).
+        M2_buffer:       Output pointer for M2 (total_output elements).
+        in_buffer:       Input pointer (strided via in_strides).
+        in_shape:        Shape of input as Array.
+        in_strides:      Strides of input as Array.
+        reduction_axes:  Axes being reduced as Array.
+        total_output:    Number of output elements (== grid_dim).
+        reduced_volume:  Number of elements reduced per output element.
+    """
+    comptime assert (
+        max_block_size.is_power_of_two() and max_block_size < 1024
+    ), "max_block_size must be a power of 2 less than 1024"
+
+    # Three shared memory arrays — mean, M2, count
+    var smem_mean = stack_allocation[
+        max_block_size, Scalar[dtype], address_space=AddressSpace.SHARED
+    ]()
+    var smem_M2 = stack_allocation[
+        max_block_size, Scalar[dtype], address_space=AddressSpace.SHARED
+    ]()
+    var smem_count = stack_allocation[
+        max_block_size, Scalar[DType.int32], address_space=AddressSpace.SHARED
+    ]()
+
+    var tid = Int(thread_idx.x)
+    var block_size = Int(block_dim.x)
+    var out_idx = Int(block_idx.x)
+
+    if out_idx >= total_output:
+        return
+
+    # Initialize shared memory
+    smem_mean[tid] = Scalar[dtype](0)
+    smem_M2[tid] = Scalar[dtype](0)
+    smem_count[tid] = Int32(0)
+
+    var input_base = output_to_input_base(
+        out_idx, in_shape, in_strides, reduction_axes
+    )
+
+    # Serial Welford over this thread's stripe
+    var local_mean = Scalar[dtype](0)
+    var local_M2 = Scalar[dtype](0)
+    var local_count = Int32(0)
+    var rank = tid
+
+    while rank < reduced_volume:
+        var x = (
+            in_buffer
+            + input_base
+            + rank_to_reduced_offset(rank, in_shape, in_strides, reduction_axes)
+        )[]
+        local_count += Int32(1)
+        var delta = x - local_mean
+        local_mean += delta / Scalar[dtype](Int(local_count))
+        var delta2 = x - local_mean
+        local_M2 += delta * delta2
+        rank += block_size
+
+    smem_mean[tid] = local_mean
+    smem_M2[tid] = local_M2
+    smem_count[tid] = local_count
+    barrier()
+
+    # Tree reduction via Welford parallel merge
+    var stride = block_size >> 1
+    while stride > 0:
+        if tid < stride:
+            var a_mean = smem_mean[tid]
+            var a_M2 = smem_M2[tid]
+            var a_count = smem_count[tid]
+            var b_mean = smem_mean[tid + stride]
+            var b_M2 = smem_M2[tid + stride]
+            var b_count = smem_count[tid + stride]
+
+            var combined_count = a_count + b_count
+            if combined_count > Int32(0):
+                var delta = b_mean - a_mean
+                var b_count_f = Scalar[dtype](Int(b_count))
+                var combined_count_f = Scalar[dtype](Int(combined_count))
+                smem_mean[tid] = a_mean + delta * b_count_f / combined_count_f
+                smem_M2[tid] = (
+                    a_M2
+                    + b_M2
+                    + delta
+                    * delta
+                    * Scalar[dtype](Int(a_count))
+                    * b_count_f
+                    / combined_count_f
+                )
+                smem_count[tid] = combined_count
+        barrier()
+        stride >>= 1
+
+    if tid == 0:
+        (mean_buffer + out_idx)[] = smem_mean[0]
+        (M2_buffer + out_idx)[] = smem_M2[0]
+
+
+# =============================================================================
+# SECTION 8 — Reduction launcher
 # =============================================================================
 #
 # Unified launcher for SUM, MEAN, PRODUCT via op_code.
@@ -1218,7 +1392,98 @@ struct Reduction[dtype: DType = DType.float32](
             device_state^, output_shape
         )
 
-    # ── launch_config (unchanged) ─────────────────────────────────────────────
+    @staticmethod
+    def launch_welford[
+        max_block_width: Int = 512,
+    ](
+        A: NDBuffer[Self.dtype],
+        normalized_axes: IntArray,
+        keepdims: Bool,
+    ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+        """Launch Welford mean + M2 reduction on GPU.
+
+        Returns (mean_ndb, M2_ndb). M2 is the unscaled sum of squared
+        deviations. Divide by n for population variance, n-1 for sample.
+
+        Args:
+            A:               Input NDBuffer. Must be on GPU.
+            normalized_axes: Validated, normalised reduction axes.
+            keepdims:        Whether to keep reduced dimensions.
+
+        Returns:
+            Tuple of (mean NDBuffer, M2 NDBuffer), same shape as sum/mean output.
+        """
+        var shape_A = A.shape
+        var strides_A = A.strides
+        var output_shape = shape_A.compute_output_shape(
+            normalized_axes, keepdims, validated=True
+        )
+
+        var normalized_axes_copy = normalized_axes
+        if len(normalized_axes_copy) == 0:
+            normalized_axes_copy = IntArray(len(shape_A))
+            for i in range(len(shape_A)):
+                normalized_axes_copy[i] = i
+
+        var reduction_axes: Array = Array(normalized_axes_copy)
+        var reduced_shape = shape_A.reduced_shape(normalized_axes)
+        var in_shape: Array = shape_A.array()
+        var in_strides: Array = strides_A.array()
+        var total_output: Int = output_shape.product()
+        var reduced_volume: Int = reduced_shape.product()
+
+        var (threads_per_block, num_blocks) = Self.launch_config[
+            max_block_width
+        ](total_output, reduced_volume)
+
+        ref A_device_state = A.device_state.value()
+        ref gpu = A_device_state.get_gpu()
+        var device_context = gpu[]
+
+        # Two output buffers — mean and M2
+        var mean_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            total_output
+        )
+        var M2_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            total_output
+        )
+
+        ref A_buffer = A_device_state.device_buffer()
+
+        var compiled_func = device_context.compile_function[
+            welford_reduce[Self.dtype, max_block_width],
+            welford_reduce[Self.dtype, max_block_width],
+        ]()
+
+        device_context.enqueue_function(
+            compiled_func,
+            mean_buffer,
+            M2_buffer,
+            A_buffer,
+            in_shape,
+            in_strides,
+            reduction_axes,
+            total_output,
+            reduced_volume,
+            grid_dim=num_blocks,
+            block_dim=threads_per_block,
+        )
+
+        device_context.synchronize()
+
+        var mean_state = DeviceState[Self.dtype](mean_buffer^, gpu)
+        var M2_state = DeviceState[Self.dtype](M2_buffer^, gpu)
+
+        var mean_ndb = NDBuffer[Self.dtype].with_device_state(
+            mean_state^, output_shape
+        )
+        var M2_ndb = NDBuffer[Self.dtype].with_device_state(
+            M2_state^, output_shape
+        )
+
+        return (mean_ndb^, M2_ndb^)
+
+    # ── launch_config ─────────────────────────────────────────────
 
     @staticmethod
     def launch_config[

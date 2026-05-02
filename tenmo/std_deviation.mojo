@@ -6,65 +6,58 @@ from .common_utils import panic, Epsilon
 from .ancestry import Ancestor
 
 
+# =============================================================================
+# Updated StdBwdArg — goes in std.mojo
+# =============================================================================
+
+@fieldwise_init
+struct StdBwdArg[dtype: DType](ArgumentType):
+    var mean: NDBuffer[Self.dtype]  # saved from Welford forward — free
+    var std: NDBuffer[Self.dtype]   # saved from forward — already computed
+    var axis: Int
+    var unbiased: Bool
+    var keepdims: Bool
+    var n: Int
+    var epsilon: Scalar[Self.dtype]
+
+
+# =============================================================================
+# Updated StdBackward — goes in std.mojo
+# =============================================================================
+
 @fieldwise_init
 struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = (
-            output.ancestry().backward_fn_arg().get[StdArg[Self.dtype]]()
-        )
-        var (axis, unbiased, keepdims, epsilon) = (
-            bwd_arg.axis,
-            bwd_arg.unbiased,
-            bwd_arg.keepdims,
-            bwd_arg.epsilon,
-        )
+        var bwd_arg = output.ancestry().backward_fn_arg().get[
+            StdBwdArg[Self.dtype]
+        ]()
+        var axis = bwd_arg.axis
+        var unbiased = bwd_arg.unbiased
+        var keepdims = bwd_arg.keepdims
+        var n = bwd_arg.n
+        var epsilon = bwd_arg.epsilon
         var gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         var input_tensor = Tensor[Self.dtype](
             parent.buffer(), requires_grad=parent.requires_grad
         )
-        ref input_shape = input_tensor.shape()
 
-        var dim = List[Int]()
-        if axis != -100:
-            dim.append(axis)
+        var divisor = Scalar[Self.dtype](n - 1 if unbiased and n > 1 else n)
 
-        # Always use keepdims=True internally
-        var mean_val = input_tensor.mean[track_grad=False](dim, keepdims=True)
-        var diff = input_tensor.__sub__[track_grad=False](mean_val)
+        # Both mean and std already saved — zero recomputation
+        var mean_tensor = Tensor[Self.dtype](bwd_arg.mean)
+        var std_tensor = Tensor[Self.dtype](bwd_arg.std)
 
-        var n: Scalar[Self.dtype]
-        if axis != -100:
-            n = Scalar[Self.dtype](input_shape[axis])
-        else:
-            n = Scalar[Self.dtype](input_shape.num_elements())
-
-        var divisor = n
-        if unbiased and n > 1:
-            divisor = n - 1
-
-        # Compute std (recompute from input for numerical stability)
-        var var_val = (
-            diff.__mul__[track_grad=False](diff).sum[track_grad=False](
-                dim, keepdims=True
-            )
-        ).__truediv__[track_grad=False](divisor)
-        var std_val = var_val.sqrt[track_grad=False](epsilon=epsilon)
-
-        # Gradient: (1 / (std * divisor)) * (x - mean)
-        # var local_grad = diff / ((std_val + self.epsilon) * divisor)
-        var local_grad = diff.__truediv__[track_grad=False](
-            (
-                (std_val.__add__[track_grad=False](epsilon)).__mul__[
-                    track_grad=False
-                ](divisor)
-            )
+        var diff = input_tensor.__sub__[track_grad=False](mean_tensor)
+        var denom = (
+            std_tensor.__add__[track_grad=False](epsilon)
+            .__mul__[track_grad=False](divisor)
         )
+        var local_grad = diff.__truediv__[track_grad=False](denom)
 
-        # Handle keepdims
         var gradbox_ancestor: Gradbox[Self.dtype]
         if not keepdims:
             if axis != -100:
@@ -72,16 +65,19 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             else:
                 var scalar_grad = gradbox.item()
                 gradbox_ancestor = Gradbox[Self.dtype].full(
-                    input_shape, scalar_grad, share=False, device=gradbox.device()
+                    input_tensor.shape(), scalar_grad, share=False, device=gradbox.device()
                 )
         else:
             gradbox_ancestor = gradbox^
 
-        # Broadcasting handles the rest
         gradbox_ancestor = local_grad.__mul__(gradbox_ancestor^)
-
         return [(parent^, gradbox_ancestor^, AddTensor)]
 
+
+# =============================================================================
+# Updated StdDev.forward — goes in std.mojo
+# replaces current forward body
+# =============================================================================
 
 @fieldwise_init
 struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -98,30 +94,75 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ) -> Tensor[Self.dtype]:
         if axis != -100 and (axis < 0 or axis >= self.rank()):
             panic("axis is not valid for standard deviation")
-        var var_result = self.variance[track_grad=False](
-            axis, keepdims=True, unbiased=unbiased
-        )
-        var result = var_result.sqrt[track_grad=False](epsilon=epsilon)
 
-        if not keepdims:
-            if axis != -100:
-                result = result.squeeze[track_grad=False]([axis])
-            else:
-                result = result.squeeze[track_grad=False]()
+        # Always compute with keepdims=True — backward needs correct broadcast shape
+        var (mean_ndb, var_ndb) = self.buffer.welford(axis, unbiased, keepdims=True)
 
+        # std from var — keepdims=True shape preserved
+        var std_ndb_keepdims = var_ndb.unary_ops[SQRT]()
+
+        # Output: squeeze if user requested keepdims=False
+        var result_ndb = std_ndb_keepdims
+        if not keepdims and axis != -100:
+            result_ndb = std_ndb_keepdims.squeeze(IntArray(axis))
+        elif not keepdims and axis == -100:
+            result_ndb = std_ndb_keepdims.squeeze(IntArray())
+
+        var result = Tensor[Self.dtype](result_ndb^, requires_grad=False)
+
+        # Save keepdims=True versions into BwdArg — correct shape for backward
         comptime if track_grad:
-            grad_required = requires_grad.or_else(self.requires_grad)
+            var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 result.requires_grad_(True)
+                var n: Int
+                if axis != -100:
+                    n = self.shape()[axis]
+                else:
+                    n = self.numels()
                 var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_STD,
-                    StdArg[Self.dtype](
+                    StdBwdArg[Self.dtype](
+                        mean_ndb^,          # keepdims=True — correct for broadcast
+                        std_ndb_keepdims^,  # keepdims=True — correct for broadcast
                         axis,
                         unbiased,
-                        keepdims,
+                        keepdims,           # original user request — for gradbox handling
+                        n,
                         epsilon,
                     ),
                 )
                 result.add_ancestry(backwardFnArg^, self)
+
+        _="""# Single Welford pass — (mean_ndb, var_ndb) both free
+        var (mean_ndb, var_ndb) = self.buffer.welford(axis, unbiased, keepdims)
+
+        # std = sqrt(var + epsilon) — fused in one scalar pass
+        var std_ndb = var_ndb.unary_ops[SQRT]()
+        var result = Tensor[Self.dtype](std_ndb, requires_grad=False)
+
+        comptime if track_grad:
+            var grad_required = requires_grad.or_else(self.requires_grad)
+            if grad_required:
+                result.requires_grad_(True)
+                var n: Int
+                if axis != -100:
+                    n = self.shape()[axis]
+                else:
+                    n = self.numels()
+                var backwardFnArg = BackwardFnArg[Self.dtype](
+                    BACKWARD_STD,
+                    StdBwdArg[Self.dtype](
+                        mean_ndb^,   # saved — free from Welford
+                        std_ndb^,    # saved — already computed above
+                        axis,
+                        unbiased,
+                        keepdims,
+                        n,
+                        epsilon,
+                    ),
+                )
+                result.add_ancestry(backwardFnArg^, self)"""
+
 
         return result^

@@ -1295,6 +1295,152 @@ struct NDBuffer[dtype: DType](
 
         return out^
 
+    # =============================================================================
+    # Returns (mean_ndb, var_ndb) — variance already divided by n or n-1.
+    # Callers:
+    #   Variance.forward  → uses mean_ndb and var_ndb directly
+    #   StdDev.forward    → uses mean_ndb, var_ndb, and sqrt(var_ndb) for std
+    #
+    # Both mean and var are returned so forward can save them into BwdArg
+    # without any extra computation — they were computed for free by Welford.
+    # =============================================================================
+
+    fn welford(
+        self: NDBuffer[Self.dtype],
+        axis: Int,
+        unbiased: Bool,
+        keepdims: Bool,
+    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+        """Compute mean and variance in a single Welford pass.
+
+        Returns (mean_ndb, var_ndb). Variance is already divided by n or n-1.
+        Both are shaped according to keepdims and axis.
+
+        No extra cost over computing variance alone — mean is free from Welford.
+        Caller saves both into BwdArg for zero-recomputation backward.
+
+        Args:
+            axis:     Reduction axis. -100 means global reduction over all dims.
+            unbiased: If True divide by n-1, else divide by n.
+            keepdims: If True keep reduced dim with size 1.
+
+        Returns:
+            Tuple of (mean NDBuffer, variance NDBuffer).
+        """
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    return self.welford_gpu(axis, unbiased, keepdims)
+                except e:
+                    print(e)
+                    panic(
+                        "NDBuffer welford → GPU operation failed for axis: "
+                        + String(axis)
+                    )
+                    # Unreachable
+                    return (Self.Empty(), Self.Empty())
+        return self.welford_cpu(axis, unbiased, keepdims)
+
+    fn welford_gpu(
+        self: NDBuffer[Self.dtype],
+        axis: Int,
+        unbiased: Bool,
+        keepdims: Bool,
+    ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+        """GPU Welford — delegates to Reduction.launch_welford."""
+        var normalized_axes: IntArray
+        if axis == -100:
+            normalized_axes = IntArray(0)  # empty = global reduction
+        else:
+            normalized_axes = IntArray(1)
+            normalized_axes[0] = axis
+
+        var (mean_ndb, M2_ndb) = Reduction[Self.dtype].launch_welford(
+            self, normalized_axes, keepdims
+        )
+
+        # n = reduced_volume
+        var n: Int
+        if axis == -100:
+            n = self.numels()
+        else:
+            n = self.shape[axis]
+
+        var divisor = Scalar[Self.dtype](n - 1 if unbiased and n > 1 else n)
+
+        # var_ndb = M2_ndb / divisor — element-wise scalar divide
+        var var_ndb = M2_ndb.scalar_ops[Divide](divisor)
+
+        return (mean_ndb^, var_ndb^)
+
+    fn welford_cpu(
+        self: NDBuffer[Self.dtype],
+        axis: Int,
+        unbiased: Bool,
+        keepdims: Bool,
+    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+        """CPU Welford — single pass mean + variance."""
+
+        # Normalize axis to IntArray — same pattern as Summer/reduce_cpu
+        var normalized_axes: IntArray
+        if axis == -100:
+            normalized_axes = IntArray.range(0, self.rank())  # empty = global, matches reduce_cpu
+        else:
+            normalized_axes = IntArray(axis)
+
+
+        var out_shape = self.shape.compute_output_shape(
+            normalized_axes, keepdims, validated=True
+        )
+        var mean_out = NDBuffer[Self.dtype].zeros(out_shape)
+        var var_out = NDBuffer[Self.dtype].zeros(out_shape)
+
+        if out_shape == Shape():
+            # Global scalar reduction
+            var local_mean = Scalar[Self.dtype](0)
+            var local_M2 = Scalar[Self.dtype](0)
+            var count = 0
+            # index_iterator handles contiguous + strided + offset — no branch needed
+            for idx in self.index_iterator():
+                var x = self.buffer[idx]
+                count += 1
+                var delta = x - local_mean
+                local_mean += delta / Scalar[Self.dtype](count)
+                var delta2 = x - local_mean
+                local_M2 += delta * delta2
+            var divisor = Scalar[Self.dtype](
+                count - 1 if unbiased and count > 1 else count
+            )
+            mean_out[IntArray()] = local_mean
+            var_out[IntArray()] = local_M2 / divisor
+        else:
+            # Axis reduction — mirrors reduce_cpu coord iteration exactly
+            var reduction_axes_shape = self.shape.reduced_shape(normalized_axes)
+            var n = reduction_axes_shape.product()
+            var divisor = Scalar[Self.dtype](
+                n - 1 if unbiased and n > 1 else n
+            )
+            for out_coord in out_shape:
+                var local_mean = Scalar[Self.dtype](0)
+                var local_M2 = Scalar[Self.dtype](0)
+                var count = 0
+                for red_coord in reduction_axes_shape:
+                    var self_coord = out_coord.replace(
+                        normalized_axes, red_coord
+                    ) if keepdims else out_coord.insert(
+                        normalized_axes, red_coord
+                    )
+                    var x = self[self_coord]
+                    count += 1
+                    var delta = x - local_mean
+                    local_mean += delta / Scalar[Self.dtype](count)
+                    var delta2 = x - local_mean
+                    local_M2 += delta * delta2
+                mean_out[out_coord] = local_mean
+                var_out[out_coord] = local_M2 / divisor
+
+        return (mean_out^, var_out^)
+
     # ── product: NEW ─────────────────────────────────────────────────────────
     # Returns Tuple[NDBuffer, ProductArg] — result + backward arg.
     # ProductArg is passed up to Product.forward which stores it in BackwardFnArg.

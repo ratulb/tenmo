@@ -7,11 +7,17 @@ from .ancestry import Ancestor
 
 
 @fieldwise_init
-struct VarianceBwdArg(ArgumentType):
+struct VarianceBwdArg[dtype: DType](ArgumentType):
+    var mean: NDBuffer[Self.dtype]  # saved from Welford forward — free
     var axis: Int
     var unbiased: Bool
     var keepdims: Bool
+    var n: Int                      # saved — avoids shape lookup in backward
 
+
+# =============================================================================
+# Updated VarianceBackward — goes in variance.mojo
+# =============================================================================
 
 @fieldwise_init
 struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -19,67 +25,45 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.ancestry().backward_fn_arg().get[VarianceBwdArg]()
-        var (axis, unbiased, keepdims) = (
-            bwd_arg.axis,
-            bwd_arg.unbiased,
-            bwd_arg.keepdims,
-        )
+        var bwd_arg = output.ancestry().backward_fn_arg().get[
+            VarianceBwdArg[Self.dtype]
+        ]()
+        var axis = bwd_arg.axis
+        var unbiased = bwd_arg.unbiased
+        var keepdims = bwd_arg.keepdims
+        var n = bwd_arg.n
         var gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         var input_tensor = Tensor[Self.dtype](
             parent.buffer(), requires_grad=parent.requires_grad
         )
-        ref input_shape = input_tensor.shape()
 
-        # Compute mean of input (always with keepdims=True)
-        var dim = List[Int]()
-        if axis != -100:
-            dim.append(axis)
+        var divisor = Scalar[Self.dtype](n - 1 if unbiased and n > 1 else n)
 
-        # var mean_val = input_tensor.mean[track_grad=False](dim, keepdims=True)
-        var mean_val: Tensor[Self.dtype]
-        if axis == -100:
-            # Global mean - scalar
-            # mean_val = input_tensor.mean[track_grad=False](keepdims=True)
-            mean_val = input_tensor.mean[track_grad=False]()
-        else:
-            # Axis-specific mean - keepdims for broadcasting
-            mean_val = input_tensor.mean[track_grad=False](dim, keepdims=True)
+        # mean already saved — no recomputation
+        var mean_tensor = Tensor[Self.dtype](bwd_arg.mean)
+        var diff = input_tensor.__sub__[track_grad=False](mean_tensor)
+        var local_grad = diff.__mul__[track_grad=False](
+            Scalar[Self.dtype](2) / divisor
+        )
 
-        var diff = input_tensor.__sub__[track_grad=False](mean_val)
-
-        # Calculate divisor
-        var n: Scalar[Self.dtype]
-        if axis != -100:
-            n = Scalar[Self.dtype](input_shape[axis])
-        else:
-            n = Scalar[Self.dtype](input_shape.num_elements())
-
-        var divisor = n
-        if unbiased and n > 1:
-            divisor = n - 1
-
-        # Gradient: (2/divisor) * (x - mean)
-        var local_grad = diff.__mul__[track_grad=False](2.0 / divisor)
-
-        # Handle gradient shape
         var gradbox_ancestor: Gradbox[Self.dtype]
-
         if not keepdims:
             if axis != -100:
-                # Specific axis was reduced - unsqueeze that axis
                 gradbox_ancestor = gradbox.unsqueeze([axis])
             else:
                 gradbox_ancestor = gradbox^
         else:
             gradbox_ancestor = gradbox^
 
-        # Broadcast to input shape (automatic broadcasting will handle it)
         gradbox_ancestor = local_grad * gradbox_ancestor
-
         return [(parent^, gradbox_ancestor^, AddTensor)]
 
+
+# =============================================================================
+# Updated Variance.forward — goes in variance.mojo
+# replaces the current forward body
+# =============================================================================
 
 @fieldwise_init
 struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -97,60 +81,38 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if axis != -100 and (axis < 0 or axis >= self.rank()):
             panic("Invalid axis specified for variance")
 
-        var dim = List[Int]()
-        if axis != -100:
-            dim.append(axis)
-
-        # Compute mean - use scalar for global, keepdims for axis-specific
-        var mean_val: Tensor[Self.dtype]
-        if axis == -100:
-            # Global mean - scalar (0D tensor)
-            # mean_val = self.mean[track_grad=False](keepdims=True)
-            mean_val = self.mean[track_grad=False](keepdims=False)
-        else:
-            # Axis-specific mean - keepdims for broadcasting
-            mean_val = self.mean[track_grad=False](dim, keepdims=True)
-
-        var diff = self.__sub__[track_grad=False](mean_val)
-        var squared_diff = diff.__mul__[track_grad=False](diff)
-
-        # Sum over same dimensions
-        var sum_sq: Tensor[Self.dtype]
-        if axis == -100:
-            sum_sq = squared_diff.sum[track_grad=False](
-                keepdims=True
-            )  # Global sum -> scalar
-        else:
-            sum_sq = squared_diff.sum[track_grad=False](dim, keepdims=True)
-
-        # Calculate divisor
-        var n: Scalar[Self.dtype]
-        if axis != -100:
-            n = Scalar[Self.dtype](self.shape()[axis])
-        else:
-            n = Scalar[Self.dtype](self.numels())
-
-        if unbiased and n > 1:
-            n = n - 1
-
-        var result = sum_sq.__truediv__[track_grad=False](n)
-        # Squeeze at the end if keepdims=False and axis-specific
-        if not keepdims:
-            if axis != -100:
-                result = result.squeeze[track_grad=False]([axis])
-            else:
-                result = result.squeeze[track_grad=False]()
+        # Single Welford pass — returns (mean_ndb, var_ndb)
+        # mean is free — Welford computes it anyway
+        #var (mean_ndb, var_ndb) = self.buffer.welford(axis, unbiased, keepdims)
+        #var result = Tensor[Self.dtype](var_ndb^, requires_grad=False)
+        # Always save mean with keepdims=True for correct backward broadcasting
+        var (mean_ndb, var_ndb) = self.buffer.welford(axis, unbiased, keepdims=True)
+        # For the output, squeeze if user requested keepdims=False
+        var result_ndb = var_ndb
+        if not keepdims and axis != -100:
+            result_ndb = var_ndb.squeeze(IntArray(axis))
+        elif not keepdims and axis == -100:
+            result_ndb = var_ndb.squeeze(IntArray())
+        var result = Tensor[Self.dtype](result_ndb^, requires_grad=False)
+        # mean_ndb stays keepdims=True — correct shape for backward broadcast
 
         comptime if track_grad:
-            grad_required = requires_grad.or_else(self.requires_grad)
+            var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 result.requires_grad_(True)
+                var n: Int
+                if axis != -100:
+                    n = self.shape()[axis]
+                else:
+                    n = self.numels()
                 var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_VARIANCE,
-                    VarianceBwdArg(
+                    VarianceBwdArg[Self.dtype](
+                        mean_ndb^,  # saved — free from Welford
                         axis,
                         unbiased,
                         keepdims,
+                        n,          # saved — free
                     ),
                 )
                 result.add_ancestry(backwardFnArg^, self)
