@@ -426,7 +426,7 @@ fn test_varstd_gpu_std_vs_cpu_consistency() raises:
         loss_cpu.backward()
         var loss_gpu = s_gpu.sum()
         loss_gpu.backward()
-        assert_true(x_cpu.grad().all_close[atol=1e-5](x_gpu.grad()))
+        assert_true(x_cpu.grad().all_close[atol=1e-5](x_gpu.grad().to_cpu()))
 
 
 fn test_varstd_gpu_variance_unbiased() raises:
