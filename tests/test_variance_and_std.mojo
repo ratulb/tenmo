@@ -4,6 +4,8 @@ from tenmo.common_utils import i, s
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 
+
+
 # ===== VARIANCE CPU TESTS =====
 
 
@@ -476,4 +478,661 @@ fn main() raises:
     test_varstd_gpu_std_vs_cpu_consistency()
     test_varstd_gpu_variance_unbiased()
 
+    #Copied
+
+     # ── Variance forward CPU ──
+    test_varstd_var_fwd_cpu_global_1d()
+    test_varstd_var_fwd_cpu_global_2d()
+    test_varstd_var_fwd_cpu_axis0_2d()
+    test_varstd_var_fwd_cpu_axis1_2d()
+    test_varstd_var_fwd_cpu_axis1_keepdims()
+    test_varstd_var_fwd_cpu_constant_is_zero()
+    test_varstd_var_fwd_cpu_3d_axis1()
+
+    # ── Variance backward CPU ──
+    test_varstd_var_bwd_cpu_global_1d()
+    test_varstd_var_bwd_cpu_global_unbiased()
+    test_varstd_var_bwd_cpu_axis0_2d()
+    test_varstd_var_bwd_cpu_axis1_2d()
+    test_varstd_var_bwd_cpu_grad_zero_for_constant()
+    test_varstd_var_bwd_cpu_3d_axis1()
+
+    # ── Variance grad flow CPU ──
+    test_varstd_var_gradflow_cpu_chained_with_sum()
+    test_varstd_var_gradflow_cpu_no_grad_leaf()
+
+    # ── Std forward CPU ──
+    test_varstd_std_fwd_cpu_global_1d()
+    test_varstd_std_fwd_cpu_global_unbiased()
+    test_varstd_std_fwd_cpu_axis0_2d()
+    test_varstd_std_fwd_cpu_axis1_2d()
+    test_varstd_std_fwd_cpu_constant_near_zero()
+    test_varstd_std_fwd_cpu_keepdims()
+    test_varstd_std_fwd_cpu_3d()
+
+    # ── Std backward CPU ──
+    test_varstd_std_bwd_cpu_global_1d()
+    test_varstd_std_bwd_cpu_axis1_2d()
+    test_varstd_std_bwd_cpu_grad_zero_for_constant()
+    test_varstd_std_bwd_cpu_3d_axis2()
+
+    # ── Std grad flow CPU ──
+    test_varstd_std_gradflow_cpu_chained_with_scalar()
+    test_varstd_std_gradflow_cpu_no_grad_leaf()
+
+    # ── Variance GPU ──
+    test_varstd_var_fwd_gpu_global_1d()
+    test_varstd_var_fwd_gpu_axis0_2d()
+    test_varstd_var_fwd_gpu_axis1_2d()
+    test_varstd_var_fwd_gpu_3d_axis1()
+    test_varstd_var_bwd_gpu_global_1d()
+    test_varstd_var_bwd_gpu_axis1_2d()
+    test_varstd_var_bwd_gpu_3d_axis1()
+
+    # ── Std GPU ──
+    test_varstd_std_fwd_gpu_global_1d()
+    test_varstd_std_fwd_gpu_axis0_2d()
+    test_varstd_std_fwd_gpu_axis1_2d()
+    test_varstd_std_fwd_gpu_3d()
+    test_varstd_std_bwd_gpu_global_1d()
+    test_varstd_std_bwd_gpu_axis1_2d()
+    test_varstd_std_bwd_gpu_3d_axis2()
+
+    # ── Parity ──
+    test_varstd_parity_var_fwd_global()
+    test_varstd_parity_var_fwd_axis1()
+    test_varstd_parity_std_fwd_global()
+    test_varstd_parity_std_fwd_axis1()
+    test_varstd_parity_var_bwd_global()
+    test_varstd_parity_std_bwd_axis1()
+
+
     print("All variance and std tests passed ✓")
+
+# ═════════════════════════════════════════════════════════════════════════════
+# VARIANCE — CPU
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Forward — CPU
+# ─────────────────────────────────────────────────────────────────────────────
+
+fn test_varstd_var_fwd_cpu_global_1d() raises:
+    print("test_varstd_var_fwd_cpu_global_1d")
+    comptime dtype = DType.float32
+    # [1,2,3,4,5] — population var = 2.0, sample var = 2.5
+    var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
+    var v_pop  = x.variance[track_grad=False](unbiased=False)
+    var v_samp = x.variance[track_grad=False](unbiased=True)
+    assert_true(v_pop.all_close[atol=1e-5](Tensor[dtype].scalar(2.0)))
+    assert_true(v_samp.all_close[atol=1e-5](Tensor[dtype].scalar(2.5)))
+
+
+fn test_varstd_var_fwd_cpu_global_2d() raises:
+    print("test_varstd_var_fwd_cpu_global_2d")
+    comptime dtype = DType.float32
+    # [[1,2],[3,4]] — global mean=2.5, pop var = (1+0.25+0.25+2.25)/4 = 1.25
+    var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
+    var v = x.variance[track_grad=False](unbiased=False)
+    assert_true(v.all_close[atol=1e-5](Tensor[dtype].scalar(1.25)))
+
+
+fn test_varstd_var_fwd_cpu_axis0_2d() raises:
+    print("test_varstd_var_fwd_cpu_axis0_2d")
+    comptime dtype = DType.float32
+    # [[1,2],[3,4]] — var along axis 0 (over rows):
+    # col0: var(1,3)=1.0(pop), col1: var(2,4)=1.0(pop)
+    var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
+    var v = x.variance[track_grad=False](axis=0, unbiased=False)
+    assert_true(v.shape() == Shape(2))
+    assert_true(v.all_close[atol=1e-5](Tensor[dtype].d1([1.0, 1.0])))
+
+
+fn test_varstd_var_fwd_cpu_axis1_2d() raises:
+    print("test_varstd_var_fwd_cpu_axis1_2d")
+    comptime dtype = DType.float32
+    # [[1,3],[2,4]] — var along axis 1 (over cols):
+    # row0: var(1,3)=1.0, row1: var(2,4)=1.0
+    var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]])
+    var v = x.variance[track_grad=False](axis=1, unbiased=False)
+    assert_true(v.shape() == Shape(2))
+    assert_true(v.all_close[atol=1e-5](Tensor[dtype].d1([1.0, 1.0])))
+
+
+fn test_varstd_var_fwd_cpu_axis1_keepdims() raises:
+    print("test_varstd_var_fwd_cpu_axis1_keepdims")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]])
+    var v = x.variance[track_grad=False](axis=1, keepdims=True, unbiased=False)
+    assert_true(v.shape() == Shape(2, 1))
+    assert_true(v.all_close[atol=1e-5](Tensor[dtype].d2([[1.0], [1.0]])))
+
+
+fn test_varstd_var_fwd_cpu_constant_is_zero() raises:
+    print("test_varstd_var_fwd_cpu_constant_is_zero")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].full(Shape(4), 7.0)
+    var v = x.variance[track_grad=False](unbiased=False)
+    assert_true(v.all_close[atol=1e-6](Tensor[dtype].scalar(0.0)))
+
+
+fn test_varstd_var_fwd_cpu_3d_axis1() raises:
+    print("test_varstd_var_fwd_cpu_3d_axis1")
+    comptime dtype = DType.float32
+    # shape (2,3,4) — variance along axis 1
+    var x = Tensor[dtype].arange(0.0, 24.0).reshape(2, 3, 4)
+    var v = x.variance[track_grad=False](axis=1, unbiased=False)
+    assert_true(v.shape() == Shape(2, 4))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Backward — CPU
+# ─────────────────────────────────────────────────────────────────────────────
+
+fn test_varstd_var_bwd_cpu_global_1d() raises:
+    print("test_varstd_var_bwd_cpu_global_1d")
+    comptime dtype = DType.float32
+    # x = [1,2,3,4,5], mean=3, diff=[-2,-1,0,1,2]
+    # pop var grad = 2/n * diff = 2/5 * diff = [-0.8,-0.4,0,0.4,0.8]
+    var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
+    var v = x.variance[track_grad=True](unbiased=False)
+    var loss = v.sum()
+    loss.backward()
+    assert_true(x.grad().all_close[atol=1e-5](
+        Tensor[dtype].d1([-0.8, -0.4, 0.0, 0.4, 0.8])
+    ))
+
+
+fn test_varstd_var_bwd_cpu_global_unbiased() raises:
+    print("test_varstd_var_bwd_cpu_global_unbiased")
+    comptime dtype = DType.float32
+    # sample var grad = 2/(n-1) * diff = 2/4 * diff = [-1,-0.5,0,0.5,1]
+    var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
+    var v = x.variance[track_grad=True](unbiased=True)
+    var loss = v.sum()
+    loss.backward()
+    assert_true(x.grad().all_close[atol=1e-5](
+        Tensor[dtype].d1([-1.0, -0.5, 0.0, 0.5, 1.0])
+    ))
+
+
+fn test_varstd_var_bwd_cpu_axis0_2d() raises:
+    print("test_varstd_var_bwd_cpu_axis0_2d")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var v = x.variance[track_grad=True](axis=0, unbiased=False)
+    var loss = v.sum()
+    loss.backward()
+    # var(col0)=1, grad = 2/2 * [-1,1] = [-1,1] for col0
+    # var(col1)=1, grad = 2/2 * [-1,1] = [-1,1] for col1
+    assert_true(x.grad().all_close[atol=1e-5](
+        Tensor[dtype].d2([[-1.0, -1.0], [1.0, 1.0]])
+    ))
+
+
+fn test_varstd_var_bwd_cpu_axis1_2d() raises:
+    print("test_varstd_var_bwd_cpu_axis1_2d")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]], requires_grad=True)
+    var v = x.variance[track_grad=True](axis=1, unbiased=False)
+    var loss = v.sum()
+    loss.backward()
+    # row0: mean=2, diff=[-1,1], grad=2/2*[-1,1]=[-1,1]
+    # row1: mean=3, diff=[-1,1], grad=[-1,1]
+    assert_true(x.grad().all_close[atol=1e-5](
+        Tensor[dtype].d2([[-1.0, 1.0], [-1.0, 1.0]])
+    ))
+
+
+fn test_varstd_var_bwd_cpu_grad_zero_for_constant() raises:
+    print("test_varstd_var_bwd_cpu_grad_zero_for_constant")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].full(Shape(4), 3.0, requires_grad=True)
+    var v = x.variance[track_grad=True](unbiased=False)
+    var loss = v.sum()
+    loss.backward()
+    assert_true(x.grad().all_close[atol=1e-6](Tensor.zeros_like(x)))
+
+
+fn test_varstd_var_bwd_cpu_3d_axis1() raises:
+    print("test_varstd_var_bwd_cpu_3d_axis1")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].arange(0.0, 24.0).reshape(2, 3, 4)
+    x.requires_grad_(True)
+    var v = x.variance[track_grad=True](axis=1, unbiased=False)
+    var loss = v.sum()
+    loss.backward()
+    assert_true(x.grad().shape() == Shape(2, 3, 4))
+    # grad sum should be zero — variance grad sums to zero per reduced axis
+    assert_true(
+        x.gradients()[][i(0), s(), s()].sum().all_close[atol=1e-4](Tensor[dtype].scalar(0.0))
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Grad flow — CPU
+# ─────────────────────────────────────────────────────────────────────────────
+
+fn test_varstd_var_gradflow_cpu_chained_with_sum() raises:
+    print("test_varstd_var_gradflow_cpu_chained_with_sum")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var v = x.variance[track_grad=True](unbiased=False)
+    var loss = v * Tensor[dtype].scalar(2.0)
+    var l = loss.sum()
+    l.backward()
+    # grad = 2 * (2/3) * diff where diff = [-1,0,1]
+    assert_true(x.grad().all_close[atol=1e-5](
+        Tensor[dtype].d1([-4.0/3.0, 0.0, 4.0/3.0])
+    ))
+
+
+fn test_varstd_var_gradflow_cpu_no_grad_leaf() raises:
+    print("test_varstd_var_gradflow_cpu_no_grad_leaf")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d1([1.0, 2.0, 3.0])   # no grad
+    var v = x.variance[track_grad=True](unbiased=False)
+    assert_true(not v.requires_grad)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# STD — CPU
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Forward — CPU
+# ─────────────────────────────────────────────────────────────────────────────
+
+fn test_varstd_std_fwd_cpu_global_1d() raises:
+    print("test_varstd_std_fwd_cpu_global_1d")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
+    var s = x.std[track_grad=False](unbiased=False)
+    # pop std = sqrt(2) ≈ 1.4142135
+    assert_true(s.all_close[atol=1e-5](Tensor[dtype].scalar(1.4142135)))
+
+
+fn test_varstd_std_fwd_cpu_global_unbiased() raises:
+    print("test_varstd_std_fwd_cpu_global_unbiased")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
+    var s = x.std[track_grad=False](unbiased=True)
+    # sample std = sqrt(2.5) ≈ 1.5811388
+    assert_true(s.all_close[atol=1e-5](Tensor[dtype].scalar(1.5811388)))
+
+
+fn test_varstd_std_fwd_cpu_axis0_2d() raises:
+    print("test_varstd_std_fwd_cpu_axis0_2d")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
+    var s = x.std[track_grad=False](axis=0, unbiased=False)
+    assert_true(s.shape() == Shape(2))
+    assert_true(s.all_close[atol=1e-5](Tensor[dtype].d1([1.0, 1.0])))
+
+
+fn test_varstd_std_fwd_cpu_axis1_2d() raises:
+    print("test_varstd_std_fwd_cpu_axis1_2d")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]])
+    var s = x.std[track_grad=False](axis=1, unbiased=False)
+    assert_true(s.shape() == Shape(2))
+    assert_true(s.all_close[atol=1e-5](Tensor[dtype].d1([1.0, 1.0])))
+
+
+fn test_varstd_std_fwd_cpu_constant_near_zero() raises:
+    print("test_varstd_std_fwd_cpu_constant_near_zero")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].full(Shape(4), 5.0)
+    var s = x.std[track_grad=False](unbiased=False)
+    # std of constant = 0 (epsilon guards division)
+    assert_true(s.all_close[atol=1e-5](Tensor[dtype].scalar(0.0)))
+
+
+fn test_varstd_std_fwd_cpu_keepdims() raises:
+    print("test_varstd_std_fwd_cpu_keepdims")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]])
+    var s = x.std[track_grad=False](axis=1, keepdims=True, unbiased=False)
+    assert_true(s.shape() == Shape(2, 1))
+
+
+fn test_varstd_std_fwd_cpu_3d() raises:
+    print("test_varstd_std_fwd_cpu_3d")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].arange(0.0, 24.0).reshape(2, 3, 4)
+    var s = x.std[track_grad=False](axis=2, unbiased=False)
+    assert_true(s.shape() == Shape(2, 3))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Backward — CPU
+# ─────────────────────────────────────────────────────────────────────────────
+
+fn test_varstd_std_bwd_cpu_global_1d() raises:
+    print("test_varstd_std_bwd_cpu_global_1d")
+    comptime dtype = DType.float32
+    # x=[1,2,3,4,5], std=sqrt(2), grad_std=1
+    # dL/dx = diff / (std * n) = [-2,-1,0,1,2] / (sqrt(2)*5)
+    var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
+    var s = x.std[track_grad=True](unbiased=False)
+    var loss = s.sum()
+    loss.backward()
+    var std_val = 1.4142135
+    var expected = Tensor[dtype].d1([
+        Scalar[dtype](-2.0 / (std_val * 5.0)),
+        Scalar[dtype](-1.0 / (std_val * 5.0)),
+        Scalar[dtype]( 0.0),
+        Scalar[dtype]( 1.0 / (std_val * 5.0)),
+        Scalar[dtype]( 2.0 / (std_val * 5.0)),
+    ])
+    assert_true(x.grad().all_close[atol=1e-5](expected))
+
+
+fn test_varstd_std_bwd_cpu_axis1_2d() raises:
+    print("test_varstd_std_bwd_cpu_axis1_2d")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]], requires_grad=True)
+    var s = x.std[track_grad=True](axis=1, unbiased=False)
+    var loss = s.sum()
+    loss.backward()
+    # std=1 for both rows, diff=[-1,1], grad = diff/(std*n) = [-0.5, 0.5]
+    assert_true(x.grad().all_close[atol=1e-5](
+        Tensor[dtype].d2([[-0.5, 0.5], [-0.5, 0.5]])
+    ))
+
+
+fn test_varstd_std_bwd_cpu_grad_zero_for_constant() raises:
+    print("test_varstd_std_bwd_cpu_grad_zero_for_constant")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].full(Shape(4), 2.0, requires_grad=True)
+    var s = x.std[track_grad=True](unbiased=False)
+    var loss = s.sum()
+    loss.backward()
+    # diff = 0 everywhere => grad = 0
+    assert_true(x.grad().all_close[atol=1e-5](Tensor.zeros_like(x)))
+
+
+fn test_varstd_std_bwd_cpu_3d_axis2() raises:
+    print("test_varstd_std_bwd_cpu_3d_axis2")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].arange(1.0, 25.0).reshape(2, 3, 4)
+    x.requires_grad_(True)
+    var s = x.std[track_grad=True](axis=2, unbiased=False)
+    var loss = s.sum()
+    loss.backward()
+    assert_true(x.grad().shape() == Shape(2, 3, 4))
+    assert_true(x.grad().sum().item() == x.grad().sum().item())  # no NaN
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Grad flow — CPU
+# ─────────────────────────────────────────────────────────────────────────────
+
+fn test_varstd_std_gradflow_cpu_chained_with_scalar() raises:
+    print("test_varstd_std_gradflow_cpu_chained_with_scalar")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
+    var s = x.std[track_grad=True](unbiased=False)
+    var scaled = s * Tensor[dtype].scalar(3.0)
+    var loss = scaled.sum()
+    loss.backward()
+    # grad = 3 * diff / (std * n)
+    assert_true(x.grad().shape() == Shape(5))
+    assert_true(x.grad().sum().item() == x.grad().sum().item())  # no NaN
+
+
+fn test_varstd_std_gradflow_cpu_no_grad_leaf() raises:
+    print("test_varstd_std_gradflow_cpu_no_grad_leaf")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d1([1.0, 2.0, 3.0])
+    var s = x.std[track_grad=True](unbiased=False)
+    assert_true(not s.requires_grad)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# VARIANCE — GPU
+# ═════════════════════════════════════════════════════════════════════════════
+
+fn test_varstd_var_fwd_gpu_global_1d() raises:
+    comptime if has_accelerator():
+        print("test_varstd_var_fwd_gpu_global_1d")
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0]).to_gpu()
+        var v = x.variance[track_grad=False](unbiased=False)
+        assert_true(v.to_cpu().all_close[atol=1e-5](Tensor[dtype].scalar(2.0)))
+
+
+fn test_varstd_var_fwd_gpu_axis0_2d() raises:
+    comptime if has_accelerator():
+        print("test_varstd_var_fwd_gpu_axis0_2d")
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
+        var v = x.variance[track_grad=False](axis=0, unbiased=False)
+        assert_true(v.shape() == Shape(2))
+        assert_true(v.to_cpu().all_close[atol=1e-5](Tensor[dtype].d1([1.0, 1.0])))
+
+
+fn test_varstd_var_fwd_gpu_axis1_2d() raises:
+    comptime if has_accelerator():
+        print("test_varstd_var_fwd_gpu_axis1_2d")
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]]).to_gpu()
+        var v = x.variance[track_grad=False](axis=1, unbiased=False)
+        assert_true(v.shape() == Shape(2))
+        assert_true(v.to_cpu().all_close[atol=1e-5](Tensor[dtype].d1([1.0, 1.0])))
+
+
+fn test_varstd_var_fwd_gpu_3d_axis1() raises:
+    comptime if has_accelerator():
+        print("test_varstd_var_fwd_gpu_3d_axis1")
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].arange(0.0, 24.0).reshape(2, 3, 4).to_gpu()
+        var v = x.variance[track_grad=False](axis=1, unbiased=False)
+        assert_true(v.shape() == Shape(2, 4))
+
+
+fn test_varstd_var_bwd_gpu_global_1d() raises:
+    comptime if has_accelerator():
+        print("test_varstd_var_bwd_gpu_global_1d")
+        comptime dtype = DType.float32
+        var x_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
+        var x_gpu = x_cpu.to_gpu()
+        var v = x_gpu.variance[track_grad=True](unbiased=False)
+        var loss = v.sum()
+        loss.backward()
+        assert_true(x_cpu.grad().all_close[atol=1e-5](
+            Tensor[dtype].d1([-0.8, -0.4, 0.0, 0.4, 0.8])
+        ))
+
+
+fn test_varstd_var_bwd_gpu_axis1_2d() raises:
+    comptime if has_accelerator():
+        print("test_varstd_var_bwd_gpu_axis1_2d")
+        comptime dtype = DType.float32
+        var x_cpu = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]], requires_grad=True)
+        var x_gpu = x_cpu.to_gpu()
+        var v = x_gpu.variance[track_grad=True](axis=1, unbiased=False)
+        var loss = v.sum()
+        loss.backward()
+        assert_true(x_cpu.grad().all_close[atol=1e-5](
+            Tensor[dtype].d2([[-1.0, 1.0], [-1.0, 1.0]])
+        ))
+
+
+fn test_varstd_var_bwd_gpu_3d_axis1() raises:
+    comptime if has_accelerator():
+        print("test_varstd_var_bwd_gpu_3d_axis1")
+        comptime dtype = DType.float32
+        var x_cpu = Tensor[dtype].arange(0.0, 24.0).reshape(2, 3, 4)
+        x_cpu.requires_grad_(True)
+        var x_gpu = x_cpu.to_gpu()
+        var v = x_gpu.variance[track_grad=True](axis=1, unbiased=False)
+        var loss = v.sum()
+        loss.backward()
+        assert_true(x_cpu.grad().shape() == Shape(2, 3, 4))
+        assert_true(x_cpu.grad().sum().item() == x_cpu.grad().sum().item())
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# STD — GPU
+# ═════════════════════════════════════════════════════════════════════════════
+
+fn test_varstd_std_fwd_gpu_global_1d() raises:
+    comptime if has_accelerator():
+        print("test_varstd_std_fwd_gpu_global_1d")
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0]).to_gpu()
+        var s = x.std[track_grad=False](unbiased=False)
+        assert_true(s.to_cpu().all_close[atol=1e-5](Tensor[dtype].scalar(1.4142135)))
+
+
+fn test_varstd_std_fwd_gpu_axis0_2d() raises:
+    comptime if has_accelerator():
+        print("test_varstd_std_fwd_gpu_axis0_2d")
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
+        var s = x.std[track_grad=False](axis=0, unbiased=False)
+        assert_true(s.shape() == Shape(2))
+        assert_true(s.to_cpu().all_close[atol=1e-5](Tensor[dtype].d1([1.0, 1.0])))
+
+
+fn test_varstd_std_fwd_gpu_axis1_2d() raises:
+    comptime if has_accelerator():
+        print("test_varstd_std_fwd_gpu_axis1_2d")
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]]).to_gpu()
+        var s = x.std[track_grad=False](axis=1, unbiased=False)
+        assert_true(s.shape() == Shape(2))
+        assert_true(s.to_cpu().all_close[atol=1e-5](Tensor[dtype].d1([1.0, 1.0])))
+
+
+fn test_varstd_std_fwd_gpu_3d() raises:
+    comptime if has_accelerator():
+        print("test_varstd_std_fwd_gpu_3d")
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].arange(0.0, 24.0).reshape(2, 3, 4).to_gpu()
+        var s = x.std[track_grad=False](axis=2, unbiased=False)
+        assert_true(s.shape() == Shape(2, 3))
+
+
+fn test_varstd_std_bwd_gpu_global_1d() raises:
+    comptime if has_accelerator():
+        print("test_varstd_std_bwd_gpu_global_1d")
+        comptime dtype = DType.float32
+        var x_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
+        var x_gpu = x_cpu.to_gpu()
+        var s = x_gpu.std[track_grad=True](unbiased=False)
+        var loss = s.sum()
+        loss.backward()
+        var std_val = 1.4142135
+        var expected = Tensor[dtype].d1([
+            Scalar[dtype](-2.0 / (std_val * 5.0)),
+            Scalar[dtype](-1.0 / (std_val * 5.0)),
+            Scalar[dtype]( 0.0),
+            Scalar[dtype]( 1.0 / (std_val * 5.0)),
+            Scalar[dtype]( 2.0 / (std_val * 5.0)),
+        ])
+        assert_true(x_cpu.grad().all_close[atol=1e-5](expected))
+
+
+fn test_varstd_std_bwd_gpu_axis1_2d() raises:
+    comptime if has_accelerator():
+        print("test_varstd_std_bwd_gpu_axis1_2d")
+        comptime dtype = DType.float32
+        var x_cpu = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]], requires_grad=True)
+        var x_gpu = x_cpu.to_gpu()
+        var s = x_gpu.std[track_grad=True](axis=1, unbiased=False)
+        var loss = s.sum()
+        loss.backward()
+        assert_true(x_cpu.grad().all_close[atol=1e-5](
+            Tensor[dtype].d2([[-0.5, 0.5], [-0.5, 0.5]])
+        ))
+
+
+fn test_varstd_std_bwd_gpu_3d_axis2() raises:
+    comptime if has_accelerator():
+        print("test_varstd_std_bwd_gpu_3d_axis2")
+        comptime dtype = DType.float32
+        var x_cpu = Tensor[dtype].arange(1.0, 25.0).reshape(2, 3, 4)
+        x_cpu.requires_grad_(True)
+        var x_gpu = x_cpu.to_gpu()
+        var s = x_gpu.std[track_grad=True](axis=2, unbiased=False)
+        var loss = s.sum()
+        loss.backward()
+        assert_true(x_cpu.grad().shape() == Shape(2, 3, 4))
+        assert_true(x_cpu.grad().sum().item() == x_cpu.grad().sum().item())
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CPU / GPU PARITY
+# ═════════════════════════════════════════════════════════════════════════════
+
+fn test_varstd_parity_var_fwd_global() raises:
+    comptime if has_accelerator():
+        print("test_varstd_parity_var_fwd_global")
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].arange(1.0, 11.0)
+        var cpu_v = x.variance[track_grad=False](unbiased=False)
+        var gpu_v = x.to_gpu().variance[track_grad=False](unbiased=False).to_cpu()
+        assert_true(cpu_v.all_close[atol=1e-4](gpu_v))
+
+
+fn test_varstd_parity_var_fwd_axis1() raises:
+    comptime if has_accelerator():
+        print("test_varstd_parity_var_fwd_axis1")
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].arange(1.0, 13.0).reshape(3, 4)
+        var cpu_v = x.variance[track_grad=False](axis=1, unbiased=False)
+        var gpu_v = x.to_gpu().variance[track_grad=False](axis=1, unbiased=False).to_cpu()
+        assert_true(cpu_v.all_close[atol=1e-4](gpu_v))
+
+
+fn test_varstd_parity_std_fwd_global() raises:
+    comptime if has_accelerator():
+        print("test_varstd_parity_std_fwd_global")
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].arange(1.0, 11.0)
+        var cpu_s = x.std[track_grad=False](unbiased=False)
+        var gpu_s = x.to_gpu().std[track_grad=False](unbiased=False).to_cpu()
+        assert_true(cpu_s.all_close[atol=1e-4](gpu_s))
+
+
+fn test_varstd_parity_std_fwd_axis1() raises:
+    comptime if has_accelerator():
+        print("test_varstd_parity_std_fwd_axis1")
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].arange(1.0, 13.0).reshape(3, 4)
+        var cpu_s = x.std[track_grad=False](axis=1, unbiased=False)
+        var gpu_s = x.to_gpu().std[track_grad=False](axis=1, unbiased=False).to_cpu()
+        assert_true(cpu_s.all_close[atol=1e-4](gpu_s))
+
+
+fn test_varstd_parity_var_bwd_global() raises:
+    comptime if has_accelerator():
+        print("test_varstd_parity_var_bwd_global")
+        comptime dtype = DType.float32
+        var x_cpu_leaf = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
+        var loss_cpu = x_cpu_leaf.variance[track_grad=True](unbiased=False).sum()
+        loss_cpu.backward()
+
+        var x_gpu_leaf = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
+        var loss_gpu = x_gpu_leaf.to_gpu().variance[track_grad=True](unbiased=False).sum()
+        loss_gpu.backward()
+
+        assert_true(x_cpu_leaf.grad().all_close[atol=1e-5](x_gpu_leaf.grad()))
+
+
+fn test_varstd_parity_std_bwd_axis1() raises:
+    comptime if has_accelerator():
+        print("test_varstd_parity_std_bwd_axis1")
+        comptime dtype = DType.float32
+        var x_cpu_leaf = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]], requires_grad=True)
+        var loss_cpu = x_cpu_leaf.std[track_grad=True](axis=1, unbiased=False).sum()
+        loss_cpu.backward()
+
+        var x_gpu_leaf = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]], requires_grad=True)
+        var loss_gpu = x_gpu_leaf.to_gpu().std[track_grad=True](axis=1, unbiased=False).sum()
+        loss_gpu.backward()
+
+        assert_true(x_cpu_leaf.grad().all_close[atol=1e-5](x_gpu_leaf.grad()))
+
