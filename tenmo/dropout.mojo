@@ -1,5 +1,5 @@
 from std.random.philox import Random as PhiloxRandom
-from std.random import seed as set_seed, random_float64, random_ui64
+from std.random import random_float64, random_ui64
 from std.sys import simd_width_of, has_accelerator
 
 from .tensor import Tensor
@@ -83,7 +83,8 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var training: Bool
     var p: Scalar[Self.dtype]
     var scale: Scalar[Self.dtype]
-    var seed: Optional[UInt64]  # UInt64 to match PhiloxRandom.seed type
+    var seed: UInt64  # UInt64 to match PhiloxRandom.seed type
+    var fixed_seed: Bool
 
     fn __init__(out self, p: Scalar[Self.dtype] = Scalar[Self.dtype](0.5)):
         if p < 0.0 or p >= 1.0:
@@ -91,13 +92,15 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self.training = True
         self.p = p
         self.scale = Scalar[Self.dtype](1.0) / (Scalar[Self.dtype](1.0) - p)
-        self.seed = None
+        self.seed = 42
+        self.fixed_seed = False
 
     fn __copyinit__(out self, copy: Self):
         self.training = copy.training
         self.p = copy.p
         self.scale = copy.scale
         self.seed = copy.seed
+        self.fixed_seed = copy.fixed_seed
 
     fn __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         # ── Eval / no-op paths ────────────────────────────────────────────────
@@ -111,8 +114,7 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         comptime if has_accelerator():
             if x.buffer.is_on_gpu():
                 try:
-                    set_seed()
-                    var seed = self.seed.or_else(random_ui64(0, 1000))
+                    var seed = self.seed if self.fixed_seed else(random_ui64(0, 1000))
                     var result = DropoutKernel[Self.dtype].launch(
                         x.buffer,
                         self.p,
@@ -233,6 +235,7 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     fn set_seed(mut self, seed_val: UInt64):
         """Set Philox seed for reproducible dropout masks."""
         self.seed = seed_val
+        self.fixed_seed = True
 
     fn into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), DROPOUT)
