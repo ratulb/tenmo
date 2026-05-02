@@ -72,7 +72,7 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             else:
                 var scalar_grad = gradbox.item()
                 gradbox_ancestor = Gradbox[Self.dtype].full(
-                    input_shape, scalar_grad, share=False
+                    input_shape, scalar_grad, share=False, device=gradbox.device()
                 )
         else:
             gradbox_ancestor = gradbox^
