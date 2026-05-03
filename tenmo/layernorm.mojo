@@ -54,7 +54,6 @@ struct LayerNormBwdArg[dtype: DType](ArgumentType):
 # =============================================================================
 # Backward
 # =============================================================================
-
 @fieldwise_init
 struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
@@ -74,19 +73,12 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var gamma    = Tensor[Self.dtype](arg.gamma)        # (D,)
 
         # ── dL/dβ = sum(upstream) over all non-D dims ──────────────────────
-        # upstream is (*, D); sum over everything except last dim
-        #TODO - why is this?
-        var d_beta_ndb = upstream.sum[track_grad=False](
-            axes=[-1], keepdims=False  # sum over batch/seq dims, keep D
-        ).buffer
-        # If upstream is (B, T, D) this gives (D,) — correct shape for beta
-
-        # Actually we want sum over all dims EXCEPT last:
-        # Reduce over all axes 0..rank-2 sequentially
+        # Reduce over all axes 0..rank-2 sequentially, leaving shape (D,)
+        # e.g. upstream (B, T, D) -> sum axis=0 -> (T, D) -> sum axis=0 -> (D,)
         var d_beta_t = upstream
         for _ax in range(upstream.rank() - 1):
             d_beta_t = d_beta_t.sum[track_grad=False](axes=[0], keepdims=False)
-        var d_beta_ndb2 = d_beta_t.buffer
+        var d_beta_ndb = d_beta_t.buffer
 
         # ── dL/dγ = sum(upstream * x_hat) over all non-D dims ──────────────
         var ux = upstream.__mul__[track_grad=False](x_hat)   # (*, D)
@@ -122,9 +114,9 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var d_x = rstd.__mul__[track_grad=False](bracket)           # (*, D)
 
         # ── Wrap into Gradbox and return ────────────────────────────────────
-        var d_input = Gradbox[Self.dtype](d_x.buffer,        share=False)
-        var d_gamma = Gradbox[Self.dtype](d_gamma_ndb,       share=False)
-        var d_beta  = Gradbox[Self.dtype](d_beta_ndb2,       share=False)
+        var d_input = Gradbox[Self.dtype](d_x.buffer,    share=False)
+        var d_gamma = Gradbox[Self.dtype](d_gamma_ndb,   share=False)
+        var d_beta  = Gradbox[Self.dtype](d_beta_ndb,    share=False)
 
         return [
             (input_ancestor^, d_input^, AddTensor),
@@ -181,20 +173,20 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var mean = self.mean[track_grad=False](axes=[-1], keepdims=True)    # (*, 1)
         var var_ = self.variance[track_grad=False](
             axis=-1, keepdims=True, unbiased=False
-        )                                                                   # (*, 1)
+        )                                                                    # (*, 1)
 
         # ── Step 2: rstd = 1 / sqrt(var + eps) ─────────────────────────────
-        var var_eps = var_.__add__[track_grad=False](eps)                  # (*, 1)
-        var std_     = var_eps.sqrt[track_grad=False]()                    # (*, 1)
-        var rstd     = std_.reciprocal[track_grad=False]()                 # (*, 1)
+        var var_eps  = var_.__add__[track_grad=False](eps)                  # (*, 1)
+        var std_     = var_eps.sqrt[track_grad=False]()                     # (*, 1)
+        var rstd     = std_.reciprocal[track_grad=False]()                  # (*, 1)
 
         # ── Step 3: normalize ───────────────────────────────────────────────
-        var x_centered = self.__sub__[track_grad=False](mean)              # (*, D)
-        var x_hat      = x_centered.__mul__[track_grad=False](rstd)        # (*, D)
+        var x_centered = self.__sub__[track_grad=False](mean)               # (*, D)
+        var x_hat      = x_centered.__mul__[track_grad=False](rstd)         # (*, D)
 
         # ── Step 4: scale and shift ─────────────────────────────────────────
-        var scaled = x_hat.__mul__[track_grad=False](gamma)                # (*, D)
-        var out_t  = scaled.__add__[track_grad=False](beta)                # (*, D)
+        var scaled = x_hat.__mul__[track_grad=False](gamma)                 # (*, D)
+        var out_t  = scaled.__add__[track_grad=False](beta)                 # (*, D)
 
         var out = Tensor[Self.dtype](out_t.buffer, requires_grad=False)
 
@@ -206,9 +198,9 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             if grad_required:
                 out.requires_grad_(True)
                 var bwd_arg = LayerNormBwdArg[Self.dtype](
-                    x_hat  = x_hat.buffer,    # (*, D) — free from forward
-                    rstd   = rstd.buffer,     # (*, 1) — free from forward
-                    gamma  = gamma.buffer,    # (D,)   — cheap buffer copy
+                    x_hat            = x_hat.buffer,   # (*, D) — free from forward
+                    rstd             = rstd.buffer,    # (*, 1) — free from forward
+                    gamma            = gamma.buffer,   # (D,)   — cheap buffer copy
                     normalized_shape = D,
                 )
                 var backwardFnArg = BackwardFnArg[Self.dtype](
@@ -301,15 +293,15 @@ struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
     fn to_gpu(deinit self, gpu: Optional[GPU] = None) raises -> Self:
         """Move gamma and beta to GPU as permanent GPU leaves."""
         var out = self^
-        out.gamma = self.gamma.to_gpu(gpu=gpu, stop_grad=True)
-        out.beta  = self.beta.to_gpu(gpu=gpu,  stop_grad=True)
+        out.gamma = out.gamma.to_gpu(gpu=gpu, stop_grad=True)
+        out.beta  = out.beta.to_gpu(gpu=gpu,  stop_grad=True)
         return out^
 
     fn to_cpu(deinit self) raises -> Self:
         """Move gamma and beta back to CPU after training."""
         var out = self^
-        out.gamma = self.gamma.to_cpu(stop_grad=True)
-        out.beta  = self.beta.to_cpu(stop_grad=True)
+        out.gamma = out.gamma.to_cpu(stop_grad=True)
+        out.beta  = out.beta.to_cpu(stop_grad=True)
         return out^
 
     fn into(self) -> Module[Self.dtype]:
