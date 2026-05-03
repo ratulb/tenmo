@@ -294,7 +294,7 @@ run_test_by_name() {
     local exit_code=0
 
     case $test_name in
-        layer_normal)   run_test "layer_norm" "tests/test_layernorm.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        layer_norm)   run_test "layer_norm" "tests/test_layernorm.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         reciprocal)     run_test "reciprocal" "tests/test_reciprocal.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         product)        run_test "product" "tests/test_product_reduction.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         unary)          run_test "unary" "tests/test_unary_ops.mojo" "$DEBUG_MODE"; exit_code=$? ;;

@@ -615,9 +615,9 @@ fn test_layernorm_gpu_vs_cpu_bwd_consistency() raises:
         loss_cpu.backward()
         var loss_gpu = out_gpu.sum()
         loss_gpu.backward()
-        assert_true(x_cpu.grad().all_close[atol=1e-5](x_gpu.grad()))
-        assert_true(gamma_cpu.grad().all_close[atol=1e-4](gamma_gpu.grad()))
-        assert_true(beta_cpu.grad().all_close[atol=1e-5](beta_gpu.grad()))
+        assert_true(x_cpu.grad().all_close[atol=1e-5](x_gpu.grad().to_cpu()))
+        assert_true(gamma_cpu.grad().all_close[atol=1e-4](gamma_gpu.grad().to_cpu()))
+        assert_true(beta_cpu.grad().all_close[atol=1e-5](beta_gpu.grad().to_cpu()))
 
 
 # =============================================================================
@@ -643,20 +643,22 @@ fn test_layernorm_gpu_layer_wrapper_bwd() raises:
     comptime if has_accelerator():
         print("test_layernorm_gpu_layer_wrapper_bwd")
         comptime dtype = DType.float32
-        var ln = LayerNorm[dtype](4)
+        var ln_gpu = LayerNorm[dtype](4).to_gpu()
         var x = Tensor[dtype].d2(
             [[1.0,2.0,3.0,4.0]], requires_grad=True
         ).to_gpu()
-        var ln_gpu = ln.to_gpu()
         var out = ln_gpu(x)
         var loss = out.sum()
         loss.backward()
-        assert_true(ln.gamma.grad().shape() == Shape(4))
-        assert_true(ln.beta.grad().shape() == Shape(4))
-        assert_true(ln.beta.grad().all_close[atol=1e-5](
-            Tensor[dtype].ones(Shape(4))
+        assert_true(ln_gpu.gamma.grad().shape() == Shape(4))
+        assert_true(ln_gpu.beta.grad().shape() == Shape(4))
+        # d_beta = ones(4), d_gamma = x_hat
+        assert_true(ln_gpu.beta.grad().all_close[atol=1e-5](
+            Tensor[dtype].ones(Shape(4)).to_gpu()
         ))
-
+        assert_true(ln_gpu.gamma.grad().all_close[atol=1e-4](
+            Tensor[dtype].d1([-1.3416, -0.4472, 0.4472, 1.3416]).to_gpu()
+        ))
 
 fn test_layernorm_gpu_eval_no_grad() raises:
     comptime if has_accelerator():
