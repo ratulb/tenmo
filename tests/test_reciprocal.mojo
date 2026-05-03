@@ -367,7 +367,7 @@ fn test_recip_gpu_vs_cpu_consistency() raises:
         loss_cpu.backward()
         var loss_gpu = r_gpu.sum()
         loss_gpu.backward()
-        assert_true(x_cpu.grad().all_close[atol=1e-6](x_gpu.grad()))
+        assert_true(x_cpu.grad().all_close[atol=1e-6](x_gpu.grad().to_cpu()))
 
 
 fn test_recip_gpu_negative_values() raises:
@@ -386,21 +386,26 @@ fn test_recip_gpu_negative_values() raises:
             Tensor[dtype].d1([-1.0, -0.25, -0.0625])
         ))
 
-
 fn test_recip_gpu_grad_accumulation() raises:
     comptime if has_accelerator():
         print("test_recip_gpu_grad_accumulation")
         comptime dtype = DType.float32
-        var x = Tensor[dtype].d1([2.0, 4.0], requires_grad=True)
-        var x_gpu = x.to_gpu()
-        var r1 = x_gpu.reciprocal[track_grad=True]()
-        var r2 = x_gpu.reciprocal[track_grad=True]()
+        var x1 = Tensor[dtype].d1([2.0, 4.0], requires_grad=True)
+        var x2 = Tensor[dtype].d1([2.0, 4.0], requires_grad=True)
+        var x1_gpu = x1.to_gpu()
+        var x2_gpu = x2.to_gpu()
+        var r1 = x1_gpu.reciprocal[track_grad=True]()
+        var r2 = x2_gpu.reciprocal[track_grad=True]()
         var loss1 = r1.sum()
         loss1.backward()
         var loss2 = r2.sum()
         loss2.backward()
-        assert_true(x.grad().all_close[atol=1e-6](
-            Tensor[dtype].d1([-0.5, -0.125])
+        # x1 and x2 each get one backward — same grad
+        assert_true(x1.grad().all_close[atol=1e-6](
+            Tensor[dtype].d1([-0.25, -0.0625])
+        ))
+        assert_true(x2.grad().all_close[atol=1e-6](
+            Tensor[dtype].d1([-0.25, -0.0625])
         ))
 
 def main() raises:
