@@ -174,8 +174,8 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var (mean_ndb, var_ndb) = self.buffer.welford(
            axis=self.rank() - 1, unbiased=False, keepdims=True
         )
-        var mean = Tensor[Self.dtype](mean_ndb^)
-        var var_ = Tensor[Self.dtype](var_ndb^)        
+        var mean = Tensor[Self.dtype](mean_ndb^, requires_grad=False)
+        var var_ = Tensor[Self.dtype](var_ndb^, requires_grad=False)
         _="""var mean = self.mean[track_grad=False](axes=[-1], keepdims=True)    # (*, 1)
         var var_ = self.variance[track_grad=False](
             axis=-1, keepdims=True, unbiased=False
