@@ -4,7 +4,150 @@ from tenmo.common_utils import i, s
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 
+#====== Complex and edge cases =======
 
+fn test_varstd_cpu_variance_in_expression() raises:
+    print("test_varstd_cpu_variance_in_expression")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    # loss = 2 * variance(x)
+    var v = x.variance[track_grad=True](unbiased=False)
+    var scaled = v * Tensor[dtype].scalar(2.0)
+    var loss = scaled.sum()
+    loss.backward()
+    # grad = 2 * 2*(x-mean)/n = 4*(x-mean)/3
+    # mean=2, n=3: [-4/3, 0, 4/3]
+    var expected = Tensor[dtype].d1([-1.3333333, 0.0, 1.3333333])
+    assert_true(x.grad().all_close[atol=1e-5](expected))
+    
+fn test_varstd_cpu_std_in_normalization() raises:
+    print("test_varstd_cpu_std_in_normalization")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var s = x.std[track_grad=True](unbiased=False)
+    var unsqueezed = s.unsqueeze[track_grad=True](0)
+    var norm = x.__truediv__[track_grad=True](
+        unsqueezed.expand[track_grad=True](3)
+    )
+    var loss = norm.sum()
+    loss.backward()
+    assert_true(x.grad().shape() == Shape(3))
+    assert_true(x.grad().all_close[atol=1e-3](
+        Tensor[dtype].d1([4.8990, 1.2247, -2.4495])
+    ))   
+ 
+    
+fn test_varstd_cpu_variance_4d_axis2() raises:
+    print("test_varstd_cpu_variance_4d_axis2")
+    comptime dtype = DType.float32
+    # Shape (2,2,3,2) — variance along axis=2 (size 3)
+    var x = Tensor[dtype].d4(
+        [[[[1.0,2.0],[3.0,4.0],[5.0,6.0]],
+          [[7.0,8.0],[9.0,10.0],[11.0,12.0]]],
+         [[[2.0,4.0],[6.0,8.0],[10.0,12.0]],
+          [[1.0,3.0],[5.0,7.0],[9.0,11.0]]]], requires_grad=True
+    )
+    var v = x.variance[track_grad=True](axis=2, keepdims=False, unbiased=False)
+    assert_true(v.shape() == Shape(2, 2, 2))
+    # Each slice of size 3 along axis=2:
+    # [1,3,5] → mean=3, var=8/3  [2,4,6] → mean=4, var=8/3
+    # [7,9,11] → mean=9, var=8/3 [8,10,12] → mean=10, var=8/3
+    # [2,6,10] → mean=6, var=32/3 [4,8,12] → mean=8, var=32/3
+    # [1,5,9]  → mean=5, var=32/3 [3,7,11] → mean=7, var=32/3
+    var expected_var = Tensor[dtype].d3(
+        [[[2.6666667, 2.6666667], [2.6666667, 2.6666667]],
+         [[10.6666667, 10.6666667], [10.6666667, 10.6666667]]]
+    )
+    assert_true(v.all_close[atol=1e-4](expected_var))
+    var loss = v.sum()
+    loss.backward()
+    assert_true(x.grad().shape() == x.shape())
+    
+fn test_varstd_gpu_variance_welford_numerical_stability() raises:
+    comptime if has_accelerator():
+        print("test_varstd_gpu_variance_welford_numerical_stability")
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].d1(
+            [1_000_001.0, 1_000_002.0, 1_000_003.0], requires_grad=True
+        )
+        var x_gpu = x.to_gpu()
+        var v = x_gpu.variance[track_grad=True](unbiased=False)
+        assert_true(v.to_cpu().all_close[atol=1e-1](Tensor[dtype].scalar(0.6666667)))
+        var loss = v.sum()
+        loss.backward()
+        var expected = Tensor[dtype].d1([-0.6666667, 0.0, 0.6666667])
+        assert_true(x.grad().all_close[atol=1e-3](expected))
+        
+        
+fn test_varstd_cpu_variance_noncontiguous_input() raises:
+    print("test_varstd_cpu_variance_noncontiguous_input")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d2(
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
+    )
+    # Transpose makes it non-contiguous — shape (2,3), strides (1,2)
+    var xt = x.transpose()
+    var v = xt.variance[track_grad=False](axis=1, keepdims=False, unbiased=False)
+    # rows of xt: [1,3,5] and [2,4,6] — var = 8/3 each
+    assert_true(v.shape() == Shape(2))
+    assert_true(v.all_close[atol=1e-4](Tensor[dtype].d1([2.6666667, 2.6666667])))
+
+
+fn test_varstd_cpu_variance_unbiased_single_element() raises:
+    print("test_varstd_cpu_variance_unbiased_single_element")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d1([5.0], requires_grad=True)
+    # unbiased with n=1 — divisor stays 1, not 0
+    var v = x.variance[track_grad=True](unbiased=True)
+    assert_true(v.all_close[atol=1e-6](Tensor[dtype].scalar(0.0)))
+    var loss = v.sum()
+    loss.backward()
+    assert_true(x.grad().all_close[atol=1e-6](Tensor[dtype].d1([0.0])))
+
+fn test_varstd_cpu_variance_single_element() raises:
+    print("test_varstd_cpu_variance_single_element")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d1([5.0], requires_grad=True)
+    # population variance of single element = 0
+    var v = x.variance[track_grad=True](unbiased=False)
+    assert_true(v.all_close[atol=1e-6](Tensor[dtype].scalar(0.0)))
+    var loss = v.sum()
+    loss.backward()
+    # grad = 2*(x-mean)/n = 2*(5-5)/1 = 0
+    assert_true(x.grad().all_close[atol=1e-6](Tensor[dtype].d1([0.0])))
+
+fn test_varstd_cpu_variance_welford_numerical_stability() raises:
+    print("test_varstd_cpu_variance_welford_numerical_stability")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d1(
+        [1_000_001.0, 1_000_002.0, 1_000_003.0], requires_grad=True
+    )
+    # unbiased=False: population var of [1,2,3] = 2/3
+    var v = x.variance[track_grad=True](unbiased=False)
+    assert_true(v.all_close[atol=1e-1](Tensor[dtype].scalar(0.6666667)))
+    var loss = v.sum()
+    loss.backward()
+    var expected = Tensor[dtype].d1([-0.6666667, 0.0, 0.6666667])
+    assert_true(x.grad().all_close[atol=1e-3](expected))
+
+fn test_varstd_cpu_variance_welford_numerical_stability_ubiased() raises:
+    print("test_varstd_cpu_variance_welford_numerical_stability")
+    comptime dtype = DType.float32
+    # Large offset — two-pass formula loses precision, Welford stays stable
+    # var([1e6+1, 1e6+2, 1e6+3]) = var([1,2,3]) = 1.0 (population)
+    var x = Tensor[dtype].d1(
+        [1_000_001.0, 1_000_002.0, 1_000_003.0], requires_grad=True
+    )
+    var v = x.variance[track_grad=True](unbiased=True)
+    v.print()
+    assert_true(v.all_close[atol=1e-1](Tensor[dtype].scalar(1.0)))
+    var loss = v.sum()
+    loss.backward()
+    # grad = 2*(x-mean)/n, mean=1e6+2, n=3
+    var expected = Tensor[dtype].d1(
+        [-0.6666667, 0.0, 0.6666667]
+    )
+    assert_true(x.grad().all_close[atol=1e-3](expected))
 
 # ===== VARIANCE CPU TESTS =====
 
@@ -449,6 +592,15 @@ fn test_varstd_gpu_variance_unbiased() raises:
 
 
 fn main() raises:
+    # Complex and edge cases
+    test_varstd_cpu_variance_unbiased_single_element()
+    test_varstd_cpu_variance_single_element()
+    test_varstd_cpu_variance_welford_numerical_stability()
+    test_varstd_cpu_variance_noncontiguous_input()
+    test_varstd_gpu_variance_welford_numerical_stability()
+    test_varstd_cpu_variance_4d_axis2()
+    test_varstd_cpu_std_in_normalization()
+    test_varstd_cpu_variance_in_expression()
     # ── CPU ──
     test_varstd_cpu_variance_scalar_global()
     test_varstd_cpu_variance_unbiased_global()
