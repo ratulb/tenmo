@@ -79,9 +79,8 @@ from std.testing import assert_true
 from tenmo.tensor import Tensor
 
 fn main() raises:
-    # Defaults to DType.float32
-
-    var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
 
     # a is used in two places
     var b = a * 2  # ∂b/∂a = 2
@@ -101,8 +100,9 @@ from tenmo.tensor import Tensor
 
 fn main() raises:
     """Broadcasting (2,3) @ (1,3,4)."""
-    var A = Tensor.ones(2, 3, requires_grad=True)
-    var B = Tensor.ones(1, 3, 4)
+    comptime dtype = DType.float32
+    var A = Tensor[dtype].ones(2, 3, requires_grad=True)
+    var B = Tensor[dtype].ones(1, 3, 4)
     var result = A.matmul(B)
     result.backward()
     print(" Broadcast matmul result")
