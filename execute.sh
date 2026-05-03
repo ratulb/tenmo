@@ -81,6 +81,7 @@ run_parallel() {
 
 # Define the complete ordered list of tests
 declare -a ALL_TESTS_IN_ORDER=(
+    "layer_norm|tests/test_layernorm.mojo"
     "reciprocal|tests/test_reciprocal.mojo"
     "product|tests/test_product_reduction.mojo"
     "unary|tests/test_unary_ops.mojo"
@@ -159,6 +160,7 @@ declare -a ALL_TESTS_IN_ORDER=(
 )
 
 declare -a GPU_TESTS=(
+    "layer_norm|tests/test_layernorm.mojo"
     "reciprocal|tests/test_reciprocal.mojo"
     "product|tests/test_product_reduction.mojo"
     "unary|tests/test_unary_ops.mojo"
@@ -292,6 +294,7 @@ run_test_by_name() {
     local exit_code=0
 
     case $test_name in
+        layer_normal)   run_test "layer_norm" "tests/test_layernorm.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         reciprocal)     run_test "reciprocal" "tests/test_reciprocal.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         product)        run_test "product" "tests/test_product_reduction.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         unary)          run_test "unary" "tests/test_unary_ops.mojo" "$DEBUG_MODE"; exit_code=$? ;;
