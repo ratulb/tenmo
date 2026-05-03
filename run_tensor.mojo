@@ -12,7 +12,29 @@ from tenmo.reduction_kernel import Reduction
 from tenmo.unary_ops_kernel import UnaryOpsKernel
 from std.random.philox import Random as PhiloxRandom
 
+from std.python import Python
+
+fn download_file() raises:
+    var urllib = Python.import_module("urllib.request")
+    var url = "https://raw.githubusercontent.com/rasbt/LLMs-from-scratch/main/ch02/01_main-chapter-code/the-verdict.txt"
+    var file_path = "the-verdict.txt"
+    #var request = urllib.Request(url, file_path)
+    var response = urllib.urlopen(url)  # This actually fetches the data
+    var content: String = String(response.read())       # Read the content
+    #print(content)
+    var file = open(file_path, "w")
+    #var data = content.as_bytes()
+    #file.write_bytes(data)
+    file.write(content)
+    #request = urllib.request.Request(url)
+    with open(file_path, "r") as f:
+        print(f.read())
 fn main() raises:
+    download_file()
+    print("Downloaded the-verdict.txt")
+
+
+fn main_1() raises:
     # whatever quick test you want
     comptime dtype = DType.float32
     var t = Tensor[dtype].scalar(3)
@@ -293,7 +315,7 @@ fn test_tensor_dot() raises:
     d.backward()
     assert_true(a.grad().all_close(Tensor[dtype].d1([0, 0, 0, 0, 0, 3, 0, 4, 0, 5])))
 
-fn main_1() raises:
+fn main_2() raises:
     test_complex_mixed_ops_backward()
     test_contig_cpu_1d_slice_view()
     test_expand_1d_to_2d_new_batch_dim()

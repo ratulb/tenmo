@@ -92,20 +92,25 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-        if axis != -100 and (axis < 0 or axis >= self.rank()):
+        # Normalize negative axis — sentinel -100 flows through unchanged
+        var normalized_axis = axis
+        if axis != -100 and axis < 0:
+            normalized_axis = self.rank() + axis
+
+        if normalized_axis != -100 and (normalized_axis < 0 or normalized_axis >= self.rank()):
             panic("axis is not valid for standard deviation")
 
         # Always compute with keepdims=True — backward needs correct broadcast shape
-        var (mean_ndb, var_ndb) = self.buffer.welford(axis, unbiased, keepdims=True)
+        var (mean_ndb, var_ndb) = self.buffer.welford(normalized_axis, unbiased, keepdims=True)
 
         # std from var — keepdims=True shape preserved
         var std_ndb_keepdims = var_ndb.unary_ops[SQRT]()
 
         # Output: squeeze if user requested keepdims=False
         var result_ndb = std_ndb_keepdims
-        if not keepdims and axis != -100:
-            result_ndb = std_ndb_keepdims.squeeze(IntArray(axis))
-        elif not keepdims and axis == -100:
+        if not keepdims and normalized_axis != -100:
+            result_ndb = std_ndb_keepdims.squeeze(IntArray(normalized_axis))
+        elif not keepdims and normalized_axis == -100:
             result_ndb = std_ndb_keepdims.squeeze(IntArray())
 
         var result = Tensor[Self.dtype](result_ndb^, requires_grad=False)
@@ -116,8 +121,8 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             if grad_required:
                 result.requires_grad_(True)
                 var n: Int
-                if axis != -100:
-                    n = self.shape()[axis]
+                if normalized_axis != -100:
+                    n = self.shape()[normalized_axis]
                 else:
                     n = self.numels()
                 var backwardFnArg = BackwardFnArg[Self.dtype](
@@ -125,7 +130,7 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     StdBwdArg[Self.dtype](
                         mean_ndb^,          # keepdims=True — correct for broadcast
                         std_ndb_keepdims^,  # keepdims=True — correct for broadcast
-                        axis,
+                        normalized_axis,
                         unbiased,
                         keepdims,           # original user request — for gradbox handling
                         n,
@@ -133,36 +138,5 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     ),
                 )
                 result.add_ancestry(backwardFnArg^, self)
-
-        _="""# Single Welford pass — (mean_ndb, var_ndb) both free
-        var (mean_ndb, var_ndb) = self.buffer.welford(axis, unbiased, keepdims)
-
-        # std = sqrt(var + epsilon) — fused in one scalar pass
-        var std_ndb = var_ndb.unary_ops[SQRT]()
-        var result = Tensor[Self.dtype](std_ndb, requires_grad=False)
-
-        comptime if track_grad:
-            var grad_required = requires_grad.or_else(self.requires_grad)
-            if grad_required:
-                result.requires_grad_(True)
-                var n: Int
-                if axis != -100:
-                    n = self.shape()[axis]
-                else:
-                    n = self.numels()
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_STD,
-                    StdBwdArg[Self.dtype](
-                        mean_ndb^,   # saved — free from Welford
-                        std_ndb^,    # saved — already computed above
-                        axis,
-                        unbiased,
-                        keepdims,
-                        n,
-                        epsilon,
-                    ),
-                )
-                result.add_ancestry(backwardFnArg^, self)"""
-
 
         return result^

@@ -78,20 +78,28 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         unbiased: Bool = True,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-        if axis != -100 and (axis < 0 or axis >= self.rank()):
+        # Normalize negative axis — but never touch the -100 sentinel
+        var normalized_axis = axis
+        if axis != -100 and axis < 0:
+            normalized_axis = self.rank() + axis   # -1 on rank 3 → 2
+
+        # Validate — only for non-sentinel, non-negative result
+        if normalized_axis != -100 and (normalized_axis < 0 or normalized_axis >= self.rank()):
             panic("Invalid axis specified for variance")
+        _="""if axis != -100 and (axis < 0 or axis >= self.rank()):
+            panic("Invalid axis specified for variance")"""
 
         # Single Welford pass — returns (mean_ndb, var_ndb)
         # mean is free — Welford computes it anyway
         #var (mean_ndb, var_ndb) = self.buffer.welford(axis, unbiased, keepdims)
         #var result = Tensor[Self.dtype](var_ndb^, requires_grad=False)
         # Always save mean with keepdims=True for correct backward broadcasting
-        var (mean_ndb, var_ndb) = self.buffer.welford(axis, unbiased, keepdims=True)
+        var (mean_ndb, var_ndb) = self.buffer.welford(normalized_axis, unbiased, keepdims=True)
         # For the output, squeeze if user requested keepdims=False
         var result_ndb = var_ndb
-        if not keepdims and axis != -100:
-            result_ndb = var_ndb.squeeze(IntArray(axis))
-        elif not keepdims and axis == -100:
+        if not keepdims and normalized_axis != -100:
+            result_ndb = var_ndb.squeeze(IntArray(normalized_axis))
+        elif not keepdims and normalized_axis == -100:
             result_ndb = var_ndb.squeeze(IntArray())
         var result = Tensor[Self.dtype](result_ndb^, requires_grad=False)
         # mean_ndb stays keepdims=True — correct shape for backward broadcast
@@ -101,15 +109,15 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             if grad_required:
                 result.requires_grad_(True)
                 var n: Int
-                if axis != -100:
-                    n = self.shape()[axis]
+                if normalized_axis != -100:
+                    n = self.shape()[normalized_axis]
                 else:
                     n = self.numels()
                 var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_VARIANCE,
                     VarianceBwdArg[Self.dtype](
                         mean_ndb^,  # saved — free from Welford
-                        axis,
+                        normalized_axis,
                         unbiased,
                         keepdims,
                         n,          # saved — free

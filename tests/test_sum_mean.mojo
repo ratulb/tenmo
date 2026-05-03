@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.device import GPU, has_accelerator
 from std.sys import has_accelerator
 
@@ -540,7 +540,7 @@ fn test_mean_cpu_gpu_consistency_3d() raises:
 
 fn main() raises:
     # Basic 1D
-    test_sum_1d_forward_cpu()
+    _="""test_sum_1d_forward_cpu()
     test_sum_1d_forward_gpu()
     test_sum_1d_backward_cpu()
     test_sum_1d_backward_gpu()
@@ -595,7 +595,7 @@ fn main() raises:
 
     # CPU-GPU consistency
     test_sum_cpu_gpu_consistency_2d()
-    test_mean_cpu_gpu_consistency_3d()
-
+    test_mean_cpu_gpu_consistency_3d()"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll sum/mean tests passed!")
     print("✓ CPU 2D mean axis0 passed")
