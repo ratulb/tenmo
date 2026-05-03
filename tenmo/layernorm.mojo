@@ -43,12 +43,13 @@ from std.sys import has_accelerator
 # Backward argument — saved from forward, zero recomputation in backward
 # =============================================================================
 
+
 @fieldwise_init
 struct LayerNormBwdArg[dtype: DType](ArgumentType):
-    var x_hat:  NDBuffer[Self.dtype]   # normalized input  (*, D) keepdims shape
-    var rstd:   NDBuffer[Self.dtype]   # 1/sqrt(var+eps)   (*, 1) keepdims shape
-    var gamma:  NDBuffer[Self.dtype]   # learnable scale   (D,)
-    var normalized_shape: Int          # D — last dim size
+    var x_hat: NDBuffer[Self.dtype]  # normalized input  (*, D) keepdims shape
+    var rstd: NDBuffer[Self.dtype]  # 1/sqrt(var+eps)   (*, 1) keepdims shape
+    var gamma: NDBuffer[Self.dtype]  # learnable scale   (D,)
+    var normalized_shape: Int  # D — last dim size
 
 
 # =============================================================================
@@ -60,17 +61,21 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref arg     = output.ancestry().backward_fn_arg().get[LayerNormBwdArg[Self.dtype]]()
-        ref gradbox = output.gradients()[]   # upstream dL/dy  (*, D)
+        ref arg = (
+            output.ancestry()
+            .backward_fn_arg()
+            .get[LayerNormBwdArg[Self.dtype]]()
+        )
+        ref gradbox = output.gradients()[]  # upstream dL/dy  (*, D)
 
-        var input_ancestor = output.ancestry().get(0)   # x
-        var gamma_ancestor = output.ancestry().get(1)   # gamma
-        var beta_ancestor  = output.ancestry().get(2)   # beta
+        var input_ancestor = output.ancestry().get(0)  # x
+        var gamma_ancestor = output.ancestry().get(1)  # gamma
+        var beta_ancestor = output.ancestry().get(2)  # beta
 
-        var upstream = Tensor[Self.dtype](gradbox.buffer)   # (*, D)
-        var x_hat    = Tensor[Self.dtype](arg.x_hat)        # (*, D)
-        var rstd     = Tensor[Self.dtype](arg.rstd)         # (*, 1)
-        var gamma    = Tensor[Self.dtype](arg.gamma)        # (D,)
+        var upstream = Tensor[Self.dtype](gradbox.buffer)  # (*, D)
+        var x_hat = Tensor[Self.dtype](arg.x_hat)  # (*, D)
+        var rstd = Tensor[Self.dtype](arg.rstd)  # (*, 1)
+        var gamma = Tensor[Self.dtype](arg.gamma)  # (D,)
 
         # ── dL/dβ = sum(upstream) over all non-D dims ──────────────────────
         # Reduce over all axes 0..rank-2 sequentially, leaving shape (D,)
@@ -81,53 +86,53 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var d_beta_ndb = d_beta_t.buffer
 
         # ── dL/dγ = sum(upstream * x_hat) over all non-D dims ──────────────
-        var ux = upstream.__mul__[track_grad=False](x_hat)   # (*, D)
+        var ux = upstream.__mul__[track_grad=False](x_hat)  # (*, D)
         var d_gamma_t = ux
         for _ax in range(ux.rank() - 1):
-            d_gamma_t = d_gamma_t.sum[track_grad=False](axes=[0], keepdims=False)
+            d_gamma_t = d_gamma_t.sum[track_grad=False](
+                axes=[0], keepdims=False
+            )
         var d_gamma_ndb = d_gamma_t.buffer
 
         # ── dL/dx — three-term formula ──────────────────────────────────────
         # d_x_hat = upstream * gamma   broadcast gamma (D,) over (*, D)
-        var d_x_hat = upstream.__mul__[track_grad=False](gamma)   # (*, D)
+        var d_x_hat = upstream.__mul__[track_grad=False](gamma)  # (*, D)
 
         # mean(d_x_hat, axis=-1, keepdims=True)
         var mean_d_x_hat = d_x_hat.mean[track_grad=False](
             axes=[-1], keepdims=True
-        )   # (*, 1)
+        )  # (*, 1)
 
         # mean(d_x_hat * x_hat, axis=-1, keepdims=True)
         var mean_d_x_hat_x_hat = d_x_hat.__mul__[track_grad=False](x_hat).mean[
             track_grad=False
-        ](axes=[-1], keepdims=True)   # (*, 1)
+        ](
+            axes=[-1], keepdims=True
+        )  # (*, 1)
 
         # dx = rstd * (d_x_hat - mean_d_x_hat - x_hat * mean_d_x_hat_x_hat)
         var term1 = d_x_hat
-        var term2 = mean_d_x_hat                                    # (*, 1) broadcasts
+        var term2 = mean_d_x_hat  # (*, 1) broadcasts
         var term3 = x_hat.__mul__[track_grad=False](
-            mean_d_x_hat_x_hat                                      # (*, 1) broadcasts
+            mean_d_x_hat_x_hat  # (*, 1) broadcasts
         )
-        var bracket = term1.__sub__[track_grad=False](
-            term2
-        ).__sub__[track_grad=False](term3)
+        var bracket = term1.__sub__[track_grad=False](term2).__sub__[
+            track_grad=False
+        ](term3)
 
-        var d_x = rstd.__mul__[track_grad=False](bracket)           # (*, D)
+        var d_x = rstd.__mul__[track_grad=False](bracket)  # (*, D)
 
         # ── Wrap into Gradbox and return ────────────────────────────────────
-        var d_input = Gradbox[Self.dtype](d_x.buffer,    share=False)
-        var d_gamma = Gradbox[Self.dtype](d_gamma_ndb,   share=False)
-        var d_beta  = Gradbox[Self.dtype](d_beta_ndb,    share=False)
+        var d_input = Gradbox[Self.dtype](d_x.buffer, share=False)
+        var d_gamma = Gradbox[Self.dtype](d_gamma_ndb, share=False)
+        var d_beta = Gradbox[Self.dtype](d_beta_ndb, share=False)
 
         return [
             (input_ancestor^, d_input^, AddTensor),
             (gamma_ancestor^, d_gamma^, AddTensor),
-            (beta_ancestor^,  d_beta^,  AddTensor),
+            (beta_ancestor^, d_beta^, AddTensor),
         ]
 
-
-# =============================================================================
-# Forward
-# =============================================================================
 
 @fieldwise_init
 struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -135,68 +140,32 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     fn forward[
         track_grad: Bool = True
     ](
-        self:   Tensor[Self.dtype],          # input (*, D)
-        gamma:  Tensor[Self.dtype],          # (D,)  learnable scale
-        beta:   Tensor[Self.dtype],          # (D,)  learnable shift
-        eps:    Scalar[Self.dtype] = Scalar[Self.dtype](1e-5),
+        self: Tensor[Self.dtype],
+        gamma: Tensor[Self.dtype],
+        beta: Tensor[Self.dtype],
+        eps: Scalar[Self.dtype] = Scalar[Self.dtype](1e-5),
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-        """LayerNorm forward — normalize over last dimension.
-
-        Composed from existing Tenmo ops — Welford powers variance() under
-        the hood. All intermediates needed for backward are saved for free.
-
-        Args:
-            self:   Input tensor of any shape (*, D).
-            gamma:  Learnable scale, shape (D,). Initialized to ones.
-            beta:   Learnable shift, shape (D,). Initialized to zeros.
-            eps:    Numerical stability constant. Default 1e-5.
-
-        Returns:
-            Normalized tensor, same shape as input.
-        """
         var D = self.shape()[-1]
 
         if gamma.shape() != Shape(D) or beta.shape() != Shape(D):
-            panic(
-                "LayerNorm: gamma and beta must have shape (",
-                String(D),
-                ",), got gamma=",
-                String(gamma.shape()),
-                " beta=",
-                String(beta.shape()),
-            )
+            panic("LayerNorm: gamma and beta shape mismatch")
 
-        # ── Step 1: mean and variance over last dim ─────────────────────────
-        # variance() uses Welford — single pass, mean is free
-        # keepdims=True so shapes broadcast correctly against input (*, D)
-        # Single Welford pass — mean and variance both free
+        # ── Pass 1: Welford — mean + var in single pass ──────────────────
         var (mean_ndb, var_ndb) = self.buffer.welford(
-           axis=self.rank() - 1, unbiased=False, keepdims=True
+            axis=self.rank() - 1, unbiased=False, keepdims=True
         )
-        var mean = Tensor[Self.dtype](mean_ndb^, requires_grad=False)
-        var var_ = Tensor[Self.dtype](var_ndb^, requires_grad=False)
-        _="""var mean = self.mean[track_grad=False](axes=[-1], keepdims=True)    # (*, 1)
-        var var_ = self.variance[track_grad=False](
-            axis=-1, keepdims=True, unbiased=False
-        )"""                                                                    # (*, 1)
 
-        # ── Step 2: rstd = 1 / sqrt(var + eps) ─────────────────────────────
-        var var_eps  = var_.__add__[track_grad=False](eps)                  # (*, 1)
-        var std_     = var_eps.sqrt[track_grad=False]()                     # (*, 1)
-        var rstd     = std_.reciprocal[track_grad=False]()                  # (*, 1)
+        # ── Pass 2: fused normalize — rstd + x_hat + out in single pass ──
+        # rstd = rsqrt(var + eps) computed inside kernel — saved for backward
+        # x_hat saved for backward — written in pass 2 anyway, zero extra cost
+        var (out_ndb, x_hat_ndb, rstd_ndb) = self.buffer.layernorm_normalize(
+            mean_ndb, var_ndb, gamma.buffer, beta.buffer, eps
+        )
 
-        # ── Step 3: normalize ───────────────────────────────────────────────
-        var x_centered = self.__sub__[track_grad=False](mean)               # (*, D)
-        var x_hat      = x_centered.__mul__[track_grad=False](rstd)         # (*, D)
+        var out = Tensor[Self.dtype](out_ndb^, requires_grad=False)
 
-        # ── Step 4: scale and shift ─────────────────────────────────────────
-        var scaled = x_hat.__mul__[track_grad=False](gamma)                 # (*, D)
-        var out_t  = scaled.__add__[track_grad=False](beta)                 # (*, D)
-
-        var out = Tensor[Self.dtype](out_t.buffer, requires_grad=False)
-
-        # ── Autograd wiring ─────────────────────────────────────────────────
+        # ── Autograd wiring ──────────────────────────────────────────────
         comptime if track_grad:
             var grad_required = requires_grad.or_else(
                 self.requires_grad or gamma.requires_grad or beta.requires_grad
@@ -204,23 +173,18 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             if grad_required:
                 out.requires_grad_(True)
                 var bwd_arg = LayerNormBwdArg[Self.dtype](
-                    x_hat            = x_hat.buffer,   # (*, D) — free from forward
-                    rstd             = rstd.buffer,    # (*, 1) — free from forward
-                    gamma            = gamma.buffer,   # (D,)   — cheap buffer copy
-                    normalized_shape = D,
+                    x_hat=x_hat_ndb^,  # (*, D) — free from pass 2
+                    rstd=rstd_ndb^,  # (*, 1) — free from pass 2
+                    gamma=gamma.buffer,  # (D,)
+                    normalized_shape=D,
                 )
                 var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_LAYER_NORM, bwd_arg^
                 )
-                # Three parents: input, gamma, beta
                 out.add_ancestry(backwardFnArg^, self, gamma, beta)
 
         return out^
 
-
-# =============================================================================
-# Layer wrapper — mirrors ReLU / Dropout pattern exactly
-# =============================================================================
 
 @fieldwise_init
 struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
@@ -238,11 +202,11 @@ struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
         eps:              Numerical stability constant. Default 1e-5.
     """
 
-    var gamma:            Tensor[Self.dtype]   # (normalized_shape,) — ones init
-    var beta:             Tensor[Self.dtype]   # (normalized_shape,) — zeros init
+    var gamma: Tensor[Self.dtype]  # (normalized_shape,) — ones init
+    var beta: Tensor[Self.dtype]  # (normalized_shape,) — zeros init
     var normalized_shape: Int
-    var eps:              Scalar[Self.dtype]
-    var training:         Bool
+    var eps: Scalar[Self.dtype]
+    var training: Bool
 
     fn __init__(
         out self,
@@ -250,12 +214,12 @@ struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
         eps: Scalar[Self.dtype] = Scalar[Self.dtype](1e-5),
     ):
         self.normalized_shape = normalized_shape
-        self.eps      = eps
+        self.eps = eps
         self.training = True
-        self.gamma    = Tensor[Self.dtype].ones(
+        self.gamma = Tensor[Self.dtype].ones(
             Shape(normalized_shape), requires_grad=True
         )
-        self.beta     = Tensor[Self.dtype].zeros(
+        self.beta = Tensor[Self.dtype].zeros(
             Shape(normalized_shape), requires_grad=True
         )
 
@@ -274,14 +238,10 @@ struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
         params.append(
-            UnsafePointer(to=self.gamma)
-            .unsafe_mut_cast[True]()
-            .as_any_origin()
+            UnsafePointer(to=self.gamma).unsafe_mut_cast[True]().as_any_origin()
         )
         params.append(
-            UnsafePointer(to=self.beta)
-            .unsafe_mut_cast[True]()
-            .as_any_origin()
+            UnsafePointer(to=self.beta).unsafe_mut_cast[True]().as_any_origin()
         )
         return params^
 
@@ -300,14 +260,14 @@ struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
         """Move gamma and beta to GPU as permanent GPU leaves."""
         var out = self^
         out.gamma = out.gamma.to_gpu(gpu=gpu, stop_grad=True)
-        out.beta  = out.beta.to_gpu(gpu=gpu,  stop_grad=True)
+        out.beta = out.beta.to_gpu(gpu=gpu, stop_grad=True)
         return out^
 
     fn to_cpu(deinit self) raises -> Self:
         """Move gamma and beta back to CPU after training."""
         var out = self^
         out.gamma = out.gamma.to_cpu(stop_grad=True)
-        out.beta  = out.beta.to_cpu(stop_grad=True)
+        out.beta = out.beta.to_cpu(stop_grad=True)
         return out^
 
     fn into(self) -> Module[Self.dtype]:

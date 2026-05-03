@@ -25,6 +25,7 @@ from .reduction_kernel import Reduction, ProductArg
 from .minmax_kernel import ReductionMinMax
 from .minmax_reducer import MinMaxReducer
 from std.math import sqrt, log, exp, tanh
+from .layernorm_kernel import LayerNormKernel
 from .mnemonics import (
     Multiply,
     Add,
@@ -1384,10 +1385,11 @@ struct NDBuffer[dtype: DType](
         # Normalize axis to IntArray — same pattern as Summer/reduce_cpu
         var normalized_axes: IntArray
         if axis == -100:
-            normalized_axes = IntArray.range(0, self.rank())  # empty = global, matches reduce_cpu
+            normalized_axes = IntArray.range(
+                0, self.rank()
+            )  # empty = global, matches reduce_cpu
         else:
             normalized_axes = IntArray(axis)
-
 
         var out_shape = self.shape.compute_output_shape(
             normalized_axes, keepdims, validated=True
@@ -1417,9 +1419,7 @@ struct NDBuffer[dtype: DType](
             # Axis reduction — mirrors reduce_cpu coord iteration exactly
             var reduction_axes_shape = self.shape.reduced_shape(normalized_axes)
             var n = reduction_axes_shape.product()
-            var divisor = Scalar[Self.dtype](
-                n - 1 if unbiased and n > 1 else n
-            )
+            var divisor = Scalar[Self.dtype](n - 1 if unbiased and n > 1 else n)
             for out_coord in out_shape:
                 var local_mean = Scalar[Self.dtype](0)
                 var local_M2 = Scalar[Self.dtype](0)
@@ -2941,7 +2941,6 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn unary_ops[
         op_code: Int,
-        #epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](self: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         var out: NDBuffer[Self.dtype]
 
@@ -2970,7 +2969,6 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn unary_ops_cpu[
         op_code: Int,
-        #epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](self: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         if self.is_contiguous():
             var start = self.offset
@@ -3147,6 +3145,89 @@ struct NDBuffer[dtype: DType](
                 index += 1
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+    fn layernorm_normalize(
+        self: NDBuffer[Self.dtype],
+        mean: NDBuffer[Self.dtype],
+        var_: NDBuffer[Self.dtype],
+        gamma: NDBuffer[Self.dtype],
+        beta: NDBuffer[Self.dtype],
+        eps: Scalar[Self.dtype],
+    ) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ]:
+        """Fused normalize: rstd + x_hat + out in single pass.
+
+        Pass 2 of LayerNorm forward — Welford (Pass 1) already ran.
+        Returns (out_ndb, x_hat_ndb, rstd_ndb).
+        out and x_hat are shape (*, D). rstd is shape (*, 1).
+
+        Args:
+         self:  Input (*, D). Must be contiguous.
+         mean:  Per-row mean (*, 1) from Welford.
+         var_:  Per-row variance (*, 1) from Welford.
+         gamma: Scale (D,).
+         beta:  Shift (D,).
+         eps:   Numerical stability constant.
+        """
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    return LayerNormKernel[Self.dtype].launch(
+                        self, mean, var_, gamma, beta, eps
+                    )
+                except e:
+                    print(e)
+                    panic("NDBuffer layernorm_normalize → GPU operation failed")
+                    return (
+                        Self.Empty(),
+                        Self.Empty(),
+                        Self.Empty(),
+                    )  # unreachable
+        return self._layernorm_normalize_cpu(mean, var_, gamma, beta, eps)
+
+    fn _layernorm_normalize_cpu(
+        self: NDBuffer[Self.dtype],
+        mean: NDBuffer[Self.dtype],
+        var_: NDBuffer[Self.dtype],
+        gamma: NDBuffer[Self.dtype],
+        beta: NDBuffer[Self.dtype],
+        eps: Scalar[Self.dtype],
+    ) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ]:
+        """CPU fused normalize — serial over rows, element-wise per row."""
+        var D = self.shape[-1]
+        var outer_size = self.numels() // D
+        var out_shape = self.shape
+        var rstd_shape = out_shape[0:-1] + [1]
+
+        var out_buf = Buffer[Self.dtype](self.numels())
+        var x_hat_buf = Buffer[Self.dtype](self.numels())
+        var rstd_buf = Buffer[Self.dtype](outer_size)
+
+        for row in range(outer_size):
+            var row_mean = mean.buffer[row]
+            var row_var = var_.buffer[row]
+            var safe_var = row_var + eps
+            # rsqrt(var + eps) = 1/sqrt(var+eps) — rstd directly
+            var rstd = rsqrt(
+                safe_var if safe_var
+                > Scalar[Self.dtype](0) else Scalar[Self.dtype](eps)
+            )
+            rstd_buf[row] = rstd
+            var row_base = row * D
+            for i in range(D):
+                var x_i = self.buffer[self.offset + row_base + i]
+                var x_hat_i = (x_i - row_mean) * rstd
+                var out_i = gamma.buffer[i] * x_hat_i + beta.buffer[i]
+                x_hat_buf[row_base + i] = x_hat_i
+                out_buf[row_base + i] = out_i
+
+        var out_ndb = NDBuffer[Self.dtype](out_buf^, out_shape)
+        var x_hat_ndb = NDBuffer[Self.dtype](x_hat_buf^, out_shape)
+        var rstd_ndb = NDBuffer[Self.dtype](rstd_buf^, rstd_shape)
+        return (out_ndb^, x_hat_ndb^, rstd_ndb^)
 
     fn minmax[
         is_max: Bool

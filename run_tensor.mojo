@@ -34,7 +34,7 @@ fn download_file() raises:
         raw_text = f.read()
         print("Total number of character:", len(raw_text))
         #print(raw_text[:99])
-fn main() raises:
+fn main_4() raises:
     download_file()
     print("Downloaded the-verdict.txt")
 
@@ -332,5 +332,9 @@ fn main_2() raises:
     test_tensor_dot()
 
 
+def main() raises:
+    var shape = Shape(2, 3, 4)
+    var s = shape[0:-2] + [1]
+    print(s)
 
 
