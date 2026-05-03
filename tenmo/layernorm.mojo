@@ -170,10 +170,16 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # ── Step 1: mean and variance over last dim ─────────────────────────
         # variance() uses Welford — single pass, mean is free
         # keepdims=True so shapes broadcast correctly against input (*, D)
-        var mean = self.mean[track_grad=False](axes=[-1], keepdims=True)    # (*, 1)
+        # Single Welford pass — mean and variance both free
+        var (mean_ndb, var_ndb) = self.buffer.welford(
+           axis=self.rank() - 1, unbiased=False, keepdims=True
+        )
+        var mean = Tensor[Self.dtype](mean_ndb^)
+        var var_ = Tensor[Self.dtype](var_ndb^)        
+        _="""var mean = self.mean[track_grad=False](axes=[-1], keepdims=True)    # (*, 1)
         var var_ = self.variance[track_grad=False](
             axis=-1, keepdims=True, unbiased=False
-        )                                                                    # (*, 1)
+        )"""                                                                    # (*, 1)
 
         # ── Step 2: rstd = 1 / sqrt(var + eps) ─────────────────────────────
         var var_eps  = var_.__add__[track_grad=False](eps)                  # (*, 1)
