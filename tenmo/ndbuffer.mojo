@@ -2941,7 +2941,7 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn unary_ops[
         op_code: Int,
-        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
+        #epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](self: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         var out: NDBuffer[Self.dtype]
 
@@ -2970,7 +2970,7 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn unary_ops_cpu[
         op_code: Int,
-        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
+        #epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](self: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         if self.is_contiguous():
             var start = self.offset

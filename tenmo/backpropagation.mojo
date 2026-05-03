@@ -85,6 +85,7 @@ comptime BACKWARD_MAX_SCALAR = 52
 comptime BACKWARD_MIN_SCALAR = 53
 comptime BACKWARD_MULTIPLY_BROADCAST = 54
 comptime BACKWARD_PRODUCT = 55
+comptime BACKWARD_LAYER_NORM = 56
 
 
 trait ArgumentType(ImplicitlyCopyable & Movable):

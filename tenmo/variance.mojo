@@ -86,8 +86,6 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # Validate — only for non-sentinel, non-negative result
         if normalized_axis != -100 and (normalized_axis < 0 or normalized_axis >= self.rank()):
             panic("Invalid axis specified for variance")
-        _="""if axis != -100 and (axis < 0 or axis >= self.rank()):
-            panic("Invalid axis specified for variance")"""
 
         # Single Welford pass — returns (mean_ndb, var_ndb)
         # mean is free — Welford computes it anyway

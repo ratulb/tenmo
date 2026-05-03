@@ -2367,7 +2367,6 @@ struct Tensor[dtype: DType](
         axis: Int = -100,
         keepdims: Bool = False,
         unbiased: Bool = True,
-        epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-12),
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
         """Compute standard deviation along an axis.
@@ -2376,14 +2375,13 @@ struct Tensor[dtype: DType](
             axis: Axis along which to compute std.
             keepdims: If True, keep reduced axis with size 1.
             unbiased: If True, use n-1. If False, use n.
-            epsilon: Small value for numerical stability.
             requires_grad: If provided, overrides requires_grad.
 
         Returns:
             Tensor with std deviation along the specified axis.
         """
         return StdDev[Self.dtype].forward[track_grad](
-            self, axis, keepdims, unbiased, epsilon, requires_grad
+            self, axis, keepdims, unbiased, requires_grad
         )
 
     fn norm(

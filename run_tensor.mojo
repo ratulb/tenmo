@@ -29,6 +29,11 @@ fn download_file() raises:
     #request = urllib.request.Request(url)
     with open(file_path, "r") as f:
         print(f.read())
+
+    with open(file_path, "r") as f:
+        raw_text = f.read()
+        print("Total number of character:", len(raw_text))
+        #print(raw_text[:99])
 fn main() raises:
     download_file()
     print("Downloaded the-verdict.txt")

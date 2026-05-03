@@ -2,7 +2,6 @@ from .tensor import Tensor
 from .mnemonics import AddTensor
 from .backpropagation import BackwardFnArg, StdArg, BACKWARD_STD
 from .gradbox import Gradbox
-from .common_utils import panic, Epsilon
 from .ancestry import Ancestor
 
 
@@ -18,7 +17,6 @@ struct StdBwdArg[dtype: DType](ArgumentType):
     var unbiased: Bool
     var keepdims: Bool
     var n: Int
-    var epsilon: Scalar[Self.dtype]
 
 
 # =============================================================================
@@ -38,7 +36,6 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var unbiased = bwd_arg.unbiased
         var keepdims = bwd_arg.keepdims
         var n = bwd_arg.n
-        var epsilon = bwd_arg.epsilon
         var gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         var input_tensor = Tensor[Self.dtype](
@@ -53,8 +50,7 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         var diff = input_tensor.__sub__[track_grad=False](mean_tensor)
         var denom = (
-            std_tensor.__add__[track_grad=False](epsilon)
-            .__mul__[track_grad=False](divisor)
+            std_tensor.__mul__[track_grad=False](divisor)
         )
         var local_grad = diff.__truediv__[track_grad=False](denom)
 
@@ -89,7 +85,6 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         axis: Int = -100,
         keepdims: Bool = False,
         unbiased: Bool = True,
-        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
         # Normalize negative axis — sentinel -100 flows through unchanged
@@ -134,7 +129,6 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                         unbiased,
                         keepdims,           # original user request — for gradbox handling
                         n,
-                        epsilon,
                     ),
                 )
                 result.add_ancestry(backwardFnArg^, self)
