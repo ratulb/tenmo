@@ -43,3 +43,5 @@ from .dropout import Dropout
 from .exponential import Exponential
 from .device_transfer import DeviceTransfer
 from .maxmin_scalar import MaxScalar, MinScalar
+from .layernorm import LayerNormForward, LayerNorm
+from .reciprocal import Reciprocal

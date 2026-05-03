@@ -14,6 +14,7 @@ from .forwards import (
     Conv2dFused,
     MaxPool2d,
     Dropout,
+    LayerNorm,
 )
 from .mnemonics import (
     mm,
@@ -29,6 +30,7 @@ from .mnemonics import (
     CONV2D,
     FLATTEN,
     MAXPOOL2D,
+    LAYER_NORM,
 )
 from .blashandle import BLASHandle, BLASHandleLite
 from std.utils.numerics import neg_inf
@@ -743,6 +745,7 @@ comptime Layer[dtype: DType] = Variant[
     Conv2D[dtype],
     Flatten[dtype],
     MaxPool2d[dtype],
+    LayerNorm[dtype],
 ]
 
 
@@ -772,6 +775,9 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             return self.layer[Flatten[Self.dtype]](xs)
         elif self.tag == MAXPOOL2D:
             return self.layer[MaxPool2d[Self.dtype]](xs)
+        elif self.tag == LAYER_NORM:
+            return self.layer[LayerNorm[Self.dtype]](xs)
+
         else:
             panic("Unknown module type")
             return Tensor[Self.dtype].scalar(0)
@@ -785,6 +791,8 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             return self.layer[LinearBLAS[Self.dtype]].parameters()
         elif self.tag == CONV2D:
             return self.layer[Conv2D[Self.dtype]].parameters()
+        elif self.tag == LAYER_NORM:
+            return self.layer[LayerNorm[Self.dtype]].parameters()
 
         else:
             return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
@@ -808,6 +816,9 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             return self.layer[Flatten[Self.dtype]].num_parameters()
         elif self.tag == MAXPOOL2D:
             return self.layer[MaxPool2d[Self.dtype]].num_parameters()
+        elif self.tag == LAYER_NORM:
+            return self.layer[LayerNorm[Self.dtype]].num_parameters()
+
         else:
             return 0
 
@@ -836,6 +847,8 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             self.layer[Flatten[Self.dtype]].train()
         elif self.tag == MAXPOOL2D:
             self.layer[MaxPool2d[Self.dtype]].train()
+        elif self.tag == LAYER_NORM:
+            self.layer[LayerNorm[Self.dtype]].train()
 
     fn eval(mut self):
         """Set module to evaluation mode."""
@@ -857,6 +870,8 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             self.layer[Flatten[Self.dtype]].eval()
         elif self.tag == MAXPOOL2D:
             self.layer[MaxPool2d[Self.dtype]].eval()
+        elif self.tag == LAYER_NORM:
+            self.layer[LayerNorm[Self.dtype]].eval()
 
     fn to_gpu(mut self, gpu: Optional[GPU] = None) raises -> Module[Self.dtype]:
         """Move this module to GPU.
@@ -882,6 +897,10 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
         elif self.tag == CONV2D:
             var l = self.layer[Conv2D[Self.dtype]]
             return Module[Self.dtype](Layer[Self.dtype](l.to_gpu(gpu)), self.tag)
+        elif self.tag == LAYER_NORM:
+            var l = self.layer[LayerNorm[Self.dtype]]
+            return Module[Self.dtype](Layer[Self.dtype](l.to_gpu(gpu)), self.tag)
+
         else:
             # RELU, SIGMOID, TANH, DROPOUT, FLATTEN, MAXPOOL2D
             # No parameters — return unchanged
@@ -898,6 +917,10 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
         elif self.tag == CONV2D:
             var l = self.layer[Conv2D[Self.dtype]]
             return Module[Self.dtype](Layer[Self.dtype](l.to_cpu()), self.tag)
+        elif self.tag == LAYER_NORM:
+            var l = self.layer[LayerNorm[Self.dtype]]
+            return Module[Self.dtype](Layer[Self.dtype](l.to_cpu()), self.tag)
+
         else:
             # RELU, SIGMOID, TANH, DROPOUT, FLATTEN, MAXPOOL2D — no-op
             return self

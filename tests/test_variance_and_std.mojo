@@ -19,7 +19,7 @@ fn test_varstd_cpu_variance_in_expression() raises:
     # mean=2, n=3: [-4/3, 0, 4/3]
     var expected = Tensor[dtype].d1([-1.3333333, 0.0, 1.3333333])
     assert_true(x.grad().all_close[atol=1e-5](expected))
-    
+
 fn test_varstd_cpu_std_in_normalization() raises:
     print("test_varstd_cpu_std_in_normalization")
     comptime dtype = DType.float32
@@ -34,9 +34,9 @@ fn test_varstd_cpu_std_in_normalization() raises:
     assert_true(x.grad().shape() == Shape(3))
     assert_true(x.grad().all_close[atol=1e-3](
         Tensor[dtype].d1([4.8990, 1.2247, -2.4495])
-    ))   
- 
-    
+    ))
+
+
 fn test_varstd_cpu_variance_4d_axis2() raises:
     print("test_varstd_cpu_variance_4d_axis2")
     comptime dtype = DType.float32
@@ -62,7 +62,7 @@ fn test_varstd_cpu_variance_4d_axis2() raises:
     var loss = v.sum()
     loss.backward()
     assert_true(x.grad().shape() == x.shape())
-    
+
 fn test_varstd_gpu_variance_welford_numerical_stability() raises:
     comptime if has_accelerator():
         print("test_varstd_gpu_variance_welford_numerical_stability")
@@ -77,8 +77,8 @@ fn test_varstd_gpu_variance_welford_numerical_stability() raises:
         loss.backward()
         var expected = Tensor[dtype].d1([-0.6666667, 0.0, 0.6666667])
         assert_true(x.grad().all_close[atol=1e-3](expected))
-        
-        
+
+
 fn test_varstd_cpu_variance_noncontiguous_input() raises:
     print("test_varstd_cpu_variance_noncontiguous_input")
     comptime dtype = DType.float32

@@ -2336,6 +2336,24 @@ struct Tensor[dtype: DType](
             self, axes, keepdims, requires_grad
         )
 
+    fn reciprocal[
+        track_grad: Bool = True
+    ](
+        self: Tensor[Self.dtype],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        """Compute reciprocal.
+
+        Args:
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with reciprocal values of the elements.
+        """
+        return Reciprocal[Self.dtype].forward[track_grad](
+            self, requires_grad
+        )
+
     fn variance[
         track_grad: Bool = True
     ](

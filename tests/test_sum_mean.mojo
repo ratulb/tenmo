@@ -598,4 +598,3 @@ fn main() raises:
     test_mean_cpu_gpu_consistency_3d()"""
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll sum/mean tests passed!")
-    print("✓ CPU 2D mean axis0 passed")

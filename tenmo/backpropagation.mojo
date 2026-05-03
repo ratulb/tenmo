@@ -454,6 +454,9 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             return DotBackward[Self.dtype].backward(output)
         elif op_code == BACKWARD_PRODUCT:
             return ProductBackward[Self.dtype].backward(output)
+        elif op_code == BACKWARD_LAYER_NORM:
+            return LayerNormBackward[Self.dtype].backward(output)
+
 
         else:
             return []

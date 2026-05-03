@@ -30,9 +30,9 @@ from .tensor import Tensor
 from .shapes import Shape
 from .gradbox import Gradbox
 from .ancestry import Ancestor
-from .backpropagation import BackwardFnArg, AddTensor, BACKWARD_LAYER_NORM
+from .backpropagation import BackwardFnArg, BACKWARD_LAYER_NORM
 from .ndbuffer import NDBuffer
-from .mnemonics import LAYER_NORM
+from .mnemonics import LAYER_NORM, AddTensor
 from .device import GPU
 from .common_utils import panic
 from std.utils import Variant
@@ -75,23 +75,24 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # ── dL/dβ = sum(upstream) over all non-D dims ──────────────────────
         # upstream is (*, D); sum over everything except last dim
+        #TODO - why is this?
         var d_beta_ndb = upstream.sum[track_grad=False](
-            axis=-1, keepdims=False  # sum over batch/seq dims, keep D
+            axes=[-1], keepdims=False  # sum over batch/seq dims, keep D
         ).buffer
         # If upstream is (B, T, D) this gives (D,) — correct shape for beta
 
         # Actually we want sum over all dims EXCEPT last:
         # Reduce over all axes 0..rank-2 sequentially
         var d_beta_t = upstream
-        for ax in range(upstream.rank() - 1):
-            d_beta_t = d_beta_t.sum[track_grad=False](axis=0, keepdims=False)
+        for _ax in range(upstream.rank() - 1):
+            d_beta_t = d_beta_t.sum[track_grad=False](axes=[0], keepdims=False)
         var d_beta_ndb2 = d_beta_t.buffer
 
         # ── dL/dγ = sum(upstream * x_hat) over all non-D dims ──────────────
         var ux = upstream.__mul__[track_grad=False](x_hat)   # (*, D)
         var d_gamma_t = ux
-        for ax in range(ux.rank() - 1):
-            d_gamma_t = d_gamma_t.sum[track_grad=False](axis=0, keepdims=False)
+        for _ax in range(ux.rank() - 1):
+            d_gamma_t = d_gamma_t.sum[track_grad=False](axes=[0], keepdims=False)
         var d_gamma_ndb = d_gamma_t.buffer
 
         # ── dL/dx — three-term formula ──────────────────────────────────────
@@ -100,13 +101,13 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # mean(d_x_hat, axis=-1, keepdims=True)
         var mean_d_x_hat = d_x_hat.mean[track_grad=False](
-            axis=-1, keepdims=True
+            axes=[-1], keepdims=True
         )   # (*, 1)
 
         # mean(d_x_hat * x_hat, axis=-1, keepdims=True)
         var mean_d_x_hat_x_hat = d_x_hat.__mul__[track_grad=False](x_hat).mean[
             track_grad=False
-        ](axis=-1, keepdims=True)   # (*, 1)
+        ](axes=[-1], keepdims=True)   # (*, 1)
 
         # dx = rstd * (d_x_hat - mean_d_x_hat - x_hat * mean_d_x_hat_x_hat)
         var term1 = d_x_hat
@@ -177,7 +178,7 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # ── Step 1: mean and variance over last dim ─────────────────────────
         # variance() uses Welford — single pass, mean is free
         # keepdims=True so shapes broadcast correctly against input (*, D)
-        var mean = self.mean[track_grad=False](axis=-1, keepdims=True)    # (*, 1)
+        var mean = self.mean[track_grad=False](axes=[-1], keepdims=True)    # (*, 1)
         var var_ = self.variance[track_grad=False](
             axis=-1, keepdims=True, unbiased=False
         )                                                                   # (*, 1)

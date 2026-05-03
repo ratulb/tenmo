@@ -56,4 +56,4 @@ comptime LOG_BACKWARD = 48
 comptime INVERT = 49
 comptime SUM = 50
 comptime MEAN = 51
-comptime PRODUCT = 52
+comptime PRODUCT = 51

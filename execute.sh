@@ -81,6 +81,7 @@ run_parallel() {
 
 # Define the complete ordered list of tests
 declare -a ALL_TESTS_IN_ORDER=(
+    "reciprocal|tests/test_reciprocal.mojo"
     "product|tests/test_product_reduction.mojo"
     "unary|tests/test_unary_ops.mojo"
     "sqrt|tests/test_sqrt.mojo"
@@ -158,6 +159,7 @@ declare -a ALL_TESTS_IN_ORDER=(
 )
 
 declare -a GPU_TESTS=(
+    "reciprocal|tests/test_reciprocal.mojo"
     "product|tests/test_product_reduction.mojo"
     "unary|tests/test_unary_ops.mojo"
     "sqrt|tests/test_sqrt.mojo"
@@ -229,7 +231,7 @@ if [ $# -eq 0 ]; then
     echo "  $0 gpu relu tanh              - Run only relu and tanh"
     echo ""
     print_colored "$CYAN" "Available tests:"
-    echo "  product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
+    echo "  reciprocal, product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
     echo "  allany, compare, count_unique, transmute, exp, summean, sigmoid"
     echo "  gpusummean, broadcast, scalar, inplace, expand, gpu_expand"
     echo "  sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout, dev_transfer"
@@ -290,6 +292,7 @@ run_test_by_name() {
     local exit_code=0
 
     case $test_name in
+        reciprocal)     run_test "reciprocal" "tests/test_reciprocal.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         product)        run_test "product" "tests/test_product_reduction.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         unary)          run_test "unary" "tests/test_unary_ops.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         sqrt)           run_test "sqrt" "tests/test_sqrt.mojo" "$DEBUG_MODE"; exit_code=$? ;;
