@@ -162,7 +162,9 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var (out_ndb, x_hat_ndb, rstd_ndb) = self.buffer.layernorm_normalize(
             mean_ndb, var_ndb, gamma.buffer, beta.buffer, eps
         )
-
+        # Make them shared so that BackwardFnArg is lighter
+        x_hat_ndb.buffer.shared()
+        rstd_ndb.buffer.shared()
         var out = Tensor[Self.dtype](out_ndb^, requires_grad=False)
 
         # ── Autograd wiring ──────────────────────────────────────────────

@@ -3,7 +3,7 @@ from .mnemonics import AddTensor
 from .backpropagation import BackwardFnArg, StdArg, BACKWARD_STD
 from .gradbox import Gradbox
 from .ancestry import Ancestor
-
+from tenmo.common_utils import Epsilon
 
 # =============================================================================
 # Updated StdBwdArg — goes in std.mojo
@@ -50,7 +50,7 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         var diff = input_tensor.__sub__[track_grad=False](mean_tensor)
         var denom = (
-            std_tensor.__mul__[track_grad=False](divisor)
+            std_tensor.__add__[track_grad=False](Epsilon[Self.dtype].value()).__mul__[track_grad=False](divisor)
         )
         var local_grad = diff.__truediv__[track_grad=False](denom)
 

@@ -11,32 +11,58 @@ from tenmo.mnemonics import *
 from tenmo.reduction_kernel import Reduction
 from tenmo.unary_ops_kernel import UnaryOpsKernel
 from std.random.philox import Random as PhiloxRandom
-
+from std.pathlib import Path
 from std.python import Python
 
 fn download_file() raises:
     var urllib = Python.import_module("urllib.request")
     var url = "https://raw.githubusercontent.com/rasbt/LLMs-from-scratch/main/ch02/01_main-chapter-code/the-verdict.txt"
     var file_path = "the-verdict.txt"
-    #var request = urllib.Request(url, file_path)
     var response = urllib.urlopen(url)  # This actually fetches the data
-    var content: String = String(response.read())       # Read the content
-    #print(content)
-    var file = open(file_path, "w")
-    #var data = content.as_bytes()
-    #file.write_bytes(data)
-    file.write(content)
-    #request = urllib.request.Request(url)
-    with open(file_path, "r") as f:
+    var content: String = String(response.read().decode('utf-8'))       # Read the content
+    var file = Path(file_path)
+    file.write_text(content)
+    _="""with open(file_path, "r") as f:
         print(f.read())
 
     with open(file_path, "r") as f:
         raw_text = f.read()
         print("Total number of character:", len(raw_text))
-        #print(raw_text[:99])
-fn main_4() raises:
+        #print(raw_text[:99])"""
+
+fn main() raises:
     download_file()
     print("Downloaded the-verdict.txt")
+    var file_path = "the-verdict.txt"
+    _="""with open(file_path, "r") as f:
+        raw_text = f.read()
+        print(raw_text)
+        print()
+        print()
+        print("Total number of character:", len(raw_text))"""
+    var path = Path(file_path)
+    var content = path.read_text()
+    print(content)
+    print("Total number of character:", len(content))
+    print(content.to_python_object()[:99])
+
+    var py_str = Python.str("Back to Python 🐍")  # Creates Python str from Mojo String
+    print(len(py_str))
+    var mojo_str = String(py_str)
+    var slices = mojo_str.codepoint_slices()
+    var count = 0;
+    for each in slices:
+        count += 1
+        print(each)
+
+    var s = "abc🐍"
+    var iter = s.codepoints()
+    print(mojo_str, len(mojo_str), "count: ", count)
+    var ss = String()
+    for e in iter:
+        print(Int(e))
+        ss += String(e)
+    print(ss)
 
 
 fn main_1() raises:
@@ -332,7 +358,7 @@ fn main_2() raises:
     test_tensor_dot()
 
 
-def main() raises:
+def main_5() raises:
     var shape = Shape(2, 3, 4)
     var s = shape[0:-2] + [1]
     print(s)

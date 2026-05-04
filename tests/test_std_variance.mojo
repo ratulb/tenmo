@@ -182,7 +182,7 @@ fn test_std_backward_numerical_stability() raises:
     print("test_std_backward_numerical_stability")
     # Test with values close to zero variance
     var x = Tensor.d1([1.0, 1.001, 0.999, 1.0], requires_grad=True)
-    var s = x.std(epsilon=1e-12)
+    var s = x.std()
     s.backward()
 
     # Should not crash or produce NaN/Inf
@@ -474,7 +474,7 @@ fn test_std_backward_numerical_stability_vs() raises:
     """Test std backward with values close to zero variance."""
     print("test_std_backward_numerical_stability_vs")
     var x = Tensor.d1([1.0, 1.001, 0.999, 1.0], requires_grad=True)
-    var s = x.std(epsilon=1e-12)
+    var s = x.std()
     s.backward()
 
     # Should not crash or produce NaN/Inf
@@ -512,19 +512,21 @@ fn test_std_backward_3d_tensor_vs() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_std_backward_epsilon_effect_vs() raises:
-    """Test that epsilon prevents division by zero in std backward."""
-    print("test_std_backward_epsilon_effect_vs")
-    var x = Tensor.d1([2.0, 2.0, 2.0], requires_grad=True)  # Zero variance
-    var s = x.std(epsilon=1.0)  # Large epsilon
+
+
+fn test_std_backward_zero_variance_vs() raises:
+    print("test_std_backward_zero_variance_vs")
+    # x = [2,2,2] — zero variance, diff = 0
+    # grad = 0/(std*n) = 0/0 without epsilon protection
+    # With epsilon: grad = 0/(eps*n) = 0 — safe
+    var x = Tensor.d1([2.0, 2.0, 2.0], requires_grad=True)
+    var s = x.std()
     s.backward()
-
-    # With zero variance, std = epsilon
-    # Gradient should be very small (controlled by epsilon)
     var grad = x.grad()
-    for i in range(3):
-        assert_true(abs(grad[i]) < 0.1)  # Should be near zero
-
+    # diff is zero so grad must be zero regardless
+    assert_true(grad.all_close[atol=1e-5](
+        Tensor.d1([0.0, 0.0, 0.0])
+    ))
 
 # ============================================================================
 # Combined Variance and Std Tests
@@ -612,7 +614,7 @@ fn run_all_variance_std_tests() raises:
     test_std_backward_numerical_stability_vs()
     test_std_no_grad_tracking_vs()
     test_std_backward_3d_tensor_vs()
-    test_std_backward_epsilon_effect_vs()
+    test_std_backward_zero_variance_vs()
 
     # Combined tests
     test_var_std_relationship_vs()
