@@ -22,10 +22,11 @@ from .unary_ops_kernel import UnaryOpsKernel
 from .matmul_kernel import MatmulNdGpu
 from .compare_kernel import AllClose, Compare, CompareScalar
 from .reduction_kernel import Reduction, ProductArg
+from .layernorm_kernel import LayerNormKernel
 from .minmax_kernel import ReductionMinMax
 from .minmax_reducer import MinMaxReducer
+from .std_variance_backward_kernel import StdVarianceBackwardKernel
 from std.math import sqrt, log, exp, tanh
-from .layernorm_kernel import LayerNormKernel
 from .mnemonics import (
     Multiply,
     Add,
@@ -3228,6 +3229,140 @@ struct NDBuffer[dtype: DType](
         var x_hat_ndb = NDBuffer[Self.dtype](x_hat_buf^, out_shape)
         var rstd_ndb = NDBuffer[Self.dtype](rstd_buf^, rstd_shape)
         return (out_ndb^, x_hat_ndb^, rstd_ndb^)
+
+    fn variance_backward_normalize(
+        self: NDBuffer[Self.dtype],
+        mean: NDBuffer[Self.dtype],
+        scale: Scalar[Self.dtype],
+    ) -> NDBuffer[Self.dtype]:
+        """Fused variance backward: (x - mean) * scale.
+
+        Single pass over (*, D).
+        x (self) may be non-contiguous — stride-aware on CPU and GPU.
+        out is always a fresh contiguous allocation.
+
+        Mean is (*, 1) keepdims=True — one scalar per row.
+        scale = 2 / divisor — uniform across all rows.
+
+        Caller multiplies result by upstream grad (pass 2).
+
+        Replaces in VarianceBackward:
+            diff       = x - mean         pass 1
+            local_grad = diff * scale     pass 2
+            (upstream multiply is still pass 2, done by caller)
+
+        Args:
+            self:  Input x (*, D). May be strided view.
+            mean:  Per-row mean (*, 1) from VarianceBwdArg.
+            scale: 2 / divisor scalar.
+
+        Returns:
+            Contiguous NDBuffer (*, D) — (x - mean) * scale.
+        """
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    return StdVarianceBackwardKernel[
+                        Self.dtype
+                    ].launch_variance_backward(self, mean, scale)
+                except e:
+                    print(e)
+                    panic("NDBuffer variance_backward_normalize → GPU failed")
+                    return Self.Empty()
+        return self._variance_backward_normalize_cpu(mean, scale)
+
+    fn _variance_backward_normalize_cpu(
+        self: NDBuffer[Self.dtype],
+        mean: NDBuffer[Self.dtype],
+        scale: Scalar[Self.dtype],
+    ) -> NDBuffer[Self.dtype]:
+        """CPU variance backward normalize — stride-aware via self[coord]."""
+        var D = self.shape[-1]
+        # var outer_size = self.numels() // D
+        var out_buf = Buffer[Self.dtype](self.numels())
+        var out_shape = self.shape
+
+        # Outer loop — iterate over all row coordinates
+        # Use index_iterator on the non-last dims to handle any stride layout
+        var row = 0
+        for outer_coord in self.shape[0:-1]:
+            var row_mean = mean.buffer[row]  # mean is (*, 1) contiguous
+            var out_base = row * D
+            for i in range(D):
+                # Build full coord: outer_coord + [i]
+                var full_coord = outer_coord.insert(len(outer_coord), i)
+                out_buf[out_base + i] = (self[full_coord] - row_mean) * scale
+                # Equivalent: (self[coord] - row_mean) * scale
+                # Written as two muls to avoid a temporary sub tensor
+            row += 1
+
+        return NDBuffer[Self.dtype](out_buf^, out_shape)
+
+    fn std_backward_normalize(
+        self: NDBuffer[Self.dtype],
+        mean: NDBuffer[Self.dtype],
+        denom: NDBuffer[Self.dtype],
+    ) -> NDBuffer[Self.dtype]:
+        """Fused std backward: (x - mean) / denom.
+
+        Single pass over (*, D).
+        x (self) may be non-contiguous — stride-aware on CPU and GPU.
+        out is always a fresh contiguous allocation.
+
+        Mean is (*, 1) keepdims=True — one scalar per row.
+        Denom is (*, 1) — (std + eps) * divisor, one scalar per row.
+
+        Caller multiplies result by upstream grad (pass 2).
+
+        Replaces in StdBackward:
+            diff       = x - mean              pass 1
+            local_grad = diff / denom          pass 2
+            (upstream multiply is still pass 2, done by caller)
+
+        Args:
+            self:  Input x (*, D). May be strided view.
+            mean:  Per-row mean (*, 1) from StdBwdArg.
+            denom: Per-row denominator (*, 1) — (std+eps)*divisor.
+
+        Returns:
+            Contiguous NDBuffer (*, D) — (x - mean) / denom.
+        """
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    return StdVarianceBackwardKernel[
+                        Self.dtype
+                    ].launch_std_backward(self, mean, denom)
+                except e:
+                    print(e)
+                    panic("NDBuffer std_backward_normalize → GPU failed")
+                    return Self.Empty()
+        return self._std_backward_normalize_cpu(mean, denom)
+
+    fn _std_backward_normalize_cpu(
+        self: NDBuffer[Self.dtype],
+        mean: NDBuffer[Self.dtype],
+        denom: NDBuffer[Self.dtype],
+    ) -> NDBuffer[Self.dtype]:
+        """CPU std backward normalize — stride-aware via self[coord]."""
+        var D = self.shape[-1]
+        # var outer_size = self.numels() // D
+        var out_buf = Buffer[Self.dtype](self.numels())
+        var out_shape = self.shape
+
+        var row = 0
+        for outer_coord in self.shape[0:-1]:
+            var row_mean = mean.buffer[row]  # (*, 1) contiguous
+            var row_denom = denom.buffer[row]  # (*, 1) contiguous
+            var out_base = row * D
+            for i in range(D):
+                var full_coord = outer_coord.insert(len(outer_coord), i)
+                out_buf[out_base + i] = (
+                    (self[full_coord] - row_mean)
+                ) / row_denom
+            row += 1
+
+        return NDBuffer[Self.dtype](out_buf^, out_shape)
 
     fn minmax[
         is_max: Bool

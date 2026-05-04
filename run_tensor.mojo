@@ -14,59 +14,12 @@ from std.random.philox import Random as PhiloxRandom
 from std.pathlib import Path
 from std.python import Python
 
-fn download_file() raises:
-    var urllib = Python.import_module("urllib.request")
-    var url = "https://raw.githubusercontent.com/rasbt/LLMs-from-scratch/main/ch02/01_main-chapter-code/the-verdict.txt"
-    var file_path = "the-verdict.txt"
-    var response = urllib.urlopen(url)  # This actually fetches the data
-    var content: String = String(response.read().decode('utf-8'))       # Read the content
-    var file = Path(file_path)
-    file.write_text(content)
-    _="""with open(file_path, "r") as f:
-        print(f.read())
-
-    with open(file_path, "r") as f:
-        raw_text = f.read()
-        print("Total number of character:", len(raw_text))
-        #print(raw_text[:99])"""
 
 fn main() raises:
-    download_file()
-    print("Downloaded the-verdict.txt")
-    var file_path = "the-verdict.txt"
-    _="""with open(file_path, "r") as f:
-        raw_text = f.read()
-        print(raw_text)
-        print()
-        print()
-        print("Total number of character:", len(raw_text))"""
-    var path = Path(file_path)
-    var content = path.read_text()
-    print(content)
-    print("Total number of character:", len(content))
-    print(content.to_python_object()[:99])
-
-    var py_str = Python.str("Back to Python 🐍")  # Creates Python str from Mojo String
-    print(len(py_str))
-    var mojo_str = String(py_str)
-    var slices = mojo_str.codepoint_slices()
-    var count = 0;
-    for each in slices:
-        count += 1
-        print(each)
-
-    var s = "abc🐍"
-    var iter = s.codepoints()
-    print(mojo_str, len(mojo_str), "count: ", count)
-    var ss = String()
-    for e in iter:
-        print(Int(e))
-        ss += String(e)
-    print(ss)
+    pass
 
 
 fn main_1() raises:
-    # whatever quick test you want
     comptime dtype = DType.float32
     var t = Tensor[dtype].scalar(3)
     assert_true(t.all_close(Tensor[DType.float32].scalar(3)))
@@ -74,7 +27,7 @@ fn main_1() raises:
     var rng = PhiloxRandom(seed=42, subsequence=UInt64(1), offset=0)
     var rand_f32 = rng.step_uniform()
     print(rand_f32)
-    _="""var srt = UnaryOpsKernel.launch[SQRT](NDBuffer[dtype](1, -9, 25))
+    _ = """var srt = UnaryOpsKernel.launch[SQRT](NDBuffer[dtype](1, -9, 25))
     srt.print()"""
 
     t.print()
@@ -111,6 +64,7 @@ fn test_prd_cpu_bwd_all_positive_1d_orig() raises:
         print("excl[1]:", excl.get(1))
         print("excl[2]:", excl.get(2))
 
+
 fn test_complex_mixed_ops_backward() raises:
     print("test_complex_mixed_ops_backward")
     comptime dtype = DType.float32
@@ -137,6 +91,7 @@ fn test_complex_mixed_ops_backward() raises:
     result.print()
     assert_true(result == Tensor[dtype].d2([[10.5, 10.5]]))
 
+
 fn test_contig_cpu_1d_slice_view() raises:
     print("test_contig_cpu_1d_slice_view")
     comptime dtype = DType.float32
@@ -159,11 +114,12 @@ fn test_contig_cpu_1d_slice_view() raises:
     loss.backward()
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
+
 fn test_expand_1d_to_2d_new_batch_dim() raises:
     print("test_expand_1d_to_2d_new_batch_dim")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)  # shape (3,)
-    var e = a.expand(4, 3)                                           # shape (4,3)
+    var e = a.expand(4, 3)  # shape (4,3)
     assert_true(e.shape() == Shape.of(4, 3))
     # Every row is [1, 2, 3]
     var expected = Tensor[dtype].d2(
@@ -174,6 +130,7 @@ fn test_expand_1d_to_2d_new_batch_dim() raises:
     es.backward()
     # Each element of a was broadcast 4 times → grad = 4.0
     assert_true(a.grad().all_close(Tensor[dtype].d1([4.0, 4.0, 4.0])))
+
 
 fn test_tanh_contiguous_vs_non_contiguous() raises:
     print("test_tanh_contiguous_vs_non_contiguous")
@@ -199,6 +156,7 @@ fn test_tanh_contiguous_vs_non_contiguous() raises:
         "Contiguous and non-contiguous should match",
     )
 
+
 fn test_matmul_2d_non_contiguous_both_views() raises:
     print("test_matmul_2d_non_contiguous_both_views")
     comptime dtype = DType.float32
@@ -219,7 +177,8 @@ fn test_matmul_2d_non_contiguous_both_views() raises:
     C.print()
     assert_true(C.all_close(expected))
 
-    #validate_matmul_2d_grads(AA, BB, C)
+    # validate_matmul_2d_grads(AA, BB, C)
+
 
 fn test_vector_matrix_with_vector_view() raises:
     print("test_vector_matrix_with_vector_view")
@@ -242,6 +201,7 @@ fn test_vector_matrix_with_vector_view() raises:
     assert_true(
         base_v.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 1.0, 0.0, 0.0]))
     )
+
 
 fn test_matrix_vector_with_matrix_view() raises:
     print("test_matrix_vector_with_matrix_view")
@@ -267,6 +227,7 @@ fn test_matrix_vector_with_matrix_view() raises:
         )
     )
 
+
 fn test_slice_backward_chained() raises:
     """Test gradient flow through chained slices."""
     print("test_slice_backward_chained")
@@ -288,18 +249,20 @@ fn test_slice_backward_chained() raises:
     x.grad().print()
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
+
 fn test_rlv_cpu_noncontig_transposed() raises:
     print("test_rlv_cpu_noncontig_transposed")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[-1.0, 2.0], [3.0, -4.0]], requires_grad=True)
-    var t = a.transpose()           # non-contiguous view
+    var t = a.transpose()  # non-contiguous view
     var out = t.relu()
     var loss = out.sum()
     loss.backward()
     # transpose relu forward: max(0, [[−1,3],[2,−4]]) = [[0,3],[2,0]]
-    assert_true(out.contiguous().all_close(
-        Tensor[dtype].d2([[0.0, 3.0], [2.0, 0.0]])
-    ))
+    assert_true(
+        out.contiguous().all_close(Tensor[dtype].d2([[0.0, 3.0], [2.0, 0.0]]))
+    )
+
 
 fn test_flatten_view_partial_tensor() raises:
     print("test_flatten_view_partial_tensor")
@@ -321,6 +284,7 @@ fn test_flatten_view_partial_tensor() raises:
     assert_true(
         a.grad().all_close(Tensor.d2([[0.0, 1.0, 1.0], [0.0, 0.0, 0.0]]))
     )
+
 
 fn test_tensor_dot() raises:
     print("test_tensor_dot")
@@ -344,7 +308,10 @@ fn test_tensor_dot() raises:
     c = Tensor[dtype].d1([3, 4, 5])
     d = b.matmul(c)
     d.backward()
-    assert_true(a.grad().all_close(Tensor[dtype].d1([0, 0, 0, 0, 0, 3, 0, 4, 0, 5])))
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d1([0, 0, 0, 0, 0, 3, 0, 4, 0, 5]))
+    )
+
 
 fn main_2() raises:
     test_complex_mixed_ops_backward()
@@ -362,5 +329,3 @@ def main_5() raises:
     var shape = Shape(2, 3, 4)
     var s = shape[0:-2] + [1]
     print(s)
-
-

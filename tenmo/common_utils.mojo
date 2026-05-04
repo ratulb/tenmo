@@ -15,6 +15,8 @@ from .intarray import IntArray
 from std.random import randn_float64
 from .ndbuffer import NDBuffer
 from std.sys import prefetch, PrefetchOptions
+from std.pathlib import Path
+from std.python import Python, PythonObject
 
 comptime LOG_LEVEL = get_defined_string["LOGGING_LEVEL", "INFO"]()
 comptime log = Logger[Level._from_str(LOG_LEVEL)]()
@@ -32,12 +34,12 @@ comptime BRIGHT_BLUE: String = "\033[94m"
 
 
 @always_inline("nodebug")
-fn now() -> Float64:
+def now() -> Float64:
     return Float64(perf_counter_ns()) / 1e9
 
 
 @always_inline
-fn binary_accuracy[
+def binary_accuracy[
     dtype: DType,
     //,
     threshold: Scalar[dtype] = Scalar[dtype](0.5),
@@ -51,7 +53,7 @@ fn binary_accuracy[
     return correct, batch_size
 
 
-fn multiclass_accuracy[
+def multiclass_accuracy[
     dtype: DType, //
 ](pred: Tensor[dtype], target: Tensor[DType.int32]) -> Int:
     var correct = 0
@@ -73,22 +75,22 @@ fn multiclass_accuracy[
 
 
 @always_inline("nodebug")
-fn log_debug(msg: String, color: String = RED):
+def log_debug(msg: String, color: String = RED):
     log.debug(color + msg + String(RESET))
 
 
 @always_inline("nodebug")
-fn log_info(msg: String, color: String = BLUE):
+def log_info(msg: String, color: String = BLUE):
     log.info(color + msg + String(RESET))
 
 
 @always_inline("nodebug")
-fn log_warning(msg: String, color: String = YELLOW):
+def log_warning(msg: String, color: String = YELLOW):
     log.warning(color + msg + String(RESET))
 
 
 @always_inline("nodebug")
-fn panic(*s: String):
+def panic(*s: String):
     var message = String(capacity=len(s))
     if len(s) > 0:
         var start = String(s[0])
@@ -100,19 +102,19 @@ fn panic(*s: String):
 
 
 @always_inline
-fn id[type: AnyType, //](t: type) -> Int:
+def id[type: AnyType, //](t: type) -> Int:
     return Int(UnsafePointer(to=t).as_immutable())
 
 
 @always_inline
-fn addr[
+def addr[
     mut: Bool, origin: Origin[mut=mut], type: AnyType, //
 ](t: type) -> UnsafePointer[type, origin]:
     return UnsafePointer(to=t).mut_cast[mut]().unsafe_origin_cast[origin]()
 
 
 @always_inline
-fn addrs[
+def addrs[
     mut: Bool, origin: Origin[mut=mut], type: AnyType, //
 ](*ts: type) -> List[UnsafePointer[type, origin]]:
     l = List[UnsafePointer[type, origin]](capacity=len(ts))
@@ -123,7 +125,7 @@ fn addrs[
     return l^
 
 
-fn copy[
+def copy[
     is_mut: Bool, origin: Origin[mut=is_mut], dtype: DType, //
 ](
     src: UnsafePointer[Scalar[dtype], origin],
@@ -188,14 +190,16 @@ fn copy[
         i += 1
 
 
-fn is_null[type: AnyType, //](ptr: UnsafePointer[type, ImmutAnyOrigin]) -> Bool:
+def is_null[
+    type: AnyType, //
+](ptr: UnsafePointer[type, ImmutAnyOrigin]) -> Bool:
     return ptr.__bool__() == False
 
 
 struct IDGen(RegisterPassable):
     @always_inline
     @staticmethod
-    fn generate_id() -> UInt:
+    def generate_id() -> UInt:
         # Use both perf_counter and monotonic for additional entropy
         perf_time = perf_counter_ns()
         mono_time = monotonic()
@@ -207,7 +211,7 @@ struct IDGen(RegisterPassable):
 
 struct Epsilon[dtype: DType](RegisterPassable):
     @staticmethod
-    fn value() -> Scalar[Self.dtype]:
+    def value() -> Scalar[Self.dtype]:
         comptime if Self.dtype == DType.float32:
             return Scalar[Self.dtype](1e-7)
         elif Self.dtype == DType.float64:
@@ -225,7 +229,7 @@ struct Epsilon[dtype: DType](RegisterPassable):
         elif Self.dtype == DType.int16:
             return rebind[Scalar[Self.dtype]](min_finite[DType.int16]())
         elif Self.dtype == DType.bool:
-            return Scalar[Self.dtype](False) #!
+            return Scalar[Self.dtype](False)  #!
         else:
             panic("Epsilon value not supported for: ", String(Self.dtype))
             return Scalar[Self.dtype](0)
@@ -233,7 +237,7 @@ struct Epsilon[dtype: DType](RegisterPassable):
 
 struct One[dtype: DType](RegisterPassable):
     @staticmethod
-    fn value() -> Scalar[Self.dtype]:
+    def value() -> Scalar[Self.dtype]:
         comptime if Self.dtype.is_floating_point():
             return Scalar[Self.dtype](1.0)
         else:
@@ -242,7 +246,7 @@ struct One[dtype: DType](RegisterPassable):
 
 struct Zero[dtype: DType](RegisterPassable):
     @staticmethod
-    fn value() -> Scalar[Self.dtype]:
+    def value() -> Scalar[Self.dtype]:
         comptime if Self.dtype.is_floating_point():
             return Scalar[Self.dtype](0.0)
         else:
@@ -250,7 +254,7 @@ struct Zero[dtype: DType](RegisterPassable):
 
 
 @always_inline("nodebug")
-fn inf[dtype: DType]() -> Scalar[dtype]:
+def inf[dtype: DType]() -> Scalar[dtype]:
     """Gets a +inf value for the given dtype.
 
     Constraints:
@@ -287,17 +291,17 @@ fn inf[dtype: DType]() -> Scalar[dtype]:
 
 
 @always_inline("nodebug")
-fn isinf[dtype: DType, //](value: Scalar[dtype]) -> Bool:
+def isinf[dtype: DType, //](value: Scalar[dtype]) -> Bool:
     return inf[dtype]() == value
 
 
 @always_inline("nodebug")
-fn isnan[dtype: DType, //](value: Scalar[dtype]) -> Bool:
+def isnan[dtype: DType, //](value: Scalar[dtype]) -> Bool:
     return nan[dtype]() == value
 
 
 @always_inline("nodebug")
-fn nan[dtype: DType]() -> Scalar[dtype]:
+def nan[dtype: DType]() -> Scalar[dtype]:
     """Gets a NaN value for the given dtype.
 
     Constraints:
@@ -358,17 +362,17 @@ comptime newaxis = Idx(NewAxis())
 
 
 @always_inline("nodebug")
-fn i(value: Int) -> Idx:
+def i(value: Int) -> Idx:
     return Idx(value)
 
 
 @always_inline("nodebug")
-fn il(index_list: IntArray) -> Idx:
+def il(index_list: IntArray) -> Idx:
     return Idx(index_list)
 
 
 @always_inline("nodebug")
-fn il(*indices: Int) -> Idx:
+def il(*indices: Int) -> Idx:
     intarray = IntArray.with_capacity(len(indices))
     for i in range(len(indices)):
         intarray.append(indices[i])
@@ -376,29 +380,29 @@ fn il(*indices: Int) -> Idx:
 
 
 @always_inline("nodebug")
-fn s() -> Idx:
+def s() -> Idx:
     return s(None, None, None)
 
 
 @always_inline("nodebug")
-fn s(end: Int) -> Idx:
+def s(end: Int) -> Idx:
     return Idx(slice(end))
 
 
 @always_inline("nodebug")
-fn s(start: Int, end: Int) -> Idx:
+def s(start: Int, end: Int) -> Idx:
     return Idx(slice(start, end))
 
 
 @always_inline("nodebug")
-fn s(start: Optional[Int], end: Optional[Int], step: Optional[Int]) -> Idx:
+def s(start: Optional[Int], end: Optional[Int], step: Optional[Int]) -> Idx:
     return Idx(slice(start, end, step))
 
 
 struct Slicer:
     @staticmethod
     @always_inline("nodebug")
-    fn slice(
+    def slice(
         slice: Slice, end: Int, start: Int = 0, step: Int = 1
     ) -> Tuple[Int, Int, Int]:
         _start, _end, _step = (
@@ -410,7 +414,7 @@ struct Slicer:
 
 
 # Utility repeat function
-fn str_repeat(s: String, n: Int) -> String:
+def str_repeat(s: String, n: Int) -> String:
     if n <= 0:
         return ""
     var parts = List[String]()
@@ -419,7 +423,7 @@ fn str_repeat(s: String, n: Int) -> String:
     return StringSlice("").join(parts)
 
 
-fn print_summary[
+def print_summary[
     dtype: DType
 ](
     mod: Sequential[dtype], sample_input: Optional[Tensor[dtype]] = None
@@ -505,7 +509,7 @@ fn print_summary[
         widths.append(maxw)
 
     # Print horizontal rule
-    fn print_rule(read widths: List[Int]):
+    def print_rule(read widths: List[Int]):
         var line = ""
         for w in widths:
             line += "+" + str_repeat("-", w + 2)
@@ -531,7 +535,7 @@ fn print_summary[
     print("  Non-trainable params:", non_trainable_params)
 
 
-fn print_buffer[
+def print_buffer[
     dtype: DType
 ](
     read buffer: NDBuffer[dtype],
@@ -616,3 +620,19 @@ fn print_buffer[
                 print()  # Newline before closing bracket
 
         print(indent + "]", end="")
+
+
+def download(url: String, save_to: String) raises:
+    try:
+        var urllib = Python.import_module("urllib.request")
+        var response = urllib.urlopen(url)
+        var content: String = String(response.read().decode("utf-8"))
+        var file = Path(save_to)
+        file.write_text(content)
+    except e:
+        print(e)
+        raise e^
+
+
+def pystr(s: String) raises -> PythonObject:
+    return Python.str(s)
