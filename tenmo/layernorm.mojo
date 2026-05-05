@@ -35,9 +35,7 @@ from .ndbuffer import NDBuffer
 from .mnemonics import LAYER_NORM, AddTensor
 from .device import GPU
 from .common_utils import panic
-from std.utils import Variant
-from std.sys import has_accelerator
-
+from tenmo.intarray import IntArray
 
 # =============================================================================
 # Backward argument — saved from forward, zero recomputation in backward
@@ -153,7 +151,7 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # ── Pass 1: Welford — mean + var in single pass ──────────────────
         var (mean_ndb, var_ndb) = self.buffer.welford(
-            axis=self.rank() - 1, unbiased=False, keepdims=True
+            axes=IntArray(self.rank() - 1), unbiased=False, keepdims=True
         )
 
         # ── Pass 2: fused normalize — rstd + x_hat + out in single pass ──

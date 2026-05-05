@@ -1309,7 +1309,7 @@ struct NDBuffer[dtype: DType](
 
     fn welford(
         self: NDBuffer[Self.dtype],
-        axis: Int,
+        axes: IntArray,
         unbiased: Bool,
         keepdims: Bool,
     ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
@@ -1322,7 +1322,7 @@ struct NDBuffer[dtype: DType](
         Caller saves both into BwdArg for zero-recomputation backward.
 
         Args:
-            axis:     Reduction axis. -100 means global reduction over all dims.
+            axes:     Reduction axes.
             unbiased: If True divide by n-1, else divide by n.
             keepdims: If True keep reduced dim with size 1.
 
@@ -1332,117 +1332,80 @@ struct NDBuffer[dtype: DType](
         comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
-                    return self.welford_gpu(axis, unbiased, keepdims)
+                    return self._welford_gpu(axes, unbiased, keepdims)
                 except e:
                     print(e)
-                    panic(
-                        "NDBuffer welford → GPU operation failed for axis: "
-                        + String(axis)
-                    )
-                    # Unreachable
+                    panic("NDBuffer welford → GPU operation failed")
                     return (Self.Empty(), Self.Empty())
-        return self.welford_cpu(axis, unbiased, keepdims)
+        return self._welford_cpu(axes, unbiased, keepdims)
 
-    fn welford_gpu(
+    fn _welford_gpu(
         self: NDBuffer[Self.dtype],
-        axis: Int,
+        axes: IntArray,
         unbiased: Bool,
         keepdims: Bool,
     ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
-        """GPU Welford — delegates to Reduction.launch_welford."""
-        var normalized_axes: IntArray
-        if axis == -100:
-            normalized_axes = IntArray(0)  # empty = global reduction
-        else:
-            normalized_axes = IntArray(1)
-            normalized_axes[0] = axis
-
         var (mean_ndb, M2_ndb) = Reduction[Self.dtype].launch_welford(
-            self, normalized_axes, keepdims
+            self, axes, keepdims
         )
-
-        # n = reduced_volume
-        var n: Int
-        if axis == -100:
-            n = self.numels()
-        else:
-            n = self.shape[axis]
-
+        var n = self.shape.reduced_shape(axes).product()
         var divisor = Scalar[Self.dtype](n - 1 if unbiased and n > 1 else n)
-
-        # var_ndb = M2_ndb / divisor — element-wise scalar divide
         var var_ndb = M2_ndb.scalar_ops[Divide](divisor)
-
         return (mean_ndb^, var_ndb^)
 
-    fn welford_cpu(
+    fn _welford_cpu(
         self: NDBuffer[Self.dtype],
-        axis: Int,
+        axes: IntArray,
         unbiased: Bool,
         keepdims: Bool,
     ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
-        """CPU Welford — single pass mean + variance."""
-
-        # Normalize axis to IntArray — same pattern as Summer/reduce_cpu
-        var normalized_axes: IntArray
-        if axis == -100:
-            normalized_axes = IntArray.range(
-                0, self.rank()
-            )  # empty = global, matches reduce_cpu
-        else:
-            normalized_axes = IntArray(axis)
-
         var out_shape = self.shape.compute_output_shape(
-            normalized_axes, keepdims, validated=True
+            axes, keepdims, validated=True
         )
         var mean_out = NDBuffer[Self.dtype].zeros(out_shape)
-        var var_out = NDBuffer[Self.dtype].zeros(out_shape)
+        var var_out  = NDBuffer[Self.dtype].zeros(out_shape)
+
+        var n = self.shape.reduced_shape(axes).product()
+        var divisor = Scalar[Self.dtype](
+            n - 1 if unbiased and n > 1 else n
+        )
 
         if out_shape == Shape():
             # Global scalar reduction
             var local_mean = Scalar[Self.dtype](0)
-            var local_M2 = Scalar[Self.dtype](0)
+            var local_M2   = Scalar[Self.dtype](0)
             var count = 0
-            # index_iterator handles contiguous + strided + offset — no branch needed
             for idx in self.index_iterator():
                 var x = self.buffer[idx]
                 count += 1
-                var delta = x - local_mean
+                var delta  = x - local_mean
                 local_mean += delta / Scalar[Self.dtype](count)
                 var delta2 = x - local_mean
-                local_M2 += delta * delta2
-            var divisor = Scalar[Self.dtype](
-                count - 1 if unbiased and count > 1 else count
-            )
+                local_M2   += delta * delta2
             mean_out[IntArray()] = local_mean
-            var_out[IntArray()] = local_M2 / divisor
+            var_out[IntArray()]  = local_M2 / divisor
         else:
-            # Axis reduction — mirrors reduce_cpu coord iteration exactly
-            var reduction_axes_shape = self.shape.reduced_shape(normalized_axes)
-            var n = reduction_axes_shape.product()
-            var divisor = Scalar[Self.dtype](n - 1 if unbiased and n > 1 else n)
+            # Multi-axis reduction — mirrors reduce_cpu coord pattern exactly
+            var reduction_axes_shape = self.shape.reduced_shape(axes)
             for out_coord in out_shape:
                 var local_mean = Scalar[Self.dtype](0)
-                var local_M2 = Scalar[Self.dtype](0)
+                var local_M2   = Scalar[Self.dtype](0)
                 var count = 0
                 for red_coord in reduction_axes_shape:
                     var self_coord = out_coord.replace(
-                        normalized_axes, red_coord
-                    ) if keepdims else out_coord.insert(
-                        normalized_axes, red_coord
-                    )
+                        axes, red_coord
+                    ) if keepdims else out_coord.insert(axes, red_coord)
                     var x = self[self_coord]
                     count += 1
-                    var delta = x - local_mean
+                    var delta  = x - local_mean
                     local_mean += delta / Scalar[Self.dtype](count)
                     var delta2 = x - local_mean
-                    local_M2 += delta * delta2
+                    local_M2   += delta * delta2
                 mean_out[out_coord] = local_mean
-                var_out[out_coord] = local_M2 / divisor
+                var_out[out_coord]  = local_M2 / divisor
 
         return (mean_out^, var_out^)
 
-    # ── product: NEW ─────────────────────────────────────────────────────────
     # Returns Tuple[NDBuffer, ProductArg] — result + backward arg.
     # ProductArg is passed up to Product.forward which stores it in BackwardFnArg.
 
