@@ -131,7 +131,9 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             panic("axis is not valid for standard deviation")
 
         # Always compute with keepdims=True — backward needs correct broadcast shape
-        var axes = IntArray.range(0, self.rank()) if normalized_axis == -100 else IntArray(normalized_axis)
+        var axes = IntArray.range(
+            0, self.rank()
+        ) if normalized_axis == -100 else IntArray(normalized_axis)
         var (mean_ndb, var_ndb) = self.buffer.welford(
             axes, unbiased, keepdims=True
         )
@@ -141,10 +143,6 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # Output: squeeze if user requested keepdims=False
         var result_ndb = std_ndb_keepdims
-        _="""if not keepdims and normalized_axis != -100:
-            result_ndb = std_ndb_keepdims.squeeze(IntArray(normalized_axis))
-        elif not keepdims and normalized_axis == -100:
-            result_ndb = std_ndb_keepdims.squeeze(IntArray())"""
         if not keepdims:
             result_ndb = std_ndb_keepdims.squeeze(axes)
 

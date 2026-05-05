@@ -118,16 +118,14 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # var (mean_ndb, var_ndb) = self.buffer.welford(axis, unbiased, keepdims)
         # var result = Tensor[Self.dtype](var_ndb^, requires_grad=False)
         # Always save mean with keepdims=True for correct backward broadcasting
-        var axes = IntArray.range(0, self.rank()) if normalized_axis == -100 else IntArray(normalized_axis)
+        var axes = IntArray.range(
+            0, self.rank()
+        ) if normalized_axis == -100 else IntArray(normalized_axis)
         var (mean_ndb, var_ndb) = self.buffer.welford(
             axes, unbiased, keepdims=True
         )
         # For the output, squeeze if user requested keepdims=False
         var result_ndb = var_ndb
-        _="""if not keepdims and normalized_axis != -100:
-            result_ndb = var_ndb.squeeze(IntArray(normalized_axis))
-        elif not keepdims and normalized_axis == -100:
-            result_ndb = var_ndb.squeeze(IntArray())"""
         if not keepdims:
             result_ndb = var_ndb.squeeze(axes)
         var result = Tensor[Self.dtype](result_ndb^, requires_grad=False)
@@ -149,7 +147,7 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                         normalized_axis,
                         unbiased,
                         keepdims,
-                        n,  # saved — free
+                        n,
                     ),
                 )
                 result.add_ancestry(backwardFnArg^, self)
