@@ -3148,9 +3148,9 @@ struct NDBuffer[dtype: DType](
                         Self.Empty(),
                         Self.Empty(),
                     )  # unreachable
-        return self._layernorm_normalize_cpu(mean, var_, gamma, beta, eps)
+        return self.layernorm_normalize_cpu(mean, var_, gamma, beta, eps)
 
-    fn _layernorm_normalize_cpu(
+    fn layernorm_normalize_cpu(
         self: NDBuffer[Self.dtype],
         mean: NDBuffer[Self.dtype],
         var_: NDBuffer[Self.dtype],

@@ -3098,6 +3098,17 @@ struct Tensor[dtype: DType](
         """
         return self.buffer.get(index)
 
+    fn set(self, index: Int, scalar: Scalar[Self.dtype]):
+        """Set element at a flat index with bounds checking.
+
+        Args:
+            index: Flat (linear) index into the tensor's memory.
+
+            Panic if index is out of bounds.
+        """
+        self.buffer.set(index, scalar)
+
+
     fn view[
         track_grad: Bool = True
     ](

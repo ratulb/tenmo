@@ -402,8 +402,9 @@ struct Gradbox[dtype: DType](
         Returns:
             A new Gradbox with the sum.
         """
+        var normalized_axes = Validator.validate_and_normalize_axes(self.shape(), axes)
         var nd_buffer = self.buffer.reduce(
-            normalized_axes=axes, keepdims=keepdims
+            normalized_axes=normalized_axes, keepdims=keepdims
         )
         return Gradbox[Self.dtype](nd_buffer^, share=False)
 
