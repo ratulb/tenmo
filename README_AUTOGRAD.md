@@ -177,7 +177,7 @@ struct Backward[dtype: DType](RegisterPassable):
         # Direct jump table — no variant extraction!
         if op_code == BACKWARD_ADD_SCALAR:
             return AddBackwardScalar.backward(output)
-        if op_code == BACKWARD_ADD:
+        elif op_code == BACKWARD_ADD:
             return AddBackward.backward(output)
         elif op_code == BACKWARD_MULTIPLY_SCALAR:
             return MultiplyBackwardScalar.backward(output)
