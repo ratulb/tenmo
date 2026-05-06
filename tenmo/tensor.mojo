@@ -2932,12 +2932,15 @@ struct Tensor[dtype: DType](
         """Dot product between two tensors. Either may be a scalar tensor."""
         return Dot[Self.dtype].forward[track_grad](self, other)
 
-
     fn dot[
         track_grad: Bool = True
-    ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+    ](self, scalar: Scalar[Self.dtype]) raises-> Tensor[Self.dtype]:
         """Dot product: tensor · scalar (scalar is broadcast to self's shape)."""
         var other = Tensor[Self.dtype].scalar(scalar, requires_grad=False)
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                var other_gpu = other.to_gpu()
+                return Dot[Self.dtype].forward[track_grad](self, other_gpu)
         return Dot[Self.dtype].forward[track_grad](self, other)
 
     fn __iadd__(self, scalar: Scalar[Self.dtype]):
