@@ -124,6 +124,7 @@ struct Layout(ImplicitlyCopyable & Movable & Equatable):
     fn rank(self) -> Int:
         return self.shape.rank()
 
+
     @always_inline
     fn max_index(self) -> Int:
         """Calculate the highest accessible memory offset.
@@ -598,6 +599,12 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn is_contiguous(self) -> Bool:
         return self.strides.is_contiguous(self.shape)
+
+    fn has_negative_strides(self) -> Bool:
+        for i in range(self.rank()):
+            if self.strides[i] < 0:
+                return True
+        return False
 
     @always_inline
     fn size(self) -> Int:
@@ -1240,8 +1247,9 @@ struct NDBuffer[dtype: DType](
         comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
+                    var contiguous_self = self.contiguous() if self.has_negative_strides() else self
                     out = Reduction[Self.dtype].launch[op_code](
-                        self, normalized_axes, keepdims
+                       contiguous_self^, normalized_axes, keepdims
                     )
                 except e:
                     print(e)
