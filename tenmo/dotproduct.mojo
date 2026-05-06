@@ -13,6 +13,7 @@ from std.gpu.primitives.warp import shuffle_down
 from std.gpu.globals import WARP_SIZE
 from std.sys import simd_width_of
 from .ancestry import Ancestor
+from .broadcast import Broadcast
 
 
 @fieldwise_init
@@ -63,59 +64,68 @@ struct Dot[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](lhs: Tensor[Self.dtype], rhs: Tensor[Self.dtype],) -> Tensor[Self.dtype]:
-        rank_lhs = lhs.rank()
-        rank_rhs = rhs.rank()
-        if not rank_lhs == rank_rhs and not rank_lhs <= 1:
+    ](lhs: Tensor[Self.dtype], rhs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+
+        # ── Broadcast scalar → vector if needed ──────────────────────────────
+        # A scalar tensor (rank=0 or numels=1) is broadcast to match the other.
+        # broadcast_to wires grad correctly so chain rule is preserved.
+        var actual_lhs = lhs
+        var actual_rhs = rhs
+
+        if lhs.numels() == 1 and rhs.numels() > 1:
+            actual_lhs = Broadcast[Self.dtype].forward[track_grad](
+                lhs, rhs.shape()
+            )
+        elif rhs.numels() == 1 and lhs.numels() > 1:
+            actual_rhs = Broadcast[Self.dtype].forward[track_grad](
+                rhs, lhs.shape()
+            )
+
+        # ── Rank and size validation (on post-broadcast tensors) ──────────────
+        if actual_lhs.rank() > 1 or actual_rhs.rank() > 1:
             panic("Tensor → dot: not supported for rank > 1")
-        var numels_lhs = lhs.numels()
-        var numels_rhs = rhs.numels()
-        if not numels_lhs == numels_rhs:
+        if actual_lhs.numels() != actual_rhs.numels():
             panic(
-                "Tensor → dot: size does not match",
-                String(numels_lhs),
-                String(numels_rhs),
+                "Tensor → dot: size does not match ",
+                String(actual_lhs.numels()),
+                " vs ",
+                String(actual_rhs.numels()),
             )
 
         var out: Tensor[Self.dtype]
 
         comptime if has_accelerator():
-            if lhs.is_on_gpu() and rhs.is_on_gpu():
+            if actual_lhs.is_on_gpu() and actual_rhs.is_on_gpu():
                 try:
                     out = DotproductKernel[Self.dtype].launch[
                         suppress_validation=True
-                    ](lhs, rhs)
-
+                    ](actual_lhs, actual_rhs)
                 except e:
                     print(e)
                     panic("Dot - GPU operation failed")
-                    # Not reachable
                     out = Tensor[Self.dtype].scalar(0)
             else:
                 out = Tensor[Self.dtype].scalar(
-                    lhs.buffer.contiguous_buffer().dot(
-                        rhs.buffer.contiguous_buffer()
+                    actual_lhs.buffer.contiguous_buffer().dot(
+                        actual_rhs.buffer.contiguous_buffer()
                     ),
                     requires_grad=False,
                 )
         else:
             out = Tensor[Self.dtype].scalar(
-                lhs.buffer.contiguous_buffer().dot(
-                    rhs.buffer.contiguous_buffer()
+                actual_lhs.buffer.contiguous_buffer().dot(
+                    actual_rhs.buffer.contiguous_buffer()
                 ),
                 requires_grad=False,
             )
 
         comptime if track_grad:
-            grad_required = lhs.requires_grad or rhs.requires_grad
-
-            if grad_required:
+            if actual_lhs.requires_grad or actual_rhs.requires_grad:
                 out.requires_grad_(True)
                 var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_DOT
                 )
-
-                out.add_ancestry(backwardFnArg^, lhs, rhs)
+                out.add_ancestry(backwardFnArg^, actual_lhs, actual_rhs)
 
         return out^
 

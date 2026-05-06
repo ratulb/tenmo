@@ -2926,16 +2926,18 @@ struct Tensor[dtype: DType](
             self, exponent, requires_grad
         )
 
-    fn dot[track_grad: Bool = True](self, other: Self) -> Tensor[Self.dtype]:
-        """Compute the dot product (matrix multiplication) with another tensor.
+    fn dot[
+        track_grad: Bool = True
+    ](self, other: Self) -> Tensor[Self.dtype]:
+        """Dot product between two tensors. Either may be a scalar tensor."""
+        return Dot[Self.dtype].forward[track_grad](self, other)
 
-        Args:
-            other: Tensor to multiply with.
-            track_grad: Whether to track gradients.
 
-        Returns:
-            Result of matrix multiplication.
-        """
+    fn dot[
+        track_grad: Bool = True
+    ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+        """Dot product: tensor · scalar (scalar is broadcast to self's shape)."""
+        var other = Tensor[Self.dtype].scalar(scalar, requires_grad=False)
         return Dot[Self.dtype].forward[track_grad](self, other)
 
     fn __iadd__(self, scalar: Scalar[Self.dtype]):
