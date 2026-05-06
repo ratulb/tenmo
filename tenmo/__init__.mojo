@@ -75,7 +75,7 @@ from  .backpropagation import *
 from  .binary_inplace_ops_kernel import *
 from  .binary_ops_kernel import *
 from  .blashandle import *
-from  .broadcastbackward import *
+from  .broadcast import *
 from  .broadcasthelper import *
 from  .buffers import *
 from  .clip import *

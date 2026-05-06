@@ -13,10 +13,65 @@ from tenmo.unary_ops_kernel import UnaryOpsKernel
 from std.random.philox import Random as PhiloxRandom
 from std.pathlib import Path
 from std.python import Python
+from std.collections import Counter
+
+@fieldwise_init
+struct Review(ImplicitlyCopyable, Movable):
+    var rating: Int
+    var comment: String
 
 
 fn main() raises:
-    pass
+    var undscore_sep = StringSlice("_")
+    var dot_sep = StringSlice(".txt")
+    var directory = Path("/home/tenmoomnet/aclImdb/train/pos")
+    var reviews = List[Review](capacity=12500)
+    for item in directory.listdir():
+        ref name = item.name()
+        var split = name.split(undscore_sep)
+        var rating = split[1].split(dot_sep)[0]
+        var complete_path = directory.joinpath(name)
+        var review = complete_path^.read_text()
+
+        reviews.append(Review(Int(rating), review))
+
+    ref last = reviews[-1]
+
+    print(last.comment)
+    print(last.rating)
+    print(len(reviews))
+
+    var counter = Counter[Int]([1, 2, 1, 2, 3, 3, 3])
+    var other = Counter[Int].fromkeys([1, 2, 3], 10)
+    print(counter[1]) # output: 2
+    counter.subtract(other)
+    print(counter[3]) # output: -8
+
+
+    comptime dtype = DType.float32
+
+    var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6], [7, 8, 9]], True)
+    var oh1 = Tensor[dtype]([1, 0, 1])
+    var r = oh1.matmul[mode=vm](a)
+    r.print()
+
+    var selected = a.gather(IntArray(2, 0))
+    selected = selected.sum(axes=[0])
+    selected.print()
+
+    var layer_2_delta = Tensor[dtype].d1([0.9])
+    var layer_2 = Tensor[dtype].randn(5, 1)
+    #var layer_1_delta = layer_2_delta.matmul[mode=vm](layer_2.transpose())
+    layer_1_delta.print()
+
+    var v1 = Tensor[dtype].d1([1, 2, 3])
+    var v2 = Tensor[dtype].d1([1, 2, 3])
+    var v = v1.dot(v2)
+    print()
+    layer_2.print()
+    v.print()
+
+
 
 
 fn main_1() raises:

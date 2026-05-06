@@ -11,7 +11,7 @@ from .backpropagation import (
 )
 from .common_utils import panic
 from .gradbox import Gradbox
-from .broadcastbackward import BroadcastBackward
+from .broadcast import BroadcastBackward
 from .ancestry import Ancestor
 
 

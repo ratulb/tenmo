@@ -9,7 +9,7 @@ from .backpropagation import (
 from .mnemonics import AddTensor, Multiply
 from .common_utils import panic, id
 from .gradbox import Gradbox
-from .broadcastbackward import BroadcastBackward
+from .broadcast import BroadcastBackward
 from .ancestry import Ancestor
 from std.os.atomic import Atomic, Consistency, fence
 

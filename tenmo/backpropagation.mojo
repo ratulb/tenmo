@@ -86,6 +86,7 @@ comptime BACKWARD_MIN_SCALAR = 53
 comptime BACKWARD_MULTIPLY_BROADCAST = 54
 comptime BACKWARD_PRODUCT = 55
 comptime BACKWARD_LAYER_NORM = 56
+comptime BACKWARD_BROADCAST_TO = 57
 
 
 trait ArgumentType(ImplicitlyCopyable & Movable):
@@ -456,7 +457,8 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             return ProductBackward[Self.dtype].backward(output)
         elif op_code == BACKWARD_LAYER_NORM:
             return LayerNormBackward[Self.dtype].backward(output)
-
+        elif op_code == BACKWARD_BROADCAST_TO:
+            return BroadcastToBackward[Self.dtype].backward(output)
 
         else:
             return []

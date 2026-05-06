@@ -4,6 +4,9 @@ from .ndbuffer import NDBuffer
 from .shapes import Shape
 from .ancestry import Ancestor
 from .broadcasthelper import ShapeBroadcaster
+from .mnemonics import AddTensor
+from .common_utils import panic
+from .backpropagation import BackwardFnArg, BACKWARD_BROADCAST_TO
 
 
 @fieldwise_init
@@ -88,3 +91,57 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
 
         return grad_contrib^
 
+
+@fieldwise_init
+struct BroadcastToBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+    @staticmethod
+    fn backward(
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var parent = output.ancestry().get(0)
+        ref incoming_grad = output.gradbox[]
+
+        var grad: Gradbox[Self.dtype]
+
+        if incoming_grad.shape() == parent.shape():
+            # No reduction needed — shapes already match
+            grad = incoming_grad
+        else:
+            # Sum over the axes that were broadcast to reduce back
+            # to the original shape
+            var axes = ShapeBroadcaster.broadcast_mask(
+                parent.shape(), incoming_grad.shape()
+            ).indices_of(1)
+            grad = incoming_grad.sum(axes=axes, keepdims=True)
+
+            # Reshape in case keepdims left size-1 dims that need squeezing
+            if grad.shape() != parent.shape():
+                grad = grad.reshape(parent.shape())
+
+        return [(parent^, grad^, AddTensor)]
+
+
+@fieldwise_init
+struct Broadcast[dtype: DType](Copyable, RegisterPassable):
+    @staticmethod
+    fn forward[
+        track_grad: Bool = True
+    ](
+        self: Tensor[Self.dtype],
+        target_shape: Shape,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+
+        var broadcasted_buffer = self.buffer.broadcast_to(target_shape)
+        var out = Tensor[Self.dtype](broadcasted_buffer^, requires_grad=False)
+
+        comptime if track_grad:
+            var grad_required = requires_grad.or_else(self.requires_grad)
+            if grad_required:
+                out.requires_grad_(True)
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
+                    BACKWARD_BROADCAST_TO
+                )
+                out.add_ancestry(backwardFnArg^, self)
+
+        return out^

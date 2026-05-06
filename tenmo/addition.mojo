@@ -8,7 +8,7 @@ from .backpropagation import (
 from .mnemonics import AddTensor, Add
 from .common_utils import panic
 from .gradbox import Gradbox
-from .broadcastbackward import BroadcastBackward
+from .broadcast import BroadcastBackward
 from .ancestry import Ancestor
 
 

@@ -561,9 +561,7 @@ struct Tensor[dtype: DType](
             validated=True,
         )
 
-    fn gather(
-        self, indices: IntArray, axis: Int = 0
-    ) -> Tensor[Self.dtype]:
+    fn gather(self, indices: IntArray, axis: Int = 0, requires_grad: Optional[Bool]=None) -> Tensor[Self.dtype]:
         """Gather slices along `axis` at the given indices.
 
         Always copies data into a fresh contiguous output tensor.
@@ -588,8 +586,10 @@ struct Tensor[dtype: DType](
         var ax = axis if axis >= 0 else axis + rank
         if ax < 0 or ax >= rank:
             panic(
-                "gather: axis ", String(axis),
-                " out of bounds for rank ", String(rank),
+                "gather: axis ",
+                String(axis),
+                " out of bounds for rank ",
+                String(rank),
             )
 
         if len(indices) == 0:
@@ -603,16 +603,23 @@ struct Tensor[dtype: DType](
                 idx += ax_dim
             if idx < 0 or idx >= ax_dim:
                 panic(
-                    "gather: index ", String(indices[k]),
-                    " out of bounds for axis ", String(ax),
-                    " with size ", String(ax_dim),
+                    "gather: index ",
+                    String(indices[k]),
+                    " out of bounds for axis ",
+                    String(ax),
+                    " with size ",
+                    String(ax_dim),
                 )
             normalized.append(idx)
 
-        return self._gather_copy(ax, normalized)
+        return self._gather_copy(ax, normalized, requires_grad)
 
-
-    fn _gather_copy(self, ax: Int, normalized: IntArray) -> Tensor[Self.dtype]:
+    fn _gather_copy(
+        self,
+        ax: Int,
+        normalized: IntArray,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
         """Copy-based gather — always produces a contiguous output tensor.
 
         Args:
@@ -627,10 +634,15 @@ struct Tensor[dtype: DType](
 
         var out_shape_arr = IntArray.with_capacity(rank)
         for d in range(rank):
-            out_shape_arr.append(len(normalized) if d == ax else self.shape()[d])
+            out_shape_arr.append(
+                len(normalized) if d == ax else self.shape()[d]
+            )
 
-        var result = Tensor[Self.dtype].zeros(Shape(out_shape_arr))
-        var total  = result.shape().num_elements()
+        var result = Tensor[Self.dtype].zeros(
+            Shape(out_shape_arr),
+            requires_grad=requires_grad.or_else(self.requires_grad),
+        )
+        var total = result.shape().num_elements()
 
         for flat in range(total):
             var coords = IntArray.with_capacity(rank)
@@ -643,7 +655,9 @@ struct Tensor[dtype: DType](
 
             var src_offset = self.offset()
             for d in range(rank):
-                src_offset += (src_idx if d == ax else coords[d]) * self.strides()[d]
+                src_offset += (
+                    src_idx if d == ax else coords[d]
+                ) * self.strides()[d]
 
             result.set(flat, self.get(src_offset))
 
@@ -1976,7 +1990,7 @@ struct Tensor[dtype: DType](
             requires_grad=requires_grad,
         )
 
-    fn broadcast_to(
+    fn broadcast_to[track_grad: Bool = True](
         self, target_shape: Shape, requires_grad: Optional[Bool] = None
     ) -> Tensor[Self.dtype]:
         """Broadcast tensor to a target shape.
@@ -1999,12 +2013,7 @@ struct Tensor[dtype: DType](
                 + String(target_shape)
             )
 
-        broadcasted_buffer = self.buffer.broadcast_to(target_shape)
-        grad_required = requires_grad.or_else(self.requires_grad)
-        out = Tensor[Self.dtype](
-            broadcasted_buffer^, requires_grad=grad_required
-        )
-        return out^
+        return Broadcast[Self.dtype].forward[track_grad](self, target_shape)
 
     @always_inline
     fn load[
@@ -2438,9 +2447,7 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with reciprocal values of the elements.
         """
-        return Reciprocal[Self.dtype].forward[track_grad](
-            self, requires_grad
-        )
+        return Reciprocal[Self.dtype].forward[track_grad](self, requires_grad)
 
     fn variance[
         track_grad: Bool = True
@@ -3195,7 +3202,6 @@ struct Tensor[dtype: DType](
             Panic if index is out of bounds.
         """
         self.buffer.set(index, scalar)
-
 
     fn view[
         track_grad: Bool = True
