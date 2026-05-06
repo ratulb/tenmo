@@ -600,12 +600,6 @@ struct NDBuffer[dtype: DType](
     fn is_contiguous(self) -> Bool:
         return self.strides.is_contiguous(self.shape)
 
-    fn has_negative_strides(self) -> Bool:
-        for i in range(self.rank()):
-            if self.strides[i] < 0:
-                return True
-        return False
-
     @always_inline
     fn size(self) -> Int:
         return self.buffer.size
@@ -1009,7 +1003,6 @@ struct NDBuffer[dtype: DType](
         var max_index = IndexCalculator.max_index(
             new_shape, new_strides, offset
         )
-        var min_idx = IndexCalculator.min_index(new_shape, new_strides, offset)
         if max_index >= size:
             panic(
                 "NDBuffer → share: invalid view [max_index="
@@ -1022,14 +1015,6 @@ struct NDBuffer[dtype: DType](
                 + String(new_strides)
                 + " offset="
                 + String(offset)
-            )
-        if min_idx < 0:
-            panic(
-                "NDBuffer → share: invalid view [min_index="
-                + String(min_idx)
-                + " < 0] shape=" + String(new_shape)
-                + " strides=" + String(new_strides)
-                + " offset=" + String(offset)
             )
 
         var ndb = NDBuffer[Self.dtype](
@@ -1256,9 +1241,8 @@ struct NDBuffer[dtype: DType](
         comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
-                    var contiguous_self = self.contiguous() if self.has_negative_strides() else self
                     out = Reduction[Self.dtype].launch[op_code](
-                       contiguous_self^, normalized_axes, keepdims
+                       self, normalized_axes, keepdims
                     )
                 except e:
                     print(e)

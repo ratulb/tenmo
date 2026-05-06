@@ -329,7 +329,7 @@ struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     @always_inline
-    fn max_index_good(shape: Shape, strides: Strides, offset: Int) -> Int:
+    fn max_index(shape: Shape, strides: Strides, offset: Int) -> Int:
         """Calculate the maximum valid flat index for the given shape and strides.
 
         Args:
@@ -346,31 +346,4 @@ struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
                 max_idx += (shape[i] - 1) * strides[i]
         return max_idx
 
-    @staticmethod
-    fn min_index(shape: Shape, strides: Strides, offset: Int) -> Int:
-        """Compute the minimum buffer index touched by this view."""
-        var min_idx = offset
-        for i in range(shape.rank()):
-            var dim    = shape[i]
-            var stride = strides[i]
-            if dim <= 1:
-                continue
-            if stride < 0:
-                min_idx += (dim - 1) * stride   # negative, so min_idx decreases
-            # stride > 0 contributes nothing — offset is already the minimum
-        return min_idx
-
-    @staticmethod
-    fn max_index(shape: Shape, strides: Strides, offset: Int) -> Int:
-        """Compute the maximum buffer index touched by this view."""
-        var max_idx = offset
-        for i in range(shape.rank()):
-            var dim    = shape[i]
-            var stride = strides[i]
-            if dim <= 1:
-                continue
-            if stride > 0:
-                max_idx += (dim - 1) * stride
-            # stride < 0 contributes nothing — offset is already the maximum
-        return max_idx
 
