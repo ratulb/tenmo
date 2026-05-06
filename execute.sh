@@ -144,6 +144,7 @@ declare -a ALL_TESTS_IN_ORDER=(
     "shuffle|tests/test_shuffle.mojo"
     "permute|tests/test_permute.mojo"
     "flatten|tests/test_flatten.mojo"
+    "gather|tests/test_gather.mojo"
     "squeeze|tests/test_squeeze.mojo"
     "unsqueeze|tests/test_unsqueeze.mojo"
     "gradbox|tests/test_gradbox.mojo"
@@ -196,6 +197,7 @@ declare -a GPU_TESTS=(
     "shuffle|tests/test_shuffle.mojo"
     "permute|tests/test_permute.mojo"
     "flatten|tests/test_flatten.mojo"
+    "gather|tests/test_gather.mojo"
     "squeeze|tests/test_squeeze.mojo"
     "ndb|tests/test_ndb.mojo"
     "transpose|tests/test_transpose.mojo"
@@ -240,7 +242,7 @@ if [ $# -eq 0 ]; then
     echo "  std_variance, stack, logarithm, concat, variance, variance_and_std, utils, onehot, power"
     echo "  indexhelper, losses, tanh, data, softmax, repeat, mmnd, attn_matmul"
     echo "  intarray, mm2d, vm, mv, slice, tiles, linspace, argminmax"
-    echo "  minmax, relu, shuffle, permute, flatten, squeeze, unsqueeze"
+    echo "  minmax, relu, shuffle, permute, flatten, gather, squeeze, unsqueeze"
     echo "  gradbox, ndb, transpose, buffers, views, shapes, strides"
     echo "  shapebroadcast, validators, ce, synth_mnist"
     echo ""
@@ -373,6 +375,7 @@ run_test_by_name() {
         shuffle)        run_test "shuffle" "tests/test_shuffle.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         permute)        run_test "permute" "tests/test_permute.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         flatten)        run_test "flatten" "tests/test_flatten.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        gather)        run_test "gather" "tests/test_gather.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         squeeze)        run_test "squeeze" "tests/test_squeeze.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         unsqueeze)      run_test "unsqueeze" "tests/test_unsqueeze.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         gradbox)        run_test "gradbox" "tests/test_gradbox.mojo" "$DEBUG_MODE"; exit_code=$? ;;
