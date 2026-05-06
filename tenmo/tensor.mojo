@@ -561,6 +561,92 @@ struct Tensor[dtype: DType](
             validated=True,
         )
 
+    fn gather[track_grad: Bool = True](
+        mut self, indices: IntArray, axis: Int = 0
+    ) -> Tensor[Self.dtype]:
+        """Gather slices along `axis` at the given indices.
+
+        Returns a zero-copy view if indices form a regular stride pattern,
+        otherwise copies data.
+        """
+        var rank = self.shape().rank()
+
+        # Validate and normalize axis
+        var ax = axis if axis >= 0 else axis + rank
+        if ax < 0 or ax >= rank:
+            panic("gather: axis ", String(axis), " out of bounds for rank ", String(rank))
+
+        if len(indices) == 0:
+            panic("gather: indices cannot be empty")
+
+        # Validate and normalize indices
+        var ax_dim = self.shape()[ax]
+        var normalized = IntArray.with_capacity(len(indices))
+        for k in range(len(indices)):
+            var idx = indices[k]
+            if idx < 0:
+                idx += ax_dim
+            if idx < 0 or idx >= ax_dim:
+                panic(
+                    "gather: index ", String(indices[k]),
+                    " out of bounds for axis ", String(ax),
+                    " with size ", String(ax_dim),
+                )
+            normalized.append(idx)
+
+        # ── Fast path: single index ───────────────────────────────────────────────
+        if len(normalized) == 1:
+            return self.slice[track_grad](
+                start = normalized[0], end = normalized[0] + 1, step = 1, axis = ax
+            )
+
+        # ── Fast path: regular stride pattern → zero-copy view ───────────────────
+        var step = normalized[1] - normalized[0]
+        if step != 0:
+            var is_regular = True
+            for k in range(2, len(normalized)):
+                if normalized[k] - normalized[k - 1] != step:
+                    is_regular = False
+                    break
+
+            if is_regular:
+                var end = normalized[len(normalized) - 1] + (1 if step > 0 else -1)
+                return self.slice[track_grad](
+                    start = normalized[0], end = end, step = step, axis = ax
+                )
+
+        # ── Slow path: irregular or repeated indices → copy ───────────────────────
+        return self._gather_copy(ax, normalized)
+
+    fn _gather_copy(mut self, ax: Int, normalized: IntArray) -> Tensor[Self.dtype]:
+        """Copy-based gather for non-contiguous index patterns."""
+        var rank = self.shape().rank()
+
+        var out_shape_arr = IntArray.with_capacity(rank)
+        for d in range(rank):
+            out_shape_arr.append(len(normalized) if d == ax else self.shape()[d])
+
+        var result = Tensor[Self.dtype].zeros(Shape(out_shape_arr))
+        var total  = result.shape().num_elements()
+
+        for flat in range(total):
+            var coords = IntArray.with_capacity(rank)
+            var rem = flat
+            for d in range(rank - 1, -1, -1):
+                #coords.insert(0, rem % result.shape()[d])
+                coords.prepend(rem % result.shape()[d])
+                rem //= result.shape()[d]
+
+            var src_idx = normalized[coords[ax]]   # already normalized
+
+            var src_offset = self.offset()
+            for d in range(rank):
+                src_offset += (src_idx if d == ax else coords[d]) * self.strides()[d]
+
+            result.set(flat, self.get(src_offset))
+
+        return result
+
     @always_inline
     fn __setitem__(self, *indices: Int, value: Scalar[Self.dtype]):
         """Set a scalar value at given coordinates.

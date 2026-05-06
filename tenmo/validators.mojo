@@ -324,6 +324,189 @@ struct Validator:
         end: Int,
         step: Int = 1,
     ) -> Tuple[Shape, Strides, Int]:
+        """Compute new shape, strides, and offset for a single-axis slice.
+
+        This function handles the full complexity of Python-style slicing semantics,
+        including negative indices, negative steps (reverse traversal), and the
+        critical distinction between a negative INDEX (e.g. -1 meaning "last element")
+        and a negative SENTINEL (e.g. -1 meaning "before index 0" in a reverse slice).
+
+        ── Negative index vs negative sentinel ──────────────────────────────────────
+        This is the subtlest correctness concern in this function.
+
+        For POSITIVE steps, a negative end is always a negative index:
+            a[0:-1]   → end=-1 means "up to but not including the last element"
+                        normalize: _end = -1 + dim
+
+        For NEGATIVE steps, end=-1 is a SENTINEL meaning "continue past index 0":
+            a[4:-1:-1] → in Python this is an EMPTY slice (end=-1 is treated as
+                         index dim-1 after normalization, so start <= end fails)
+            a[4::-1]   → None end, meaning "go all the way to and including index 0"
+
+        In our internal calling convention (from gather), we represent "include
+        index 0 in a reverse traversal" as end=-1 WITHOUT normalization. This is
+        safe because gather always passes already-normalized start indices, and
+        only produces end=-1 when the last gather index is 0 (meaning we want to
+        include index 0 in the output). We therefore must NOT normalize end=-1
+        when step < 0.
+
+        ── Clamping bounds ───────────────────────────────────────────────────────────
+        After normalization, clamping differs by step sign:
+
+        Positive step:  valid range for start and end is [0, dim]
+                        (end=dim means "go up to but not including dim", i.e. full axis)
+
+        Negative step:  valid range for start is [-1, dim-1]
+                        valid range for end   is [-1, dim-1]
+                        end=-1 is the legitimate lower sentinel, meaning
+                        "include index 0 and then stop" — it must NOT be
+                        clamped to 0, which would exclude index 0 from the slice.
+
+        ── Length calculation ────────────────────────────────────────────────────────
+        Positive step, start < end:
+            length = ceil((end - start) / step)
+                   = (end - start + step - 1) // step
+
+        Negative step, start > end:
+            length = ceil((start - end) / |step|)
+                   = (start - end - step - 1) // (-step)
+            Note: "- step - 1" works because step is negative, so -step is positive
+                  and (-step - 1) == (|step| - 1), giving the ceiling correctly.
+
+        Args:
+            original_shape:   Shape of the tensor being sliced.
+            original_strides: Strides of the tensor being sliced.
+            axis:             Axis to slice along. May be negative (e.g. -1 for last axis).
+            start:            Slice start index. May be negative (normalized to dim+start).
+                              For negative steps this is the HIGH end of the range.
+            end:              Slice end index (exclusive). May be negative.
+                              For positive steps: negative values are normalized as indices.
+                              For negative steps: -1 is the sentinel "before index 0"
+                              and is NOT normalized — see discussion above.
+            step:             Step size. Must not be zero. Negative values reverse traversal.
+
+        Returns:
+            Tuple of (new_shape, new_strides, new_offset) where:
+                new_shape:   Same rank as original; only the sliced axis dimension changes.
+                new_strides: Same rank as original; sliced axis stride is original*step.
+                new_offset:  Byte offset (in elements) from original base to slice start.
+
+        Panics:
+            - step == 0
+            - axis out of bounds after normalization
+            - start == end (zero-length slice is almost certainly a caller error)
+            - Computed slice length is 0 (invalid range for the given step direction)
+        """
+
+        if step == 0:
+            panic("Slice step cannot be zero")
+
+        if start == end:
+            panic("Slice start and end cannot be the same")
+
+        # ── Normalize axis ────────────────────────────────────────────────────────
+        # Allow negative axis: -1 means last axis, -rank means first axis.
+        var actual_axis = axis
+        if actual_axis < 0:
+            actual_axis += original_shape.rank()
+        if actual_axis < 0 or actual_axis >= original_shape.rank():
+            panic(
+                "Axis ",
+                String(axis),
+                " out of bounds for tensor of rank ",
+                String(original_shape.rank()),
+            )
+
+        # ── Build output shape, strides, offset ──────────────────────────────────
+        # All axes other than actual_axis pass through unchanged.
+        var new_shape:   IntArray = IntArray.with_capacity(original_shape.rank())
+        var new_strides: IntArray = IntArray.with_capacity(original_shape.rank())
+        var new_offset:  Int      = 0
+
+        for i in range(original_shape.rank()):
+            var dim    = original_shape[i]
+            var stride = original_strides[i]
+
+            if i != actual_axis:
+                # Non-sliced axis: carry forward unchanged.
+                new_shape.append(dim)
+                new_strides.append(stride)
+                continue
+
+            # ── Normalize start ───────────────────────────────────────────────────
+            # Negative start is always a genuine negative index regardless of step
+            # direction: -1 means last element, -dim means first element.
+            var _start = start + dim if start < 0 else start
+
+            # ── Normalize end ─────────────────────────────────────────────────────
+            # KEY DISTINCTION: only normalize negative end for positive steps.
+            #
+            # Positive step:  end=-1 is a negative index → normalize to dim-1.
+            # Negative step:  end=-1 is the sentinel "before index 0" → do NOT
+            #                 normalize. Normalizing would turn it into dim-1,
+            #                 which would make the range appear to run from a high
+            #                 start down to near the top of the axis — completely
+            #                 wrong when we want to traverse down to index 0.
+            var _end: Int
+            if end < 0 and step > 0:
+                _end = end + dim    # genuine negative index, e.g. a[1:-1]
+            else:
+                _end = end          # positive index, or negative-step sentinel
+
+            # ── Clamp to valid bounds ─────────────────────────────────────────────
+            # Positive step: both start and end live in [0, dim].
+            #   end=dim means "up to the last element inclusive" (exclusive sentinel
+            #   one past the end), which is the standard Python behaviour.
+            #
+            # Negative step: start and end live in [-1, dim-1].
+            #   start=dim-1 is the last element (highest valid index).
+            #   end=-1 is the lower sentinel meaning "include index 0 then stop".
+            #   Clamping end to 0 would EXCLUDE index 0, which is wrong.
+            if step > 0:
+                _start = max(0,  min(_start, dim))
+                _end   = max(0,  min(_end,   dim))
+            else:
+                _start = max(-1, min(_start, dim - 1))
+                _end   = max(-1, min(_end,   dim - 1))
+
+            # ── Compute output length ─────────────────────────────────────────────
+            var length = 0
+            if step > 0 and _start < _end:
+                # Forward traversal: ceiling division.
+                length = (_end - _start + step - 1) // step
+            elif step < 0 and _start > _end:
+                # Reverse traversal: ceiling division over absolute step.
+                # (-step - 1) == (|step| - 1) because step is negative.
+                length = (_start - _end - step - 1) // (-step)
+            # else: length remains 0 — range is empty for this step direction.
+
+            if length == 0:
+                panic(
+                    "Invalid slice range [",
+                    String(start), ":", String(end), ":", String(step),
+                    "] produces empty result on axis of size ", String(dim),
+                )
+
+            # ── Append sliced axis metadata ───────────────────────────────────────
+            # new stride = original stride * step  (negative step → negative stride,
+            #              which is how reverse traversal is encoded in a strided view)
+            # new offset contribution = _start * stride  (pointer to first element)
+            new_shape.append(length)
+            new_strides.append(stride * step)
+            new_offset += _start * stride
+
+        return Shape(new_shape), Strides(new_strides), new_offset
+
+    @always_inline
+    @staticmethod
+    fn validate_and_compute_slice_metadata_orig(
+        original_shape: Shape,
+        original_strides: Strides,
+        axis: Int,
+        start: Int,
+        end: Int,
+        step: Int = 1,
+    ) -> Tuple[Shape, Strides, Int]:
         """
         Compute new shape, strides, and offset for a single-axis slice.
 
@@ -495,7 +678,6 @@ struct Validator:
     fn validate_and_compute_view_metadata(
         original_shape: Shape,
         original_strides: Strides,
-        # slices: VariadicListMem[Slice],
         slices: VariadicList[Slice, _],
     ) -> Tuple[Shape, Strides, Int]:
         """
@@ -547,7 +729,6 @@ struct Validator:
     fn validate_and_compute_advanced_indexing_metadata(
         original_shape: Shape,
         original_strides: Strides,
-        # indices: VariadicListMem[Idx],
         indices: VariadicList[Idx, _],
     ) -> Tuple[Shape, Strides, Int]:
         """
