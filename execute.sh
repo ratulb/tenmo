@@ -81,7 +81,7 @@ run_parallel() {
 
 # Define the complete ordered list of tests
 declare -a ALL_TESTS_IN_ORDER=(
-    "dot|tests/tests/test_dot.mojo"
+    "dot|tests/test_dot.mojo"
     "layer_norm|tests/test_layernorm.mojo"
     "reciprocal|tests/test_reciprocal.mojo"
     "product|tests/test_product_reduction.mojo"
@@ -162,7 +162,7 @@ declare -a ALL_TESTS_IN_ORDER=(
 )
 
 declare -a GPU_TESTS=(
-    "dot|tests/tests/test_dot.mojo"
+    "dot|tests/test_dot.mojo"
     "layer_norm|tests/test_layernorm.mojo"
     "reciprocal|tests/test_reciprocal.mojo"
     "product|tests/test_product_reduction.mojo"
