@@ -329,7 +329,7 @@ struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     @always_inline
-    fn max_index_orig(shape: Shape, strides: Strides, offset: Int) -> Int:
+    fn max_index_good(shape: Shape, strides: Strides, offset: Int) -> Int:
         """Calculate the maximum valid flat index for the given shape and strides.
 
         Args:
@@ -347,26 +347,30 @@ struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
         return max_idx
 
     @staticmethod
-    fn max_index(shape: Shape, strides: Strides, offset: Int) -> Int:
-        """Compute the maximum buffer index touched by this view.
+    fn min_index(shape: Shape, strides: Strides, offset: Int) -> Int:
+        """Compute the minimum buffer index touched by this view."""
+        var min_idx = offset
+        for i in range(shape.rank()):
+            var dim    = shape[i]
+            var stride = strides[i]
+            if dim <= 1:
+                continue
+            if stride < 0:
+                min_idx += (dim - 1) * stride   # negative, so min_idx decreases
+            # stride > 0 contributes nothing — offset is already the minimum
+        return min_idx
 
-        For positive strides the last element along the axis is at
-        (dim-1)*stride. For negative strides the first element along
-        the axis is at offset (already accounted for) and subsequent
-        elements go lower — so the axis contributes 0 additional reach
-        beyond the offset. We therefore only accumulate positive stride
-        contributions on top of the base offset.
-        """
+    @staticmethod
+    fn max_index(shape: Shape, strides: Strides, offset: Int) -> Int:
+        """Compute the maximum buffer index touched by this view."""
         var max_idx = offset
         for i in range(shape.rank()):
             var dim    = shape[i]
             var stride = strides[i]
-            if dim == 0:
+            if dim <= 1:
                 continue
             if stride > 0:
-                # Furthest element is at the high end of this axis
                 max_idx += (dim - 1) * stride
-            # stride < 0: furthest element is at index 0 of this axis,
-            # which is already captured by offset — no additional reach.
-            # stride == 0: broadcast axis, always same element, no reach.
+            # stride < 0 contributes nothing — offset is already the maximum
         return max_idx
+

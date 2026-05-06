@@ -1009,7 +1009,8 @@ struct NDBuffer[dtype: DType](
         var max_index = IndexCalculator.max_index(
             new_shape, new_strides, offset
         )
-        if max_index > size:
+        var min_idx = IndexCalculator.min_index(new_shape, new_strides, offset)
+        if max_index >= size:
             panic(
                 "NDBuffer → share: invalid view [max_index="
                 + String(max_index)
@@ -1021,6 +1022,14 @@ struct NDBuffer[dtype: DType](
                 + String(new_strides)
                 + " offset="
                 + String(offset)
+            )
+        if min_idx < 0:
+            panic(
+                "NDBuffer → share: invalid view [min_index="
+                + String(min_idx)
+                + " < 0] shape=" + String(new_shape)
+                + " strides=" + String(new_strides)
+                + " offset=" + String(offset)
             )
 
         var ndb = NDBuffer[Self.dtype](
