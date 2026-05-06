@@ -547,7 +547,6 @@ struct Validator:
     fn validate_and_compute_advanced_indexing_metadata(
         original_shape: Shape,
         original_strides: Strides,
-        # indices: VariadicListMem[Idx],
         indices: VariadicList[Idx, _],
     ) -> Tuple[Shape, Strides, Int]:
         """
