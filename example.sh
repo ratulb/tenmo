@@ -3,7 +3,7 @@ clear
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No example specified"
-    echo "Usage: $0 [binary_mnist|mnist|mnist_gpu|xor|spiral|cifar_10|mnist_conv2d]"
+    echo "Usage: $0 [imdb|binary_mnist|mnist|mnist_gpu|xor|spiral|cifar_10|mnist_conv2d]"
     exit 1
 fi
 
@@ -14,6 +14,10 @@ fi
 
 # Determine which test to run based on the argument
 case $1 in
+    imdb)
+        echo "Running IMDB sentiment training loop"
+        mojo -I . $DEBUG_MODE examples/imdb_sentiment.mojo
+        ;;
     binary_mnist)
         echo "Running binary mnist training loop"
         mojo -I . $DEBUG_MODE examples/binary_mnist.mojo

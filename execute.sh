@@ -82,6 +82,7 @@ run_parallel() {
 # Define the complete ordered list of tests
 declare -a ALL_TESTS_IN_ORDER=(
     "dot|tests/test_dot.mojo"
+    "outer|tests/test_outer.mojo"
     "layer_norm|tests/test_layernorm.mojo"
     "reciprocal|tests/test_reciprocal.mojo"
     "product|tests/test_product_reduction.mojo"
@@ -163,6 +164,7 @@ declare -a ALL_TESTS_IN_ORDER=(
 
 declare -a GPU_TESTS=(
     "dot|tests/test_dot.mojo"
+    "outer|tests/test_outer.mojo"
     "layer_norm|tests/test_layernorm.mojo"
     "reciprocal|tests/test_reciprocal.mojo"
     "product|tests/test_product_reduction.mojo"
@@ -299,6 +301,7 @@ run_test_by_name() {
 
     case $test_name in
         dot)            run_test "dot" "tests/test_dot.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        outer)          run_test "outer" "tests/test_outer.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         layer_norm)     run_test "layer_norm" "tests/test_layernorm.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         reciprocal)     run_test "reciprocal" "tests/test_reciprocal.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         product)        run_test "product" "tests/test_product_reduction.mojo" "$DEBUG_MODE"; exit_code=$? ;;

@@ -561,7 +561,20 @@ struct Tensor[dtype: DType](
             validated=True,
         )
 
-    fn gather(self, indices: IntArray, axis: Int = 0, requires_grad: Optional[Bool]=None) -> Tensor[Self.dtype]:
+    fn gather(
+        self,
+        indices: List[Int],
+        axis: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        return self.gather(IntArray(indices), axis, requires_grad)
+
+    fn gather(
+        self,
+        indices: IntArray,
+        axis: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
         """Gather slices along `axis` at the given indices.
 
         Always copies data into a fresh contiguous output tensor.
@@ -662,6 +675,37 @@ struct Tensor[dtype: DType](
             result.set(flat, self.get(src_offset))
 
         return result
+
+    fn outer[track_grad: Bool = True](
+        self, other: Tensor[Self.dtype]
+    ) -> Tensor[Self.dtype]:
+        """Compute the outer product of two tensors.
+
+        Both tensors are flattened to 1-D before the product is computed.
+        Result shape is (self.numels(), other.numels()).
+
+        Gradient flows back through both inputs if either requires grad —
+        implemented entirely via reshape + unsqueeze + multiply so no
+        custom backward is needed.
+
+        Args:
+            other: Second tensor. Will be flattened to 1-D.
+
+        Returns:
+            2-D tensor of shape (self.numels(), other.numels()).
+        """
+        # Flatten both to 1-D — reshape tracks grad if input does
+        var a = self.reshape[track_grad](Shape(self.numels()))    # (m,)
+        var b = other.reshape[track_grad](Shape(other.numels()))  # (n,)
+
+        # Unsqueeze a → column vector (m, 1)
+        var col_axes = IntArray()
+        col_axes.append(1)
+        var a_col = a.unsqueeze[track_grad](col_axes)             # (m, 1)
+
+        # Broadcast multiply (m, 1) * (n,) → (m, n)
+        # This is a broadcast multiply — BroadcastBackward handles grad
+        return a_col.__mul__[track_grad](b)                                          # (m, n)
 
     @always_inline
     fn __setitem__(self, *indices: Int, value: Scalar[Self.dtype]):
@@ -1990,7 +2034,9 @@ struct Tensor[dtype: DType](
             requires_grad=requires_grad,
         )
 
-    fn broadcast_to[track_grad: Bool = True](
+    fn broadcast_to[
+        track_grad: Bool = True
+    ](
         self, target_shape: Shape, requires_grad: Optional[Bool] = None
     ) -> Tensor[Self.dtype]:
         """Broadcast tensor to a target shape.
@@ -2926,16 +2972,15 @@ struct Tensor[dtype: DType](
             self, exponent, requires_grad
         )
 
-    fn dot[
-        track_grad: Bool = True
-    ](self, other: Self) -> Tensor[Self.dtype]:
+    fn dot[track_grad: Bool = True](self, other: Self) -> Tensor[Self.dtype]:
         """Dot product between two tensors. Either may be a scalar tensor."""
         return Dot[Self.dtype].forward[track_grad](self, other)
 
     fn dot[
         track_grad: Bool = True
-    ](self, scalar: Scalar[Self.dtype]) raises-> Tensor[Self.dtype]:
-        """Dot product: tensor · scalar (scalar is broadcast to self's shape)."""
+    ](self, scalar: Scalar[Self.dtype]) raises -> Tensor[Self.dtype]:
+        """Dot product: tensor · scalar (scalar is broadcast to self's shape).
+        """
         var other = Tensor[Self.dtype].scalar(scalar, requires_grad=False)
         comptime if has_accelerator():
             if self.is_on_gpu():
