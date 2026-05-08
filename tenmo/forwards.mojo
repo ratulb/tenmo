@@ -46,3 +46,4 @@ from .maxmin_scalar import MaxScalar, MinScalar
 from .layernorm import LayerNormForward, LayerNorm
 from .reciprocal import Reciprocal
 from .broadcast import Broadcast
+from .gather import Gather, GatherArg

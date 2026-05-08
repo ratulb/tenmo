@@ -504,6 +504,44 @@ struct Gradbox[dtype: DType](
 
         return Gradbox[Self.dtype](ndb^, share=False)
 
+    fn slice(self, start: Int, end: Int, step: Int = 1, axis: Int = 0) -> Gradbox[
+        Self.dtype
+    ]:
+        """Slice Gradbox along a single axis with start, end, and step.
+
+        Args:
+            start: Start index.
+            end: End index.
+            step: Step size (default: 1).
+            axis: Axis to slice along (default: 0).
+
+        Returns:
+            A gradbox over the sliced region.
+        Raises:
+            Panic if called on an unshared Gradbox.
+        """
+        if not self.shared():
+            panic(
+                "Gradbox -> slice: can not call on an unshared gradbox"
+            )
+        var shape, strides, offset = (
+            Validator.validate_and_compute_slice_metadata(
+                self.shape(), self.strides(), axis, start, end, step
+            )
+        )
+
+        # Handle scalar (rank-0) case
+        var is_scalar = len(shape) == 0
+        var slice_shape = Shape() if is_scalar else shape
+        var slice_strides = Strides() if is_scalar else strides
+        var abs_offset = self.offset() + offset
+        var shared_buffer = self.buffer.buffer.copy()
+        var ndb = NDBuffer[Self.dtype](
+            shared_buffer^, shape=slice_shape^, strides=slice_strides^, offset=abs_offset
+        )
+
+        return Gradbox[Self.dtype](ndb^, share=False)
+
     @always_inline
     fn __getitem__(self, indices: List[Int]) -> Scalar[Self.dtype]:
         """Index the Gradbox with a List of integers.

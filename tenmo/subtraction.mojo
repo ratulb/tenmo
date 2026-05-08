@@ -172,3 +172,23 @@ struct Subtractor[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     out.add_ancestry(backwardFnArg^, self, other)
 
         return out^
+
+    @staticmethod
+    fn forward(self: Tensor[Self.dtype], other: Gradbox[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
+        if self.shape() != other.shape():
+            panic(
+                "Tensor subtraction(gradbox) dimension mismatch: shapes don't match "
+                + String(self.shape())
+                + " with "
+                + String(other.shape()),
+                "at Subtractor → forward",
+            )
+
+        var out = Tensor[Self.dtype](
+            self.buffer.arithmetic_ops[Subtract](other.buffer),
+            requires_grad=False,
+        )
+
+        return out^

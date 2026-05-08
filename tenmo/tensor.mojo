@@ -16,10 +16,12 @@ from .common_utils import (
     panic,
     Epsilon,
     One,
+    i,
+    s,
 )
 from .mnemonics import *
 from .indexhelper import IndexIterator
-from .backpropagation import Backward, BackwardFnArg
+from .backpropagation import Backward, BackwardFnArg, IntArrayArg
 from .forwards import *
 from .buffers import Buffer
 from .validators import Validator
@@ -561,15 +563,19 @@ struct Tensor[dtype: DType](
             validated=True,
         )
 
-    fn gather(
+    fn gather[
+        track_grad: Bool = True
+    ](
         self,
         indices: List[Int],
         axis: Int = 0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-        return self.gather(IntArray(indices), axis, requires_grad)
+        return self.gather[track_grad](IntArray(indices), axis, requires_grad)
 
-    fn gather(
+    fn gather[
+        track_grad: Bool
+    ](
         self,
         indices: IntArray,
         axis: Int = 0,
@@ -594,7 +600,7 @@ struct Tensor[dtype: DType](
             - indices is empty
             - any index out of bounds after normalization
         """
-        var rank = self.shape().rank()
+        _ = """var rank = self.shape().rank()
 
         var ax = axis if axis >= 0 else axis + rank
         if ax < 0 or ax >= rank:
@@ -625,7 +631,11 @@ struct Tensor[dtype: DType](
                 )
             normalized.append(idx)
 
-        return self._gather_copy(ax, normalized, requires_grad)
+        return self._gather_copy(ax, normalized, requires_grad)"""
+
+        return Gather[Self.dtype].forward[track_grad](
+            self, indices, axis, requires_grad
+        )
 
     fn _gather_copy(
         self,
@@ -676,9 +686,9 @@ struct Tensor[dtype: DType](
 
         return result
 
-    fn outer[track_grad: Bool = True](
-        self, other: Tensor[Self.dtype]
-    ) -> Tensor[Self.dtype]:
+    fn outer[
+        track_grad: Bool = True
+    ](self, other: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         """Compute the outer product of two tensors.
 
         Both tensors are flattened to 1-D before the product is computed.
@@ -695,17 +705,17 @@ struct Tensor[dtype: DType](
             2-D tensor of shape (self.numels(), other.numels()).
         """
         # Flatten both to 1-D — reshape tracks grad if input does
-        var a = self.reshape[track_grad](Shape(self.numels()))    # (m,)
+        var a = self.reshape[track_grad](Shape(self.numels()))  # (m,)
         var b = other.reshape[track_grad](Shape(other.numels()))  # (n,)
 
         # Unsqueeze a → column vector (m, 1)
         var col_axes = IntArray()
         col_axes.append(1)
-        var a_col = a.unsqueeze[track_grad](col_axes)             # (m, 1)
+        var a_col = a.unsqueeze[track_grad](col_axes)  # (m, 1)
 
         # Broadcast multiply (m, 1) * (n,) → (m, n)
         # This is a broadcast multiply — BroadcastBackward handles grad
-        return a_col.__mul__[track_grad](b)                                          # (m, n)
+        return a_col.__mul__[track_grad](b)  # (m, n)
 
     @always_inline
     fn __setitem__(self, *indices: Int, value: Scalar[Self.dtype]):
@@ -2594,13 +2604,33 @@ struct Tensor[dtype: DType](
             incoming: Gradbox containing upstream gradients.
         """
         ref gradbox = self.gradbox[]
-        if opcode == MulTensor:
+        if opcode == ScatterAddTensor:
+            # grad is (n_indices, hidden_size) — NOT full parent shape
+            # indices are on the output node(self)'s BackwardFnArg
+            ref sparse_arr = (
+                self.ancestry().backward_fn_arg().get[IntArrayArg]().array
+            )
+            var ax = sparse_arr[0]
+            var n_indices = len(sparse_arr) - 1
+
+            for k in range(n_indices):
+                var row_idx = sparse_arr[k + 1]
+                var grad_row = incoming.slice(
+                    start=k, end=k + 1, axis=ax
+                ).squeeze()
+                var current_row = (
+                    self.gradbox[]
+                    .slice(start=row_idx, end=row_idx + 1, axis=ax)
+                    .squeeze()
+                )
+                self.gradbox[].fill(current_row + grad_row, i(row_idx), s())
+        elif opcode == MulTensor:
             gradbox *= incoming
-        if opcode == AddTensor:
+        elif opcode == AddTensor:
             gradbox += incoming
-        if opcode == SubtractTensor:
+        elif opcode == SubtractTensor:
             gradbox -= incoming
-        if opcode == ZeroGrad:
+        else:  # opcode == ZeroGrad:
             self.zero_grad()
 
     fn __iadd__(self, other: Self):
@@ -2896,6 +2926,17 @@ struct Tensor[dtype: DType](
             Tensor with element-wise difference.
         """
         return Subtractor[Self.dtype].forward[track_grad](self, other)
+
+    fn __sub__(self, other: Gradbox[Self.dtype]) -> Tensor[Self.dtype]:
+        """Element-wise subtraction of two tensors.
+
+        Args:
+            other: Gradbox to subtract.
+
+        Returns:
+            Tensor with element-wise difference.
+        """
+        return Subtractor[Self.dtype].forward(self, other)
 
     fn __rmul__[
         track_grad: Bool = True
@@ -3209,8 +3250,38 @@ struct Tensor[dtype: DType](
                                     target.gradbox[] += grad
                                 elif op_code == SubtractTensor:
                                     target.gradbox[] -= grad
-                                else:
+                                elif op_code == ZeroGrad:
                                     target.gradbox[].zero_grad()
+                                elif op_code == ScatterAddTensor:
+                                    # grad is (n_indices, hidden_size) — NOT full parent shape
+                                    # indices are on the output node's BackwardFnArg
+                                    ref gather = (
+                                        node.ancestry()
+                                        .backward_fn_arg()
+                                        .get[GatherArg]()
+                                    )
+                                    var ax = gather.axis
+                                    var n_indices = len(gather.indices)
+
+                                    for k in range(n_indices):
+                                        var row_idx = gather.indices[k]
+                                        var grad_row = grad.slice(
+                                            start=k, end=k + 1, axis=ax
+                                        ).squeeze()
+                                        var current_row = (
+                                            target.gradbox[]
+                                            .slice(
+                                                start=row_idx,
+                                                end=row_idx + 1,
+                                                axis=ax,
+                                            )
+                                            .squeeze()
+                                        )
+                                        target.gradbox[].fill(
+                                            current_row + grad_row,
+                                            i(row_idx),
+                                            s(),
+                                        )
 
                         if target_id in fanin:
                             fanin[target_id] -= 1

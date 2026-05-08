@@ -36,7 +36,7 @@ from tenmo.shapes import Shape
 fn main() raises:
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var a_gpu = a.to_gpu()
-    var b_gpu = Tensor.full_gpu(Shape.of(2, 2), 2.0)
+    var b_gpu = Tensor.full(Shape.of(2, 2), 2.0).to_gpu()
     var c_gpu = a_gpu * b_gpu
     var loss = c_gpu.sum()
     loss.backward()
