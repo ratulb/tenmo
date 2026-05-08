@@ -571,10 +571,12 @@ struct Tensor[dtype: DType](
         axis: Int = 0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-        return self.gather[track_grad](IntArray(indices), axis, requires_grad)
+        return self.gather[track_grad=track_grad](
+            indices=IntArray(indices), axis=axis, requires_grad=requires_grad
+        )
 
     fn gather[
-        track_grad: Bool
+        track_grad: Bool = True
     ](
         self,
         indices: IntArray,
@@ -600,91 +602,10 @@ struct Tensor[dtype: DType](
             - indices is empty
             - any index out of bounds after normalization
         """
-        _ = """var rank = self.shape().rank()
 
-        var ax = axis if axis >= 0 else axis + rank
-        if ax < 0 or ax >= rank:
-            panic(
-                "gather: axis ",
-                String(axis),
-                " out of bounds for rank ",
-                String(rank),
-            )
-
-        if len(indices) == 0:
-            panic("gather: indices cannot be empty")
-
-        var ax_dim = self.shape()[ax]
-        var normalized = IntArray.with_capacity(len(indices))
-        for k in range(len(indices)):
-            var idx = indices[k]
-            if idx < 0:
-                idx += ax_dim
-            if idx < 0 or idx >= ax_dim:
-                panic(
-                    "gather: index ",
-                    String(indices[k]),
-                    " out of bounds for axis ",
-                    String(ax),
-                    " with size ",
-                    String(ax_dim),
-                )
-            normalized.append(idx)
-
-        return self._gather_copy(ax, normalized, requires_grad)"""
-
-        return Gather[Self.dtype].forward[track_grad](
+        return Gather[Self.dtype].forward[track_grad=track_grad](
             self, indices, axis, requires_grad
         )
-
-    fn _gather_copy(
-        self,
-        ax: Int,
-        normalized: IntArray,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype]:
-        """Copy-based gather — always produces a contiguous output tensor.
-
-        Args:
-            ax:         Normalized (non-negative) axis to gather along.
-            normalized: Validated, normalized gather indices.
-
-        Returns:
-            Fresh contiguous tensor. Shape is identical to self except
-            axis `ax` has dimension len(normalized).
-        """
-        var rank = self.shape().rank()
-
-        var out_shape_arr = IntArray.with_capacity(rank)
-        for d in range(rank):
-            out_shape_arr.append(
-                len(normalized) if d == ax else self.shape()[d]
-            )
-
-        var result = Tensor[Self.dtype].zeros(
-            Shape(out_shape_arr),
-            requires_grad=requires_grad.or_else(self.requires_grad),
-        )
-        var total = result.shape().num_elements()
-
-        for flat in range(total):
-            var coords = IntArray.with_capacity(rank)
-            var rem = flat
-            for d in range(rank - 1, -1, -1):
-                coords.prepend(rem % result.shape()[d])
-                rem //= result.shape()[d]
-
-            var src_idx = normalized[coords[ax]]
-
-            var src_offset = self.offset()
-            for d in range(rank):
-                src_offset += (
-                    src_idx if d == ax else coords[d]
-                ) * self.strides()[d]
-
-            result.set(flat, self.get(src_offset))
-
-        return result
 
     fn outer[
         track_grad: Bool = True
