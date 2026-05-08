@@ -14,14 +14,14 @@ fi
 
 # Determine which test to run based on the argument
 case $1 in
-    imdb_v3)
+    imdb_v1)
         echo "Running IMDB sentiment training loop"
-        mojo -I . $DEBUG_MODE examples/imdb_sentiment_v3.mojo
+        mojo -I . $DEBUG_MODE examples/imdb_sentiment_v1.mojo
         ;;
 
     imdb)
         echo "Running IMDB sentiment training loop"
-        mojo -I . $DEBUG_MODE examples/imdb_sentiment.mojo
+        mojo -I . $DEBUG_MODE examples/imdb_sentiment_v2.mojo
         ;;
     binary_mnist)
         echo "Running binary mnist training loop"

@@ -21,6 +21,22 @@ struct Review(ImplicitlyCopyable, Movable):
     var comment: String
 
 
+def main_wip() raises:
+
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var b = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
+    var s = Tensor[dtype].scalar(2.0, requires_grad=True)
+    var ss = Tensor[dtype].d1([2.0], requires_grad=True)
+
+    # All of these work:
+    var _r1 = a.dot(b)           # vector · vector  (existing)
+    var _r2 = a.dot(s)           # vector · scalar  (broadcasts s → [2,2,2])
+    var _r3 = s.dot(a)           # scalar · vector  (broadcasts s → [1,2,3] shape)
+    var _r4 = a.dot(2.0)         # tensor · Scalar literal
+
+    var _r5 = a.dot(ss)
+
 fn main() raises:
     var undscore_sep = StringSlice("_")
     var dot_sep = StringSlice(".txt")
@@ -61,7 +77,7 @@ fn main() raises:
 
     var layer_2_delta = Tensor[dtype].d1([0.9])
     var layer_2 = Tensor[dtype].randn(5, 1)
-    #var layer_1_delta = layer_2_delta.matmul[mode=vm](layer_2.transpose())
+    var layer_1_delta = layer_2_delta.matmul[mode=vm](layer_2.transpose())
     layer_1_delta.print()
 
     var v1 = Tensor[dtype].d1([1, 2, 3])

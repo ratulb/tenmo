@@ -1,5 +1,5 @@
 """
-IMDB Sentiment Classifier — Tenmo Tensor Showcase
+IMDB Sentiment Classifier
 ==================================================
 
 A from-scratch two-layer neural network trained on the IMDB movie review
@@ -17,7 +17,7 @@ Training
     SGD with sparse embedding updates: only the rows of weights_0_1
     corresponding to tokens present in the current review are updated.
     This mirrors the original NumPy implementation from Trask's
-    "Grokking Deep Learning", Chapter 12.
+    "Grokking Deep Learning", Chapter 11.
 
 Dataset
 ───────
@@ -49,13 +49,12 @@ from tenmo.common_utils import (
 from std.pathlib import Path
 from std.math import abs
 from std.python import Python
-
+from std.collections import Set
 
 # =============================================================================
 # Configuration
 # =============================================================================
 
-# comptime TRAIN_FOLDER = "/home/tenmoomnet/aclImdb/train"
 comptime TRAIN_FOLDER = "aclImdb/train"
 comptime LEARNING_RATE: Float32 = 0.01
 comptime ITERATIONS = 2
@@ -190,11 +189,11 @@ struct IMDBPreprocessor:
                 var ids = tokenizer.encode(review.comment)
 
                 # Deduplicate: presence-only, order does not matter
-                var seen = Dict[Int, Bool]()
+                var seen = Set[Int]()
                 var deduped = List[Int]()
                 for token_id in ids:
                     if token_id not in seen:
-                        seen[token_id] = True
+                        seen.add(token_id)
                         deduped.append(token_id)
                 token_id_sets.append(deduped^)
             except:
@@ -297,25 +296,31 @@ def main() raises:
             # 1. Gather the embedding rows for every token present in this
             #    review and sum them into a single hidden vector.
             #    Shape: (len(token_ids), hidden_size) → sum → (hidden_size,)
-            var embedding_sum = weights_0_1.gather(token_ids).sum(
+            var embedding_sum = weights_0_1.gather[track_grad=False](token_ids).sum[track_grad=False](
                 axes=[0], keepdims=False
             )
             var hidden = sigmoid(embedding_sum)  # (hidden_size,)
 
             # 2. Project hidden → scalar prediction via dot product.
-            var output_weights_flat = weights_1_2.squeeze()  # (hidden_size,)
-            var prediction = sigmoid(hidden.dot(output_weights_flat))  # scalar
+            var output_weights_flat = weights_1_2.squeeze[track_grad=False]()  # (hidden_size,)
+            var prediction = sigmoid(hidden.dot[track_grad=False](output_weights_flat))  # scalar
 
             # ── Backward pass (manual) ────────────────────────────────────────
             #
-            # Output layer error: dL/d(prediction) * sigmoid'
-            # For MSE + sigmoid output: delta = prediction - target
+            # Output layer error: dL/d(prediction) for BCE loss
+            # For BCE + sigmoid output, the gradient simplifies to:
+            # delta_output = prediction - target
             var output_delta = prediction - target  # scalar
 
-            # Hidden layer error: back-propagate through output weights
-            var hidden_delta = (
-                output_delta * output_weights_flat
-            )  # (hidden_size,)
+            # Propagate error to hidden layer (before activation)
+            # dL/dz1 = W2^T @ output_delta
+            var hidden_error = output_delta * output_weights_flat  # (hidden_size,)
+
+            # Apply sigmoid derivative for hidden layer activation
+            # For hidden = sigmoid(z1), we need to multiply by sigmoid'(z1)
+            # sigmoid'(z1) = hidden * (1 - hidden)
+            var sigmoid_grad = hidden * (Tensor[dtype].scalar(1.0) - hidden)  # (hidden_size,)
+            var hidden_delta = hidden_error * sigmoid_grad  # (hidden_size,)
 
             # ── Weight updates ────────────────────────────────────────────────
             #
@@ -323,7 +328,7 @@ def main() raises:
             # outer(hidden, output_delta): (hidden_size,) x scalar → (hidden_size, 1)
             var unsqueeze_axes = IntArray()
             unsqueeze_axes.append(1)
-            var hidden_col = hidden.unsqueeze(
+            var hidden_col = hidden.unsqueeze[track_grad=False](
                 unsqueeze_axes
             )  # (hidden_size, 1)
             var outer_product = hidden_col * output_delta  # (hidden_size, 1)
@@ -331,6 +336,7 @@ def main() raises:
 
             # Sparse embedding update: only rows touched by this review's tokens
             # weights_0_1[token_id] -= hidden_delta * lr
+            # Note: Now hidden_delta includes the sigmoid derivative for the hidden layer
             for token_id in token_ids:
                 var embedding_row = weights_0_1[
                     i(token_id), s()
@@ -344,12 +350,13 @@ def main() raises:
             num_seen += 1
 
             if (sample_idx % 10) == 9:
-                var raw_pct = Float32(sample_idx) / Float32(len(token_id_sets))
-                var pct_int = Int(raw_pct * 10000)
-                var pct_whole = pct_int // 100
-                var pct_decimal = pct_int % 100
-                var decimal_str = ("0" if pct_decimal < 10 else "") + String(
-                    pct_decimal
+                var pct = (
+                    Float32(sample_idx) / Float32(len(token_id_sets)) * 100.0
+                )
+                var pct_whole = Int(pct)
+                var pct_frac = Int((pct - Float32(pct_whole)) * 100.0)
+                var decimal_str = ("0" if pct_frac < 10 else "") + String(
+                    pct_frac
                 )
                 var train_acc = Float32(num_correct) / Float32(num_seen)
                 sys.stdout.write(
@@ -375,12 +382,12 @@ def main() raises:
         ref token_ids = token_id_sets[sample_idx]
         ref true_label = labels[sample_idx]
 
-        var embedding_sum = weights_0_1.gather(token_ids).sum(
+        var embedding_sum = weights_0_1.gather[track_grad=False](token_ids).sum(
             axes=[0], keepdims=False
         )
         var hidden = sigmoid(embedding_sum)
-        var output_weights_flat = weights_1_2.squeeze()
-        var prediction = sigmoid(hidden.dot(output_weights_flat))
+        var output_weights_flat = weights_1_2.squeeze[track_grad=False]()
+        var prediction = sigmoid(hidden.dot[track_grad=False](output_weights_flat))
 
         if abs(prediction.item() - Float32(true_label)) < 0.5:
             num_correct += 1
@@ -388,3 +395,15 @@ def main() raises:
 
     var test_accuracy = Float32(num_correct) / Float32(num_seen)
     print("Test Accuracy: " + String(test_accuracy))
+
+
+#Loading reviews from: aclImdb/train
+#Building vocabulary...
+#Vocabulary size: 49301
+#Encoding reviews...
+#Reviews loaded: 25000
+#Labels  loaded: 25000
+#Iter:0  Progress: 95.99%  Training Accuracy: 0.99858333
+#Iter:1  Progress: 95.99%  Training Accuracy: 0.99720836
+#Evaluating on test set (1000 reviews)...
+#Test Accuracy: 1.0
