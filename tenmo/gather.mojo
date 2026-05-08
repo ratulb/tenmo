@@ -6,14 +6,17 @@ from .mnemonics import ScatterAddTensor, ZeroGrad
 from .backpropagation import IntArrayArg, BACKWARD_GATHER
 from .common_utils import panic
 
+
 @fieldwise_init
 struct GatherArg(ArgumentType):
     """Carries the axis and normalized indices for a gather operation.
     Used by both GatherBackward (to scatter grad) and the engine's
     ScatterAddTensor branch (to know which rows to update).
     """
-    var axis:    Int
+
+    var axis: Int
     var indices: IntArray
+
 
 @fieldwise_init
 struct GatherBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -82,7 +85,6 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         if len(indices) == 0:
             panic("gather: indices cannot be empty")
         var ax_dim = self.shape()[ax]
-        #print("Self shape: ", self.shape(), "ax: ", ax, "axis: ", axis, "ax_dim: ", ax_dim)
         var normalized = IntArray.with_capacity(len(indices))
 
         for k in range(len(indices)):
@@ -101,13 +103,12 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
             normalized.append(idx)
 
         var out = Self._gather_copy(self, ax, normalized)
-        #print("Normalized: ", normalized)
         comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
                 var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_GATHER,  GatherArg(ax, normalized)
+                    BACKWARD_GATHER, GatherArg(ax, normalized)
                 )
                 out.add_ancestry(backwardFnArg^, self)
 
