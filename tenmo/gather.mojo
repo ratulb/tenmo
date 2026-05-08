@@ -103,7 +103,6 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
             normalized.append(idx)
 
         var out = Self._gather_copy(self, ax, normalized)
-        # print("Normalized: ", normalized)
         comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
