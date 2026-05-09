@@ -979,6 +979,9 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn shared(self) -> Bool:
         """Check if underlying buffer is shared."""
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                return True   # DeviceBuffer is always ref-counted
         return self.buffer.is_shared()
 
     fn share(
