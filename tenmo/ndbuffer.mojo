@@ -124,7 +124,6 @@ struct Layout(ImplicitlyCopyable & Movable & Equatable):
     fn rank(self) -> Int:
         return self.shape.rank()
 
-
     @always_inline
     fn max_index(self) -> Int:
         """Calculate the highest accessible memory offset.
@@ -988,21 +987,22 @@ struct NDBuffer[dtype: DType](
         strides: Optional[Strides] = None,
         offset: Int = 0,
     ) -> NDBuffer[Self.dtype]:
-        """
-        Create shared view of this buffer.
-        First call enables ref counting. Subsequent calls just create views.
-        """
-        var size = len(self.buffer) if self.is_on_cpu() else len(
-            self.device_state.value()
-        )
-        # Enable ref counting if not already shared
-        if self.is_on_cpu() and size > 0 and not self.shared():
-            self.buffer.shared()
+        # ── Correct size depending on device ─────────────────────────────────
+        var size: Int
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                size = len(self.device_state.value())
+            else:
+                size = len(self.buffer)
+        else:
+            size = len(self.buffer)
+
         var new_shape = shape.or_else(self.shape)
         var new_strides = strides.or_else(Strides.default(new_shape))
         var max_index = IndexCalculator.max_index(
             new_shape, new_strides, offset
         )
+
         if max_index >= size:
             panic(
                 "NDBuffer → share: invalid view [max_index="
@@ -1016,6 +1016,9 @@ struct NDBuffer[dtype: DType](
                 + " offset="
                 + String(offset)
             )
+        # Enable ref counting on CPU only
+        if self.is_on_cpu() and size > 0 and not self.shared():
+            self.buffer.shared()
 
         var ndb = NDBuffer[Self.dtype](
             buffer=self.buffer.copy(),
@@ -1242,7 +1245,7 @@ struct NDBuffer[dtype: DType](
             if self.is_on_gpu():
                 try:
                     out = Reduction[Self.dtype].launch[op_code](
-                       self, normalized_axes, keepdims
+                        self, normalized_axes, keepdims
                     )
                 except e:
                     print(e)
@@ -1364,33 +1367,31 @@ struct NDBuffer[dtype: DType](
             axes, keepdims, validated=True
         )
         var mean_out = NDBuffer[Self.dtype].zeros(out_shape)
-        var var_out  = NDBuffer[Self.dtype].zeros(out_shape)
+        var var_out = NDBuffer[Self.dtype].zeros(out_shape)
 
         var n = self.shape.reduced_shape(axes).product()
-        var divisor = Scalar[Self.dtype](
-            n - 1 if unbiased and n > 1 else n
-        )
+        var divisor = Scalar[Self.dtype](n - 1 if unbiased and n > 1 else n)
 
         if out_shape == Shape():
             # Global scalar reduction
             var local_mean = Scalar[Self.dtype](0)
-            var local_M2   = Scalar[Self.dtype](0)
+            var local_M2 = Scalar[Self.dtype](0)
             var count = 0
             for idx in self.index_iterator():
                 var x = self.buffer[idx]
                 count += 1
-                var delta  = x - local_mean
+                var delta = x - local_mean
                 local_mean += delta / Scalar[Self.dtype](count)
                 var delta2 = x - local_mean
-                local_M2   += delta * delta2
+                local_M2 += delta * delta2
             mean_out[IntArray()] = local_mean
-            var_out[IntArray()]  = local_M2 / divisor
+            var_out[IntArray()] = local_M2 / divisor
         else:
             # Multi-axis reduction — mirrors reduce_cpu coord pattern exactly
             var reduction_axes_shape = self.shape.reduced_shape(axes)
             for out_coord in out_shape:
                 var local_mean = Scalar[Self.dtype](0)
-                var local_M2   = Scalar[Self.dtype](0)
+                var local_M2 = Scalar[Self.dtype](0)
                 var count = 0
                 for red_coord in reduction_axes_shape:
                     var self_coord = out_coord.replace(
@@ -1398,12 +1399,12 @@ struct NDBuffer[dtype: DType](
                     ) if keepdims else out_coord.insert(axes, red_coord)
                     var x = self[self_coord]
                     count += 1
-                    var delta  = x - local_mean
+                    var delta = x - local_mean
                     local_mean += delta / Scalar[Self.dtype](count)
                     var delta2 = x - local_mean
-                    local_M2   += delta * delta2
+                    local_M2 += delta * delta2
                 mean_out[out_coord] = local_mean
-                var_out[out_coord]  = local_M2 / divisor
+                var_out[out_coord] = local_M2 / divisor
 
         return (mean_out^, var_out^)
 
@@ -3000,6 +3001,8 @@ struct NDBuffer[dtype: DType](
                 except e:
                     panic(
                         "NDBuffer unary_ops_with_mask → GPU launch failed: ",
+                        "opcode = ",
+                        String(op_code),
                         String(e),
                     )
                     # Unreachable

@@ -14,7 +14,8 @@ from std.gpu.globals import WARP_SIZE
 from std.sys import simd_width_of
 from .ancestry import Ancestor
 from .broadcast import Broadcast
-
+from .device import DeviceState
+from .ndbuffer import NDBuffer
 
 @fieldwise_init
 struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -332,6 +333,7 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
             )
 
         device_context.synchronize()
-
-        return Tensor[Self.dtype].from_device_buffer(result_buffer, Shape())
+        var device_state = DeviceState[Self.dtype](result_buffer^, A_device_state.get_gpu())
+        var ndb = NDBuffer[Self.dtype].with_device_state(device_state^, Shape())
+        return Tensor[Self.dtype](ndb^, requires_grad=False)
 

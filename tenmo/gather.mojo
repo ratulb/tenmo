@@ -139,7 +139,7 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
             )
 
         var result = Tensor[Self.dtype].zeros(
-            Shape(out_shape_arr), requires_grad=False
+            Shape(out_shape_arr), requires_grad=False, device=self.device()
         )
         var total = result.shape().num_elements()
 
