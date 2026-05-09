@@ -44,7 +44,7 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
     @always_inline
     @staticmethod
-    fn fill_up(
+    fn fill_up_parked( #TODO check if this is required!
         target: NDBuffer[Self.dtype],
         source: NDBuffer[Self.dtype],
         *indices: Idx,
@@ -56,7 +56,6 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     fn fill(
         target: NDBuffer[Self.dtype],
         source: NDBuffer[Self.dtype],
-        # indices: VariadicListMem[Idx],
         indices: VariadicList[Idx, _],
     ):
         shape, strides, offset = (

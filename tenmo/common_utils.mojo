@@ -792,7 +792,7 @@ struct SimpleTokenizer[
 
             var splitted = py_str.split(' ')
             var freq = collections.Counter(splitted)
-            var min_freq: PythonObject = 2
+            var min_freq: PythonObject = 5
 
             # most_common returns all items sorted by count — filter via Python eval
             var filter_fn = Python.evaluate("lambda f, mf: [w for w, c in f.items() if c >= mf]")

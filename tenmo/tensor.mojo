@@ -376,6 +376,38 @@ struct Tensor[dtype: DType](
         """
         return self.buffer.max_index()
 
+    fn detach(mut self) -> Tensor[Self.dtype]:
+        """Create a new tensor sharing the same data but detached from the
+        computation graph.
+
+        The returned tensor:
+        - shares the same underlying buffer (no copy)
+        - has requires_grad=False
+        - has no ancestors — gradient stops here
+        - has no gradbox
+
+        Use when you want a value in the forward pass but explicitly do not
+        want gradients to flow back through that path. Common cases:
+        - stopping gradient through attention weights
+        - using a tensor as a constant in a computation
+        - breaking cycles in the computation graph
+        - inference on a subset of a larger graph
+
+        Returns:
+            A new Tensor with the same buffer, shape, strides and offset
+            but with requires_grad=False and no ancestry.
+        """
+        var out = Tensor[Self.dtype](
+            self.buffer.share(
+                shape   = self.shape(),
+                strides = self.strides(),
+                offset  = self.offset(),
+            ),
+            requires_grad = False,
+        )
+        # No add_ancestry call — graph connection severed
+        return out^
+
     @always_inline
     fn index_iterator(
         self,
