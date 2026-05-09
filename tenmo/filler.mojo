@@ -8,7 +8,7 @@ from .ndbuffer import NDBuffer
 
 
 @fieldwise_init
-struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
+struct Filler_parked[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn fill(
@@ -155,3 +155,131 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                 except e:
                     print(e)
                     panic("Filler -> fill: raised `StopIteration` erorr")
+
+@fieldwise_init
+struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
+
+    @always_inline
+    @staticmethod
+    fn fill(
+        target: NDBuffer[Self.dtype],
+        value: Scalar[Self.dtype],
+        indices: VariadicList[Idx, _],
+    ):
+        var (shape, strides, offset) = (
+            Validator.validate_and_compute_advanced_indexing_metadata(
+                target.shape, target.strides, indices
+            )
+        )
+        var absolute_offset = target.offset + offset
+
+        if strides.is_contiguous(shape):
+            # Contiguous fill — sequential indices
+            var end = absolute_offset + shape.num_elements()
+            for idx in range(absolute_offset, end):
+                target.set(idx, value)
+        else:
+            var index_iterator = IndexIterator(
+                shape   = Pointer(to=shape),
+                strides = Pointer(to=strides),
+                start_offset = absolute_offset,
+            )
+            for idx in index_iterator:
+                target.set(idx, value)
+
+    @always_inline
+    @staticmethod
+    fn fill(
+        target: NDBuffer[Self.dtype],
+        source: NDBuffer[Self.dtype],
+        indices: VariadicList[Idx, _],
+    ):
+        var (shape, strides, offset) = (
+            Validator.validate_and_compute_advanced_indexing_metadata(
+                target.shape, target.strides, indices
+            )
+        )
+        ref source_shape = source.shape
+        if not ShapeBroadcaster.broadcastable(source_shape, shape):
+            panic(
+                "Filler → fill: input buffer not broadcastable to shape",
+                shape.__str__(),
+            )
+        var absolute_offset = target.offset + offset
+
+        if shape == source_shape:
+            if source.is_contiguous() and strides.is_contiguous(shape):
+                # Both contiguous — sequential index copy
+                var src_idx  = source.offset
+                var dst_idx  = absolute_offset
+                var numels   = shape.num_elements()
+                for k in range(numels):
+                    target.set(dst_idx + k, source.get(src_idx + k))
+
+            elif source.is_contiguous() and not strides.is_contiguous(shape):
+                # Source contiguous, target strided
+                var src_offset = source.offset
+                var index_iterator = IndexIterator(
+                    shape        = Pointer(to=shape),
+                    strides      = Pointer(to=strides),
+                    start_offset = absolute_offset,
+                )
+                for dst_idx in index_iterator:
+                    target.set(dst_idx, source.get(src_offset))
+                    src_offset += 1
+
+            elif not source.is_contiguous() and strides.is_contiguous(shape):
+                # Source strided, target contiguous
+                var dst_offset = absolute_offset
+                for src_idx in source.index_iterator():
+                    target.set(dst_offset, source.get(src_idx))
+                    dst_offset += 1
+
+            else:
+                # Both strided
+                var src_iter  = source.index_iterator()
+                var dest_iter = IndexIterator(
+                    shape        = Pointer(to=shape),
+                    strides      = Pointer(to=strides),
+                    start_offset = absolute_offset,
+                )
+                while src_iter.__has_next__():
+                    var src_idx  = -1
+                    var dst_idx  = -1
+                    try:
+                        src_idx = src_iter.__next__()
+                        dst_idx = dest_iter.__next__()
+                    except e:
+                        print(e)
+                        panic("Raised StopIteration in Filler -> fill")
+                    target.set(dst_idx, source.get(src_idx))
+
+        else:
+            # Shapes differ but broadcastable
+            var broadcast_shape = ShapeBroadcaster.broadcast_shape[
+                validated=True
+            ](source_shape, shape)
+            if broadcast_shape != shape:
+                panic(
+                    "Filler → fill: broadcast shape",
+                    broadcast_shape.__str__(),
+                    "is not equal to selected slice shape",
+                    shape.__str__(),
+                )
+            var mask = ShapeBroadcaster.broadcast_mask(source_shape, shape)
+            var index_iterator = IndexIterator(
+                shape        = Pointer(to=shape),
+                strides      = Pointer(to=strides),
+                start_offset = absolute_offset,
+            )
+            var coord_iterator = shape.__iter__()
+            for dst_idx in index_iterator:
+                try:
+                    var coord        = coord_iterator.__next__()
+                    var source_coord = ShapeBroadcaster.translate_index(
+                        source_shape, coord, mask, shape
+                    )
+                    target.set(dst_idx, source[source_coord])
+                except e:
+                    print(e)
+                    panic("Filler -> fill: raised StopIteration error")
