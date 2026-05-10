@@ -6,6 +6,7 @@ from tenmo.tensor import Tensor
 from std.pathlib import Path
 from std.collections import Set
 from std.python import Python
+from std.sys import has_accelerator
 from tenmo.common_utils import (
     SimpleTokenizer,
     DEFAULT_SPLITTER,
@@ -69,7 +70,6 @@ struct IMDBPreprocessor:
         """Extract labels (1 for positive, 0 for negative)."""
         var labels = List[Int]()
         for review in self.reviews.value():
-            # Rating >=7 is positive (1), <=4 is negative (0)
             labels.append(1 if review.rating >= 7 else 0)
         return labels^
 
@@ -82,7 +82,6 @@ struct IMDBPreprocessor:
         var lines = [
             StringSlice(review.comment) for review in self.reviews.value()
         ]
-
         return SimpleTokenizer.from_text_lines_min_freq(lines^)
 
     fn build_datasets(
@@ -122,7 +121,7 @@ struct IMDBPreprocessor:
 
             target_dataset.append(1 if review.rating >= 7 else 0)
 
-        # Shuffle datasets
+        # Shuffle once after all reviews are encoded
         if shuffle:
             self.shuffle_datasets(input_dataset, target_dataset, random_seed)
 
@@ -137,9 +136,7 @@ struct IMDBPreprocessor:
         """Shuffle input_dataset and target_dataset(labels) together."""
         var rng_seed = random_seed
         for idx in range(len(input_dataset) - 1, 0, -1):
-            rng_seed = (rng_seed * 1664525 + 1013904223) % (
-                2**31
-            )  # ← evolves
+            rng_seed = (rng_seed * 1664525 + 1013904223) % (2**31)
             var j = rng_seed % (idx + 1)
             input_dataset.swap_elements(idx, j)
             target_dataset.swap_elements(idx, j)
@@ -158,6 +155,12 @@ def main() raises:
     comptime dtype = DType.float32
     var sys = Python.import_module("sys")
 
+    # ── Device detection ──────────────────────────────────────────────────────
+    comptime if has_accelerator():
+        print("Device: GPU")
+    else:
+        print("Device: CPU")
+
     # ── Load and preprocess ───────────────────────────────────────────────────
     print("Loading reviews from:", TRAIN_FOLDER)
     var preprocessor = IMDBPreprocessor()
@@ -169,7 +172,6 @@ def main() raises:
     print("Vocabulary size:", vocab_size)
 
     print("Encoding reviews...")
-
     var datasets = preprocessor.build_datasets(
         tokenizer, shuffle=True, random_seed=42
     )
@@ -181,6 +183,10 @@ def main() raises:
     print("Labels  loaded:", len(labels))
 
     # ── Weight initialisation ─────────────────────────────────────────────────
+    # Weights are initialised on CPU then moved to GPU if available.
+    # The optimizer holds UnsafePointers to the original Tensor variables —
+    # moving to GPU updates the tensor's internal buffer in-place so the
+    # pointers remain valid.
     var weights_0_1 = Tensor[dtype].rand(
         Shape(vocab_size, HIDDEN_SIZE),
         min=-0.1,
@@ -195,6 +201,10 @@ def main() raises:
         init_seed=RANDOM_SEED_W12,
         requires_grad=True,
     )
+
+    comptime if has_accelerator():
+        weights_0_1 = weights_0_1.to_gpu()
+        weights_1_2 = weights_1_2.to_gpu()
 
     var optimizer = SGD(
         parameters=[
@@ -211,6 +221,13 @@ def main() raises:
 
     var train_size = len(token_id_sets) - TEST_SIZE
 
+    print("Training configuration:")
+    print("  Iterations:    ", ITERATIONS)
+    print("  Hidden size:   ", HIDDEN_SIZE)
+    print("  Learning rate: ", LEARNING_RATE)
+    print("  Train samples: ", train_size)
+    print("  Test samples:  ", TEST_SIZE)
+
     # ── Training loop ─────────────────────────────────────────────────────────
     for iteration in range(ITERATIONS):
         var num_correct = 0
@@ -218,31 +235,39 @@ def main() raises:
 
         for sample_idx in range(train_size):
             ref token_ids = token_id_sets[sample_idx]
+
+            # target is a scalar tensor — move to GPU if needed
             var target = Tensor[dtype].scalar(Float32(labels[sample_idx]))
+            comptime if has_accelerator():
+                target = target.to_gpu()
 
             # ── Forward pass ──────────────────────────────────────────────────
+            # gather: (n_tokens, hidden_size)  — on same device as weights_0_1
+            # sum:    (hidden_size,)
+            # sigmoid:(hidden_size,)
+            # dot:    scalar
+            # sigmoid:scalar
             var hidden = (
                 weights_0_1.gather(token_ids)
                 .sum(axes=[0], keepdims=False)
                 .sigmoid()
             )
-            print("Forward: hidden is on gpu: ", hidden.is_on_gpu())
-            comptime if has_accelerator():
-                if not hidden.is_on_gpu():
-                    hidden = hidden.to_gpu()
             var prediction = hidden.dot(weights_1_2).sigmoid()
 
-            # ── Loss ──────────────────────────────────────────────────────────
+            # ── Loss — MSE ────────────────────────────────────────────────────
             var diff = prediction - target
             var loss = diff**2
 
-            # ── Backward pass ─────────────────────────────────────────────────
+            # ── Backward + optimizer step ─────────────────────────────────────
+            # GatherBackward fires ScatterAddTensor — sparsely updates only
+            # the embedding rows for tokens present in this review.
+            # Filler.fill uses NDBuffer.get/set which are GPU-transparent.
             optimizer.zero_grad()
-
             loss.backward()
             optimizer.step()
 
             # ── Progress tracking ─────────────────────────────────────────────
+            # diff.item() calls NDBuffer.get(0) — GPU-transparent
             if abs(diff.item()) < 0.5:
                 num_correct += 1
             num_seen += 1
@@ -280,20 +305,17 @@ def main() raises:
         ref token_ids = token_id_sets[sample_idx]
         ref true_label = labels[sample_idx]
 
+        # No grad tracking needed for inference
         var hidden = (
             weights_0_1.gather[track_grad=False](token_ids)
             .sum[track_grad=False](axes=[0], keepdims=False)
             .sigmoid[track_grad=False]()
         )
-
-        print("hidden is on gpu: ", hidden.is_on_gpu(), "weights_1_2: ", weights_1_2.is_on_gpu())
-        comptime if has_accelerator():
-            if not hidden.is_on_gpu():
-                hidden = hidden.to_gpu()
         var prediction = hidden.dot[track_grad=False](weights_1_2).sigmoid[
             track_grad=False
         ]()
 
+        # prediction.item() is GPU-transparent
         if abs(prediction.item() - Float32(true_label)) < 0.5:
             num_correct += 1
         num_seen += 1
@@ -302,6 +324,14 @@ def main() raises:
     print("Test Accuracy: " + String(test_accuracy))
 
     # ── Similarity search — verify embedding quality ──────────────────────────
+    # Similarity search scans the entire vocabulary — bring weights to CPU
+    # once to avoid per-word GPU round-trips.
+    var embeddings_cpu: Tensor[dtype]
+    comptime if has_accelerator():
+        embeddings_cpu = weights_0_1.to_cpu()
+    else:
+        embeddings_cpu = weights_0_1
+
     var query_words = [
         "beautiful",
         "wonderful",
@@ -311,7 +341,7 @@ def main() raises:
     ]
     for target in query_words:
         print("\nTarget: ", target)
-        var neighbours = similar(tokenizer, weights_0_1, target)
+        var neighbours = similar(tokenizer, embeddings_cpu, target)
         for item in neighbours:
             print(" ", item[0], item[1])
 
@@ -322,10 +352,25 @@ def similar(
     target: String = "beautiful",
     top_n: Int = 10,
 ) raises -> List[Tuple[String, Float32]]:
+    """Find top_n words with embeddings most similar to target.
+
+    Args:
+        tokenizer:  trained tokenizer with str_to_int vocab.
+        embeddings: CPU embedding tensor (vocab_size, hidden_size).
+                    Caller must ensure this is on CPU — pass weights_0_1.to_cpu()
+                    when running on GPU to avoid per-word device round-trips.
+        target:     word to find neighbours for.
+        top_n:      number of nearest neighbours to return.
+
+    Returns:
+        List of (word, negative_distance) sorted by descending score.
+    """
     var target_ids = tokenizer.encode(target)
     var scores = Dict[String, Float32]()
 
+    # Compute target embedding once outside the loop
     var target_row = embeddings.gather[track_grad=False](target_ids)
+
     for ref pair in tokenizer.str_to_int.items():
         var word = pair.key
         var index = pair.value
@@ -348,75 +393,3 @@ def compare(
     x: Tuple[String, Float32], y: Tuple[String, Float32]
 ) capturing -> Bool:
     return x[1] > y[1]
-
-#Loading reviews from: aclImdb/train
-#Building vocabulary...
-#Vocabulary size: 29777
-#Encoding reviews...
-#Reviews loaded: 25000
-#Labels  loaded: 25000
-#Iter:0  Progress: 95.99%  Training Accuracy: 0.82791677
-#Iter:1  Progress: 95.99%  Training Accuracy: 0.89787554
-#Iter:2  Progress: 95.99%  Training Accuracy: 0.92966664
-#Evaluating on test set (1000 reviews)...
-#Test Accuracy: 0.863
-#
-#Target:  beautiful
-#  cry -0.8139669
-#  innocent -0.82132995
-#  tragic -0.82555395
-#  impressive -0.83826303
-#  magic -0.84857774
-#  unique -0.851256
-#  stunning -0.8520091
-#  compelling -0.8524668
-#  buddy -0.85552156
-#  superb -0.8582328
-#
-#Target:  wonderful
-#  refreshing -0.81821996
-#  definitely -0.8412058
-#  rare -0.87024164
-#  funniest -0.8810015
-#  gem -0.88207245
-#  surprised -0.8925017
-#  enjoyable -0.89441526
-#  incredible -0.8946219
-#  fantastic -0.9034469
-#  wonderfully -0.90369225
-#
-#Target:  outstanding
-#  offers -0.7104493
-#  appreciated -0.7180212
-#  sweet -0.74203795
-#  fantastic -0.7430425
-#  games -0.74329716
-#  beautifully -0.75147206
-#  realistic -0.75587887
-#  noir -0.7573669
-#  surprisingly -0.760731
-#  originally -0.7609394
-#
-#Target:  boring
-#  poorly -0.8065185
-#  mess -0.8126137
-#  disappointing -0.818716
-#  awful -0.8211603
-#  terrible -0.8514237
-#  disappointment -0.88710153
-#  dull -0.8926999
-#  supposed -0.90556884
-#  horrible -0.91566694
-#  badly -0.9355349
-#
-#Target:  terrible
-#  disappointment -0.77307105
-#  dull -0.7917348
-#  poorly -0.8179629
-#  badly -0.82152003
-#  mess -0.8331556
-#  disappointing -0.83548564
-#  worse -0.83746415
-#  fails -0.8376444
-#  awful -0.84623975
-#  boring -0.8514237
