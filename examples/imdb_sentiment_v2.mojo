@@ -355,12 +355,12 @@ def similar(
     """Find top_n words with embeddings most similar to target.
 
     Args:
-        tokenizer:  trained tokenizer with str_to_int vocab.
+        tokenizer:  Trained tokenizer with str_to_int vocab.
         embeddings: CPU embedding tensor (vocab_size, hidden_size).
                     Caller must ensure this is on CPU — pass weights_0_1.to_cpu()
                     when running on GPU to avoid per-word device round-trips.
-        target:     word to find neighbours for.
-        top_n:      number of nearest neighbours to return.
+        target:     Word to find neighbours for.
+        top_n:      Number of nearest neighbours to return.
 
     Returns:
         List of (word, negative_distance) sorted by descending score.
