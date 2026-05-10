@@ -111,6 +111,47 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
 
         return out^
 
+    fn update_grad(
+        ref self,
+        ref incoming: Gradbox[Self.dtype],
+        op_code: Int,
+        extra_arg: Optional[BackwardFnArg[Self.dtype]] = None,
+    ):
+        """Apply incoming gradient to this ancestor's gradbox.
+
+        Args:
+            incoming:  Upstream gradient from backward handler.
+            op_code:   How to accumulate — AddTensor, SubtractTensor,
+                       ZeroGrad, ScatterAddTensor.
+            extra_arg: Type-erased argument for ops that need additional
+                       context beyond the gradient itself. Currently used
+                       by ScatterAddTensor to carry GatherArg (indices + axis).
+                       Future ops can store any ArgumentType here.
+        """
+        if not self.requires_grad or not self.gradbox:
+            return
+
+        if op_code == AddTensor:
+            self.gradbox[] += incoming
+
+        elif op_code == SubtractTensor:
+            self.gradbox[] -= incoming
+
+        elif op_code == ZeroGrad:
+            self.gradbox[].zero_grad()
+
+        elif op_code == ScatterAddTensor:
+            ref arg = extra_arg.value().get[GatherArg]()
+            Filler[Self.dtype].scatter_add(
+                self.gradbox[].buffer,
+                incoming.buffer,
+                arg.indices,
+                arg.axis,
+            )
+
+        else:
+            print("Ancestor → update_grad: unknown op_code", String(op_code))
+
     fn __del__(deinit self):
         if not self.gradbox:
             return

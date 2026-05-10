@@ -399,11 +399,11 @@ struct Tensor[dtype: DType](
         """
         var out = Tensor[Self.dtype](
             self.buffer.share(
-                shape   = self.shape(),
-                strides = self.strides(),
-                offset  = self.offset(),
+                shape=self.shape(),
+                strides=self.strides(),
+                offset=self.offset(),
             ),
-            requires_grad = False,
+            requires_grad=False,
         )
         # No add_ancestry call — graph connection severed
         return out^
@@ -2549,43 +2549,6 @@ struct Tensor[dtype: DType](
     ](self, other: Self) -> Tensor[Self.dtype]:
         return Divider[Self.dtype].forward[track_grad](self, other)
 
-    fn update_grad[opcode: Int](mut self, incoming: Gradbox[Self.dtype]):
-        """Update gradient using an incoming gradient and operation type.
-
-        Args:
-            opcode: Operation mnemonic (MulTensor, AddTensor, etc.)
-            incoming: Gradbox containing upstream gradients.
-        """
-        ref gradbox = self.gradbox[]
-        if opcode == ScatterAddTensor:
-            # grad is (n_indices, hidden_size) — NOT full parent shape
-            # indices are on the output node(self)'s BackwardFnArg
-            ref sparse_arr = (
-                self.ancestry().backward_fn_arg().get[IntArrayArg]().array
-            )
-            var ax = sparse_arr[0]
-            var n_indices = len(sparse_arr) - 1
-
-            for k in range(n_indices):
-                var row_idx = sparse_arr[k + 1]
-                var grad_row = incoming.slice(
-                    start=k, end=k + 1, axis=ax
-                ).squeeze()
-                var current_row = (
-                    self.gradbox[]
-                    .slice(start=row_idx, end=row_idx + 1, axis=ax)
-                    .squeeze()
-                )
-                self.gradbox[].fill(current_row + grad_row, i(row_idx), s())
-        elif opcode == MulTensor:
-            gradbox *= incoming
-        elif opcode == AddTensor:
-            gradbox += incoming
-        elif opcode == SubtractTensor:
-            gradbox -= incoming
-        else:  # opcode == ZeroGrad:
-            self.zero_grad()
-
     fn __iadd__(self, other: Self):
         """In-place addition of another tensor.
 
@@ -3095,6 +3058,15 @@ struct Tensor[dtype: DType](
         var squared = Multiplicator[Self.dtype].forward[track_grad](diff, diff)
         return squared.mean[track_grad]()
 
+    fn requires_grad_(mut self, requires_grad: Bool = True):
+        """Enable or disable gradient tracking in-place.
+        Args:
+            requires_grad: True to enable gradient tracking, False to disable.
+        """
+        self.requires_grad = requires_grad
+        if requires_grad and not self.has_grad():
+            self.init_gradbox()
+
     fn backward[
         graph_size: Int = 50
     ](
@@ -3111,16 +3083,6 @@ struct Tensor[dtype: DType](
         var shape = output.shape()
         var seed_tensor = Tensor[Self.dtype].full(shape, start_grad)
         output.backward[graph_size](seed_tensor)
-
-    fn requires_grad_(mut self, requires_grad: Bool = True):
-        """Enable or disable gradient tracking in-place.
-
-        Args:
-            requires_grad: True to enable gradient tracking, False to disable.
-        """
-        self.requires_grad = requires_grad
-        if requires_grad and not self.has_grad():
-            self.init_gradbox()
 
     fn backward[
         graph_size: Int = 50,
@@ -3198,43 +3160,15 @@ struct Tensor[dtype: DType](
                         if target_id in id_to_index:
                             var target_idx = id_to_index[target_id]
                             ref target = node_list[target_idx]
-                            if target.requires_grad and target.gradbox:
-                                if op_code == AddTensor:
-                                    target.gradbox[] += grad
-                                elif op_code == SubtractTensor:
-                                    target.gradbox[] -= grad
-                                elif op_code == ZeroGrad:
-                                    target.gradbox[].zero_grad()
-                                elif op_code == ScatterAddTensor:
-                                    # grad is (n_indices, hidden_size) — NOT full parent shape
-                                    # indices are on the output node's BackwardFnArg
-                                    ref gather = (
-                                        node.ancestry()
-                                        .backward_fn_arg()
-                                        .get[GatherArg]()
-                                    )
-                                    var ax = gather.axis
-                                    var n_indices = len(gather.indices)
 
-                                    for k in range(n_indices):
-                                        var row_idx = gather.indices[k]
-                                        var grad_row = grad.slice(
-                                            start=k, end=k + 1, axis=ax
-                                        ).squeeze()
-                                        var current_row = (
-                                            target.gradbox[]
-                                            .slice(
-                                                start=row_idx,
-                                                end=row_idx + 1,
-                                                axis=ax,
-                                            )
-                                            .squeeze()
-                                        )
-                                        target.gradbox[].fill(
-                                            current_row + grad_row,
-                                            i(row_idx),
-                                            s(),
-                                        )
+                            # Extract extra_arg from the output node for ops that need it
+                            var extra_arg: Optional[
+                                BackwardFnArg[Self.dtype]
+                            ] = None
+                            if op_code == ScatterAddTensor:
+                                extra_arg = node.ancestry().backward_fn_arg()
+
+                            target.update_grad(grad, op_code, extra_arg)
 
                         if target_id in fanin:
                             fanin[target_id] -= 1
@@ -3245,6 +3179,20 @@ struct Tensor[dtype: DType](
 
         except e:
             print(e)
+
+    fn update_grad[opcode: Int](ref self, incoming: Gradbox[Self.dtype]):
+        if not self.requires_grad:
+            print("Tensor update_grad -> does not require grad")
+            return
+        ref gradbox = self.gradbox[]
+        if opcode == MulTensor:
+            gradbox *= incoming
+        elif opcode == AddTensor:
+            gradbox += incoming
+        elif opcode == SubtractTensor:
+            gradbox -= incoming
+        elif opcode == ZeroGrad:
+            self.zero_grad()
 
     comptime IteratorType[
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
