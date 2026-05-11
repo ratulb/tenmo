@@ -3,7 +3,7 @@ clear
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No example specified"
-    echo "Usage: $0 [imdb|imdb_v3|binary_mnist|mnist|mnist_gpu|xor|spiral|cifar_10|mnist_conv2d]"
+    echo "Usage: $0 [imdb|imdb_v1|binary_mnist|mnist|mnist_gpu|xor|spiral|cifar_10|mnist_conv2d]"
     exit 1
 fi
 
@@ -15,12 +15,12 @@ fi
 # Determine which test to run based on the argument
 case $1 in
     imdb_v1)
-        echo "Running IMDB sentiment training loop"
+        echo "Running IMDB sentiment training loop(v1)"
         mojo -I . $DEBUG_MODE examples/imdb_sentiment_v1.mojo
         ;;
 
     imdb)
-        echo "Running IMDB sentiment training loop"
+        echo "Running IMDB sentiment training loop(v2)"
         mojo -I . $DEBUG_MODE examples/imdb_sentiment_v2.mojo
         ;;
     binary_mnist)
@@ -54,7 +54,7 @@ case $1 in
 
     *)
        echo "Error: Unknown test '$1'"
-       echo "Available training loops: binary_mnist, mnist, xor, spiral, cifar_10, mnist_conv2d"
+       echo "Available training loops: imdb, imdb_v1, binary_mnist, mnist, xor, spiral, cifar_10, mnist_conv2d"
        exit 1
     ;;
 esac

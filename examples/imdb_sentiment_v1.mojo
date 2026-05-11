@@ -47,9 +47,10 @@ from tenmo.common_utils import (
     s,
 )
 from std.pathlib import Path
-from std.math import abs
+from std.math import sqrt
 from std.python import Python
 from std.collections import Set
+from std.os.process import Process
 
 # =============================================================================
 # Configuration
@@ -96,14 +97,17 @@ struct IMDBPreprocessor:
 
     # ── Loading ───────────────────────────────────────────────────────────────
 
-    fn load_from_folder(mut self, folder_path: String) raises:
+    fn load_from_folder(
+        mut self, folder_path: String
+    ) raises:
         """Recursively load all pos/neg reviews under folder_path.
 
         Args:
             folder_path: Root of the split directory (e.g. .../aclImdb/train).
         """
-        var pos_path = Path.home() / folder_path / "pos"
-        var neg_path = Path.home() / folder_path / "neg"
+        download()
+        var pos_path = Path("/tmp") / folder_path / "pos"
+        var neg_path = Path("/tmp") / folder_path / "neg"
         ref reviews = self.reviews.value()
 
         if pos_path.exists():
@@ -202,7 +206,22 @@ struct IMDBPreprocessor:
 
             labels.append(1 if review.rating >= 7 else 0)
 
+        self.shuffle_datasets(token_id_sets, labels)
         return (token_id_sets^, labels^)
+
+    def shuffle_datasets(
+        self,
+        mut input_dataset: List[List[Int]],
+        mut target_dataset: List[Int],
+        random_seed: Int = 42,
+    ):
+        """Shuffle input_dataset and target_dataset(labels) together."""
+        var rng_seed = random_seed
+        for idx in range(len(input_dataset) - 1, 0, -1):
+            rng_seed = (rng_seed * 1664525 + 1013904223) % (2**31)
+            var j = rng_seed % (idx + 1)
+            input_dataset.swap_elements(idx, j)
+            target_dataset.swap_elements(idx, j)
 
     fn get_labels(self) -> List[Int]:
         """Return binary labels for all loaded reviews (convenience method).
@@ -296,14 +315,18 @@ def main() raises:
             # 1. Gather the embedding rows for every token present in this
             #    review and sum them into a single hidden vector.
             #    Shape: (len(token_ids), hidden_size) → sum → (hidden_size,)
-            var embedding_sum = weights_0_1.gather[track_grad=False](token_ids).sum[track_grad=False](
-                axes=[0], keepdims=False
-            )
+            var embedding_sum = weights_0_1.gather[track_grad=False](
+                token_ids
+            ).sum[track_grad=False](axes=[0], keepdims=False)
             var hidden = sigmoid(embedding_sum)  # (hidden_size,)
 
             # 2. Project hidden → scalar prediction via dot product.
-            var output_weights_flat = weights_1_2.squeeze[track_grad=False]()  # (hidden_size,)
-            var prediction = sigmoid(hidden.dot[track_grad=False](output_weights_flat))  # scalar
+            var output_weights_flat = weights_1_2.squeeze[
+                track_grad=False
+            ]()  # (hidden_size,)
+            var prediction = sigmoid(
+                hidden.dot[track_grad=False](output_weights_flat)
+            )  # scalar
 
             # ── Backward pass (manual) ────────────────────────────────────────
             #
@@ -314,12 +337,16 @@ def main() raises:
 
             # Propagate error to hidden layer (before activation)
             # dL/dz1 = W2^T @ output_delta
-            var hidden_error = output_delta * output_weights_flat  # (hidden_size,)
+            var hidden_error = (
+                output_delta * output_weights_flat
+            )  # (hidden_size,)
 
             # Apply sigmoid derivative for hidden layer activation
             # For hidden = sigmoid(z1), we need to multiply by sigmoid'(z1)
             # sigmoid'(z1) = hidden * (1 - hidden)
-            var sigmoid_grad = hidden * (Tensor[dtype].scalar(1.0) - hidden)  # (hidden_size,)
+            var sigmoid_grad = hidden * (
+                Tensor[dtype].scalar(1.0) - hidden
+            )  # (hidden_size,)
             var hidden_delta = hidden_error * sigmoid_grad  # (hidden_size,)
 
             # ── Weight updates ────────────────────────────────────────────────
@@ -387,7 +414,9 @@ def main() raises:
         )
         var hidden = sigmoid(embedding_sum)
         var output_weights_flat = weights_1_2.squeeze[track_grad=False]()
-        var prediction = sigmoid(hidden.dot[track_grad=False](output_weights_flat))
+        var prediction = sigmoid(
+            hidden.dot[track_grad=False](output_weights_flat)
+        )
 
         if abs(prediction.item() - Float32(true_label)) < 0.5:
             num_correct += 1
@@ -396,14 +425,100 @@ def main() raises:
     var test_accuracy = Float32(num_correct) / Float32(num_seen)
     print("Test Accuracy: " + String(test_accuracy))
 
+    # ── Similarity search — verify embedding quality ──────────────────────────
 
-#Loading reviews from: aclImdb/train
-#Building vocabulary...
-#Vocabulary size: 49301
-#Encoding reviews...
-#Reviews loaded: 25000
-#Labels  loaded: 25000
-#Iter:0  Progress: 95.99%  Training Accuracy: 0.99858333
-#Iter:1  Progress: 95.99%  Training Accuracy: 0.99720836
-#Evaluating on test set (1000 reviews)...
-#Test Accuracy: 1.0
+    var query_words = [
+        "beautiful",
+        "wonderful",
+        "outstanding",
+        "boring",
+        "terrible",
+    ]
+    for target in query_words:
+        print("\nTarget: ", target)
+        var neighbours = similar(tokenizer, weights_0_1, target)
+        for item in neighbours:
+            print(" ", item[0], item[1])
+
+def similar(
+    tokenizer: SimpleTokenizer[_, _, _, _],
+    ref embeddings: Tensor[DType.float32],
+    target: String = "beautiful",
+    top_n: Int = 10,
+) raises -> List[Tuple[String, Float32]]:
+    """Find top_n words with embeddings most similar to target.
+
+    Args:
+        tokenizer:  Trained tokenizer with str_to_int vocab.
+        embeddings: CPU embedding tensor (vocab_size, hidden_size).
+                    Caller must ensure this is on CPU — pass weights_0_1.to_cpu()
+                    when running on GPU to avoid per-word device round-trips.
+        target:     Word to find neighbours for.
+        top_n:      Number of nearest neighbours to return.
+
+    Returns:
+        List of (word, negative_distance) sorted by descending score.
+    """
+    var target_ids = tokenizer.encode(target)
+    var scores = Dict[String, Float32]()
+
+    # Compute target embedding once outside the loop
+    var target_row = embeddings.gather[track_grad=False](target_ids)
+
+    for ref pair in tokenizer.str_to_int.items():
+        var word = pair.key
+        var index = pair.value
+        if word == target:
+            continue
+        var raw_diff = target_row - embeddings.gather[track_grad=False]([index])
+        scores[word] = -sqrt((raw_diff * raw_diff).sum().item())
+
+    # Sort descending by score and return top_n
+    var result = [(item.key, item.value) for item in scores.items()]
+    sort[cmp_fn=compare](result)
+
+    var top = List[Tuple[String, Float32]]()
+    for k in range(min(top_n, len(result))):
+        top.append(result[k])
+    return top^
+
+
+def compare(
+    x: Tuple[String, Float32], y: Tuple[String, Float32]
+) capturing -> Bool:
+    return x[1] > y[1]
+
+fn download(
+    to: String = "/tmp",
+    url: String = "https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz",
+) raises:
+    var download_to = "/tmp"
+    var file_path = Path("/tmp/aclImdb_v1.tar.gz")
+    var extracted_path = Path("/tmp/aclImdb/")
+
+    if extracted_path.exists() and extracted_path.is_dir():
+        print("Extracted folder", extracted_path.name(), "exists")
+        return
+    elif file_path.exists() and file_path.is_file():
+        print("/tmp/aclImdb_v1.tar.gz file exists - extracting")
+        _ = Process.run("tar", ["-xzf", "/tmp/aclImdb_v1.tar.gz", "-C", "/tmp"])
+    else:
+        print("File or folder is not present - downloading")
+        var args = ["-P", download_to, url]
+        _ = Process.run("wget", args)
+        print("Downloaded - extracting now")
+        _ = Process.run("tar", ["-xzf", "/tmp/aclImdb_v1.tar.gz", "-C", "/tmp"])
+
+    print("done")
+
+
+# Loading reviews from: aclImdb/train
+# Building vocabulary...
+# Vocabulary size: 49301
+# Encoding reviews...
+# Reviews loaded: 25000
+# Labels  loaded: 25000
+# Iter:0  Progress: 95.99%  Training Accuracy: 0.99858333
+# Iter:1  Progress: 95.99%  Training Accuracy: 0.99720836
+# Evaluating on test set (1000 reviews)...
+# Test Accuracy: 1.0

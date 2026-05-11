@@ -7,6 +7,7 @@ from std.pathlib import Path
 from std.collections import Set
 from std.python import Python
 from std.sys import has_accelerator
+from std.os.process import Process
 from tenmo.common_utils import (
     SimpleTokenizer,
     DEFAULT_SPLITTER,
@@ -31,8 +32,9 @@ struct IMDBPreprocessor:
 
     fn load_from_folder(mut self, folder_path: String) raises:
         """Load reviews from pos/neg folders."""
-        var pos_path = Path.home() / folder_path / "pos"
-        var neg_path = Path.home() / folder_path / "neg"
+        download()
+        var pos_path = Path("/tmp") / folder_path / "pos"
+        var neg_path = Path("/tmp") / folder_path / "neg"
         ref reviews = self.reviews.value()
 
         # Load positive reviews
@@ -393,3 +395,27 @@ def compare(
     x: Tuple[String, Float32], y: Tuple[String, Float32]
 ) capturing -> Bool:
     return x[1] > y[1]
+
+
+fn download(
+    url: String = "https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz",
+) raises:
+    var file_path = Path("/tmp/aclImdb_v1.tar.gz")
+    var extracted_path = Path("/tmp/aclImdb/")
+
+    if extracted_path.exists() and extracted_path.is_dir():
+        print("Extracted folder", extracted_path.name(), "exists")
+        return
+    elif file_path.exists() and file_path.is_file():
+        print(file_path.__fspath__(), " file exists - extracting")
+        _ = Process.run("tar", ["-xzf", "/tmp/aclImdb_v1.tar.gz", "-C", "/tmp"])
+    else:
+        print("File or folder is not present - downloading")
+        # var args = ["-P", "/tmp", url] # strangely this does not work!
+        var download_to = "/tmp"
+        var args = ["-P", download_to, url]
+        _ = Process.run("wget", args)
+        print("Downloaded - extracting now")
+        _ = Process.run("tar", ["-xzf", "/tmp/aclImdb_v1.tar.gz", "-C", "/tmp"])
+
+    print("done")
