@@ -601,10 +601,11 @@ struct Tensor[dtype: DType](
         self,
         indices: List[Int],
         axis: Int = 0,
+        fuse_sum: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
         return self.gather[track_grad=track_grad](
-            indices=IntArray(indices), axis=axis, requires_grad=requires_grad
+            indices=IntArray(indices), axis=axis, fuse_sum=fuse_sum, requires_grad=requires_grad
         )
 
     fn gather[
@@ -613,6 +614,7 @@ struct Tensor[dtype: DType](
         self,
         indices: IntArray,
         axis: Int = 0,
+        fuse_sum: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
         """Gather slices along `axis` at the given indices.
@@ -636,7 +638,7 @@ struct Tensor[dtype: DType](
         """
 
         return Gather[Self.dtype].forward[track_grad=track_grad](
-            self, indices, axis, requires_grad
+            self, indices, axis, fuse_sum, requires_grad
         )
 
     fn outer[

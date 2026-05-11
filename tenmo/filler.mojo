@@ -126,6 +126,28 @@ def scatter_add_rows_strided_kernel[
     _ = Atomic.fetch_add(target + target_idx, source[source_idx])
 
 
+fn scatter_add_broadcast_kernel[
+    dtype: DType
+](
+    target: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    source: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    indices: UnsafePointer[Int32, ImmutAnyOrigin],
+    n_indices: Int,
+    row_width: Int,
+):
+    """Broadcast scatter-add: target[indices[k], col] += source[col] for all k.
+    Grid:  (n_indices,) — one block per index
+    Block: (min(row_width, 512),) — one thread per column
+    Atomic add handles repeated indices safely.
+    """
+    var row = Int(block_idx.x)
+    var col = Int(thread_idx.x)
+    if row >= n_indices or col >= row_width:
+        return
+    var target_row = Int(indices[row])
+    _ = Atomic.fetch_add(target + target_row * row_width + col, source[col])
+
+
 # =============================================================================
 # GPU launcher helpers
 # =============================================================================
@@ -254,7 +276,7 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         try:
             var n_indices = len(indices)
             var row_width = (
-                source.shape[1] if source.shape.rank() > 1 else source.numels()
+                source.numels() if source.shape.rank() == 1 else source.shape[1]
             )
 
             comptime if has_accelerator():
@@ -406,13 +428,16 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     ):
         """CPU scatter-add — row-by-row loop, no atomics needed (single thread).
         """
+        var is_broadcast = source.shape.rank() == 1
         for k in range(n_indices):
             var target_row = indices[k]
             for col in range(row_width):
-                var src_val = source.get(source.offset + k * row_width + col)
+                var src_flat = col if is_broadcast else k * row_width + col
                 var dst_idx = target.offset + target_row * row_width + col
-                var dst_val = target.get(dst_idx)
-                target.set(dst_idx, dst_val + src_val)
+                target.set(
+                    dst_idx,
+                    target.get(dst_idx) + source.get(source.offset + src_flat),
+                )
 
     # =========================================================================
     # GPU implementations
@@ -551,6 +576,7 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         Atomic add ensures correctness when the same token_id appears more
         than once in a review's token_ids list.
         """
+
         comptime if has_accelerator():
             ref t_state = target.device_state.value()
             ref s_state = source.device_state.value()
@@ -568,11 +594,10 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             var tpb = min(row_width, 512)
             var blocks = n_indices
 
-            if source.is_contiguous() and target.strides[1] == 1:
-                # Fast path — contiguous kernel
+            if source.shape.rank() == 1:
                 var compiled = ctx.compile_function[
-                    scatter_add_rows_kernel[Self.dtype],
-                    scatter_add_rows_kernel[Self.dtype],
+                    scatter_add_broadcast_kernel[Self.dtype],
+                    scatter_add_broadcast_kernel[Self.dtype],
                 ]()
                 ctx.enqueue_function(
                     compiled,
@@ -585,22 +610,20 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                     block_dim=tpb,
                 )
             else:
-                # Strided path
+                if target.shape.rank() != 2 or source.shape.rank() != 2:
+                    panic(
+                        "Filler._scatter_add_gpu: only 2D tensors supported "
+                        "for non-broadcast path"
+                    )
                 var compiled = ctx.compile_function[
-                    scatter_add_rows_strided_kernel[Self.dtype],
-                    scatter_add_rows_strided_kernel[Self.dtype],
+                    scatter_add_rows_kernel[Self.dtype],
+                    scatter_add_rows_kernel[Self.dtype],
                 ]()
                 ctx.enqueue_function(
                     compiled,
                     t_state.device_buffer(),
                     s_state.device_buffer(),
                     idx_buf,
-                    target.strides[0],
-                    target.strides[1] if target.shape.rank() > 1 else 1,
-                    source.strides[0] if source.shape.rank() > 1 else row_width,
-                    source.strides[1] if source.shape.rank() > 1 else 1,
-                    target.offset,
-                    source.offset,
                     n_indices,
                     row_width,
                     grid_dim=blocks,

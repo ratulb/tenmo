@@ -249,11 +249,12 @@ def main() raises:
             # sigmoid:(hidden_size,)
             # dot:    scalar
             # sigmoid:scalar
-            var hidden = (
+            _="""var hidden = (
                 weights_0_1.gather(token_ids)
                 .sum(axes=[0], keepdims=False)
                 .sigmoid()
-            )
+            )"""
+            var hidden = weights_0_1.gather(token_ids, fuse_sum=True).sigmoid()
             var prediction = hidden.dot(weights_1_2).sigmoid()
 
             # ── Loss — MSE ────────────────────────────────────────────────────
@@ -308,11 +309,14 @@ def main() raises:
         ref true_label = labels[sample_idx]
 
         # No grad tracking needed for inference
-        var hidden = (
+        _="""var hidden = (
             weights_0_1.gather[track_grad=False](token_ids)
             .sum[track_grad=False](axes=[0], keepdims=False)
             .sigmoid[track_grad=False]()
-        )
+        )"""
+        var hidden = weights_0_1.gather[track_grad=False](
+            token_ids, fuse_sum=True
+        ).sigmoid[track_grad=False]()
         var prediction = hidden.dot[track_grad=False](weights_1_2).sigmoid[
             track_grad=False
         ]()
