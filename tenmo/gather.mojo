@@ -47,7 +47,7 @@ fn gather_gpu_kernel[
     in_shape: Array,
     in_strides: Array,
     in_offset: Int,
-    indices_buffer: UnsafePointer[Int, ImmutAnyOrigin],
+    indices_buffer: UnsafePointer[Int64, ImmutAnyOrigin],
     indices_len: Int,
     axis: Int,
     out_shape: Array,
@@ -96,8 +96,8 @@ fn gather_gpu_kernel[
         var src_coords = out_coords
         var idx_val = indices_buffer[out_coords[axis]]
         if idx_val < 0:
-            idx_val += in_shape[axis]
-        src_coords.storage[axis] = idx_val
+            idx_val += Int64(in_shape[axis])
+        src_coords.storage[axis] = Int(idx_val)
 
         # ── Compute flat indices and copy ─────────────────────────────────────
         var src_flat = in_strides.fma(src_coords, in_offset)
@@ -115,7 +115,7 @@ fn gather_rows_2d_kernel[
     in_rows: Int,
     in_cols: Int,
     in_row_stride: Int,
-    indices_buffer: UnsafePointer[Int, ImmutAnyOrigin],
+    indices_buffer: UnsafePointer[Int64, ImmutAnyOrigin],
     out_rows: Int,
     out_row_stride: Int,
 ):
@@ -146,14 +146,14 @@ fn gather_rows_2d_kernel[
 
     var src_row = indices_buffer[row]
     if src_row < 0:
-        src_row += in_rows
+        src_row += Int64(in_rows)
 
     # Grid-stride within block to cover in_cols > block_dim
     var col_stride = Int(block_dim.x)
     var c = col
     while c < in_cols:
         out_buffer[row * out_row_stride + c] = in_buffer[
-            src_row * in_row_stride + c
+            src_row * Int64(in_row_stride) + Int64(c)
         ]
         c += col_stride
 
