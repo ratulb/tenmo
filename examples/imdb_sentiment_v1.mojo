@@ -490,7 +490,8 @@ def compare(
 
 fn download(
     to: String = "/tmp",
-    url: String = "https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz",
+    #url: String = "https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz",
+    url: String = "https://huggingface.co/datasets/NolanChai/aclImdb_v1/resolve/main/aclImdb_v1.tar.gz"
 ) raises:
     var download_to = "/tmp"
     var file_path = Path("/tmp/aclImdb_v1.tar.gz")
