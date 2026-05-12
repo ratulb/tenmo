@@ -1,5 +1,5 @@
 from tenmo.shapes import Shape
-from std.math import abs, sqrt
+from std.math import sqrt
 from tenmo.sgd import SGD
 from std.random import seed
 from tenmo.tensor import Tensor
@@ -8,12 +8,9 @@ from std.collections import Set
 from std.python import Python
 from std.sys import has_accelerator
 from std.os.process import Process
-from tenmo.common_utils import (
-    SimpleTokenizer,
-    DEFAULT_SPLITTER,
-    DEFAULT_SUBSTITUTION,
-    DEFAULT_UNK,
-    END_OF_TEXT,
+from tenmo.nlp import (
+    DefaultTokenizer,
+    IMDBTextCleaner,
 )
 
 
@@ -77,18 +74,18 @@ struct IMDBPreprocessor:
 
     fn init_tokenizer(
         self,
-    ) raises -> SimpleTokenizer[
-        DEFAULT_SPLITTER, DEFAULT_SUBSTITUTION, DEFAULT_UNK, END_OF_TEXT
-    ]:
+        min_freq: Int = 5,
+        max_n: Int = 2,
+    ) raises -> DefaultTokenizer:
         """Initialize tokenizer from review content."""
-        var lines = [
-            StringSlice(review.comment) for review in self.reviews.value()
-        ]
-        return SimpleTokenizer.from_text_lines_min_freq(lines^)
+        var lines = [review.comment for review in self.reviews.value()]
+        return DefaultTokenizer.from_text_lines(
+            lines, IMDBTextCleaner(), min_freq=min_freq, max_n=max_n
+        )
 
     fn build_datasets(
         self,
-        tokenizer: SimpleTokenizer,
+        tokenizer: DefaultTokenizer,
         shuffle: Bool = True,
         random_seed: Int = 42,
     ) -> Tuple[List[List[Int]], List[Int]]:
@@ -123,7 +120,7 @@ struct IMDBPreprocessor:
 
             target_dataset.append(1 if review.rating >= 7 else 0)
 
-        # Shuffle once after all reviews are encoded
+        # Shuffle once after all reviews are encoded if required
         if shuffle:
             self.shuffle_datasets(input_dataset, target_dataset, random_seed)
 
@@ -146,11 +143,13 @@ struct IMDBPreprocessor:
 
 comptime TRAIN_FOLDER = "aclImdb/train"
 comptime LEARNING_RATE: Float32 = 0.01
-comptime ITERATIONS = 3
+comptime ITERATIONS = 2
 comptime HIDDEN_SIZE = 100
 comptime TEST_SIZE = 1000  # last N reviews held out for testing
 comptime RANDOM_SEED_W01 = 42
 comptime RANDOM_SEED_W12 = 24
+comptime WORD_RETENTION_MIN_FREQ = 5
+comptime NGRAM_SIZE = 2
 
 
 def main() raises:
@@ -168,16 +167,17 @@ def main() raises:
     var preprocessor = IMDBPreprocessor()
     preprocessor.load_from_folder(TRAIN_FOLDER)
 
-    print("Building vocabulary...")
-    var tokenizer = preprocessor.init_tokenizer()
+    print("Building vocabulary with retention frequency: ", WORD_RETENTION_MIN_FREQ, " and ngram_size: ", NGRAM_SIZE)
+    var tokenizer = preprocessor.init_tokenizer(min_freq=WORD_RETENTION_MIN_FREQ, max_n=NGRAM_SIZE)
     var vocab_size = len(tokenizer)
     print("Vocabulary size:", vocab_size)
 
     print("Encoding reviews...")
     var datasets = preprocessor.build_datasets(
-        tokenizer, shuffle=True, random_seed=42
+        tokenizer, shuffle=False, random_seed=42
     )
-    ref (token_id_sets, labels) = datasets
+    var token_id_sets = datasets[0].copy()
+    var labels = datasets[1].copy()
 
     # Free up all the review strings because we are done with them
     _ = preprocessor.reviews.take()
@@ -232,6 +232,7 @@ def main() raises:
 
     # ── Training loop ─────────────────────────────────────────────────────────
     for iteration in range(ITERATIONS):
+        preprocessor.shuffle_datasets(token_id_sets, labels, iteration)
         var num_correct = 0
         var num_seen = 0
 
@@ -249,7 +250,7 @@ def main() raises:
             # sigmoid:(hidden_size,)
             # dot:    scalar
             # sigmoid:scalar
-            _="""var hidden = (
+            _ = """var hidden = (
                 weights_0_1.gather(token_ids)
                 .sum(axes=[0], keepdims=False)
                 .sigmoid()
@@ -309,7 +310,7 @@ def main() raises:
         ref true_label = labels[sample_idx]
 
         # No grad tracking needed for inference
-        _="""var hidden = (
+        _ = """var hidden = (
             weights_0_1.gather[track_grad=False](token_ids)
             .sum[track_grad=False](axes=[0], keepdims=False)
             .sigmoid[track_grad=False]()
@@ -353,7 +354,7 @@ def main() raises:
 
 
 def similar(
-    tokenizer: SimpleTokenizer[_, _, _, _],
+    tokenizer: DefaultTokenizer,
     ref embeddings: Tensor[DType.float32],
     target: String = "beautiful",
     top_n: Int = 10,
@@ -380,7 +381,7 @@ def similar(
     for ref pair in tokenizer.str_to_int.items():
         var word = pair.key
         var index = pair.value
-        if word == target:
+        if word == target or '_' in word:
             continue
         var raw_diff = target_row - embeddings.gather[track_grad=False]([index])
         scores[word] = -sqrt((raw_diff * raw_diff).sum().item())

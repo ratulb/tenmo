@@ -37,12 +37,11 @@ Usage
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from tenmo.intarray import IntArray
+from tenmo.nlp import (
+    IMDBTextCleaner,
+    DefaultTokenizer,
+)
 from tenmo.common_utils import (
-    SimpleTokenizer,
-    DEFAULT_SPLITTER,
-    DEFAULT_SUBSTITUTION,
-    DEFAULT_UNK,
-    END_OF_TEXT,
     i,
     s,
 )
@@ -51,19 +50,6 @@ from std.math import sqrt
 from std.python import Python
 from std.collections import Set
 from std.os.process import Process
-
-# =============================================================================
-# Configuration
-# =============================================================================
-
-comptime TRAIN_FOLDER = "aclImdb/train"
-comptime LEARNING_RATE: Float32 = 0.01
-comptime ITERATIONS = 2
-comptime HIDDEN_SIZE = 100
-comptime TEST_SIZE = 1000  # last N reviews held out for testing
-comptime RANDOM_SEED_W01 = 1
-comptime RANDOM_SEED_W12 = 2
-
 
 # =============================================================================
 # Review and dataset structures
@@ -97,9 +83,7 @@ struct IMDBPreprocessor:
 
     # ── Loading ───────────────────────────────────────────────────────────────
 
-    fn load_from_folder(
-        mut self, folder_path: String
-    ) raises:
+    fn load_from_folder(mut self, folder_path: String) raises:
         """Recursively load all pos/neg reviews under folder_path.
 
         Args:
@@ -112,19 +96,19 @@ struct IMDBPreprocessor:
 
         if pos_path.exists():
             for item in pos_path.listdir():
-                var rating = self._extract_rating(item.name())
+                var rating = self.extract_rating(item.name())
                 if rating >= 7:
                     var comment = pos_path.joinpath(item.name()).read_text()
                     reviews.append(Review(rating, comment))
 
         if neg_path.exists():
             for item in neg_path.listdir():
-                var rating = self._extract_rating(item.name())
+                var rating = self.extract_rating(item.name())
                 if rating <= 4:
                     var comment = neg_path.joinpath(item.name()).read_text()
                     reviews.append(Review(rating, comment))
 
-    fn _extract_rating(self, filename: String) -> Int:
+    fn extract_rating(self, filename: String) -> Int:
         """Parse the numeric rating embedded in an IMDB filename.
 
         IMDB filenames follow the pattern '<review_id>_<rating>.txt',
@@ -149,27 +133,29 @@ struct IMDBPreprocessor:
 
     fn init_tokenizer(
         self,
-    ) raises -> SimpleTokenizer[
-        DEFAULT_SPLITTER, DEFAULT_SUBSTITUTION, DEFAULT_UNK, END_OF_TEXT
-    ]:
+        min_freq: Int = 5,
+        max_n: Int = 1,
+    ) raises -> DefaultTokenizer:
         """Build a vocabulary from all loaded review texts.
 
         Applies lowercasing, HTML stripping, digit removal, and a minimum
         frequency filter (min_freq=2) to keep the vocabulary compact.
 
         Returns:
-            Trained SimpleTokenizer ready to encode new text.
+            Trained DefaultTokenizer ready to encode new text.
         """
-        var lines = [
-            StringSlice(review.comment) for review in self.reviews.value()
-        ]
-        return SimpleTokenizer.from_text_lines_min_freq(lines^)
+        var lines = [review.comment for review in self.reviews.value()]
+        return DefaultTokenizer.from_text_lines(
+            lines^, IMDBTextCleaner(), min_freq=min_freq, max_n=max_n
+        )
 
     # ── Dataset builder ───────────────────────────────────────────────────────
 
     fn build_datasets(
         self,
-        tokenizer: SimpleTokenizer,
+        tokenizer: DefaultTokenizer,
+        shuffle: Bool = True,
+        random_seed: Int = 42,
     ) -> Tuple[List[List[Int]], List[Int]]:
         """Encode all reviews into token-id sets and produce binary labels.
 
@@ -180,6 +166,8 @@ struct IMDBPreprocessor:
 
         Args:
             tokenizer: Tokenizer built from the same review corpus.
+            shuffle: Should we shuffle the datasets.
+            random_seed: Random seed used for shuffle.
 
         Returns:
             T(t)oken_id_sets : List[List[Int]] — One deduplicated id list per review.
@@ -206,7 +194,8 @@ struct IMDBPreprocessor:
 
             labels.append(1 if review.rating >= 7 else 0)
 
-        self.shuffle_datasets(token_id_sets, labels)
+        if shuffle:
+            self.shuffle_datasets(token_id_sets, labels, random_seed)
         return (token_id_sets^, labels^)
 
     def shuffle_datasets(
@@ -257,6 +246,22 @@ fn sigmoid[
 
 
 # =============================================================================
+# Configuration
+# =============================================================================
+
+comptime TRAIN_FOLDER = "aclImdb/train"
+comptime LEARNING_RATE: Float32 = 0.01
+comptime ITERATIONS = 3
+comptime HIDDEN_SIZE = 100
+comptime TEST_SIZE = 1000  # last N reviews held out for testing
+comptime RANDOM_SEED_W01 = 1
+comptime RANDOM_SEED_W12 = 2
+comptime WORD_RETENTION_MIN_FREQ = 5
+comptime NGRAM_SIZE = 3
+
+
+
+# =============================================================================
 # Training and evaluation
 # =============================================================================
 
@@ -270,13 +275,17 @@ def main() raises:
     var preprocessor = IMDBPreprocessor()
     preprocessor.load_from_folder(TRAIN_FOLDER)
 
-    print("Building vocabulary...")
-    var tokenizer = preprocessor.init_tokenizer()
+    print("Building vocabulary with retention frequency: ", WORD_RETENTION_MIN_FREQ, " and ngram_size: ", NGRAM_SIZE)
+    var tokenizer = preprocessor.init_tokenizer(min_freq=WORD_RETENTION_MIN_FREQ, max_n=NGRAM_SIZE)
     var vocab_size = len(tokenizer)
     print("Vocabulary size:", vocab_size)
 
     print("Encoding reviews...")
-    ref (token_id_sets, labels) = preprocessor.build_datasets(tokenizer)
+    var datasets = preprocessor.build_datasets(
+        tokenizer, shuffle=False, random_seed=42
+    )
+    var token_id_sets = datasets[0].copy()
+    var labels = datasets[1].copy()
     _ = preprocessor.reviews.take()  # free raw review text — no longer needed
     print("Reviews loaded:", len(token_id_sets))
     print("Labels  loaded:", len(labels))
@@ -301,8 +310,16 @@ def main() raises:
     var alpha = Tensor[dtype].scalar(LEARNING_RATE)
     var train_size = len(token_id_sets) - TEST_SIZE
 
+    print("Training configuration:")
+    print("  Iterations:    ", ITERATIONS)
+    print("  Hidden size:   ", HIDDEN_SIZE)
+    print("  Learning rate: ", LEARNING_RATE)
+    print("  Train samples: ", train_size)
+    print("  Test samples:  ", TEST_SIZE)
+
     # ── Training loop ─────────────────────────────────────────────────────────
     for iteration in range(ITERATIONS):
+        preprocessor.shuffle_datasets(token_id_sets, labels, iteration)
         var num_correct = 0
         var num_seen = 0
 
@@ -440,8 +457,9 @@ def main() raises:
         for item in neighbours:
             print(" ", item[0], item[1])
 
+
 def similar(
-    tokenizer: SimpleTokenizer[_, _, _, _],
+    tokenizer: DefaultTokenizer,
     ref embeddings: Tensor[DType.float32],
     target: String = "beautiful",
     top_n: Int = 10,
@@ -468,7 +486,7 @@ def similar(
     for ref pair in tokenizer.str_to_int.items():
         var word = pair.key
         var index = pair.value
-        if word == target:
+        if word == target or '_' in word:
             continue
         var raw_diff = target_row - embeddings.gather[track_grad=False]([index])
         scores[word] = -sqrt((raw_diff * raw_diff).sum().item())
@@ -488,10 +506,11 @@ def compare(
 ) capturing -> Bool:
     return x[1] > y[1]
 
+
 fn download(
     to: String = "/tmp",
-    #url: String = "https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz",
-    url: String = "https://huggingface.co/datasets/NolanChai/aclImdb_v1/resolve/main/aclImdb_v1.tar.gz"
+    # url: String = "https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz",
+    url: String = "https://huggingface.co/datasets/NolanChai/aclImdb_v1/resolve/main/aclImdb_v1.tar.gz",
 ) raises:
     var download_to = "/tmp"
     var file_path = Path("/tmp/aclImdb_v1.tar.gz")
