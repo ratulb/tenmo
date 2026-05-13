@@ -15,6 +15,7 @@ from .forwards import (
     MaxPool2d,
     Dropout,
     LayerNorm,
+    Embedding,
 )
 from .mnemonics import (
     mm,
@@ -31,6 +32,7 @@ from .mnemonics import (
     FLATTEN,
     MAXPOOL2D,
     LAYER_NORM,
+    EMBEDDING,
 )
 from .blashandle import BLASHandle, BLASHandleLite
 from std.utils.numerics import neg_inf
@@ -773,6 +775,8 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             return self.layer[Conv2D[Self.dtype]](xs)
         elif self.tag == FLATTEN:
             return self.layer[Flatten[Self.dtype]](xs)
+        elif self.tag == EMBEDDING:
+            return self.layer[Embedding[Self.dtype]](xs)
         elif self.tag == MAXPOOL2D:
             return self.layer[MaxPool2d[Self.dtype]](xs)
         elif self.tag == LAYER_NORM:
@@ -814,6 +818,8 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             return self.layer[Conv2D[Self.dtype]].num_parameters()
         elif self.tag == FLATTEN:
             return self.layer[Flatten[Self.dtype]].num_parameters()
+        elif self.tag == EMBEDDING:
+            return self.layer[Embedding[Self.dtype]].num_parameters()
         elif self.tag == MAXPOOL2D:
             return self.layer[MaxPool2d[Self.dtype]].num_parameters()
         elif self.tag == LAYER_NORM:
@@ -845,6 +851,8 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             self.layer[Conv2D[Self.dtype]].train()
         elif self.tag == FLATTEN:
             self.layer[Flatten[Self.dtype]].train()
+        elif self.tag == EMBEDDING:
+            self.layer[Embedding[Self.dtype]].train()
         elif self.tag == MAXPOOL2D:
             self.layer[MaxPool2d[Self.dtype]].train()
         elif self.tag == LAYER_NORM:
@@ -868,6 +876,8 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             self.layer[Conv2D[Self.dtype]].eval()
         elif self.tag == FLATTEN:
             self.layer[Flatten[Self.dtype]].eval()
+        elif self.tag == EMBEDDING:
+            self.layer[Embedding[Self.dtype]].eval()
         elif self.tag == MAXPOOL2D:
             self.layer[MaxPool2d[Self.dtype]].eval()
         elif self.tag == LAYER_NORM:
@@ -900,6 +910,9 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
         elif self.tag == LAYER_NORM:
             var l = self.layer[LayerNorm[Self.dtype]]
             return Module[Self.dtype](Layer[Self.dtype](l.to_gpu(gpu)), self.tag)
+        elif self.tag == EMBEDDING:
+            var l = self.layer[Embedding[Self.dtype]]
+            return Module[Self.dtype](Layer[Self.dtype](l.to_gpu(gpu)), self.tag)
 
         else:
             # RELU, SIGMOID, TANH, DROPOUT, FLATTEN, MAXPOOL2D
@@ -919,6 +932,9 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             return Module[Self.dtype](Layer[Self.dtype](l.to_cpu()), self.tag)
         elif self.tag == LAYER_NORM:
             var l = self.layer[LayerNorm[Self.dtype]]
+            return Module[Self.dtype](Layer[Self.dtype](l.to_cpu()), self.tag)
+        elif self.tag == EMBEDDING:
+            var l = self.layer[Embedding[Self.dtype]]
             return Module[Self.dtype](Layer[Self.dtype](l.to_cpu()), self.tag)
 
         else:

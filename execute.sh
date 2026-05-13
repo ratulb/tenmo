@@ -81,6 +81,7 @@ run_parallel() {
 
 # Define the complete ordered list of tests
 declare -a ALL_TESTS_IN_ORDER=(
+    "embedding|tests/test_embedding.mojo"
     "dot|tests/test_dot.mojo"
     "outer|tests/test_outer.mojo"
     "layer_norm|tests/test_layernorm.mojo"
@@ -163,6 +164,7 @@ declare -a ALL_TESTS_IN_ORDER=(
 )
 
 declare -a GPU_TESTS=(
+    "embedding|tests/test_embedding.mojo"
     "dot|tests/test_dot.mojo"
     "outer|tests/test_outer.mojo"
     "layer_norm|tests/test_layernorm.mojo"
@@ -239,7 +241,7 @@ if [ $# -eq 0 ]; then
     echo "  $0 gpu relu tanh              - Run only relu and tanh"
     echo ""
     print_colored "$CYAN" "Available tests:"
-    echo "  reciprocal, product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
+    echo "  embedding, layer_norm, reciprocal, product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
     echo "  allany, compare, count_unique, transmute, exp, summean, sigmoid"
     echo "  gpusummean, broadcast, scalar, inplace, expand, gpu_expand"
     echo "  sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout, dev_transfer"
@@ -300,6 +302,7 @@ run_test_by_name() {
     local exit_code=0
 
     case $test_name in
+        embedding)      run_test "embedding" "tests/test_embedding.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         dot)            run_test "dot" "tests/test_dot.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         outer)          run_test "outer" "tests/test_outer.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         layer_norm)     run_test "layer_norm" "tests/test_layernorm.mojo" "$DEBUG_MODE"; exit_code=$? ;;

@@ -3,7 +3,7 @@ from .tensor import Tensor
 from .gradbox import Gradbox
 from .backpropagation import BackwardFnArg
 from .ndbuffer import NDBuffer, Layout, Storage
-from .common_utils import panic
+from .common_utils import panic, i, s
 from .shapes import Shape
 from std.os.atomic import Consistency, fence
 
@@ -148,7 +148,9 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
                 arg.indices,
                 arg.axis,
             )
-
+            # Zero padding row grad if set
+            if arg.padding_idx:
+                self.gradbox[].fill(0.0, i(arg.padding_idx.value()), s())
         else:
             print("Ancestor → update_grad: unknown op_code", String(op_code))
 

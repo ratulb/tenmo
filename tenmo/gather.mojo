@@ -527,8 +527,9 @@ struct GatherArg(ArgumentType):
 
     var axis: Int
     var indices: IntArray
-
-
+    var padding_idx: Optional[Int]
+    # padding_idx zeroing happens in engine's ScatterAddTensor branch
+    # by reading GatherArg.padding_idx
 # =============================================================================
 # SECTION 5 — GatherBackward
 # =============================================================================
@@ -583,6 +584,7 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         indices: IntArray,
         axis: Int = 0,
         fuse_sum: Bool = False,
+        padding_idx: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
         """Gather slices along `axis` at the given indices.
@@ -663,7 +665,7 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
             if grad_required:
                 out.requires_grad_(True)
                 var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_GATHER, GatherArg(ax, normalized)
+                    BACKWARD_GATHER, GatherArg(ax, normalized, padding_idx)
                 )
                 out.add_ancestry(backwardFnArg^, self)
 
