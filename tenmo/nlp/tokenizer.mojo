@@ -50,40 +50,38 @@ struct SimpleTokenizer[
     def __moveinit__(out self, deinit take: Self):
         self.int_to_str = take.int_to_str^
         self.str_to_int = take.str_to_int^
-        self.text_cleaner = take.text_cleaner^
+        self.text_cleaner = take.text_cleaner
         self.max_n = take.max_n
         self.regex_parser = take.regex_parser^
 
     @staticmethod
-    def ngramify(words: PythonObject, max_n: Int) raises -> PythonObject:
-        """Generate unigrams + bigrams + trigrams from a Python word list.
-
-        Args:
-            words:  Python list of cleaned word strings.
-            max_n:  Maximum n-gram size (1=unigrams, 2=+bigrams, 3=+trigrams).
-
-        Returns:
-            Python list with original words and n-gram tokens joined by '_'.
-        """
-        var py = Python.import_module("builtins")
-        var result = py.list(words)
-        var n: Int = len(words)
+    def ngramify(
+        words:   PythonObject,
+        max_n:   Int,
+        cleaner: IMDBTextCleaner,
+    ) raises -> PythonObject:
+        var py     = Python.import_module("builtins")
+        var n      = len(words)
+        var result = py.list(words)   # unigrams — full word list, no stopword filter
 
         if max_n >= 2:
+            # n-grams use content words only — stopwords filtered here
+            var cw      = cleaner.content_words(words)
+            var nc      = len(cw)
             var bigrams = py.list()
-            for k in range(n - 1):
-                bigrams.append(words[k] + py.str("_") + words[k + 1])
+            for k in range(nc - 1):
+                bigrams.append(cw[k] + py.str('_') + cw[k + 1])
             result.extend(bigrams)
 
         if max_n >= 3:
+            var cw       = cleaner.content_words(words)
+            var nc       = len(cw)
             var trigrams = py.list()
-            for k in range(n - 2):
+            for k in range(nc - 2):
                 trigrams.append(
-                    words[k]
-                    + py.str("_")
-                    + words[k + 1]
-                    + py.str("_")
-                    + words[k + 2]
+                    cw[k]     + py.str('_')
+                    + cw[k+1] + py.str('_')
+                    + cw[k+2]
                 )
             result.extend(trigrams)
 
@@ -115,7 +113,7 @@ struct SimpleTokenizer[
 
         for line in lines:
             var words = text_cleaner.clean_text(line)
-            var tokens = Self.ngramify(words, max_n)
+            var tokens = Self.ngramify(words, max_n, text_cleaner)
             freq.update(tokens)
 
         var filter_fn = Python.evaluate(
@@ -177,7 +175,7 @@ struct SimpleTokenizer[
 
     def encode(self, text: String) raises -> List[Int]:
         var words = self.text_cleaner.clean_text(text)
-        var tokens = Self.ngramify(words, self.max_n)
+        var tokens = Self.ngramify(words, self.max_n, self.text_cleaner)
         var token_ids = List[Int](capacity=len(tokens))
         for token in tokens:
             var token_str = String(token)
