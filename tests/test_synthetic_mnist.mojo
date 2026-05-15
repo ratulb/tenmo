@@ -3,7 +3,7 @@ from tenmo.shapes import Shape
 from tenmo.net import Linear, ReLU, Sequential
 from tenmo.sgd import SGD
 from tenmo.crossentropy import CrossEntropyLoss
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.utils.numerics import max_finite
 from tenmo.common_utils import log_debug, s, i as Row
 
@@ -98,6 +98,11 @@ fn get_batches(
     return batches^
 
 
+fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
 fn main():
     # Make synthetic dataset (like 1000 "images")
     num_samples = 100

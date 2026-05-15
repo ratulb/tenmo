@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
 from tenmo.relu import ReLU
 from std.sys import has_accelerator
-from std.testing import assert_true, assert_equal
+from std.testing import assert_true, assert_equal, TestSuite
 from tenmo.shapes import Shape
 from std.math import abs
 
@@ -672,7 +672,7 @@ fn test_rlv_parity_bwd_2d() raises:
 # =============================================================================
 
 fn main() raises:
-    # ── CPU Forward ──────────────────────────────────────────────────────────
+    _="""# ── CPU Forward ──────────────────────────────────────────────────────────
     test_rlv_cpu_fwd_all_positive()
     test_rlv_cpu_fwd_all_negative()
     test_rlv_cpu_fwd_mixed()
@@ -746,4 +746,6 @@ fn main() raises:
     test_relu_multidim()
 
 
-    print("All rlv_ tests passed.")
+    print("All rlv_ tests passed.")"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll relu tests passed!")

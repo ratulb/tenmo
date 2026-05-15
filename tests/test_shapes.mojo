@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 
-from std.testing import assert_true, assert_raises
+from std.testing import assert_true, assert_raises, TestSuite
 from tenmo.intarray import IntArray
 
 # ============================================
@@ -500,6 +500,11 @@ fn test_zip_reversed() raises:
 
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     test_negative_indices()
     test_slice_shape()
     test_slice_from()
@@ -512,3 +517,4 @@ fn main() raises:
     test_zip_reversed()
 
     run_all_shape_tests()
+"""

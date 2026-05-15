@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.shapes import Shape
 from tenmo.shuffle import Shuffle
 from std.sys import has_accelerator
@@ -1073,7 +1073,7 @@ fn test_shuf_gpu_large_axis_dim_matches_cpu() raises:
 
 
 fn main() raises:
-    # Old tests
+    _="""# Old tests
     test_tensor_shuffle_forward_basic()
     test_tensor_shuffle_forward_axis1()
     test_tensor_shuffle_backward_axis0()
@@ -1158,4 +1158,6 @@ fn main() raises:
     test_shuf_gpu_large_axis_dim()
     test_shuf_gpu_large_axis_dim_matches_cpu()
 
-    print("All shuffle tests passed.")
+    print("All shuffle tests passed.")"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll shuffle tests passed!")

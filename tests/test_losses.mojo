@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
 from tenmo.net import MSELoss, BCELoss, BCEWithLogitsLoss, Linear, Sigmoid
 from tenmo.common_utils import isnan, isinf
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.intarray import IntArray
 
 # ============================================================================
@@ -415,6 +415,10 @@ fn test_loss_with_zero_gradient() raises:
 
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
+fn main() raises:
     run_all_loss_tests()
 
 
@@ -466,3 +470,4 @@ fn run_all_loss_tests() raises:
     print("\n" + "=" * 80)
     print("ALL LOSS FUNCTION TESTS PASSED! ✓")
     print("=" * 80 + "\n")
+"""

@@ -1,9 +1,13 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.strides import Strides
 from tenmo.mnemonics import vm
 
+fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_="""
 fn main() raises:
     test_vector_matrix_no_batch()
     test_vector_matrix_batch_M_only()
@@ -49,6 +53,7 @@ fn main() raises:
     test_matmul_nd_with_view_offset_grad()
 
     print("All vector-matrix tests passed!")
+"""
 
 
 # ===== BASIC VECTOR-MATRIX TESTS =====

@@ -1,4 +1,4 @@
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 from tenmo.tensor import Tensor
 
@@ -342,6 +342,7 @@ fn test_devtransfer_multihop_all_stop_grad_false() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 
 fn main() raises:
+    _ = """
     # Scenario 1: CPU->GPU stop_grad=False, grad reaches A
     test_devtransfer_cpu2gpu_default_stop_grad_false_1d()
     test_devtransfer_cpu2gpu_default_stop_grad_false_2d()
@@ -373,3 +374,5 @@ fn main() raises:
     test_devtransfer_multihop_all_stop_grad_false()
 
     print("All device transfer grad flow tests passed ✓")
+    """
+    TestSuite.discover_tests[__functions_in_module()]().run()

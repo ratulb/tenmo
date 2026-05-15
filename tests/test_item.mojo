@@ -1,9 +1,32 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 
+fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
+fn main() raises:
+    # CPU first
+    test_item_cpu_scalar_tensor()
+    test_item_cpu_1d_tensor()
+    test_item_cpu_gradbox_scalar()
+
+    comptime if not has_accelerator():
+        print("No GPU — skipping GPU item tests")
+        return
+
+    test_item_gpu_scalar_tensor()
+    test_item_gpu_1d_tensor()
+    test_item_gpu_gradbox_scalar()
+    test_item_gpu_gradbox_after_backward()
+    test_item_gpu_sum_result()
+    test_item_gpu_mean_result()
+
+    print("\n=== ALL ITEM TESTS PASSED ===")
+"""
+
 fn test_item_cpu_scalar_tensor() raises:
-    print("test_item_cpu_scalar_tensor")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(42.0)
     assert_true(a.item() == 42.0)
@@ -98,22 +121,3 @@ fn test_item_gpu_mean_result() raises:
     assert_true(m.item() == 2.5)
     print("passed")
 
-
-fn main() raises:
-    # CPU first
-    test_item_cpu_scalar_tensor()
-    test_item_cpu_1d_tensor()
-    test_item_cpu_gradbox_scalar()
-
-    comptime if not has_accelerator():
-        print("No GPU — skipping GPU item tests")
-        return
-
-    test_item_gpu_scalar_tensor()
-    test_item_gpu_1d_tensor()
-    test_item_gpu_gradbox_scalar()
-    test_item_gpu_gradbox_after_backward()
-    test_item_gpu_sum_result()
-    test_item_gpu_mean_result()
-
-    print("\n=== ALL ITEM TESTS PASSED ===")

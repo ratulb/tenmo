@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.intarray import IntArray
 from tenmo.shapes import Shape
 from std.sys import has_accelerator
@@ -2042,7 +2042,7 @@ fn run_all_minmax_tests() raises:
 
 
 fn main() raises:
-    # Old tests
+    _="""# Old tests
     test_max_min_mixed()
     test_max_min()
     run_all_minmax_tests()
@@ -2123,4 +2123,6 @@ fn main() raises:
     test_mmrev_gpu_max_then_op_grad_flow()
     test_mmrev_gpu_grad_lands_on_cpu()
 
-    print("All mmrev tests passed.")
+    print("All mmrev tests passed.")"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll minmax tests passed!")

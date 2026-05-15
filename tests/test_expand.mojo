@@ -1,4 +1,4 @@
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 # ============================================================
@@ -399,6 +399,7 @@ fn test_expand_is_zero_stride_view() raises:
 # ============================================================
 
 fn main() raises:
+    _ = """
     # 1D → nD
     test_expand_1d_to_2d_new_batch_dim()
     test_expand_1d_to_3d()
@@ -443,3 +444,5 @@ fn main() raises:
     test_expand_is_zero_stride_view()
 
     print("All expand tests passed.")
+    """
+    TestSuite.discover_tests[__functions_in_module()]().run()

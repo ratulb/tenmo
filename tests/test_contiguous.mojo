@@ -1,4 +1,4 @@
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
@@ -712,6 +712,7 @@ fn test_contig_gpu_cpu_tensor_unchanged() raises:
 
 
 fn main() raises:
+    _ = """
     # CPU scalar
     test_contig_cpu_scalar_forward()
     test_contig_cpu_scalar_backward()
@@ -775,3 +776,5 @@ fn main() raises:
     test_contig_gpu_cpu_tensor_unchanged()
 
     print("All contiguous tests passed.")
+    """
+    TestSuite.discover_tests[__functions_in_module()]().run()

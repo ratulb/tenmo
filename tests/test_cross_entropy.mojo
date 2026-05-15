@@ -1,6 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
-from std.testing import assert_false
+from std.testing import assert_true, assert_false, TestSuite
 from std.time import perf_counter_ns
 from tenmo.shapes import Shape
 from tenmo.common_utils import log_warning
@@ -1866,7 +1865,7 @@ fn test_ce_spatial_with_ignore() raises:
     assert_true(loss.item() > 0)
 
 
-fn test_ce_gradients_basic_uu() raises:
+fn _ce_gradients_basic_uu() raises:
     print("test_ce_gradients_basic")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -2073,7 +2072,7 @@ fn test_ce_large_logits() raises:
 
 
 # Negative validation tests (should not panic if validation is correct)
-fn test_ce_validation_wrong_target_dims() raises:
+fn _ce_validation_wrong_target_dims() raises:
     print("test_ce_validation_wrong_target_dims")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DType.int32].d2([[0, 1], [1, 0]])  # Wrong: should be 1D
@@ -2084,7 +2083,7 @@ fn test_ce_validation_wrong_target_dims() raises:
     _loss = loss_fn(logits, target)
 
 
-fn test_ce_validation_class_out_of_bounds() raises:
+fn _ce_validation_class_out_of_bounds() raises:
     print("test_ce_validation_class_out_of_bounds")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()  # 2 classes
     var target = Tensor[DType.int32].d1([0, 2])  # Class 2 is out of bounds"""
@@ -2095,7 +2094,7 @@ fn test_ce_validation_class_out_of_bounds() raises:
     _loss = loss_fn(logits, target)
 
 
-fn test_ce_validation_spatial_mismatch() raises:
+fn _ce_validation_spatial_mismatch() raises:
     print("test_ce_validation_spatial_mismatch")
     var logits = Tensor.d4([[[[2.0, 1.0], [1.0, 2.0]]]]).float()  # (1, 2, 2, 2)
     var target = Tensor[DType.int32].d3(
@@ -2107,7 +2106,7 @@ fn test_ce_validation_spatial_mismatch() raises:
     _loss = loss_fn(logits, target)
 
 
-fn test_ce_validation_batch_size_mismatch() raises:
+fn _ce_validation_batch_size_mismatch() raises:
     print("test_ce_validation_batch_size_mismatch")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()  # batch size 2
     var target = Tensor[DType.int32].d1([0, 1, 0])  # batch size 3
@@ -3833,7 +3832,7 @@ fn test_ce_edge_zero_grad_no_requires_grad() raises:
 
 
 fn main() raises:
-    # Group A: Basic Forward CI CPU
+    _="""# Group A: Basic Forward CI CPU
     test_ce_ci_basic_mean()
     test_ce_ci_basic_sum()
     test_ce_ci_basic_none()
@@ -3936,7 +3935,7 @@ fn main() raises:
 
     # Old tests follow
     run_all_tests()
-    test_ce_gradients_computation_heavy()  # Need to be re-enabled
+    test_ce_gradients_computation_heavy()
     test_ce_reduction_none_1()
     # Basic functionality tests
     test_ce_basic_no_reduction()
@@ -3991,4 +3990,6 @@ fn main() raises:
     test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig()
     run_all_ce_tests_v2()
 
-    print("All CrossEntropyLoss tests passed!")
+    print("All CrossEntropyLoss tests passed!")"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll cross entropy tests passed!")

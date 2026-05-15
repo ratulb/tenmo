@@ -1,8 +1,7 @@
 from tenmo.tensor import Tensor
-
 # from common_utils import binary_accuracy as accuracy
 from tenmo.common_utils import now
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 
 
 fn accuracy[
@@ -17,7 +16,13 @@ fn accuracy[
 
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     run_all_accuracy_tests()
+"""
 
 
 fn test_accuracy_perfect_predictions() raises:

@@ -82,7 +82,7 @@ environments:
       - conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-0.26.2.0-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mblack-26.2.0-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mojo-python-0.26.2.0-release.conda
-      - conda_source: bpe[1109ecc0] @ git+https://github.com/ratulb/bpe.mojo#d91d44eadf1032f91be979dd8092be384bd3d3ee
+      - conda_source: bpe[1741f7e3] @ ../bpe
       - conda_source: mojodoc[73406872] @ git+https://github.com/ratulb/mojodoc?branch=main#541db67e33b5b6a430330616be505c83de5e2d32
       - pypi: https://files.pythonhosted.org/packages/16/e1/3079a9ff9b8e11b846c6ac5c8b5bfb7ff225eee721825310c91b3b50304f/tqdm-4.67.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/4b/f9/d8ac11ddbd5d506e7c6be71b8a33698c73fd9dc108f6c9e0595f7cd60619/pure_cifar_10-0.1.1-py3-none-any.whl
@@ -168,7 +168,7 @@ environments:
       - conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-0.26.2.0-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mblack-26.2.0-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mojo-python-0.26.2.0-release.conda
-      - conda_source: bpe[1109ecc0] @ git+https://github.com/ratulb/bpe.mojo#d91d44eadf1032f91be979dd8092be384bd3d3ee
+      - conda_source: bpe[1741f7e3] @ ../bpe
       - conda_source: mojodoc[73406872] @ git+https://github.com/ratulb/mojodoc?branch=main#541db67e33b5b6a430330616be505c83de5e2d32
       - pypi: https://files.pythonhosted.org/packages/16/e1/3079a9ff9b8e11b846c6ac5c8b5bfb7ff225eee721825310c91b3b50304f/tqdm-4.67.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/4b/f9/d8ac11ddbd5d506e7c6be71b8a33698c73fd9dc108f6c9e0595f7cd60619/pure_cifar_10-0.1.1-py3-none-any.whl
@@ -1171,10 +1171,7 @@ packages:
   run_exports: {}
   size: 22936
   timestamp: 1773780198161
-- conda_source: bpe[1109ecc0] @ git+https://github.com/ratulb/bpe.mojo#d91d44eadf1032f91be979dd8092be384bd3d3ee
-  version: 0.1.0
-  build: hb0f4dca_0
-  subdir: linux-64
+- conda_source: bpe[1741f7e3] @ ../bpe
   variants:
     target_platform: linux-64
   depends:

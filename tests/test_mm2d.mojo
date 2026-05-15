@@ -2,6 +2,8 @@ from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from tenmo.common_utils import panic
 from std.sys import simd_width_of
+from std.testing import assert_true, TestSuite
+from tenmo.strides import Strides
 
 
 fn matmul_naive[
@@ -98,6 +100,10 @@ fn validate_matmul_2d_grads[
     print("Matmul_2d gradient validation passed for all applicable tensors")
 
 
+fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
 fn main() raises:
     run_all_matmul_2d_forward_tests()
 
@@ -717,3 +723,4 @@ fn test_matmul_2d_contiguous_after_transpose() raises:
     var c = a.matmul(b_contiguous)
     # Should use fast path and give correct result
     assert_true(c.shape() == Shape(2, 2))
+"""

@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 # ===----------------------------------------------------------------------=== #
 # Sigmoid exhaustive tests — prefix: sig_
@@ -485,7 +485,7 @@ fn test_sig_gpu_cpu_backward_parity() raises:
 # ===----------------------------------------------------------------------=== #
 
 fn main() raises:
-    # --- CPU forward ---
+    _="""# --- CPU forward ---
     test_sig_cpu_scalar_forward()
     test_sig_cpu_1d_forward_known_values()
     test_sig_cpu_2d_forward()
@@ -533,4 +533,6 @@ fn main() raises:
     test_sig_gpu_cpu_forward_parity()
     test_sig_gpu_cpu_backward_parity()
 
-    print("All sigmoid tests passed.")
+    print("All sigmoid tests passed.")"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll sigmoid tests passed!")

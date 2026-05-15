@@ -1,10 +1,16 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from tenmo.mnemonics import mv
+from std.testing import assert_true, TestSuite
+from tenmo.strides import Strides
 
 # comptime mv = 2 # matrix vector
 
 
+fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
 fn main() raises:
     run_all_matrix_vector_tests()
     test_matrix_vector_no_batch()
@@ -21,6 +27,7 @@ fn main() raises:
 
 from std.testing import assert_true
 from tenmo.strides import Strides
+"""
 
 
 fn test_matrix_vector_no_batch() raises:

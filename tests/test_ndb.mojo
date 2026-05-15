@@ -1,4 +1,4 @@
-from std.testing import assert_true, assert_false
+from std.testing import assert_true, assert_false, TestSuite
 from tenmo.buffers import Buffer
 from tenmo.intarray import IntArray
 from tenmo.shapes import Shape
@@ -1872,6 +1872,11 @@ fn run_all_ndbuffer_tests() raises:
 
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     try:
         var runs = 1
         comptime _dtype = DType.float32
@@ -1942,6 +1947,7 @@ fn main() raises:
             print("All ndb_minmax tests passed")
     except e:
         raise e^
+"""
 
 
 fn test_buffer_sum() raises:

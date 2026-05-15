@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
 from tenmo.common_utils import panic, now
-from std.testing import assert_true, assert_equal, assert_false
+from std.testing import assert_true, assert_equal, assert_false, TestSuite
 from tenmo.dataloader import *
 from std.python import Python, PythonObject
 
@@ -528,6 +528,7 @@ fn test_dataloader_shuffle_quality() raises:
 
 
 fn main() raises:
+    _ = """
     # test_multi_epoch_no_memory_growth() #TBE
     # test_shuffle_uses_two_buffers()#TBE
     # test_no_memory_growth_with_shuffle()#TBE
@@ -577,6 +578,8 @@ fn main() raises:
 
     run_zero_copy_tests()
     run_all_dl_tests()
+    """
+    TestSuite.discover_tests[__functions_in_module()]().run()
 
 
 # ============================================================================

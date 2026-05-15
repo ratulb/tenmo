@@ -1,4 +1,4 @@
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.tensor import Tensor
 from std.sys import has_accelerator
 from tenmo.shapes import Shape
@@ -590,6 +590,11 @@ fn test_uop_cross_relu_negate_grad_flow_gpu() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     # SQRT
     test_uop_sqrt_forward_1d_cpu()
     test_uop_sqrt_forward_2d_cpu()
@@ -648,3 +653,4 @@ fn main() raises:
     test_uop_cross_relu_negate_grad_flow_gpu()
 
     print("All uop tests passed!")
+"""

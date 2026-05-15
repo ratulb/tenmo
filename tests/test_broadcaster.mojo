@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
-from std.testing import assert_true, assert_raises
+from std.testing import assert_true, assert_raises, TestSuite
 from tenmo.broadcasthelper import ShapeBroadcaster
 from tenmo.intarray import IntArray
 
@@ -141,7 +141,9 @@ fn test_pad_shapes() raises:
 
 
 fn main() raises:
-    test_empty_shape_broadcastable()
+    _="""test_empty_shape_broadcastable()
     test_broadcastable()
     test_pad_shapes()
-    test_broadcast_shape()
+    test_broadcast_shape()"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll broadcaster tests passed!")

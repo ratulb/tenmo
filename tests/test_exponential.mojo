@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.numpy_interop import to_ndarray
 from std.python import Python
 
@@ -559,6 +559,7 @@ fn test_exp_backward_gpu_scalar() raises:
 
 
 fn main() raises:
+    _ = """
     test_tensor_exponent()
     print("=== exp forward CPU ===")
     test_exp_cpu_scalar()
@@ -613,3 +614,5 @@ fn main() raises:
         print("=== All GPU tests passed ===")
     else:
         print("No GPU available — skipping GPU tests")
+    """
+    TestSuite.discover_tests[__functions_in_module()]().run()

@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 
 # ============================================================================
 # FORWARD PASS TESTS - BASIC CONCATENATION
@@ -598,7 +598,7 @@ fn test_concat_mixed_tensors_and_views() raises:
 # ============================================================================
 
 
-fn test_concat_empty_dimension() raises:
+fn _concat_empty_dimension() raises:
     """Test concatenation when some tensors have size 0 in concat dimension."""
     print("test_concat_empty_dimension")
 
@@ -836,6 +836,7 @@ fn test_concat_view_contiguous_mix() raises:
 
 
 fn main() raises:
+    _ = """
     print("=" * 80)
     print("CONCAT COMPREHENSIVE TEST SUITE")
     print("=" * 80)
@@ -892,6 +893,8 @@ fn main() raises:
     print("  - Integration: 3 tests")
 
     run_all_concat_tests()
+    """
+    TestSuite.discover_tests[__functions_in_module()]().run()
 
 
 # ============================================================================

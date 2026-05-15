@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 from tenmo.shapes import Shape
 
@@ -560,6 +560,7 @@ fn test_exp_parity_using_zero_grad() raises:
 
 
 fn main() raises:
+    _ = """
     # CPU forward
     test_exp_cpu_1d_square()
     test_exp_cpu_1d_cube()
@@ -612,3 +613,5 @@ fn main() raises:
     test_exp_parity_using_zero_grad()
 
     print("All exponentiation tests passed!")
+    """
+    TestSuite.discover_tests[__functions_in_module()]().run()

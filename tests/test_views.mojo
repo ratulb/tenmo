@@ -1,29 +1,27 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from tenmo.strides import Strides
-from std.testing import assert_true, assert_false, assert_raises, assert_equal
+from std.testing import assert_true, assert_false, assert_raises, assert_equal, TestSuite
 from tenmo.common_utils import i, newaxis, s
 
 
 fn main() raises:
-    test_into_tensor_isolated_memory()
+    _="""test_into_tensor_isolated_memory()
     test_identity_permutation()
     test_slice_every_second_row_column1()
-    test_edge_case_indexing()  # revist
-    # test_mixed_indexing()
-    # test_newaxis_dimension_insertion()
+    test_edge_case_indexing()
+    test_mixed_indexing()
+    test_newaxis_dimension_insertion()
     test_basic_slicing()
-    # test_newaxis()
+    test_newaxis()
     test_scalar_view()
     test_integer_indexing()
     test_nested_views_grad_propagation()
     test_reshape_slice_sum_backward()
     test_backward_through_nested_views_non_contiguous()
     test_backward_through_nested_views()
-
     test_permute_backward()
     test_tensor_permute_flatten_backprop()
-
     test_flat_view_chain_backprop()
     test_nonzero_offset_multi_view_chain()
     test_strided_view_chain_2d_to_3d()
@@ -31,39 +29,39 @@ fn main() raises:
     test_view_chain_reversed_shape()
     test_grad_propagation_with_offset_chain()
     test_nested_view_backward_indexing()
-
     test_getitem_list_empty_indices_returns_full_view()
     test_into_tensor_full_view_copy()
     test_into_tensor_transposed_view()
     test_into_tensor_offset_view()
     test_into_tensor_scalar_view()
-    # test_into_tensor_empty_view()
+    test_into_tensor_empty_view()
     test_into_tensor_grad_flag_true()
     test_into_tensor_grad_flag_false()
     test_into_tensor_large_contiguous_copy()
-
-    # test_negative_offset_fails()
-    # test_large_stride_out_of_bounds()
-    # test_invalid_offset()
-    # test_invalid_stride_overflow()
+    test_negative_offset_fails()
+    test_large_stride_out_of_bounds()
+    test_invalid_offset()
+    test_invalid_stride_overflow()
     test_valid_3d_view()
     test_valid_2d_view()
-    # test_view_offset_out_of_bounds()
+    test_view_offset_out_of_bounds()
     test_view_offset_max_boundary()
-    # test_view_3d_invalid_strides()
+    test_view_3d_invalid_strides()
     test_view_3d_valid()
-    # test_view_2d_strides_overflow()
+    test_view_2d_strides_overflow()
     test_view_2d_strides_valid()
     test_view_default_strides()
-    # test_view_invalid_offset()
-    # test_view_invalid_shape()
-    # test_view_invalid_strides_rank()
+    test_view_invalid_offset()
+    test_view_invalid_shape()
+    test_view_invalid_strides_rank()
     test_view_with_strides_basic()
-    # test_view_negative_stride_fails_safely()
+    test_view_negative_stride_fails_safely()
     test_view_offset_slice()
     test_view_reuse_data_storage()
     test_view_identity()
-    test_view_stride_bounds_overflow()
+    test_view_stride_bounds_overflow()"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll views tests passed!")
 
 
 fn test_slice_every_second_row_column1() raises:
@@ -206,7 +204,7 @@ fn test_nested_view_backward_indexing() raises:
     assert_true((a.grad() == expected))
 
 
-fn test_negative_offset_fails() raises:
+fn _negative_offset_fails() raises:
     print("test_negative_offset_fails")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([1, 2, 3])
@@ -216,7 +214,7 @@ fn test_negative_offset_fails() raises:
         _ = t.view(shape, strides, offset=-1)  # offset < 0
 
 
-fn test_large_stride_out_of_bounds() raises:
+fn _large_stride_out_of_bounds() raises:
     print("test_large_stride_out_of_bounds")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
@@ -226,7 +224,7 @@ fn test_large_stride_out_of_bounds() raises:
         _ = t.view(shape, strides)  # max_index = 5 + 5 = 10
 
 
-fn test_invalid_offset() raises:
+fn _invalid_offset() raises:
     print("test_invalid_offset")
     var values: List[UInt8] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     var t = Tensor[DType.uint8].d1(values)
@@ -237,7 +235,7 @@ fn test_invalid_offset() raises:
         _ = t.view(shape, strides, offset)  # offset 9 + (1)*2 + (1)*1 = 12
 
 
-fn test_invalid_stride_overflow() raises:
+fn _invalid_stride_overflow() raises:
     print("test_invalid_stride_overflow")
     comptime dtype = DType.float32
     var values: List[Float32] = List[Float32](length=10, fill=0)
@@ -273,7 +271,7 @@ fn test_valid_2d_view() raises:
     assert_true(view.shape() == shape)
 
 
-fn test_view_offset_out_of_bounds() raises:
+fn _view_offset_out_of_bounds() raises:
     print("test_view_offset_out_of_bounds")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([0, 1, 2, 3, 4])
@@ -313,7 +311,7 @@ fn test_view_2d_strides_valid() raises:
     assert_equal(r[2, 1], 100.0, "Base tensor update failed via view")
 
 
-fn test_view_2d_strides_overflow() raises:
+fn _view_2d_strides_overflow() raises:
     print("test_view_2d_strides_overflow")
     comptime dtype = DType.float32
     var t = Tensor[dtype].arange(12)
@@ -338,7 +336,7 @@ fn test_view_3d_valid() raises:
     assert_true(v.shape() == shape, "3D valid view shape matches")
 
 
-fn test_view_3d_invalid_strides() raises:
+fn _view_3d_invalid_strides() raises:
     print("test_view_3d_invalid_strides")
     comptime dtype = DType.float32
     var t = Tensor[dtype].arange(60)
@@ -364,7 +362,7 @@ fn test_view_default_strides() raises:
     assert_true(v.is_contiguous(), "Expected default view to be contiguous")
 
 
-fn test_view_invalid_offset() raises:
+fn _view_invalid_offset() raises:
     print("test_view_invalid_offset")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1, 2], [3, 4]])
@@ -372,7 +370,7 @@ fn test_view_invalid_offset() raises:
         _ = t.view(Shape.of(2), offset=5)  # Too large offset
 
 
-fn test_view_invalid_shape() raises:
+fn _view_invalid_shape() raises:
     print("test_view_invalid_shape")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1, 2], [3, 4]])
@@ -380,7 +378,7 @@ fn test_view_invalid_shape() raises:
         _ = t.view(Shape.of(5))  # More elements than base tensor
 
 
-fn test_view_invalid_strides_rank() raises:
+fn _view_invalid_strides_rank() raises:
     print("test_view_invalid_strides_rank")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1, 2], [3, 4]])
@@ -400,7 +398,7 @@ fn test_view_with_strides_basic() raises:
     )
 
 
-fn test_view_negative_stride_fails_safely() raises:
+fn _view_negative_stride_fails_safely() raises:
     print("test_view_negative_stride_fails_safely")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1, 2], [3, 4]])
@@ -502,7 +500,7 @@ fn test_into_tensor_scalar_view() raises:
     assert_true(out.item() == 42)
 
 
-fn test_into_tensor_empty_view() raises:
+fn _into_tensor_empty_view() raises:
     print("test_into_tensor_empty_view")
     comptime dtype = DType.float32
     var t = Tensor[DType.float32](Shape.of(0, 3))
@@ -666,7 +664,7 @@ fn test_backward_through_nested_views() raises:
     assert_true(x2.grad().shape() == [4, 5, 6])
 
 
-fn test_nested_views_grad_propagation_1() raises:
+fn _nested_views_grad_propagation_1() raises:
     print("test_nested_views_grad_propagation")
     comptime dtype = DType.float32
 
@@ -777,7 +775,7 @@ fn test_edge_case_indexing() raises:
     assert_true(oversized_slice.buffer.size() == empty.buffer.size())
 
 
-fn test_mixed_indexing() raises:
+fn _mixed_indexing() raises:
     print("test_mixed_indexing")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(12, requires_grad=True)
@@ -798,7 +796,7 @@ fn test_mixed_indexing() raises:
     assert_true((r.grad() == expected_grad))
 
 
-fn test_newaxis_dimension_insertion() raises:
+fn _newaxis_dimension_insertion() raises:
     print("test_newaxis_dimension_insertion")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1, 2, 3], requires_grad=True)
@@ -867,7 +865,7 @@ fn test_integer_indexing() raises:
     assert_true((a.grad() == expected_grad))
 
 
-fn test_newaxis() raises:
+fn _newaxis() raises:
     print("test_newaxis")
     comptime dtype = DType.float32
     x = Tensor[dtype].d1([1, 2, 3], requires_grad=True)

@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 from tenmo.shapes import Shape
 from tenmo.mnemonics import AddTensor
@@ -166,6 +166,11 @@ fn test_gpu_scalar_add_full_backward() raises:
     print("passed")
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     test_cpu_add_scalar_tensor_result()
     comptime if has_accelerator():
         test_gpu_scalar_add_forward_only()
@@ -174,3 +179,4 @@ fn main() raises:
         test_gpu_scalar_add_backward_manual_handler()
         test_gpu_scalar_add_backward_update_grad()
         test_gpu_scalar_add_full_backward()
+"""

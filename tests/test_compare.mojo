@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 from tenmo.shapes import Shape
 from tenmo.mnemonics import Equal, NotEqual, LessThan, LessThanEqual, GreaterThan, GreaterThanEqual
@@ -725,6 +725,7 @@ fn test_compare_parity_large() raises:
 
 
 fn main() raises:
+    _ = """
     # CPU Equal
     test_compare_cpu_eq_1d()
     test_compare_cpu_eq_scalar()
@@ -819,3 +820,5 @@ fn main() raises:
     print("Parity compare tests passed!")
 
     print("All compare tests passed!")
+    """
+    TestSuite.discover_tests[__functions_in_module()]().run()

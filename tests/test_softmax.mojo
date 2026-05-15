@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.shapes import Shape
 from std.sys import has_accelerator
 from tenmo.shapes import Shape
@@ -963,7 +963,7 @@ fn test_log_softmax_parity_using_zero_grad() raises:
 
 
 fn main() raises:
-    # ── Group A: CPU Softmax Forward ──────────────────────────────────────────
+    _="""# ── Group A: CPU Softmax Forward ──────────────────────────────────────────
     test_softmax_cpu_1d_basic()
     test_softmax_cpu_1d_uniform()
     test_softmax_cpu_1d_large_values()
@@ -1049,4 +1049,6 @@ fn main() raises:
 
     # End of old tests
 
-    print("All softmax tests passed!")
+    print("All softmax tests passed!")"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll softmax tests passed!")

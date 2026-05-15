@@ -530,6 +530,8 @@ struct GatherArg(ArgumentType):
     var padding_idx: Optional[Int]
     # padding_idx zeroing happens in engine's ScatterAddTensor branch
     # by reading GatherArg.padding_idx
+
+
 # =============================================================================
 # SECTION 5 — GatherBackward
 # =============================================================================
@@ -657,7 +659,9 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
             normalized.append(idx)
 
         # ── Copy / fused embedding-bag (CPU or GPU kernel) ────────────────────
-        var out = Self._gather_copy(self, ax, normalized, fuse_sum)
+        var out = Self._gather_copy(
+            self, ax=ax, normalized=normalized, fuse_sum=fuse_sum
+        )
 
         # ── Wire backward if needed ───────────────────────────────────────────
         comptime if track_grad:
@@ -707,9 +711,25 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
                     return Tensor[Self.dtype].scalar(0)
 
         # ── CPU path ──────────────────────────────────────────────────────────
+        # fuse_sum: collapse axis 0 by summing — produces shape (cols,)
+        ref shape = self.shape()
+        var rank = shape.rank()
+        if fuse_sum and ax == 0 and rank == 2:
+            var cols = shape[1]
+            var result = Tensor[Self.dtype].zeros(
+                Shape(cols), requires_grad=False, device=self.device()
+            )
+            ref res_buffer = result.buffer.data_buffer()
+            ref self_buffer = self.buffer.data_buffer()
+            var base_offset = self.offset()          # fixed base — never mutated
+            var sorted = normalized.sorted()
+            for row in sorted:
+                var row_offset = base_offset + row * cols   # fresh per iteration
+                res_buffer += self_buffer[row_offset : row_offset + cols]
+            return result^
+
         # fuse_sum on CPU: gather into full buffer then sum over axis 0.
         # This keeps the CPU path simple and correct without a separate kernel.
-        var rank = self.shape().rank()
         var out_shape_arr = IntArray.with_capacity(rank)
         for d in range(rank):
             out_shape_arr.append(
@@ -736,17 +756,5 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
                 ) * self.strides()[d]
 
             gathered.set(flat, self.get(src_offset))
-
-        # fuse_sum: collapse axis 0 by summing — produces shape (cols,)
-        if fuse_sum and ax == 0 and rank == 2:
-            var cols = self.shape()[1]
-            var result = Tensor[Self.dtype].zeros(
-                Shape(cols), requires_grad=False, device=self.device()
-            )
-            for row in range(len(normalized)):
-                for c in range(cols):
-                    var v = gathered.get(row * cols + c)
-                    result.set(c, result.get(c) + v)
-            return result^
 
         return gathered^

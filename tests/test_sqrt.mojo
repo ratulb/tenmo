@@ -1,4 +1,4 @@
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 from tenmo.tensor import Tensor  # adjust import path to your project
 
@@ -505,6 +505,11 @@ fn test_sqrt_parity_bwd_3d() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     # ── Forward CPU ──
     test_sqrt_fwd_cpu_1d()
     test_sqrt_fwd_cpu_2d()
@@ -555,3 +560,4 @@ fn main() raises:
     test_sqrt_parity_bwd_3d()
 
     print("All sqrt tests passed ✓")
+"""

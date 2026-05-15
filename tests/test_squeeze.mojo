@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from std.sys import has_accelerator
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 
 
 fn test_squeeze_scalar() raises:
@@ -764,6 +764,11 @@ fn test_squz_unsquz_gpu_round_trip_multi() raises:
 # ============================================================
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     #Old tests
     test_squeeze_scalar()
     test_squeeze_1d_no_effect()
@@ -833,3 +838,4 @@ fn main() raises:
     test_squz_unsquz_gpu_round_trip_multi()
 
     print("All squeeze/unsqueeze tests passed.")
+"""

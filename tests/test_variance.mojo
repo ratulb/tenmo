@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
 from std.math import sqrt
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.common_utils import isnan, isinf
 
 
@@ -726,9 +726,11 @@ fn test_variance_global() raises:
 
 
 fn main() raises:
-    test_sqrt_backward()
+    _="""test_sqrt_backward()
     test_sqrt_backward_zero_handling()
     run_all_var_std_tests()
     run_all_variance_std_tests()
     test_variance_comprehensive()
-    test_variance_global()
+    test_variance_global()"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll variance tests passed!")

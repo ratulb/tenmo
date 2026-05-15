@@ -5,7 +5,7 @@ from std.sys import has_accelerator
 
 
 fn main() raises:
-    test_tensor_argmax_keepdims()
+    _="""test_tensor_argmax_keepdims()
     print("\n=== Running all Argmin tests ===")
     test_tensor_argmin_1d()
     test_tensor_argmin_2d_basic()
@@ -70,10 +70,12 @@ fn main() raises:
     test_argmin_3d_keepdims_gpu()
     test_argmin_4d_axis0_gpu()
 
-    print("passes")
+    print("passes")"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll argminmax tests passed!")
 
 
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 
 
 fn test_tensor_argmax_keepdims() raises:

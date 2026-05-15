@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
 from tenmo.intarray import IntArray
 from tenmo.shapes import Shape
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.permute import Permute
 from std.sys import has_accelerator
 
@@ -761,6 +761,10 @@ fn test_perm_parity_using_zero_grad() raises:
 
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
+fn main() raises:
     #Old tests
     test_tensor_permute_basic()
     test_tensor_permute_3d_axes()
@@ -831,3 +835,4 @@ fn main() raises:
     print("Parity passed!")
 
     print("All permute tests passed!")
+"""

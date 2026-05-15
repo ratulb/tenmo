@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.common_utils import i, il, s, newaxis, Idx
 from tenmo.intarray import IntArray
 
@@ -583,6 +583,7 @@ fn test_fill_image_patch_simulation() raises:
 
 
 fn main() raises:
+    _ = """
     print("=" * 80)
     print("TENSOR FILL COMPREHENSIVE TEST SUITE")
     print("=" * 80)
@@ -660,3 +661,5 @@ fn main() raises:
     print("✓ x.fill(tensor, s(), s()) - broadcasting")
     print("✓ Works on views and reshaped tensors")
     print("=" * 80)
+    """
+    TestSuite.discover_tests[__functions_in_module()]().run()

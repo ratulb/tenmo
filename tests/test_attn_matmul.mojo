@@ -1,4 +1,4 @@
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
@@ -549,7 +549,7 @@ fn test_batchmm_parity_4d_backward() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 fn main() raises:
-    # ── CPU ──
+    _="""# ── CPU ──
     test_batchmm_2d_basic()
     test_batchmm_2d_non_square()
     test_batchmm_3d_shape()
@@ -590,4 +590,6 @@ fn main() raises:
     test_batchmm_parity_4d_context()
     test_batchmm_parity_4d_backward()
 
-    print("All batched matmul tests passed ✓")
+    print("All batched matmul tests passed ✓")"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll attn matmul tests passed!")

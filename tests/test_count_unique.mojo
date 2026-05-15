@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 from tenmo.shapes import Shape
 
@@ -503,6 +503,7 @@ fn test_countuniq_parity_noncontiguous() raises:
 
 
 fn main() raises:
+    _ = """
     # CPU count
     test_countuniq_cpu_count_1d_basic()
     test_countuniq_cpu_count_1d_all_same()
@@ -564,3 +565,5 @@ fn main() raises:
     print("Parity passed!")
 
     print("All count/unique tests passed!")
+    """
+    TestSuite.discover_tests[__functions_in_module()]().run()

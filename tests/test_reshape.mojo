@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from tenmo.strides import Strides
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 
 
 # ===== BASIC RESHAPE FUNCTIONALITY =====
@@ -349,6 +349,11 @@ fn test_reshape_preserves_requires_grad() raises:
 
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     print("Running comprehensive reshape functionality tests...")
 
     # Basic functionality
@@ -388,3 +393,4 @@ fn main() raises:
     test_reshape_preserves_requires_grad()
 
     print("✓ All reshape functionality tests passed!")
+"""

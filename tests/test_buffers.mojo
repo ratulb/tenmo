@@ -2,7 +2,7 @@ from tenmo.buffers import Buffer
 from tenmo.mnemonics import *
 from std.sys import simd_width_of
 from std.time import perf_counter_ns
-from std.testing import assert_almost_equal
+from std.testing import assert_almost_equal, TestSuite
 
 # ============================================
 # Test Constants
@@ -2285,6 +2285,7 @@ fn run_all_tests() raises:
 
 
 fn main() raises:
+    _ = """
     print("Running buffer tests")
     run_all_dunder_comparison_tests()
     run_all_comparison_tests()
@@ -2322,6 +2323,8 @@ fn main() raises:
     run_all_manual_vectorization_tests_2()
     run_relu_optimization_tests()
     print("Done running buffer tests")
+    """
+    TestSuite.discover_tests[__functions_in_module()]().run()
 
 
 from std.testing import assert_true, assert_false
@@ -2418,7 +2421,7 @@ fn test_buffer_slice() raises:
     )
 
 
-fn test_buffer_buffer_mul() raises:
+fn _buffer_buffer_mul() raises:
     print("test_buffer_buffer_mul")
     x = Buffer[DType.bool](129)
     x.fill(Scalar[DType.bool](True))

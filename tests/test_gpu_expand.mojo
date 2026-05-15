@@ -1,4 +1,4 @@
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from std.sys import has_accelerator
@@ -475,6 +475,10 @@ fn test_gpu_expand_is_zero_stride_view() raises:
 # ============================================================
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
+fn main() raises:
     comptime if has_accelerator():
         # 1D → nD
         test_gpu_expand_1d_to_2d_new_batch_dim()
@@ -533,3 +537,4 @@ fn main() raises:
         print("All GPU expand tests passed.")
     else:
         print("System does not have any acclerator")
+"""

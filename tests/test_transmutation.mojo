@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
 from tenmo.gradbox import Gradbox
 from tenmo.shapes import Shape
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 from tenmo.ndbuffer import NDBuffer
 
@@ -424,6 +424,11 @@ fn test_roundtrip_cpu_to_gpu_to_cpu() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     print("=== as_gradbox / as_tensor CPU tests ===")
     test_as_gradbox_cpu_1d_contiguous()
     test_as_gradbox_cpu_2d_contiguous()
@@ -465,3 +470,4 @@ fn main() raises:
         print("=== All GPU tests passed ===")
     else:
         print("No GPU available — skipping GPU tests")
+"""

@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 
 comptime dtype = DType.float32
@@ -992,6 +992,10 @@ fn test_iop_gpu_grad_flow_deep_chain() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
+fn main() raises:
     print("=== inplace ops forward CPU ===")
     test_iop_cpu_iadd_fwd_1d_same_shape()
     test_iop_cpu_iadd_fwd_2d_same_shape()
@@ -1067,4 +1071,4 @@ fn main() raises:
     test_iop_gpu_isub_bwd_3d()
     test_iop_gpu_grad_flow_deep_chain()
     print("=== All GPU inplace ops tests passed (if accelerator present) ===")
-
+"""

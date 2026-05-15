@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 from tenmo.shapes import Shape
 
@@ -533,7 +533,7 @@ fn test_anytrue_parity_from_comparison() raises:
 
 
 fn main() raises:
-    # CPU all_true
+    _="""# CPU all_true
     test_alltrue_cpu_1d_all_true()
     test_alltrue_cpu_1d_all_false()
     test_alltrue_cpu_1d_mixed()
@@ -616,4 +616,6 @@ fn main() raises:
     test_anytrue_parity_from_comparison()
     print("Parity passed!")
 
-    print("All all_true/any_true tests passed!")
+    print("All all_true/any_true tests passed!")"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll all true any true tests passed!")

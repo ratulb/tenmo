@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true, assert_false
+from std.testing import assert_true, assert_false, TestSuite
 from tenmo.common_utils import isnan, isinf, Epsilon
 from std.math import log
 from std.sys import has_accelerator
@@ -390,6 +390,10 @@ fn run_all_log_tests() raises:
 # ============================================================================
 
 
+fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
 fn main() raises:
     """Example usage and quick verification."""
     print("Example: Basic logarithm with epsilon")
@@ -967,3 +971,4 @@ fn test_log_parity_chain_exp() raises:
         loss_gpu.backward()
 
         assert_true(a_cpu.grad().all_close(2 * a_gpu.grad().to_cpu()))
+"""

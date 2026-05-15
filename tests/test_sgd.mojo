@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.sgd import SGD
 from std.sys import has_accelerator
 from tenmo.common_utils import s
@@ -559,6 +559,11 @@ fn test_sgd_gpu_large_tensor() raises:
 
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     test_sgd_basic()
     test_sgd_momentum()
     test_sgd_weight_decay()
@@ -599,3 +604,4 @@ fn main() raises:
     test_sgd_gpu_large_tensor()
 
     print("\n=== ALL SGD TESTS PASSED ===")
+"""

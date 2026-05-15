@@ -8,7 +8,7 @@ Broadcasting rules for matmul:
 3. Last 2 dimensions must be compatible for matrix multiplication
 """
 
-from std.testing import assert_almost_equal, assert_equal, assert_true, assert_false
+from std.testing import assert_almost_equal, assert_equal, assert_true, assert_false, TestSuite
 from std.math import sqrt
 from std.random import random_float64
 from tenmo.tensor import Tensor
@@ -559,7 +559,7 @@ fn test_non_contiguous_gradients() raises:
 
 
 fn main() raises:
-    print("\n")
+    _="""print("\n")
     print("" * 80)
     print("" + " " * 78 + "")
     print("" + " " * 20 + "BATCHED MATMUL TEST SUITE" + " " * 33 + "")
@@ -590,4 +590,6 @@ fn main() raises:
     print("" + " " * 25 + "ALL TESTS PASSED! " + " " * 30 + "")
     print("" + " " * 78 + "")
     print("" * 80)
-    print("\n")
+    print("\n")"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll matmul tests passed!")

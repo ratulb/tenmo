@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.shapes import Shape
 from std.sys import has_accelerator
 
@@ -885,88 +885,10 @@ fn test_tile_parity_using_zero_grad() raises:
 
 
 fn main() raises:
-    # CPU tile forward
-    test_tile_cpu_1d_basic()
-    test_tile_cpu_1d_once()
-    test_tile_cpu_2d_both_dims()
-    test_tile_cpu_2d_rows_only()
-    test_tile_cpu_2d_extra_repeat_dims()
-    test_tile_cpu_3d_basic()
-    test_tile_cpu_values_preserved()
-    test_tile_cpu_no_grad()
-    test_tile_cpu_requires_grad()
-    test_tile_cpu_suppress_grad()
-    print("CPU tile forward passed!")
+    TestSuite.discover_tests[__functions_in_module()]().run()
 
-    # CPU tile backward
-    test_tile_cpu_backward_1d()
-    test_tile_cpu_backward_2d()
-    test_tile_cpu_backward_1d_once()
-    test_tile_cpu_backward_chain()
-    test_tile_cpu_backward_nonuniform_grad()
-    test_tile_cpu_backward_2d_extra_dims()
-    print("CPU tile backward passed!")
 
-    # GPU tile forward
-    test_tile_gpu_1d_basic()
-    test_tile_gpu_1d_once()
-    test_tile_gpu_2d_both_dims()
-    test_tile_gpu_2d_rows_only()
-    test_tile_gpu_2d_extra_repeat_dims()
-    test_tile_gpu_3d_basic()
-    test_tile_gpu_values_preserved()
-    test_tile_gpu_no_grad()
-    test_tile_gpu_requires_grad()
-    print("GPU tile forward passed!")
-
-    # GPU tile backward
-    test_tile_gpu_backward_1d()
-    test_tile_gpu_backward_2d()
-    test_tile_gpu_backward_chain()
-    test_tile_gpu_backward_nonuniform_grad()
-    test_tile_gpu_backward_extra_dims()
-    print("GPU tile backward passed!")
-
-    # Parity
-    test_tile_parity_1d()
-    test_tile_parity_2d()
-    test_tile_parity_extra_dims()
-    test_tile_parity_backward_1d()
-    test_tile_parity_backward_2d()
-    test_tile_parity_using_zero_grad()
-    print("Parity passed!")
-
-    # Start old tests
-    print("Running comprehensive tiles functionality tests...")
-    test_tile_scalar()
-    test_tile_1d_repeats()
-    test_tile_2d_nonuniform_repeats()
-    test_tile_axis_selective_grad()
-    test_tile_nonrepeated_axis_stability()
-    test_tile_high_dimensional()
-    test_tile_in_computational_graph()
-
-    test_tensor_tiles_1d()
-    test_tensor_tiles_2d()
-    test_tensor_tiles_1d_to_2d_with_gradients()
-    test_tensor_tiles_2d_to_3d_with_gradients()
-
-    test_scalar_tiles_1d()
-    test_scalar_tiles_2d()
-    test_1d_tiles_single_dimension()
-    test_1d_tiles_to_2d()
-    test_1d_tiles_multiple_dims()
-    test_2d_tiles_single_dimension()
-    test_2d_tiles_both_dims()
-    test_2d_tiles_3d_output()
-    test_3d_tiles_single_batch()
-    test_3d_tiles_all_dims()
-    test_tiles_with_leading_singleton_dims()
-    test_tiles_with_trailing_singleton_dims()
-    test_tiles_complex_broadcasting_pattern()
-    test_tiles_gradient_accumulation()
-    test_tiles_in_computational_graph()
-    test_tiles_with_negative_gradient_flow()
-    test_tiles_high_dimensional()
-    # End of old tests
-    print("All tiles functionality tests passed!")
+_="""
+fn main() raises:
+    pass
+"""

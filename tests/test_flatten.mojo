@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.shapes import Shape
 from tenmo.strides import Strides
 from std.sys import has_accelerator
@@ -1111,7 +1111,7 @@ fn test_flat_parity_using_zero_grad() raises:
 
 
 fn main() raises:
-    # Old tests
+    _="""# Old tests
     print("Running all flatten tests...")
     test_flatten_scalar()
     test_flatten_1d()
@@ -1206,4 +1206,6 @@ fn main() raises:
     test_flat_parity_using_zero_grad()
     print("Parity passed!")
 
-    print("All flatten tests passed!")
+    print("All flatten tests passed!")"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll flatten tests passed!")

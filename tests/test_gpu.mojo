@@ -2,7 +2,7 @@ from tenmo.tensor import Tensor
 from tenmo.ndbuffer import NDBuffer
 from tenmo.intarray import IntArray
 from tenmo.shapes import Shape
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 from tenmo.mnemonics import vm, mv
 from tenmo.gradbox import Gradbox
@@ -622,6 +622,10 @@ fn test_gpu_grad_flow() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
 fn main() raises:
     # CPU — sum
     test_v2_tensor_sum_scalar_input()

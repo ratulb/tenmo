@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 
 
@@ -873,7 +873,7 @@ fn test_trrev_gpu_grad_does_not_accumulate_across_separate_passes() raises:
 
 
 fn main() raises:
-    # Old tests
+    _="""# Old tests
     test_2d_transpose_no_axes()
     test_2d_transpose_explicit_axes()
     test_3d_transpose_axes_0_1()
@@ -933,4 +933,6 @@ fn main() raises:
     test_trrev_gpu_transpose_contiguous_then_op_backward()
     test_trrev_gpu_grad_does_not_accumulate_across_separate_passes()
 
-    print("All trrev tests passed.")
+    print("All trrev tests passed.")"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll transpose tests passed!")

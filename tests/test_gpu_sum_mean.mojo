@@ -1,4 +1,4 @@
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.tensor import Tensor
 from std.sys import has_accelerator
 from tenmo.shapes import Shape
@@ -1075,6 +1075,10 @@ fn test_gpu_mean_keepdims_then_sum_backward() raises:
 
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
+fn main() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping GPU sum/mean tests")
         return
@@ -1173,3 +1177,4 @@ fn main() raises:
     test_gpu_mean_keepdims_then_sum_backward()
 
     print("\n=== ALL GPU SUM/MEAN TESTS PASSED ===")
+"""

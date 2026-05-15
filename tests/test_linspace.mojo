@@ -1,12 +1,17 @@
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.tensor import Tensor
 
 
+fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
 fn main() raises:
     test_tensor_linspace_basic()
     test_tensor_linspace_edge_cases()
     test_tensor_linspace_precision()
     test_tensor_linspace_with_gradients()
+"""
 
 
 fn test_tensor_linspace_basic() raises:

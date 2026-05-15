@@ -1,9 +1,14 @@
 from tenmo.tensor import Tensor
 from tenmo.numpy_interop import to_ndarray, from_ndarray
 
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 
 
+fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
 fn main() raises:
     test_1d_tensor_to_numpy_and_back()
     test_2d_tensor_to_numpy_and_back()
@@ -20,6 +25,7 @@ fn main() raises:
     test_bool_tensor()
     test_copy_vs_zero_copy()
     test_random_tensor_large()
+"""
 
 
 fn test_scalar_tensor_conversion() raises:

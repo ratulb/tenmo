@@ -1,5 +1,5 @@
 from tenmo.buffers import Buffer
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.ndbuffer import NDBuffer
 from tenmo.shapes import Shape
 from tenmo.gradbox import Gradbox
@@ -9,6 +9,7 @@ from tenmo.intarray import IntArray
 
 
 fn main() raises:
+    _ = """
     run = 1
     for _ in range(run):
         test_gradbox_is_shared()
@@ -36,6 +37,8 @@ fn main() raises:
         test_gradbox_squeeze_unsqueeze_symmetry()
         test_gradbox_unsqueeze_negative_axes()
         test_gradbox_squeeze_unsqueeze_multiple_axes()
+    """
+    TestSuite.discover_tests[__functions_in_module()]().run()
 
 
 fn test_gradbox_unsqueeze_basic() raises:

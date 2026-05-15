@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 
 
 fn test_tensor_slice_1d_basic() raises:
@@ -223,6 +223,11 @@ fn test_tensor_slice_step_edge_cases() raises:
 
 # Consolidated test function
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     print("Running comprehensive tensor slice tests...")
     test_tensor_slice_1d_basic()
     test_tensor_slice_1d_negative_indices()
@@ -237,6 +242,7 @@ fn main() raises:
     test_tensor_slice_step_edge_cases()
     print("All tensor slice tests passed! ✓")
     run_additional_tests()
+"""
 
 
 # ============================================================================

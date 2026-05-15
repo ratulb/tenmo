@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 
 
@@ -598,6 +598,10 @@ fn test_maxmin_gpu_parity_min() raises:
 
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
+fn main() raises:
     # CPU Max
     test_maxmin_cpu_max_1d_forward()
     test_maxmin_cpu_max_1d_backward()
@@ -655,3 +659,4 @@ fn main() raises:
     test_maxmin_gpu_parity_min()
 
     print("All max/min tests passed!")
+"""

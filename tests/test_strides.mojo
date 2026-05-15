@@ -1,6 +1,6 @@
 from tenmo.shapes import Shape
 from tenmo.strides import Strides
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.intarray import IntArray
 
 # ============================================
@@ -208,6 +208,12 @@ fn run_all_strides_tests() raises:
 
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     print("Running strides tests")
     test_compute_default_strides()
     run_all_strides_tests()
+"""

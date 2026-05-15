@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.common_utils import s, i
 
 # ============================================================================
@@ -566,6 +566,7 @@ fn test_chunk_backward_2d() raises:
 # ============================================================================
 
 fn main() raises:
+    _ = """
     print("=" * 80)
     print("TENSOR chunking COMPREHENSIVE TEST SUITE")
     print("Testing API change: 'mut self' → 'self'")
@@ -634,3 +635,5 @@ fn main() raises:
     print("✓ Const references can be chunked")
     print("✓ Gradient flow preserved")
     print("=" * 80)
+    """
+    TestSuite.discover_tests[__functions_in_module()]().run()

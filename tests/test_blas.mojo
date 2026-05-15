@@ -3,7 +3,7 @@ from tenmo.shapes import Shape
 from std.time import perf_counter_ns
 from tenmo.blashandle import BLASHandle
 from tenmo.common_utils import now
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 
 
 fn benchmark_cifar_sizes() raises:
@@ -54,6 +54,7 @@ fn benchmark_cifar_sizes() raises:
 
 
 fn main() raises:
+    _ = """
     # benchmark_cifar_sizes()
     run_all_blas_tests()
     # test_case_4_comprehensive()
@@ -64,6 +65,8 @@ fn main() raises:
     test_blas_case_4_Atranspose_Btranspose()
     test_blas_matmul_edge_cases()
     test_blas_gradient_accuracy()
+    """
+    TestSuite.discover_tests[__functions_in_module()]().run()
 
 
 # ============================================================================
@@ -873,7 +876,7 @@ fn test_blas_case_3_A_Btranspose() raises:
     print("✓ All checks passed!")
 
 
-fn test_case_4_comprehensive() raises:
+fn _case_4_comprehensive() raises:
     """
     Test Case 4: C = A^T @ B^T.
     Compare: Native Mojo matmul, BLAS matmul, and PyTorch.

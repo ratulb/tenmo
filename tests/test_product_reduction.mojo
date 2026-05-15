@@ -21,7 +21,7 @@
 # =============================================================================
 
 from std.sys import has_accelerator
-from std.testing import assert_true, assert_equal
+from std.testing import assert_true, TestSuite, assert_equal
 from tenmo.tensor import Tensor
 from std.math import abs
 from tenmo.intarray import IntArray
@@ -982,7 +982,7 @@ fn test_prd_parity_store_vs_recompute() raises:
 
 
 fn main() raises:
-    # ── CPU Forward ──────────────────────────────────────────────────────────
+    _="""# ── CPU Forward ──────────────────────────────────────────────────────────
     test_prd_cpu_fwd_all_positive_1d()
     test_prd_cpu_fwd_all_negative_1d()
     test_prd_cpu_fwd_mixed_signs_1d()
@@ -1071,4 +1071,6 @@ fn main() raises:
     test_prd_parity_bwd_negative_elements()
     test_prd_parity_store_vs_recompute()
 
-    print("All prd_ tests passed.")
+    print("All prd_ tests passed.")"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll product reduction tests passed!")

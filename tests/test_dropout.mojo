@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
 from std.random import seed
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.net import Dropout
 from std.sys import has_accelerator
 from std.random import seed
@@ -560,7 +560,7 @@ fn test_dropout_large_tensor_backward() raises:
 # ============================================================================
 
 fn main() raises:
-    print("=" * 80)
+    _="""print("=" * 80)
     print("DROPOUT COMPREHENSIVE TEST SUITE")
     print("=" * 80)
 
@@ -646,7 +646,9 @@ fn main() raises:
 
     print("\n" + "=" * 80)
     print("ALL TESTS PASSED! ✓")
-    print("=" * 80)
+    print("=" * 80)"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll dropout tests passed!")
 
 
 #=========

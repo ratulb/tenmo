@@ -1,13 +1,18 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.strides import Strides
 from tenmo.common_utils import s, il
 
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
+fn main() raises:
     test_matmul_nd_comprehensive()
     test_matmul_nd_complete()
+"""
 
 
 fn test_matmul_nd_3d_basic_with_grad() raises:
@@ -702,3 +707,4 @@ fn test_matmul_nd_with_higher_dim_batch() raises:
     var C = A.matmul(B)
     assert_true(C.shape() == Shape(2, 2, 2, 2))
     assert_true(C.all_close(A))  # Identity matrix case
+"""

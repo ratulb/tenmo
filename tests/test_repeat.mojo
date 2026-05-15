@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 
 
 fn test_repeat_1d_simple() raises:
@@ -283,6 +283,11 @@ fn test_repeat_strict_validation() raises:
 
 # Consolidated test function
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     print(
         "Running comprehensive PyTorch-compatible repeat functionality tests..."
     )
@@ -311,3 +316,4 @@ fn main() raises:
     test_repeat_strict_validation()
 
     print("All PyTorch-compatible repeat functionality tests passed!")
+"""

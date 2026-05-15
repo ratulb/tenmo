@@ -5,7 +5,7 @@ Tests forward pass, backward pass, edge cases, and numerical gradients.
 from tenmo.tensor import Tensor
 from tenmo.cnn import Conv2dFused
 
-from std.testing import assert_almost_equal, assert_equal, assert_true, assert_false
+from std.testing import assert_almost_equal, assert_equal, assert_true, assert_false, TestSuite
 from std.math import sqrt
 from tenmo.common_utils import isnan, isinf
 from std.math import sqrt
@@ -442,6 +442,10 @@ fn test_numerical_stability() raises:
     print("Numerical stability good")
 
 
+fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
 fn main() raises:
     print("=" * 60)
     print("Conv2D Comprehensive Test Suite")
@@ -2065,3 +2069,4 @@ fn test_conv2d_edge_output_size_1() raises:
     assert_true(output.shape()[2] == 1)
     assert_true(output.shape()[3] == 1)
     assert_true(output[0, 0, 0, 0] == 9.0)
+"""

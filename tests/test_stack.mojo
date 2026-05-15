@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.shapes import Shape
 
 # ============================================================================
@@ -661,6 +661,11 @@ fn test_hstack_backward_1d() raises:
 
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     test_stack_axis0_2d()
     test_stack_axis1_2d()
     test_stack_axis2_2d()
@@ -688,6 +693,7 @@ fn main() raises:
     test_hstack_backward_1d()
 
     run_all_stack_tests()
+"""
 
 
 # """

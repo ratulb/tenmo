@@ -3,7 +3,7 @@ from tenmo.net import Tanh, Linear
 from tenmo.common_utils import isnan, isinf
 from tenmo.shapes import Shape
 from tenmo.intarray import IntArray
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 from std.math import tanh as scalar_tanh, abs as scalar_abs
 
@@ -1142,7 +1142,7 @@ fn test_tanh_gpu_bwd_scalar_one() raises:
 
 
 fn main() raises:
-    run_all_tanh_tests()
+    _="""run_all_tanh_tests()
     print("=== tanh forward CPU ===")
     test_tanh_cpu_fwd_scalar_zero()
     test_tanh_cpu_fwd_scalar_one()
@@ -1200,4 +1200,6 @@ fn main() raises:
     test_tanh_gpu_bwd_double_tanh()
     test_tanh_gpu_bwd_large()
     test_tanh_gpu_bwd_grad_flow_two_paths()
-    print("=== All GPU tanh tests passed (if accelerator present) ===")
+    print("=== All GPU tanh tests passed (if accelerator present) ===")"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll tanh tests passed!")

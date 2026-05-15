@@ -1,6 +1,6 @@
 from tenmo.shapes import Shape
 from tenmo.validators import Validator
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.intarray import IntArray
 
 
@@ -347,6 +347,12 @@ fn test_validate_new_shape() raises:
 
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+_="""
+fn main() raises:
     test_validate_new_shape()
     test_validate_and_normalize_axes()
     run_all_validator_tests()
+"""

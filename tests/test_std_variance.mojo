@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true
+from std.testing import assert_true, TestSuite
 from tenmo.common_utils import isnan, isinf
 
 
@@ -625,7 +625,9 @@ fn run_all_variance_std_tests() raises:
     print("\n=== All Variance & Std Tests Passed! ===\n")
 
 fn main() raises:
-    test_sqrt_backward()
+    _="""test_sqrt_backward()
     test_sqrt_backward_zero_handling()
     run_all_var_std_tests()
-    run_all_variance_std_tests()
+    run_all_variance_std_tests()"""
+    TestSuite.discover_tests[__functions_in_module()]().run()
+    print("\nAll std variance tests passed!")

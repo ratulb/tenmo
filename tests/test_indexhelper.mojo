@@ -3,7 +3,7 @@ from tenmo.strides import Strides
 from tenmo.common_utils import now
 from tenmo.buffers import Buffer
 from tenmo.intarray import IntArray
-from std.testing import assert_equal, assert_true, assert_false
+from std.testing import assert_equal, assert_true, assert_false, TestSuite
 from tenmo.indexhelper import IndexIterator
 from tenmo.indexhelper import IndexCalculator
 
@@ -880,7 +880,12 @@ fn run_all_index_iterator_review_tests() raises:
 
 
 fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+_ = """
+fn main() raises:
     run_all_tests()
     run_all_index_calculator_tests()
     run_all_benchmarks()
     run_all_index_iterator_review_tests()
+"""
