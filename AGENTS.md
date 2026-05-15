@@ -530,3 +530,29 @@ Direct gradient update on Tensor (used by some paths):
 - `comptime` blocks for compile-time branching (e.g. `comptime if track_grad:`)
 - `^` suffix for owned value transfer (e.g. `out.add_ancestry(backwardFnArg^, self)`)
 - `ref` for borrow references (e.g. `ref gradbox = output.gradients()`)
+
+## Gradbox Testing Convention
+
+**Gradboxes are shared at birth** when the user requests gradients (backward needs to update them). Intermediate/temporary gradboxes are rarely shared.
+
+When inspecting gradients in tests, **always use `.grad().detach(share=True)`** before slicing or indexing:
+
+```mojo
+var grad = tensor.grad().detach(share=True)
+assert_true(grad[i(0), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
+```
+
+Calling `.grad()` directly returns an unshared gradbox — slicing it with `[]` or `i()` will ABORT with: *"can not call on an unshared gradbox"*.
+
+This pattern is used consistently in `test_embedding.mojo` and all backward-pass tests.
+
+## Running Selective Tests
+
+**`./execute.sh <name>`** — runs a single test alias from the test runner (e.g. `./execute.sh gather`)
+
+**`./fire.sh <file.mojo>`** — runs any `.mojo` file directly with `mojo -I .` (e.g. `./fire.sh test_gather_memcpy_new.mojo`)
+
+To run specific test functions within a file, the `TestSuite` discovers all `fn test_*` functions automatically. You can selectively run tests using CLI arguments:
+- `mojo run <file.mojo> --only test_foo test_bar` — run only specified tests
+- `mojo run <file.mojo> --skip test_slow test_flaky` — skip specified tests
+- See `TestSuite` documentation for full CLI filtering capabilities.
