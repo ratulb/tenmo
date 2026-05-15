@@ -445,80 +445,6 @@ fn test_numerical_stability() raises:
 fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
-_ = """
-fn main() raises:
-    print("=" * 60)
-    print("Conv2D Comprehensive Test Suite")
-    print("=" * 60)
-
-    test_basic_forward()
-    test_stride()
-    test_dilation()
-    test_padding_same()
-    test_padding_explicit()
-    test_bias()
-    test_multi_channel()
-    test_batch()
-    test_gradient_input()
-    test_gradient_kernel()
-    test_gradient_bias()
-    test_gradient_flow()
-    test_edge_cases()
-    test_performance_batch()
-    test_numerical_stability()
-
-    test_basic_shapes()
-    test_padding_modes()
-    test_stride_2()
-    test_dilation_2()
-    test_bias_2()
-    test_known_values()
-    test_gradient_shapes()
-    test_gradient_correctness()
-    test_gradient_stride_dilation()
-    test_gradient_accumulation()
-    test_batch_processing()
-    test_edge_cases_2()
-
-    print("\n--- FORWARD: Basic Functionality ---")
-    test_conv2d_forward_single_batch_single_channel()
-    test_conv2d_forward_with_bias()
-    test_conv2d_forward_multiple_channels()
-    test_conv2d_forward_multiple_filters()
-    test_conv2d_forward_batch_processing()
-
-    print("\n--- FORWARD: Stride Tests ---")
-    test_conv2d_stride_2()
-    test_conv2d_stride_3()
-
-    print("\n--- FORWARD: Padding Tests ---")
-    test_conv2d_padding_valid()
-    test_conv2d_padding_same()
-    test_conv2d_padding_int()
-    test_conv2d_padding_tuple()
-    test_conv2d_padding_list_asymmetric()
-
-    print("\n--- FORWARD: Dilation Tests ---")
-    test_conv2d_dilation_2()
-    test_conv2d_dilation_3()
-
-    print("\n--- FORWARD: Combined Parameters ---")
-    test_conv2d_stride_and_padding()
-    test_conv2d_stride_padding_dilation()
-    test_conv2d_all_parameters()
-
-    print("\n--- BACKWARD: Gradient Tests ---")
-    test_conv2d_backward_simple()
-    test_conv2d_backward_input_gradient()
-    test_conv2d_backward_kernel_gradient()
-    test_conv2d_backward_with_stride()
-
-    print("\n--- EDGE CASES ---")
-    test_conv2d_edge_1x1_kernel()
-    test_conv2d_edge_large_kernel()
-    test_conv2d_edge_output_size_1()
-
-
 # -------------------------------------------------------------------
 # HELPER FUNCTIONS
 # -------------------------------------------------------------------
@@ -2069,4 +1995,3 @@ fn test_conv2d_edge_output_size_1() raises:
     assert_true(output.shape()[2] == 1)
     assert_true(output.shape()[3] == 1)
     assert_true(output[0, 0, 0, 0] == 9.0)
-"""
