@@ -7,6 +7,7 @@ from std.python import Python, PythonObject
 # Comprehensive tests for TensorDataset, Batch, and DataLoader
 # With FIXED shuffle implementation
 
+comptime dtype = DType.float32
 
 fn assert_true_1(condition: Bool, msg: String = "Assertion failed") raises:
     if not condition:
@@ -884,10 +885,10 @@ fn test_dataloader_multi_dimensional_labels_dl() raises:
 fn test_dataloader_shuffle_changes_order_dl_orig() raises:
     """Test that shuffle actually changes the order (probabilistic test)."""
     print("test_dataloader_shuffle_changes_order_dl")
-    var features = Tensor.d2(
+    var features = Tensor[dtype].d2(
         [[1.0, 0.0], [2.0, 0.0], [3.0, 0.0], [4.0, 0.0], [5.0, 0.0]]
-    ).float()
-    var labels = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0]).float()
+    )
+    var labels = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -899,7 +900,7 @@ fn test_dataloader_shuffle_changes_order_dl_orig() raises:
 
     # Check that we got all samples (sum should be same)
     var sum_features = batch.features.sum()
-    var expected_sum = Tensor.d1([15.0]).float()  # 1+2+3+4+5
+    var expected_sum = Tensor[dtype].scalar(15.0)  # 1+2+3+4+5
     assert_true(sum_features.all_close(expected_sum))
 
 
