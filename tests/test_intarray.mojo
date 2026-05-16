@@ -1227,8 +1227,4 @@ fn run_all_intarray_tests() raises:
 fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
-_ = """
-fn main() raises:
-    run_all_intarray_tests()
-    run_all_intarray_v2_tests()
-"""
+

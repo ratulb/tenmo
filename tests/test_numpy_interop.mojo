@@ -8,24 +8,6 @@ fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-_="""
-fn main() raises:
-    test_1d_tensor_to_numpy_and_back()
-    test_2d_tensor_to_numpy_and_back()
-    test_tensor_view_to_numpy_and_back()
-    test_bool_tensor_to_numpy_and_back()
-    test_copy_vs_zero_copy_behavior()
-    test_scalar_tensor_conversion()
-    test_1d_tensor_random()
-    test_2d_tensor_random()
-    test_3d_tensor_random()
-    test_4d_tensor_random()
-    test_views_1d_2d()
-    test_views_3d_4d()
-    test_bool_tensor()
-    test_copy_vs_zero_copy()
-    test_random_tensor_large()
-"""
 
 
 fn test_scalar_tensor_conversion() raises:

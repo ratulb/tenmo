@@ -286,34 +286,3 @@ fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-_="""
-fn main() raises:
-    print(
-        "Running comprehensive PyTorch-compatible repeat functionality tests..."
-    )
-    test_repeat_partial_nonrepeated_axes_grad()
-    test_repeat_axis_selective()
-    test_repeat_scalar()
-    test_repeat_1d_simple()
-    test_repeat_2d_axis_expand()
-    test_repeat_with_broadcast_like_extension()
-    test_repeat_in_computational_graph()
-
-    test_repeat_scalar_to_1d()
-    test_repeat_scalar_to_2d()
-    test_repeat_scalar_to_3d()
-    test_repeat_1d_to_longer_1d()
-    test_repeat_1d_to_2d()
-    test_repeat_1d_to_3d()
-    test_repeat_2d_same_rank()
-    test_repeat_2d_to_3d()
-    test_repeat_3d_same_rank()
-    test_repeat_3d_all_dims()
-    test_repeat_identity_operation()
-    test_repeat_complex_pattern()
-    test_repeat_gradient_accumulation()
-    test_repeat_in_computational_graph_1()
-    test_repeat_strict_validation()
-
-    print("All PyTorch-compatible repeat functionality tests passed!")
-"""

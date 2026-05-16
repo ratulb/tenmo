@@ -664,36 +664,6 @@ fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-_="""
-fn main() raises:
-    test_stack_axis0_2d()
-    test_stack_axis1_2d()
-    test_stack_axis2_2d()
-    test_stack_axis_negative()
-    test_stack_1d_tensors()
-    test_stack_1d_axis1()
-    test_stack_3d_tensors()
-    test_stack_many_tensors()
-    test_stack_single_tensor()
-    test_vstack_2d()
-    test_vstack_1d()
-    test_vstack_mixed_rows()
-    test_hstack_2d()
-    test_hstack_1d()
-    test_hstack_mixed_cols()
-    test_stack_backward_axis0()
-    test_stack_backward_axis1()
-    test_stack_backward_weighted()
-    test_stack_backward_three_tensors()
-    test_stack_backward_chain()
-    test_vstack_backward()
-    test_vstack_backward_1d()
-    test_vstack_backward_weighted()
-    test_hstack_backward()
-    test_hstack_backward_1d()
-
-    run_all_stack_tests()
-"""
 
 
 # """

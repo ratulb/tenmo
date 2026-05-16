@@ -292,6 +292,8 @@ fn test_sgd_cpu_set_lr() raises:
 # ── GPU Tests ─────────────────────────────────────────────────────────────────
 
 fn test_sgd_gpu_vanilla_single_step() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_vanilla_single_step")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var w_gpu = w.to_gpu()
@@ -306,6 +308,8 @@ fn test_sgd_gpu_vanilla_single_step() raises:
 
 
 fn test_sgd_gpu_vanilla_matches_cpu() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_vanilla_matches_cpu")
     var w = Tensor[dtype].rand(4, 8, requires_grad=True)
     var w_gpu = w.to_gpu()
@@ -327,6 +331,8 @@ fn test_sgd_gpu_vanilla_matches_cpu() raises:
 
 
 fn test_sgd_gpu_vanilla_multiple_steps() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_vanilla_multiple_steps")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var w_gpu = w.to_gpu()
@@ -342,6 +348,8 @@ fn test_sgd_gpu_vanilla_multiple_steps() raises:
 
 
 fn test_sgd_gpu_weight_decay() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_weight_decay")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var w_gpu = w.to_gpu()
@@ -360,6 +368,8 @@ fn test_sgd_gpu_weight_decay() raises:
 
 
 fn test_sgd_gpu_momentum_single_step() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_momentum_single_step")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var w_gpu = w.to_gpu()
@@ -373,6 +383,8 @@ fn test_sgd_gpu_momentum_single_step() raises:
 
 
 fn test_sgd_gpu_momentum_multiple_steps() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_momentum_multiple_steps")
     var w = Tensor[dtype].d1([1.0], requires_grad=True)
     var w_gpu = w.to_gpu()
@@ -387,6 +399,8 @@ fn test_sgd_gpu_momentum_multiple_steps() raises:
 
 
 fn test_sgd_gpu_momentum_matches_cpu() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_momentum_matches_cpu")
     var w = Tensor[dtype].rand(4, 8, requires_grad=True)
     var w_gpu = w.to_gpu()
@@ -408,6 +422,8 @@ fn test_sgd_gpu_momentum_matches_cpu() raises:
 
 
 fn test_sgd_gpu_clip_value() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_clip_value")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var w_gpu = w.to_gpu()
@@ -421,6 +437,8 @@ fn test_sgd_gpu_clip_value() raises:
 
 
 fn test_sgd_gpu_clip_value_matches_cpu() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_clip_value_matches_cpu")
     var w = Tensor[dtype].rand(8, 8, requires_grad=True)
     var w_gpu = w.to_gpu()
@@ -441,6 +459,8 @@ fn test_sgd_gpu_clip_value_matches_cpu() raises:
 
 
 fn test_sgd_gpu_clip_norm_matches_cpu() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_clip_norm_matches_cpu")
     var w = Tensor[dtype].rand(8, 8, requires_grad=True)
     var w_gpu = w.to_gpu()
@@ -461,6 +481,8 @@ fn test_sgd_gpu_clip_norm_matches_cpu() raises:
 
 
 fn test_sgd_gpu_multiple_parameters() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_multiple_parameters")
     var w1 = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var w2 = Tensor[dtype].d1([3.0, 4.0], requires_grad=True)
@@ -479,6 +501,8 @@ fn test_sgd_gpu_multiple_parameters() raises:
 
 
 fn test_sgd_gpu_zero_grad() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_zero_grad")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var w_gpu = w.to_gpu()
@@ -494,6 +518,8 @@ fn test_sgd_gpu_zero_grad() raises:
 
 
 fn test_sgd_gpu_backward_integration() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_backward_integration")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var w_gpu = w.to_gpu()
@@ -513,6 +539,8 @@ fn test_sgd_gpu_backward_integration() raises:
 
 
 fn test_sgd_gpu_backward_integration_matches_cpu() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_backward_integration_matches_cpu")
     var w = Tensor[dtype].rand(4, 4, requires_grad=True)
     var x = Tensor[dtype].rand(4, 4)
@@ -539,6 +567,8 @@ fn test_sgd_gpu_backward_integration_matches_cpu() raises:
 
 
 fn test_sgd_gpu_large_tensor() raises:
+    if not has_accelerator():
+        return
     print("test_sgd_gpu_large_tensor")
     var w = Tensor[dtype].rand(128, 256, requires_grad=True)
     var w_gpu = w.to_gpu()
@@ -562,46 +592,3 @@ fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-_="""
-fn main() raises:
-    test_sgd_basic()
-    test_sgd_momentum()
-    test_sgd_weight_decay()
-    test_sgd_grad_norm_clipping()
-    test_sgd_value_clipping()
-
-    # New CPU tests
-    test_sgd_cpu_vanilla_single_step()
-    test_sgd_cpu_vanilla_multiple_steps()
-    test_sgd_cpu_vanilla_2d()
-    test_sgd_cpu_zero_grad()
-    test_sgd_cpu_weight_decay()
-    test_sgd_cpu_momentum_single_step()
-    test_sgd_cpu_momentum_multiple_steps()
-    test_sgd_cpu_clip_value()
-    test_sgd_cpu_multiple_parameters()
-    test_sgd_cpu_backward_integration()
-    test_sgd_cpu_set_lr()
-
-    comptime if not has_accelerator():
-        print("No GPU — skipping GPU SGD tests")
-        return
-
-    test_sgd_gpu_vanilla_single_step()
-    test_sgd_gpu_vanilla_matches_cpu()
-    test_sgd_gpu_vanilla_multiple_steps()
-    test_sgd_gpu_weight_decay()
-    test_sgd_gpu_momentum_single_step()
-    test_sgd_gpu_momentum_multiple_steps()
-    test_sgd_gpu_momentum_matches_cpu()
-    test_sgd_gpu_clip_value()
-    test_sgd_gpu_clip_value_matches_cpu()
-    test_sgd_gpu_clip_norm_matches_cpu()
-    test_sgd_gpu_multiple_parameters()
-    test_sgd_gpu_zero_grad()
-    test_sgd_gpu_backward_integration()
-    test_sgd_gpu_backward_integration_matches_cpu()
-    test_sgd_gpu_large_tensor()
-
-    print("\n=== ALL SGD TESTS PASSED ===")
-"""

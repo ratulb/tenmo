@@ -65,19 +65,23 @@ from .gradbox import Gradbox
 from .ancestry import Ancestor, Ancestors
 from .ndbuffer import Layout, Storage
 from .buffers import Buffer
+from .shapes import Shape
+from .strides import Strides
+from .intarray import IntArray
+from .array import Array
 
 # Modules
 from  .addition import *
 from  .ancestry import *
 from  .argminmax import *
-from  .array import *
+#from  .array import *
 from  .backpropagation import *
 from  .binary_inplace_ops_kernel import *
 from  .binary_ops_kernel import *
 from  .blashandle import *
 from  .broadcast import *
 from  .broadcasthelper import *
-from  .buffers import *
+#from  .buffers import *
 from  .clip import *
 from  .cnn import *
 from  .common_utils import *
@@ -97,9 +101,9 @@ from  .exponentiator import *
 from  .filler import *
 from  .flatten import *
 from  .forwards import *
-from  .gradbox import *
+#from  .gradbox import *
 from  .indexhelper import *
-from  .intarray import *
+#from  .intarray import *
 from  .logarithm import *
 from  .matmul import *
 from  .matmul_kernel import *
@@ -127,7 +131,7 @@ from  .reshape import *
 from  .scalar_inplace_ops_kernel import *
 from  .scalar_ops_kernel import *
 from  .sgd import *
-from  .shapes import *
+#from  .shapes import *
 from  .shuffle import *
 from  .sigmoid import *
 from  .softmax import *
@@ -139,7 +143,7 @@ from  .strides import *
 from  .subtraction import *
 from  .summation import *
 from  .tanh import *
-from  .tensor import *
+#from  .tensor import *
 from  .tiles import *
 from  .transpose import *
 from  .unary_ops_kernel import *

@@ -7,53 +7,6 @@ from tenmo.mnemonics import vm
 fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
-_="""
-fn main() raises:
-    test_vector_matrix_no_batch()
-    test_vector_matrix_batch_M_only()
-    test_vector_matrix_batch_v_only()
-    test_vector_matrix_both_batched()
-    test_vector_matrix_broadcast_batch()
-    test_vector_matrix_asymmetric_shapes()
-    test_vector_matrix_single_element()
-    print("=" * 50)
-    print("ALL VECTOR-MATRIX TESTS PASSED!")
-    print("=" * 50)
-
-    # ===== BASIC VECTOR-MATRIX TESTS =====
-    test_vector_matrix_1d_2d_basic()
-    test_vector_matrix_identity()
-    test_vector_matrix_zeros()
-    test_vector_matrix_single_element_orig()
-
-    # ===== BATCHED VECTOR-MATRIX TESTS =====
-    test_vector_matrix_2d_2d_batched()
-    test_vector_matrix_2d_3d_batched()
-    test_vector_matrix_broadcast_vector()
-    test_vector_matrix_broadcast_matrix()
-    test_vector_matrix_3d_3d_high_batch()
-    test_vector_matrix_4d_batch()
-
-    # ===== VIEW TESTS WITH GRADIENTS =====
-    test_vector_matrix_with_vector_view()
-    test_vector_matrix_with_matrix_view()
-
-    # ===== EDGE CASE TESTS =====
-    test_vector_matrix_large_dimensions()
-    test_vector_matrix_non_contiguous_batch()
-
-    # ===== COMPREHENSIVE TEST FUNCTIONS =====
-    test_vector_matrix_basic_forward_backward()
-    test_matrix_vector_basic_forward_backward()
-    test_vector_matrix_batched()
-    test_vector_matrix_broadcasting()
-    test_vector_matrix_with_views()
-    test_vector_matrix_singleton_batch()
-    test_vector_matrix_high_dimensional_batch()
-    test_matmul_nd_with_view_offset_grad()
-
-    print("All vector-matrix tests passed!")
-"""
 
 
 # ===== BASIC VECTOR-MATRIX TESTS =====

@@ -288,24 +288,6 @@ fn test_shape_compute_output_shape_single_axis() raises:
     print("test_shape_compute_output_shape_single_axis passed")
 
 
-fn test_shape_compute_output_shape_single_axis_1() raises:
-    print("test_shape_compute_output_shape_single_axis")
-    var s = Shape(2, 3, 4)
-    var axes = IntArray(1)  # Reduce middle axis
-    axes.append(1)  # Reduce middle axis
-    var result_no_keep = s.compute_output_shape(axes, keepdims=False)
-    var result_keep = s.compute_output_shape(axes, keepdims=True)
-    assert_true(
-        result_no_keep.rank() == 2, "result without keepdims should have rank 2"
-    )
-    assert_true(result_no_keep[0] == 2, "first dim unchanged")
-    assert_true(result_no_keep[1] == 4, "third dim unchanged")
-    assert_true(
-        result_keep.rank() == 3, "result with keepdims should have rank 3"
-    )
-    assert_true(result_keep[1] == 1, "reduced dim should be 1")
-    print("test_shape_compute_output_shape_single_axis passed")
-
 
 fn test_shape_compute_output_shape_multiple_axes() raises:
     print("test_shape_compute_output_shape_multiple_axes")
@@ -503,18 +485,3 @@ fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-_="""
-fn main() raises:
-    test_negative_indices()
-    test_slice_shape()
-    test_slice_from()
-    test_reverse()
-    test_equivalence()
-    test_empty_shape()
-    test_replace()
-    test_shape_as_intlist()
-    test_index_iter()
-    test_zip_reversed()
-
-    run_all_shape_tests()
-"""

@@ -7,18 +7,6 @@ fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-_="""
-fn main() raises:
-    test_unsqueeze_scalar_to_1d()
-    test_unsqueeze_1d_to_2d_front()
-    test_unsqueeze_1d_to_2d_back()
-    test_unsqueeze_2d_insert_middle_dim()
-    test_unsqueeze_3d_insert_front_and_back()
-    test_unsqueeze_chain_grad_flow()
-    test_unsqueeze_multiple_dims()
-    test_unsqueeze_preserves_buffer_sharing()
-    print("passes")
-"""
 
 
 fn test_unsqueeze_scalar_to_1d() raises:

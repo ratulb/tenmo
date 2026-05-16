@@ -726,11 +726,5 @@ fn test_variance_global() raises:
 
 
 fn main() raises:
-    _="""test_sqrt_backward()
-    test_sqrt_backward_zero_handling()
-    run_all_var_std_tests()
-    run_all_variance_std_tests()
-    test_variance_comprehensive()
-    test_variance_global()"""
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll variance tests passed!")

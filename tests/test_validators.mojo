@@ -350,9 +350,3 @@ fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-_="""
-fn main() raises:
-    test_validate_new_shape()
-    test_validate_and_normalize_axes()
-    run_all_validator_tests()
-"""

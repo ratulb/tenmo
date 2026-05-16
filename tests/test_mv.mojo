@@ -10,24 +10,6 @@ from tenmo.strides import Strides
 fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
-_ = """
-fn main() raises:
-    run_all_matrix_vector_tests()
-    test_matrix_vector_no_batch()
-    test_matrix_vector_batch_v_only()
-    test_matrix_vector_batch_M_only()
-    test_matrix_vector_both_batched()
-    test_matrix_vector_broadcast_batch()
-    print("=" * 50)
-    print("ALL TESTS PASSED!")
-    print("=" * 50)
-
-
-# ===== BASIC MATRIX-VECTOR TESTS =====
-
-from std.testing import assert_true
-from tenmo.strides import Strides
-"""
 
 
 fn test_matrix_vector_no_batch() raises:
@@ -760,3 +742,4 @@ fn run_all_matrix_vector_tests() raises:
     test_matrix_vector_no_grad()
 
     print("All matrix-vector multiplication tests passed! ✓")
+

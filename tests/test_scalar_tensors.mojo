@@ -18,6 +18,8 @@ fn test_cpu_add_scalar_tensor_result() raises:
     print("passed")
 
 fn test_gpu_scalar_add_backward_only() raises:
+    if not has_accelerator():
+        return
     print("test_gpu_scalar_add_backward_only")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(3.0, requires_grad=True)
@@ -37,6 +39,8 @@ fn test_gpu_scalar_add_backward_only() raises:
     print("passed")
 
 fn test_gpu_scalar_add_forward_only() raises:
+    if not has_accelerator():
+        return
     print("test_gpu_scalar_add_forward_only")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(3.0, requires_grad=True)
@@ -53,6 +57,8 @@ fn test_gpu_scalar_add_forward_only() raises:
     print("passed")
 
 fn test_gpu_scalar_add_backward_seed_only() raises:
+    if not has_accelerator():
+        return
     print("test_gpu_scalar_add_backward_seed_only")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(3.0, requires_grad=True)
@@ -76,6 +82,8 @@ fn test_gpu_scalar_add_backward_seed_only() raises:
     print("passed")
 
 fn test_gpu_scalar_add_backward_manual_handler() raises:
+    if not has_accelerator():
+        return
     print("test_gpu_scalar_add_backward_manual_handler")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(3.0, requires_grad=True)
@@ -101,6 +109,8 @@ fn test_gpu_scalar_add_backward_manual_handler() raises:
 
 
 fn test_gpu_scalar_add_backward_update_grad() raises:
+    if not has_accelerator():
+        return
     print("test_gpu_scalar_add_backward_update_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(3.0, requires_grad=True)
@@ -143,6 +153,8 @@ fn test_gpu_scalar_add_backward_update_grad() raises:
     print("passed")
 
 fn test_gpu_scalar_add_full_backward() raises:
+    if not has_accelerator():
+        return
     print("test_gpu_scalar_add_full_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(3.0, requires_grad=True)
@@ -169,14 +181,3 @@ fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-_="""
-fn main() raises:
-    test_cpu_add_scalar_tensor_result()
-    comptime if has_accelerator():
-        test_gpu_scalar_add_forward_only()
-        test_gpu_scalar_add_backward_only()
-        test_gpu_scalar_add_backward_seed_only()
-        test_gpu_scalar_add_backward_manual_handler()
-        test_gpu_scalar_add_backward_update_grad()
-        test_gpu_scalar_add_full_backward()
-"""

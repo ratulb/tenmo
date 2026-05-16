@@ -7,7 +7,7 @@ from std.math import log
 from tenmo.shapes import Shape
 
 fn main() raises:
-    _="""print("Example: Basic logarithm with epsilon")
+    print("Example: Basic logarithm with epsilon")
 
     comptime dtype = DType.float64
 
@@ -23,56 +23,6 @@ fn main() raises:
     var loss = y.sum()
     loss.backward()
     x.grad().print()
-
-    run_all_log_tests()
-
-    # New tests
-
-    # CPU forward
-    test_log_cpu_1d_basic_forward()
-    test_log_cpu_2d_forward()
-    test_log_cpu_3d_forward()
-    test_log_cpu_ones_forward()
-    test_log_cpu_epsilon_clamping()
-    test_log_cpu_custom_epsilon()
-    test_log_cpu_large_values()
-    test_log_cpu_no_grad()
-    test_log_cpu_requires_grad_propagates()
-    test_log_cpu_suppress_grad()
-
-    # CPU backward
-    test_log_cpu_1d_backward()
-    test_log_cpu_2d_backward()
-    test_log_cpu_3d_backward()
-    test_log_cpu_backward_chain()
-    test_log_cpu_backward_epsilon_clamping()
-    test_log_cpu_backward_custom_epsilon()
-    test_log_cpu_backward_chained_with_exp()
-    # GPU forward
-    test_log_gpu_1d_basic_forward()
-    test_log_gpu_2d_forward()
-    test_log_gpu_3d_forward()
-    test_log_gpu_ones_forward()
-    test_log_gpu_epsilon_clamping()
-    test_log_gpu_large_values()
-    # GPU backward
-    test_log_gpu_1d_backward()
-    test_log_gpu_2d_backward()
-    test_log_gpu_3d_backward()
-    test_log_gpu_backward_chain()
-    test_log_gpu_backward_epsilon_clamping()
-    test_log_gpu_backward_chained_with_exp()
-    test_log_gpu_backward_custom_epsilon()
-
-    # Parity
-    test_log_parity_1d_forward()
-    test_log_parity_2d_forward()
-    test_log_parity_1d_backward()
-    test_log_parity_2d_backward()
-    test_log_parity_epsilon_clamping()
-    test_log_parity_chain_exp()"""
-
-
 
 
     TestSuite.discover_tests[__functions_in_module()]().run()

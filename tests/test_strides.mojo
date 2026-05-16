@@ -211,9 +211,3 @@ fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-_="""
-fn main() raises:
-    print("Running strides tests")
-    test_compute_default_strides()
-    run_all_strides_tests()
-"""

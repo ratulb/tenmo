@@ -319,114 +319,125 @@ fn test_exp_backward_cpu_double_exp() raises:
 
 
 fn test_exp_gpu_scalar() raises:
-    print("test_exp_gpu_scalar")
-    var t = Tensor[dtype].scalar(0.0).to_gpu()
-    var out = t.exp()
-    assert_true(out.is_on_gpu())
-    assert_true(close(out.to_cpu(), Tensor[dtype].scalar(1.0)))
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_gpu_scalar")
+        var t = Tensor[dtype].scalar(0.0).to_gpu()
+        var out = t.exp()
+        assert_true(out.is_on_gpu())
+        assert_true(close(out.to_cpu(), Tensor[dtype].scalar(1.0)))
+        print("passed")
 
 
 fn test_exp_gpu_1d_zeros() raises:
-    print("test_exp_gpu_1d_zeros")
-    var t = Tensor[dtype].zeros(Shape(8)).to_gpu()
-    var out = t.exp()
-    assert_true(out.is_on_gpu())
-    assert_true(close(out.to_cpu(), Tensor[dtype].ones(Shape(8))))
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_gpu_1d_zeros")
+        var t = Tensor[dtype].zeros(Shape(8)).to_gpu()
+        var out = t.exp()
+        assert_true(out.is_on_gpu())
+        assert_true(close(out.to_cpu(), Tensor[dtype].ones(Shape(8))))
+        print("passed")
 
 
 fn test_exp_gpu_1d_known_values() raises:
-    print("test_exp_gpu_1d_known_values")
-    var t_cpu = Tensor[dtype].d1([0.0, 1.0, -1.0, 2.0])
-    var t_gpu = t_cpu.to_gpu()
-    var out = t_gpu.exp()
-    assert_true(out.is_on_gpu())
-    var expected = t_cpu.exp()
-    assert_true(close(out.to_cpu(), expected))
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_gpu_1d_known_values")
+        var t_cpu = Tensor[dtype].d1([0.0, 1.0, -1.0, 2.0])
+        var t_gpu = t_cpu.to_gpu()
+        var out = t_gpu.exp()
+        assert_true(out.is_on_gpu())
+        var expected = t_cpu.exp()
+        assert_true(close(out.to_cpu(), expected))
+        print("passed")
 
 
 fn test_exp_gpu_2d_contiguous() raises:
-    print("test_exp_gpu_2d_contiguous")
-    var t_cpu = Tensor[dtype].rand(4, 5)
-    var t_gpu = t_cpu.to_gpu()
-    var out_gpu = t_gpu.exp()
-    var out_cpu = t_cpu.exp()
-    assert_true(out_gpu.is_on_gpu())
-    assert_true(out_gpu.shape() == Shape(4, 5))
-    assert_true(close(out_gpu.to_cpu(), out_cpu))
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_gpu_2d_contiguous")
+        var t_cpu = Tensor[dtype].rand(4, 5)
+        var t_gpu = t_cpu.to_gpu()
+        var out_gpu = t_gpu.exp()
+        var out_cpu = t_cpu.exp()
+        assert_true(out_gpu.is_on_gpu())
+        assert_true(out_gpu.shape() == Shape(4, 5))
+        assert_true(close(out_gpu.to_cpu(), out_cpu))
+        print("passed")
 
 
 fn test_exp_gpu_3d() raises:
-    print("test_exp_gpu_3d")
-    var t_cpu = Tensor[dtype].rand(2, 3, 4)
-    var t_gpu = t_cpu.to_gpu()
-    var out_gpu = t_gpu.exp()
-    var out_cpu = t_cpu.exp()
-    assert_true(out_gpu.is_on_gpu())
-    assert_true(close(out_gpu.to_cpu(), out_cpu))
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_gpu_3d")
+        var t_cpu = Tensor[dtype].rand(2, 3, 4)
+        var t_gpu = t_cpu.to_gpu()
+        var out_gpu = t_gpu.exp()
+        var out_cpu = t_cpu.exp()
+        assert_true(out_gpu.is_on_gpu())
+        assert_true(close(out_gpu.to_cpu(), out_cpu))
+        print("passed")
 
 
 fn test_exp_gpu_4d() raises:
-    print("test_exp_gpu_4d")
-    var t_cpu = Tensor[dtype].rand(2, 3, 4, 5)
-    var t_gpu = t_cpu.to_gpu()
-    var out_gpu = t_gpu.exp()
-    var out_cpu = t_cpu.exp()
-    assert_true(out_gpu.is_on_gpu())
-    assert_true(close(out_gpu.to_cpu(), out_cpu))
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_gpu_4d")
+        var t_cpu = Tensor[dtype].rand(2, 3, 4, 5)
+        var t_gpu = t_cpu.to_gpu()
+        var out_gpu = t_gpu.exp()
+        var out_cpu = t_cpu.exp()
+        assert_true(out_gpu.is_on_gpu())
+        assert_true(close(out_gpu.to_cpu(), out_cpu))
+        print("passed")
 
 
 fn test_exp_gpu_negative_values() raises:
-    print("test_exp_gpu_negative_values")
-    var t_cpu = Tensor[dtype].d1([-2.0, -1.0, 0.0, 1.0, 2.0])
-    var t_gpu = t_cpu.to_gpu()
-    var out_gpu = t_gpu.exp()
-    var out_cpu = t_cpu.exp()
-    assert_true(close(out_gpu.to_cpu(), out_cpu))
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_gpu_negative_values")
+        var t_cpu = Tensor[dtype].d1([-2.0, -1.0, 0.0, 1.0, 2.0])
+        var t_gpu = t_cpu.to_gpu()
+        var out_gpu = t_gpu.exp()
+        var out_cpu = t_cpu.exp()
+        assert_true(close(out_gpu.to_cpu(), out_cpu))
+        print("passed")
 
 
 fn test_exp_gpu_large() raises:
-    print("test_exp_gpu_large")
-    var t_cpu = Tensor[dtype].rand(64, 128)
-    var t_gpu = t_cpu.to_gpu()
-    var out_gpu = t_gpu.exp()
-    var out_cpu = t_cpu.exp()
-    assert_true(out_gpu.is_on_gpu())
-    assert_true(close(out_gpu.to_cpu(), out_cpu))
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_gpu_large")
+        var t_cpu = Tensor[dtype].rand(64, 128)
+        var t_gpu = t_cpu.to_gpu()
+        var out_gpu = t_gpu.exp()
+        var out_cpu = t_cpu.exp()
+        assert_true(out_gpu.is_on_gpu())
+        assert_true(close(out_gpu.to_cpu(), out_cpu))
+        print("passed")
 
 
 fn test_exp_gpu_matches_cpu() raises:
-    print("test_exp_gpu_matches_cpu")
-    var t_cpu = Tensor[dtype].rand(9, 20)
-    var t_gpu = t_cpu.to_gpu()
-    assert_true(close(t_gpu.exp().to_cpu(), t_cpu.exp()))
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_gpu_matches_cpu")
+        var t_cpu = Tensor[dtype].rand(9, 20)
+        var t_gpu = t_cpu.to_gpu()
+        assert_true(close(t_gpu.exp().to_cpu(), t_cpu.exp()))
+        print("passed")
 
 
 fn test_exp_gpu_no_requires_grad() raises:
-    print("test_exp_gpu_no_requires_grad")
-    var t = Tensor[dtype].d1([1.0, 2.0]).to_gpu()
-    var out = t.exp[track_grad=False]()
-    assert_true(not out.requires_grad)
-    #assert_true(not out.has_backward_fn())
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_gpu_no_requires_grad")
+        var t = Tensor[dtype].d1([1.0, 2.0]).to_gpu()
+        var out = t.exp[track_grad=False]()
+        assert_true(not out.requires_grad)
+        #assert_true(not out.has_backward_fn())
+        print("passed")
 
 
 fn test_exp_gpu_requires_grad_propagates() raises:
-    print("test_exp_gpu_requires_grad_propagates")
-    var t = Tensor[dtype].d1([1.0, 2.0], requires_grad=True).to_gpu()
-    var out = t.exp()
-    assert_true(out.is_on_gpu())
-    assert_true(out.requires_grad)
-    #assert_true(out.has_backward_fn())
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_gpu_requires_grad_propagates")
+        var t = Tensor[dtype].d1([1.0, 2.0], requires_grad=True).to_gpu()
+        var out = t.exp()
+        assert_true(out.is_on_gpu())
+        assert_true(out.requires_grad)
+        #assert_true(out.has_backward_fn())
+        print("passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -435,127 +446,136 @@ fn test_exp_gpu_requires_grad_propagates() raises:
 
 
 fn test_exp_backward_gpu_zeros() raises:
-    print("test_exp_backward_gpu_zeros")
-    var t_cpu = Tensor[dtype].zeros(Shape(4), requires_grad=True)
-    var t_gpu = t_cpu.to_gpu()
-    var out = t_gpu.exp()
-    out.backward()
-    # grad = exp(0) = 1
-    assert_true(close(t_cpu.grad().as_tensor(), Tensor[dtype].ones(Shape(4))))
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_backward_gpu_zeros")
+        var t_cpu = Tensor[dtype].zeros(Shape(4), requires_grad=True)
+        var t_gpu = t_cpu.to_gpu()
+        var out = t_gpu.exp()
+        out.backward()
+        # grad = exp(0) = 1
+        assert_true(close(t_cpu.grad().as_tensor(), Tensor[dtype].ones(Shape(4))))
+        print("passed")
 
 
 fn test_exp_backward_gpu_1d_known() raises:
-    print("test_exp_backward_gpu_1d_known")
-    var t_cpu = Tensor[dtype].d1([0.0, 1.0, -1.0], requires_grad=True)
-    var t_gpu = t_cpu.to_gpu()
-    var out = t_gpu.exp()
-    out.backward()
-    var expected = Tensor[dtype].d1(
-        [
-            1.0,
-            scalar_exp(Float32(1.0)),
-            scalar_exp(Float32(-1.0)),
-        ]
-    )
-    assert_true(close(t_cpu.grad().as_tensor(), expected))
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_backward_gpu_1d_known")
+        var t_cpu = Tensor[dtype].d1([0.0, 1.0, -1.0], requires_grad=True)
+        var t_gpu = t_cpu.to_gpu()
+        var out = t_gpu.exp()
+        out.backward()
+        var expected = Tensor[dtype].d1(
+            [
+                1.0,
+                scalar_exp(Float32(1.0)),
+                scalar_exp(Float32(-1.0)),
+            ]
+        )
+        assert_true(close(t_cpu.grad().as_tensor(), expected))
+        print("passed")
 
 
 fn test_exp_backward_gpu_matches_cpu() raises:
-    print("test_exp_backward_gpu_matches_cpu")
-    var t_cpu = Tensor[dtype].rand(4, 5, requires_grad=True)
-    var t_gpu = t_cpu.to_gpu()
+    comptime if has_accelerator():
+        print("test_exp_backward_gpu_matches_cpu")
+        var t_cpu = Tensor[dtype].rand(4, 5, requires_grad=True)
+        var t_gpu = t_cpu.to_gpu()
 
-    # CPU backward
-    var out_cpu = t_cpu.exp()
-    out_cpu.backward()
-    var grad_cpu = t_cpu.grad().as_tensor().copy()
-    t_cpu.zero_grad()
+        # CPU backward
+        var out_cpu = t_cpu.exp()
+        out_cpu.backward()
+        var grad_cpu = t_cpu.grad().as_tensor().copy()
+        t_cpu.zero_grad()
 
-    # GPU backward
-    var out_gpu = t_gpu.exp()
-    out_gpu.backward()
+        # GPU backward
+        var out_gpu = t_gpu.exp()
+        out_gpu.backward()
 
-    assert_true(close(t_cpu.grad().as_tensor(), grad_cpu))
-    print("passed")
+        assert_true(close(t_cpu.grad().as_tensor(), grad_cpu))
+        print("passed")
 
 
 fn test_exp_backward_gpu_2d() raises:
-    print("test_exp_backward_gpu_2d")
-    var t_cpu = Tensor[dtype].zeros(Shape(3, 4), requires_grad=True)
-    var t_gpu = t_cpu.to_gpu()
-    var out = t_gpu.exp()
-    out.backward()
-    assert_true(
-        close(t_cpu.grad().as_tensor(), Tensor[dtype].ones(Shape(3, 4)))
-    )
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_backward_gpu_2d")
+        var t_cpu = Tensor[dtype].zeros(Shape(3, 4), requires_grad=True)
+        var t_gpu = t_cpu.to_gpu()
+        var out = t_gpu.exp()
+        out.backward()
+        assert_true(
+            close(t_cpu.grad().as_tensor(), Tensor[dtype].ones(Shape(3, 4)))
+        )
+        print("passed")
 
 
 fn test_exp_backward_gpu_3d() raises:
-    print("test_exp_backward_gpu_3d")
-    var t_cpu = Tensor[dtype].zeros(Shape(2, 3, 4), requires_grad=True)
-    var t_gpu = t_cpu.to_gpu()
-    var out = t_gpu.exp()
-    out.backward()
-    assert_true(
-        close(t_cpu.grad().as_tensor(), Tensor[dtype].ones(Shape(2, 3, 4)))
-    )
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_backward_gpu_3d")
+        var t_cpu = Tensor[dtype].zeros(Shape(2, 3, 4), requires_grad=True)
+        var t_gpu = t_cpu.to_gpu()
+        var out = t_gpu.exp()
+        out.backward()
+        assert_true(
+            close(t_cpu.grad().as_tensor(), Tensor[dtype].ones(Shape(2, 3, 4)))
+        )
+        print("passed")
 
 
 fn test_exp_backward_gpu_chain_rule() raises:
-    print("test_exp_backward_gpu_chain_rule")
-    # y = exp(x * 2), dy/dx = 2 * exp(2x)
-    var t_cpu = Tensor[dtype].d1([0.0, 1.0], requires_grad=True)
-    var t_gpu = t_cpu.to_gpu()
-    var t2 = t_gpu * Scalar[dtype](2)
-    var out = t2.exp()
-    out.backward()
-    var expected = Tensor[dtype].d1(
-        [
-            2.0 * scalar_exp(Float32(0.0)),
-            2.0 * scalar_exp(Float32(2.0)),
-        ]
-    )
-    assert_true(close(t_cpu.grad().as_tensor(), expected))
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_backward_gpu_chain_rule")
+        # y = exp(x * 2), dy/dx = 2 * exp(2x)
+        var t_cpu = Tensor[dtype].d1([0.0, 1.0], requires_grad=True)
+        var t_gpu = t_cpu.to_gpu()
+        var t2 = t_gpu * Scalar[dtype](2)
+        var out = t2.exp()
+        out.backward()
+        var expected = Tensor[dtype].d1(
+            [
+                2.0 * scalar_exp(Float32(0.0)),
+                2.0 * scalar_exp(Float32(2.0)),
+            ]
+        )
+        assert_true(close(t_cpu.grad().as_tensor(), expected))
+        print("passed")
 
 
 fn test_exp_backward_gpu_large() raises:
-    print("test_exp_backward_gpu_large")
-    var t_cpu = Tensor[dtype].zeros(Shape(32, 32), requires_grad=True)
-    var t_gpu = t_cpu.to_gpu()
-    var out = t_gpu.exp()
-    out.backward()
-    assert_true(
-        close(t_cpu.grad().as_tensor(), Tensor[dtype].ones(Shape(32, 32)))
-    )
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_backward_gpu_large")
+        var t_cpu = Tensor[dtype].zeros(Shape(32, 32), requires_grad=True)
+        var t_gpu = t_cpu.to_gpu()
+        var out = t_gpu.exp()
+        out.backward()
+        assert_true(
+            close(t_cpu.grad().as_tensor(), Tensor[dtype].ones(Shape(32, 32)))
+        )
+        print("passed")
 
 
 fn test_exp_backward_gpu_double_exp() raises:
-    print("test_exp_backward_gpu_double_exp")
-    # y = exp(exp(x)), x=0: grad = exp(0)*exp(exp(0)) = 1*e = e
-    var t_cpu = Tensor[dtype].scalar(0.0, requires_grad=True)
-    var t_gpu = t_cpu.to_gpu()
-    var out = t_gpu.exp().exp()
-    out.backward()
-    var expected = Tensor[dtype].scalar(scalar_exp(Float32(1.0)))
-    assert_true(close(t_cpu.grad().as_tensor(), expected))
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_backward_gpu_double_exp")
+        # y = exp(exp(x)), x=0: grad = exp(0)*exp(exp(0)) = 1*e = e
+        var t_cpu = Tensor[dtype].scalar(0.0, requires_grad=True)
+        var t_gpu = t_cpu.to_gpu()
+        var out = t_gpu.exp().exp()
+        out.backward()
+        var expected = Tensor[dtype].scalar(scalar_exp(Float32(1.0)))
+        assert_true(close(t_cpu.grad().as_tensor(), expected))
+        print("passed")
 
 
 fn test_exp_backward_gpu_scalar() raises:
-    print("test_exp_backward_gpu_scalar")
-    var t_cpu = Tensor[dtype].scalar(1.0, requires_grad=True)
-    var t_gpu = t_cpu.to_gpu()
-    var out = t_gpu.exp()
-    out.backward()
-    var expected = Tensor[dtype].scalar(scalar_exp(Float32(1.0)))
-    assert_true(close(t_cpu.grad().as_tensor(), expected))
-    print("passed")
+    comptime if has_accelerator():
+        print("test_exp_backward_gpu_scalar")
+        var t_cpu = Tensor[dtype].scalar(1.0, requires_grad=True)
+        var t_gpu = t_cpu.to_gpu()
+        var out = t_gpu.exp()
+        out.backward()
+        var expected = Tensor[dtype].scalar(scalar_exp(Float32(1.0)))
+        assert_true(close(t_cpu.grad().as_tensor(), expected))
+        print("passed")
 
 
 fn main() raises:
@@ -616,3 +636,4 @@ fn main() raises:
         print("No GPU available — skipping GPU tests")
     """
     TestSuite.discover_tests[__functions_in_module()]().run()
+

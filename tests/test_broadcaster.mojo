@@ -141,9 +141,5 @@ fn test_pad_shapes() raises:
 
 
 fn main() raises:
-    _="""test_empty_shape_broadcastable()
-    test_broadcastable()
-    test_pad_shapes()
-    test_broadcast_shape()"""
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll broadcaster tests passed!")

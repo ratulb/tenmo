@@ -489,122 +489,6 @@ fn test_pad_requires_grad_propagation() raises:
 fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
-_ = """
-fn main() raises:
-    print("=" * 80)
-    print("PAD COMPREHENSIVE TEST SUITE")
-    print("=" * 80)
-
-    print("\n--- FORWARD PASS TESTS: CONSTANT PADDING ---")
-    run_all_padding_tests()
-    test_pad_constant_2d_symmetric()
-    test_pad_constant_2d_asymmetric()
-    test_pad_constant_1d()
-    test_pad_constant_3d()
-    test_pad_constant_4d_conv_style()
-    test_pad_constant_nonzero_value()
-    test_pad_zero_padding()
-
-    print("\n--- BACKWARD PASS TESTS ---")
-    test_pad_backward_symmetric()
-    test_pad_backward_asymmetric()
-    test_pad_backward_weighted()
-    test_pad_backward_1d()
-    test_pad_backward_3d()
-    test_pad_backward_chain()
-    test_pad_backward_4d_conv_style()
-
-    print("\n--- SPECIAL PADDING MODES ---")
-    test_pad_replicate_2d()
-    test_pad_reflect_2d()
-
-    print("\n--- INTEGRATION TESTS ---")
-    test_pad_for_convolution()
-    test_pad_selective_dimensions()
-    test_pad_requires_grad_propagation()
-
-    print("\n" + "=" * 80)
-    print("ALL TESTS PASSED! ✓")
-    print("=" * 80)
-    print("\nTotal tests run: 20")
-    print("  - Forward (constant): 7 tests")
-    print("  - Backward: 7 tests")
-    print("  - Special modes: 2 tests")
-    print("  - Integration: 3 tests")
-
-    print("=" * 80)
-    print("CIRCULAR PADDING COMPREHENSIVE TEST SUITE")
-    print("=" * 80)
-
-    print("\n--- FORWARD PASS TESTS ---")
-    test_pad_circular_1d_symmetric()
-    test_pad_circular_1d_asymmetric()
-    test_pad_circular_2d_symmetric()
-    test_pad_circular_2d_asymmetric()
-    test_pad_circular_2d_one_dimension()
-    test_pad_circular_large_padding()
-    test_pad_circular_3d()
-    test_pad_circular_single_element()
-
-    print("\n--- BACKWARD PASS TESTS ---")
-    test_pad_circular_backward_1d()
-    test_pad_circular_backward_2d()
-    test_pad_circular_backward_weighted()
-    test_pad_circular_backward_chain()
-
-    print("\n--- COMPARISON TESTS ---")
-    test_circular_vs_replicate_difference()
-    test_circular_periodic_signal()
-
-    print("\n" + "=" * 80)
-    print("ALL CIRCULAR PADDING TESTS PASSED! ✓")
-    print("=" * 80)
-    print("\nTotal tests run: 14")
-    print("  - Forward pass: 8 tests")
-    print("  - Backward pass: 4 tests")
-    print("  - Comparison: 2 tests")
-    print("\n" + "=" * 80)
-    print("CIRCULAR PADDING USE CASES:")
-    print("  - Periodic signals (audio, time series)")
-    print("  - Toroidal/wraparound geometry")
-    print("  - FFT-based convolutions")
-    print("  - Texture mapping in graphics")
-    print("=" * 80)
-
-
-# ============================================================================
-# CIRCULAR/WRAP PADDING TESTS
-# ============================================================================
-
-
-fn test_pad_circular_1d_symmetric() raises:
-    """Test symmetric circular padding on 1D tensor."""
-    print("test_pad_circular_1d_symmetric")
-
-    comptime dtype = DType.float32
-    var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])
-
-    var pad = List[Tuple[Int, Int]]()
-    pad.append((2, 2))  # Pad 2 on each side
-
-    var result = Tensor[dtype].pad(x, pad, mode="circular")
-
-    # Mapping for each output index:
-    # out[0]: (0-2) % 4 = -2 % 4 = 2 → x[2] = 3
-    # out[1]: (1-2) % 4 = -1 % 4 = 3 → x[3] = 4
-    # out[2]: (2-2) % 4 = 0 % 4 = 0 → x[0] = 1
-    # out[3]: (3-2) % 4 = 1 % 4 = 1 → x[1] = 2
-    # out[4]: (4-2) % 4 = 2 % 4 = 2 → x[2] = 3
-    # out[5]: (5-2) % 4 = 3 % 4 = 3 → x[3] = 4
-    # out[6]: (6-2) % 4 = 4 % 4 = 0 → x[0] = 1
-    # out[7]: (7-2) % 4 = 5 % 4 = 1 → x[1] = 2
-    #
-    # Expected: [3, 4, 1, 2, 3, 4, 1, 2]
-    var expected = Tensor[dtype].d1([3.0, 4.0, 1.0, 2.0, 3.0, 4.0, 1.0, 2.0])
-
-    assert_true(result.all_close[atol=1e-6](expected))
-
-
 fn test_pad_circular_1d_asymmetric() raises:
     """Test asymmetric circular padding on 1D tensor."""
     print("test_pad_circular_1d_asymmetric")
@@ -1687,4 +1571,5 @@ fn run_all_padding_tests() raises:
     test_pad_large_asymmetric()
     test_pad_zero_padding_one_side()
     test_pad_backward_asymmetric()
-"""
+
+

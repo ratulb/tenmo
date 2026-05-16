@@ -374,36 +374,4 @@ fn test_onehot_gpu_parity_2d() raises:
 fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
-_ = """
-fn main() raises:
-    # CPU tests
-    test_onehot_cpu_1d_basic()
-    test_onehot_cpu_1d_single_class()
-    test_onehot_cpu_1d_first_class()
-    test_onehot_cpu_1d_last_class()
-    test_onehot_cpu_1d_mixed()
-    test_onehot_cpu_2d_basic()
-    test_onehot_cpu_2d_single_row()
-    test_onehot_cpu_1d_large_num_classes()
-    test_onehot_cpu_shape()
-    test_onehot_cpu_all_zeros_except_one()
-    test_onehot_cpu_explicit_cpu_device()
 
-    # GPU tests
-    test_onehot_gpu_1d_basic()
-    test_onehot_gpu_1d_mixed()
-    test_onehot_gpu_2d_basic()
-    test_onehot_gpu_first_class()
-    test_onehot_gpu_last_class()
-    test_onehot_gpu_shape()
-    test_onehot_gpu_all_zeros_except_one()
-    test_onehot_gpu_large_num_classes()
-    test_onehot_gpu_explicit_device()
-    test_onehot_gpu_override_to_cpu()
-
-    # Parity tests
-    test_onehot_gpu_parity_1d()
-    test_onehot_gpu_parity_2d()
-
-    print("All onehot tests passed!")
-"""

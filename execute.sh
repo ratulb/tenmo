@@ -91,7 +91,7 @@ declare -a ALL_TESTS_IN_ORDER=(
     "sqrt|tests/test_sqrt.mojo"
     "attn_matmul|tests/test_attn_matmul.mojo"
     "tensors|tests/test_tensors.mojo"
-    "gpu|tests/test_gpu.mojo"
+    "gpu_cpu|tests/test_gpu.mojo"
     "item|tests/test_item.mojo"
     "contiguous|tests/test_contiguous.mojo"
     "maxmin_scalar|tests/test_maxmin_scalar.mojo"
@@ -173,7 +173,7 @@ declare -a GPU_TESTS=(
     "unary|tests/test_unary_ops.mojo"
     "sqrt|tests/test_sqrt.mojo"
     "attn_matmul|tests/test_attn_matmul.mojo"
-    "gpu|tests/test_gpu.mojo"
+    "gpu_cpu|tests/test_gpu.mojo"
     "item|tests/test_item.mojo"
     "contiguous|tests/test_contiguous.mojo"
     "maxmin_scalar|tests/test_maxmin_scalar.mojo"
@@ -243,7 +243,7 @@ if [ $# -eq 0 ]; then
     print_colored "$CYAN" "Available tests:"
     echo "  embedding, layer_norm, reciprocal, product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
     echo "  allany, compare, count_unique, transmute, exp, summean, sigmoid"
-    echo "  gpusummean, broadcast, scalar, inplace, expand, gpu_expand"
+    echo "  gpusummean, broadcast, scalar, inplace, expand, gpu_expand, gpu_cpu"
     echo "  sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout, dev_transfer"
     echo "  std_variance, stack, logarithm, concat, variance, variance_and_std, utils, onehot, power"
     echo "  indexhelper, losses, tanh, data, softmax, repeat, mmnd, attn_matmul"
@@ -341,6 +341,7 @@ run_test_by_name() {
         exp)            run_test "exp" "tests/test_exponential.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         summean)        run_test "summean" "tests/test_sum_mean.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         sigmoid)        run_test "sigmoid" "tests/test_sigmoid.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        gpu_cpu)        run_test "gpu_cpu" "tests/test_gpu.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         gpusummean)     run_test "gpusummean" "tests/test_gpu_sum_mean.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         broadcast)      run_test "broadcast" "tests/test_broadcast.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         scalar)         run_test "scalar" "tests/test_scalar_tensors.mojo" "$DEBUG_MODE"; exit_code=$? ;;

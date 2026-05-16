@@ -559,37 +559,5 @@ fn test_non_contiguous_gradients() raises:
 
 
 fn main() raises:
-    _="""print("\n")
-    print("" * 80)
-    print("" + " " * 78 + "")
-    print("" + " " * 20 + "BATCHED MATMUL TEST SUITE" + " " * 33 + "")
-    print(
-        "" + " " * 15 + "Broadcasting + Gradient Verification" + " " * 27 + ""
-    )
-    print("" + " " * 78 + "")
-    print("" * 80)
-    print("\n")
-
-    test_basic_2d_times_3d()
-    test_3d_times_2d()
-    test_batch_broadcasting()
-    test_multi_batch_broadcasting()
-    test_numerical_correctness()
-    test_gradient_with_numerical_check()
-    test_symmetric_broadcasting()
-    test_complex_broadcasting()
-    test_edge_case_single_batch()
-    test_large_batch()
-    test_pytorch_comparison()
-    test_gradient_accumulation()
-    test_non_contiguous_gradients()
-
-    print("\n")
-    print("" * 80)
-    print("" + " " * 78 + "")
-    print("" + " " * 25 + "ALL TESTS PASSED! " + " " * 30 + "")
-    print("" + " " * 78 + "")
-    print("" * 80)
-    print("\n")"""
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll matmul tests passed!")

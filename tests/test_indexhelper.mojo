@@ -882,10 +882,4 @@ fn run_all_index_iterator_review_tests() raises:
 fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
-_ = """
-fn main() raises:
-    run_all_tests()
-    run_all_index_calculator_tests()
-    run_all_benchmarks()
-    run_all_index_iterator_review_tests()
-"""
+

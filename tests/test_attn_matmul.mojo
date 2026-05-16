@@ -549,47 +549,5 @@ fn test_batchmm_parity_4d_backward() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 fn main() raises:
-    _="""# ── CPU ──
-    test_batchmm_2d_basic()
-    test_batchmm_2d_non_square()
-    test_batchmm_3d_shape()
-    test_batchmm_3d_values()
-    test_batchmm_3d_identity()
-    test_batchmm_4d_shape_scores()
-    test_batchmm_4d_shape_context()
-    test_batchmm_4d_scores_values()
-    test_batchmm_4d_context_values()
-    test_batchmm_4d_multi_head_independent()
-    test_batchmm_4d_realistic_attention_shape()
-    test_batchmm_4d_broadcast_batch_dim()
-    test_batchmm_4d_backward_scores()
-    test_batchmm_4d_backward_context()
-    test_batchmm_4d_backward_full_attention_chain()
-
-    # ── GPU ──
-    test_batchmm_gpu_2d_basic()
-    test_batchmm_gpu_2d_non_square()
-    test_batchmm_gpu_3d_shape()
-    test_batchmm_gpu_3d_values()
-    test_batchmm_gpu_3d_identity()
-    test_batchmm_gpu_4d_shape_scores()
-    test_batchmm_gpu_4d_shape_context()
-    test_batchmm_gpu_4d_scores_values()
-    test_batchmm_gpu_4d_context_values()
-    test_batchmm_gpu_4d_multi_head_independent()
-    test_batchmm_gpu_4d_realistic_attention_shape()
-    test_batchmm_gpu_4d_broadcast_batch_dim()
-    test_batchmm_gpu_4d_backward_scores()
-    test_batchmm_gpu_4d_backward_context()
-    test_batchmm_gpu_4d_backward_full_attention_chain()
-
-    # ── Parity ──
-    test_batchmm_parity_2d()
-    test_batchmm_parity_3d()
-    test_batchmm_parity_4d_scores()
-    test_batchmm_parity_4d_context()
-    test_batchmm_parity_4d_backward()
-
-    print("All batched matmul tests passed ✓")"""
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll attn matmul tests passed!")

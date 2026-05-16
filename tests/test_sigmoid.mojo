@@ -485,54 +485,5 @@ fn test_sig_gpu_cpu_backward_parity() raises:
 # ===----------------------------------------------------------------------=== #
 
 fn main() raises:
-    _="""# --- CPU forward ---
-    test_sig_cpu_scalar_forward()
-    test_sig_cpu_1d_forward_known_values()
-    test_sig_cpu_2d_forward()
-    test_sig_cpu_3d_forward()
-    test_sig_cpu_4d_forward()
-    test_sig_cpu_f64_forward()
-
-    # --- CPU backward ---
-    test_sig_cpu_scalar_backward()
-    test_sig_cpu_1d_backward()
-    test_sig_cpu_2d_backward()
-    test_sig_cpu_3d_backward()
-    test_sig_cpu_4d_backward()
-    test_sig_cpu_f64_backward()
-
-    # --- CPU grad-flow ---
-    test_sig_cpu_grad_no_grad_leaf()
-    test_sig_cpu_grad_chained_with_add()
-    test_sig_cpu_grad_chained_with_mul()
-    test_sig_cpu_grad_double_sigmoid()
-    test_sig_cpu_grad_track_grad_false_no_backward()
-    test_sig_cpu_grad_requires_grad_override()
-
-    # --- GPU forward ---
-    test_sig_gpu_scalar_forward()
-    test_sig_gpu_1d_forward()
-    test_sig_gpu_2d_forward()
-    test_sig_gpu_3d_forward()
-    test_sig_gpu_4d_forward()
-    test_sig_gpu_f64_forward()
-
-    # --- GPU backward ---
-    test_sig_gpu_scalar_backward()
-    test_sig_gpu_1d_backward()
-    test_sig_gpu_2d_backward()
-    test_sig_gpu_3d_backward()
-    test_sig_gpu_4d_backward()
-    test_sig_gpu_f64_backward()
-
-    # --- GPU grad-flow ---
-    test_sig_gpu_grad_chained_with_add()
-    test_sig_gpu_grad_chained_with_mul()
-    test_sig_gpu_grad_double_sigmoid()
-    test_sig_gpu_grad_track_grad_false()
-    test_sig_gpu_cpu_forward_parity()
-    test_sig_gpu_cpu_backward_parity()
-
-    print("All sigmoid tests passed.")"""
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll sigmoid tests passed!")

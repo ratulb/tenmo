@@ -14,10 +14,146 @@ from std.random.philox import Random as PhiloxRandom
 from std.pathlib import Path
 from std.python import Python
 from std.collections import Counter
+from tenmo.nlp import IMDBTextCleaner, DefaultTokenizer
+from tenmo.buffers import Buffer
+from bpe import BasicTokenizer, RegexTokenizer, GPT4Tokenizer
+
+comptime dtype = DType.float32
+
+def main() raises:
+    test_shape_compute_output_shape_single_axis()
+
+fn test_shape_compute_output_shape_single_axis() raises:
+    print("test_shape_compute_output_shape_single_axis")
+    var s = Shape(2, 3, 4)
+    var axes = IntArray.with_capacity(1)
+    axes.append(1)  # Reduce middle axis
+    var result_no_keep = s.compute_output_shape(axes, keepdims=False)
+    var result_keep = s.compute_output_shape(axes, keepdims=True)
+    assert_true(
+        result_no_keep.rank() == 2, "result without keepdims should have rank 2"
+    )
+    assert_true(result_no_keep[0] == 2, "first dim unchanged")
+    assert_true(result_no_keep[1] == 4, "third dim unchanged")
+    assert_true(
+        result_keep.rank() == 3, "result with keepdims should have rank 3"
+    )
+    assert_true(result_keep[1] == 1, "reduced dim should be 1")
+    print("test_shape_compute_output_shape_single_axis passed")
+
+def main_100() raises:
+    _="""var v = Tensor[dtype].d1([1, 2, 3])
+    var m = Tensor[dtype].d2([[4, 5, 6], [7,8,9],[10, 11, 12]])
+    var r = v.matmul[mode=vm](m)
+    r.print()"""
+    var strs: List[UInt8] = [1, 6, 9]
+    var xxx = strs[::]
+    print(xxx)
+
+    var tok = RegexTokenizer()
+    tok.train("hello world", 256 + 8)
+
+    # tok.vocab_size gives total token count
+    # tok.vocab.get(id) gives bytes for that id
+    print("tok.vocab_size: ", tok.bpe.vocab_size)
+
+    var word2index = Dict[String, Int]()
+    for token_id in range(tok.bpe.vocab_size):
+        var token_bytes = tok.bpe.vocab.get(token_id)
+        var key = String(from_utf8_lossy=token_bytes[::])
+        #var key = String(from_utf8_lossy=Span[UInt8](token_bytes))
+        word2index[key] = token_id
+
+    # Look up a token by its text
+    if "hello" in word2index:
+        print(word2index["hello"]) # Does not print!
+    if "world" in word2index:
+        print(word2index["world"]) # Does not print!
 
 
-fn main() raises:
-    comptime dtype = DType.float32
+    _="""for item in word2index.items():
+        print(item.key, item.value)"""
+
+fn main_70() raises:
+    var b = Buffer[dtype]([Scalar[dtype](1), Scalar[dtype](21), Scalar[dtype](9)])
+    var r = b.load[3](0)
+    print(r+r)
+
+fn test_mcpy_cpu_2d_fuse_sum_duplicate_indices() raises:
+    print("mcpy_cpu_2d_fuse_sum_duplicate_indices")
+    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
+    var idx = IntArray()
+    idx.append(0)
+    idx.append(0)
+    idx.append(0)
+    # row 0 three times: [3, 6]
+    var result = a.gather(idx, axis=0, fuse_sum=True)
+    assert_true(result.all_close(Tensor[dtype].d1([3.0, 6.0])))
+
+def main_60() raises:
+    test_mcpy_cpu_2d_fuse_sum_duplicate_indices()
+
+def main_80() raises:
+    var t = BasicTokenizer()
+    t.train("aaabdaaabac", 256 + 3)
+    var ids = t.encode("aaabdaaabac")
+    print(ids)
+    # [258, 100, 258, 97, 99]
+    print(t.decode(ids))
+    # aaabdaaabac
+
+    var rt = RegexTokenizer()
+    rt.train("The quick brown fox jumps over the lazy dog.", 256 + 16)
+    ids = t.encode("The quick brown fox jumps over the lazy dog.")
+    print(len(ids))
+    # 27 (pretokenization prevents cross-word merges)
+    print(rt.decode(ids))
+
+
+    var gpt4 = GPT4Tokenizer()
+    gpt4.load_tiktoken("/home/tenmoomnet/bpe/data/o200k_base.tiktoken")
+    ids = gpt4.encode("Hello, world!")
+    print(len(ids))
+    # 4
+    print(gpt4.decode(ids))
+    # Hello, world!
+
+
+
+def main_40() raises:
+    var cleaner = IMDBTextCleaner()
+    var tokenizer = DefaultTokenizer.from_file("the-verdict.txt", cleaner, 3, 1)
+    #var url = "https://raw.githubusercontent.com/rasbt/LLMs-from-scratch/main/ch02/01_main-chapter-code/the-verdict.txt"
+    #var tokenizer = DefaultTokenizer.from_url(url, cleaner, 1, 1)
+    print(len(tokenizer))
+    var text = "It's the last he painted, you know, Mrs. Gisburn said with pardonable pride."
+
+    var ids = tokenizer.encode(text)
+    print(tokenizer.decode(ids))
+    #from importlib.metadata import version
+    #import tiktoken
+    var importlib = Python.import_module("importlib.metadata")
+    var tiktoken = Python.import_module("tiktoken")
+    var version = importlib.version
+    print("tiktoken version:", version("tiktoken"))
+
+    var enc      = tiktoken.get_encoding("cl100k_base")
+    #var enc      = tiktoken.get_encoding("gpt2")
+    print(enc.decode(enc.encode(text)))
+    text = (
+        "Hello, do you like tea? <|endoftext|> In the sunlit terraces"
+        "of someunknownPlace."
+    )
+    #integers = tokenizer.encode(text, allowed_special={"<|endoftext|>"})
+    integers = tokenizer.encode(text)
+    print(integers)
+    var py = Python.import_module("builtins")
+    integers1 = enc.encode(py.str(text),allowed_special={"<|endoftext|>"})
+    print(integers1)
+    strings = tokenizer.decode(integers)
+    print(strings)
+
+fn main_30() raises:
     var t = Tensor[dtype].scalar(3)
     assert_true(t.all_close(Tensor[DType.float32].scalar(3)))
     print(max(SIMD[dtype, 3](0), SIMD[dtype, 3](-9, 2, -32)))
@@ -32,7 +168,6 @@ fn main() raises:
 
 fn test_prd_cpu_bwd_all_positive_1d() raises:
     print("test_prd_cpu_bwd_all_positive_1d")
-    comptime dtype = DType.float32
     var a = Tensor[dtype].d1([2, 3, 4], requires_grad=True)
     var out = a.product(IntArray(0))
     var loss = out.sum()
@@ -44,7 +179,6 @@ fn test_prd_cpu_bwd_all_positive_1d() raises:
 
 fn test_prd_cpu_bwd_all_positive_1d_orig() raises:
     print("test_prd_cpu_bwd_all_positive_1d")
-    comptime dtype = DType.float32
     var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
     var result = a.buffer.product_cpu(IntArray(0), False)
     var arg = result[1]
@@ -59,7 +193,6 @@ fn test_prd_cpu_bwd_all_positive_1d_orig() raises:
 
 fn test_complex_mixed_ops_backward() raises:
     print("test_complex_mixed_ops_backward")
-    comptime dtype = DType.float32
 
     a = Tensor[dtype].d2(
         [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]], requires_grad=True
@@ -86,7 +219,6 @@ fn test_complex_mixed_ops_backward() raises:
 
 fn test_contig_cpu_1d_slice_view() raises:
     print("test_contig_cpu_1d_slice_view")
-    comptime dtype = DType.float32
     # Create a non-contiguous view via transpose of a 2D then flatten — or use
     # a known strided view via unsqueeze + squeeze to produce offset
     var a = Tensor[dtype].d2(
@@ -109,7 +241,6 @@ fn test_contig_cpu_1d_slice_view() raises:
 
 fn test_expand_1d_to_2d_new_batch_dim() raises:
     print("test_expand_1d_to_2d_new_batch_dim")
-    comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)  # shape (3,)
     var e = a.expand(4, 3)  # shape (4,3)
     assert_true(e.shape() == Shape.of(4, 3))
@@ -127,7 +258,6 @@ fn test_expand_1d_to_2d_new_batch_dim() raises:
 fn test_tanh_contiguous_vs_non_contiguous() raises:
     print("test_tanh_contiguous_vs_non_contiguous")
 
-    comptime dtype = DType.float32
     var x_contig = Tensor[dtype].d1([0.0, 1.0, -1.0], requires_grad=True)
     var y_contig = x_contig.tanh[track_grad=True]()
 
@@ -151,7 +281,6 @@ fn test_tanh_contiguous_vs_non_contiguous() raises:
 
 fn test_matmul_2d_non_contiguous_both_views() raises:
     print("test_matmul_2d_non_contiguous_both_views")
-    comptime dtype = DType.float32
     var base = Tensor[dtype].d2(
         [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
         requires_grad=True,
@@ -174,7 +303,6 @@ fn test_matmul_2d_non_contiguous_both_views() raises:
 
 fn test_vector_matrix_with_vector_view() raises:
     print("test_vector_matrix_with_vector_view")
-    comptime dtype = DType.float32
     var base_v = Tensor[dtype].d1([0.0, 1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var v_view = base_v.view(
         shape=Shape(3), strides=Strides(1), offset=1
@@ -197,7 +325,6 @@ fn test_vector_matrix_with_vector_view() raises:
 
 fn test_matrix_vector_with_matrix_view() raises:
     print("test_matrix_vector_with_matrix_view")
-    comptime dtype = DType.float32
     var base_M = Tensor[dtype].d1(
         [0.0, 0.0, 1.0, 2.0, 3.0, 4.0, 0.0, 0.0], requires_grad=True
     )
@@ -224,7 +351,6 @@ fn test_slice_backward_chained() raises:
     """Test gradient flow through chained slices."""
     print("test_slice_backward_chained")
 
-    comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]],
         requires_grad=True,
@@ -244,7 +370,6 @@ fn test_slice_backward_chained() raises:
 
 fn test_rlv_cpu_noncontig_transposed() raises:
     print("test_rlv_cpu_noncontig_transposed")
-    comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[-1.0, 2.0], [3.0, -4.0]], requires_grad=True)
     var t = a.transpose()  # non-contiguous view
     var out = t.relu()
@@ -280,7 +405,6 @@ fn test_flatten_view_partial_tensor() raises:
 
 fn test_tensor_dot() raises:
     print("test_tensor_dot")
-    comptime dtype = DType.float32
     a = Tensor[dtype].scalar(5, requires_grad=True)
     b = Tensor[dtype].scalar(15, requires_grad=True)
     c = a.matmul(b)
