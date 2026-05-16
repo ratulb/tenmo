@@ -45,20 +45,6 @@ fn ndarray_ptr[
 
 
 fn to_ndarray[dtype: DType, //](tensor: Tensor[dtype]) raises -> PythonObject:
-    _="""np = Python.import_module("numpy")
-    shape_tuple = list_to_tuple(tensor.shape().tolist())
-    ndarray = np.zeros(shape_tuple, dtype=numpy_dtype(tensor.dtype))
-    if tensor.is_contiguous():
-        dst_ptr = ndarray_ptr[dtype](ndarray)
-        buffer_ptr = tensor.data_ptr() + tensor.offset()
-        memcpy(dest=dst_ptr, src=buffer_ptr, count=tensor.numels())
-    else:
-        flat = ndarray.flat
-        idx = 0
-        for coord in tensor.shape():
-            flat[idx] = tensor[coord]
-            idx += 1
-    return ndarray"""
     return to_ndarray(tensor.buffer)
 
 fn to_ndarray[dtype: DType, //](gradbox: Gradbox[dtype]) raises -> PythonObject:
@@ -79,9 +65,6 @@ fn to_ndarray[dtype: DType, //](ndb: NDBuffer[dtype]) raises -> PythonObject:
             flat[idx] = ndb[coord]
             idx += 1
     return ndarray
-
-
-
 
 fn from_ndarray[
     dtype: DType
@@ -145,8 +128,6 @@ fn as_nested_list[dtype: DType, //](self: NDBuffer[dtype]) raises -> PythonObjec
     """Convert NDBuffer to a nested Python list retaining shape structure."""
     var ndarray = to_ndarray(self)
     return ndarray.tolist()
-
-
 
 fn test_to_ndarray() raises:
     comptime dtype = DType.int32
