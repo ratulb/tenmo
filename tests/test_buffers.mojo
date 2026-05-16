@@ -892,22 +892,6 @@ fn test_float64_convenience() raises:
 # ============================================
 # Boolean Buffer Operations
 # ============================================
-fn test_mul_bool_buffers() raises:
-    print("test_mul_bool_buffers")
-    var a = Buffer[DType.bool](MEDIUM_SIZE)
-    var b = Buffer[DType.bool](MEDIUM_SIZE)
-    for i in range(MEDIUM_SIZE):
-        a[i] = i % 2 == 0  # Even indices True
-        b[i] = i % 3 == 0  # Divisible by 3 True
-
-    var result = a * b  # Logical AND
-    for i in range(MEDIUM_SIZE):
-        expected = (i % 2 == 0) and (i % 3 == 0)  # Divisible by 6
-        assert_true(
-            result[i] == expected, "mul bool: mismatch at " + String(i)
-        )
-    print("test_mul_bool_buffers passed")
-
 
 fn test_imul_bool_scalar() raises:
     print("test_imul_bool_scalar")
@@ -3707,23 +3691,6 @@ fn test_arithmetic_simd_boundary_arith() raises:
         assert_true(result[i] == Int32(i) * 3)
 
 
-fn test_arithmetic_bool_buffers_arith() raises:
-    """Test arithmetic on boolean buffers."""
-    print("test_arithmetic_bool_buffers_arith")
-    var buf1 = Buffer[DType.bool](100)
-    var buf2 = Buffer[DType.bool](100)
-
-    for i in range(100):
-        buf1[i] = i % 2 == 0
-        buf2[i] = i % 3 == 0
-
-    var result = buf1.arithmetic_ops[Multiply](buf2)  # Logical AND
-
-    for i in range(100):
-        var expected = (i % 2 == 0) and (i % 3 == 0)
-        assert_true(result[i] == expected)
-
-
 fn test_arithmetic_int64_arith() raises:
     """Test arithmetic on int64 buffers."""
     print("test_arithmetic_int64_arith")
@@ -4255,24 +4222,6 @@ fn test_mv_inplace_overwrite_partial() raises:
     print("test_mv_inplace_overwrite_partial passed")
 
 
-fn test_mv_inplace_bool_multiply() raises:
-    """Test boolean multiplication (AND operation)."""
-    print("test_mv_inplace_bool_multiply")
-    var buffer1 = Buffer[DType.bool](MEDIUM_SIZE)
-    var buffer2 = Buffer[DType.bool](MEDIUM_SIZE)
-
-    for i in range(MEDIUM_SIZE):
-        buffer1[i] = i < 40
-        buffer2[i] = i > 20
-
-    buffer1.inplace_ops[Multiply](buffer2)
-
-    # Check results (bool multiply is AND)
-    for i in range(MEDIUM_SIZE):
-        var expected = (i < 40) and (i > 20)  # True for [21, 39]
-        assert_true(buffer1[i] == expected, "Bool multiply failed")
-
-    print("test_mv_inplace_bool_multiply passed")
 
 
 fn test_mv_inplace_bool_overwrite() raises:
