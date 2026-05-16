@@ -12,6 +12,26 @@ from tenmo.mnemonics import MEAN, SUM
 comptime dtype = DType.float32
 
 
+fn close_enough[
+    dtype: DType
+](a: Tensor[dtype], b: Tensor[dtype]) raises -> Bool:
+    if (a.is_on_cpu() and b.is_on_cpu()) or (a.is_on_gpu() and b.is_on_gpu()):
+        return a.all_close(b)
+    elif a.is_on_cpu() and b.is_on_gpu():
+        return a.all_close(b.to_cpu())
+    else:
+        return a.to_cpu().all_close(b)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Entry point
+# ===============================================================================
+
+
+fn main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Tensor.sum — CPU
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -356,9 +376,7 @@ fn test_v2_ndbuffer_mean_keepdims() raises:
             ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # keepdims -> shape (2, 1)
-    var result = ndb.reduce[MEAN](
-        normalized_axes=IntArray(1), keepdims=True
-    )
+    var result = ndb.reduce[MEAN](normalized_axes=IntArray(1), keepdims=True)
     assert_true(result[IntArray(0, 0)] == 2.0)
     assert_true(result[IntArray(1, 0)] == 5.0)
     print("test_v2_ndbuffer_mean_keepdims passed")
@@ -590,146 +608,35 @@ fn test_cpu_grad_flow() raises:
 
 
 fn test_gpu_grad_flow() raises:
-    print("=== Test : Backward grad flow GPU ===")
-    var A = Tensor[dtype].arange(9 * 30, requires_grad=True)
-    var B = Tensor[dtype].arange(30 * 5)
+    comptime if has_accelerator():
+        print("=== Test : Backward grad flow GPU ===")
+        var A = Tensor[dtype].arange(9 * 30, requires_grad=True)
+        var B = Tensor[dtype].arange(30 * 5)
 
-    var A_reshaped = A.reshape(Shape(1, 9, 30))
-    var B_reshaped = B.reshape(Shape(30, 5))
+        var A_reshaped = A.reshape(Shape(1, 9, 30))
+        var B_reshaped = B.reshape(Shape(30, 5))
 
-    var A_gpu = A_reshaped.to_gpu()
-    var A_r = A_gpu.reshape(3, 3, 1, 30)
-    var A_rr = A_r.reshape(3, 2, 3, 1, 15)
-    var B_gpu = B_reshaped.to_gpu()
-    var A_gpu_reshaped = A_rr.reshape(Shape(9, 1, 30))
-    var C_gpu = A_gpu_reshaped.matmul(B_gpu)
+        var A_gpu = A_reshaped.to_gpu()
+        var A_r = A_gpu.reshape(3, 3, 1, 30)
+        var A_rr = A_r.reshape(3, 2, 3, 1, 15)
+        var B_gpu = B_reshaped.to_gpu()
+        var A_gpu_reshaped = A_rr.reshape(Shape(9, 1, 30))
+        var C_gpu = A_gpu_reshaped.matmul(B_gpu)
 
-    C_gpu.backward()
-    var A_grad = A.grad().copy()
+        C_gpu.backward()
+        var A_grad = A.grad().copy()
 
-    var grad_out = Gradbox[dtype].full(C_gpu.shape(), 1)
-    # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
-    var A_grad_expected = grad_out.matmul(B_reshaped.transpose(-1, -2))
-    A_grad_expected = A_grad_expected.reshape(Shape(9 * 30))
+        var grad_out = Gradbox[dtype].full(C_gpu.shape(), 1)
+        # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
+        var A_grad_expected = grad_out.matmul(B_reshaped.transpose(-1, -2))
+        A_grad_expected = A_grad_expected.reshape(Shape(9 * 30))
 
-    assert_true(A_grad.all_close(A_grad_expected))
+        assert_true(A_grad.all_close(A_grad_expected))
 
     print("PASSED: GPU backward flow")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Entry point
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-fn main() raises:
-    TestSuite.discover_tests[__functions_in_module()]().run()
-
-_ = """
-fn main() raises:
-    # CPU — sum
-    test_v2_tensor_sum_scalar_input()
-    test_v2_tensor_sum_1d()
-    test_v2_tensor_sum_1d_keepdims()
-    test_v2_tensor_sum_2d_axis0()
-    test_v2_tensor_sum_2d_axis1()
-    test_v2_tensor_sum_2d_axis0_keepdims()
-    test_v2_tensor_sum_2d_axis1_keepdims()
-    test_v2_tensor_sum_2d_all_axes()
-    test_v2_tensor_sum_3d_axis0()
-    test_v2_tensor_sum_3d_axis1()
-    test_v2_tensor_sum_3d_axis2()
-    test_v2_tensor_sum_3d_axes_0_2()
-    test_v2_tensor_sum_3d_all_axes_keepdims()
-    test_v2_tensor_sum_zeros()
-    test_v2_tensor_sum_negative_values()
-
-    # CPU — mean
-    test_v2_tensor_mean_1d()
-    test_v2_tensor_mean_2d_axis0()
-    test_v2_tensor_mean_2d_axis1()
-    test_v2_tensor_mean_2d_axis0_keepdims()
-    test_v2_tensor_mean_2d_axis1_keepdims()
-    test_v2_tensor_mean_3d_axis1()
-    test_v2_tensor_mean_3d_all_axes()
-    test_v2_tensor_mean_uniform()
-
-    # CPU — NDBuffer
-    test_v2_ndbuffer_sum_1d()
-    test_v2_ndbuffer_sum_2d_axis0()
-    test_v2_ndbuffer_sum_2d_axis1()
-    test_v2_ndbuffer_mean_2d_axis0()
-    test_v2_ndbuffer_mean_2d_axis1()
-    test_v2_ndbuffer_sum_keepdims()
-    test_v2_ndbuffer_mean_keepdims()
-
-    test_cpu_grad_flow()
-
-    # GPU — Tensor sum
-    test_v2_gpu_tensor_sum_1d()
-    test_v2_gpu_tensor_sum_2d_axis0()
-    test_v2_gpu_tensor_sum_2d_axis1()
-    test_v2_gpu_tensor_sum_3d_axis1()
-    test_v2_gpu_tensor_sum_3d_axes_0_2()
-    test_v2_gpu_tensor_sum_keepdims()
-    test_v2_gpu_tensor_sum_all_axes()
-
-    # GPU — Tensor mean
-    test_v2_gpu_tensor_mean_2d_axis0()
-    test_v2_gpu_tensor_mean_2d_axis1()
-    test_v2_gpu_tensor_mean_3d_axis1()
-    test_v2_gpu_tensor_mean_keepdims()
-    test_v2_gpu_tensor_mean_all_axes()
-
-    # GPU — NDBuffer
-    test_v2_gpu_ndbuffer_sum_2d_axis1()
-    test_v2_gpu_ndbuffer_mean_2d_axis0()
-
-    # vector matrix multiplication
-    test_vector_matrix_mul_tests()
-
-    # matrix vector multiplication
-    test_matrix_vector_multiplications()
-
-    # Tensor tensor multiplication
-    test_tensor_tensor_multiplications()
-
-    comptime if not has_accelerator():
-        print("No GPU available — skipping tests")
-        return
-    else:
-        test_gpu_transfer_fidelity()
-        test_ancestry_storage_fidelity()
-        test_forward_matmul_fidelity()
-        test_ancestry_transposed_matmul_fidelity()
-        test_transposed_matmul_fidelity()
-        test_backward_grad_A_fidelity()
-
-        test_gpu_grad_flow()
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Helpers
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-fn close_enough[
-    dtype: DType
-](mut a: Tensor[dtype], b: Tensor[dtype]) raises -> Bool:
-    var a_gpu = a.to_gpu()
-    # return a_gpu.all_close(b.to_gpu())
-    return a_gpu.all_close(b)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Basic correctness — no batch dims
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
 fn test_vmnd_1d_v_2d_M() raises:
-    """V[k] @ M[k, n] → out[n]. Simplest case, no batch dims."""
-    print("test_vmnd_1d_v_2d_M")
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         # v = [1, 2, 3],  M = [[1,0],[0,1],[1,1]]
@@ -1058,39 +965,6 @@ fn test_vmnd_known_values_broadcast() raises:
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(expected.to_gpu().all_close(gpu_result))
     print("test_vmnd_known_values_broadcast passed")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Entry point for vector matrix multiplication
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-fn test_vector_matrix_mul_tests() raises:
-    # Basic correctness
-    test_vmnd_1d_v_2d_M()
-    test_vmnd_identity_matrix()
-    test_vmnd_zero_vector()
-    test_vmnd_ones_vector()
-    test_vmnd_single_output_element()
-    test_vmnd_large_k()
-    test_vmnd_large_n()
-
-    # Batched — same batch shape
-    test_vmnd_batched_2d_v_3d_M()
-    test_vmnd_batched_3d_v_4d_M()
-    test_vmnd_batched_arange_values()
-
-    # Broadcast — different batch ranks
-    test_vmnd_broadcast_v1d_M3d()
-    test_vmnd_broadcast_v2d_M3d()
-    test_vmnd_broadcast_v3d_M2d()
-    test_vmnd_broadcast_both_size1()
-    test_vmnd_broadcast_large_batch()
-
-    # Known values — spot checks
-    test_vmnd_known_values_no_batch()
-    test_vmnd_known_values_batched()
-    test_vmnd_known_values_broadcast()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1456,39 +1330,6 @@ fn test_mvnd_broadcast_large_batch() raises:
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
     print("test_mvnd_broadcast_large_batch passed")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Entry point for matrix vector multiplication
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-fn test_matrix_vector_multiplications() raises:
-    # Basic correctness
-    test_mvnd_2d_M_1d_v()
-    test_mvnd_known_values()
-    test_mvnd_identity_matrix()
-    test_mvnd_zero_vector()
-    test_mvnd_ones_vector()
-    test_mvnd_single_row_matrix()
-    test_mvnd_single_col_matrix()
-    test_mvnd_large_k()
-    test_mvnd_large_m()
-    test_mvnd_negative_values()
-
-    # Batched — same batch shape
-    test_mvnd_batched_3d_M_2d_v()
-    test_mvnd_batched_4d_M_3d_v()
-    test_mvnd_batched_arange_values()
-    test_mvnd_known_values_batched()
-
-    # Broadcast — different batch ranks
-    test_mvnd_broadcast_3d_M_1d_v()
-    test_mvnd_broadcast_2d_M_3d_v()
-    test_mvnd_broadcast_4d_M_2d_v()
-    test_mvnd_broadcast_size1_batch()
-    test_mvnd_broadcast_known_values()
-    test_mvnd_broadcast_large_batch()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1947,164 +1788,132 @@ fn test_mmnd_broadcast_large() raises:
 
 
 fn test_gpu_transfer_fidelity() raises:
-    print("=== Test 1: GPU transfer fidelity ===")
-    var B = Tensor[dtype].rand(80, 20)
-    var B_gpu = B.to_gpu()
-    var B_back = B_gpu.to_cpu()
-    assert_true(B.all_close(B_back))
+    comptime if has_accelerator():
+        print("=== Test 1: GPU transfer fidelity ===")
+        var B = Tensor[dtype].rand(80, 20)
+        var B_gpu = B.to_gpu()
+        var B_back = B_gpu.to_cpu()
+        assert_true(B.all_close(B_back))
     print("PASSED: B == B_gpu.to_cpu()")
 
 
 fn test_ancestry_storage_fidelity() raises:
-    print("=== Test 2: Ancestry storage fidelity ===")
-    var A = Tensor[dtype].rand(9, 80, requires_grad=True)
-    var A_gpu = A.to_gpu()
-    var B = Tensor[dtype].rand(80, 20)
-    var B_gpu = B.to_gpu()
-    var C_gpu = A_gpu.matmul(B_gpu)
-    var B_from_ancestry = C_gpu.ancestry().tensor(1)
-    var B_ancestry_back = B_from_ancestry.to_cpu()
-    assert_true(B.all_close(B_ancestry_back))
+    comptime if has_accelerator():
+        print("=== Test 2: Ancestry storage fidelity ===")
+        var A = Tensor[dtype].rand(9, 80, requires_grad=True)
+        var A_gpu = A.to_gpu()
+        var B = Tensor[dtype].rand(80, 20)
+        var B_gpu = B.to_gpu()
+        var C_gpu = A_gpu.matmul(B_gpu)
+        var B_from_ancestry = C_gpu.ancestry().tensor(1)
+        var B_ancestry_back = B_from_ancestry.to_cpu()
+        assert_true(B.all_close(B_ancestry_back))
     print("PASSED: B from ancestry == original B")
 
 
 fn test_forward_matmul_fidelity() raises:
-    print("=== Test 3: Forward matmul fidelity ===")
-    var A = Tensor[dtype].rand(9, 80, requires_grad=True)
-    var B = Tensor[dtype].rand(80, 20)
-    var A_gpu = A.to_gpu()
-    var B_gpu = B.to_gpu()
-    var C_cpu = A.matmul(B)
-    var C_gpu = A_gpu.matmul(B_gpu)
-    assert_true(C_cpu.all_close(C_gpu.to_cpu()))
+    comptime if has_accelerator():
+        print("=== Test 3: Forward matmul fidelity ===")
+        var A = Tensor[dtype].rand(9, 80, requires_grad=True)
+        var B = Tensor[dtype].rand(80, 20)
+        var A_gpu = A.to_gpu()
+        var B_gpu = B.to_gpu()
+        var C_cpu = A.matmul(B)
+        var C_gpu = A_gpu.matmul(B_gpu)
+        assert_true(C_cpu.all_close(C_gpu.to_cpu()))
     print("PASSED: CPU matmul == GPU matmul")
 
 
 fn test_backward_grad_A_fidelity() raises:
-    print("=== Test 4: Backward grad_A fidelity ===")
-    var AA = Tensor[dtype].arange(9 * 30, requires_grad=True)
-    var A = AA.reshape(9, 30)
-    var B = Tensor[dtype].arange(30 * 5).reshape(30, 5)
+    comptime if has_accelerator():
+        print("=== Test 4: Backward grad_A fidelity ===")
+        var AA = Tensor[dtype].arange(9 * 30, requires_grad=True)
+        var A = AA.reshape(9, 30)
+        var B = Tensor[dtype].arange(30 * 5).reshape(30, 5)
 
-    var A_gpu = A.to_gpu()
-    var B_gpu = B.to_gpu()
-    var C_cpu = A.matmul(B)
-    var C_gpu = A_gpu.matmul(B_gpu)
+        var A_gpu = A.to_gpu()
+        var B_gpu = B.to_gpu()
+        var C_cpu = A.matmul(B)
+        var C_gpu = A_gpu.matmul(B_gpu)
 
-    C_cpu.backward()
+        C_cpu.backward()
 
-    assert_true(A_gpu.grad().to_cpu().all_close(Tensor[dtype].zeros(Shape(9, 30))))
+        assert_true(
+            A_gpu.grad().to_cpu().all_close(Tensor[dtype].zeros(Shape(9, 30)))
+        )
 
-    C_gpu.backward()
+        C_gpu.backward()
 
-    assert_true(AA.grad().to_gpu().reshape(Shape(9, 30)).all_close(A_gpu.grad() * 2))
+        assert_true(
+            AA.grad().to_gpu().reshape(Shape(9, 30)).all_close(A_gpu.grad() * 2)
+        )
     print("PASSED: GPU backward grad_A == CPU backward grad_A")
 
 
 fn test_transposed_matmul_fidelity() raises:
-    print("=== Test 5: Transposed matmul fidelity ===")
-    var B = Tensor[dtype].rand(80, 20)
-    var B_gpu = B.to_gpu()
-    var BT_cpu = B.transpose(axes=IntArray(-1, -2))
-    var BT_gpu = B_gpu.buffer.transpose(axes=IntArray(-1, -2))
+    comptime if has_accelerator():
+        print("=== Test 5: Transposed matmul fidelity ===")
+        var B = Tensor[dtype].rand(80, 20)
+        var B_gpu = B.to_gpu()
+        var BT_cpu = B.transpose(axes=IntArray(-1, -2))
+        var BT_gpu = B_gpu.buffer.transpose(axes=IntArray(-1, -2))
 
-    var grad_out = Tensor[dtype].ones(9, 20)
-    var grad_out_gpu = grad_out.to_gpu()
+        var grad_out = Tensor[dtype].ones(9, 20)
+        var grad_out_gpu = grad_out.to_gpu()
 
-    var grad_A_cpu = grad_out.matmul(BT_cpu)
+        var grad_A_cpu = grad_out.matmul(BT_cpu)
 
-    var grad_A_ndb = MatmulNdGpu[dtype].launch[tile_size=32](
-        grad_out_gpu.buffer, BT_gpu
-    )
-    var grad_A_GPU = Tensor[dtype](grad_A_ndb^)
-    var grad_A_gpu = grad_A_GPU.to_cpu()
+        var grad_A_ndb = MatmulNdGpu[dtype].launch[tile_size=32](
+            grad_out_gpu.buffer, BT_gpu
+        )
+        var grad_A_GPU = Tensor[dtype](grad_A_ndb^)
+        var grad_A_gpu = grad_A_GPU.to_cpu()
 
-    print("CPU grad_A row 0:")
-    for i in range(min(8, grad_A_cpu.shape()[-1])):
-        print(grad_A_cpu.buffer[[0, i]], end=" ")
-    print()
-    print("GPU grad_A row 0:")
-    for i in range(min(8, grad_A_gpu.shape()[-1])):
-        print(grad_A_gpu.buffer[[0, i]], end=" ")
-    print()
+        print("CPU grad_A row 0:")
+        for i in range(min(8, grad_A_cpu.shape()[-1])):
+            print(grad_A_cpu.buffer[[0, i]], end=" ")
+        print()
+        print("GPU grad_A row 0:")
+        for i in range(min(8, grad_A_gpu.shape()[-1])):
+            print(grad_A_gpu.buffer[[0, i]], end=" ")
+        print()
 
-    assert_true(grad_A_cpu.all_close(grad_A_gpu))
+        assert_true(grad_A_cpu.all_close(grad_A_gpu))
     print("PASSED: GPU transposed matmul == CPU")
 
 
 fn test_ancestry_transposed_matmul_fidelity() raises:
-    print("=== Test 6: B from ancestry transposed matmul ===")
-    var A = Tensor[dtype].rand(9, 80, requires_grad=True)
-    var B = Tensor[dtype].rand(80, 20)
-    var A_gpu = A.to_gpu()
-    var B_gpu = B.to_gpu()
-    var C_gpu = A_gpu.matmul(B_gpu)
+    comptime if has_accelerator():
+        print("=== Test 6: B from ancestry transposed matmul ===")
+        var A = Tensor[dtype].rand(9, 80, requires_grad=True)
+        var B = Tensor[dtype].rand(80, 20)
+        var A_gpu = A.to_gpu()
+        var B_gpu = B.to_gpu()
+        var C_gpu = A_gpu.matmul(B_gpu)
 
-    var grad_out = Tensor[dtype].ones(9, 20)
-    var grad_out_gpu = grad_out.to_gpu()
+        var grad_out = Tensor[dtype].ones(9, 20)
+        var grad_out_gpu = grad_out.to_gpu()
 
-    var BT_cpu = B.transpose(axes=IntArray(-1, -2))
-    var grad_A_cpu = grad_out.matmul(BT_cpu)
+        var BT_cpu = B.transpose(axes=IntArray(-1, -2))
+        var grad_A_cpu = grad_out.matmul(BT_cpu)
 
-    var B_anc = C_gpu.ancestry().tensor(1)
-    var BT_anc = B_anc.buffer.transpose(axes=IntArray(-1, -2))
+        var B_anc = C_gpu.ancestry().tensor(1)
+        var BT_anc = B_anc.buffer.transpose(axes=IntArray(-1, -2))
 
-    var grad_A_anc_ndb = MatmulNdGpu[dtype].launch[tile_size=32](
-        grad_out_gpu.buffer, BT_anc
-    )
-    var grad_A_ANC = Tensor[dtype](grad_A_anc_ndb^)
-    var grad_A_anc = grad_A_ANC.to_cpu()
+        var grad_A_anc_ndb = MatmulNdGpu[dtype].launch[tile_size=32](
+            grad_out_gpu.buffer, BT_anc
+        )
+        var grad_A_ANC = Tensor[dtype](grad_A_anc_ndb^)
+        var grad_A_anc = grad_A_ANC.to_cpu()
 
-    print("CPU grad_A row 0:")
-    for i in range(min(8, grad_A_cpu.shape()[-1])):
-        print(grad_A_cpu.buffer[[0, i]], end=" ")
-    print()
-    print("GPU grad_A from ancestry row 0:")
-    for i in range(min(8, grad_A_anc.shape()[-1])):
-        print(grad_A_anc.buffer[[0, i]], end=" ")
-    print()
+        print("CPU grad_A row 0:")
+        for i in range(min(8, grad_A_cpu.shape()[-1])):
+            print(grad_A_cpu.buffer[[0, i]], end=" ")
+        print()
+        print("GPU grad_A from ancestry row 0:")
+        for i in range(min(8, grad_A_anc.shape()[-1])):
+            print(grad_A_anc.buffer[[0, i]], end=" ")
+        print()
 
-    assert_true(grad_A_cpu.all_close(grad_A_anc))
+        assert_true(grad_A_cpu.all_close(grad_A_anc))
     print("PASSED: B from ancestry transposed matmul == CPU")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Entry point
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-fn test_tensor_tensor_multiplications() raises:
-    # Basic correctness
-    test_mmnd_2d_known_values()
-    test_mmnd_2d_identity()
-    test_mmnd_2d_zero_matrix()
-    test_mmnd_2d_ones()
-    test_mmnd_2d_rectangular()
-    test_mmnd_2d_negative_values()
-    test_mmnd_2d_single_element()
-
-    # Tile boundary stress
-    test_mmnd_2d_non_tile_multiple_m()
-    test_mmnd_2d_non_tile_multiple_n()
-    test_mmnd_2d_non_tile_multiple_k()
-    test_mmnd_2d_all_non_tile_multiples()
-    test_mmnd_2d_smaller_than_tile()
-
-    # Large matrices
-    test_mmnd_2d_large_square()
-    test_mmnd_2d_large_rectangular()
-
-    # Batched same shape
-    test_mmnd_batched_3d_known_values()
-    test_mmnd_batched_3d_arange()
-    test_mmnd_batched_4d()
-    test_mmnd_batched_large_batch()
-    test_mmnd_batched_non_tile_multiples()
-
-    # Broadcast
-    test_mmnd_broadcast_3d_A_2d_B()
-    test_mmnd_broadcast_2d_A_3d_B()
-    test_mmnd_broadcast_4d_A_3d_B()
-    test_mmnd_broadcast_size1_batch_dim()
-    test_mmnd_broadcast_known_values()
-    test_mmnd_broadcast_large()
