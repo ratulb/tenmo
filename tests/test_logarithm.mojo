@@ -6,6 +6,83 @@ from std.sys import has_accelerator
 from std.math import log
 from tenmo.shapes import Shape
 
+fn main() raises:
+    _="""print("Example: Basic logarithm with epsilon")
+
+    comptime dtype = DType.float64
+
+    # Example 1: Basic usage
+    var x = Tensor[dtype]([1.0, 2.0, 3.0], requires_grad=True)
+    var y = x.log()
+
+    # Example 2: With zero handling
+    # var x_with_zero = Tensor[dtype]([0.0, 1.0, 2.0], requires_grad=True)
+    # var y_with_zero = x_with_zero.log(epsilon=1e-10)
+
+    # Example 3: Gradient computation
+    var loss = y.sum()
+    loss.backward()
+    x.grad().print()
+
+    run_all_log_tests()
+
+    # New tests
+
+    # CPU forward
+    test_log_cpu_1d_basic_forward()
+    test_log_cpu_2d_forward()
+    test_log_cpu_3d_forward()
+    test_log_cpu_ones_forward()
+    test_log_cpu_epsilon_clamping()
+    test_log_cpu_custom_epsilon()
+    test_log_cpu_large_values()
+    test_log_cpu_no_grad()
+    test_log_cpu_requires_grad_propagates()
+    test_log_cpu_suppress_grad()
+
+    # CPU backward
+    test_log_cpu_1d_backward()
+    test_log_cpu_2d_backward()
+    test_log_cpu_3d_backward()
+    test_log_cpu_backward_chain()
+    test_log_cpu_backward_epsilon_clamping()
+    test_log_cpu_backward_custom_epsilon()
+    test_log_cpu_backward_chained_with_exp()
+    # GPU forward
+    test_log_gpu_1d_basic_forward()
+    test_log_gpu_2d_forward()
+    test_log_gpu_3d_forward()
+    test_log_gpu_ones_forward()
+    test_log_gpu_epsilon_clamping()
+    test_log_gpu_large_values()
+    # GPU backward
+    test_log_gpu_1d_backward()
+    test_log_gpu_2d_backward()
+    test_log_gpu_3d_backward()
+    test_log_gpu_backward_chain()
+    test_log_gpu_backward_epsilon_clamping()
+    test_log_gpu_backward_chained_with_exp()
+    test_log_gpu_backward_custom_epsilon()
+
+    # Parity
+    test_log_parity_1d_forward()
+    test_log_parity_2d_forward()
+    test_log_parity_1d_backward()
+    test_log_parity_2d_backward()
+    test_log_parity_epsilon_clamping()
+    test_log_parity_chain_exp()"""
+
+
+
+
+    TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+
+
+
+
+    print("All logarithm tests passed!")
 
 # ============================================================================
 # TESTS - Forward Pass
@@ -390,80 +467,6 @@ fn run_all_log_tests() raises:
 # ============================================================================
 
 
-fn main() raises:
-    TestSuite.discover_tests[__functions_in_module()]().run()
-
-_ = """
-fn main() raises:
-    """Example usage and quick verification."""
-    print("Example: Basic logarithm with epsilon")
-
-    comptime dtype = DType.float64
-
-    # Example 1: Basic usage
-    var x = Tensor[dtype]([1.0, 2.0, 3.0], requires_grad=True)
-    var y = x.log()
-
-    # Example 2: With zero handling
-    # var x_with_zero = Tensor[dtype]([0.0, 1.0, 2.0], requires_grad=True)
-    # var y_with_zero = x_with_zero.log(epsilon=1e-10)
-
-    # Example 3: Gradient computation
-    var loss = y.sum()
-    loss.backward()
-
-    run_all_log_tests()
-
-    # New tests
-
-    # CPU forward
-    test_log_cpu_1d_basic_forward()
-    test_log_cpu_2d_forward()
-    test_log_cpu_3d_forward()
-    test_log_cpu_ones_forward()
-    test_log_cpu_epsilon_clamping()
-    test_log_cpu_custom_epsilon()
-    test_log_cpu_large_values()
-    test_log_cpu_no_grad()
-    test_log_cpu_requires_grad_propagates()
-    test_log_cpu_suppress_grad()
-
-    # CPU backward
-    test_log_cpu_1d_backward()
-    test_log_cpu_2d_backward()
-    test_log_cpu_3d_backward()
-    test_log_cpu_backward_chain()
-    test_log_cpu_backward_epsilon_clamping()
-    test_log_cpu_backward_custom_epsilon()
-    test_log_cpu_backward_chained_with_exp()
-
-    # GPU forward
-    test_log_gpu_1d_basic_forward()
-    test_log_gpu_2d_forward()
-    test_log_gpu_3d_forward()
-    test_log_gpu_ones_forward()
-    test_log_gpu_epsilon_clamping()
-    test_log_gpu_large_values()
-
-    # GPU backward
-    test_log_gpu_1d_backward()
-    test_log_gpu_2d_backward()
-    test_log_gpu_3d_backward()
-    test_log_gpu_backward_chain()
-    test_log_gpu_backward_epsilon_clamping()
-    test_log_gpu_backward_chained_with_exp()
-    test_log_gpu_backward_custom_epsilon()
-
-    # Parity
-    test_log_parity_1d_forward()
-    test_log_parity_2d_forward()
-    test_log_parity_1d_backward()
-    test_log_parity_2d_backward()
-    test_log_parity_epsilon_clamping()
-    test_log_parity_chain_exp()
-
-
-    print("All logarithm tests passed!")
 
 
 # ── CPU Forward Tests ─────────────────────────────────────────────────────────
@@ -971,4 +974,4 @@ fn test_log_parity_chain_exp() raises:
         loss_gpu.backward()
 
         assert_true(a_cpu.grad().all_close(2 * a_gpu.grad().to_cpu()))
-"""
+
