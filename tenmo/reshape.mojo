@@ -39,7 +39,7 @@ struct Reshape[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         comptime if track_grad:
-            grad_required = requires_grad.or_else(tensor.requires_grad)
+            var grad_required = requires_grad.or_else(tensor.requires_grad)
 
             if grad_required:
                 out.requires_grad_(True)
