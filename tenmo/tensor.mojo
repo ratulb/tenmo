@@ -3945,7 +3945,7 @@ struct Tensor[dtype: DType](
     ](
         logits: Tensor[Self.dtype],
         target: Tensor[Self.dtype],
-        epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9),
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """BCE loss with logits (sigmoid applied internally).
 
