@@ -33,7 +33,6 @@ from tenmo.intarray import IntArray
 
 
 fn test_prd_cpu_fwd_all_positive_1d() raises:
-    print("test_prd_cpu_fwd_all_positive_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=False)
     var out = a.product(IntArray(0))
@@ -42,7 +41,6 @@ fn test_prd_cpu_fwd_all_positive_1d() raises:
 
 
 fn test_prd_cpu_fwd_all_negative_1d() raises:
-    print("test_prd_cpu_fwd_all_negative_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([-2.0, -3.0, -4.0], requires_grad=False)
     var out = a.product(IntArray(0))
@@ -51,7 +49,6 @@ fn test_prd_cpu_fwd_all_negative_1d() raises:
 
 
 fn test_prd_cpu_fwd_mixed_signs_1d() raises:
-    print("test_prd_cpu_fwd_mixed_signs_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([-2.0, 3.0, -4.0], requires_grad=False)
     var out = a.product(IntArray(0))
@@ -60,7 +57,6 @@ fn test_prd_cpu_fwd_mixed_signs_1d() raises:
 
 
 fn test_prd_cpu_fwd_single_zero_1d() raises:
-    print("test_prd_cpu_fwd_single_zero_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([2.0, 0.0, 4.0], requires_grad=False)
     var out = a.product(IntArray(0))
@@ -68,7 +64,6 @@ fn test_prd_cpu_fwd_single_zero_1d() raises:
 
 
 fn test_prd_cpu_fwd_two_zeros_1d() raises:
-    print("test_prd_cpu_fwd_two_zeros_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([2.0, 0.0, 0.0], requires_grad=False)
     var out = a.product(IntArray(0))
@@ -76,7 +71,6 @@ fn test_prd_cpu_fwd_two_zeros_1d() raises:
 
 
 fn test_prd_cpu_fwd_single_element() raises:
-    print("test_prd_cpu_fwd_single_element")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([5.0], requires_grad=False)
     var out = a.product(IntArray(0))
@@ -84,7 +78,6 @@ fn test_prd_cpu_fwd_single_element() raises:
 
 
 fn test_prd_cpu_fwd_2d_axis0() raises:
-    print("test_prd_cpu_fwd_2d_axis0")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
     var out = a.product(IntArray(0))
@@ -93,7 +86,6 @@ fn test_prd_cpu_fwd_2d_axis0() raises:
 
 
 fn test_prd_cpu_fwd_2d_axis1() raises:
-    print("test_prd_cpu_fwd_2d_axis1")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
     var out = a.product(IntArray(1))
@@ -102,7 +94,6 @@ fn test_prd_cpu_fwd_2d_axis1() raises:
 
 
 fn test_prd_cpu_fwd_2d_keepdims() raises:
-    print("test_prd_cpu_fwd_2d_keepdims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
     var out = a.product(IntArray(1), keepdims=True)
@@ -111,7 +102,6 @@ fn test_prd_cpu_fwd_2d_keepdims() raises:
 
 
 fn test_prd_cpu_fwd_2d_all_axes() raises:
-    print("test_prd_cpu_fwd_2d_all_axes")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
     var axes = IntArray(0, 1)
@@ -121,7 +111,6 @@ fn test_prd_cpu_fwd_2d_all_axes() raises:
 
 
 fn test_prd_cpu_fwd_3d_axis1() raises:
-    print("test_prd_cpu_fwd_3d_axis1")
     comptime dtype = DType.float32
     # shape [2,2,2]
     var a = Tensor[dtype].full([2, 2, 2], 2.0, requires_grad=False)
@@ -131,7 +120,6 @@ fn test_prd_cpu_fwd_3d_axis1() raises:
 
 
 fn test_prd_cpu_fwd_4d() raises:
-    print("test_prd_cpu_fwd_4d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].full([2, 2, 2, 2], 2.0, requires_grad=False)
     var out = a.product(IntArray(3))
@@ -140,7 +128,6 @@ fn test_prd_cpu_fwd_4d() raises:
 
 
 fn test_prd_cpu_fwd_scalar_input() raises:
-    print("test_prd_cpu_fwd_scalar_input")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(7.0, requires_grad=False)
     var out = a.product(IntArray())
@@ -148,7 +135,6 @@ fn test_prd_cpu_fwd_scalar_input() raises:
 
 
 fn test_prd_cpu_fwd_dtype_float64() raises:
-    print("test_prd_cpu_fwd_dtype_float64")
     comptime dtype = DType.float64
     var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=False)
     var out = a.product(IntArray(0))
@@ -156,7 +142,6 @@ fn test_prd_cpu_fwd_dtype_float64() raises:
 
 
 fn test_prd_cpu_fwd_dtype_int32() raises:
-    print("test_prd_cpu_fwd_dtype_int32")
     comptime dtype = DType.int32
     var a = Tensor[dtype].d1([2, 3, 4], requires_grad=False)
     var out = a.product(IntArray(0))
@@ -164,7 +149,6 @@ fn test_prd_cpu_fwd_dtype_int32() raises:
 
 
 fn test_prd_cpu_fwd_negative_sign_tracking() raises:
-    print("test_prd_cpu_fwd_negative_sign_tracking")
     comptime dtype = DType.float32
     # odd negatives → negative result
     var a = Tensor[dtype].d1([-1.0, 2.0, 3.0], requires_grad=False)
@@ -182,7 +166,6 @@ fn test_prd_cpu_fwd_negative_sign_tracking() raises:
 
 
 fn test_prd_cpu_bwd_all_positive_1d() raises:
-    print("test_prd_cpu_bwd_all_positive_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
     var out = a.product(IntArray(0))
@@ -195,7 +178,6 @@ fn test_prd_cpu_bwd_all_positive_1d() raises:
 
 
 fn test_prd_cpu_bwd_single_zero() raises:
-    print("test_prd_cpu_bwd_single_zero")
     comptime dtype = DType.float32
     # x = [2, 0, 4] — one zero
     # grad_x[1] = 2*4 = 8 (the zero element gets the non-zero grad)
@@ -211,7 +193,6 @@ fn test_prd_cpu_bwd_single_zero() raises:
 
 
 fn test_prd_cpu_bwd_two_zeros() raises:
-    print("test_prd_cpu_bwd_two_zeros")
     comptime dtype = DType.float32
     # x = [2, 0, 0] — two zeros → all grads zero
     var a = Tensor[dtype].d1([2.0, 0.0, 0.0], requires_grad=True)
@@ -224,7 +205,6 @@ fn test_prd_cpu_bwd_two_zeros() raises:
 
 
 fn test_prd_cpu_bwd_negative_elements() raises:
-    print("test_prd_cpu_bwd_negative_elements")
     comptime dtype = DType.float32
     # x = [-2, 3, -4] → product = 24
     # grad_x[0] = 3*(-4) = -12
@@ -240,7 +220,6 @@ fn test_prd_cpu_bwd_negative_elements() raises:
 
 
 fn test_prd_cpu_bwd_2d_axis0() raises:
-    print("test_prd_cpu_bwd_2d_axis0")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var out = a.product(IntArray(0))
@@ -255,7 +234,6 @@ fn test_prd_cpu_bwd_2d_axis0() raises:
 
 
 fn test_prd_cpu_bwd_2d_axis1() raises:
-    print("test_prd_cpu_bwd_2d_axis1")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var out = a.product(IntArray(1))
@@ -270,7 +248,6 @@ fn test_prd_cpu_bwd_2d_axis1() raises:
 
 
 fn test_prd_cpu_bwd_keepdims() raises:
-    print("test_prd_cpu_bwd_keepdims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var out = a.product(IntArray(1), keepdims=True)
@@ -285,7 +262,6 @@ fn test_prd_cpu_bwd_keepdims() raises:
 
 
 fn test_prd_cpu_bwd_3d() raises:
-    print("test_prd_cpu_bwd_3d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].full([2, 2, 2], 2.0, requires_grad=True)
     var out = a.product(IntArray(2))
@@ -298,7 +274,6 @@ fn test_prd_cpu_bwd_3d() raises:
 
 
 fn test_prd_cpu_bwd_grad_shape_preserved() raises:
-    print("test_prd_cpu_bwd_grad_shape_preserved")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -310,7 +285,6 @@ fn test_prd_cpu_bwd_grad_shape_preserved() raises:
 
 
 fn test_prd_cpu_bwd_recompute_path() raises:
-    print("test_prd_cpu_bwd_recompute_path")
     comptime dtype = DType.float32
     # store_excl_product=False → recompute path in backward
     var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
@@ -328,7 +302,6 @@ fn test_prd_cpu_bwd_recompute_path() raises:
 
 
 fn test_prd_cpu_grad_chain_product_mul() raises:
-    print("test_prd_cpu_grad_chain_product_mul")
     comptime dtype = DType.float32
     # y = product(a) * 2  →  grad_a[i] = 2 * excl_product[i]
     var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
@@ -342,7 +315,6 @@ fn test_prd_cpu_grad_chain_product_mul() raises:
 
 
 fn test_prd_cpu_grad_chain_sum_of_product() raises:
-    print("test_prd_cpu_grad_chain_sum_of_product")
     comptime dtype = DType.float32
     # Reduce along axis1, then sum
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -357,7 +329,6 @@ fn test_prd_cpu_grad_chain_sum_of_product() raises:
 
 
 fn test_prd_cpu_grad_no_grad_tensor() raises:
-    print("test_prd_cpu_grad_no_grad_tensor")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=False)
     var out = a.product(IntArray(0))
@@ -367,7 +338,6 @@ fn test_prd_cpu_grad_no_grad_tensor() raises:
 
 
 fn test_prd_cpu_grad_two_inputs() raises:
-    print("test_prd_cpu_grad_two_inputs")
     comptime dtype = DType.float32
     # z = product(a * b, axis=0)
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -382,7 +352,6 @@ fn test_prd_cpu_grad_two_inputs() raises:
 
 
 fn test_prd_cpu_grad_large_tensor() raises:
-    print("test_prd_cpu_grad_large_tensor")
     comptime dtype = DType.float32
     # All ones — product=1, excl_product=1 everywhere
     var a = Tensor[dtype].full([1024], 1.0, requires_grad=True)
@@ -398,7 +367,6 @@ fn test_prd_cpu_grad_large_tensor() raises:
 
 
 fn test_prd_cpu_noncontig_transposed_fwd() raises:
-    print("test_prd_cpu_noncontig_transposed_fwd")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
     var t = a.transpose()
@@ -408,7 +376,6 @@ fn test_prd_cpu_noncontig_transposed_fwd() raises:
 
 
 fn test_prd_cpu_noncontig_transposed_bwd() raises:
-    print("test_prd_cpu_noncontig_transposed_bwd")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var t = a.transpose()
@@ -425,7 +392,6 @@ fn test_prd_cpu_noncontig_transposed_bwd() raises:
 
 fn test_prd_gpu_fwd_all_positive_1d() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_fwd_all_positive_1d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([2.0, 3.0, 4.0]).to_gpu()
         var out = a.product(IntArray(0))
@@ -436,7 +402,6 @@ fn test_prd_gpu_fwd_all_positive_1d() raises:
 
 fn test_prd_gpu_fwd_all_negative_1d() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_fwd_all_negative_1d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([-2.0, -3.0, -4.0]).to_gpu()
         var out = a.product(IntArray(0))
@@ -447,7 +412,6 @@ fn test_prd_gpu_fwd_all_negative_1d() raises:
 
 fn test_prd_gpu_fwd_mixed_signs_1d() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_fwd_mixed_signs_1d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([-2.0, 3.0, -4.0]).to_gpu()
         var out = a.product(IntArray(0))
@@ -458,7 +422,6 @@ fn test_prd_gpu_fwd_mixed_signs_1d() raises:
 
 fn test_prd_gpu_fwd_single_zero() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_fwd_single_zero")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([2.0, 0.0, 4.0]).to_gpu()
         var out = a.product(IntArray(0))
@@ -469,7 +432,6 @@ fn test_prd_gpu_fwd_single_zero() raises:
 
 fn test_prd_gpu_fwd_two_zeros() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_fwd_two_zeros")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([2.0, 0.0, 0.0]).to_gpu()
         var out = a.product(IntArray(0))
@@ -480,7 +442,6 @@ fn test_prd_gpu_fwd_two_zeros() raises:
 
 fn test_prd_gpu_fwd_2d_axis0() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_fwd_2d_axis0")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
         var out = a.product(IntArray(0))
@@ -491,7 +452,6 @@ fn test_prd_gpu_fwd_2d_axis0() raises:
 
 fn test_prd_gpu_fwd_2d_axis1() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_fwd_2d_axis1")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
         var out = a.product(IntArray(1))
@@ -502,7 +462,6 @@ fn test_prd_gpu_fwd_2d_axis1() raises:
 
 fn test_prd_gpu_fwd_2d_keepdims() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_fwd_2d_keepdims")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
         var out = a.product(IntArray(1), keepdims=True)
@@ -513,7 +472,6 @@ fn test_prd_gpu_fwd_2d_keepdims() raises:
 
 fn test_prd_gpu_fwd_3d() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_fwd_3d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].full([2, 2, 2], 2.0).to_gpu()
         var out = a.product(IntArray(2))
@@ -524,7 +482,6 @@ fn test_prd_gpu_fwd_3d() raises:
 
 fn test_prd_gpu_fwd_4d() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_fwd_4d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].full([2, 2, 2, 2], 2.0).to_gpu()
         var out = a.product(IntArray(3))
@@ -537,7 +494,6 @@ fn test_prd_gpu_fwd_4d() raises:
 
 fn test_prd_gpu_fwd_large() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_fwd_large")
         comptime dtype = DType.float32
         # All ones — product=1, exercises multi-block dispatch
         var a = Tensor[dtype].full([65536], 1.0).to_gpu()
@@ -549,7 +505,6 @@ fn test_prd_gpu_fwd_large() raises:
 
 fn test_prd_gpu_fwd_dtype_float64() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_fwd_dtype_float64")
         comptime dtype = DType.float64
         var a = Tensor[dtype].d1([2.0, 3.0, 4.0]).to_gpu()
         var out = a.product(IntArray(0))
@@ -560,7 +515,6 @@ fn test_prd_gpu_fwd_dtype_float64() raises:
 
 fn test_prd_gpu_fwd_negative_sign_tracking() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_fwd_negative_sign_tracking")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([-1.0, 2.0, 3.0]).to_gpu()
         var out = a.product(IntArray(0))
@@ -576,7 +530,6 @@ fn test_prd_gpu_fwd_negative_sign_tracking() raises:
 
 fn test_prd_gpu_bwd_all_positive_1d() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_bwd_all_positive_1d")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
         var a = a_cpu.to_gpu()
@@ -592,7 +545,6 @@ fn test_prd_gpu_bwd_all_positive_1d() raises:
 
 fn test_prd_gpu_bwd_single_zero() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_bwd_single_zero")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([2.0, 0.0, 4.0], requires_grad=True)
         var a = a_cpu.to_gpu()
@@ -607,7 +559,6 @@ fn test_prd_gpu_bwd_single_zero() raises:
 
 fn test_prd_gpu_bwd_two_zeros() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_bwd_two_zeros")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([2.0, 0.0, 0.0], requires_grad=True)
         var a = a_cpu.to_gpu()
@@ -622,7 +573,6 @@ fn test_prd_gpu_bwd_two_zeros() raises:
 
 fn test_prd_gpu_bwd_negative_elements() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_bwd_negative_elements")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([-2.0, 3.0, -4.0], requires_grad=True)
         var a = a_cpu.to_gpu()
@@ -638,7 +588,6 @@ fn test_prd_gpu_bwd_negative_elements() raises:
 
 fn test_prd_gpu_bwd_2d_axis0() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_bwd_2d_axis0")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
             [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
@@ -656,7 +605,6 @@ fn test_prd_gpu_bwd_2d_axis0() raises:
 
 fn test_prd_gpu_bwd_2d_axis1() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_bwd_2d_axis1")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
             [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
@@ -674,7 +622,6 @@ fn test_prd_gpu_bwd_2d_axis1() raises:
 
 fn test_prd_gpu_bwd_keepdims() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_bwd_keepdims")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
             [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
@@ -692,7 +639,6 @@ fn test_prd_gpu_bwd_keepdims() raises:
 
 fn test_prd_gpu_bwd_3d() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_bwd_3d")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].full([2, 2, 2], 2.0, requires_grad=True)
         var a = a_cpu.to_gpu()
@@ -708,7 +654,6 @@ fn test_prd_gpu_bwd_3d() raises:
 
 fn test_prd_gpu_bwd_grad_shape_preserved() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_bwd_grad_shape_preserved")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
             [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -722,7 +667,6 @@ fn test_prd_gpu_bwd_grad_shape_preserved() raises:
 
 fn test_prd_gpu_bwd_recompute_path() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_bwd_recompute_path")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
         var a = a_cpu.to_gpu()
@@ -738,7 +682,6 @@ fn test_prd_gpu_bwd_recompute_path() raises:
 
 fn test_prd_gpu_bwd_large() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_bwd_large")
         comptime dtype = DType.float32
         # All ones — excl_product = 1 everywhere — exercises multi-block backward
         var a_cpu = Tensor[dtype].full([1024], 1.0, requires_grad=True)
@@ -756,7 +699,6 @@ fn test_prd_gpu_bwd_large() raises:
 
 fn test_prd_gpu_grad_chain_product_mul() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_grad_chain_product_mul")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
         var a = a_cpu.to_gpu()
@@ -773,7 +715,6 @@ fn test_prd_gpu_grad_chain_product_mul() raises:
 
 fn test_prd_gpu_grad_chain_sum_of_product() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_grad_chain_sum_of_product")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
             [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
@@ -791,7 +732,6 @@ fn test_prd_gpu_grad_chain_sum_of_product() raises:
 
 fn test_prd_gpu_grad_two_inputs() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_grad_two_inputs")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
         var b_cpu = Tensor[dtype].d1([3.0, 4.0], requires_grad=True)
@@ -816,7 +756,6 @@ fn test_prd_gpu_grad_two_inputs() raises:
 
 fn test_prd_gpu_noncontig_transposed_fwd() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_noncontig_transposed_fwd")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
         var t = a.transpose()
@@ -828,7 +767,6 @@ fn test_prd_gpu_noncontig_transposed_fwd() raises:
 
 fn test_prd_gpu_noncontig_transposed_bwd() raises:
     comptime if has_accelerator():
-        print("test_prd_gpu_noncontig_transposed_bwd")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
             [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
@@ -850,7 +788,6 @@ fn test_prd_gpu_noncontig_transposed_bwd() raises:
 
 fn test_prd_parity_fwd_1d() raises:
     comptime if has_accelerator():
-        print("test_prd_parity_fwd_1d")
         comptime dtype = DType.float32
         var data = Tensor[dtype].d1([2.0, -3.0, 4.0])
         var cpu_out = data.product(IntArray(0))
@@ -860,7 +797,6 @@ fn test_prd_parity_fwd_1d() raises:
 
 fn test_prd_parity_fwd_2d_axis0() raises:
     comptime if has_accelerator():
-        print("test_prd_parity_fwd_2d_axis0")
         comptime dtype = DType.float32
         var data = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
         var cpu_out = data.product(IntArray(0))
@@ -870,7 +806,6 @@ fn test_prd_parity_fwd_2d_axis0() raises:
 
 fn test_prd_parity_fwd_single_zero() raises:
     comptime if has_accelerator():
-        print("test_prd_parity_fwd_single_zero")
         comptime dtype = DType.float32
         var data = Tensor[dtype].d1([2.0, 0.0, 4.0])
         var cpu_out = data.product(IntArray(0))
@@ -880,7 +815,6 @@ fn test_prd_parity_fwd_single_zero() raises:
 
 fn test_prd_parity_fwd_two_zeros() raises:
     comptime if has_accelerator():
-        print("test_prd_parity_fwd_two_zeros")
         comptime dtype = DType.float32
         var data = Tensor[dtype].d1([2.0, 0.0, 0.0])
         var cpu_out = data.product(IntArray(0))
@@ -890,7 +824,6 @@ fn test_prd_parity_fwd_two_zeros() raises:
 
 fn test_prd_parity_bwd_all_positive() raises:
     comptime if has_accelerator():
-        print("test_prd_parity_bwd_all_positive")
         comptime dtype = DType.float32
         # Separate leaf tensors — no retained grad cross-contamination
         var a_cpu = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
@@ -908,7 +841,6 @@ fn test_prd_parity_bwd_all_positive() raises:
 
 fn test_prd_parity_bwd_single_zero() raises:
     comptime if has_accelerator():
-        print("test_prd_parity_bwd_single_zero")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([2.0, 0.0, 4.0], requires_grad=True)
         var loss_cpu = a_cpu.product(IntArray(0)).sum()
@@ -925,7 +857,6 @@ fn test_prd_parity_bwd_single_zero() raises:
 
 fn test_prd_parity_bwd_two_zeros() raises:
     comptime if has_accelerator():
-        print("test_prd_parity_bwd_two_zeros")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([2.0, 0.0, 0.0], requires_grad=True)
         var loss_cpu = a_cpu.product(IntArray(0)).sum()
@@ -942,7 +873,6 @@ fn test_prd_parity_bwd_two_zeros() raises:
 
 fn test_prd_parity_bwd_negative_elements() raises:
     comptime if has_accelerator():
-        print("test_prd_parity_bwd_negative_elements")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([-2.0, 3.0, -4.0], requires_grad=True)
         var loss_cpu = a_cpu.product(IntArray(0)).sum()
@@ -959,7 +889,6 @@ fn test_prd_parity_bwd_negative_elements() raises:
 
 fn test_prd_parity_store_vs_recompute() raises:
     comptime if has_accelerator():
-        print("test_prd_parity_store_vs_recompute")
         comptime dtype = DType.float32
         # store path
         var a1 = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)

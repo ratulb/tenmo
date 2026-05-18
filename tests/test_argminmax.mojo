@@ -175,7 +175,8 @@ fn test_argmin_1d_basic_cpu() raises:
     print("test_argmin_1d_basic_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([5.0, 2.0, 8.0, 1.0, 9.0])
-    var result = t.argmin(axis=0).reshape(Shape(1))
+    var _tmp0 = t.argmin(axis=0)
+    var result = _tmp0.reshape(Shape(1))
     assert_true(result == Tensor[DType.int32].d1([3]))
     print("✓ Passed")
 
@@ -184,7 +185,8 @@ fn test_argmax_1d_basic_cpu() raises:
     print("test_argmax_1d_basic_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([5.0, 2.0, 8.0, 1.0, 9.0])
-    var result = t.argmax(axis=0).reshape(Shape(1))
+    var _tmp0 = t.argmax(axis=0)
+    var result = _tmp0.reshape(Shape(1))
     assert_true(result == Tensor[DType.int32].d1([4]))
     print("✓ Passed")
 
@@ -193,7 +195,8 @@ fn test_argmin_1d_negative_values_cpu() raises:
     print("test_argmin_1d_negative_values_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([-5.0, -2.0, -8.0, -1.0, -9.0])
-    var result = t.argmin(axis=0).reshape(Shape(1))
+    var _tmp0 = t.argmin(axis=0)
+    var result = _tmp0.reshape(Shape(1))
     assert_true(result == Tensor[DType.int32].d1([4]))
     print("✓ Passed")
 
@@ -202,7 +205,8 @@ fn test_argmax_1d_negative_values_cpu() raises:
     print("test_argmax_1d_negative_values_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([-5.0, -2.0, -8.0, -1.0, -9.0])
-    var result = t.argmax(axis=0).reshape(Shape(1))
+    var _tmp0 = t.argmax(axis=0)
+    var result = _tmp0.reshape(Shape(1))
     assert_true(result == Tensor[DType.int32].d1([3]))
     print("✓ Passed")
 
@@ -503,7 +507,8 @@ fn test_argmin_1d_basic_gpu() raises:
         var t = Tensor[dtype].d1([5.0, 2.0, 8.0, 1.0, 9.0])
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmin(axis=0)
-        var result_cpu = result.to_cpu().reshape(Shape(1))
+        var _tmp0 = result.to_cpu()
+        var result_cpu = _tmp0.reshape(Shape(1))
         assert_true(result_cpu == Tensor[DType.int32].d1([3]))
         print("✓ Passed")
 
@@ -515,7 +520,8 @@ fn test_argmax_1d_basic_gpu() raises:
         var t = Tensor[dtype].d1([5.0, 2.0, 8.0, 1.0, 9.0])
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmax(axis=0)
-        var result_cpu = result.to_cpu().reshape(Shape(1))
+        var _tmp0 = result.to_cpu()
+        var result_cpu = _tmp0.reshape(Shape(1))
         assert_true(result_cpu == Tensor[DType.int32].d1([4]))
         print("✓ Passed")
 
@@ -527,7 +533,8 @@ fn test_argmin_1d_negative_values_gpu() raises:
         var t = Tensor[dtype].d1([-5.0, -2.0, -8.0, -1.0, -9.0])
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmin(axis=0)
-        var result_cpu = result.to_cpu().reshape(Shape(1))
+        var _tmp0 = result.to_cpu()
+        var result_cpu = _tmp0.reshape(Shape(1))
         assert_true(result_cpu == Tensor[DType.int32].d1([4]))
         print("✓ Passed")
 
@@ -539,7 +546,8 @@ fn test_argmax_1d_negative_values_gpu() raises:
         var t = Tensor[dtype].d1([-5.0, -2.0, -8.0, -1.0, -9.0])
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmax(axis=0)
-        var result_cpu = result.to_cpu().reshape(Shape(1))
+        var _tmp0 = result.to_cpu()
+        var result_cpu = _tmp0.reshape(Shape(1))
         assert_true(result_cpu == Tensor[DType.int32].d1([3]))
         print("✓ Passed")
 

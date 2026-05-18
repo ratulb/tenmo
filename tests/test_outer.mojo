@@ -15,7 +15,6 @@ from std.sys import has_accelerator
 # ─────────────────────────────────────────────────────────────────────────────
 
 fn test_outer_cpu_fwd_basic() raises:
-    print("test_outer_cpu_fwd_basic")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var b = Tensor[dtype].d1([4.0, 5.0])
@@ -29,7 +28,6 @@ fn test_outer_cpu_fwd_basic() raises:
 
 
 fn test_outer_cpu_fwd_square() raises:
-    print("test_outer_cpu_fwd_square")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var b = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -42,7 +40,6 @@ fn test_outer_cpu_fwd_square() raises:
 
 
 fn test_outer_cpu_fwd_vector_scalar() raises:
-    print("test_outer_cpu_fwd_vector_scalar")
     comptime dtype = DType.float32
     # (hidden_size,) × scalar → (hidden_size, 1) — the IMDB gradient case
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])
@@ -55,7 +52,6 @@ fn test_outer_cpu_fwd_vector_scalar() raises:
 
 
 fn test_outer_cpu_fwd_scalar_vector() raises:
-    print("test_outer_cpu_fwd_scalar_vector")
     comptime dtype = DType.float32
     # scalar × vector → (1, n)
     var a = Tensor[dtype].scalar(3.0)
@@ -66,7 +62,6 @@ fn test_outer_cpu_fwd_scalar_vector() raises:
 
 
 fn test_outer_cpu_fwd_negative_values() raises:
-    print("test_outer_cpu_fwd_negative_values")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, -2.0])
     var b = Tensor[dtype].d1([-3.0, 4.0])
@@ -78,7 +73,6 @@ fn test_outer_cpu_fwd_negative_values() raises:
 
 
 fn test_outer_cpu_fwd_ones() raises:
-    print("test_outer_cpu_fwd_ones")
     comptime dtype = DType.float32
     # outer(ones, ones) = all-ones matrix
     var a = Tensor[dtype].d1([1.0, 1.0, 1.0])
@@ -88,7 +82,6 @@ fn test_outer_cpu_fwd_ones() raises:
 
 
 fn test_outer_cpu_fwd_single_elements() raises:
-    print("test_outer_cpu_fwd_single_elements")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([5.0])
     var b = Tensor[dtype].d1([7.0])
@@ -98,7 +91,6 @@ fn test_outer_cpu_fwd_single_elements() raises:
 
 
 fn test_outer_cpu_fwd_result_shape() raises:
-    print("test_outer_cpu_fwd_result_shape")
     comptime dtype = DType.float32
     # Shape must always be (m, n) regardless of input shapes
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -112,7 +104,6 @@ fn test_outer_cpu_fwd_result_shape() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 
 fn test_outer_cpu_fwd_2d_inputs_flattened() raises:
-    print("test_outer_cpu_fwd_2d_inputs_flattened")
     comptime dtype = DType.float32
     # (2,2) × (2,2) → flatten to (4,) × (4,) → (4,4)
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -129,7 +120,6 @@ fn test_outer_cpu_fwd_2d_inputs_flattened() raises:
 
 
 fn test_outer_cpu_fwd_2d_vector_flattened() raises:
-    print("test_outer_cpu_fwd_2d_vector_flattened")
     comptime dtype = DType.float32
     # (2,2) flattened × (3,) → (4,3)
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -149,7 +139,6 @@ fn test_outer_cpu_fwd_2d_vector_flattened() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 
 fn test_outer_cpu_bwd_both_grad() raises:
-    print("test_outer_cpu_bwd_both_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var b = Tensor[dtype].d1([4.0, 5.0], requires_grad=True)
@@ -163,7 +152,6 @@ fn test_outer_cpu_bwd_both_grad() raises:
 
 
 fn test_outer_cpu_bwd_lhs_only() raises:
-    print("test_outer_cpu_bwd_lhs_only")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var b = Tensor[dtype].d1([4.0, 5.0])
@@ -174,7 +162,6 @@ fn test_outer_cpu_bwd_lhs_only() raises:
 
 
 fn test_outer_cpu_bwd_rhs_only() raises:
-    print("test_outer_cpu_bwd_rhs_only")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var b = Tensor[dtype].d1([4.0, 5.0], requires_grad=True)
@@ -185,7 +172,6 @@ fn test_outer_cpu_bwd_rhs_only() raises:
 
 
 fn test_outer_cpu_bwd_vector_scalar() raises:
-    print("test_outer_cpu_bwd_vector_scalar")
     comptime dtype = DType.float32
     # The IMDB gradient case: hidden (n,) × output_delta scalar → (n,1)
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -200,7 +186,6 @@ fn test_outer_cpu_bwd_vector_scalar() raises:
 
 
 fn test_outer_cpu_bwd_ones() raises:
-    print("test_outer_cpu_bwd_ones")
     comptime dtype = DType.float32
     # outer(ones_m, ones_n) → all-ones (m,n); grad of sum = ones
     # d/da[i] = sum_j(1) = n = 4 for all i
@@ -215,7 +200,6 @@ fn test_outer_cpu_bwd_ones() raises:
 
 
 fn test_outer_cpu_bwd_chained_multiply() raises:
-    print("test_outer_cpu_bwd_chained_multiply")
     comptime dtype = DType.float32
     # outer then scale then sum — verify chain rule
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -233,7 +217,6 @@ fn test_outer_cpu_bwd_chained_multiply() raises:
 
 
 fn test_outer_cpu_bwd_chained_add() raises:
-    print("test_outer_cpu_bwd_chained_add")
     comptime dtype = DType.float32
     # outer + another tensor then sum — verifies grad accumulation
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -251,7 +234,6 @@ fn test_outer_cpu_bwd_chained_add() raises:
 
 
 fn test_outer_cpu_bwd_no_grad_when_neither_requires() raises:
-    print("test_outer_cpu_bwd_no_grad_when_neither_requires")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var b = Tensor[dtype].d1([4.0, 5.0])
@@ -264,7 +246,6 @@ fn test_outer_cpu_bwd_no_grad_when_neither_requires() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 
 fn test_outer_cpu_no_track_grad_explicit() raises:
-    print("test_outer_cpu_no_track_grad_explicit")
     comptime dtype = DType.float32
     # Even if inputs require grad, track_grad=False suppresses it
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -285,7 +266,6 @@ fn test_outer_cpu_no_track_grad_explicit() raises:
 
 fn test_outer_gpu_fwd_basic() raises:
     comptime if has_accelerator():
-        print("test_outer_gpu_fwd_basic")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
         var b = Tensor[dtype].d1([4.0, 5.0]).to_gpu()
@@ -299,7 +279,6 @@ fn test_outer_gpu_fwd_basic() raises:
 
 fn test_outer_gpu_fwd_vector_scalar() raises:
     comptime if has_accelerator():
-        print("test_outer_gpu_fwd_vector_scalar")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0]).to_gpu()
         var b = Tensor[dtype].scalar(2.0).to_gpu()
@@ -312,7 +291,6 @@ fn test_outer_gpu_fwd_vector_scalar() raises:
 
 fn test_outer_gpu_fwd_negative_values() raises:
     comptime if has_accelerator():
-        print("test_outer_gpu_fwd_negative_values")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, -2.0]).to_gpu()
         var b = Tensor[dtype].d1([-3.0, 4.0]).to_gpu()
@@ -325,7 +303,6 @@ fn test_outer_gpu_fwd_negative_values() raises:
 
 fn test_outer_gpu_fwd_result_shape() raises:
     comptime if has_accelerator():
-        print("test_outer_gpu_fwd_result_shape")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0]).to_gpu()
         var b = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
@@ -335,7 +312,6 @@ fn test_outer_gpu_fwd_result_shape() raises:
 
 fn test_outer_gpu_fwd_2d_flattened() raises:
     comptime if has_accelerator():
-        print("test_outer_gpu_fwd_2d_flattened")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0],[3.0, 4.0]]).to_gpu()
         var b = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
@@ -355,7 +331,6 @@ fn test_outer_gpu_fwd_2d_flattened() raises:
 
 fn test_outer_gpu_bwd_both_grad() raises:
     comptime if has_accelerator():
-        print("test_outer_gpu_bwd_both_grad")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
         var b = Tensor[dtype].d1([4.0, 5.0], requires_grad=True)
@@ -370,7 +345,6 @@ fn test_outer_gpu_bwd_both_grad() raises:
 
 fn test_outer_gpu_bwd_vector_scalar() raises:
     comptime if has_accelerator():
-        print("test_outer_gpu_bwd_vector_scalar")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
         var b = Tensor[dtype].scalar(2.0, requires_grad=True)
@@ -385,7 +359,6 @@ fn test_outer_gpu_bwd_vector_scalar() raises:
 
 fn test_outer_gpu_bwd_lhs_only() raises:
     comptime if has_accelerator():
-        print("test_outer_gpu_bwd_lhs_only")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
         var b = Tensor[dtype].d1([4.0, 5.0])
@@ -399,7 +372,6 @@ fn test_outer_gpu_bwd_lhs_only() raises:
 
 fn test_outer_gpu_bwd_chained_multiply() raises:
     comptime if has_accelerator():
-        print("test_outer_gpu_bwd_chained_multiply")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
         var b = Tensor[dtype].d1([3.0, 4.0], requires_grad=True)
@@ -416,7 +388,6 @@ fn test_outer_gpu_bwd_chained_multiply() raises:
 
 fn test_outer_gpu_no_track_grad_explicit() raises:
     comptime if has_accelerator():
-        print("test_outer_gpu_no_track_grad_explicit")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
         var b = Tensor[dtype].d1([4.0, 5.0], requires_grad=True)

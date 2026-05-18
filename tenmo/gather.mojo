@@ -33,6 +33,7 @@ from tenmo.gradbox import Gradbox
 from tenmo.ancestry import Ancestor
 from tenmo.backpropagation import BackwardFnArg, BACKWARD_GATHER, ArgumentType
 from tenmo.mnemonics import AddTensor, ScatterAddTensor, ZeroGrad
+from tenmo.shared import Reduction
 
 
 # =============================================================================
@@ -161,7 +162,8 @@ fn gather_rows_2d_kernel[
 
 
 fn embedding_bag_kernel[
-    dtype: DType
+    dtype: DType,
+    mean: Bool,
 ](
     out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     in_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
@@ -174,6 +176,7 @@ fn embedding_bag_kernel[
     """Fused gather+sum kernel for 2-D embedding lookup (axis=0).
 
     Replaces gather(indices, axis=0).sum(axis=0) with a single kernel.
+    When mean=True, divides the accumulated sum by n_indices.
     Output shape: (in_cols,) — one scalar per column, summed across all
     gathered rows. No intermediate (n_tokens, hidden_size) buffer needed.
 
@@ -182,6 +185,7 @@ fn embedding_bag_kernel[
 
     Each thread owns one column and accumulates across all n_indices rows:
         out[c] = sum(in[indices[k] * in_row_stride + c] for k in range(n_indices))
+        (divided by n_indices when mean=True)
 
     This is the hot path for bag-of-words NLP models:
         hidden = embedding_bag(weights, token_ids)
@@ -202,6 +206,7 @@ fn embedding_bag_kernel[
     var col = Int(thread_idx.x)
     var col_stride = Int(block_dim.x)
     var c = col
+    var divisor = Scalar[dtype](n_indices)
     while c < in_cols:
         var acc = Scalar[dtype](0)
         for k in range(n_indices):
@@ -209,7 +214,10 @@ fn embedding_bag_kernel[
             if src_row < 0:
                 src_row += Int64(in_rows)
             acc += in_buffer[src_row * Int64(in_row_stride) + Int64(c)]
-        out_buffer[c] = acc
+        comptime if mean:
+            out_buffer[c] = acc / divisor
+        else:
+            out_buffer[c] = acc
         c += col_stride
 
 
@@ -289,24 +297,24 @@ fn gather_gpu[
     tensor: NDBuffer[dtype],
     axis: Int,
     indices: IntArray,
-    fuse_sum: Bool = False,
+    reduction: Reduction = Reduction(0),
 ) raises -> NDBuffer[dtype]:
     """GPU gather with optional fused sum for embedding-bag use case.
 
-    When fuse_sum=True and the tensor is 2D with axis=0, uses
+    When reduction.is_sum() and the tensor is 2D with axis=0, uses
     embedding_bag_kernel to produce output shape (cols,) directly,
     avoiding the intermediate (n_tokens, cols) allocation.
 
     Args:
         tensor:   Input NDBuffer on GPU.
-        axis:     Axis to gather along (must be 0 for fuse_sum).
+        axis:     Axis to gather along (must be 0 for reduction SUM/MEAN).
         indices:  Row indices to gather.
-        fuse_sum: If True and rank==2 and axis==0, fuse gather+sum into
-                  one kernel. Output shape becomes (cols,) not (n,cols).
+        reduction: How to reduce gathered rows (NONE=0, SUM=1, MEAN=2).
+                   SUM/MEAN fuse gather+sum into one kernel.
 
     Returns:
         NDBuffer on GPU. Shape is (len(indices), ...) normally,
-        or (cols,) when fuse_sum=True.
+        or (cols,) when reduction is SUM or MEAN.
     """
     # Match DeviceState's internal storage type — bool is stored as uint8
     comptime datatype: DType = DType.uint8 if dtype == DType.bool else dtype
@@ -332,26 +340,32 @@ fn gather_gpu[
     # ── Fused embedding-bag path: gather + sum in one kernel ──────────────────
     # Conditions: caller requests it, rank==2, axis==0.
     # Output shape: (in_cols,) — the sum over gathered rows.
-    if fuse_sum and rank == 2 and axis == 0:
+    if (reduction.is_sum() or reduction.is_mean()) and rank == 2 and axis == 0:
         var in_cols = tensor.shape[1]
         var block_cols = _gather_2d_block_cols(in_cols)
         var out_dev = ctx.enqueue_create_buffer[datatype](in_cols)
-        var compiled = ctx.compile_function[
-            embedding_bag_kernel[datatype],
-            embedding_bag_kernel[datatype],
-        ]()
-        ctx.enqueue_function(
-            compiled,
-            out_dev,
-            in_dev,
-            tensor.shape[0],
-            in_cols,
-            tensor.strides[0],
-            idx_dev,
-            n_indices,
-            grid_dim=1,
-            block_dim=block_cols,
-        )
+        if reduction.is_mean():
+            var compiled = ctx.compile_function[
+                embedding_bag_kernel[datatype, True],
+                embedding_bag_kernel[datatype, True],
+            ]()
+            ctx.enqueue_function(
+                compiled, out_dev, in_dev,
+                tensor.shape[0], in_cols, tensor.strides[0],
+                idx_dev, n_indices,
+                grid_dim=1, block_dim=block_cols,
+            )
+        else:
+            var compiled = ctx.compile_function[
+                embedding_bag_kernel[datatype, False],
+                embedding_bag_kernel[datatype, False],
+            ]()
+            ctx.enqueue_function(
+                compiled, out_dev, in_dev,
+                tensor.shape[0], in_cols, tensor.strides[0],
+                idx_dev, n_indices,
+                grid_dim=1, block_dim=block_cols,
+            )
         ctx.synchronize()
         var out_shape = Shape(in_cols)
         var result_state = DeviceState[dtype].__init__[special=True](
@@ -517,8 +531,8 @@ fn gather_gpu[
 
 @fieldwise_init
 struct GatherArg(ArgumentType):
-    """Carries axis and normalized indices for GatherBackward and
-    the ScatterAddTensor engine branch.
+    """Carries axis, indices, reduction and padding info for GatherBackward
+    and the ScatterAddTensor engine branch.
 
     Stored in BackwardFnArg on the gather output node during forward.
     Retrieved by the backward engine when ScatterAddTensor fires —
@@ -528,8 +542,10 @@ struct GatherArg(ArgumentType):
     var axis: Int
     var indices: IntArray
     var padding_idx: Optional[Int]
+    var reduction: Reduction
     # padding_idx zeroing happens in engine's ScatterAddTensor branch
-    # by reading GatherArg.padding_idx
+    # by reading GatherArg.padding_idx.
+    # MEAN reduction: backward divides gradient by len(indices).
 
 
 # =============================================================================
@@ -548,15 +564,19 @@ struct GatherBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         Forward:  out[k]                = src[indices[k]]
         Backward: grad_src[indices[k]] += grad_out[k]   (scatter-add)
 
-        For embedding_bag (fuse_sum=True):
+        For embedding_bag (reduction.is_sum()):
             Forward:  out[c] = sum_k src[indices[k], c]
             Backward: grad_src[indices[k], c] += grad_out[c]  for all k
             — identical scatter-add semantics, GatherArg.axis=0.
+        For MEAN reduction:
+            Forward:  out[c] = sum_k src[indices[k], c] / n
+            Backward: grad_src[indices[k], c] += grad_out[c] / n  for all k
 
-        The GatherArg (axis + indices) is already stored on this node's
-        BackwardFnArg — the ScatterAddTensor engine branch reads it from
-        there. GatherBackward itself is a passthrough: it signals the engine
-        to use scatter-add semantics and clears its own gradbox via ZeroGrad.
+        The GatherArg (axis + indices + reduction) is already stored on this
+        node's BackwardFnArg — the ScatterAddTensor engine branch reads
+        padding_idx from there. GatherBackward scales by 1/n for MEAN,
+        then signals the engine to use scatter-add semantics and clears
+        its own gradbox via ZeroGrad.
 
         Returns:
             - (parent, incoming_grad, ScatterAddTensor): engine does scatter-add.
@@ -564,11 +584,23 @@ struct GatherBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         """
         var parent = output.ancestry().get(0)
         ref incoming_grad = output.gradbox[]
+        ref bwd_arg = (
+            output.ancestry()
+            .backward_fn_arg()
+            .get[GatherArg]()
+        )
 
-        return [
-            (parent^, incoming_grad, ScatterAddTensor),
-            (output, incoming_grad, ZeroGrad),
-        ]
+        if bwd_arg.reduction.is_mean():
+            var n = Scalar[Self.dtype](len(bwd_arg.indices))
+            return [
+                (parent^, incoming_grad / n, ScatterAddTensor),
+                (output, incoming_grad, ZeroGrad),
+            ]
+        else:
+            return [
+                (parent^, incoming_grad, ScatterAddTensor),
+                (output, incoming_grad, ZeroGrad),
+            ]
 
 
 # =============================================================================
@@ -585,17 +617,16 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         self: Tensor[Self.dtype],
         indices: IntArray,
         axis: Int = 0,
-        fuse_sum: Bool = False,
+        reduction: Reduction = Reduction(2),
         padding_idx: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
         """Gather slices along `axis` at the given indices.
 
-        When fuse_sum=True (and tensor is 2D on GPU, axis=0), uses a fused
-        embedding-bag kernel that performs gather+sum in a single pass,
-        producing output shape (cols,) instead of (n_tokens, cols).
-        The backward pass is identical in both cases — ScatterAddTensor
-        scatter-adds grad_out into each gathered row of the parent.
+        When reduction.is_sum() or reduction.is_mean() (and tensor is 2D, axis=0),
+        uses a fused gather+sum that produces output shape (cols,) instead of
+        (n_tokens, cols). The backward pass uses ScatterAddTensor, scaled by
+        1/n for MEAN.
 
         Always produces a fresh contiguous output tensor (copy semantics).
         On GPU the copy is done via kernel — no map_to_host per element.
@@ -612,13 +643,12 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
             indices:       Indices along `axis`. Negative values are normalized.
             axis:          Axis to gather along. Negative axes are normalized.
             requires_grad: Override requires_grad. Defaults to self.requires_grad.
-            fuse_sum:      If True and rank==2 and axis==0 and on GPU, fuse
-                           gather+sum into one kernel. Output shape: (cols,).
-                           Use for bag-of-words embedding lookup.
+            reduction:     How to reduce gathered rows (NONE/SUM/MEAN).
+                           SUM/MEAN fuse gather+sum, output shape: (cols,).
 
         Returns:
             Contiguous tensor. Shape is (len(indices), ...) normally,
-            or (cols,) when fuse_sum=True.
+            or (cols,) when reduction is SUM or MEAN.
 
         Panics:
             - axis out of bounds after normalization.
@@ -659,19 +689,48 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
             normalized.append(idx)
 
         # ── Copy / fused embedding-bag (CPU or GPU kernel) ────────────────────
-        var out = Self._gather_copy(
-            self, ax=ax, normalized=normalized, fuse_sum=fuse_sum
-        )
+        var is_fast_path = (reduction.is_sum() or reduction.is_mean()) and ax == 0 and rank == 2
 
-        # ── Wire backward if needed ───────────────────────────────────────────
+        var out: Tensor[Self.dtype]
         comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
-            if grad_required:
-                out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_GATHER, GatherArg(ax, normalized, padding_idx)
+            if grad_required and not is_fast_path and (reduction.is_sum() or reduction.is_mean()):
+                # General case with grad: standard gather, wire GatherBackward
+                # (NONE), then chain sum/mean so backward flows through both ops.
+                out = Self._gather_copy(
+                    self, ax=ax, normalized=normalized, reduction=Reduction(2)
                 )
-                out.add_ancestry(backwardFnArg^, self)
+                out.requires_grad_(True)
+                var bfa = BackwardFnArg[Self.dtype](
+                    BACKWARD_GATHER,
+                    GatherArg(ax, normalized, padding_idx, Reduction(2)),
+                )
+                out.add_ancestry(bfa^, self)
+                if reduction.is_sum():
+                    out = out.sum[track_grad=True](IntArray(ax))
+                elif reduction.is_mean():
+                    out = out.mean[track_grad=True](IntArray(ax))
+            else:
+                out = Self._gather_copy(
+                    self, ax=ax, normalized=normalized, reduction=reduction
+                )
+                if grad_required:
+                    out.requires_grad_(True)
+                    var bfa = BackwardFnArg[Self.dtype](
+                        BACKWARD_GATHER,
+                        GatherArg(ax, normalized, padding_idx, reduction),
+                    )
+                    out.add_ancestry(bfa^, self)
+        else:
+            out = Self._gather_copy(
+                self, ax=ax, normalized=normalized,
+                reduction=reduction if is_fast_path else Reduction(2),
+            )
+            if not is_fast_path:
+                if reduction.is_sum():
+                    out = out.sum[track_grad=False](IntArray(ax))
+                elif reduction.is_mean():
+                    out = out.mean[track_grad=False](IntArray(ax))
 
         return out^
 
@@ -680,60 +739,76 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         self: Tensor[Self.dtype],
         ax: Int,
         normalized: IntArray,
-        fuse_sum: Bool,
+        reduction: Reduction,
     ) -> Tensor[Self.dtype]:
-        """Dispatch to GPU kernel or CPU loop depending on device.
+        """Gather + optional reduce, single dispatch.
 
-        GPU path: gather_gpu kernel — no map_to_host, fully parallel.
-                  When fuse_sum=True, uses embedding_bag_kernel for
-                  fused gather+sum in a single pass.
-        CPU path: strided element loop using NDBuffer.get/set.
-                  fuse_sum on CPU falls back to gather then sum loop.
+        Fast path (rank==2, ax==0, SUM/MEAN): fused single-pass kernel.
+        General case: standard gather then post-process with sum/mean
+        via existing Tensor ops (track_grad=False since backward is
+        wired separately by Gather.forward).
 
         Args:
             self:       Tensor.
             ax:         Normalized axis to gather along.
             normalized: Validated, normalized indices.
-            fuse_sum:   Use fused embedding-bag kernel on GPU.
+            reduction:  How to reduce gathered rows (NONE/SUM/MEAN).
 
         Returns:
             Fresh contiguous tensor on the same device as self.
         """
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    var ndb = gather_gpu[Self.dtype](
-                        self.buffer, ax, normalized, fuse_sum
-                    )
-                    return Tensor[Self.dtype](ndb^, requires_grad=False)
-                except e:
-                    panic("gather_gpu failed: ", String(e))
-                    return Tensor[Self.dtype].scalar(0)
-
-        # ── CPU path ──────────────────────────────────────────────────────────
-        # fuse_sum: collapse axis 0 by summing — produces shape (cols,)
         ref shape = self.shape()
         var rank = shape.rank()
-        if fuse_sum and ax == 0 and rank == 2:
+
+        # ── Fast path: rank==2, ax==0, SUM or MEAN ────────────────────────────
+        if (reduction.is_sum() or reduction.is_mean()) and ax == 0 and rank == 2:
+            comptime if has_accelerator():
+                if self.is_on_gpu():
+                    try:
+                        var ndb = gather_gpu[Self.dtype](
+                            self.buffer, ax, normalized, reduction
+                        )
+                        return Tensor[Self.dtype](ndb^, requires_grad=False)
+                    except e:
+                        panic("gather_gpu failed: ", String(e))
+                        return Tensor[Self.dtype].scalar(0)
+
             var cols = shape[1]
             var result = Tensor[Self.dtype].zeros(
                 Shape(cols), requires_grad=False, device=self.device()
             )
             ref res_buffer = result.buffer.data_buffer()
             ref self_buffer = self.buffer.data_buffer()
-            var base_offset = self.offset()          # fixed base — never mutated
+            var base_offset = self.offset()
             var sorted = normalized.sorted()
             for row in sorted:
-                var row_offset = base_offset + row * cols   # fresh per iteration
+                var row_offset = base_offset + row * cols
                 res_buffer += self_buffer[row_offset : row_offset + cols]
+            if reduction.is_mean():
+                result /= Scalar[Self.dtype](len(normalized))
             return result^
 
-        # fuse_sum on CPU: gather into full buffer then sum over axis 0.
-        # This keeps the CPU path simple and correct without a separate kernel.
+        # ── General case: standard gather (CPU or GPU) ─────────────────────────
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    var ndb = gather_gpu[Self.dtype](
+                        self.buffer, ax, normalized, Reduction(2)
+                    )
+                    var gathered = Tensor[Self.dtype](ndb^, requires_grad=False)
+                    if reduction.is_sum():
+                        gathered = gathered.sum[track_grad=False](IntArray(ax))
+                    elif reduction.is_mean():
+                        gathered = gathered.mean[track_grad=False](IntArray(ax))
+                    return gathered^
+                except e:
+                    panic("gather_gpu failed: ", String(e))
+                    return Tensor[Self.dtype].scalar(0)
+
         var out_shape_arr = IntArray.with_capacity(rank)
         for d in range(rank):
             out_shape_arr.append(
-                len(normalized) if d == ax else self.shape()[d]
+                len(normalized) if d == ax else shape[d]
             )
 
         var gathered = Tensor[Self.dtype].zeros(
@@ -757,4 +832,8 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
 
             gathered.set(flat, self.get(src_offset))
 
+        if reduction.is_sum():
+            gathered = gathered.sum[track_grad=False](IntArray(ax))
+        elif reduction.is_mean():
+            gathered = gathered.mean[track_grad=False](IntArray(ax))
         return gathered^

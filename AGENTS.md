@@ -546,6 +546,78 @@ Calling `.grad()` directly returns an unshared gradbox — slicing it with `[]` 
 
 This pattern is used consistently in `test_embedding.mojo` and all backward-pass tests.
 
+## Autograd & Optimizer Notes
+
+### `SGD[dtype: DType, //]` — Witness Parameter
+
+The `//` after `dtype` means it is a **witness** parameter — it **is** auto-inferred from `__init__` arguments:
+
+```mojo
+var opt = SGD(params, lr=0.01)                           # dtype auto-inferred — OK
+var opt = SGD[DType.float32](params, lr=0.01)            # explicit positional — OK
+var opt = SGD[dtype=DType.float32](params, lr=0.01)      # explicit keyword — OK
+```
+
+Mojo deduces `dtype` from the element type of the parameter list (e.g., from the embedding weight's dtype). Witness parameters configure the struct at compile time and are derivable from runtime constructor args.
+
+### `.backward()` on Non-Scalar Tensors
+
+`tensor.backward()` works on **any** tensor, not just scalars. When called on a non-scalar tensor `C` of shape `(N,)`, it computes `d(sum(C))/d(leaf)` — equivalent to `C.sum().backward()` in PyTorch.
+
+```mojo
+var A = Tensor[dtype].rand(shape)
+var B = Tensor[dtype].rand(shape)
+var C = A.matmul[mode=mv](B)          # shape (N,) — non-scalar
+C.backward()                          # OK — computes d(sum(C))/d(A), d(sum(C))/d(B)
+```
+
+This is convenient for element-wise losses: `loss.backward()` without an explicit `.sum()`.
+
+### `Embedding.from_pretrained(weights, freeze=True)`
+
+Loads a pretrained weight matrix (e.g. GloVe, fastText, word2vec) into an `Embedding`:
+
+```mojo
+var emb = Embedding[dtype].from_pretrained(glove_weights)       # frozen — no gradient
+var emb = Embedding[dtype].from_pretrained(glove_weights, freeze=False)  # fine-tuned
+```
+
+- **`freeze=True` (default):** `weight.requires_grad = False`. Embeddings act as fixed lookups — no gradients, no SGD updates. Use for feature extraction where pretrained vectors should stay intact.
+- **`freeze=False`:** `weight.requires_grad = True`. Gradients flow into the weight during `.backward()`. `SGD.step()` updates the pretrained vectors. Use for domain adaptation or fine-tuning.
+
+Args:
+- `weights`: Pretrained `Tensor` — must be 2D `(vocab_size, embedding_dim)`.
+- `padding_idx`: Row to keep zeroed (never receives gradient).
+- `freeze`: If `True` (default), `requires_grad=False` — no gradient flow.
+
+## Lessons from Sparse Embedding Training
+
+### Manual `scatter_add` vs Autograd `Embedding` + `SGD`
+
+Two approaches were implemented for word2vec-style negative sampling training on IMDB (252K vocab, 100 hidden dim):
+
+| Approach | Per-step cost | Time for 5K reviews × 2 iters |
+|---|---|---|
+| **Manual** (gather[track_grad=False], manual backward, Filler.scatter_add) | ~3.6 ms | ~2 hours |
+| **Autograd** (Embedding, BCEWithLogitsLoss, .backward(), SGD.step()) | ~60 ms | too slow — aborted |
+
+**Why autograd is 16× slower:**
+
+`SGD.step()` iterates over **all** 25M weight parameters (252K × 100 × 2) on every training step. For word2vec, only ~10 rows (1000 elements) actually changed per step — a 25000× waste. The manual `scatter_add` touches only the rows that received gradient updates.
+
+**When to use each approach:**
+
+- **Dense architectures** (MLP, CNN, Transformer in full-batch): every parameter updates each step → `SGD.step()` cost is amortized → autograd + optimizer is appropriate.
+- **Sparse lookup tasks** (word2vec, large-vocab embeddings): most rows are untouched each step → manual `scatter_add` is the correct pattern.
+
+**Current Tenmo limitation:** No sparse optimizer exists. `SGD.step()` always touches every parameter, even if only a few rows have non-zero gradients.
+
+## What to Improve in Tenmo
+
+1. **Sparse optimizer support** — Add a sparse gradient mode to `SGD` (or a separate `SparseSGD`) that only touches rows with non-zero gradients. This would make `Embedding` + autograd practical for word2vec-style tasks.
+
+2. **Embedding integration with `Module`/`Sequential`** — `Embedding` was not included in the `Layer` variant (`net.mojo:740`). `Sequential.parameters()` returned an empty list for Embedding. **FIXED** — added `Embedding[dtype]` to `Layer` variant and dispatch in `Module.parameters()`.
+
 ## Running Selective Tests
 
 **`./execute.sh <name>`** — runs a single test alias from the test runner (e.g. `./execute.sh gather`)

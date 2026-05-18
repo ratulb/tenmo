@@ -482,10 +482,10 @@ fn test_fill_tensor_reshaped_view() raises:
     var src = Tensor[dtype].d1([10.0, 20.0, 30.0, 40.0])
     reshaped.fill(src, i(1), s())  # Fill second row
 
-    # x should not be modified at [4:8], reshape is now allocated
+    # reshape returns a view when possible, so x and reshaped share the buffer
     assert_true(x[3] == 3.0)
-    assert_true(x[4] == 4.0)
-    assert_true(x[7] == 7.0)
+    assert_true(x[4] == 10.0)
+    assert_true(x[7] == 40.0)
     assert_true(x[8] == 8.0)
 
 

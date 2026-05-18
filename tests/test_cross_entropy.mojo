@@ -3036,7 +3036,9 @@ fn test_ce_3d_basic() raises:
     print("test_ce_3d_basic")
     comptime dtype = DType.float32
     # logits: (2, 3, 4) — batch=2, classes=3, spatial=4
-    var logits = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4)).float()
+    var _tmp0 = Tensor[dtype].arange(24)
+    var _tmp1 = _tmp0.reshape(Shape(2, 3, 4))
+    var logits = _tmp1.float()
     var target = Tensor[DType.int32].d2([[0, 1, 2, 0], [1, 2, 0, 1]])
     var ce = CrossEntropyLoss[dtype](reduction="mean")
     var loss = ce(logits, target)

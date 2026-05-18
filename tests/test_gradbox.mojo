@@ -44,7 +44,8 @@ fn main() raises:
 fn test_gradbox_unsqueeze_basic() raises:
     print("test_gradbox_unsqueeze_basic")
     comptime dtype = DType.float32
-    var g = Gradbox[dtype].arange(6).reshape(Shape(2, 3))
+    var _tmp0 = Gradbox[dtype].arange(6)
+    var g = _tmp0.reshape(Shape(2, 3))
 
     var g1 = g.unsqueeze([0])
     var g2 = g.unsqueeze([-1])
@@ -64,7 +65,8 @@ fn test_gradbox_unsqueeze_basic() raises:
 fn test_gradbox_squeeze_basic() raises:
     print("test_gradbox_squeeze_basic")
     comptime dtype = DType.float32
-    var g = Gradbox[dtype].arange(6).reshape(Shape(1, 2, 3, 1))
+    var _tmp0 = Gradbox[dtype].arange(6)
+    var g = _tmp0.reshape(Shape(1, 2, 3, 1))
 
     var g1 = g.squeeze()
     var g2 = g.squeeze([0])
@@ -87,7 +89,8 @@ fn test_gradbox_squeeze_basic() raises:
 fn test_gradbox_squeeze_unsqueeze_symmetry() raises:
     print("test_gradbox_squeeze_unsqueeze_symmetry")
     comptime dtype = DType.float32
-    var g = Gradbox[dtype].arange(12).reshape(Shape(2, 3, 2))
+    var _tmp0 = Gradbox[dtype].arange(12)
+    var g = _tmp0.reshape(Shape(2, 3, 2))
 
     var u = g.unsqueeze([0, 3])
     var s = u.squeeze()
@@ -101,7 +104,8 @@ fn test_gradbox_squeeze_unsqueeze_symmetry() raises:
 fn test_gradbox_unsqueeze_negative_axes() raises:
     print("test_gradbox_unsqueeze_negative_axes")
     comptime dtype = DType.float32
-    var g = Gradbox[dtype].arange(4).reshape(Shape(2, 2))
+    var _tmp0 = Gradbox[dtype].arange(4)
+    var g = _tmp0.reshape(Shape(2, 2))
 
     var g1 = g.unsqueeze([-1])
     var g2 = g.unsqueeze([-2])
@@ -121,7 +125,8 @@ fn test_gradbox_unsqueeze_negative_axes() raises:
 fn test_gradbox_squeeze_unsqueeze_multiple_axes() raises:
     print("test_gradbox_squeeze_unsqueeze_multiple_axes")
     comptime dtype = DType.float32
-    var g = Gradbox[dtype].arange(8).reshape(Shape(1, 2, 1, 4, 1))
+    var _tmp0 = Gradbox[dtype].arange(8)
+    var g = _tmp0.reshape(Shape(1, 2, 1, 4, 1))
 
     var s = g.squeeze([0, 2, 4])
     assert_true(s.shape() == Shape(2, 4))

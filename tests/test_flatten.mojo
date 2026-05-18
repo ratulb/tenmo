@@ -597,7 +597,8 @@ fn test_flat_cpu_4d_middle() raises:
     print("test_flat_cpu_4d_middle")
     comptime dtype = DType.float32
     # Shape (2,3,4,5) → flatten(1,2) → (2,12,5)
-    var a = Tensor[dtype].arange(120).reshape(Shape(2, 3, 4, 5))
+    var _tmp0 = Tensor[dtype].arange(120)
+    var a = _tmp0.reshape(Shape(2, 3, 4, 5))
     var result = a.flatten(1, 2)
     assert_true(result.shape() == Shape(2, 12, 5))
     assert_true(result.numels() == 120)
@@ -607,7 +608,8 @@ fn test_flat_cpu_4d_start0_end2() raises:
     print("test_flat_cpu_4d_start0_end2")
     comptime dtype = DType.float32
     # Shape (2,3,4,5) → flatten(0,2) → (24,5)
-    var a = Tensor[dtype].arange(120).reshape(Shape(2, 3, 4, 5))
+    var _tmp0 = Tensor[dtype].arange(120)
+    var a = _tmp0.reshape(Shape(2, 3, 4, 5))
     var result = a.flatten(0, 2)
     assert_true(result.shape() == Shape(24, 5))
     assert_true(result.numels() == 120)
@@ -617,7 +619,8 @@ fn test_flat_cpu_values_preserved() raises:
     print("test_flat_cpu_values_preserved")
     comptime dtype = DType.float32
     # Verify values are preserved after flatten
-    var a = Tensor[dtype].arange(6).reshape(Shape(2, 3))
+    var _tmp0 = Tensor[dtype].arange(6)
+    var a = _tmp0.reshape(Shape(2, 3))
     var result = a.flatten()
     for i in range(6):
         assert_true(result[[i]] == Scalar[dtype](i))
@@ -707,7 +710,8 @@ fn test_flat_cpu_backward_grad_shape() raises:
     print("test_flat_cpu_backward_grad_shape")
     comptime dtype = DType.float32
     # Verify grad has same shape as original tensor
-    var a = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+    var _tmp0 = Tensor[dtype].arange(24)
+    var a = _tmp0.reshape(Shape(2, 3, 4))
     a.requires_grad_(True)
     var result = a.flatten()
     var loss = result.sum()
@@ -733,7 +737,8 @@ fn test_flat_cpu_backward_nonuniform_grad() raises:
 fn test_flat_cpu_backward_4d_partial() raises:
     print("test_flat_cpu_backward_4d_partial")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(120).reshape(Shape(2, 3, 4, 5))
+    var _tmp0 = Tensor[dtype].arange(120)
+    var a = _tmp0.reshape(Shape(2, 3, 4, 5))
     a.requires_grad_(True)
     var result = a.flatten(1, 2)
     var loss = result.sum()
@@ -838,7 +843,9 @@ fn test_flat_gpu_4d_middle() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_4d_middle")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].arange(120).reshape(Shape(2, 3, 4, 5)).to_gpu()
+        var _tmp0 = Tensor[dtype].arange(120)
+        var _tmp1 = _tmp0.reshape(Shape(2, 3, 4, 5))
+        var a = _tmp1.to_gpu()
         var result = a.flatten(1, 2)
         assert_true(result.is_on_gpu())
         assert_true(result.shape() == Shape(2, 12, 5))
@@ -849,7 +856,8 @@ fn test_flat_gpu_values_preserved() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_values_preserved")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].arange(6).reshape(Shape(2, 3))
+        var _tmp0 = Tensor[dtype].arange(6)
+        var a_cpu = _tmp0.reshape(Shape(2, 3))
         var a_gpu = a_cpu.to_gpu()
         var result = a_gpu.flatten()
         var result_cpu = result.to_cpu()
@@ -948,7 +956,8 @@ fn test_flat_gpu_backward_grad_shape() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_backward_grad_shape")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(24)
+        var a_cpu = _tmp0.reshape(Shape(2, 3, 4))
         a_cpu.requires_grad_(True)
         var a_gpu = a_cpu.to_gpu()
         var result = a_gpu.flatten()
@@ -977,7 +986,8 @@ fn test_flat_gpu_backward_4d_partial() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_backward_4d_partial")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].arange(120).reshape(Shape(2, 3, 4, 5))
+        var _tmp0 = Tensor[dtype].arange(120)
+        var a_cpu = _tmp0.reshape(Shape(2, 3, 4, 5))
         a_cpu.requires_grad_(True)
         var a_gpu = a_cpu.to_gpu()
         var result = a_gpu.flatten(1, 2)
@@ -1007,7 +1017,8 @@ fn test_flat_parity_3d_partial_forward() raises:
     comptime if has_accelerator():
         print("test_flat_parity_3d_partial_forward")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(24)
+        var a_cpu = _tmp0.reshape(Shape(2, 3, 4))
         var a_gpu = a_cpu.to_gpu()
         assert_true(a_cpu.flatten(1, 2).all_close(a_gpu.flatten(1, 2).to_cpu()))
 
@@ -1016,7 +1027,8 @@ fn test_flat_parity_4d_forward() raises:
     comptime if has_accelerator():
         print("test_flat_parity_4d_forward")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].arange(120).reshape(Shape(2, 3, 4, 5))
+        var _tmp0 = Tensor[dtype].arange(120)
+        var a_cpu = _tmp0.reshape(Shape(2, 3, 4, 5))
         var a_gpu = a_cpu.to_gpu()
         assert_true(a_cpu.flatten(0, 2).all_close(a_gpu.flatten(0, 2).to_cpu()))
 
@@ -1047,9 +1059,12 @@ fn test_flat_parity_3d_backward() raises:
     comptime if has_accelerator():
         print("test_flat_parity_3d_backward")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(24)
+        var a_cpu = _tmp0.reshape(Shape(2, 3, 4))
         a_cpu.requires_grad_(True)
-        var a_gpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4)).to_gpu()
+        var _tmp1 = Tensor[dtype].arange(24)
+        var _tmp2 = _tmp1.reshape(Shape(2, 3, 4))
+        var a_gpu = _tmp2.to_gpu()
         a_gpu.requires_grad_(True)
 
         var loss_cpu = a_cpu.flatten(1, 2).sum()

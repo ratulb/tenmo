@@ -30,12 +30,31 @@ struct Reshape[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     fn forward[
         track_grad: Bool = True
     ](
-        tensor: Tensor[Self.dtype],
+        mut tensor: Tensor[Self.dtype],
         new_shape: Shape,
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
     ) -> Tensor[Self.dtype]:
-        var ndb = tensor.buffer.reshape(new_shape, validated)
+        var shape = new_shape if validated else Validator.validate_and_construct_new_shape(
+            tensor.shape(), new_shape.intarray()
+        )
+        var strides = Strides.default(shape)
+        # Use view (share) if the new shape fits in the underlying buffer,
+        # otherwise materialize (contiguous). This handles cases like expand+tile
+        # where stride=0 creates more logical elements than physical storage.
+        var buffer_size: Int
+        comptime if has_accelerator():
+            if tensor.buffer.is_on_gpu():
+                buffer_size = len(tensor.buffer.device_state.value())
+            else:
+                buffer_size = len(tensor.buffer.buffer)
+        else:
+            buffer_size = len(tensor.buffer.buffer)
+        var ndb: NDBuffer[Self.dtype]
+        if IndexCalculator.max_index(shape, strides, 0) < buffer_size:
+            ndb = tensor.buffer.share(shape, strides, offset=0)
+        else:
+            ndb = tensor.buffer.contiguous(shape)
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         comptime if track_grad:
@@ -49,4 +68,3 @@ struct Reshape[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^
-

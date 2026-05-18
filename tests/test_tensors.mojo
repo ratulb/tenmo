@@ -25,7 +25,6 @@ def test_count() raises:
 
 
 def test_reshape_slice_sum_backward() raises:
-    print("test_reshape_slice_sum_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(6, requires_grad=True)
     r = a.reshape([2, 3])
@@ -51,7 +50,6 @@ def test_reshape_slice_sum_backward() raises:
 
 
 def test_shared_tensor_twice() raises:
-    print("test_shared_tensor_twice")
 
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -71,7 +69,6 @@ def test_shared_tensor_twice() raises:
 
 
 def test_broadcast_and_reuse() raises:
-    print("test_broadcast_and_reuse")
 
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -94,7 +91,6 @@ def test_broadcast_and_reuse() raises:
 
 
 def test_branching_square_add() raises:
-    print("test_branching_square_add")
 
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([2.0], requires_grad=True)
@@ -110,7 +106,6 @@ def test_branching_square_add() raises:
 
 
 def test_merge_of_dependent_branches() raises:
-    print("test_merge_of_dependent_branches")
 
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0], requires_grad=True)
@@ -128,7 +123,6 @@ def test_merge_of_dependent_branches() raises:
 
 
 def test_square_and_identity_path() raises:
-    print("test_square_and_identity_path")
 
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([3.0], requires_grad=True)
@@ -143,7 +137,6 @@ def test_square_and_identity_path() raises:
 
 
 def test_shared_dependency_multiple_paths() raises:
-    print("test_shared_dependency_multiple_paths")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0], requires_grad=True)
     var b = a + 1  # ∂b/∂a = 1
@@ -158,7 +151,6 @@ def test_shared_dependency_multiple_paths() raises:
 
 
 def test_diamond_dependency() raises:
-    print("test_diamond_dependency")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0], requires_grad=True)
     var b = a + 1  # ∂b/∂a = 1
@@ -174,7 +166,6 @@ def test_diamond_dependency() raises:
 
 
 def test_repeated_tensor_use() raises:
-    print("test_repeated_tensor_use")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([2.0], requires_grad=True)
     var b = a * a  # ∂b/∂a = a + a = 4 (since ∂(a²)/∂a = 2a)
@@ -188,7 +179,6 @@ def test_repeated_tensor_use() raises:
 
 
 def test_topological_sort_required() raises:
-    print("test_topological_sort_required")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0], requires_grad=True)
     var b = a * 2  # ∂b/∂a = 2
@@ -201,7 +191,6 @@ def test_topological_sort_required() raises:
 
 
 def test_matmul_scalar_output() raises:
-    print("test_matmul_scalar_output")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0]])
     var b = Tensor[dtype].d2([[3.0], [4.0]])
@@ -210,7 +199,6 @@ def test_matmul_scalar_output() raises:
 
 
 def test_matmul_tensor_tensor() raises:
-    print("test_matmul_tensor_tensor")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var b = Tensor[dtype].d2([[5.0], [6.0]])
@@ -219,7 +207,6 @@ def test_matmul_tensor_tensor() raises:
 
 
 def test_matmul_tensor_view() raises:
-    print("test_matmul_tensor_view")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var b = Tensor[dtype].d2([[5.0], [6.0]])
@@ -230,7 +217,6 @@ def test_matmul_tensor_view() raises:
 
 
 def test_matmul_view_tensor() raises:
-    print("test_matmul_view_tensor")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var b = Tensor[dtype].d2([[5.0], [6.0]])
@@ -240,7 +226,6 @@ def test_matmul_view_tensor() raises:
 
 
 def test_matmul_view_view() raises:
-    print("test_matmul_view_view")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var b = Tensor[dtype].d2([[5.0], [6.0]])
@@ -251,7 +236,6 @@ def test_matmul_view_view() raises:
 
 
 def test_matmul_transposed_tensor_tensor() raises:
-    print("test_matmul_transposed_tensor_tensor")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]])  # shape (1,3)
     var b = Tensor[dtype].d2([[4.0], [5.0], [6.0]])  # shape (3,1)
@@ -260,7 +244,6 @@ def test_matmul_transposed_tensor_tensor() raises:
 
 
 def test_matmul_transposed_tensor_view() raises:
-    print("test_matmul_transposed_tensor_view")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]])
     var b = Tensor[dtype].d2([[4.0], [5.0], [6.0]])
@@ -270,7 +253,6 @@ def test_matmul_transposed_tensor_view() raises:
 
 
 def test_matmul_transposed_view_tensor() raises:
-    print("test_matmul_transposed_view_tensor")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]])
     var b = Tensor[dtype].d2([[4.0], [5.0], [6.0]])
@@ -280,7 +262,6 @@ def test_matmul_transposed_view_tensor() raises:
 
 
 def test_matmul_transposed_view_view() raises:
-    print("test_matmul_transposed_view_view")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]])
     var b = Tensor[dtype].d2([[4.0], [5.0], [6.0]])
@@ -291,7 +272,6 @@ def test_matmul_transposed_view_view() raises:
 
 
 def test_tensor_shared_multiple_paths() raises:
-    print("test_tensor_shared_multiple_paths")
     comptime dtype = DType.float32
     var x = Tensor[dtype].scalar(2.0, requires_grad=True)
     var y = x * 3  # 6
@@ -306,7 +286,6 @@ def test_tensor_shared_multiple_paths() raises:
 
 
 def test_tensor_reuse_broadcasting() raises:
-    print("test_tensor_reuse_broadcasting")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1, 2, 3], requires_grad=True)
     var y = x + x  # [2, 4, 6]
@@ -321,7 +300,6 @@ def test_tensor_reuse_broadcasting() raises:
 
 
 def test_tensor_reuse_deep_chain() raises:
-    print("test_tensor_reuse_deep_chain")
     comptime dtype = DType.float32
     var x = Tensor[dtype].scalar(2.0, requires_grad=True)
     var y = x + 1  # 3
@@ -337,7 +315,6 @@ def test_tensor_reuse_deep_chain() raises:
 
 
 def test_tensor_reuse_in_two_branches() raises:
-    print("test_tensor_reuse_in_two_branches")
     comptime dtype = DType.float32
     var x = Tensor[dtype].scalar(2.0, requires_grad=True)
     var y1 = x + 1  # 3
@@ -351,7 +328,6 @@ def test_tensor_reuse_in_two_branches() raises:
 
 
 def test_tensor_reuse_mixed() raises:
-    print("test_tensor_reuse_mixed")
     comptime dtype = DType.float32
     var x = Tensor[dtype].scalar(3.0, requires_grad=True)
     var y = x * x + x  # 3 * 3 + 3 = 12
@@ -363,7 +339,6 @@ def test_tensor_reuse_mixed() raises:
 
 
 def test_tensor_reuse_add() raises:
-    print("test_tensor_reuse_add")
     comptime dtype = DType.float32
     var x = Tensor[dtype].scalar(2.0, requires_grad=True)
     var y = x + x  # 2 + 2 = 4
@@ -375,7 +350,6 @@ def test_tensor_reuse_add() raises:
 
 
 def test_simple_chain() raises:
-    print("test_simple_chain")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(2.0, requires_grad=True)
     var b = Tensor[dtype].scalar(3.0, requires_grad=True)
@@ -388,7 +362,6 @@ def test_simple_chain() raises:
 
 
 def test_scalar_mul_scalar() raises:
-    print("test_scalar_mul_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(3.0, requires_grad=True)
     var b = Tensor[dtype].scalar(4.0, requires_grad=True)
@@ -402,7 +375,6 @@ def test_scalar_mul_scalar() raises:
 
 
 def test_1d_mul_1d_same_shape() raises:
-    print("test_1d_mul_1d_same_shape")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var b = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
@@ -417,7 +389,6 @@ def test_1d_mul_1d_same_shape() raises:
 
 
 def test_2d_mul_2d_same_shape() raises:
-    print("test_2d_mul_2d_same_shape")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
@@ -432,7 +403,6 @@ def test_2d_mul_2d_same_shape() raises:
 
 
 def test_broadcast_2d_1d_mul() raises:
-    print("test_broadcast_2d_1d_mul")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = Tensor[dtype].d1([5.0, 6.0], requires_grad=True)
@@ -449,7 +419,6 @@ def test_broadcast_2d_1d_mul() raises:
 
 
 def test_broadcast_1d_2d_mul() raises:
-    print("test_broadcast_1d_2d_mul")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([2.0, 3.0], requires_grad=True)
     var b = Tensor[dtype].d2([[4.0, 5.0], [6.0, 7.0]], requires_grad=True)
@@ -465,7 +434,6 @@ def test_broadcast_1d_2d_mul() raises:
 
 
 def test_3d_broadcast_mul() raises:
-    print("test_3d_broadcast_mul")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0], [2.0]], [[3.0], [4.0]]], requires_grad=True
@@ -484,7 +452,6 @@ def test_3d_broadcast_mul() raises:
 
 
 def test_mul_one_requires_grad() raises:
-    print("test_mul_one_requires_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])  # no grad
     var b = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
@@ -497,7 +464,6 @@ def test_mul_one_requires_grad() raises:
 
 
 def test_scalar_tensor_mul() raises:
-    print("test_scalar_tensor_mul")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(2.0, requires_grad=True)
     var b = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -510,7 +476,6 @@ def test_scalar_tensor_mul() raises:
 
 
 def test_unsqueeze() raises:
-    print("test_unsqueeze")
     _ = """tensor = Tensor[dtype].rand([2,3], requires_grad=True)
     tensor2 = tensor.unsqueeze(0)
     tensor2[IntArray(0, 0, 0)] = 100"""
@@ -518,7 +483,6 @@ def test_unsqueeze() raises:
 
 
 def test_tensor_mean() raises:
-    print("test_tensor_mean")
 
     comptime dtype = DType.float32
     a = Tensor[dtype].scalar(5.0, requires_grad=True)
@@ -584,7 +548,6 @@ def test_tensor_mean() raises:
 
 
 def test_forward_multivariate_prediction() raises:
-    print("test_forward_multivariate_prediction")
     comptime dtype = DType.float32
     # x.shape() = (3, 2), w.shape() = (2, 1)
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
@@ -598,7 +561,6 @@ def test_forward_multivariate_prediction() raises:
 
 
 def test_weights_bias_gradients() raises:
-    print("test_weights_bias_gradients")
     comptime dtype = DType.float32
     var xx = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var ww = Tensor[dtype].d2([[0.1], [0.2]], requires_grad=True)
@@ -615,7 +577,6 @@ def test_weights_bias_gradients() raises:
 
 
 def test_training_convergence() raises:
-    print("test_training_convergence")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
     var y = Tensor[dtype].d2([[13.0], [23.0], [33.0]]).float()
@@ -626,7 +587,6 @@ def test_training_convergence() raises:
     for _ in range(1000):
         var y_pred = x.matmul(w) + b
         var loss = ((y_pred - y) ** 2).mean()
-        # loss.print()
         loss.backward()
 
         # SGD
@@ -643,7 +603,6 @@ def test_training_convergence() raises:
 
 
 def test_transpose_gradients() raises:
-    print("test_transpose_gradients")
     # Case 1: Simple 2D transpose
     comptime dtype = DType.float32
     a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
@@ -671,7 +630,6 @@ def test_transpose_gradients() raises:
 
 def test_reshape_grad_flow() raises:
     """Test suite for gradient flow through reshape operations."""
-    print("test_reshape_grad_flow")
 
     comptime dtype = DType.float32
     # === 1D Tensor Cases ===
@@ -767,7 +725,6 @@ def test_reshape_grad_flow() raises:
 
 
 def test_reshape_gradient() raises:
-    print("test_reshape_gradient")
     # 1. Reshape scalar to (1,) and back
     comptime dtype = DType.float32
     a = Tensor[dtype].scalar(42, requires_grad=True)
@@ -868,7 +825,6 @@ def test_reshape_gradient() raises:
 
 
 def test_broadcast_mul() raises:
-    print("test_broadcast_mul")
     # 1. Scalar * Scalar
     comptime dtype = DType.float32
     a = Tensor[dtype].scalar(3, requires_grad=True)
@@ -1076,7 +1032,6 @@ def test_broadcast_mul() raises:
 
 
 def test_broadcast_sub() raises:
-    print("test_broadcast_sub")
     # 1. Scalar - Scalar
     comptime dtype = DType.float32
     X = Tensor[dtype].scalar(100, requires_grad=True)
@@ -1285,7 +1240,6 @@ def test_broadcast_sub() raises:
 
 
 def test_broadcast_add() raises:
-    print("test_broadcast_add")
     # 1. Scalar + Scalar
     comptime dtype = DType.float32
     a = Tensor[dtype].scalar(5, requires_grad=True)
@@ -1447,7 +1401,6 @@ def test_broadcast_add() raises:
 
 
 def test_power() raises:
-    print("test_power")
     comptime dtype = DType.float32
     tensor = Tensor[dtype].arange(1 * 2 * 3)
     r = tensor.reshape(1, 2, 3)
@@ -1456,7 +1409,6 @@ def test_power() raises:
 
 
 def test_grad_flow_through_reshape() raises:
-    print("test_grad_flow_through_reshape")
     comptime dtype = DType.float32
     a = Tensor[dtype].of(1.0, 2.0, 3.0, requires_grad=True)
 
@@ -1481,7 +1433,6 @@ def test_grad_flow_through_reshape() raises:
 
 
 def test_reshape_preserves_grad_accumulation() raises:
-    print("test_reshape_preserves_grad_accumulation")
     # Chained reshape should still accumulate gradients
     comptime dtype = DType.float32
     a = Tensor[dtype].of(1.0, 2.0, 3.0, requires_grad=True)
@@ -1495,7 +1446,6 @@ def test_reshape_preserves_grad_accumulation() raises:
 
 
 def test_multi_dimensional_reshape() raises:
-    print("test_multi_dimensional_reshape")
     # (2, 3) → (3, 2)
     comptime dtype = DType.float32
     a1 = Tensor[dtype].d2(
@@ -1514,7 +1464,6 @@ def test_multi_dimensional_reshape() raises:
 
 
 def test_reshape_tensor_to_scalar() raises:
-    print("test_reshape_tensor_to_scalar")
     # (1,) → reshape to scalar
     comptime dtype = DType.float32
     a = Tensor[dtype].of(42.0, requires_grad=True)
@@ -1528,7 +1477,6 @@ def test_reshape_tensor_to_scalar() raises:
 
 
 def test_reshape_scalar_to_tensor() raises:
-    print("test_reshape_scalar_to_tensor")
     # Scalar → reshape to (1,)
     comptime dtype = DType.float32
     a = Tensor[dtype].scalar(42.0, requires_grad=True)
@@ -1541,7 +1489,6 @@ def test_reshape_scalar_to_tensor() raises:
 
 
 def test_miscellaneous() raises:
-    print("test_miscellaneous")
     comptime dtype = DType.float32
     a = Tensor[dtype].of(1.0, 2.0, 3.0, requires_grad=True)
     b = Tensor[dtype].scalar(5.0)
@@ -1558,7 +1505,6 @@ def test_miscellaneous() raises:
 
 
 def test_mean() raises:
-    print("test_mean")
     comptime dtype = DType.float32
     a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
     b = a.mean([0])
@@ -1605,7 +1551,6 @@ def test_mean() raises:
 
 
 def test_sum() raises:
-    print("test_sum")
     # 1. Basic Value Tests
     comptime dtype = DType.float32
     a = Tensor[dtype].of(1, 2, 3)
@@ -1700,7 +1645,6 @@ def test_sum() raises:
 
 
 def test_broadcast_add_2_tensors() raises:
-    print("test_broadcast_add_2_tensors")
 
     comptime dtype = DType.float32
     tensor1 = Tensor[dtype].d1([1, 2, 3, 4], requires_grad=True)
@@ -1856,7 +1800,6 @@ def test_broadcast_add_2_tensors() raises:
 
 
 def test_add_2_tensors() raises:
-    print("test_add_2_tensors")
 
     comptime dtype = DType.float32
     tensor_a = Tensor[dtype].rand([128, 128], requires_grad=True)
@@ -1873,7 +1816,6 @@ def test_add_2_tensors() raises:
 
 
 def test_arange() raises:
-    print("test_arange")
     comptime dtype = DType.float32
     tensor = Tensor[dtype].arange(0, 10)
     expected = Tensor[dtype].d1([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
@@ -1889,7 +1831,6 @@ def test_arange() raises:
 
 
 def test_random() raises:
-    print("test_random")
     comptime dtype = DType.float32
     rand_tensor = Tensor[dtype].rand([10])
 
@@ -1909,14 +1850,12 @@ def test_random() raises:
 
 
 def test_item() raises:
-    print("test_item")
     comptime dtype = DType.float32
     tensor = Tensor[dtype].d1([42])
     assert_true(tensor.item() == 42)
 
 
 def test_view() raises:
-    print("test_view")
     comptime dtype = DType.float32
     tensor = Tensor[dtype].rand([1])
     r = tensor.reshape()
@@ -1928,7 +1867,6 @@ def test_view() raises:
 
 
 def test_tensor_of_list() raises:
-    print("test_tensor_of_list")
     comptime dtype = DType.float32
     tensor = Tensor[dtype].d1([1, 3, 4, 5])
     assert_true(
@@ -1959,7 +1897,6 @@ def test_tensor_of_list() raises:
 
 
 def test_scalar_tensor() raises:
-    print("test_scalar_tensor")
     comptime dtype = DType.float32
     tensor = Tensor[dtype].scalar(42)
     assert_true(
@@ -1973,7 +1910,6 @@ def test_scalar_tensor() raises:
 
 
 def test_reshape() raises:
-    print("test_reshape")
     comptime dtype = DType.float32
     tensor = Tensor[dtype].rand([3, 3])
     reshaped = tensor.reshape(9)
@@ -2036,7 +1972,6 @@ def test_reshape() raises:
 
 
 def test_tensor_multiplications() raises:
-    print("test_tensor_multiplications")
     test_scalar_mul_scalar()
     test_1d_mul_1d_same_shape()
     test_2d_mul_2d_same_shape()
@@ -2048,7 +1983,6 @@ def test_tensor_multiplications() raises:
 
 
 def test_scalar_addition() raises:
-    print("test_scalar_addition")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(3.0, requires_grad=True)
     var b = Tensor[dtype].scalar(4.0, requires_grad=True)
@@ -2060,7 +1994,6 @@ def test_scalar_addition() raises:
 
 
 def test_broadcast_addition() raises:
-    print("test_broadcast_addition")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
     var b = Tensor[dtype].d1([10, 20], requires_grad=True)
@@ -2075,7 +2008,6 @@ def test_broadcast_addition() raises:
 
 
 def test_sum_all_dims() raises:
-    print("test_sum_all_dims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
     var s = a.sum()  # scalar
@@ -2085,7 +2017,6 @@ def test_sum_all_dims() raises:
 
 
 def test_sum_specific_axis() raises:
-    print("test_sum_specific_axis")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True
@@ -2097,7 +2028,6 @@ def test_sum_specific_axis() raises:
 
 
 def test_mean_with_keepdims() raises:
-    print("test_mean_with_keepdims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
     var m = a.mean(axes=[0], keepdims=True)  # shape (1,2)
@@ -2110,7 +2040,6 @@ def test_mean_with_keepdims() raises:
 
 
 def test_matmul_shapes() raises:
-    print("test_matmul_shapes")
     # Test various matmul shape combinations
     comptime dtype = DType.float32
     var m1 = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
@@ -2124,7 +2053,6 @@ def test_matmul_shapes() raises:
 
 
 def test_matmul_broadcasting() raises:
-    print("test_matmul_broadcasting")
     # Batch matmul
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
@@ -2138,7 +2066,6 @@ def test_matmul_broadcasting() raises:
 
 
 def test_zero_grad() raises:
-    print("test_zero_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(1.0, requires_grad=True)
     var b = a * 2
@@ -2148,7 +2075,6 @@ def test_zero_grad() raises:
 
 
 def test_transpose_grad() raises:
-    print("test_transpose_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
     var b = a.transpose()
@@ -2219,7 +2145,6 @@ def test_scalar_div_tensor_2d() raises:
 
 
 def test_mul_same_shape() raises:
-    print("test_mul_same_shape")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
@@ -2232,7 +2157,6 @@ def test_mul_same_shape() raises:
 
 
 def test_mul_tensor_scalar() raises:
-    print("test_mul_tensor_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[2.0, 4.0], [6.0, 8.0]], requires_grad=True)
     var b = Tensor[dtype].scalar(3, requires_grad=True)
@@ -2245,7 +2169,6 @@ def test_mul_tensor_scalar() raises:
 
 
 def test_mul_scalar_tensor() raises:
-    print("test_mul_scalar_tensor")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(5.0, requires_grad=True)
     var b = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -2258,7 +2181,6 @@ def test_mul_scalar_tensor() raises:
 
 
 def test_mul_broadcast_row() raises:
-    print("test_mul_broadcast_row")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = Tensor[dtype].d1([10.0, 20.0], requires_grad=True)
@@ -2275,7 +2197,6 @@ def test_mul_broadcast_row() raises:
 
 
 def test_mul_broadcast_col() raises:
-    print("test_mul_broadcast_col")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0], [2.0], [3.0]], requires_grad=True
@@ -2296,7 +2217,6 @@ def test_mul_broadcast_col() raises:
 
 
 def test_sub_same_shape() raises:
-    print("test_sub_same_shape")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[3.0, 4.0], [5.0, 6.0]], requires_grad=True)
     var b = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -2312,7 +2232,6 @@ def test_sub_same_shape() raises:
 
 
 def test_sub_broadcast_row() raises:
-    print("test_sub_broadcast_row")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[10.0, 20.0], [30.0, 40.0]], requires_grad=True)
     var b = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -2326,7 +2245,6 @@ def test_sub_broadcast_row() raises:
 
 
 def test_sub_scalar_tensor() raises:
-    print("test_sub_scalar_tensor")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(10.0, requires_grad=True)
     var b = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -2342,7 +2260,6 @@ def test_sub_scalar_tensor() raises:
 
 
 def test_sub_tensor_scalar() raises:
-    print("test_sub_tensor_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = Tensor[dtype].scalar(1.5, requires_grad=True)
@@ -2356,7 +2273,6 @@ def test_sub_tensor_scalar() raises:
 
 
 def test_sub_broadcast_col() raises:
-    print("test_sub_broadcast_col")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[10.0], [20.0]], requires_grad=True
@@ -2372,7 +2288,6 @@ def test_sub_broadcast_col() raises:
 
 
 def test_add_scalar_scalar() raises:
-    print("test_add_scalar_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(2.0, requires_grad=True)
     var b = Tensor[dtype].scalar(3.0, requires_grad=True)
@@ -2384,7 +2299,6 @@ def test_add_scalar_scalar() raises:
 
 
 def test_add_scalar_1d() raises:
-    print("test_add_scalar_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(2.0, requires_grad=True)
     var b = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -2397,7 +2311,6 @@ def test_add_scalar_1d() raises:
 
 
 def test_add_1d_1d() raises:
-    print("test_add_1d_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var b = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
@@ -2410,7 +2323,6 @@ def test_add_1d_1d() raises:
 
 
 def test_add_2d_scalar() raises:
-    print("test_add_2d_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = Tensor[dtype].scalar(5.0, requires_grad=True)
@@ -2423,7 +2335,6 @@ def test_add_2d_scalar() raises:
 
 
 def test_add_2d_1d() raises:
-    print("test_add_2d_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = Tensor[dtype].d1([10.0, 20.0], requires_grad=True)
@@ -2436,7 +2347,6 @@ def test_add_2d_1d() raises:
 
 
 def test_add_3d_1d() raises:
-    print("test_add_3d_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -2452,7 +2362,6 @@ def test_add_3d_1d() raises:
 
 
 def test_add_3d_2d() raises:
-    print("test_add_3d_2d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -2471,7 +2380,6 @@ def test_add_3d_2d() raises:
 
 
 def test_add_broadcast_degenerate() raises:
-    print("test_add_broadcast_degenerate")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0], [2.0]], [[3.0], [4.0]]], requires_grad=True
@@ -2487,7 +2395,6 @@ def test_add_broadcast_degenerate() raises:
 
 
 def add_mismatch_shapes() raises:
-    print("test_add_mismatch_shapes")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var b = Tensor[dtype].d2([[1.0], [2.0], [3.0]])  # Shape mismatch
@@ -2497,7 +2404,6 @@ def add_mismatch_shapes() raises:
 
 
 def test_mean_scalar() raises:
-    print("test_mean_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(4.2, requires_grad=True)
     var m = a.mean()
@@ -2507,7 +2413,6 @@ def test_mean_scalar() raises:
 
 
 def test_mean_1d() raises:
-    print("test_mean_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var m = a.mean()
@@ -2520,7 +2425,6 @@ def test_mean_1d() raises:
 
 
 def test_mean_2d_all_axes() raises:
-    print("test_mean_2d_all_axes")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var m = a.mean()
@@ -2533,7 +2437,6 @@ def test_mean_2d_all_axes() raises:
 
 
 def test_mean_axis0() raises:
-    print("test_mean_axis0")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var m = a.mean(axes=[0])
@@ -2546,7 +2449,6 @@ def test_mean_axis0() raises:
 
 
 def test_mean_axis1_keepdims() raises:
-    print("test_mean_axis1_keepdims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[2.0, 4.0], [6.0, 8.0]], requires_grad=True)
     var m = a.mean(axes=[1], keepdims=True)
@@ -2561,7 +2463,6 @@ def test_mean_axis1_keepdims() raises:
 
 
 def test_mean_multiple_axes() raises:
-    print("test_mean_multiple_axes")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -2576,7 +2477,6 @@ def test_mean_multiple_axes() raises:
 
 
 def test_mean_no_axes() raises:
-    print("test_mean_no_axes")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[2.0, 4.0], [6.0, 8.0]], requires_grad=True)
     var m = a.mean(axes=[])
@@ -2588,7 +2488,6 @@ def test_mean_no_axes() raises:
 
 
 def test_mean_no_grad() raises:
-    print("test_mean_no_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[10.0, 20.0], [30.0, 40.0]], requires_grad=False)
     var m = a.mean()
@@ -2596,7 +2495,6 @@ def test_mean_no_grad() raises:
 
 
 def test_scalar_sum_explicit_axes() raises:
-    print("test_scalar_sum_explicit_axes")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(10.0)
     var result = a.sum(axes=[])
@@ -2606,7 +2504,6 @@ def test_scalar_sum_explicit_axes() raises:
 
 
 def test_scalar_sum_keepdims_true() raises:
-    print("test_scalar_sum_keepdims_true")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(7.0)
     var result = a.sum(axes=[], keepdims=True)
@@ -2618,7 +2515,6 @@ def test_scalar_sum_keepdims_true() raises:
 
 
 def test_scalar_sum_custom_grad() raises:
-    print("test_scalar_sum_custom_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(2.0, requires_grad=True)
     var result = a.sum()
@@ -2631,7 +2527,6 @@ def test_scalar_sum_custom_grad() raises:
 
 # This test needs to be enabled once sum is migrated
 def test_reshape_reused_twice_correct_grad() raises:
-    print("test_reshape_reused_twice_correct_grad")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var r = x.reshape(Shape.of(2, 2))
@@ -2646,7 +2541,6 @@ def test_reshape_reused_twice_correct_grad() raises:
 
 # This test need to be enabled
 def test_sum_gradient_accumulation() raises:
-    print("test_sum_gradient_accumulation")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
     var s1 = a.sum()
@@ -2662,7 +2556,6 @@ def test_sum_gradient_accumulation() raises:
 
 
 def test_scalar_sum_backward() raises:
-    print("test_scalar_sum_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(3.14, requires_grad=True)
     var result = a.sum()  # Should just return a
@@ -2672,7 +2565,6 @@ def test_scalar_sum_backward() raises:
 
 
 def test_scalar_sum_forward() raises:
-    print("test_scalar_sum_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(42.0)
     var result = a.sum()
@@ -2682,7 +2574,6 @@ def test_scalar_sum_forward() raises:
 
 
 def test_sum_all_axes_keepdims() raises:
-    print("test_sum_all_axes_keepdims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
     var s = a.sum(axes=[0, 1], keepdims=True)
@@ -2720,18 +2611,15 @@ def test_sum_multi_axes() raises:
 
 
 def test_sum_axis1_nokeepdims() raises:
-    print("test_sum_axis1_nokeepdims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
     var s = a.sum(axes=[1])
     s.backward(Tensor[dtype].d1([5, 6]))  # shape: (2,)
-    s.print()
     # Broadcast (2,) to (2,2)
     assert_true(a.grad().all_close(Tensor[dtype].d2([[5, 5], [6, 6]])))
 
 
 def test_sum_axis1_keepdims() raises:
-    print("test_sum_axis1_keepdims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
     var s = a.sum(axes=[1], keepdims=True)
@@ -2745,7 +2633,6 @@ def test_sum_axis1_keepdims() raises:
 
 
 def test_sum_axis0() raises:
-    print("test_sum_axis0")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
     var s = a.sum(axes=[0])
@@ -2762,7 +2649,6 @@ def test_sum_axis0() raises:
 
 
 def test_sum_all_elements() raises:
-    print("test_sum_all_elements")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
     var s = a.sum()
@@ -2775,7 +2661,6 @@ def test_sum_all_elements() raises:
 
 # Basic reshape gradient: forward shape is changed, but grads match original shape
 def test_reshape_gradient_2d() raises:
-    print("test_reshape_gradient_2d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = a.reshape(Shape.of(4))  # Flatten
@@ -2787,7 +2672,6 @@ def test_reshape_gradient_2d() raises:
 
 
 def test_reshape_gradient_flatten() raises:
-    print("test_reshape_gradient_flatten")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var y = x.reshape(Shape.of(2, 2))  # Reshape to 2x2
@@ -2800,7 +2684,6 @@ def test_reshape_gradient_flatten() raises:
 
 
 def test_multiple_reshapes() raises:
-    print("test_multiple_reshapes")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([10.0, 20.0, 30.0, 40.0], requires_grad=True)
     var t2 = t.reshape(Shape.of(2, 2))
@@ -2814,7 +2697,6 @@ def test_multiple_reshapes() raises:
 
 
 def test_reshape_noop() raises:
-    print("test_reshape_noop")
     comptime dtype = DType.float32
     var m = Tensor[dtype].d2([[5.0, 6.0]], requires_grad=True)
     var reshaped = m.reshape(Shape.of(1, 2))  # No shape change
@@ -2826,7 +2708,6 @@ def test_reshape_noop() raises:
 
 
 def test_tensor_div_scalar_2d() raises:
-    print("test_tensor_div_scalar_2d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[2.0, 4.0], [6.0, 8.0]], requires_grad=True)
     var b = a / 2.0
@@ -2844,7 +2725,6 @@ def test_tensor_div_scalar_2d() raises:
 
 
 def test_tensor_div_scalar_nonuniform() raises:
-    print("test_tensor_div_scalar_nonuniform")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([10.0, 20.0, 30.0], requires_grad=True)
     var out = a / 10.0
@@ -2863,7 +2743,6 @@ def test_tensor_div_scalar_nonuniform() raises:
 
 
 def test_tensor_div_scalar() raises:
-    print("test_tensor_div_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([4.0, 6.0], requires_grad=True)
     var s = a / 2.0
@@ -2880,7 +2759,6 @@ def test_tensor_div_scalar() raises:
 
 
 def test_tensor_scalar_subtract() raises:
-    print("test_tensor_scalar_subtract")
     # test_scalar_sub
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(5.0, requires_grad=True)
@@ -2896,7 +2774,6 @@ def test_tensor_scalar_subtract() raises:
 
 
 def test_tensor_scalar_add_mul_pow() raises:
-    print("test_tensor_scalar_add_mul_pow")
     # ─────── Tensor + scalar ───────
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(3.0, requires_grad=True)
@@ -2936,7 +2813,6 @@ def test_tensor_scalar_add_mul_pow() raises:
 
 
 def test_slice_grad() raises:
-    print("test_slice_grad")
 
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1, 2, 3, 4], requires_grad=True)
@@ -2949,7 +2825,6 @@ def test_slice_grad() raises:
 
 def test_nested_operations() raises:
     comptime dtype = DType.float32
-    print("test_nested_operations")
     var a = Tensor[dtype].d1([1, 2], requires_grad=True)
     var b = Tensor[dtype].d1([3, 4], requires_grad=True)
     var c = (a * b).sum() + (a + b).product()
@@ -2960,7 +2835,6 @@ def test_nested_operations() raises:
 
 
 def test_large_tensor_backprop() raises:
-    print("test_large_tensor_backprop")
     # Test memory efficiency
     comptime dtype = DType.float32
     var a = Tensor[dtype].rand(Shape([100, 128]), requires_grad=True)
@@ -2974,7 +2848,6 @@ def test_large_tensor_backprop() raises:
 
 def test_detach() raises:
     comptime dtype = DType.float32
-    print("test_detach")
     var a = Tensor[dtype].d1([1, 2], requires_grad=True)
     var b = a.detach() * 2  # Should not propagate grad
     var c = a * b
@@ -2986,7 +2859,6 @@ def test_detach() raises:
 
 
 def test_empty_tensor() raises:
-    print("test_empty_tensor")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([], requires_grad=True)
     var s = a.sum()
@@ -2996,7 +2868,6 @@ def test_empty_tensor() raises:
 
 
 def test_flat_view_chain_backprop() raises:
-    print("test_flat_view_chain_backprop")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(10, requires_grad=True)
     var v1 = a.view([4, 2], offset=2)
@@ -3008,7 +2879,6 @@ def test_flat_view_chain_backprop() raises:
 
 
 def test_reshape_backward() raises:
-    print("test_reshape_backward")
     comptime dtype = DType.float32
     a = Tensor[dtype].d2([[1, 2, 3]], requires_grad=True)
     r = a.reshape(3)
@@ -3024,7 +2894,6 @@ def test_reshape_backward() raises:
 
 
 def test_add_backward() raises:
-    print("test_add_backward")
     comptime dtype = DType.float32
     A1 = Tensor[dtype].d2([[1, 2, 3]], requires_grad=True)
     AV = A1.into_view()
@@ -3063,7 +2932,6 @@ def test_add_backward() raises:
 
 
 def test_reshape_backward_scalar() raises:
-    print("test_reshape_backward_scalar")
     comptime dtype = DType.float32
     a = Tensor[dtype].scalar(100, requires_grad=True)
     r = a.reshape()
@@ -3076,7 +2944,6 @@ def test_reshape_backward_scalar() raises:
 
 
 def test_add_tensor_and_view() raises:
-    print("test_add_tensor_and_view")
     comptime dtype = DType.float32
     a = Tensor[dtype].full(Shape.of(3, 3), 2)
     av = a.into_view()
@@ -3118,7 +2985,6 @@ def test_add_tensor_and_view() raises:
 
 
 def test_add_tensors() raises:
-    print("test_add_tensors")
     comptime dtype = DType.float32
     a = Tensor[dtype].full(Shape.of(3, 3), 2)
     b = Tensor[dtype].full(Shape.of(3, 3), 42)
@@ -3144,7 +3010,6 @@ def test_add_tensors() raises:
 
 
 def test_add_scalar() raises:
-    print("test_add_scalar")
     comptime dtype = DType.float32
     a = Tensor[dtype].full(Shape.of(3, 3), 2)
     b = a + 3
@@ -3155,7 +3020,6 @@ def test_add_scalar() raises:
 
 
 def test_subtract_scalar() raises:
-    print("test_subtract_scalar")
     comptime dtype = DType.float32
     a = Tensor[dtype].full(Shape.of(3, 3), 5)
     b = a - 3
@@ -3166,7 +3030,6 @@ def test_subtract_scalar() raises:
 
 
 def test_powering() raises:
-    print("test_powering")
     comptime dtype = DType.float32
     a = Tensor[dtype].full(Shape.of(3, 3), 2)
     b = a**3
@@ -3175,7 +3038,6 @@ def test_powering() raises:
 
 
 def test_invert() raises:
-    print("test_invert")
     comptime dtype = DType.int32
     a = Tensor[DType.bool].full(Shape.of(3, 3), Scalar[DType.bool](True))
     b = ~a
@@ -3187,7 +3049,6 @@ def test_invert() raises:
 
 
 def test_negate_absolute() raises:
-    print("test_negate_absolute")
     comptime dtype = DType.float32
     a = Tensor[DType.float32].full(Shape.of(3, 3), 42)
     negated = -a
@@ -3198,7 +3059,6 @@ def test_negate_absolute() raises:
 
 
 def test_inplace_update() raises:
-    print("test_inplace_update")
     comptime dtype = DType.float32
     a = Tensor[dtype].zeros(3, 3)
     b = Tensor[dtype].full(Shape.of(3, 3), 42)
@@ -3207,7 +3067,6 @@ def test_inplace_update() raises:
 
 
 def test_exponentiation() raises:
-    print("test_exponentiation")
     comptime dtype = DType.float32
     a = Tensor[dtype].full(Shape.of(3, 3), 2)
     expected = Tensor[dtype].full(Shape.of(3, 3), 7.389056).float()
@@ -3216,7 +3075,6 @@ def test_exponentiation() raises:
 
 
 def test_grad_update() raises:
-    print("test_grad_update")
     comptime dtype = DType.float32
     a = Tensor[dtype].rand([3, 4], requires_grad=True)
     v = a.into_view()
@@ -3230,7 +3088,6 @@ def test_grad_update() raises:
 
 
 def test_sum_all() raises:
-    print("test_sum_all")
     comptime dtype = DType.float32
     a = Tensor[dtype].arange(3 * 4 * 5)
     r = a.reshape(3, 4, 5)
@@ -3263,7 +3120,6 @@ def test_sum_all() raises:
 
 
 def test_view_of_view() raises:
-    print("test_view_of_view")
     comptime dtype = DType.float32
     a = Tensor[dtype].scalar(10)
     v1 = a.into_view()
@@ -3276,7 +3132,6 @@ def test_view_of_view() raises:
 
 
 def test_scalar_indexing() raises:
-    print("test_scalar_indexing")
     comptime dtype = DType.float32
     a = Tensor[dtype].scalar(10)
     v = a.into_view()
@@ -3297,7 +3152,6 @@ def test_scalar_indexing() raises:
 
 
 def test_grads_on_tensor_init() raises:
-    print("test_grads_on_tensor_init")
     comptime dtype = DType.float32
     a = Tensor[dtype](6, 3, 4, requires_grad=True)
     b = Tensor[dtype](6, 3, 4)
@@ -3332,7 +3186,6 @@ def test_reshape_exp() raises:
 
 
 def test_validate_matmul_last_2_dims() raises:
-    print("test_validate_matmul_last_2_dims")
     comptime dtype = DType.float32
     a = Tensor[dtype].arange(2 * 3 * 5 * 4, requires_grad=True)
     a_reshaped = a.reshape(2, 3, 5, -1)
@@ -3348,14 +3201,15 @@ def test_validate_matmul_last_2_dims() raises:
             [1830, 1830, 1830, 1830, 1830],
         ]
     )
+    var _tmp0 = b.grad()
+    var _tmp1 = _tmp0.reshape(Shape(4, 5))
     assert_true(
-        (b.grad().reshape(Shape(4, 5)) == expected),
+        (_tmp1 == expected),
         "batched tensor multiplication assertion failed",
     )
 
 
 def test_tensor_dot() raises:
-    print("test_tensor_dot")
     comptime dtype = DType.float32
     a = Tensor[dtype].scalar(5, requires_grad=True)
     b = Tensor[dtype].scalar(15, requires_grad=True)
@@ -3382,7 +3236,6 @@ def test_tensor_dot() raises:
 
 
 def test_dot_product() raises:
-    print("test_dot_product")
     # 1D @ 1D -> scalar (dot product)
     comptime dtype = DType.float32
     a = Tensor[dtype].d1([1, 2, 3], requires_grad=True)
@@ -3399,7 +3252,6 @@ def test_dot_product() raises:
 
 
 def test_vector_matrix_matmul() raises:
-    print("test_vector_matrix_matmul")
     comptime dtype = DType.float32
     # 1D @ 2D -> 1D
     a = Tensor[dtype].arange(3, requires_grad=True)
@@ -3417,7 +3269,6 @@ def test_vector_matrix_matmul() raises:
 
 
 def test_matrix_vector_matmul() raises:
-    print("test_matrix_vector_matmul")
     comptime dtype = DType.float32
     # 2D @ 1D -> 1D
     a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6], [7, 8, 9]], requires_grad=True)
@@ -3446,7 +3297,6 @@ def test_matrix_vector_matmul() raises:
 
 
 def test_matrix_matrix_matmul() raises:
-    print("test_matrix_matrix_matmul")
     comptime dtype = DType.float32
     # 2D @ 2D -> 2D
     a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
@@ -3476,7 +3326,6 @@ def test_matrix_matrix_matmul() raises:
 
 
 def test_batched_matrix_matmul() raises:
-    print("test_batched_matrix_matmul")
     comptime dtype = DType.float32
     # 3D @ 3D -> 3D (batched matrix multiplication)
     a = Tensor[dtype].d3(
@@ -3512,7 +3361,6 @@ def test_batched_matrix_matmul() raises:
 
 
 def test_broadcasted_matrix_matmul() raises:
-    print("test_broadcasted_matrix_matmul")
     comptime dtype = DType.float32
     # 3D @ 2D -> 3D (broadcasted matmul)
     a = Tensor[dtype].d3(
@@ -3535,7 +3383,6 @@ def test_broadcasted_matrix_matmul() raises:
 
 
 def test_high_dim_batched_matmul() raises:
-    print("test_high_dim_batched_matmul")
     comptime dtype = DType.float32
     # 4D @ 4D -> 4D (higher dimensional batched matmul)
     a = Tensor[dtype].d4(
@@ -3556,7 +3403,6 @@ def test_high_dim_batched_matmul() raises:
 
 
 def test_matmul_no_grad() raises:
-    print("test_matmul_no_grad")
     comptime dtype = DType.float32
     # Test matmul without requiring gradients
     a = Tensor[dtype].d1([1, 2, 3])
@@ -3570,7 +3416,6 @@ def test_matmul_no_grad() raises:
 
 
 def test_matmul_mixed_grad() raises:
-    print("test_matmul_mixed_grad")
     comptime dtype = DType.float32
     # Test matmul with only one tensor requiring grad
     a = Tensor[dtype].d1([1, 2, 3], requires_grad=True)
@@ -3587,7 +3432,6 @@ def test_matmul_mixed_grad() raises:
 
 
 def test_matmul_shape_validation() raises:
-    print("test_matmul_shape_validation")
     comptime dtype = DType.float32
     # These should work (valid shapes)
     a1 = Tensor[dtype].d1([1, 2, 3])
@@ -3603,7 +3447,6 @@ def test_matmul_shape_validation() raises:
 
 
 def test_batched_matrix_vector_matmul() raises:
-    print("test_batched_matrix_vector_matmul")
     comptime dtype = DType.float32
     a = Tensor[dtype].d3(
         [[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]], requires_grad=True
@@ -3630,7 +3473,6 @@ def test_batched_matrix_vector_matmul() raises:
 
 
 def test_matrix_vector_mm_simple() raises:
-    print("test_matrix_vector_mm_simple")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1, 2], [3, 4]])  # (2,2)
     var b = Tensor[dtype].d1([5, 6])  # (2,)
@@ -3641,7 +3483,6 @@ def test_matrix_vector_mm_simple() raises:
 
 
 def test_matrix_vector_mm_backward_A() raises:
-    print("test_matrix_vector_mm_backward_A")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)  # (2,2)
     var b = Tensor[dtype].d1([5, 6])  # (2,)
@@ -3654,7 +3495,6 @@ def test_matrix_vector_mm_backward_A() raises:
 
 
 def test_matrix_vector_mm_backward_b() raises:
-    print("test_matrix_vector_mm_backward_b")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1, 2], [3, 4]])  # (2,2)
     var b = Tensor[dtype].d1([5, 6], requires_grad=True)  # (2,)
@@ -3667,7 +3507,6 @@ def test_matrix_vector_mm_backward_b() raises:
 
 
 def test_matrix_vector_mm_batched_forward() raises:
-    print("test_matrix_vector_mm_batched_forward")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]  # batch 0  # batch 1
@@ -3682,7 +3521,6 @@ def test_matrix_vector_mm_batched_forward() raises:
 
 
 def test_matrix_vector_mm_backward_b_batched() raises:
-    print("test_matrix_vector_mm_backward_b_batched")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]  # batch 0  # batch 1
@@ -3700,7 +3538,6 @@ def test_matrix_vector_mm_backward_b_batched() raises:
 
 
 def test_matrix_vector_mm_backward_A_batched() raises:
-    print("test_matrix_vector_mm_backward_A_batched")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1, 2], [3, 4]], [[5, 6], [7, 8]]],  # batch 0  # batch 1
@@ -3716,7 +3553,6 @@ def test_matrix_vector_mm_backward_A_batched() raises:
 
 
 def test_matrix_vector_mm_deeper_batch_forward() raises:
-    print("test_matrix_vector_mm_deeper_batch_forward")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [
@@ -3734,7 +3570,6 @@ def test_matrix_vector_mm_deeper_batch_forward() raises:
 
 
 def test_matrix_vector_mm_backward_b_deeper_batch() raises:
-    print("test_matrix_vector_mm_backward_b_deeper_batch")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [
@@ -3754,7 +3589,6 @@ def test_matrix_vector_mm_backward_b_deeper_batch() raises:
 
 
 def test_batched_matmul_vector_rhs_broadcast() raises:
-    print("test_batched_matmul_vector_rhs_broadcast")
     comptime dtype = DType.float32
     # A: (2,3,4)  v: (4,)  -> out (2,3)
     A = Tensor[dtype].arange(2 * 3 * 4, requires_grad=True)
@@ -3777,7 +3611,6 @@ def test_batched_matmul_vector_rhs_broadcast() raises:
 
 
 def test_vector_matrix_mm_simple() raises:
-    print("test_vector_matrix_mm_simple")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1, 2, 3], requires_grad=True)  # shape (3,)
     # B must have shape (3, 2) so that (3,) @ (3,2) -> (2,)
@@ -3793,7 +3626,6 @@ def test_vector_matrix_mm_simple() raises:
 
 
 def test_vector_matrix_mm_backward_vector() raises:
-    print("test_vector_matrix_mm_backward_vector")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1, 2, 3], requires_grad=True)  # shape (3,)
     # var a = Tensor[dtype].d2([[1, 2, 3]], requires_grad=True)           # shape (3,)
@@ -3810,7 +3642,6 @@ def test_vector_matrix_mm_backward_vector() raises:
 
 
 def test_vector_matrix_mm_backward_matrix() raises:
-    print("test_vector_matrix_mm_backward_matrix")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([2, 3], requires_grad=False)  # shape (2,)
     var b = Tensor[dtype].d2(
@@ -3826,7 +3657,6 @@ def test_vector_matrix_mm_backward_matrix() raises:
 
 
 def test_vector_matrix_mm_batched_matrix() raises:
-    print("test_vector_matrix_mm_batched_matrix")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1(d1([1, 2]), requires_grad=True)  # shape (2,)
     # b: batch of 2 matrices, each (2,2) ; shape (2, 2, 2)
@@ -3850,7 +3680,6 @@ def test_vector_matrix_mm_batched_matrix() raises:
 
 
 def test_vector_matrix_mm_backward_batched_matrix_vector_grad() raises:
-    print("test_vector_matrix_mm_backward_batched_matrix_vector_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1(d1([1, 2]), requires_grad=True)  # shape (2,)
     var b = Tensor[dtype].d3(
@@ -3867,7 +3696,6 @@ def test_vector_matrix_mm_backward_batched_matrix_vector_grad() raises:
 
 
 def test_vector_matrix_mm_backward_batched_matrix_matrix_grad() raises:
-    print("test_vector_matrix_mm_backward_batched_matrix_matrix_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1(d1([3, 4]), requires_grad=False)  # shape (2,)
     var b = Tensor[dtype].d3(
@@ -3885,7 +3713,6 @@ def test_vector_matrix_mm_backward_batched_matrix_matrix_grad() raises:
 
 
 def test_max_min_mixed() raises:
-    print("test_max_min_mixed")
 
     comptime dtype = DType.float32
     # Test 1: Basic max reduction along axis 1
@@ -4024,7 +3851,6 @@ def test_max_min_mixed() raises:
 
 
 def test_max_min() raises:
-    print("test_max_min")
     comptime dtype = DType.float32
     a = Tensor[dtype].d2(
         d2([[42.0, 0.0, -5.0], [0.0, 35.0, 0.0], [51.0, 0.0, 51.0]]),
@@ -4057,7 +3883,6 @@ def test_max_min() raises:
 
 
 def test_mask() raises:
-    print("test_mask")
     comptime dtype = DType.float32
     a = Tensor[dtype].arange(Scalar[DType.float32](2 * 3))
     r = a.reshape(2, 3)
@@ -4071,7 +3896,6 @@ def test_mask() raises:
 
 
 def test_randint() raises:
-    print("test_randint")
     low = Int32(10)
     high = Int32(30)
     a = Tensor[DType.int32].rand([3, 4], low, high)
@@ -4087,7 +3911,6 @@ def test_randint() raises:
 
 
 def test_slice_single_axis() raises:
-    print("test_slice_single_axis")
     comptime dtype = DType.float32
     x = Tensor[dtype].arange(
         Scalar[DType.float32](0), Scalar[DType.float32](12)
@@ -4111,7 +3934,6 @@ def test_slice_single_axis() raises:
 
 
 def test_slice_single_axis_positive() raises:
-    print("test_slice_single_axis_positive")
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(
         Scalar[DType.float32](0), Scalar[DType.float32](10)
@@ -4129,7 +3951,6 @@ def test_slice_single_axis_positive() raises:
 
 
 def test_slice_single_axis_negative_indices() raises:
-    print("test_slice_single_axis_negative_indices")
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(
         Scalar[DType.float32](0), Scalar[DType.float32](10)
@@ -4147,7 +3968,6 @@ def test_slice_single_axis_negative_indices() raises:
 
 
 def test_slice_single_axis_step_greater_than_1() raises:
-    print("test_slice_single_axis_step_greater_than_1")
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(
         Scalar[DType.float32](0), Scalar[DType.float32](10)
@@ -4158,7 +3978,6 @@ def test_slice_single_axis_step_greater_than_1() raises:
 
 
 def test_slice_single_axis_step_negative() raises:
-    print("test_slice_single_axis_step_negative")
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(
         Scalar[DType.float32](0), Scalar[DType.float32](10)
@@ -4169,7 +3988,6 @@ def test_slice_single_axis_step_negative() raises:
 
 
 def test_slice_single_axis_full_axis() raises:
-    print("test_slice_single_axis_full_axis")
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(
         Scalar[DType.float32](0), Scalar[DType.float32](5)
@@ -4180,7 +3998,6 @@ def test_slice_single_axis_full_axis() raises:
 
 
 def test_slice_single_axis_single_element() raises:
-    print("test_slice_single_axis_single_element")
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(
         Scalar[DType.float32](0), Scalar[DType.float32](5)
@@ -4194,7 +4011,6 @@ def test_slice_single_axis_single_element() raises:
 
 
 def test_slice_multi_axis_basic() raises:
-    print("test_slice_multi_axis_basic")
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(
         Scalar[DType.float32](0), Scalar[DType.float32](24)
@@ -4205,7 +4021,6 @@ def test_slice_multi_axis_basic() raises:
 
 
 def test_slice_multi_axis_negative_indices() raises:
-    print("test_slice_multi_axis_negative_indices")
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(
         Scalar[DType.float32](0), Scalar[DType.float32](24)
@@ -4216,7 +4031,6 @@ def test_slice_multi_axis_negative_indices() raises:
 
 
 def test_slice_multi_axis_step() raises:
-    print("test_slice_multi_axis_step")
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(
         Scalar[DType.float32](0), Scalar[DType.float32](24)
@@ -4227,7 +4041,6 @@ def test_slice_multi_axis_step() raises:
 
 
 def test_slice_multi_axis_mixed() raises:
-    print("test_slice_multi_axis_mixed")
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(
         Scalar[DType.float32](0), Scalar[DType.float32](24)
@@ -4256,7 +4069,6 @@ def d2(l: List[List[Float32]]) -> List[List[Scalar[DType.float32]]]:
 
 
 def test_repeat_1d_axis0() raises:
-    print("test_repeat_1d_axis0")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1(d1([10.0, 20, 30]))
     var r = a.repeat([2])
@@ -4268,7 +4080,6 @@ def d1(l: List[Float32]) -> List[Scalar[DType.float32]]:
 
 
 def test_repeat_backward_simple() raises:
-    print("test_repeat_backward_simple")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True).float()
     var r = a.repeat([2])  # [1,1,2,2,3,3]
@@ -4279,7 +4090,6 @@ def test_repeat_backward_simple() raises:
 
 
 def test_repeat_backward_with_view_slice() raises:
-    print("test_repeat_backward_with_view_slice")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype].d1([10.0, 20.0, 30.0, 40.0], requires_grad=True).float()
@@ -4295,7 +4105,6 @@ def test_repeat_backward_with_view_slice() raises:
 
 
 def test_repeat_backward_with_strided_view() raises:
-    print("test_repeat_backward_with_strided_view")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype]
@@ -4317,7 +4126,6 @@ def test_repeat_backward_with_strided_view() raises:
 
 
 def test_repeat_backward_multi_axis() raises:
-    print("test_repeat_backward_multi_axis")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True).float()
@@ -4332,7 +4140,6 @@ def test_repeat_backward_multi_axis() raises:
 
 
 def test_repeat_backward_chain_view_repeat() raises:
-    print("test_repeat_backward_chain_view_repeat")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype]
@@ -4354,7 +4161,6 @@ def test_repeat_backward_chain_view_repeat() raises:
 
 
 def test_tile_1d_basic() raises:
-    print("test_tile_1d_basic")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).float()
     var t = a.tile([2])
@@ -4362,7 +4168,6 @@ def test_tile_1d_basic() raises:
 
 
 def test_tile_1d_multi() raises:
-    print("test_tile_1d_multi")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([4.0, 5.0]).float()
     var t = a.tile([3])
@@ -4370,7 +4175,6 @@ def test_tile_1d_multi() raises:
 
 
 def test_tile_2d_row() raises:
-    print("test_tile_2d_row")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).float()
     var t = a.tile([1, 2])
@@ -4381,7 +4185,6 @@ def test_tile_2d_row() raises:
 
 
 def test_tile_2d_col() raises:
-    print("test_tile_2d_col")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).float()
     var t = a.tile([2, 1])
@@ -4394,7 +4197,6 @@ def test_tile_2d_col() raises:
 
 
 def test_tile_2d_both_axes() raises:
-    print("test_tile_2d_both_axes")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).float()
     var t = a.tile([2, 2])
@@ -4414,7 +4216,6 @@ def test_tile_2d_both_axes() raises:
 
 
 def test_tile_backward_1d() raises:
-    print("test_tile_backward_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True).float()
     var t = a.tile([2])
@@ -4424,7 +4225,6 @@ def test_tile_backward_1d() raises:
 
 
 def test_tile_backward_2d() raises:
-    print("test_tile_backward_2d")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True).float()
@@ -4437,7 +4237,6 @@ def test_tile_backward_2d() raises:
 
 
 def test_tile_single_axis_repeat_one() raises:
-    print("test_tile_single_axis_repeat_one")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([5.0, 6.0]).float()
     var t = a.tile([1])
@@ -4445,7 +4244,6 @@ def test_tile_single_axis_repeat_one() raises:
 
 
 def test_tile_edge_empty_tensor() raises:
-    print("test_tile_edge_empty_tensor")
     comptime dtype = DType.float32
     var l: List[Scalar[DType.float32]] = []
     var a = Tensor[dtype].d1(l).float()
@@ -4454,7 +4252,6 @@ def test_tile_edge_empty_tensor() raises:
 
 
 def test_flatten_forward_contiguous_1d() raises:
-    print("test_flatten_forward_contiguous_1d")
     comptime dtype = DType.float32
     var d1: List[Scalar[DType.float32]] = [1.0, 2.0, 3.0]
     var a = Tensor[dtype].d1(d1).float()
@@ -4464,7 +4261,6 @@ def test_flatten_forward_contiguous_1d() raises:
 
 
 def test_flatten_forward_contiguous_2d() raises:
-    print("test_flatten_forward_contiguous_2d")
     comptime dtype = DType.float32
     var d2: List[List[Scalar[DType.float32]]] = [[1.0, 2.0], [3.0, 4.0]]
     var a = Tensor[dtype].d2(d2)
@@ -4474,7 +4270,6 @@ def test_flatten_forward_contiguous_2d() raises:
 
 
 def test_flatten_backward_contiguous() raises:
-    print("test_flatten_backward_contiguous")
     comptime dtype = DType.float32
     var d2: List[List[Scalar[DType.float32]]] = [[1.0, 2.0], [3.0, 4.0]]
     var a = Tensor[dtype].d2(d2, requires_grad=True)
@@ -4487,7 +4282,6 @@ def test_flatten_backward_contiguous() raises:
 
 
 def test_flatten_forward_view_slice() raises:
-    print("test_flatten_forward_view_slice")
     comptime dtype = DType.float32
     var d2: List[List[Scalar[DType.float32]]] = [
         [1.0, 2.0, 3.0],
@@ -4501,7 +4295,6 @@ def test_flatten_forward_view_slice() raises:
 
 
 def test_flatten_backward_view_slice() raises:
-    print("test_flatten_backward_view_slice")
     comptime dtype = DType.float32
     var d2: List[List[Scalar[DType.float32]]] = [
         [1.0, 2.0, 3.0],
@@ -4521,7 +4314,6 @@ def test_flatten_backward_view_slice() raises:
 
 
 def test_flatten_backward_non_contiguous_stride() raises:
-    print("test_flatten_backward_non_contiguous_stride")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype]
@@ -4543,7 +4335,6 @@ def test_flatten_backward_non_contiguous_stride() raises:
 
 
 def test_flatten_forward_contiguous_3d() raises:
-    print("test_flatten_forward_contiguous_3d")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype]
@@ -4562,7 +4353,6 @@ def test_flatten_forward_contiguous_3d() raises:
 
 
 def test_flatten_backward_contiguous_3d() raises:
-    print("test_flatten_backward_contiguous_3d")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype]
@@ -4588,7 +4378,6 @@ def test_flatten_backward_contiguous_3d() raises:
 
 
 def test_flatten_forward_3d_slice() raises:
-    print("test_flatten_forward_3d_slice")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype]
@@ -4601,7 +4390,6 @@ def test_flatten_forward_3d_slice() raises:
 
 
 def test_flatten_backward_3d_slice() raises:
-    print("test_flatten_backward_3d_slice")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype]
@@ -4627,7 +4415,6 @@ def test_flatten_backward_3d_slice() raises:
 
 
 def test_flatten_full_default_forward_2d() raises:
-    print("test_flatten_full_default_forward_2d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).float()
     var f = a.flatten()
@@ -4636,7 +4423,6 @@ def test_flatten_full_default_forward_2d() raises:
 
 
 def test_flatten_partial_forward_3d() raises:
-    print("test_flatten_partial_forward_3d")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype]
@@ -4685,7 +4471,6 @@ def test_flatten_partial_forward_3d() raises:
 
 
 def test_flatten_start_only_forward_3d() raises:
-    print("test_flatten_start_only_forward_3d")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype]
@@ -4708,7 +4493,6 @@ def test_flatten_start_only_forward_3d() raises:
 
 
 def test_flatten_start_eq_end_forward_noop_3d() raises:
-    print("test_flatten_start_eq_end_forward_noop_3d")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype]
@@ -4721,7 +4505,6 @@ def test_flatten_start_eq_end_forward_noop_3d() raises:
 
 
 def test_flatten_backward_contiguous_2d() raises:
-    print("test_flatten_backward_contiguous_2d")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True).float()
@@ -4734,7 +4517,6 @@ def test_flatten_backward_contiguous_2d() raises:
 
 
 def test_flatten_backward_partial_3d() raises:
-    print("test_flatten_backward_partial_3d")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype]
@@ -4782,7 +4564,6 @@ def test_flatten_backward_partial_3d() raises:
 
 
 def test_flatten_backward_view_strided_2d() raises:
-    print("test_flatten_backward_view_strided_2d")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype]
@@ -4802,7 +4583,6 @@ def test_flatten_backward_view_strided_2d() raises:
 
 
 def test_flatten_backward_3d_strided_view() raises:
-    print("test_flatten_backward_3d_strided_view")
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype]
@@ -4826,7 +4606,6 @@ def test_flatten_backward_3d_strided_view() raises:
 
 
 def test_flatten_gradient_correctness_strided_view() raises:
-    print("test_flatten_gradient_correctness_strided_view")
     comptime dtype = DType.float32
 
     var a = (
@@ -4854,7 +4633,6 @@ def test_flatten_gradient_correctness_strided_view() raises:
 
 
 def test_flatten_gradient_correctness() raises:
-    print("test_flatten_gradient_correctness")
 
     comptime dtype = DType.float32
     var a = (
@@ -4873,7 +4651,6 @@ def test_flatten_gradient_correctness() raises:
 
 
 def test_shuffle() raises:
-    print("test_shuffle")
     comptime dtype = DType.float32
     var perm: List[Int] = [2, 3, 0, 4, 1]
     a = Tensor[dtype].arange(Scalar[DType.float32](5), requires_grad=True)
@@ -4887,7 +4664,6 @@ def test_shuffle() raises:
 
 
 def test_fill() raises:
-    print("test_fill")
     comptime dtype = DType.float32
     a = Tensor[dtype].zeros(10)
     a.fill(42)
@@ -4948,7 +4724,6 @@ def test_fill() raises:
 
 
 def test_element_at() raises:
-    print("test_element_at")
     comptime dtype = DType.float32
     a = Tensor[dtype].arange(Scalar[DType.float32](10))
     v = a[s(2, 8, 2)]
@@ -4988,7 +4763,6 @@ def test_argmin_max() raises:
 
 
 def test_slice_backward() raises:
-    print("test_slice_backward")
     comptime dtype = DType.float32
     a = Tensor[dtype].d1([1, 2, 3, 4, 5, 6], requires_grad=True)
     r = a.reshape([2, 3])
@@ -5001,7 +4775,6 @@ def test_slice_backward() raises:
 
 
 def test_view_backward() raises:
-    print("test_view_backward")
     comptime dtype = DType.float32
     a = Tensor[dtype].d1([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], requires_grad=True)
     v = a.view(shape=Shape(2, 4), strides=Strides(4, 1), offset=2)
@@ -5021,7 +4794,6 @@ def test_view_backward() raises:
 
 
 def test_complex_mixed_ops_backward() raises:
-    print("test_complex_mixed_ops_backward")
     comptime dtype = DType.float32
 
     a = Tensor[dtype].d2(
@@ -5046,7 +4818,6 @@ def test_complex_mixed_ops_backward() raises:
 
 
 def test_view_chain_with_hidden_elements() raises:
-    print("=== Mojo: View chain with hidden elements ===")
 
     comptime dtype = DType.float32
     var l: List[List[Scalar[DType.float32]]] = [
@@ -5072,7 +4843,6 @@ def test_view_chain_with_hidden_elements() raises:
 
 
 def test_gradient_flow_through_views() raises:
-    print("=== Testing Gradient Flow Through View Chain ===")
     comptime dtype = DType.float32
     var l: List[List[Scalar[DType.float32]]] = [[1, 2, 3, 4], [5, 6, 7, 8]]
     var a = Tensor[dtype].d2(l, requires_grad=True)
@@ -5086,6 +4856,5 @@ def test_gradient_flow_through_views() raises:
 
 
 def main() raises:
-    print("Starting tensor test cases")
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("Finished running tensor test cases")

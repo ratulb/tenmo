@@ -13,45 +13,7 @@ from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
 from .intarray import IntArray
 from .ancestry import Ancestor
-
-
-struct Reduction(ImplicitlyCopyable, RegisterPassable):
-    var reduction: Int
-
-    fn __init__(out self, reduction: Int = 0):
-        self.reduction = reduction
-        if reduction < 0 or reduction > 2:
-            panic(
-                "Reduction: must be 0=mean, 1=sum, 2=none, got "
-                + String(reduction)
-            )
-
-    fn __init__(out self, reduction: String):
-        if reduction == "mean":
-            self.reduction = 0
-        elif reduction == "sum":
-            self.reduction = 1
-        elif reduction == "none":
-            self.reduction = 2
-        else:
-            self.reduction = -1
-            panic(
-                "Reduction: must be 'mean', 'sum', or 'none', got '"
-                + reduction
-                + "'"
-            )
-
-    fn __copyinit__(out self, copy: Self):
-        self.reduction = copy.reduction
-
-    fn is_mean(self) -> Bool:
-        return self.reduction == 0
-
-    fn is_sum(self) -> Bool:
-        return self.reduction == 1
-
-    fn is_none(self) -> Bool:
-        return self.reduction == 2
+from tenmo.shared import Reduction
 
 
 # Validation
@@ -442,7 +404,8 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
             C,
         )
         # Step 6: Reshape back to original logits shape
-        var grad_final = Gradbox[Self.dtype](scaled^, share=False).reshape(
+        var _tmp0 = Gradbox[Self.dtype](scaled^, share=False)
+        var grad_final = _tmp0.reshape(
             logits_shape
         )
         # Step 6: Reshape and UNPERMUTE back to original logits shape

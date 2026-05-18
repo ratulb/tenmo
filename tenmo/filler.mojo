@@ -259,33 +259,35 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     @always_inline
     @staticmethod
     def scatter_add(
-        target: NDBuffer[Self.dtype],  # (vocab_size, hidden_size) gradbox
-        source: NDBuffer[Self.dtype],  # (n_indices,  hidden_size) incoming grad
-        indices: IntArray,  # which rows of target to scatter into
+        target: NDBuffer[Self.dtype],  # gradbox
+        source: NDBuffer[Self.dtype],  # incoming grad
+        indices: IntArray,
         axis: Int = 0,
     ):
-        """Scatter-add source rows into target rows at the given indices.
+        """Scatter-add source into target at given indices along axis.
 
-        target[indices[k], :] += source[k, :]  for k in range(n_indices)
+        For axis=0: target[indices[k], ...] += source[k, ...]
+        For axis=1: target[:, indices[k], ...] += source[:, k, ...]
+        (broadcasts source when source.shape.rank() == 1)
 
-        Uses atomic add — safe for repeated indices (same token appearing
-        multiple times in a review).
-
+        Uses atomic add — safe for repeated indices.
         Dispatches to GPU kernel when target is on GPU, CPU loop otherwise.
         """
         try:
             var n_indices = len(indices)
-            var row_width = (
-                source.numels() if source.shape.rank() == 1 else source.shape[1]
-            )
+            # Slice volume = number of target elements orthogonal to axis
+            var tgt_ax_size = target.shape[axis]
+            var slice_volume = target.numels() // tgt_ax_size
 
             comptime if has_accelerator():
                 if target.is_on_gpu():
                     Self._scatter_add_gpu(
-                        target, source, indices, n_indices, row_width
+                        target, source, indices, n_indices, slice_volume
                     )
                     return
-            Self._scatter_add_cpu(target, source, indices, n_indices, row_width)
+            Self._scatter_add_cpu(
+                target, source, indices, n_indices, slice_volume, axis
+            )
         except e:
             print(e)
             panic("Error in Filler scatter_add")
@@ -424,19 +426,41 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         source: NDBuffer[Self.dtype],
         indices: IntArray,
         n_indices: Int,
-        row_width: Int,
+        slice_volume: Int,
+        axis: Int,
     ):
-        """CPU scatter-add — row-by-row loop, no atomics needed (single thread).
+        """CPU scatter-add — iterates over all elements in each slice along axis.
+        Correct for any rank and axis (not just 2D axis=0).
         """
+        var rank = target.shape.rank()
         var is_broadcast = source.shape.rank() == 1
+
         for k in range(n_indices):
-            var target_row = indices[k]
-            for col in range(row_width):
-                var src_flat = col if is_broadcast else k * row_width + col
-                var dst_idx = target.offset + target_row * row_width + col
+            var tgt_idx = indices[k]
+            for elem in range(slice_volume):
+                # Decompose elem into coordinates for non-axis dims
+                var rem = elem
+                var dst_off = target.offset + tgt_idx * target.strides[axis]
+                var src_off: Int = source.offset
+                if not is_broadcast:
+                    src_off += k * source.strides[axis]
+
+                for d in range(rank - 1, -1, -1):
+                    if d == axis:
+                        continue
+                    var dim_size = target.shape[d]
+                    var cd = rem % dim_size
+                    rem //= dim_size
+                    dst_off += cd * target.strides[d]
+                    if not is_broadcast:
+                        src_off += cd * source.strides[d]
+
+                if is_broadcast:
+                    src_off = source.offset + elem
+
                 target.set(
-                    dst_idx,
-                    target.get(dst_idx) + source.get(source.offset + src_flat),
+                    dst_off,
+                    target.get(dst_off) + source.get(src_off),
                 )
 
     # =========================================================================

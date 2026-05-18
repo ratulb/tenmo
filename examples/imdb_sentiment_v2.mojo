@@ -12,6 +12,7 @@ from tenmo.nlp import (
     DefaultTokenizer,
     IMDBTextCleaner,
 )
+from tenmo.shared import Reduction
 
 
 @fieldwise_init
@@ -255,7 +256,7 @@ def main() raises:
                 .sum(axes=[0], keepdims=False)
                 .sigmoid()
             )"""
-            var hidden = weights_0_1.gather(token_ids, fuse_sum=True).sigmoid()
+            var hidden = weights_0_1.gather(token_ids, reduction=Reduction(1)).sigmoid()
             var prediction = hidden.dot(weights_1_2).sigmoid()
 
             # ── Loss — MSE ────────────────────────────────────────────────────
@@ -316,7 +317,7 @@ def main() raises:
             .sigmoid[track_grad=False]()
         )"""
         var hidden = weights_0_1.gather[track_grad=False](
-            token_ids, fuse_sum=True
+            token_ids, reduction=Reduction(1)
         ).sigmoid[track_grad=False]()
         var prediction = hidden.dot[track_grad=False](weights_1_2).sigmoid[
             track_grad=False

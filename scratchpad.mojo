@@ -6,6 +6,7 @@ from tenmo.intarray import IntArray
 from std.testing import assert_true
 from tenmo.numpy_interop import test_to_ndarray
 from tenmo.common_utils import *
+from tenmo.shared import Reduction as SharedReduction
 from tenmo.strides import Strides
 from tenmo.mnemonics import *
 from tenmo.reduction_kernel import Reduction
@@ -17,10 +18,48 @@ from std.collections import Counter
 from tenmo.nlp import IMDBTextCleaner, DefaultTokenizer
 from tenmo.buffers import Buffer
 from bpe import BasicTokenizer, RegexTokenizer, GPT4Tokenizer
+from tenmo.embedding import Embedding
+from std.collections import InlineArray
 
 comptime dtype = DType.float32
 
+
 def main() raises:
+    # Fixed size, stack allocated
+    # Elements must be SAME type
+    # Designed for uninitialized memory management
+    var a = InlineArray[Int, 3](uninitialized=True)
+    a[0] = 10   # ✅ actually works via __getitem__ returning ref
+    print(a[0])
+
+
+fn test_emb_cpu_max_norm_clips_large_rows() raises:
+    print("test_emb_cpu_max_norm_clips_large_rows")
+    comptime dtype = DType.float32
+    var emb = Embedding[dtype](
+        num_embeddings=3, embedding_dim=2,
+        max_norm=1.0, init_method="zero"
+    )
+    emb.weight.print()
+    # Set row 0 to a large vector with norm > 1
+    print("Check 1")
+    emb.weight.fill(Tensor[dtype].d1([3.0, 4.0]), i(0), s())   # norm=5
+    emb.weight.print()
+    print("Check 2")
+    var result = emb([0])
+    print("Check 3")
+    result.print()
+    # After max_norm=1.0 clipping, norm of result row should be <= 1.0
+    result.squeeze().norm().print()
+    var norm = result.squeeze().norm().item()
+
+    print("Check 4")
+    assert_true(abs(norm - 1.0) < 1e-5)
+
+def main_120() raises:
+    test_emb_cpu_max_norm_clips_large_rows()
+
+def main_110() raises:
     test_shape_compute_output_shape_single_axis()
 
 fn test_shape_compute_output_shape_single_axis() raises:
@@ -87,7 +126,7 @@ fn test_mcpy_cpu_2d_fuse_sum_duplicate_indices() raises:
     idx.append(0)
     idx.append(0)
     # row 0 three times: [3, 6]
-    var result = a.gather(idx, axis=0, fuse_sum=True)
+    var result = a.gather(idx, axis=0, reduction=SharedReduction(1))
     assert_true(result.all_close(Tensor[dtype].d1([3.0, 6.0])))
 
 def main_60() raises:

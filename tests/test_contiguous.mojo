@@ -13,7 +13,6 @@ from tenmo.shapes import Shape
 
 
 fn test_contig_cpu_scalar_forward() raises:
-    print("test_contig_cpu_scalar_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(42.0)
     a.requires_grad_(True)
@@ -23,7 +22,6 @@ fn test_contig_cpu_scalar_forward() raises:
 
 
 fn test_contig_cpu_scalar_backward() raises:
-    print("test_contig_cpu_scalar_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(3.0)
     a.requires_grad_(True)
@@ -38,7 +36,6 @@ fn test_contig_cpu_scalar_backward() raises:
 
 
 fn test_contig_cpu_1d_already_contiguous() raises:
-    print("test_contig_cpu_1d_already_contiguous")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var c = a.contiguous()
@@ -50,7 +47,6 @@ fn test_contig_cpu_1d_already_contiguous() raises:
 
 
 fn test_contig_cpu_1d_slice_view() raises:
-    print("test_contig_cpu_1d_slice_view")
     comptime dtype = DType.float32
     # Create a non-contiguous view via transpose of a 2D then flatten — or use
     # a known strided view via unsqueeze + squeeze to produce offset
@@ -72,7 +68,6 @@ fn test_contig_cpu_1d_slice_view() raises:
 
 
 fn test_contig_cpu_1d_values_preserved() raises:
-    print("test_contig_cpu_1d_values_preserved")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([10.0, 20.0, 30.0], requires_grad=True)
     var c = a.contiguous()
@@ -88,7 +83,6 @@ fn test_contig_cpu_1d_values_preserved() raises:
 
 
 fn test_contig_cpu_2d_already_contiguous() raises:
-    print("test_contig_cpu_2d_already_contiguous")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var c = a.contiguous()
@@ -100,7 +94,6 @@ fn test_contig_cpu_2d_already_contiguous() raises:
 
 
 fn test_contig_cpu_2d_transpose_non_contiguous() raises:
-    print("test_contig_cpu_2d_transpose_non_contiguous")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -117,7 +110,6 @@ fn test_contig_cpu_2d_transpose_non_contiguous() raises:
 
 
 fn test_contig_cpu_2d_non_uniform_values_grad() raises:
-    print("test_contig_cpu_2d_non_uniform_values_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var t = a.transpose()  # (2,2), non-contiguous: [[1,3],[2,4]]
@@ -135,7 +127,6 @@ fn test_contig_cpu_2d_non_uniform_values_grad() raises:
 
 
 fn test_contig_cpu_2d_large_random() raises:
-    print("test_contig_cpu_2d_large_random")
     comptime dtype = DType.float32
     var a = Tensor[dtype].randn(16, 32)
     a.requires_grad_(True)
@@ -156,7 +147,6 @@ fn test_contig_cpu_2d_large_random() raises:
 
 
 fn test_contig_cpu_3d_already_contiguous() raises:
-    print("test_contig_cpu_3d_already_contiguous")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -170,7 +160,6 @@ fn test_contig_cpu_3d_already_contiguous() raises:
 
 
 fn test_contig_cpu_3d_transpose_last_axes() raises:
-    print("test_contig_cpu_3d_transpose_last_axes")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -193,7 +182,6 @@ fn test_contig_cpu_3d_transpose_last_axes() raises:
 
 
 fn test_contig_cpu_3d_unsqueeze_then_contiguous() raises:
-    print("test_contig_cpu_3d_unsqueeze_then_contiguous")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -210,7 +198,6 @@ fn test_contig_cpu_3d_unsqueeze_then_contiguous() raises:
 
 
 fn test_contig_cpu_3d_squeeze_then_contiguous() raises:
-    print("test_contig_cpu_3d_squeeze_then_contiguous")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0]], [[3.0, 4.0]]], requires_grad=True  # (2,1,2)
@@ -230,7 +217,6 @@ fn test_contig_cpu_3d_squeeze_then_contiguous() raises:
 
 
 fn test_contig_cpu_4d_already_contiguous() raises:
-    print("test_contig_cpu_4d_already_contiguous")
     comptime dtype = DType.float32
     var a = Tensor[dtype].randn(2, 3, 4, 5)
     a.requires_grad_(True)
@@ -243,7 +229,6 @@ fn test_contig_cpu_4d_already_contiguous() raises:
 
 
 fn test_contig_cpu_4d_transpose_non_contiguous() raises:
-    print("test_contig_cpu_4d_transpose_non_contiguous")
     comptime dtype = DType.float32
     var a = Tensor[dtype].randn(2, 3, 4, 5)
     a.requires_grad_(True)
@@ -269,7 +254,6 @@ fn test_contig_cpu_4d_transpose_non_contiguous() raises:
 
 
 fn test_contig_cpu_track_grad_false() raises:
-    print("test_contig_cpu_track_grad_false")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var c = a.contiguous[track_grad=False]()
@@ -283,7 +267,6 @@ fn test_contig_cpu_track_grad_false() raises:
 
 
 fn test_contig_cpu_grad_accumulation() raises:
-    print("test_contig_cpu_grad_accumulation")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var c1 = a.contiguous()
@@ -302,7 +285,6 @@ fn test_contig_cpu_grad_accumulation() raises:
 
 
 fn test_contig_cpu_chained_contiguous() raises:
-    print("test_contig_cpu_chained_contiguous")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var t = a.transpose()
@@ -325,7 +307,6 @@ fn test_contig_cpu_chained_contiguous() raises:
 
 fn test_contig_gpu_scalar_forward() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_scalar_forward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].scalar(42.0)
         a.requires_grad_(True)
@@ -337,7 +318,6 @@ fn test_contig_gpu_scalar_forward() raises:
 
 fn test_contig_gpu_scalar_backward() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_scalar_backward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].scalar(3.0)
         a.requires_grad_(True)
@@ -355,7 +335,6 @@ fn test_contig_gpu_scalar_backward() raises:
 
 fn test_contig_gpu_1d_already_contiguous() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_1d_already_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -370,7 +349,6 @@ fn test_contig_gpu_1d_already_contiguous() raises:
 
 fn test_contig_gpu_1d_values_preserved() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_1d_values_preserved")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([10.0, 20.0, 30.0], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -388,7 +366,6 @@ fn test_contig_gpu_1d_values_preserved() raises:
 
 fn test_contig_gpu_2d_already_contiguous() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_2d_already_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -403,7 +380,6 @@ fn test_contig_gpu_2d_already_contiguous() raises:
 
 fn test_contig_gpu_2d_transpose_non_contiguous() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_2d_transpose_non_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
             [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -425,7 +401,6 @@ fn test_contig_gpu_2d_transpose_non_contiguous() raises:
 
 fn test_contig_gpu_2d_matches_cpu() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_2d_matches_cpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(8, 16)
         a.requires_grad_(True)
@@ -446,7 +421,6 @@ fn test_contig_gpu_2d_matches_cpu() raises:
 
 fn test_contig_gpu_2d_non_uniform_grad() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_2d_non_uniform_grad")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -467,7 +441,6 @@ fn test_contig_gpu_2d_non_uniform_grad() raises:
 
 fn test_contig_gpu_3d_already_contiguous() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_3d_already_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
             [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
@@ -484,7 +457,6 @@ fn test_contig_gpu_3d_already_contiguous() raises:
 
 fn test_contig_gpu_3d_transpose_last_axes() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_3d_transpose_last_axes")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
             [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
@@ -508,7 +480,6 @@ fn test_contig_gpu_3d_transpose_last_axes() raises:
 
 fn test_contig_gpu_3d_unsqueeze_then_contiguous() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_3d_unsqueeze_then_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
             [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -529,7 +500,6 @@ fn test_contig_gpu_3d_unsqueeze_then_contiguous() raises:
 
 fn test_contig_gpu_3d_squeeze_then_contiguous() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_3d_squeeze_then_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
             [[[1.0, 2.0]], [[3.0, 4.0]]], requires_grad=True  # (2,1,2)
@@ -548,7 +518,6 @@ fn test_contig_gpu_3d_squeeze_then_contiguous() raises:
 
 fn test_contig_gpu_3d_matches_cpu() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_3d_matches_cpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(4, 5, 6)
         a.requires_grad_(True)
@@ -574,7 +543,6 @@ fn test_contig_gpu_3d_matches_cpu() raises:
 
 fn test_contig_gpu_4d_already_contiguous() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_4d_already_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(2, 3, 4, 5)
         a.requires_grad_(True)
@@ -589,7 +557,6 @@ fn test_contig_gpu_4d_already_contiguous() raises:
 
 fn test_contig_gpu_4d_transpose_non_contiguous() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_4d_transpose_non_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(2, 3, 4, 5)
         a.requires_grad_(True)
@@ -616,7 +583,6 @@ fn test_contig_gpu_4d_transpose_non_contiguous() raises:
 
 fn test_contig_gpu_track_grad_false() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_track_grad_false")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -632,7 +598,6 @@ fn test_contig_gpu_track_grad_false() raises:
 
 fn test_contig_gpu_grad_accumulation() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_grad_accumulation")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -655,7 +620,6 @@ fn test_contig_gpu_grad_accumulation() raises:
 
 fn test_contig_gpu_grad_lands_on_cpu() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_grad_lands_on_cpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -673,7 +637,6 @@ fn test_contig_gpu_grad_lands_on_cpu() raises:
 
 fn test_contig_gpu_chained_contiguous() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_chained_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -695,7 +658,6 @@ fn test_contig_gpu_chained_contiguous() raises:
 
 fn test_contig_gpu_cpu_tensor_unchanged() raises:
     comptime if has_accelerator():
-        print("test_contig_gpu_cpu_tensor_unchanged")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_snapshot = a.copy()
@@ -712,69 +674,4 @@ fn test_contig_gpu_cpu_tensor_unchanged() raises:
 
 
 fn main() raises:
-    _ = """
-    # CPU scalar
-    test_contig_cpu_scalar_forward()
-    test_contig_cpu_scalar_backward()
-
-    # CPU 1D
-    test_contig_cpu_1d_already_contiguous()
-    test_contig_cpu_1d_slice_view()
-    test_contig_cpu_1d_values_preserved()
-
-    # CPU 2D
-    test_contig_cpu_2d_already_contiguous()
-    test_contig_cpu_2d_transpose_non_contiguous()
-    test_contig_cpu_2d_non_uniform_values_grad()
-    test_contig_cpu_2d_large_random()
-
-    # CPU 3D
-    test_contig_cpu_3d_already_contiguous()
-    test_contig_cpu_3d_transpose_last_axes()
-    test_contig_cpu_3d_unsqueeze_then_contiguous()
-    test_contig_cpu_3d_squeeze_then_contiguous()
-
-    # CPU 4D
-    test_contig_cpu_4d_already_contiguous()
-    test_contig_cpu_4d_transpose_non_contiguous()
-
-    # CPU misc
-    test_contig_cpu_track_grad_false()
-    test_contig_cpu_grad_accumulation()
-    test_contig_cpu_chained_contiguous()
-
-    # GPU scalar
-    test_contig_gpu_scalar_forward()
-    test_contig_gpu_scalar_backward()
-
-    # GPU 1D
-    test_contig_gpu_1d_already_contiguous()
-    test_contig_gpu_1d_values_preserved()
-
-    # GPU 2D
-    test_contig_gpu_2d_already_contiguous()
-    test_contig_gpu_2d_transpose_non_contiguous()
-    test_contig_gpu_2d_matches_cpu()
-    test_contig_gpu_2d_non_uniform_grad()
-
-    # GPU 3D
-    test_contig_gpu_3d_already_contiguous()
-    test_contig_gpu_3d_transpose_last_axes()
-    test_contig_gpu_3d_unsqueeze_then_contiguous()
-    test_contig_gpu_3d_squeeze_then_contiguous()
-    test_contig_gpu_3d_matches_cpu()
-
-    # GPU 4D
-    test_contig_gpu_4d_already_contiguous()
-    test_contig_gpu_4d_transpose_non_contiguous()
-
-    # GPU misc
-    test_contig_gpu_track_grad_false()
-    test_contig_gpu_grad_accumulation()
-    test_contig_gpu_grad_lands_on_cpu()
-    test_contig_gpu_chained_contiguous()
-    test_contig_gpu_cpu_tensor_unchanged()
-
-    print("All contiguous tests passed.")
-    """
     TestSuite.discover_tests[__functions_in_module()]().run()

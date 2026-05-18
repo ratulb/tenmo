@@ -2,7 +2,7 @@ from .tensor import Tensor
 from .shapes import Shape
 from .gradbox import Gradbox
 from std.math import sqrt
-from .common_utils import panic, now
+from .common_utils import panic, now, Epsilon
 from std.utils import Variant
 from .forwards import (
     Matmul,
@@ -748,6 +748,7 @@ comptime Layer[dtype: DType] = Variant[
     Flatten[dtype],
     MaxPool2d[dtype],
     LayerNorm[dtype],
+    Embedding[dtype],
 ]
 
 
@@ -797,6 +798,8 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             return self.layer[Conv2D[Self.dtype]].parameters()
         elif self.tag == LAYER_NORM:
             return self.layer[LayerNorm[Self.dtype]].parameters()
+        elif self.tag == EMBEDDING:
+            return self.layer[Embedding[Self.dtype]].parameters()
 
         else:
             return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
@@ -1140,7 +1143,7 @@ struct BCELoss[dtype: DType = DType.float32](RegisterPassable):
     var epsilon: Scalar[Self.dtype]
 
     fn __init__(
-        out self, epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9)
+        out self, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ):
         self.training = True
         self.epsilon = epsilon
@@ -1161,7 +1164,7 @@ struct BCELoss[dtype: DType = DType.float32](RegisterPassable):
     ](
         pred: Tensor[Self.dtype],
         target: Tensor[Self.dtype],
-        epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9),
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         # Clip for numerical stability
         var pred_safe = Clip[Self.dtype].forward[track_grad](

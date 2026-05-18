@@ -240,7 +240,8 @@ fn test_perm_cpu_3d_120() raises:
     print("test_perm_cpu_3d_120")
     comptime dtype = DType.float32
     # Shape (2,3,4) → permute(1,2,0) → (3,4,2)
-    var a = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+    var _tmp0 = Tensor[dtype].arange(24)
+    var a = _tmp0.reshape(Shape(2, 3, 4))
     var result = a.permute(IntArray(1, 2, 0))
     assert_true(result.shape() == Shape(3, 4, 2))
     # result[i,j,k] = a[k,i,j]
@@ -254,7 +255,8 @@ fn test_perm_cpu_3d_201() raises:
     print("test_perm_cpu_3d_201")
     comptime dtype = DType.float32
     # Shape (2,3,4) → permute(2,0,1) → (4,2,3)
-    var a = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+    var _tmp0 = Tensor[dtype].arange(24)
+    var a = _tmp0.reshape(Shape(2, 3, 4))
     var result = a.permute(IntArray(2, 0, 1))
     assert_true(result.shape() == Shape(4, 2, 3))
     # result[i,j,k] = a[j,k,i]
@@ -268,7 +270,8 @@ fn test_perm_cpu_3d_210() raises:
     print("test_perm_cpu_3d_210")
     comptime dtype = DType.float32
     # Shape (2,3,4) → permute(2,1,0) → (4,3,2)
-    var a = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+    var _tmp0 = Tensor[dtype].arange(24)
+    var a = _tmp0.reshape(Shape(2, 3, 4))
     var result = a.permute(IntArray(2, 1, 0))
     assert_true(result.shape() == Shape(4, 3, 2))
     for i in range(4):
@@ -280,7 +283,8 @@ fn test_perm_cpu_3d_210() raises:
 fn test_perm_cpu_shape_preserved() raises:
     print("test_perm_cpu_shape_preserved")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(60).reshape(Shape(3, 4, 5))
+    var _tmp0 = Tensor[dtype].arange(60)
+    var a = _tmp0.reshape(Shape(3, 4, 5))
     var result = a.permute(IntArray(2, 0, 1))
     assert_true(result.shape() == Shape(5, 3, 4))
     assert_true(result.numels() == 60)
@@ -354,7 +358,8 @@ fn test_perm_cpu_backward_3d_021() raises:
 fn test_perm_cpu_backward_3d_210() raises:
     print("test_perm_cpu_backward_3d_210")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+    var _tmp0 = Tensor[dtype].arange(24)
+    var a = _tmp0.reshape(Shape(2, 3, 4))
     a.requires_grad_(True)
     var result = a.permute(IntArray(2, 1, 0))
     var loss = result.sum()
@@ -479,7 +484,8 @@ fn test_perm_gpu_3d_120() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_3d_120")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(24)
+        var a_cpu = _tmp0.reshape(Shape(2, 3, 4))
         var a_gpu = a_cpu.to_gpu()
         var result = a_gpu.permute(IntArray(1, 2, 0))
         assert_true(result.is_on_gpu())
@@ -495,7 +501,8 @@ fn test_perm_gpu_3d_210() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_3d_210")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(24)
+        var a_cpu = _tmp0.reshape(Shape(2, 3, 4))
         var a_gpu = a_cpu.to_gpu()
         var result = a_gpu.permute(IntArray(2, 1, 0))
         assert_true(result.is_on_gpu())
@@ -511,7 +518,9 @@ fn test_perm_gpu_shape_preserved() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_shape_preserved")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].arange(60).reshape(Shape(3, 4, 5)).to_gpu()
+        var _tmp0 = Tensor[dtype].arange(60)
+        var _tmp1 = _tmp0.reshape(Shape(3, 4, 5))
+        var a = _tmp1.to_gpu()
         var result = a.permute(IntArray(2, 0, 1))
         assert_true(result.shape() == Shape(5, 3, 4))
         assert_true(result.numels() == 60)
@@ -577,7 +586,8 @@ fn test_perm_gpu_backward_3d_210() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_backward_3d_210")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(24)
+        var a_cpu = _tmp0.reshape(Shape(2, 3, 4))
         a_cpu.requires_grad_(True)
         var a_gpu = a_cpu.to_gpu()
         var result = a_gpu.permute(IntArray(2, 1, 0))
@@ -653,7 +663,8 @@ fn test_perm_parity_3d_120() raises:
     comptime if has_accelerator():
         print("test_perm_parity_3d_120")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(24)
+        var a_cpu = _tmp0.reshape(Shape(2, 3, 4))
         var a_gpu = a_cpu.to_gpu()
         assert_true(
             a_cpu.permute(IntArray(1, 2, 0)).all_close(
@@ -666,7 +677,8 @@ fn test_perm_parity_3d_210() raises:
     comptime if has_accelerator():
         print("test_perm_parity_3d_210")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(24)
+        var a_cpu = _tmp0.reshape(Shape(2, 3, 4))
         var a_gpu = a_cpu.to_gpu()
         assert_true(
             a_cpu.permute(IntArray(2, 1, 0)).all_close(
@@ -699,9 +711,12 @@ fn test_perm_parity_backward_3d() raises:
     comptime if has_accelerator():
         print("test_perm_parity_backward_3d")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(24)
+        var a_cpu = _tmp0.reshape(Shape(2, 3, 4))
         a_cpu.requires_grad_(True)
-        var a_gpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4)).to_gpu()
+        var _tmp0 = Tensor[dtype].arange(24)
+        var _tmp1 = _tmp0.reshape(Shape(2, 3, 4))
+        var a_gpu = _tmp1.to_gpu()
         a_gpu.requires_grad_(True)
 
         var loss_cpu = a_cpu.permute(IntArray(2, 0, 1)).sum()

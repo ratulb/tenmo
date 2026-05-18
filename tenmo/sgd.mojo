@@ -157,6 +157,99 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             param_ptr[k] = p - self.lr * v
 
     @always_inline
+    fn _zero_rows_ptr[
+        simd_w: Int
+    ](
+        self,
+        ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        row_width: Int,
+        indices: IntArray,
+    ):
+        var zero_vec = SIMD[Self.dtype, simd_w](0)
+        for k in range(len(indices)):
+            var row = indices[k]
+            var base = row * row_width
+            var j = 0
+            var vec_end = (row_width // simd_w) * simd_w
+            for _ in range(vec_end // simd_w):
+                ptr.store[width=simd_w](base + j, zero_vec)
+                j += simd_w
+            for col in range(vec_end, row_width):
+                ptr[base + col] = 0
+
+    @always_inline
+    fn _step_no_momentum_sparse[
+        simd_w: Int
+    ](
+        self,
+        param_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        grad_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        row_width: Int,
+        indices: IntArray,
+    ):
+        var lr_vec = SIMD[Self.dtype, simd_w](self.lr)
+        var wd_vec = SIMD[Self.dtype, simd_w](self.weight_decay)
+        for k in range(len(indices)):
+            var row = indices[k]
+            var base = row * row_width
+            var j = 0
+            var vec_end = (row_width // simd_w) * simd_w
+            for _ in range(vec_end // simd_w):
+                var p_vec = param_ptr.load[width=simd_w](base + j)
+                var g_vec = grad_ptr.load[width=simd_w](base + j)
+                if self.weight_decay > 0:
+                    g_vec += p_vec * wd_vec
+                p_vec -= lr_vec * g_vec
+                param_ptr.store[width=simd_w](base + j, p_vec)
+                j += simd_w
+            for col in range(vec_end, row_width):
+                var p = param_ptr[base + col]
+                var g = grad_ptr[base + col]
+                if self.weight_decay > 0:
+                    g += p * self.weight_decay
+                param_ptr[base + col] = p - self.lr * g
+
+    @always_inline
+    fn _apply_momentum_sparse[
+        simd_w: Int
+    ](
+        self,
+        param_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        grad_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        vel_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        row_width: Int,
+        indices: IntArray,
+    ):
+        var lr_vec = SIMD[Self.dtype, simd_w](self.lr)
+        var momentum_vec = SIMD[Self.dtype, simd_w](self.momentum)
+        var wd_vec = SIMD[Self.dtype, simd_w](self.weight_decay)
+        for k in range(len(indices)):
+            var row = indices[k]
+            var base = row * row_width
+            var j = 0
+            var vec_end = (row_width // simd_w) * simd_w
+            for _ in range(vec_end // simd_w):
+                var p_vec = param_ptr.load[width=simd_w](base + j)
+                var g_vec = grad_ptr.load[width=simd_w](base + j)
+                var v_vec = vel_ptr.load[width=simd_w](base + j)
+                if self.weight_decay > 0:
+                    g_vec += p_vec * wd_vec
+                v_vec = momentum_vec * v_vec + g_vec
+                vel_ptr.store[width=simd_w](base + j, v_vec)
+                p_vec -= lr_vec * v_vec
+                param_ptr.store[width=simd_w](base + j, p_vec)
+                j += simd_w
+            for col in range(vec_end, row_width):
+                var p = param_ptr[base + col]
+                var g = grad_ptr[base + col]
+                var v = vel_ptr[base + col]
+                if self.weight_decay > 0:
+                    g += p * self.weight_decay
+                v = self.momentum * v + g
+                vel_ptr[base + col] = v
+                param_ptr[base + col] = p - self.lr * v
+
+    @always_inline
     fn _apply_clip_norm_to_ptr[
         simd_w: Int
     ](
@@ -311,9 +404,13 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
 
 
     @always_inline
-    fn step(mut self):
+    fn step(mut self, indices: IntArray = IntArray()):
         """
         Optimized parameter update.
+
+        When `indices` is provided and non-empty, performs a sparse row-wise
+        update: only the rows specified in `indices` are updated (2D parameters
+        only). Non-2D parameters are skipped in sparse mode.
 
         Single pass per parameter:
         1. Clip gradient (if needed)
@@ -321,10 +418,13 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         3. Apply weight decay
         4. Update parameter
 
+        Args:
+            indices: Row indices for sparse update (default: empty = dense).
         """
 
         self.clip_gradients()
         comptime simd_w = simd_width_of[Self.dtype]()
+        var is_sparse = len(indices) > 0
 
         for i in range(len(self.parameters)):
             ref parameter = self.parameters[i][]
@@ -334,6 +434,54 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             ref grad = parameter.gradients()[]
             var num_elements = parameter.num_elements()
 
+            if is_sparse:
+                var shape = parameter.shape()
+                if shape.rank() != 2:
+                    continue
+                var row_width = shape[1]
+
+                comptime if has_accelerator():
+                    if parameter.is_on_gpu():
+                        try:
+                            var param_ds = parameter.buffer.device_state.value()
+                            var grad_ds = grad.buffer.device_state.value()
+                            if self.use_momentum:
+                                ref velocity = self.velocities[i]
+                                var vel_ds = velocity.buffer.device_state.value()
+                                with param_ds.buffer.map_to_host() as param_host, grad_ds.buffer.map_to_host() as grad_host, vel_ds.buffer.map_to_host() as vel_host:
+                                    self._apply_momentum_sparse[simd_w](
+                                        param_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
+                                        grad_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
+                                        vel_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
+                                        row_width, indices,
+                                    )
+                            else:
+                                with param_ds.buffer.map_to_host() as param_host, grad_ds.buffer.map_to_host() as grad_host:
+                                    self._step_no_momentum_sparse[simd_w](
+                                        param_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
+                                        grad_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
+                                        row_width, indices,
+                                    )
+                            param_ds.sync()
+                        except e:
+                            panic("SGD.step GPU sparse failed: " + String(e))
+                        continue
+
+                # CPU sparse path
+                if self.use_momentum:
+                    ref velocity = self.velocities[i]
+                    self._apply_momentum_sparse[simd_w](
+                        parameter.data_ptr(), grad.data_ptr(),
+                        velocity.data_ptr(), row_width, indices,
+                    )
+                else:
+                    self._step_no_momentum_sparse[simd_w](
+                        parameter.data_ptr(), grad.data_ptr(),
+                        row_width, indices,
+                    )
+                continue
+
+            # Dense path (existing behavior)
             comptime if has_accelerator():
                 if parameter.is_on_gpu():
                     try:
@@ -373,7 +521,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                         panic("SGD.step GPU failed: " + String(e))
                     continue
 
-            # CPU path
+            # CPU dense path
             if self.use_momentum:
                 ref velocity = self.velocities[i]
                 self._apply_momentum[simd_w](
@@ -390,9 +538,38 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 )
 
     @always_inline
-    fn zero_grad(self):
+    fn zero_grad(mut self, indices: IntArray = IntArray()):
+        """
+        Zero gradients.
+
+        When `indices` is provided and non-empty, only zero the specified
+        rows of 2D gradient buffers (sparse mode). Falls back to dense
+        zeroing for non-2D parameters.
+
+        Args:
+            indices: Row indices for sparse zeroing (default: empty = dense).
+        """
+        var is_sparse = len(indices) > 0
+        comptime simd_w = simd_width_of[Self.dtype]()
         for i in range(len(self.parameters)):
-            self.parameters[i][].zero_grad()
+            ref parameter = self.parameters[i][]
+            if not parameter.has_grad():
+                continue
+            ref grad = parameter.gradients()[]
+            if is_sparse:
+                var shape = parameter.shape()
+                if shape.rank() != 2:
+                    continue
+                self._zero_rows_ptr[simd_w](
+                    grad.data_ptr(), shape[1], indices,
+                )
+                if self.use_momentum:
+                    ref velocity = self.velocities[i]
+                    self._zero_rows_ptr[simd_w](
+                        velocity.data_ptr(), shape[1], indices,
+                    )
+            else:
+                parameter.zero_grad()
 
     fn set_lr(mut self, lr: Scalar[Self.dtype]):
         self.lr = lr

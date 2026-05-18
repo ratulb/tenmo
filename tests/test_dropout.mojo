@@ -1187,7 +1187,8 @@ fn test_dropout2_parity_eval_cpu_gpu_match() raises:
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.eval()
-        var x_cpu = Tensor[dtype].arange(1.0, 17.0).reshape(4, 4)
+        var _tmp0 = Tensor[dtype].arange(1.0, 17.0)
+        var x_cpu = _tmp0.reshape(4, 4)
         var cpu_out = dropout(x_cpu)
         var gpu_out = dropout(x_cpu.to_gpu()).to_cpu()
         assert_true(cpu_out.all_close[atol=1e-5](gpu_out))

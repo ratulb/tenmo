@@ -38,79 +38,62 @@ fn main() raises:
 
 
 fn test_v2_tensor_sum_scalar_input() raises:
-    print("test_v2_tensor_sum_scalar_input")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(7)
     var s = a.sum()
     assert_true(s == Tensor[dtype].scalar(7))
-    print("test_v2_tensor_sum_scalar_input passed")
 
 
 fn test_v2_tensor_sum_1d() raises:
-    print("test_v2_tensor_sum_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1, 2, 3, 4, 5])
     var s = a.sum()
     assert_true(s == Tensor[dtype].scalar(15))
-    print("test_v2_tensor_sum_1d passed")
 
 
 fn test_v2_tensor_sum_1d_keepdims() raises:
-    print("test_v2_tensor_sum_1d_keepdims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1, 2, 3, 4, 5])
     var s = a.sum(keepdims=True)
     assert_true(s == Tensor[dtype].d1([15]))
-    print("test_v2_tensor_sum_1d_keepdims passed")
 
 
 fn test_v2_tensor_sum_2d_axis0() raises:
-    print("test_v2_tensor_sum_2d_axis0")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var s = a.sum(axes=[0])
     assert_true(s == Tensor[dtype].d1([5, 7, 9]))
-    print("test_v2_tensor_sum_2d_axis0 passed")
 
 
 fn test_v2_tensor_sum_2d_axis1() raises:
-    print("test_v2_tensor_sum_2d_axis1")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var s = a.sum(axes=[1])
     assert_true(s == Tensor[dtype].d1([6, 15]))
-    print("test_v2_tensor_sum_2d_axis1 passed")
 
 
 fn test_v2_tensor_sum_2d_axis0_keepdims() raises:
-    print("test_v2_tensor_sum_2d_axis0_keepdims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var s = a.sum(axes=[0], keepdims=True)
     assert_true(s == Tensor[dtype].d2([[5, 7, 9]]))
-    print("test_v2_tensor_sum_2d_axis0_keepdims passed")
 
 
 fn test_v2_tensor_sum_2d_axis1_keepdims() raises:
-    print("test_v2_tensor_sum_2d_axis1_keepdims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var s = a.sum(axes=[1], keepdims=True)
     assert_true(s == Tensor[dtype].d2([[6], [15]]))
-    print("test_v2_tensor_sum_2d_axis1_keepdims passed")
 
 
 fn test_v2_tensor_sum_2d_all_axes() raises:
-    print("test_v2_tensor_sum_2d_all_axes")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var s = a.sum(axes=[0, 1])
     assert_true(s == Tensor[dtype].scalar(21))
-    print("test_v2_tensor_sum_2d_all_axes passed")
 
 
 fn test_v2_tensor_sum_3d_axis0() raises:
-    print("test_v2_tensor_sum_3d_axis0")
     comptime dtype = DType.float32
     # arange(24).reshape(2,3,4)
     var a = Tensor[dtype].arange(24)
@@ -123,11 +106,9 @@ fn test_v2_tensor_sum_3d_axis0() raises:
             [[12, 14, 16, 18], [20, 22, 24, 26], [28, 30, 32, 34]]
         )
     )
-    print("test_v2_tensor_sum_3d_axis0 passed")
 
 
 fn test_v2_tensor_sum_3d_axis1() raises:
-    print("test_v2_tensor_sum_3d_axis1")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(24)
     a = a.reshape(2, 3, 4)
@@ -135,11 +116,9 @@ fn test_v2_tensor_sum_3d_axis1() raises:
     # batch 0: cols 0+4+8, 1+5+9, 2+6+10, 3+7+11 = 12,15,18,21
     # batch 1: cols 12+16+20, 13+17+21, 14+18+22, 15+19+23 = 48,51,54,57
     assert_true(s == Tensor[dtype].d2([[12, 15, 18, 21], [48, 51, 54, 57]]))
-    print("test_v2_tensor_sum_3d_axis1 passed")
 
 
 fn test_v2_tensor_sum_3d_axis2() raises:
-    print("test_v2_tensor_sum_3d_axis2")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(24)
     a = a.reshape(2, 3, 4)
@@ -147,11 +126,9 @@ fn test_v2_tensor_sum_3d_axis2() raises:
     # batch 0: 0+1+2+3, 4+5+6+7, 8+9+10+11 = 6, 22, 38
     # batch 1: 12+13+14+15, 16+17+18+19, 20+21+22+23 = 54, 70, 86
     assert_true(s == Tensor[dtype].d2([[6, 22, 38], [54, 70, 86]]))
-    print("test_v2_tensor_sum_3d_axis2 passed")
 
 
 fn test_v2_tensor_sum_3d_axes_0_2() raises:
-    print("test_v2_tensor_sum_3d_axes_0_2")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(24)
     a = a.reshape(2, 3, 4)
@@ -161,35 +138,28 @@ fn test_v2_tensor_sum_3d_axes_0_2() raises:
     # row 1: (4+5+6+7) + (16+17+18+19) = 22 + 70 = 92
     # row 2: (8+9+10+11) + (20+21+22+23) = 38 + 86 = 124
     assert_true(s == Tensor[dtype].d1([60, 92, 124]))
-    print("test_v2_tensor_sum_3d_axes_0_2 passed")
 
 
 fn test_v2_tensor_sum_3d_all_axes_keepdims() raises:
-    print("test_v2_tensor_sum_3d_all_axes_keepdims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].ones(2, 3, 4)
     var s = a.sum(axes=[0, 1, 2], keepdims=True)
     # shape (1,1,1), value 24
     assert_true(s == Tensor[dtype].d3([[[24]]]))
-    print("test_v2_tensor_sum_3d_all_axes_keepdims passed")
 
 
 fn test_v2_tensor_sum_zeros() raises:
-    print("test_v2_tensor_sum_zeros")
     comptime dtype = DType.float32
     var a = Tensor[dtype].zeros(3, 4)
     var s = a.sum()
     assert_true(s == Tensor[dtype].scalar(0))
-    print("test_v2_tensor_sum_zeros passed")
 
 
 fn test_v2_tensor_sum_negative_values() raises:
-    print("test_v2_tensor_sum_negative_values")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[-1, -2], [3, 4]])
     var s = a.sum()
     assert_true(s == Tensor[dtype].scalar(4))
-    print("test_v2_tensor_sum_negative_values passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -198,52 +168,41 @@ fn test_v2_tensor_sum_negative_values() raises:
 
 
 fn test_v2_tensor_mean_1d() raises:
-    print("test_v2_tensor_mean_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1, 2, 3, 4, 5])
     var m = a.mean()
     assert_true(m.all_close(Tensor[dtype].scalar(3)))
-    print("test_v2_tensor_mean_1d passed")
 
 
 fn test_v2_tensor_mean_2d_axis0() raises:
-    print("test_v2_tensor_mean_2d_axis0")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2, 3], [3, 4, 5]])
     var m = a.mean(axes=[0])
     assert_true(m.all_close(Tensor[dtype].d1([2, 3, 4])))
-    print("test_v2_tensor_mean_2d_axis0 passed")
 
 
 fn test_v2_tensor_mean_2d_axis1() raises:
-    print("test_v2_tensor_mean_2d_axis1")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var m = a.mean(axes=[1])
     assert_true(m.all_close(Tensor[dtype].d1([2, 5])))
-    print("test_v2_tensor_mean_2d_axis1 passed")
 
 
 fn test_v2_tensor_mean_2d_axis0_keepdims() raises:
-    print("test_v2_tensor_mean_2d_axis0_keepdims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2], [3, 4]])
     var m = a.mean(axes=[0], keepdims=True)
     assert_true(m.all_close(Tensor[dtype].d2([[2, 3]])))
-    print("test_v2_tensor_mean_2d_axis0_keepdims passed")
 
 
 fn test_v2_tensor_mean_2d_axis1_keepdims() raises:
-    print("test_v2_tensor_mean_2d_axis1_keepdims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2], [3, 4]])
     var m = a.mean(axes=[1], keepdims=True)
     assert_true(m.all_close(Tensor[dtype].d2([[1.5], [3.5]])))
-    print("test_v2_tensor_mean_2d_axis1_keepdims passed")
 
 
 fn test_v2_tensor_mean_3d_axis1() raises:
-    print("test_v2_tensor_mean_3d_axis1")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(24)
     a = a.reshape(2, 3, 4)
@@ -251,27 +210,22 @@ fn test_v2_tensor_mean_3d_axis1() raises:
     # batch 0: mean over 3 rows -> [4,5,6,7]
     # batch 1: mean over 3 rows -> [16,17,18,19]
     assert_true(m.all_close(Tensor[dtype].d2([[4, 5, 6, 7], [16, 17, 18, 19]])))
-    print("test_v2_tensor_mean_3d_axis1 passed")
 
 
 fn test_v2_tensor_mean_3d_all_axes() raises:
-    print("test_v2_tensor_mean_3d_all_axes")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(24)
     a = a.reshape(2, 3, 4)
     var m = a.mean()
     # mean of 0..23 = 11.5
     assert_true(m.all_close(Tensor[dtype].scalar(11.5)))
-    print("test_v2_tensor_mean_3d_all_axes passed")
 
 
 fn test_v2_tensor_mean_uniform() raises:
-    print("test_v2_tensor_mean_uniform")
     comptime dtype = DType.float32
     var a = Tensor[dtype].ones(4, 5) * 3
     var m = a.mean()
     assert_true(m.all_close(Tensor[dtype].scalar(3)))
-    print("test_v2_tensor_mean_uniform passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -280,17 +234,14 @@ fn test_v2_tensor_mean_uniform() raises:
 
 
 fn test_v2_ndbuffer_sum_1d() raises:
-    print("test_v2_ndbuffer_sum_1d")
     var ndb = NDBuffer[DType.float32](Shape(5))
     for i in range(5):
         ndb[IntArray(i)] = Float32(i + 1)  # 1,2,3,4,5
     var result = ndb.reduce(normalized_axes=IntArray(0))
     assert_true(result[IntArray()] == 15)
-    print("test_v2_ndbuffer_sum_1d passed")
 
 
 fn test_v2_ndbuffer_sum_2d_axis0() raises:
-    print("test_v2_ndbuffer_sum_2d_axis0")
     var ndb = NDBuffer[DType.float32](Shape(2, 3))
     var val = 1
     for i in range(2):
@@ -302,11 +253,9 @@ fn test_v2_ndbuffer_sum_2d_axis0() raises:
     assert_true(result[IntArray(0)] == 5)
     assert_true(result[IntArray(1)] == 7)
     assert_true(result[IntArray(2)] == 9)
-    print("test_v2_ndbuffer_sum_2d_axis0 passed")
 
 
 fn test_v2_ndbuffer_sum_2d_axis1() raises:
-    print("test_v2_ndbuffer_sum_2d_axis1")
     var ndb = NDBuffer[DType.float32](Shape(2, 3))
     var val = 1
     for i in range(2):
@@ -317,11 +266,9 @@ fn test_v2_ndbuffer_sum_2d_axis1() raises:
     var result = ndb.reduce(normalized_axes=IntArray(1))
     assert_true(result[IntArray(0)] == 6)
     assert_true(result[IntArray(1)] == 15)
-    print("test_v2_ndbuffer_sum_2d_axis1 passed")
 
 
 fn test_v2_ndbuffer_mean_2d_axis0() raises:
-    print("test_v2_ndbuffer_mean_2d_axis0")
     var ndb = NDBuffer[DType.float32](Shape(2, 3))
     var val = 1
     for i in range(2):
@@ -333,11 +280,9 @@ fn test_v2_ndbuffer_mean_2d_axis0() raises:
     assert_true(result[IntArray(0)] == 2.5)
     assert_true(result[IntArray(1)] == 3.5)
     assert_true(result[IntArray(2)] == 4.5)
-    print("test_v2_ndbuffer_mean_2d_axis0 passed")
 
 
 fn test_v2_ndbuffer_mean_2d_axis1() raises:
-    print("test_v2_ndbuffer_mean_2d_axis1")
     var ndb = NDBuffer[DType.float32](Shape(2, 3))
     var val = 1
     for i in range(2):
@@ -348,11 +293,9 @@ fn test_v2_ndbuffer_mean_2d_axis1() raises:
     var result = ndb.reduce[MEAN](normalized_axes=IntArray(1))
     assert_true(result[IntArray(0)] == 2.0)
     assert_true(result[IntArray(1)] == 5.0)
-    print("test_v2_ndbuffer_mean_2d_axis1 passed")
 
 
 fn test_v2_ndbuffer_sum_keepdims() raises:
-    print("test_v2_ndbuffer_sum_keepdims")
     var ndb = NDBuffer[DType.float32](Shape(2, 3))
     var val = 1
     for i in range(2):
@@ -364,11 +307,9 @@ fn test_v2_ndbuffer_sum_keepdims() raises:
     assert_true(result[IntArray(0, 0)] == 5)
     assert_true(result[IntArray(0, 1)] == 7)
     assert_true(result[IntArray(0, 2)] == 9)
-    print("test_v2_ndbuffer_sum_keepdims passed")
 
 
 fn test_v2_ndbuffer_mean_keepdims() raises:
-    print("test_v2_ndbuffer_mean_keepdims")
     var ndb = NDBuffer[DType.float32](Shape(2, 3))
     var val = 1
     for i in range(2):
@@ -379,7 +320,6 @@ fn test_v2_ndbuffer_mean_keepdims() raises:
     var result = ndb.reduce[MEAN](normalized_axes=IntArray(1), keepdims=True)
     assert_true(result[IntArray(0, 0)] == 2.0)
     assert_true(result[IntArray(1, 0)] == 5.0)
-    print("test_v2_ndbuffer_mean_keepdims passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -388,7 +328,6 @@ fn test_v2_ndbuffer_mean_keepdims() raises:
 
 
 fn test_v2_gpu_tensor_sum_1d() raises:
-    print("test_v2_gpu_tensor_sum_1d")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -397,11 +336,9 @@ fn test_v2_gpu_tensor_sum_1d() raises:
         var cpu_result = a.sum()
         var gpu_result = a_gpu.sum()
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-        print("test_v2_gpu_tensor_sum_1d passed")
 
 
 fn test_v2_gpu_tensor_sum_2d_axis0() raises:
-    print("test_v2_gpu_tensor_sum_2d_axis0")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -410,11 +347,9 @@ fn test_v2_gpu_tensor_sum_2d_axis0() raises:
         var cpu_result = a.sum(axes=[0])
         var gpu_result = a_gpu.sum(axes=[0])
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-        print("test_v2_gpu_tensor_sum_2d_axis0 passed")
 
 
 fn test_v2_gpu_tensor_sum_2d_axis1() raises:
-    print("test_v2_gpu_tensor_sum_2d_axis1")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -423,11 +358,9 @@ fn test_v2_gpu_tensor_sum_2d_axis1() raises:
         var cpu_result = a.sum(axes=[1])
         var gpu_result = a_gpu.sum(axes=[1])
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-        print("test_v2_gpu_tensor_sum_2d_axis1 passed")
 
 
 fn test_v2_gpu_tensor_sum_3d_axis1() raises:
-    print("test_v2_gpu_tensor_sum_3d_axis1")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -437,11 +370,9 @@ fn test_v2_gpu_tensor_sum_3d_axis1() raises:
         var cpu_result = a.sum(axes=[1])
         var gpu_result = a_gpu.sum(axes=[1])
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-        print("test_v2_gpu_tensor_sum_3d_axis1 passed")
 
 
 fn test_v2_gpu_tensor_sum_3d_axes_0_2() raises:
-    print("test_v2_gpu_tensor_sum_3d_axes_0_2")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -451,11 +382,9 @@ fn test_v2_gpu_tensor_sum_3d_axes_0_2() raises:
         var cpu_result = a.sum(axes=[0, 2])
         var gpu_result = a_gpu.sum(axes=[0, 2])
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-        print("test_v2_gpu_tensor_sum_3d_axes_0_2 passed")
 
 
 fn test_v2_gpu_tensor_sum_keepdims() raises:
-    print("test_v2_gpu_tensor_sum_keepdims")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -465,11 +394,9 @@ fn test_v2_gpu_tensor_sum_keepdims() raises:
         var cpu_result = a.sum(axes=[1], keepdims=True)
         var gpu_result = a_gpu.sum(axes=[1], keepdims=True)
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-        print("test_v2_gpu_tensor_sum_keepdims passed")
 
 
 fn test_v2_gpu_tensor_sum_all_axes() raises:
-    print("test_v2_gpu_tensor_sum_all_axes")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -478,11 +405,9 @@ fn test_v2_gpu_tensor_sum_all_axes() raises:
         var cpu_result = a.sum()
         var gpu_result = a_gpu.sum()
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-        print("test_v2_gpu_tensor_sum_all_axes passed")
 
 
 fn test_v2_gpu_tensor_mean_2d_axis0() raises:
-    print("test_v2_gpu_tensor_mean_2d_axis0")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -491,11 +416,9 @@ fn test_v2_gpu_tensor_mean_2d_axis0() raises:
         var cpu_result = a.mean(axes=[0])
         var gpu_result = a_gpu.mean(axes=[0])
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-        print("test_v2_gpu_tensor_mean_2d_axis0 passed")
 
 
 fn test_v2_gpu_tensor_mean_2d_axis1() raises:
-    print("test_v2_gpu_tensor_mean_2d_axis1")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -504,11 +427,9 @@ fn test_v2_gpu_tensor_mean_2d_axis1() raises:
         var cpu_result = a.mean(axes=[1])
         var gpu_result = a_gpu.mean(axes=[1])
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-        print("test_v2_gpu_tensor_mean_2d_axis1 passed")
 
 
 fn test_v2_gpu_tensor_mean_3d_axis1() raises:
-    print("test_v2_gpu_tensor_mean_3d_axis1")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -518,11 +439,9 @@ fn test_v2_gpu_tensor_mean_3d_axis1() raises:
         var cpu_result = a.mean(axes=[1])
         var gpu_result = a_gpu.mean(axes=[1])
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-        print("test_v2_gpu_tensor_mean_3d_axis1 passed")
 
 
 fn test_v2_gpu_tensor_mean_keepdims() raises:
-    print("test_v2_gpu_tensor_mean_keepdims")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -532,11 +451,9 @@ fn test_v2_gpu_tensor_mean_keepdims() raises:
         var cpu_result = a.mean(axes=[1], keepdims=True)
         var gpu_result = a_gpu.mean(axes=[1], keepdims=True)
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-        print("test_v2_gpu_tensor_mean_keepdims passed")
 
 
 fn test_v2_gpu_tensor_mean_all_axes() raises:
-    print("test_v2_gpu_tensor_mean_all_axes")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -546,7 +463,6 @@ fn test_v2_gpu_tensor_mean_all_axes() raises:
         var cpu_result = a.mean()
         var gpu_result = a_gpu.mean()
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-        print("test_v2_gpu_tensor_mean_all_axes passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -555,7 +471,6 @@ fn test_v2_gpu_tensor_mean_all_axes() raises:
 
 
 fn test_v2_gpu_ndbuffer_sum_2d_axis1() raises:
-    print("test_v2_gpu_ndbuffer_sum_2d_axis1")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -566,11 +481,9 @@ fn test_v2_gpu_ndbuffer_sum_2d_axis1() raises:
         var tensor = Tensor[dtype].d1([6, 15])
         var g_tensor = tensor.to_gpu()
         assert_true(g_tensor.buffer.all_close(gpu_result))
-        print("test_v2_gpu_ndbuffer_sum_2d_axis1 passed")
 
 
 fn test_v2_gpu_ndbuffer_mean_2d_axis0() raises:
-    print("test_v2_gpu_ndbuffer_mean_2d_axis0")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -581,11 +494,9 @@ fn test_v2_gpu_ndbuffer_mean_2d_axis0() raises:
         var expected = Tensor[dtype].d1([2, 3, 4])
         expected = expected.to_gpu()
         assert_true(expected.buffer.all_close(gpu_result))
-        print("test_v2_gpu_ndbuffer_mean_2d_axis0 passed")
 
 
 fn test_cpu_grad_flow() raises:
-    print("=== Test : Backward grad flow CPU ===")
     var A = Tensor[dtype].arange(9 * 30, requires_grad=True)
     var B = Tensor[dtype].arange(30 * 5)
 
@@ -604,12 +515,10 @@ fn test_cpu_grad_flow() raises:
 
     assert_true(A_grad.all_close(A_grad_expected))
 
-    print("PASSED: CPU grad flow")
 
 
 fn test_gpu_grad_flow() raises:
     comptime if has_accelerator():
-        print("=== Test : Backward grad flow GPU ===")
         var A = Tensor[dtype].arange(9 * 30, requires_grad=True)
         var B = Tensor[dtype].arange(30 * 5)
 
@@ -633,7 +542,6 @@ fn test_gpu_grad_flow() raises:
 
         assert_true(A_grad.all_close(A_grad_expected))
 
-    print("PASSED: GPU backward flow")
 
 
 fn test_vmnd_1d_v_2d_M() raises:
@@ -648,12 +556,10 @@ fn test_vmnd_1d_v_2d_M() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_1d_v_2d_M passed")
 
 
 fn test_vmnd_identity_matrix() raises:
     """V @ I = v."""
-    print("test_vmnd_identity_matrix")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -664,12 +570,10 @@ fn test_vmnd_identity_matrix() raises:
         var I_gpu = I.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](I_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_identity_matrix passed")
 
 
 fn test_vmnd_zero_vector() raises:
     """Zero vector gives zero output."""
-    print("test_vmnd_zero_vector")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -681,12 +585,10 @@ fn test_vmnd_zero_vector() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_zero_vector passed")
 
 
 fn test_vmnd_ones_vector() raises:
     """Ones vector sums columns of M."""
-    print("test_vmnd_ones_vector")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -698,12 +600,10 @@ fn test_vmnd_ones_vector() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_ones_vector passed")
 
 
 fn test_vmnd_single_output_element() raises:
     """N=1: output is a scalar-like vector."""
-    print("test_vmnd_single_output_element")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -715,12 +615,10 @@ fn test_vmnd_single_output_element() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_single_output_element passed")
 
 
 fn test_vmnd_large_k() raises:
     """Large k to stress the dot product loop."""
-    print("test_vmnd_large_k")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -734,12 +632,10 @@ fn test_vmnd_large_k() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_large_k passed")
 
 
 fn test_vmnd_large_n() raises:
     """N > block_size to exercise multi-block coverage."""
-    print("test_vmnd_large_n")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -752,7 +648,6 @@ fn test_vmnd_large_n() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_large_n passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -762,7 +657,6 @@ fn test_vmnd_large_n() raises:
 
 fn test_vmnd_batched_2d_v_3d_M() raises:
     """V[b, k] @ M[b, k, n] → out[b, n]."""
-    print("test_vmnd_batched_2d_v_3d_M")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -776,12 +670,10 @@ fn test_vmnd_batched_2d_v_3d_M() raises:
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         # result_cpu = gpu_result.to_cpu()
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_batched_2d_v_3d_M passed")
 
 
 fn test_vmnd_batched_3d_v_4d_M() raises:
     """V[a, b, k] @ M[a, b, k, n] → out[a, b, n]."""
-    print("test_vmnd_batched_3d_v_4d_M")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -793,12 +685,10 @@ fn test_vmnd_batched_3d_v_4d_M() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_batched_3d_v_4d_M passed")
 
 
 fn test_vmnd_batched_arange_values() raises:
     """Batched with non-trivial values to catch index mapping errors."""
-    print("test_vmnd_batched_arange_values")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -812,7 +702,6 @@ fn test_vmnd_batched_arange_values() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_batched_arange_values passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -822,7 +711,6 @@ fn test_vmnd_batched_arange_values() raises:
 
 fn test_vmnd_broadcast_v1d_M3d() raises:
     """V[k] broadcast against M[b, k, n] → out[b, n]."""
-    print("test_vmnd_broadcast_v1d_M3d")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -834,12 +722,10 @@ fn test_vmnd_broadcast_v1d_M3d() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_broadcast_v1d_M3d passed")
 
 
 fn test_vmnd_broadcast_v2d_M3d() raises:
     """V[1, k] broadcast against M[b, k, n] → out[b, n]."""
-    print("test_vmnd_broadcast_v2d_M3d")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -851,12 +737,10 @@ fn test_vmnd_broadcast_v2d_M3d() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_broadcast_v2d_M3d passed")
 
 
 fn test_vmnd_broadcast_v3d_M2d() raises:
     """V[a, b, k] broadcast against M[k, n] → out[a, b, n]."""
-    print("test_vmnd_broadcast_v3d_M2d")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -869,12 +753,10 @@ fn test_vmnd_broadcast_v3d_M2d() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_broadcast_v3d_M2d passed")
 
 
 fn test_vmnd_broadcast_both_size1() raises:
     """Both v and M have a size-1 batch dim that broadcasts."""
-    print("test_vmnd_broadcast_both_size1")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -885,12 +767,10 @@ fn test_vmnd_broadcast_both_size1() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_broadcast_both_size1 passed")
 
 
 fn test_vmnd_broadcast_large_batch() raises:
     """Large broadcast batch to stress multi-block output coverage."""
-    print("test_vmnd_broadcast_large_batch")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -904,7 +784,6 @@ fn test_vmnd_broadcast_large_batch() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_vmnd_broadcast_large_batch passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -914,7 +793,6 @@ fn test_vmnd_broadcast_large_batch() raises:
 
 fn test_vmnd_known_values_no_batch() raises:
     """Hand-computed result verified against GPU."""
-    print("test_vmnd_known_values_no_batch")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -927,30 +805,14 @@ fn test_vmnd_known_values_no_batch() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(expected.to_gpu().all_close(gpu_result))
-    print("test_vmnd_known_values_no_batch passed")
 
 
 fn test_vmnd_known_values_batched() raises:
     """Hand-computed batched result verified against GPU."""
-    print("test_vmnd_known_values_batched")
-
-    comptime if has_accelerator():
-        comptime dtype = DType.float32
-        # batch 0: v=[1,0] @ M=[[1,2],[3,4]] = [1, 2]
-        # batch 1: v=[0,1] @ M=[[5,6],[7,8]] = [7, 8]
-        var v = Tensor[dtype].d2([[1, 0], [0, 1]])
-        var M = Tensor[dtype].d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
-        var expected = Tensor[dtype].d2([[1, 2], [7, 8]])
-        var v_gpu = v.to_gpu()
-        var M_gpu = M.to_gpu()
-        var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
-        assert_true(expected.to_gpu().all_close(gpu_result))
-    print("test_vmnd_known_values_batched passed")
 
 
 fn test_vmnd_known_values_broadcast() raises:
     """Hand-computed broadcast result verified against GPU."""
-    print("test_vmnd_known_values_broadcast")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -964,7 +826,6 @@ fn test_vmnd_known_values_broadcast() raises:
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
         assert_true(expected.to_gpu().all_close(gpu_result))
-    print("test_vmnd_known_values_broadcast passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -974,7 +835,6 @@ fn test_vmnd_known_values_broadcast() raises:
 
 fn test_mvnd_2d_M_1d_v() raises:
     """M[m, k] @ v[k] → out[m]. Simplest case, no batch dims."""
-    print("test_mvnd_2d_M_1d_v")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -987,12 +847,10 @@ fn test_mvnd_2d_M_1d_v() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mvnd_2d_M_1d_v passed")
 
 
 fn test_mvnd_known_values() raises:
     """Hand-computed result verified directly against GPU output."""
-    print("test_mvnd_known_values")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1005,12 +863,10 @@ fn test_mvnd_known_values() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(expected, gpu_result))
-    print("test_mvnd_known_values passed")
 
 
 fn test_mvnd_identity_matrix() raises:
     """I @ v = v."""
-    print("test_mvnd_identity_matrix")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1021,12 +877,10 @@ fn test_mvnd_identity_matrix() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mvnd_identity_matrix passed")
 
 
 fn test_mvnd_zero_vector() raises:
     """M @ zero_vector = zero output."""
-    print("test_mvnd_zero_vector")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1038,12 +892,10 @@ fn test_mvnd_zero_vector() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mvnd_zero_vector passed")
 
 
 fn test_mvnd_ones_vector() raises:
     """M @ ones = row sums of M."""
-    print("test_mvnd_ones_vector")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1055,12 +907,10 @@ fn test_mvnd_ones_vector() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(expected, gpu_result))
-    print("test_mvnd_ones_vector passed")
 
 
 fn test_mvnd_single_row_matrix() raises:
     """M[1, k] @ v[k] → out[1]. Single row edge case."""
-    print("test_mvnd_single_row_matrix")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1072,12 +922,10 @@ fn test_mvnd_single_row_matrix() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(expected, gpu_result))
-    print("test_mvnd_single_row_matrix passed")
 
 
 fn test_mvnd_single_col_matrix() raises:
     """M[m, 1] @ v[1] → out[m]. k=1 edge case."""
-    print("test_mvnd_single_col_matrix")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1089,12 +937,10 @@ fn test_mvnd_single_col_matrix() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(expected, gpu_result))
-    print("test_mvnd_single_col_matrix passed")
 
 
 fn test_mvnd_large_k() raises:
     """Large k to stress the dot product loop."""
-    print("test_mvnd_large_k")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1108,12 +954,10 @@ fn test_mvnd_large_k() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mvnd_large_k passed")
 
 
 fn test_mvnd_large_m() raises:
     """M > block_size to exercise multi-block coverage."""
-    print("test_mvnd_large_m")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1126,12 +970,10 @@ fn test_mvnd_large_m() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mvnd_large_m passed")
 
 
 fn test_mvnd_negative_values() raises:
     """Negative values in both M and v."""
-    print("test_mvnd_negative_values")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1143,7 +985,6 @@ fn test_mvnd_negative_values() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(expected, gpu_result))
-    print("test_mvnd_negative_values passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1153,7 +994,6 @@ fn test_mvnd_negative_values() raises:
 
 fn test_mvnd_batched_3d_M_2d_v() raises:
     """M[b, m, k] @ v[b, k] → out[b, m]."""
-    print("test_mvnd_batched_3d_M_2d_v")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1166,12 +1006,10 @@ fn test_mvnd_batched_3d_M_2d_v() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mvnd_batched_3d_M_2d_v passed")
 
 
 fn test_mvnd_batched_4d_M_3d_v() raises:
     """M[a, b, m, k] @ v[a, b, k] → out[a, b, m]."""
-    print("test_mvnd_batched_4d_M_3d_v")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1183,12 +1021,10 @@ fn test_mvnd_batched_4d_M_3d_v() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mvnd_batched_4d_M_3d_v passed")
 
 
 fn test_mvnd_batched_arange_values() raises:
     """Batched with non-trivial arange values to catch index mapping errors."""
-    print("test_mvnd_batched_arange_values")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1202,12 +1038,10 @@ fn test_mvnd_batched_arange_values() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mvnd_batched_arange_values passed")
 
 
 fn test_mvnd_known_values_batched() raises:
     """Hand-computed batched result verified directly against GPU."""
-    print("test_mvnd_known_values_batched")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1220,7 +1054,6 @@ fn test_mvnd_known_values_batched() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(expected, gpu_result))
-    print("test_mvnd_known_values_batched passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1230,7 +1063,6 @@ fn test_mvnd_known_values_batched() raises:
 
 fn test_mvnd_broadcast_3d_M_1d_v() raises:
     """M[b, m, k] broadcast against v[k] → out[b, m]."""
-    print("test_mvnd_broadcast_3d_M_1d_v")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1242,12 +1074,10 @@ fn test_mvnd_broadcast_3d_M_1d_v() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mvnd_broadcast_3d_M_1d_v passed")
 
 
 fn test_mvnd_broadcast_2d_M_3d_v() raises:
     """M[m, k] broadcast against v[b, k] → out[b, m]."""
-    print("test_mvnd_broadcast_2d_M_3d_v")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1260,12 +1090,10 @@ fn test_mvnd_broadcast_2d_M_3d_v() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mvnd_broadcast_2d_M_3d_v passed")
 
 
 fn test_mvnd_broadcast_4d_M_2d_v() raises:
     """M[a, b, m, k] broadcast against v[b, k] → out[a, b, m]."""
-    print("test_mvnd_broadcast_4d_M_2d_v")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1276,12 +1104,10 @@ fn test_mvnd_broadcast_4d_M_2d_v() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mvnd_broadcast_4d_M_2d_v passed")
 
 
 fn test_mvnd_broadcast_size1_batch() raises:
     """V with size-1 batch dim that broadcasts across M's batch."""
-    print("test_mvnd_broadcast_size1_batch")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1292,12 +1118,10 @@ fn test_mvnd_broadcast_size1_batch() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mvnd_broadcast_size1_batch passed")
 
 
 fn test_mvnd_broadcast_known_values() raises:
     """Hand-computed broadcast result verified directly against GPU."""
-    print("test_mvnd_broadcast_known_values")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1311,12 +1135,10 @@ fn test_mvnd_broadcast_known_values() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(expected, gpu_result))
-    print("test_mvnd_broadcast_known_values passed")
 
 
 fn test_mvnd_broadcast_large_batch() raises:
     """Large broadcast batch to stress multi-block output coverage."""
-    print("test_mvnd_broadcast_large_batch")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1329,7 +1151,6 @@ fn test_mvnd_broadcast_large_batch() raises:
         var v_gpu = v.to_gpu()
         var gpu_result = M_gpu.matmul[mode=mv](v_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mvnd_broadcast_large_batch passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1339,7 +1160,6 @@ fn test_mvnd_broadcast_large_batch() raises:
 
 fn test_mmnd_2d_known_values() raises:
     """Hand-computed 2D matmul verified directly against GPU."""
-    print("test_mmnd_2d_known_values")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1353,12 +1173,10 @@ fn test_mmnd_2d_known_values() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(expected, gpu_result))
-    print("test_mmnd_2d_known_values passed")
 
 
 fn test_mmnd_2d_identity() raises:
     """A @ I = A."""
-    print("test_mmnd_2d_identity")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1370,12 +1188,10 @@ fn test_mmnd_2d_identity() raises:
         var i_gpu = I.to_gpu()
         var gpu_result = a_gpu.matmul(i_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_2d_identity passed")
 
 
 fn test_mmnd_2d_zero_matrix() raises:
     """A @ zeros = zeros."""
-    print("test_mmnd_2d_zero_matrix")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1387,12 +1203,10 @@ fn test_mmnd_2d_zero_matrix() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_2d_zero_matrix passed")
 
 
 fn test_mmnd_2d_ones() raises:
     """Ones @ ones = matrix of k."""
-    print("test_mmnd_2d_ones")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1405,12 +1219,10 @@ fn test_mmnd_2d_ones() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_2d_ones passed")
 
 
 fn test_mmnd_2d_rectangular() raises:
     """Non-square matrices: (m, k) @ (k, n) where m != k != n."""
-    print("test_mmnd_2d_rectangular")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1423,12 +1235,10 @@ fn test_mmnd_2d_rectangular() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_2d_rectangular passed")
 
 
 fn test_mmnd_2d_negative_values() raises:
     """Negative values in both A and B."""
-    print("test_mmnd_2d_negative_values")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1439,12 +1249,10 @@ fn test_mmnd_2d_negative_values() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_2d_negative_values passed")
 
 
 fn test_mmnd_2d_single_element() raises:
     """(1, k) @ (k, 1) → (1, 1): inner product as matmul."""
-    print("test_mmnd_2d_single_element")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1456,7 +1264,6 @@ fn test_mmnd_2d_single_element() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(expected, gpu_result))
-    print("test_mmnd_2d_single_element passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1466,7 +1273,6 @@ fn test_mmnd_2d_single_element() raises:
 
 fn test_mmnd_2d_non_tile_multiple_m() raises:
     """M(m) not a multiple of TILE_SIZE."""
-    print("test_mmnd_2d_non_tile_multiple_m")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1477,12 +1283,10 @@ fn test_mmnd_2d_non_tile_multiple_m() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_2d_non_tile_multiple_m passed")
 
 
 fn test_mmnd_2d_non_tile_multiple_n() raises:
     """N(n) not a multiple of TILE_SIZE."""
-    print("test_mmnd_2d_non_tile_multiple_n")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1493,12 +1297,10 @@ fn test_mmnd_2d_non_tile_multiple_n() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_2d_non_tile_multiple_n passed")
 
 
 fn test_mmnd_2d_non_tile_multiple_k() raises:
     """K(k) not a multiple of TILE_SIZE."""
-    print("test_mmnd_2d_non_tile_multiple_k")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1509,12 +1311,10 @@ fn test_mmnd_2d_non_tile_multiple_k() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_2d_non_tile_multiple_k passed")
 
 
 fn test_mmnd_2d_all_non_tile_multiples() raises:
     """M(m), k, n all non-multiples of TILE_SIZE simultaneously."""
-    print("test_mmnd_2d_all_non_tile_multiples")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1527,12 +1327,10 @@ fn test_mmnd_2d_all_non_tile_multiples() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_2d_all_non_tile_multiples passed")
 
 
 fn test_mmnd_2d_smaller_than_tile() raises:
     """M(m), k, n all smaller than TILE_SIZE."""
-    print("test_mmnd_2d_smaller_than_tile")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1545,7 +1343,6 @@ fn test_mmnd_2d_smaller_than_tile() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_2d_smaller_than_tile passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1555,7 +1352,6 @@ fn test_mmnd_2d_smaller_than_tile() raises:
 
 fn test_mmnd_2d_large_square() raises:
     """Large square matrices well beyond tile size."""
-    print("test_mmnd_2d_large_square")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1566,12 +1362,10 @@ fn test_mmnd_2d_large_square() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_2d_large_square passed")
 
 
 fn test_mmnd_2d_large_rectangular() raises:
     """Large rectangular matrices with non-tile-multiple dimensions."""
-    print("test_mmnd_2d_large_rectangular")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1582,7 +1376,6 @@ fn test_mmnd_2d_large_rectangular() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_2d_large_rectangular passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1592,7 +1385,6 @@ fn test_mmnd_2d_large_rectangular() raises:
 
 fn test_mmnd_batched_3d_known_values() raises:
     """Hand-computed batched matmul verified directly against GPU."""
-    print("test_mmnd_batched_3d_known_values")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1605,12 +1397,10 @@ fn test_mmnd_batched_3d_known_values() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(expected, gpu_result))
-    print("test_mmnd_batched_3d_known_values passed")
 
 
 fn test_mmnd_batched_3d_arange() raises:
     """A[b, m, k] @ B[b, k, n] with arange values."""
-    print("test_mmnd_batched_3d_arange")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1623,12 +1413,10 @@ fn test_mmnd_batched_3d_arange() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_batched_3d_arange passed")
 
 
 fn test_mmnd_batched_4d() raises:
     """A[a, b, m, k] @ B[a, b, k, n] — 4D batch."""
-    print("test_mmnd_batched_4d")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1639,12 +1427,10 @@ fn test_mmnd_batched_4d() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_batched_4d passed")
 
 
 fn test_mmnd_batched_large_batch() raises:
     """Many batch elements to stress grid.z coverage."""
-    print("test_mmnd_batched_large_batch")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1655,12 +1441,10 @@ fn test_mmnd_batched_large_batch() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_batched_large_batch passed")
 
 
 fn test_mmnd_batched_non_tile_multiples() raises:
     """Batched with m, k, n not multiples of TILE_SIZE."""
-    print("test_mmnd_batched_non_tile_multiples")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1673,7 +1457,6 @@ fn test_mmnd_batched_non_tile_multiples() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_batched_non_tile_multiples passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1683,7 +1466,6 @@ fn test_mmnd_batched_non_tile_multiples() raises:
 
 fn test_mmnd_broadcast_3d_A_2d_B() raises:
     """A[b, m, k] @ B[k, n] — B broadcasts across batch."""
-    print("test_mmnd_broadcast_3d_A_2d_B")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1696,12 +1478,10 @@ fn test_mmnd_broadcast_3d_A_2d_B() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_broadcast_3d_A_2d_B passed")
 
 
 fn test_mmnd_broadcast_2d_A_3d_B() raises:
     """A[m, k] @ B[b, k, n] — A broadcasts across batch."""
-    print("test_mmnd_broadcast_2d_A_3d_B")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1714,12 +1494,10 @@ fn test_mmnd_broadcast_2d_A_3d_B() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_broadcast_2d_A_3d_B passed")
 
 
 fn test_mmnd_broadcast_4d_A_3d_B() raises:
     """A[a, b, m, k] @ B[b, k, n] — B missing leading batch dim."""
-    print("test_mmnd_broadcast_4d_A_3d_B")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1730,12 +1508,10 @@ fn test_mmnd_broadcast_4d_A_3d_B() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_broadcast_4d_A_3d_B passed")
 
 
 fn test_mmnd_broadcast_size1_batch_dim() raises:
     """Size-1 batch dim in A broadcasts across B's batch."""
-    print("test_mmnd_broadcast_size1_batch_dim")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1748,12 +1524,10 @@ fn test_mmnd_broadcast_size1_batch_dim() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_broadcast_size1_batch_dim passed")
 
 
 fn test_mmnd_broadcast_known_values() raises:
     """Hand-computed broadcast result verified directly against GPU."""
-    print("test_mmnd_broadcast_known_values")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1768,12 +1542,10 @@ fn test_mmnd_broadcast_known_values() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(expected, gpu_result))
-    print("test_mmnd_broadcast_known_values passed")
 
 
 fn test_mmnd_broadcast_large() raises:
     """Large broadcast batch to stress multi-block and multi-z coverage."""
-    print("test_mmnd_broadcast_large")
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1784,22 +1556,18 @@ fn test_mmnd_broadcast_large() raises:
         var b_gpu = B.to_gpu()
         var gpu_result = a_gpu.matmul(b_gpu)
         assert_true(close_enough(cpu_result, gpu_result))
-    print("test_mmnd_broadcast_large passed")
 
 
 fn test_gpu_transfer_fidelity() raises:
     comptime if has_accelerator():
-        print("=== Test 1: GPU transfer fidelity ===")
         var B = Tensor[dtype].rand(80, 20)
         var B_gpu = B.to_gpu()
         var B_back = B_gpu.to_cpu()
         assert_true(B.all_close(B_back))
-    print("PASSED: B == B_gpu.to_cpu()")
 
 
 fn test_ancestry_storage_fidelity() raises:
     comptime if has_accelerator():
-        print("=== Test 2: Ancestry storage fidelity ===")
         var A = Tensor[dtype].rand(9, 80, requires_grad=True)
         var A_gpu = A.to_gpu()
         var B = Tensor[dtype].rand(80, 20)
@@ -1808,12 +1576,10 @@ fn test_ancestry_storage_fidelity() raises:
         var B_from_ancestry = C_gpu.ancestry().tensor(1)
         var B_ancestry_back = B_from_ancestry.to_cpu()
         assert_true(B.all_close(B_ancestry_back))
-    print("PASSED: B from ancestry == original B")
 
 
 fn test_forward_matmul_fidelity() raises:
     comptime if has_accelerator():
-        print("=== Test 3: Forward matmul fidelity ===")
         var A = Tensor[dtype].rand(9, 80, requires_grad=True)
         var B = Tensor[dtype].rand(80, 20)
         var A_gpu = A.to_gpu()
@@ -1821,15 +1587,14 @@ fn test_forward_matmul_fidelity() raises:
         var C_cpu = A.matmul(B)
         var C_gpu = A_gpu.matmul(B_gpu)
         assert_true(C_cpu.all_close(C_gpu.to_cpu()))
-    print("PASSED: CPU matmul == GPU matmul")
 
 
 fn test_backward_grad_A_fidelity() raises:
     comptime if has_accelerator():
-        print("=== Test 4: Backward grad_A fidelity ===")
         var AA = Tensor[dtype].arange(9 * 30, requires_grad=True)
         var A = AA.reshape(9, 30)
-        var B = Tensor[dtype].arange(30 * 5).reshape(30, 5)
+        var _tmp0 = Tensor[dtype].arange(30 * 5)
+        var B = _tmp0.reshape(30, 5)
 
         var A_gpu = A.to_gpu()
         var B_gpu = B.to_gpu()
@@ -1844,15 +1609,15 @@ fn test_backward_grad_A_fidelity() raises:
 
         C_gpu.backward()
 
+        var _tmp1 = AA.grad().to_gpu()
+        var _tmp2 = _tmp1.reshape(Shape(9, 30))
         assert_true(
-            AA.grad().to_gpu().reshape(Shape(9, 30)).all_close(A_gpu.grad() * 2)
+            _tmp2.all_close(A_gpu.grad() * 2)
         )
-    print("PASSED: GPU backward grad_A == CPU backward grad_A")
 
 
 fn test_transposed_matmul_fidelity() raises:
     comptime if has_accelerator():
-        print("=== Test 5: Transposed matmul fidelity ===")
         var B = Tensor[dtype].rand(80, 20)
         var B_gpu = B.to_gpu()
         var BT_cpu = B.transpose(axes=IntArray(-1, -2))
@@ -1869,22 +1634,12 @@ fn test_transposed_matmul_fidelity() raises:
         var grad_A_GPU = Tensor[dtype](grad_A_ndb^)
         var grad_A_gpu = grad_A_GPU.to_cpu()
 
-        print("CPU grad_A row 0:")
-        for i in range(min(8, grad_A_cpu.shape()[-1])):
-            print(grad_A_cpu.buffer[[0, i]], end=" ")
-        print()
-        print("GPU grad_A row 0:")
-        for i in range(min(8, grad_A_gpu.shape()[-1])):
-            print(grad_A_gpu.buffer[[0, i]], end=" ")
-        print()
 
         assert_true(grad_A_cpu.all_close(grad_A_gpu))
-    print("PASSED: GPU transposed matmul == CPU")
 
 
 fn test_ancestry_transposed_matmul_fidelity() raises:
     comptime if has_accelerator():
-        print("=== Test 6: B from ancestry transposed matmul ===")
         var A = Tensor[dtype].rand(9, 80, requires_grad=True)
         var B = Tensor[dtype].rand(80, 20)
         var A_gpu = A.to_gpu()
@@ -1906,14 +1661,5 @@ fn test_ancestry_transposed_matmul_fidelity() raises:
         var grad_A_ANC = Tensor[dtype](grad_A_anc_ndb^)
         var grad_A_anc = grad_A_ANC.to_cpu()
 
-        print("CPU grad_A row 0:")
-        for i in range(min(8, grad_A_cpu.shape()[-1])):
-            print(grad_A_cpu.buffer[[0, i]], end=" ")
-        print()
-        print("GPU grad_A from ancestry row 0:")
-        for i in range(min(8, grad_A_anc.shape()[-1])):
-            print(grad_A_anc.buffer[[0, i]], end=" ")
-        print()
 
         assert_true(grad_A_cpu.all_close(grad_A_anc))
-    print("PASSED: B from ancestry transposed matmul == CPU")

@@ -666,7 +666,8 @@ fn test_varstd_var_fwd_cpu_3d_axis1() raises:
     print("test_varstd_var_fwd_cpu_3d_axis1")
     comptime dtype = DType.float32
     # shape (2,3,4) — variance along axis 1
-    var x = Tensor[dtype].arange(0.0, 24.0).reshape(2, 3, 4)
+    var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+    var x = _tmp0.reshape(2, 3, 4)
     var v = x.variance[track_grad=False](axis=1, unbiased=False)
     assert_true(v.shape() == Shape(2, 4))
 
@@ -743,7 +744,8 @@ fn test_varstd_var_bwd_cpu_grad_zero_for_constant() raises:
 fn test_varstd_var_bwd_cpu_3d_axis1() raises:
     print("test_varstd_var_bwd_cpu_3d_axis1")
     comptime dtype = DType.float32
-    var x = Tensor[dtype].arange(0.0, 24.0).reshape(2, 3, 4)
+    var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+    var x = _tmp0.reshape(2, 3, 4)
     x.requires_grad_(True)
     var v = x.variance[track_grad=True](axis=1, unbiased=False)
     var loss = v.sum()
@@ -845,7 +847,8 @@ fn test_varstd_std_fwd_cpu_keepdims() raises:
 fn test_varstd_std_fwd_cpu_3d() raises:
     print("test_varstd_std_fwd_cpu_3d")
     comptime dtype = DType.float32
-    var x = Tensor[dtype].arange(0.0, 24.0).reshape(2, 3, 4)
+    var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+    var x = _tmp0.reshape(2, 3, 4)
     var s = x.std[track_grad=False](axis=2, unbiased=False)
     assert_true(s.shape() == Shape(2, 3))
 
@@ -901,7 +904,8 @@ fn test_varstd_std_bwd_cpu_grad_zero_for_constant() raises:
 fn test_varstd_std_bwd_cpu_3d_axis2() raises:
     print("test_varstd_std_bwd_cpu_3d_axis2")
     comptime dtype = DType.float32
-    var x = Tensor[dtype].arange(1.0, 25.0).reshape(2, 3, 4)
+    var _tmp0 = Tensor[dtype].arange(1.0, 25.0)
+    var x = _tmp0.reshape(2, 3, 4)
     x.requires_grad_(True)
     var s = x.std[track_grad=True](axis=2, unbiased=False)
     var loss = s.sum()
@@ -972,7 +976,9 @@ fn test_varstd_var_fwd_gpu_3d_axis1() raises:
     comptime if has_accelerator():
         print("test_varstd_var_fwd_gpu_3d_axis1")
         comptime dtype = DType.float32
-        var x = Tensor[dtype].arange(0.0, 24.0).reshape(2, 3, 4).to_gpu()
+        var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+        var _tmp1 = _tmp0.reshape(2, 3, 4)
+        var x = _tmp1.to_gpu()
         var v = x.variance[track_grad=False](axis=1, unbiased=False)
         assert_true(v.shape() == Shape(2, 4))
 
@@ -1009,7 +1015,8 @@ fn test_varstd_var_bwd_gpu_3d_axis1() raises:
     comptime if has_accelerator():
         print("test_varstd_var_bwd_gpu_3d_axis1")
         comptime dtype = DType.float32
-        var x_cpu = Tensor[dtype].arange(0.0, 24.0).reshape(2, 3, 4)
+        var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+        var x_cpu = _tmp0.reshape(2, 3, 4)
         x_cpu.requires_grad_(True)
         var x_gpu = x_cpu.to_gpu()
         var v = x_gpu.variance[track_grad=True](axis=1, unbiased=False)
@@ -1056,7 +1063,9 @@ fn test_varstd_std_fwd_gpu_3d() raises:
     comptime if has_accelerator():
         print("test_varstd_std_fwd_gpu_3d")
         comptime dtype = DType.float32
-        var x = Tensor[dtype].arange(0.0, 24.0).reshape(2, 3, 4).to_gpu()
+        var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+        var _tmp1 = _tmp0.reshape(2, 3, 4)
+        var x = _tmp1.to_gpu()
         var s = x.std[track_grad=False](axis=2, unbiased=False)
         assert_true(s.shape() == Shape(2, 3))
 
@@ -1099,7 +1108,8 @@ fn test_varstd_std_bwd_gpu_3d_axis2() raises:
     comptime if has_accelerator():
         print("test_varstd_std_bwd_gpu_3d_axis2")
         comptime dtype = DType.float32
-        var x_cpu = Tensor[dtype].arange(1.0, 25.0).reshape(2, 3, 4)
+        var _tmp0 = Tensor[dtype].arange(1.0, 25.0)
+        var x_cpu = _tmp0.reshape(2, 3, 4)
         x_cpu.requires_grad_(True)
         var x_gpu = x_cpu.to_gpu()
         var s = x_gpu.std[track_grad=True](axis=2, unbiased=False)
@@ -1127,7 +1137,8 @@ fn test_varstd_parity_var_fwd_axis1() raises:
     comptime if has_accelerator():
         print("test_varstd_parity_var_fwd_axis1")
         comptime dtype = DType.float32
-        var x = Tensor[dtype].arange(1.0, 13.0).reshape(3, 4)
+        var _tmp0 = Tensor[dtype].arange(1.0, 13.0)
+        var x = _tmp0.reshape(3, 4)
         var cpu_v = x.variance[track_grad=False](axis=1, unbiased=False)
         var gpu_v = x.to_gpu().variance[track_grad=False](axis=1, unbiased=False).to_cpu()
         assert_true(cpu_v.all_close[atol=1e-4](gpu_v))
@@ -1147,7 +1158,8 @@ fn test_varstd_parity_std_fwd_axis1() raises:
     comptime if has_accelerator():
         print("test_varstd_parity_std_fwd_axis1")
         comptime dtype = DType.float32
-        var x = Tensor[dtype].arange(1.0, 13.0).reshape(3, 4)
+        var _tmp0 = Tensor[dtype].arange(1.0, 13.0)
+        var x = _tmp0.reshape(3, 4)
         var cpu_s = x.std[track_grad=False](axis=1, unbiased=False)
         var gpu_s = x.to_gpu().std[track_grad=False](axis=1, unbiased=False).to_cpu()
         assert_true(cpu_s.all_close[atol=1e-4](gpu_s))

@@ -330,7 +330,8 @@ fn test_trrev_cpu_3d_default_axes_forward() raises:
     print("test_trrev_cpu_3d_default_axes_forward")
     comptime dtype = DType.float32
     # Shape (2,3,4) → default transpose reverses axes → (4,3,2)
-    var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+    var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+    var a = _tmp0.reshape(Shape(2, 3, 4))
     var t = a.transpose()
     assert_true(t.shape() == Shape(4, 3, 2))
     # Check a few specific elements
@@ -346,7 +347,8 @@ fn test_trrev_cpu_3d_default_axes_forward() raises:
 fn test_trrev_cpu_3d_default_axes_backward() raises:
     print("test_trrev_cpu_3d_default_axes_backward")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+    var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+    var a = _tmp0.reshape(Shape(2, 3, 4))
     a.requires_grad_(True)
     var t = a.transpose()
     var loss = t.sum()
@@ -358,7 +360,8 @@ fn test_trrev_cpu_3d_explicit_axes_forward() raises:
     print("test_trrev_cpu_3d_explicit_axes_forward")
     comptime dtype = DType.float32
     # Shape (2,3,4), transpose axes (0,2,1) → shape (2,4,3)
-    var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+    var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+    var a = _tmp0.reshape(Shape(2, 3, 4))
     var t = a.transpose(0, 2, 1)
     assert_true(t.shape() == Shape(2, 4, 3))
     # a[i,j,k] == t[i,k,j]
@@ -371,7 +374,8 @@ fn test_trrev_cpu_3d_explicit_axes_forward() raises:
 fn test_trrev_cpu_3d_explicit_axes_backward() raises:
     print("test_trrev_cpu_3d_explicit_axes_backward")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+    var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+    var a = _tmp0.reshape(Shape(2, 3, 4))
     a.requires_grad_(True)
     var t = a.transpose(0, 2, 1)
     var loss = t.sum()
@@ -382,7 +386,8 @@ fn test_trrev_cpu_3d_explicit_axes_backward() raises:
 fn test_trrev_cpu_3d_transpose_then_contiguous() raises:
     print("test_trrev_cpu_3d_transpose_then_contiguous")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+    var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+    var a = _tmp0.reshape(Shape(2, 3, 4))
     a.requires_grad_(True)
     var t = a.transpose()  # (4,3,2)
     var c = t.contiguous()
@@ -397,7 +402,8 @@ fn test_trrev_cpu_3d_transpose_then_contiguous() raises:
 fn test_trrev_cpu_3d_chained_transpose_backward() raises:
     print("test_trrev_cpu_3d_chained_transpose_backward")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(1.0, 25.0).reshape(Shape(2, 3, 4))
+    var _tmp0 = Tensor[dtype].arange(1.0, 25.0)
+    var a = _tmp0.reshape(Shape(2, 3, 4))
     a.requires_grad_(True)
     # T1: (2,3,4)->(4,3,2), T2: (4,3,2)->(2,3,4) — identity
     var t1 = a.transpose()
@@ -414,7 +420,8 @@ fn test_trrev_cpu_4d_default_axes_forward() raises:
     print("test_trrev_cpu_4d_default_axes_forward")
     comptime dtype = DType.float32
     # Shape (2,3,4,5) → default transpose → (5,4,3,2)
-    var a = Tensor[dtype].arange(0.0, 120.0).reshape(Shape(2, 3, 4, 5))
+    var _tmp0 = Tensor[dtype].arange(0.0, 120.0)
+    var a = _tmp0.reshape(Shape(2, 3, 4, 5))
     var t = a.transpose()
     assert_true(t.shape() == Shape(5, 4, 3, 2))
     # a[i,j,k,l] == t[l,k,j,i]
@@ -426,7 +433,8 @@ fn test_trrev_cpu_4d_default_axes_forward() raises:
 fn test_trrev_cpu_4d_default_axes_backward() raises:
     print("test_trrev_cpu_4d_default_axes_backward")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(0.0, 120.0).reshape(Shape(2, 3, 4, 5))
+    var _tmp0 = Tensor[dtype].arange(0.0, 120.0)
+    var a = _tmp0.reshape(Shape(2, 3, 4, 5))
     a.requires_grad_(True)
     var t = a.transpose()
     var loss = t.sum()
@@ -438,7 +446,8 @@ fn test_trrev_cpu_4d_explicit_axes_forward() raises:
     print("test_trrev_cpu_4d_explicit_axes_forward")
     comptime dtype = DType.float32
     # Shape (2,3,4,5), axes (0,2,1,3) → (2,4,3,5)
-    var a = Tensor[dtype].arange(0.0, 120.0).reshape(Shape(2, 3, 4, 5))
+    var _tmp0 = Tensor[dtype].arange(0.0, 120.0)
+    var a = _tmp0.reshape(Shape(2, 3, 4, 5))
     var t = a.transpose(0, 2, 1, 3)
     assert_true(t.shape() == Shape(2, 4, 3, 5))
     # a[i,j,k,l] == t[i,k,j,l]
@@ -449,7 +458,8 @@ fn test_trrev_cpu_4d_explicit_axes_forward() raises:
 fn test_trrev_cpu_4d_explicit_axes_backward() raises:
     print("test_trrev_cpu_4d_explicit_axes_backward")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(0.0, 120.0).reshape(Shape(2, 3, 4, 5))
+    var _tmp0 = Tensor[dtype].arange(0.0, 120.0)
+    var a = _tmp0.reshape(Shape(2, 3, 4, 5))
     a.requires_grad_(True)
     var t = a.transpose(0, 2, 1, 3)
     var loss = t.sum()
@@ -662,7 +672,8 @@ fn test_trrev_gpu_3d_default_axes_forward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_3d_default_axes_forward")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+        var a = _tmp0.reshape(Shape(2, 3, 4))
         var a_gpu = a.to_gpu()
         var t = a_gpu.transpose()
         assert_true(t.shape() == Shape(4, 3, 2))
@@ -676,7 +687,8 @@ fn test_trrev_gpu_3d_default_axes_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_3d_default_axes_backward")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+        var a = _tmp0.reshape(Shape(2, 3, 4))
         a.requires_grad_(True)
         var a_gpu = a.to_gpu()
         var t = a_gpu.transpose()
@@ -691,7 +703,8 @@ fn test_trrev_gpu_3d_explicit_axes_forward() raises:
         print("test_trrev_gpu_3d_explicit_axes_forward")
         comptime dtype = DType.float32
         # (2,3,4) → axes (0,2,1) → (2,4,3)
-        var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+        var a = _tmp0.reshape(Shape(2, 3, 4))
         var a_gpu = a.to_gpu()
         var t = a_gpu.transpose(0, 2, 1)
         assert_true(t.shape() == Shape(2, 4, 3))
@@ -706,7 +719,8 @@ fn test_trrev_gpu_3d_explicit_axes_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_3d_explicit_axes_backward")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+        var a = _tmp0.reshape(Shape(2, 3, 4))
         a.requires_grad_(True)
         var a_gpu = a.to_gpu()
         var t = a_gpu.transpose(0, 2, 1)
@@ -720,7 +734,8 @@ fn test_trrev_gpu_3d_transpose_then_contiguous() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_3d_transpose_then_contiguous")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+        var a = _tmp0.reshape(Shape(2, 3, 4))
         a.requires_grad_(True)
         var a_gpu = a.to_gpu()
         var t = a_gpu.transpose()  # (4,3,2)
@@ -739,7 +754,8 @@ fn test_trrev_gpu_3d_chained_transpose_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_3d_chained_transpose_backward")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].arange(1.0, 25.0).reshape(Shape(2, 3, 4))
+        var _tmp0 = Tensor[dtype].arange(1.0, 25.0)
+        var a = _tmp0.reshape(Shape(2, 3, 4))
         a.requires_grad_(True)
         var a_gpu = a.to_gpu()
         var t1 = a_gpu.transpose()  # (4,3,2)
@@ -757,7 +773,8 @@ fn test_trrev_gpu_4d_default_axes_forward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_4d_default_axes_forward")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].arange(0.0, 120.0).reshape(Shape(2, 3, 4, 5))
+        var _tmp0 = Tensor[dtype].arange(0.0, 120.0)
+        var a = _tmp0.reshape(Shape(2, 3, 4, 5))
         var a_gpu = a.to_gpu()
         var t = a_gpu.transpose()
         assert_true(t.shape() == Shape(5, 4, 3, 2))
@@ -770,7 +787,8 @@ fn test_trrev_gpu_4d_default_axes_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_4d_default_axes_backward")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].arange(0.0, 120.0).reshape(Shape(2, 3, 4, 5))
+        var _tmp0 = Tensor[dtype].arange(0.0, 120.0)
+        var a = _tmp0.reshape(Shape(2, 3, 4, 5))
         a.requires_grad_(True)
         var a_gpu = a.to_gpu()
         var t = a_gpu.transpose()
@@ -785,7 +803,8 @@ fn test_trrev_gpu_4d_explicit_axes_forward() raises:
         print("test_trrev_gpu_4d_explicit_axes_forward")
         comptime dtype = DType.float32
         # (2,3,4,5), axes (0,2,1,3) → (2,4,3,5)
-        var a = Tensor[dtype].arange(0.0, 120.0).reshape(Shape(2, 3, 4, 5))
+        var _tmp0 = Tensor[dtype].arange(0.0, 120.0)
+        var a = _tmp0.reshape(Shape(2, 3, 4, 5))
         var a_gpu = a.to_gpu()
         var t = a_gpu.transpose(0, 2, 1, 3)
         assert_true(t.shape() == Shape(2, 4, 3, 5))
@@ -798,7 +817,8 @@ fn test_trrev_gpu_4d_explicit_axes_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_4d_explicit_axes_backward")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].arange(0.0, 120.0).reshape(Shape(2, 3, 4, 5))
+        var _tmp0 = Tensor[dtype].arange(0.0, 120.0)
+        var a = _tmp0.reshape(Shape(2, 3, 4, 5))
         a.requires_grad_(True)
         var a_gpu = a.to_gpu()
         var t = a_gpu.transpose(0, 2, 1, 3)

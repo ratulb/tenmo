@@ -194,7 +194,9 @@ fn test_reshape_with_arithmetic_ops() raises:
     var y = Tensor.d1([5.0, 6.0], requires_grad=True)
 
     var x_flat = x.reshape(4)
-    var y_broadcast = y.reshape(2, 1).expand(2, 2).reshape(4)  # [5, 5, 6, 6]
+    var _tmp0 = y.reshape(2, 1)
+    var _tmp1 = _tmp0.expand(2, 2)
+    var y_broadcast = _tmp1.reshape(4)  # [5, 5, 6, 6]
     var result = x_flat * y_broadcast
     var loss = result.sum()
     loss.backward()
@@ -266,7 +268,7 @@ fn test_reshape_large_tensor() raises:
     print("test_reshape_large_tensor")
     # Test with larger tensors to ensure no memory issues
     comptime dtype = DType.float32
-    var data = List[Scalar[dtype]](capacity=UInt(1024))
+    var data = List[Scalar[dtype]]()
     for i in range(1024):
         data.append(Scalar[dtype](i))
 

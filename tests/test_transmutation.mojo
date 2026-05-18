@@ -42,7 +42,8 @@ fn test_as_gradbox_cpu_1d_contiguous() raises:
 
 fn test_as_gradbox_cpu_2d_contiguous() raises:
     print("test_as_gradbox_cpu_2d_contiguous")
-    var t = Tensor[dtype].arange(6).reshape(Shape(2, 3))
+    var _tmp0 = Tensor[dtype].arange(6)
+    var t = _tmp0.reshape(Shape(2, 3))
     var g = t.as_gradbox()
     assert_true(g.is_on_cpu())
     assert_true(g.is_contiguous())
@@ -55,7 +56,8 @@ fn test_as_gradbox_cpu_2d_contiguous() raises:
 
 fn test_as_gradbox_cpu_3d_contiguous() raises:
     print("test_as_gradbox_cpu_3d_contiguous")
-    var t = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
+    var _tmp0 = Tensor[dtype].arange(24)
+    var t = _tmp0.reshape(Shape(2, 3, 4))
     var g = t.as_gradbox()
     assert_true(g.is_on_cpu())
     assert_true(g.is_contiguous())
@@ -65,7 +67,8 @@ fn test_as_gradbox_cpu_3d_contiguous() raises:
 
 fn test_as_gradbox_cpu_non_contiguous_transposed() raises:
     print("test_as_gradbox_cpu_non_contiguous_transposed")
-    var t = Tensor[dtype].arange(6).reshape(Shape(2, 3))
+    var _tmp0 = Tensor[dtype].arange(6)
+    var t = _tmp0.reshape(Shape(2, 3))
     var t_T = t.transpose()  # (3, 2) — non-contiguous
     var g = t_T.as_gradbox(contiguous=True)
     assert_true(g.is_on_cpu())
@@ -79,7 +82,8 @@ fn test_as_gradbox_cpu_non_contiguous_transposed() raises:
 
 fn test_as_gradbox_cpu_non_contiguous_no_materialise() raises:
     print("test_as_gradbox_cpu_non_contiguous_no_materialise")
-    var t = Tensor[dtype].arange(6).reshape(Shape(2, 3))
+    var _tmp0 = Tensor[dtype].arange(6)
+    var t = _tmp0.reshape(Shape(2, 3))
     var t_T = t.transpose()
     var g = t_T.as_gradbox(contiguous=False)
     assert_true(g.is_on_cpu())
@@ -91,7 +95,8 @@ fn test_as_gradbox_cpu_non_contiguous_no_materialise() raises:
 
 fn test_as_gradbox_cpu_with_offset() raises:
     print("test_as_gradbox_cpu_with_offset")
-    var t = Tensor[dtype].arange(12).reshape(Shape(3, 4))
+    var _tmp0 = Tensor[dtype].arange(12)
+    var t = _tmp0.reshape(Shape(3, 4))
     #var sliced = t.slice(Slice(1, 3))  # rows 1..2 — offset non-zero
     var sliced = t[1:3, ::]  # rows 1..2 — offset non-zero
     var g = sliced.as_gradbox(contiguous=True)
@@ -112,7 +117,8 @@ fn test_as_gradbox_cpu_share_true() raises:
 
 fn test_as_gradbox_cpu_4d() raises:
     print("test_as_gradbox_cpu_4d")
-    var t = Tensor[dtype].arange(120).reshape(Shape(2, 3, 4, 5))
+    var _tmp0 = Tensor[dtype].arange(120)
+    var t = _tmp0.reshape(Shape(2, 3, 4, 5))
     var g = t.as_gradbox()
     assert_true(g.is_on_cpu())
     assert_true(g.is_contiguous())
@@ -156,7 +162,8 @@ fn test_as_tensor_cpu_3d_contiguous() raises:
 
 fn test_as_tensor_cpu_non_contiguous() raises:
     print("test_as_tensor_cpu_non_contiguous")
-    var base = Tensor[dtype].arange(6).reshape(Shape(2, 3))
+    var _tmp0 = Tensor[dtype].arange(6)
+    var base = _tmp0.reshape(Shape(2, 3))
     var g = base.transpose().as_gradbox(contiguous=False)
     assert_true(not g.is_contiguous())
     var t = g.as_tensor()  # should materialise contiguous copy
@@ -241,7 +248,9 @@ fn test_as_gradbox_gpu_1d_contiguous() raises:
 fn test_as_gradbox_gpu_2d_contiguous() raises:
     comptime if has_accelerator():
         print("test_as_gradbox_gpu_2d_contiguous")
-        var t = Tensor[dtype].arange(6).reshape(Shape(2, 3)).to_gpu()
+        var _tmp0 = Tensor[dtype].arange(6)
+        var _tmp1 = _tmp0.reshape(Shape(2, 3))
+        var t = _tmp1.to_gpu()
         var g = t.as_gradbox()
         assert_true(g.is_on_gpu())
         assert_true(g.is_contiguous())
@@ -257,7 +266,9 @@ fn test_as_gradbox_gpu_2d_contiguous() raises:
 fn test_as_gradbox_gpu_3d_contiguous() raises:
     comptime if has_accelerator():
         print("test_as_gradbox_gpu_3d_contiguous")
-        var t = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4)).to_gpu()
+        var _tmp0 = Tensor[dtype].arange(24)
+        var _tmp1 = _tmp0.reshape(Shape(2, 3, 4))
+        var t = _tmp1.to_gpu()
         var g = t.as_gradbox()
         assert_true(g.is_on_gpu())
         assert_true(g.is_contiguous())
@@ -268,7 +279,9 @@ fn test_as_gradbox_gpu_3d_contiguous() raises:
 fn test_as_gradbox_gpu_4d() raises:
     comptime if has_accelerator():
         print("test_as_gradbox_gpu_4d")
-        var t = Tensor[dtype].arange(120).reshape(Shape(2, 3, 4, 5)).to_gpu()
+        var _tmp0 = Tensor[dtype].arange(120)
+        var _tmp1 = _tmp0.reshape(Shape(2, 3, 4, 5))
+        var t = _tmp1.to_gpu()
         var g = t.as_gradbox()
         assert_true(g.is_on_gpu())
         assert_true(g.is_contiguous())
@@ -279,7 +292,9 @@ fn test_as_gradbox_gpu_4d() raises:
 fn test_as_gradbox_gpu_contiguous_false() raises:
     comptime if has_accelerator():
         print("test_as_gradbox_gpu_contiguous_false")
-        var t = Tensor[dtype].arange(6).reshape(Shape(2, 3)).to_gpu()
+        var _tmp0 = Tensor[dtype].arange(6)
+        var _tmp1 = _tmp0.reshape(Shape(2, 3))
+        var t = _tmp1.to_gpu()
         var g = t.as_gradbox(contiguous=False)
         assert_true(g.is_on_gpu())
         assert_true(g.shape() == Shape(2, 3))

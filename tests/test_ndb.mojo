@@ -2819,7 +2819,9 @@ fn ndb_minmax_gpu_3d_contiguous() raises:
     comptime if has_accelerator():
         print("ndb_minmax_gpu_3d_contiguous")
         comptime dtype = DType.float32
-        var t = Tensor[dtype].arange(0, 24).reshape(Shape(2, 3, 4)).to_gpu()
+        var _tmp0 = Tensor[dtype].arange(0, 24)
+        var _tmp1 = _tmp0.reshape(Shape(2, 3, 4))
+        var t = _tmp1.to_gpu()
         var ndb = t.buffer
         # shape=[2,3,4], strides=[12,4,1], offset=0
         # min=0, max=23
@@ -2849,7 +2851,9 @@ fn ndb_minmax_gpu_4d_contiguous() raises:
     comptime if has_accelerator():
         print("ndb_minmax_gpu_4d_contiguous")
         comptime dtype = DType.float32
-        var t = Tensor[dtype].arange(0, 16).reshape(Shape(2, 2, 2, 2)).to_gpu()
+        var _tmp0 = Tensor[dtype].arange(0, 16)
+        var _tmp1 = _tmp0.reshape(Shape(2, 2, 2, 2))
+        var t = _tmp1.to_gpu()
         var ndb = t.buffer
         # shape=[2,2,2,2], strides=[8,4,2,1], offset=0
         # min=0, max=15

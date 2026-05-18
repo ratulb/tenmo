@@ -6,6 +6,7 @@ from tenmo.net import Module, Layer
 from tenmo.device import Device
 from tenmo.mnemonics import EMBEDDING
 from tenmo.common_utils import i, s
+from tenmo.shared import Reduction
 
 
 @fieldwise_init
@@ -16,7 +17,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
     Backward: ScatterAddTensor — sparse gradient update into weight rows
 
     Equivalent to PyTorch nn.Embedding but with:
-    - Optional fused gather+sum (embedding_bag) via fuse_sum=True
+    - Optional fused gather+sum (embedding_bag) via reduction=Reduction(1)
     - padding_idx support — that row's grad is zeroed after each update
     - Pretrained weight loading via from_pretrained()
     - Standard init methods matching nn.init.*
@@ -31,6 +32,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
     var max_norm: Optional[Float64]  # renormalise rows if set
     var norm_type: Float64  # L2 norm order (default 2.0)
     var training: Bool
+    var reduction: Reduction
 
     fn __init__(
         out self,
@@ -42,6 +44,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
         init_seed: Optional[Int] = None,
         init_method: String = "normal",
         freeze: Bool = False,
+        reduction: Reduction = Reduction(2),
     ):
         """
         Args:
@@ -60,6 +63,9 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
                             "kaiming"  — Kaiming normal
                             "zero"     — all zeros
             freeze:         If True, requires_grad=False — no gradient.
+            reduction:      How to reduce gathered rows (NONE=2, SUM=1, MEAN=0).
+                            Default NONE preserves standard gather behavior.
+                            Set to Reduction(1) for bag-of-words sum.
         """
         self.num_embeddings = num_embeddings
         self.embedding_dim = embedding_dim
@@ -67,17 +73,18 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
         self.max_norm = max_norm
         self.norm_type = norm_type
         self.training = True
+        self.reduction = reduction
 
         var shape = Shape(num_embeddings, embedding_dim)
-        var rg = not freeze
+        var grad_required = not freeze
 
         if init_method == "normal":
             self.weight = Tensor[Self.dtype].randn(
-                shape, mean=0.0, std=1.0, init_seed=init_seed, requires_grad=rg
+                shape, mean=0.0, std=1.0, init_seed=init_seed, requires_grad=grad_required
             )
         elif init_method == "uniform":
             self.weight = Tensor[Self.dtype].rand(
-                shape, min=-1, max=1, init_seed=init_seed, requires_grad=rg
+                shape, min=-1, max=1, init_seed=init_seed, requires_grad=grad_required
             )
         elif init_method == "xavier":
             var limit = Scalar[Self.dtype](
@@ -88,15 +95,15 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
                 min=-limit,
                 max=limit,
                 init_seed=init_seed,
-                requires_grad=rg,
+                requires_grad=grad_required,
             )
         elif init_method == "kaiming":
             var std = sqrt(2.0 / Float64(embedding_dim))
             self.weight = Tensor[Self.dtype].randn(
-                shape, mean=0.0, std=std, init_seed=init_seed, requires_grad=rg
+                shape, mean=0.0, std=std, init_seed=init_seed, requires_grad=grad_required
             )
         else:  # "zero"
-            self.weight = Tensor[Self.dtype].zeros(shape, requires_grad=rg)
+            self.weight = Tensor[Self.dtype].zeros(shape, requires_grad=grad_required)
 
         # Zero out padding row if set
         if padding_idx:
@@ -106,26 +113,26 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
     fn __call__(
         mut self,
         indices: List[Int],
-        fuse_sum: Bool = False,
     ) -> Tensor[Self.dtype]:
-        return self.__call__(IntArray(indices), fuse_sum)
+        return self.__call__(IntArray(indices))
 
     fn __call__(
         mut self,
         indices: IntArray,
-        fuse_sum: Bool = False,
     ) -> Tensor[Self.dtype]:
         """Lookup embeddings for given indices.
 
+        Reduction is determined by self.reduction:
+            NONE (0) — standard gather, output shape (n, embedding_dim).
+            SUM  (1) — fused gather+sum (embedding_bag), output (embedding_dim,).
+            MEAN (2) — like SUM but divided by n.
+
         Args:
             indices:  Token ids to look up. Each must be in [0, num_embeddings).
-            fuse_sum: If True, fuse gather+sum into one kernel (embedding_bag).
-                      Output shape: (embedding_dim,) instead of (n, embedding_dim).
-                      Use for bag-of-words models.
 
         Returns:
-            (len(indices), embedding_dim) normally.
-            (embedding_dim,) when fuse_sum=True.
+            (len(indices), embedding_dim) when reduction is NONE.
+            (embedding_dim,) when reduction is SUM or MEAN.
         """
         var result: Tensor[Self.dtype]
         if self.training:
@@ -133,12 +140,12 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
                 self.weight,
                 indices,
                 axis=0,
-                fuse_sum=fuse_sum,
+                reduction=self.reduction,
                 padding_idx=self.padding_idx,
             )
         else:
             result = Gather[Self.dtype].forward[track_grad=False](
-                self.weight, indices, axis=0, fuse_sum=fuse_sum
+                self.weight, indices, axis=0, reduction=self.reduction
             )
 
         # Apply max_norm renormalisation if set (in-place on result)
@@ -150,7 +157,6 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
     fn __call__(
         mut self,
         indices: Tensor[DType.int64],
-        fuse_sum: Bool = False,
     ) -> Tensor[Self.dtype]:
         """Lookup embeddings for indices given as an int64 Tensor.
         Enables batched transformer-style usage:
@@ -160,7 +166,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
         var n = indices.numels()
         for k in range(n):
             idx.append(Int(indices.get(k)))
-        return self.__call__(idx, fuse_sum)
+        return self.__call__(idx)
 
     # ── Utilities ─────────────────────────────────────────────────────────────
 
@@ -203,6 +209,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
         max_norm: Optional[Float64] = None,
         norm_type: Float64 = 2.0,
         freeze: Bool = True,  # frozen by default — PyTorch convention
+        reduction: Reduction = Reduction(2),
     ) -> Embedding[Self.dtype]:
         """Load pretrained embeddings (GloVe, fastText, word2vec etc.).
 
@@ -212,6 +219,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
             max_norm:    Renormalisation threshold.
             freeze:      If True (default), embeddings are not updated during training.
                          Set False to fine-tune pretrained embeddings.
+            reduction:   How to reduce gathered rows (NONE/SUM/MEAN).
 
         Returns:
             Embedding with weights copied from pretrained tensor.
@@ -228,6 +236,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
             norm_type=norm_type,
             init_method="zero",  # allocate, then overwrite
             freeze=freeze,
+            reduction=reduction,
         )
         # Copy pretrained weights in
         emb.weight.fill(weights, s(), s())

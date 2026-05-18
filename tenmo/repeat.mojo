@@ -10,7 +10,7 @@ struct Repeat[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     fn forward[
         track_grad: Bool = True
     ](
-        self: Tensor[Self.dtype],
+        mut self: Tensor[Self.dtype],
         repeat: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
