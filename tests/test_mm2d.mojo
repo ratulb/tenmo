@@ -6,7 +6,7 @@ from std.testing import assert_true, TestSuite
 from tenmo.strides import Strides
 
 
-fn matmul_naive[
+def matmul_naive[
     dtype: DType, //
 ](A: Tensor[dtype], B: Tensor[dtype]) raises -> Tensor[dtype]:
     """Naive matrix multiplication for verification purposes.
@@ -36,7 +36,7 @@ fn matmul_naive[
     return C^
 
 
-fn validate_matmul_2d_grads[
+def validate_matmul_2d_grads[
     dtype: DType, //
 ](mut A: Tensor[dtype], mut B: Tensor[dtype], C: Tensor[dtype]) raises:
     print("validate_matmul_2d_grads")
@@ -100,7 +100,7 @@ fn validate_matmul_2d_grads[
     print("Matmul_2d gradient validation passed for all applicable tensors")
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

@@ -29,7 +29,7 @@ struct IntArray(
 
 
     @always_inline("nodebug")
-    fn __init__(out self):
+    def __init__(out self):
         """Create an empty IntArray instance.
 
         Initializes an array with zero size and zero capacity.
@@ -40,7 +40,7 @@ struct IntArray(
         self._capacity = 0
 
     @always_inline("nodebug")
-    fn __init__(out self, *values: Int):
+    def __init__(out self, *values: Int):
         """Create IntArray from variadic integer arguments.
 
         Args:
@@ -57,7 +57,7 @@ struct IntArray(
             self._data[i] = values[i]
 
     @always_inline("nodebug")
-    fn __init__(out self, values: VariadicList[Int, _]):
+    def __init__(out self, values: VariadicList[Int, _]):
         """Create IntArray from a VariadicList of integers.
 
         Args:
@@ -71,7 +71,7 @@ struct IntArray(
             self._data[i] = values[i]
 
     @always_inline("nodebug")
-    fn __init__(out self, values: List[Int]):
+    def __init__(out self, values: List[Int]):
         """Create IntArray from a Mojo List.
 
         Args:
@@ -87,7 +87,7 @@ struct IntArray(
         memcpy(dest=self._data, src=values._data, count=n)
 
     @always_inline("nodebug")
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         """Create a deep copy of another IntArray instance.
 
         Args:
@@ -105,7 +105,7 @@ struct IntArray(
             self._data = UnsafePointer[Int, MutExternalOrigin]()
 
     @always_inline("nodebug")
-    fn __del__(deinit self):
+    def __del__(deinit self):
         """Free memory when the IntArray instance is deinitialized.
 
         Releases any allocated memory back to the system.
@@ -116,7 +116,7 @@ struct IntArray(
 
     @staticmethod
     @always_inline("nodebug")
-    fn filled(size: Int, value: Int) -> Self:
+    def filled(size: Int, value: Int) -> Self:
         """Create an IntArray filled with a specific value.
 
         Args:
@@ -136,7 +136,7 @@ struct IntArray(
 
     @staticmethod
     @always_inline("nodebug")
-    fn range(start: Int, end: Int, step: Int = 1) -> Self:
+    def range(start: Int, end: Int, step: Int = 1) -> Self:
         """Create an IntArray from a range of values.
 
         Args:
@@ -180,7 +180,7 @@ struct IntArray(
 
     @staticmethod
     @always_inline("nodebug")
-    fn with_capacity(capacity: Int) -> Self:
+    def with_capacity(capacity: Int) -> Self:
         """Create an IntArray with pre-allocated capacity but zero size.
 
         Args:
@@ -201,7 +201,7 @@ struct IntArray(
 
     @staticmethod
     @always_inline
-    fn invert_permutation(perm: Self) -> Self:
+    def invert_permutation(perm: Self) -> Self:
         """Invert a permutation array.
 
         Args:
@@ -220,7 +220,7 @@ struct IntArray(
 
 
     @always_inline("nodebug")
-    fn size(self) -> Int:
+    def size(self) -> Int:
         """Get the number of elements in the array.
 
         Returns:
@@ -229,7 +229,7 @@ struct IntArray(
         return self._size
 
     @always_inline("nodebug")
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         """Get the number of elements in the array.
 
         Returns:
@@ -239,7 +239,7 @@ struct IntArray(
         return self._size
 
     @always_inline("nodebug")
-    fn capacity(self) -> Int:
+    def capacity(self) -> Int:
         """Get the allocated capacity of the array.
 
         Returns:
@@ -248,7 +248,7 @@ struct IntArray(
         return self._capacity
 
     @always_inline("nodebug")
-    fn is_empty(self) -> Bool:
+    def is_empty(self) -> Bool:
         """Check if the array is empty.
 
         Returns:
@@ -258,7 +258,7 @@ struct IntArray(
 
 
     @always_inline("nodebug")
-    fn __getitem__(ref self, idx: Int) -> ref[self] Int:
+    def __getitem__(ref self, idx: Int) -> ref[self] Int:
         """Get element at index.
 
         Args:
@@ -276,7 +276,7 @@ struct IntArray(
         return (self._data + index)[]
 
     @always_inline("nodebug")
-    fn __setitem__(mut self, idx: Int, value: Int):
+    def __setitem__(mut self, idx: Int, value: Int):
         """Set element at index.
 
         Args:
@@ -293,7 +293,7 @@ struct IntArray(
         (self._data + index)[] = value
 
     @always_inline("nodebug")
-    fn __getitem__(self, slice: Slice) -> Self:
+    def __getitem__(self, slice: Slice) -> Self:
         """Get slice as new array.
 
         Args:
@@ -354,7 +354,7 @@ struct IntArray(
 
 
     @always_inline("nodebug")
-    fn reserve(mut self, required: Int):
+    def reserve(mut self, required: Int):
         """Ensure capacity, reallocating if needed.
 
         Args:
@@ -380,7 +380,7 @@ struct IntArray(
         self._capacity = new_cap
 
     @always_inline
-    fn append(mut self, *values: Int):
+    def append(mut self, *values: Int):
         """Append one or more elements to the end of the array.
 
         Args:
@@ -395,7 +395,7 @@ struct IntArray(
         self._size += len(values)
 
     @always_inline
-    fn prepend(mut self, value: Int):
+    def prepend(mut self, value: Int):
         """Prepend an element to the beginning of the array.
 
         Args:
@@ -413,7 +413,7 @@ struct IntArray(
         self._size += 1
 
     @always_inline("nodebug")
-    fn __iadd__(mut self, other: Self):
+    def __iadd__(mut self, other: Self):
         """In-place addition with another IntArray.
 
         Args:
@@ -432,7 +432,7 @@ struct IntArray(
             self[i] += other[i]
 
     @always_inline("nodebug")
-    fn __iadd__(mut self, other: List[Int]):
+    def __iadd__(mut self, other: List[Int]):
         """In-place addition with a Mojo List.
 
         Args:
@@ -451,7 +451,7 @@ struct IntArray(
             self[i] += other[i]
 
     @always_inline("nodebug")
-    fn __radd__(self, value: Int) -> Self:
+    def __radd__(self, value: Int) -> Self:
         """Reverse addition with an integer.
 
         Args:
@@ -466,7 +466,7 @@ struct IntArray(
         return IntArray(value).__add__(self)
 
     @always_inline("nodebug")
-    fn __add__(self, value: Int) -> Self:
+    def __add__(self, value: Int) -> Self:
         """Return new array with value appended.
 
         Args:
@@ -485,7 +485,7 @@ struct IntArray(
         return result^
 
     @always_inline("nodebug")
-    fn __add__(self, other: IntArray) -> Self:
+    def __add__(self, other: IntArray) -> Self:
         """Return new array with values of other IntArray concatenated.
 
         Args:
@@ -506,7 +506,7 @@ struct IntArray(
         return result^
 
     @always_inline("nodebug")
-    fn __add__(self, other: List[Int]) -> Self:
+    def __add__(self, other: List[Int]) -> Self:
         """Return new array with values of other List[Int] concatenated.
 
         Args:
@@ -521,7 +521,7 @@ struct IntArray(
         return self.__add__(IntArray(other))
 
     @always_inline("nodebug")
-    fn __radd__(self, other: List[Int]) -> Self:
+    def __radd__(self, other: List[Int]) -> Self:
         """Reverse addition with a List[Int].
 
         Args:
@@ -533,7 +533,7 @@ struct IntArray(
         return IntArray(other).__add__(self)
 
     @always_inline("nodebug")
-    fn pop(mut self, index: Int = -1) -> Int:
+    def pop(mut self, index: Int = -1) -> Int:
         """Remove and return element at specified index.
 
         Args:
@@ -558,7 +558,7 @@ struct IntArray(
         self._size -= 1
         return val
 
-    fn clear(mut self):
+    def clear(mut self):
         """Remove all elements from the array.
 
         Note:
@@ -568,14 +568,14 @@ struct IntArray(
         self._size = 0
 
     @always_inline("nodebug")
-    fn replace(self, idx: Int, value: Int) -> Self:
+    def replace(self, idx: Int, value: Int) -> Self:
         """Return copy with element at idx replaced."""
         var result = self
         result[idx] = value
         return result^
 
     @always_inline("nodebug")
-    fn replace(self, indices: Self, values: Self) -> Self:
+    def replace(self, indices: Self, values: Self) -> Self:
         """Return copy with multiple replacements."""
         var n = len(self)
         var m = len(indices)
@@ -598,7 +598,7 @@ struct IntArray(
         return result^
 
     @always_inline("nodebug")
-    fn insert(self, at: Int, value: Int) -> Self:
+    def insert(self, at: Int, value: Int) -> Self:
         """Insert value at position, return new IntArray."""
         if at < 0 or at > len(self):
             panic("IntArray -> insert - index out of bounds: " + String(at))
@@ -612,7 +612,7 @@ struct IntArray(
         return result^
 
     @always_inline("nodebug")
-    fn insert(self, indices: Self, values: Self) -> Self:
+    def insert(self, indices: Self, values: Self) -> Self:
         """Insert values at multiple sorted indices."""
         if len(indices) != len(values):
             panic("IntArray -> insert: indices and values must be same length")
@@ -656,7 +656,7 @@ struct IntArray(
 
         return result^
 
-    fn sort(mut self, asc: Bool = True):
+    def sort(mut self, asc: Bool = True):
         """Insertion sort in place."""
         for i in range(1, len(self)):
             var elem = self[i]
@@ -666,14 +666,14 @@ struct IntArray(
                 j -= 1
             self[j] = elem
 
-    fn sorted(self, asc: Bool = True) -> Self:
+    def sorted(self, asc: Bool = True) -> Self:
         """Return sorted copy."""
         var result = self.copy()
         result.sort(asc)
         return result^
 
     @always_inline("nodebug")
-    fn indices_of(self, val: Int) -> Self:
+    def indices_of(self, val: Int) -> Self:
         """Return indices where value equals val."""
         var result = IntArray.with_capacity(len(self))
         for i in range(len(self)):
@@ -682,20 +682,20 @@ struct IntArray(
         return result
 
     @always_inline("nodebug")
-    fn fill(mut self, value: Int):
+    def fill(mut self, value: Int):
         """Fill with value."""
         for i in range(self._size):
             self._data[i] = value
 
     @always_inline
-    fn __contains__(self, value: Int) -> Bool:
+    def __contains__(self, value: Int) -> Bool:
         """Check if contains value."""
         for i in range(self._size):
             if self._data[i] == value:
                 return True
         return False
 
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         """Check equality."""
         if self._size != other._size:
             return False
@@ -704,7 +704,7 @@ struct IntArray(
                 return False
         return True
 
-    fn __eq__(self, other: List[Int]) -> Bool:
+    def __eq__(self, other: List[Int]) -> Bool:
         """Check equality with List."""
         if self._size != len(other):
             return False
@@ -715,7 +715,7 @@ struct IntArray(
 
 
     @always_inline("nodebug")
-    fn tolist(self) -> List[Int]:
+    def tolist(self) -> List[Int]:
         """Convert to List[Int]."""
         var result = List[Int](capacity=Int(self._size))
         for i in range(self._size):
@@ -723,7 +723,7 @@ struct IntArray(
         return result^
 
     @no_inline
-    fn __str__(self) -> String:
+    def __str__(self) -> String:
         """String representation."""
         if self._size == 0:
             return "[]"
@@ -736,7 +736,7 @@ struct IntArray(
         return result
 
     @no_inline
-    fn __repr__(self) -> String:
+    def __repr__(self) -> String:
         """Get official string representation of the IntArray.
 
         Returns:
@@ -745,7 +745,7 @@ struct IntArray(
         return self.__str__()
 
     @no_inline
-    fn write_to[W: Writer](self, mut writer: W):
+    def write_to[W: Writer](self, mut writer: W):
         """Write IntArray to a writer.
 
         Args:
@@ -755,7 +755,7 @@ struct IntArray(
 
 
     @always_inline("nodebug")
-    fn product(self) -> Int:
+    def product(self) -> Int:
         """Calculate the product of all elements.
 
         Returns:
@@ -769,7 +769,7 @@ struct IntArray(
         return prod
 
     @always_inline("nodebug")
-    fn sum(self) -> Int:
+    def sum(self) -> Int:
         """Calculate the sum of all elements.
 
         Returns:
@@ -782,7 +782,7 @@ struct IntArray(
 
 
     @always_inline("nodebug")
-    fn reverse(mut self):
+    def reverse(mut self):
         """Reverse the array in place.
 
         Note:
@@ -795,7 +795,7 @@ struct IntArray(
             self._data[self._size - 1 - i] = temp
 
     @always_inline("nodebug")
-    fn reversed(self) -> Self:
+    def reversed(self) -> Self:
         """Return a reversed copy of the array.
 
         Returns:
@@ -810,7 +810,7 @@ struct IntArray(
         return result^
 
     @always_inline("nodebug")
-    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+    def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         """Get iterator over elements of the IntArray.
 
         Returns:
@@ -819,7 +819,7 @@ struct IntArray(
         return {0, Pointer(to=self)}
 
     @always_inline("nodebug")
-    fn __reversed__(
+    def __reversed__(
         ref self,
     ) -> IntArrayIterator[origin_of(self), False]:
         """Get reverse iterator over elements of the IntArray.
@@ -830,7 +830,7 @@ struct IntArray(
         return IntArrayIterator[forward=False](len(self), Pointer(to=self))
 
     @always_inline("nodebug")
-    fn zip(
+    def zip(
         ref self, ref other: Self
     ) -> ZipIterator[origin_of(self), origin_of(other)]:
         """Iterate over elements of two IntArrays, returning pair of immutable references.
@@ -841,7 +841,7 @@ struct IntArray(
         return ZipIterator(0, Pointer(to=self), Pointer(to=other))
 
     @always_inline("nodebug")
-    fn zip_reversed(
+    def zip_reversed(
         ref self, ref other: Self
     ) -> ZipIterator[origin_of(self), origin_of(other), False]:
         """Iterate over element pairs of two IntArrays, returning immutable references in reverse order.
@@ -870,10 +870,10 @@ struct IntArrayIterator[
     var index: Int
     var src: Pointer[IntArray, Self.origin]
 
-    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+    def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self
 
-    fn __next__(
+    def __next__(
         mut self,
     ) raises StopIteration -> ref[Self.origin] Self.Element:
         comptime if Self.forward:
@@ -887,7 +887,7 @@ struct IntArrayIterator[
             self.index -= 1
             return self.src[][self.index]
 
-    fn bounds(self) -> Tuple[Int, Optional[Int]]:
+    def bounds(self) -> Tuple[Int, Optional[Int]]:
         var iter_len: Int
 
         comptime if Self.forward:
@@ -898,10 +898,10 @@ struct IntArrayIterator[
         return (iter_len, {iter_len})
 
     @always_inline
-    fn __has_next__(self) -> Bool:
+    def __has_next__(self) -> Bool:
         return self.__len__() > 0
 
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         comptime if Self.forward:
             return len(self.src[]) - self.index
         else:
@@ -918,7 +918,7 @@ struct ZipIterator[
     var src_this: Pointer[IntArray, Self.origin_this]
     var src_that: Pointer[IntArray, Self.origin_that]
 
-    fn __init__(
+    def __init__(
         out self,
         idx: Int,
         src_this: Pointer[IntArray, Self.origin_this],
@@ -930,16 +930,16 @@ struct ZipIterator[
         self.offset = abs(len(src_this[]) - len(src_that[]))
 
     @always_inline("nodebug")
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.index = copy.index
         self.offset = copy.offset
         self.src_this = copy.src_this
         self.src_that = copy.src_that
 
-    fn __iter__(self) -> Self:
+    def __iter__(self) -> Self:
         return self.copy()
 
-    fn __next__(mut self) -> Tuple[Int, Int]:
+    def __next__(mut self) -> Tuple[Int, Int]:
         comptime if Self.forward:
             self.index += 1
             return (
@@ -960,10 +960,10 @@ struct ZipIterator[
                 )
 
     @always_inline
-    fn __has_next__(self) -> Bool:
+    def __has_next__(self) -> Bool:
         return self.__len__() > 0
 
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         comptime if Self.forward:
             return min(len(self.src_this[]), len(self.src_that[])) - self.index
         else:

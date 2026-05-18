@@ -6,14 +6,14 @@ from std.sys import has_accelerator
 # ── CPU Tests: Max ────────────────────────────────────────────────────────────
 
 
-fn test_maxmin_cpu_max_1d_forward() raises:
+def test_maxmin_cpu_max_1d_forward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 5.0, 3.0, 7.0, 2.0], requires_grad=True)
     var b = a.max(4.0)
     assert_true(b.all_close(Tensor[dtype].d1([4.0, 5.0, 4.0, 7.0, 4.0])))
 
 
-fn test_maxmin_cpu_max_1d_backward() raises:
+def test_maxmin_cpu_max_1d_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 5.0, 3.0, 7.0, 2.0], requires_grad=True)
     var b = a.max(4.0)
@@ -23,7 +23,7 @@ fn test_maxmin_cpu_max_1d_backward() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 0.0, 1.0, 0.0])))
 
 
-fn test_maxmin_cpu_max_1d_boundary() raises:
+def test_maxmin_cpu_max_1d_boundary() raises:
     comptime dtype = DType.float32
     # Value exactly equal to scalar — grad should be zero (not strictly greater)
     var a = Tensor[dtype].d1([4.0, 4.0, 5.0], requires_grad=True)
@@ -34,14 +34,14 @@ fn test_maxmin_cpu_max_1d_boundary() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 1.0])))
 
 
-fn test_maxmin_cpu_max_2d_forward() raises:
+def test_maxmin_cpu_max_2d_forward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 6.0], [3.0, 2.0]], requires_grad=True)
     var b = a.max(4.0)
     assert_true(b.all_close(Tensor[dtype].d2([[4.0, 6.0], [4.0, 4.0]])))
 
 
-fn test_maxmin_cpu_max_2d_backward() raises:
+def test_maxmin_cpu_max_2d_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 6.0], [3.0, 2.0]], requires_grad=True)
     var b = a.max(4.0)
@@ -50,7 +50,7 @@ fn test_maxmin_cpu_max_2d_backward() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[0.0, 1.0], [0.0, 0.0]])))
 
 
-fn test_maxmin_cpu_max_3d_forward() raises:
+def test_maxmin_cpu_max_3d_forward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 5.0], [3.0, 8.0]], [[6.0, 2.0], [4.0, 9.0]]],
@@ -66,7 +66,7 @@ fn test_maxmin_cpu_max_3d_forward() raises:
     )
 
 
-fn test_maxmin_cpu_max_3d_backward() raises:
+def test_maxmin_cpu_max_3d_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 5.0], [3.0, 8.0]], [[6.0, 2.0], [4.0, 9.0]]],
@@ -84,7 +84,7 @@ fn test_maxmin_cpu_max_3d_backward() raises:
     )
 
 
-fn test_maxmin_cpu_max_all_below_scalar() raises:
+def test_maxmin_cpu_max_all_below_scalar() raises:
     comptime dtype = DType.float32
     # All values below scalar — grad should be all zeros
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -95,7 +95,7 @@ fn test_maxmin_cpu_max_all_below_scalar() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 0.0])))
 
 
-fn test_maxmin_cpu_max_all_above_scalar() raises:
+def test_maxmin_cpu_max_all_above_scalar() raises:
     comptime dtype = DType.float32
     # All values above scalar — grad should be all ones
     var a = Tensor[dtype].d1([5.0, 6.0, 7.0], requires_grad=True)
@@ -106,7 +106,7 @@ fn test_maxmin_cpu_max_all_above_scalar() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([1.0, 1.0, 1.0])))
 
 
-fn test_maxmin_cpu_max_chained() raises:
+def test_maxmin_cpu_max_chained() raises:
     comptime dtype = DType.float32
     # Chain: max then sum — verify grad flows correctly through chain
     var a = Tensor[dtype].d2([[1.0, 8.0], [5.0, 3.0]], requires_grad=True)
@@ -119,14 +119,14 @@ fn test_maxmin_cpu_max_chained() raises:
 
 
 # ── CPU Tests: Min ────────────────────────────────────────────────────────────
-fn test_maxmin_cpu_min_1d_forward() raises:
+def test_maxmin_cpu_min_1d_forward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 5.0, 3.0, 7.0, 2.0], requires_grad=True)
     var b = a.min(4.0)
     assert_true(b.all_close(Tensor[dtype].d1([1.0, 4.0, 3.0, 4.0, 2.0])))
 
 
-fn test_maxmin_cpu_min_1d_backward() raises:
+def test_maxmin_cpu_min_1d_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 5.0, 3.0, 7.0, 2.0], requires_grad=True)
     var b = a.min(4.0)
@@ -136,7 +136,7 @@ fn test_maxmin_cpu_min_1d_backward() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([1.0, 0.0, 1.0, 0.0, 1.0])))
 
 
-fn test_maxmin_cpu_min_1d_boundary() raises:
+def test_maxmin_cpu_min_1d_boundary() raises:
     comptime dtype = DType.float32
     # Value exactly equal to scalar — grad should be zero (not strictly less)
     var a = Tensor[dtype].d1([4.0, 4.0, 3.0], requires_grad=True)
@@ -147,14 +147,14 @@ fn test_maxmin_cpu_min_1d_boundary() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 1.0])))
 
 
-fn test_maxmin_cpu_min_2d_forward() raises:
+def test_maxmin_cpu_min_2d_forward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 6.0], [3.0, 2.0]], requires_grad=True)
     var b = a.min(4.0)
     assert_true(b.all_close(Tensor[dtype].d2([[1.0, 4.0], [3.0, 2.0]])))
 
 
-fn test_maxmin_cpu_min_2d_backward() raises:
+def test_maxmin_cpu_min_2d_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 6.0], [3.0, 2.0]], requires_grad=True)
     var b = a.min(4.0)
@@ -163,7 +163,7 @@ fn test_maxmin_cpu_min_2d_backward() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[1.0, 0.0], [1.0, 1.0]])))
 
 
-fn test_maxmin_cpu_min_3d_forward() raises:
+def test_maxmin_cpu_min_3d_forward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 5.0], [3.0, 8.0]], [[6.0, 2.0], [4.0, 9.0]]],
@@ -179,7 +179,7 @@ fn test_maxmin_cpu_min_3d_forward() raises:
     )
 
 
-fn test_maxmin_cpu_min_3d_backward() raises:
+def test_maxmin_cpu_min_3d_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 5.0], [3.0, 8.0]], [[6.0, 2.0], [4.0, 9.0]]],
@@ -197,7 +197,7 @@ fn test_maxmin_cpu_min_3d_backward() raises:
     )
 
 
-fn test_maxmin_cpu_min_all_above_scalar() raises:
+def test_maxmin_cpu_min_all_above_scalar() raises:
     comptime dtype = DType.float32
     # All values above scalar — grad should be all zeros
     var a = Tensor[dtype].d1([5.0, 6.0, 7.0], requires_grad=True)
@@ -208,7 +208,7 @@ fn test_maxmin_cpu_min_all_above_scalar() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 0.0])))
 
 
-fn test_maxmin_cpu_min_all_below_scalar() raises:
+def test_maxmin_cpu_min_all_below_scalar() raises:
     comptime dtype = DType.float32
     # All values below scalar — grad should be all ones
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -219,7 +219,7 @@ fn test_maxmin_cpu_min_all_below_scalar() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([1.0, 1.0, 1.0])))
 
 
-fn test_maxmin_cpu_min_chained() raises:
+def test_maxmin_cpu_min_chained() raises:
     comptime dtype = DType.float32
     # Chain: min then multiply — verify grad flows correctly
     var a = Tensor[dtype].d2([[1.0, 8.0], [5.0, 3.0]], requires_grad=True)
@@ -234,7 +234,7 @@ fn test_maxmin_cpu_min_chained() raises:
 # ── CPU Tests: Max + Min combined in chain ────────────────────────────────────
 
 
-fn test_maxmin_cpu_max_then_min_chained() raises:
+def test_maxmin_cpu_max_then_min_chained() raises:
     comptime dtype = DType.float32
     # clamp(x, 2.0, 6.0) = min(max(x, 2.0), 6.0)
     var a = Tensor[dtype].d1([1.0, 3.0, 5.0, 7.0, 9.0], requires_grad=True)
@@ -248,7 +248,7 @@ fn test_maxmin_cpu_max_then_min_chained() raises:
     )
 
 
-fn test_maxmin_cpu_negated_grad_flow() raises:
+def test_maxmin_cpu_negated_grad_flow() raises:
     comptime dtype = DType.float32
     # Verify grad is negated correctly through subtraction chain
     var a = Tensor[dtype].d1([1.0, 5.0, 3.0], requires_grad=True)
@@ -263,7 +263,7 @@ fn test_maxmin_cpu_negated_grad_flow() raises:
 # ── GPU Tests: Max ────────────────────────────────────────────────────────────
 
 
-fn test_maxmin_gpu_max_1d_forward() raises:
+def test_maxmin_gpu_max_1d_forward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 5.0, 3.0, 7.0, 2.0], requires_grad=True)
@@ -274,7 +274,7 @@ fn test_maxmin_gpu_max_1d_forward() raises:
         )
 
 
-fn test_maxmin_gpu_max_1d_backward() raises:
+def test_maxmin_gpu_max_1d_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 5.0, 3.0, 7.0, 2.0], requires_grad=True)
@@ -287,7 +287,7 @@ fn test_maxmin_gpu_max_1d_backward() raises:
         )
 
 
-fn test_maxmin_gpu_max_2d_forward() raises:
+def test_maxmin_gpu_max_2d_forward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 6.0], [3.0, 2.0]], requires_grad=True)
@@ -298,7 +298,7 @@ fn test_maxmin_gpu_max_2d_forward() raises:
         )
 
 
-fn test_maxmin_gpu_max_2d_backward() raises:
+def test_maxmin_gpu_max_2d_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 6.0], [3.0, 2.0]], requires_grad=True)
@@ -311,7 +311,7 @@ fn test_maxmin_gpu_max_2d_backward() raises:
         )
 
 
-fn test_maxmin_gpu_max_3d_backward() raises:
+def test_maxmin_gpu_max_3d_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -331,7 +331,7 @@ fn test_maxmin_gpu_max_3d_backward() raises:
         )
 
 
-fn test_maxmin_gpu_max_all_below_scalar() raises:
+def test_maxmin_gpu_max_all_below_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -342,7 +342,7 @@ fn test_maxmin_gpu_max_all_below_scalar() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 0.0])))
 
 
-fn test_maxmin_gpu_max_all_above_scalar() raises:
+def test_maxmin_gpu_max_all_above_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([5.0, 6.0, 7.0], requires_grad=True)
@@ -353,7 +353,7 @@ fn test_maxmin_gpu_max_all_above_scalar() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([1.0, 1.0, 1.0])))
 
 
-fn test_maxmin_gpu_max_chained() raises:
+def test_maxmin_gpu_max_chained() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 8.0], [5.0, 3.0]], requires_grad=True)
@@ -370,7 +370,7 @@ fn test_maxmin_gpu_max_chained() raises:
 # ── GPU Tests: Min ────────────────────────────────────────────────────────────
 
 
-fn test_maxmin_gpu_min_1d_forward() raises:
+def test_maxmin_gpu_min_1d_forward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 5.0, 3.0, 7.0, 2.0], requires_grad=True)
@@ -381,7 +381,7 @@ fn test_maxmin_gpu_min_1d_forward() raises:
         )
 
 
-fn test_maxmin_gpu_min_1d_backward() raises:
+def test_maxmin_gpu_min_1d_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 5.0, 3.0, 7.0, 2.0], requires_grad=True)
@@ -394,7 +394,7 @@ fn test_maxmin_gpu_min_1d_backward() raises:
         )
 
 
-fn test_maxmin_gpu_min_2d_forward() raises:
+def test_maxmin_gpu_min_2d_forward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 6.0], [3.0, 2.0]], requires_grad=True)
@@ -405,7 +405,7 @@ fn test_maxmin_gpu_min_2d_forward() raises:
         )
 
 
-fn test_maxmin_gpu_min_2d_backward() raises:
+def test_maxmin_gpu_min_2d_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 6.0], [3.0, 2.0]], requires_grad=True)
@@ -418,7 +418,7 @@ fn test_maxmin_gpu_min_2d_backward() raises:
         )
 
 
-fn test_maxmin_gpu_min_3d_backward() raises:
+def test_maxmin_gpu_min_3d_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -438,7 +438,7 @@ fn test_maxmin_gpu_min_3d_backward() raises:
         )
 
 
-fn test_maxmin_gpu_min_all_above_scalar() raises:
+def test_maxmin_gpu_min_all_above_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([5.0, 6.0, 7.0], requires_grad=True)
@@ -449,7 +449,7 @@ fn test_maxmin_gpu_min_all_above_scalar() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 0.0])))
 
 
-fn test_maxmin_gpu_min_all_below_scalar() raises:
+def test_maxmin_gpu_min_all_below_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -460,7 +460,7 @@ fn test_maxmin_gpu_min_all_below_scalar() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([1.0, 1.0, 1.0])))
 
 
-fn test_maxmin_gpu_min_chained() raises:
+def test_maxmin_gpu_min_chained() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 8.0], [5.0, 3.0]], requires_grad=True)
@@ -477,7 +477,7 @@ fn test_maxmin_gpu_min_chained() raises:
 # ── GPU Tests: Max + Min combined ─────────────────────────────────────────────
 
 
-fn test_maxmin_gpu_max_then_min_chained() raises:
+def test_maxmin_gpu_max_then_min_chained() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         # clamp(x, 2.0, 6.0) = min(max(x, 2.0), 6.0)
@@ -495,7 +495,7 @@ fn test_maxmin_gpu_max_then_min_chained() raises:
         )
 
 
-fn test_maxmin_gpu_negated_grad_flow() raises:
+def test_maxmin_gpu_negated_grad_flow() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 5.0, 3.0], requires_grad=True)
@@ -510,7 +510,7 @@ fn test_maxmin_gpu_negated_grad_flow() raises:
 # ── CPU/GPU parity check ──────────────────────────────────────────────────────
 
 
-fn test_maxmin_gpu_parity_max() raises:
+def test_maxmin_gpu_parity_max() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
@@ -531,7 +531,7 @@ fn test_maxmin_gpu_parity_max() raises:
         assert_true(a_cpu.grad().all_close(2 * a_gpu.grad().to_cpu()))
 
 
-fn test_maxmin_gpu_parity_min() raises:
+def test_maxmin_gpu_parity_min() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
@@ -555,7 +555,7 @@ fn test_maxmin_gpu_parity_min() raises:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

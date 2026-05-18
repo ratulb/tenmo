@@ -7,7 +7,7 @@ from tenmo.shapes import Shape
 # ============================================================================
 
 
-fn test_stack_axis0_2d() raises:
+def test_stack_axis0_2d() raises:
     """Test stack along axis 0 for 2D tensors."""
     print("test_stack_axis0_2d")
 
@@ -39,7 +39,7 @@ fn test_stack_axis0_2d() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stack_axis1_2d() raises:
+def test_stack_axis1_2d() raises:
     """Test stack along axis 1 for 2D tensors."""
     print("test_stack_axis1_2d")
 
@@ -71,7 +71,7 @@ fn test_stack_axis1_2d() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stack_axis2_2d() raises:
+def test_stack_axis2_2d() raises:
     """Test stack along axis 2 for 2D tensors."""
     print("test_stack_axis2_2d")
 
@@ -103,7 +103,7 @@ fn test_stack_axis2_2d() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stack_axis_negative() raises:
+def test_stack_axis_negative() raises:
     """Test stack with negative axis."""
     print("test_stack_axis_negative")
 
@@ -122,7 +122,7 @@ fn test_stack_axis_negative() raises:
     assert_true(result1.all_close[atol=1e-6](result2))
 
 
-fn test_stack_1d_tensors() raises:
+def test_stack_1d_tensors() raises:
     """Test stack of 1D tensors."""
     print("test_stack_1d_tensors")
 
@@ -149,7 +149,7 @@ fn test_stack_1d_tensors() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stack_1d_axis1() raises:
+def test_stack_1d_axis1() raises:
     """Test stack of 1D tensors along axis 1."""
     print("test_stack_1d_axis1")
 
@@ -172,7 +172,7 @@ fn test_stack_1d_axis1() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stack_3d_tensors() raises:
+def test_stack_3d_tensors() raises:
     """Test stack of 3D tensors."""
     print("test_stack_3d_tensors")
 
@@ -193,7 +193,7 @@ fn test_stack_3d_tensors() raises:
     assert_true(result.shape()[3] == 2)
 
 
-fn test_stack_many_tensors() raises:
+def test_stack_many_tensors() raises:
     """Test stack of many tensors."""
     print("test_stack_many_tensors")
 
@@ -213,7 +213,7 @@ fn test_stack_many_tensors() raises:
     assert_true(result.shape()[2] == 3)
 
 
-fn test_stack_single_tensor() raises:
+def test_stack_single_tensor() raises:
     """Test stack of single tensor (edge case)."""
     print("test_stack_single_tensor")
 
@@ -234,7 +234,7 @@ fn test_stack_single_tensor() raises:
 # ============================================================================
 # VSTACK TESTS
 # ============================================================================
-fn test_vstack_2d() raises:
+def test_vstack_2d() raises:
     """Test vstack with 2D tensors."""
     print("test_vstack_2d")
 
@@ -256,7 +256,7 @@ fn test_vstack_2d() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_vstack_1d() raises:
+def test_vstack_1d() raises:
     """Test vstack with 1D tensors."""
     print("test_vstack_1d")
 
@@ -283,7 +283,7 @@ fn test_vstack_1d() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_vstack_mixed_rows() raises:
+def test_vstack_mixed_rows() raises:
     """Test vstack with different number of rows."""
     print("test_vstack_mixed_rows")
 
@@ -321,7 +321,7 @@ fn test_vstack_mixed_rows() raises:
 # ============================================================================
 
 
-fn test_hstack_2d() raises:
+def test_hstack_2d() raises:
     """Test hstack with 2D tensors."""
     print("test_hstack_2d")
 
@@ -344,7 +344,7 @@ fn test_hstack_2d() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_hstack_1d() raises:
+def test_hstack_1d() raises:
     """Test hstack with 1D tensors."""
     print("test_hstack_1d")
 
@@ -370,7 +370,7 @@ fn test_hstack_1d() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_hstack_mixed_cols() raises:
+def test_hstack_mixed_cols() raises:
     """Test hstack with different number of columns."""
     print("test_hstack_mixed_cols")
 
@@ -402,7 +402,7 @@ fn test_hstack_mixed_cols() raises:
 # ============================================================================
 
 
-fn test_stack_backward_axis0() raises:
+def test_stack_backward_axis0() raises:
     """Test gradient flow through stack along axis 0."""
     print("test_stack_backward_axis0")
 
@@ -425,7 +425,7 @@ fn test_stack_backward_axis0() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_stack_backward_axis1() raises:
+def test_stack_backward_axis1() raises:
     """Test gradient flow through stack along axis 1."""
     print("test_stack_backward_axis1")
 
@@ -448,7 +448,7 @@ fn test_stack_backward_axis1() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_stack_backward_weighted() raises:
+def test_stack_backward_weighted() raises:
     """Test gradient flow with weighted loss."""
     print("test_stack_backward_weighted")
 
@@ -474,7 +474,7 @@ fn test_stack_backward_weighted() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad_B))
 
 
-fn test_stack_backward_three_tensors() raises:
+def test_stack_backward_three_tensors() raises:
     """Test gradient flow through stack of three tensors."""
     print("test_stack_backward_three_tensors")
 
@@ -499,7 +499,7 @@ fn test_stack_backward_three_tensors() raises:
     assert_true(C.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_stack_backward_chain() raises:
+def test_stack_backward_chain() raises:
     """Test gradient flow through chained operations."""
     print("test_stack_backward_chain")
 
@@ -529,7 +529,7 @@ fn test_stack_backward_chain() raises:
 # ============================================================================
 
 
-fn test_vstack_backward() raises:
+def test_vstack_backward() raises:
     """Test gradient flow through vstack."""
     print("test_vstack_backward")
 
@@ -554,7 +554,7 @@ fn test_vstack_backward() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad_B))
 
 
-fn test_vstack_backward_1d() raises:
+def test_vstack_backward_1d() raises:
     """Test gradient flow through vstack with 1D tensors."""
     print("test_vstack_backward_1d")
 
@@ -576,7 +576,7 @@ fn test_vstack_backward_1d() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_vstack_backward_weighted() raises:
+def test_vstack_backward_weighted() raises:
     """Test gradient flow through vstack with weighted loss."""
     print("test_vstack_backward_weighted")
 
@@ -612,7 +612,7 @@ fn test_vstack_backward_weighted() raises:
 # ============================================================================
 
 
-fn test_hstack_backward() raises:
+def test_hstack_backward() raises:
     """Test gradient flow through hstack."""
     print("test_hstack_backward")
 
@@ -637,7 +637,7 @@ fn test_hstack_backward() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad_B))
 
 
-fn test_hstack_backward_1d() raises:
+def test_hstack_backward_1d() raises:
     """Test gradient flow through hstack with 1D tensors."""
     print("test_hstack_backward_1d")
 
@@ -660,7 +660,7 @@ fn test_hstack_backward_1d() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad_B))
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
@@ -676,7 +676,7 @@ fn main() raises:
 # ============================================================================
 
 
-fn test_stk_basic_2_tensors_axis0() raises:
+def test_stk_basic_2_tensors_axis0() raises:
     """Test stacking 2 tensors along axis 0."""
     print("test_stk_basic_2_tensors_axis0")
 
@@ -694,7 +694,7 @@ fn test_stk_basic_2_tensors_axis0() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stk_basic_3_tensors_axis0() raises:
+def test_stk_basic_3_tensors_axis0() raises:
     """Test stacking 3 tensors along axis 0."""
     print("test_stk_basic_3_tensors_axis0")
 
@@ -714,7 +714,7 @@ fn test_stk_basic_3_tensors_axis0() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stk_axis1_2d() raises:
+def test_stk_axis1_2d() raises:
     """Test stacking along axis 1 for 2D tensors."""
     print("test_stk_axis1_2d")
 
@@ -736,7 +736,7 @@ fn test_stk_axis1_2d() raises:
     assert_true(result.shape()[2] == 2)
 
 
-fn test_stk_axis_negative() raises:
+def test_stk_axis_negative() raises:
     """Test stacking with negative axis."""
     print("test_stk_axis_negative")
 
@@ -755,7 +755,7 @@ fn test_stk_axis_negative() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stk_single_element_tensors() raises:
+def test_stk_single_element_tensors() raises:
     """Test stacking single-element tensors."""
     print("test_stk_single_element_tensors")
 
@@ -775,7 +775,7 @@ fn test_stk_single_element_tensors() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stk_3d_tensors() raises:
+def test_stk_3d_tensors() raises:
     """Test stacking 3D tensors."""
     print("test_stk_3d_tensors")
 
@@ -800,7 +800,7 @@ fn test_stk_3d_tensors() raises:
 # ============================================================================
 
 
-fn test_stk_backward_simple_axis0() raises:
+def test_stk_backward_simple_axis0() raises:
     """Test gradient flow through stack with axis=0."""
     print("test_stk_backward_simple_axis0")
 
@@ -822,7 +822,7 @@ fn test_stk_backward_simple_axis0() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_stk_backward_weighted() raises:
+def test_stk_backward_weighted() raises:
     """Test gradient flow with weighted loss."""
     print("test_stk_backward_weighted")
 
@@ -850,7 +850,7 @@ fn test_stk_backward_weighted() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad_B))
 
 
-fn test_stk_backward_axis1() raises:
+def test_stk_backward_axis1() raises:
     """Test gradient flow through stack with axis=1."""
     print("test_stk_backward_axis1")
 
@@ -872,7 +872,7 @@ fn test_stk_backward_axis1() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_stk_backward_three_tensors() raises:
+def test_stk_backward_three_tensors() raises:
     """Test gradient flow with three input tensors."""
     print("test_stk_backward_three_tensors")
 
@@ -903,7 +903,7 @@ fn test_stk_backward_three_tensors() raises:
     assert_true(C.grad().all_close[atol=1e-6](expected_grad_C))
 
 
-fn test_stk_backward_selective_grad() raises:
+def test_stk_backward_selective_grad() raises:
     """Test gradient flow when only some tensors require grad."""
     print("test_stk_backward_selective_grad")
 
@@ -933,7 +933,7 @@ fn test_stk_backward_selective_grad() raises:
 # ============================================================================
 
 
-fn test_stk_vstack_1d_tensors() raises:
+def test_stk_vstack_1d_tensors() raises:
     """Test vstack with 1D tensors."""
     print("test_stk_vstack_1d_tensors")
 
@@ -951,7 +951,7 @@ fn test_stk_vstack_1d_tensors() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stk_vstack_2d_tensors() raises:
+def test_stk_vstack_2d_tensors() raises:
     """Test vstack with 2D tensors."""
     print("test_stk_vstack_2d_tensors")
 
@@ -971,7 +971,7 @@ fn test_stk_vstack_2d_tensors() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stk_vstack_different_rows() raises:
+def test_stk_vstack_different_rows() raises:
     """Test vstack with tensors having different number of rows."""
     print("test_stk_vstack_different_rows")
 
@@ -991,7 +991,7 @@ fn test_stk_vstack_different_rows() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stk_vstack_backward() raises:
+def test_stk_vstack_backward() raises:
     """Test gradient flow through vstack."""
     print("test_stk_vstack_backward")
 
@@ -1023,7 +1023,7 @@ fn test_stk_vstack_backward() raises:
 # ============================================================================
 
 
-fn test_stk_hstack_1d_tensors() raises:
+def test_stk_hstack_1d_tensors() raises:
     """Test hstack with 1D tensors."""
     print("test_stk_hstack_1d_tensors")
 
@@ -1041,7 +1041,7 @@ fn test_stk_hstack_1d_tensors() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stk_hstack_2d_tensors() raises:
+def test_stk_hstack_2d_tensors() raises:
     """Test hstack with 2D tensors."""
     print("test_stk_hstack_2d_tensors")
 
@@ -1061,7 +1061,7 @@ fn test_stk_hstack_2d_tensors() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stk_hstack_different_columns() raises:
+def test_stk_hstack_different_columns() raises:
     """Test hstack with tensors having different number of columns."""
     print("test_stk_hstack_different_columns")
 
@@ -1081,7 +1081,7 @@ fn test_stk_hstack_different_columns() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_stk_hstack_backward() raises:
+def test_stk_hstack_backward() raises:
     """Test gradient flow through hstack."""
     print("test_stk_hstack_backward")
 
@@ -1108,7 +1108,7 @@ fn test_stk_hstack_backward() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad_B))
 
 
-fn test_stk_hstack_2d_backward() raises:
+def test_stk_hstack_2d_backward() raises:
     """Test gradient flow through hstack with 2D tensors."""
     print("test_stk_hstack_2d_backward")
 
@@ -1140,7 +1140,7 @@ fn test_stk_hstack_2d_backward() raises:
 # ============================================================================
 
 
-fn test_stk_large_number_tensors() raises:
+def test_stk_large_number_tensors() raises:
     """Test stacking a large number of tensors."""
     print("test_stk_large_number_tensors")
 
@@ -1158,7 +1158,7 @@ fn test_stk_large_number_tensors() raises:
     assert_true(result.shape()[2] == 3)
 
 
-fn test_stk_zeros_and_ones() raises:
+def test_stk_zeros_and_ones() raises:
     """Test stacking tensors with zeros and ones."""
     print("test_stk_zeros_and_ones")
 
@@ -1183,7 +1183,7 @@ fn test_stk_zeros_and_ones() raises:
     assert_true(abs(sum_middle - 12.0) < 1e-6)
 
 
-fn test_stk_chain_operations() raises:
+def test_stk_chain_operations() raises:
     """Test stacking followed by other operations."""
     print("test_stk_chain_operations")
 
@@ -1206,7 +1206,7 @@ fn test_stk_chain_operations() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_stk_mixed_operations() raises:
+def test_stk_mixed_operations() raises:
     """Test mixing stack, vstack, and hstack."""
     print("test_stk_mixed_operations")
 
@@ -1239,7 +1239,7 @@ fn test_stk_mixed_operations() raises:
 # ============================================================================
 
 
-fn run_all_stack_tests() raises:
+def run_all_stack_tests() raises:
     """Run all stack operation tests."""
     print("\n" + "=" * 60)
     print("RUNNING COMPREHENSIVE STACK OPERATIONS TEST SUITE")
@@ -1282,7 +1282,7 @@ fn run_all_stack_tests() raises:
     test_stk_mixed_operations()
 
 
-fn test_stack_operations() raises:
+def test_stack_operations() raises:
     comptime dtype = DType.float32
 
     print("=" * 70)

@@ -3,7 +3,7 @@ from tenmo.shapes import Shape
 from std.testing import assert_true, TestSuite
 
 
-fn test_repeat_1d_simple() raises:
+def test_repeat_1d_simple() raises:
     print("test_repeat_1d_simple")
     var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var y = x.repeat(2)
@@ -13,7 +13,7 @@ fn test_repeat_1d_simple() raises:
     assert_true(x.grad().all_close(Tensor.d1([2.0, 2.0, 2.0])))
 
 
-fn test_repeat_axis_selective() raises:
+def test_repeat_axis_selective() raises:
     print("test_repeat_axis_selective")
     var x = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True
@@ -25,7 +25,7 @@ fn test_repeat_axis_selective() raises:
     assert_true(x.grad().all_close(Tensor.d3([[[6.0, 6.0], [6.0, 6.0]]])))
 
 
-fn test_repeat_partial_nonrepeated_axes_grad() raises:
+def test_repeat_partial_nonrepeated_axes_grad() raises:
     print("test_repeat_partial_nonrepeated_axes_grad")
     var x = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -37,7 +37,7 @@ fn test_repeat_partial_nonrepeated_axes_grad() raises:
     assert_true(x.grad().all_close(Tensor.zeros_like(x) + 6.0))
 
 
-fn test_repeat_scalar() raises:
+def test_repeat_scalar() raises:
     print("test_repeat_scalar")
     var x = Tensor.scalar(5.0, requires_grad=True)
     var y = x.repeat(3)
@@ -47,7 +47,7 @@ fn test_repeat_scalar() raises:
     assert_true(x.grad().all_close(Tensor.scalar(3.0)))  # repeated 3 times
 
 
-fn test_repeat_2d_axis_expand() raises:
+def test_repeat_2d_axis_expand() raises:
     print("test_repeat_2d_axis_expand")
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var y = x.repeat(2, 3)
@@ -58,7 +58,7 @@ fn test_repeat_2d_axis_expand() raises:
     assert_true(x.grad().all_close(Tensor.d2([[6.0, 6.0], [6.0, 6.0]])))
 
 
-fn test_repeat_with_broadcast_like_extension() raises:
+def test_repeat_with_broadcast_like_extension() raises:
     print("test_repeat_with_broadcast_like_extension")
     var x = Tensor.d2([[1.0], [2.0]], requires_grad=True)  # shape (2,1)
     var y = x.repeat(3, 4)  # (6,4)
@@ -68,7 +68,7 @@ fn test_repeat_with_broadcast_like_extension() raises:
     assert_true(x.grad().all_close(Tensor.d2([[12.0], [12.0]])))
 
 
-fn test_repeat_in_computational_graph() raises:
+def test_repeat_in_computational_graph() raises:
     print("test_repeat_in_computational_graph")
     var a = Tensor.d1([1.0, 2.0], requires_grad=True)
     var b = Tensor.d1([3.0, 4.0], requires_grad=True)
@@ -83,7 +83,7 @@ fn test_repeat_in_computational_graph() raises:
     assert_true(b.grad().all_close(Tensor.d1([4.0, 8.0])))  # 4*1, 4*2
 
 
-fn test_repeat_scalar_to_1d() raises:
+def test_repeat_scalar_to_1d() raises:
     print("test_repeat_scalar_to_1d")
     var x = Tensor.scalar(2.0, requires_grad=True)
     var y = x.repeat(5)
@@ -95,7 +95,7 @@ fn test_repeat_scalar_to_1d() raises:
     assert_true(x.grad().item() == 5.0)
 
 
-fn test_repeat_scalar_to_2d() raises:
+def test_repeat_scalar_to_2d() raises:
     print("test_repeat_scalar_to_2d")
     var x = Tensor.scalar(3.0, requires_grad=True)
     var y = x.repeat(2, 3)
@@ -107,7 +107,7 @@ fn test_repeat_scalar_to_2d() raises:
     assert_true(x.grad().item() == 6.0)
 
 
-fn test_repeat_scalar_to_3d() raises:
+def test_repeat_scalar_to_3d() raises:
     print("test_repeat_scalar_to_3d")
     var x = Tensor.scalar(4.0, requires_grad=True)
     var y = x.repeat(2, 3, 1)  # Note: must have at least 1 dimension for scalar
@@ -118,7 +118,7 @@ fn test_repeat_scalar_to_3d() raises:
     assert_true(x.grad().item() == 6.0)
 
 
-fn test_repeat_1d_to_longer_1d() raises:
+def test_repeat_1d_to_longer_1d() raises:
     print("test_repeat_1d_to_longer_1d")
     var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var y = x.repeat(4)
@@ -133,7 +133,7 @@ fn test_repeat_1d_to_longer_1d() raises:
     assert_true(x.grad().all_close(Tensor.d1([4.0, 4.0, 4.0])))
 
 
-fn test_repeat_1d_to_2d() raises:
+def test_repeat_1d_to_2d() raises:
     print("test_repeat_1d_to_2d")
     var x = Tensor.d1([1.0, 2.0], requires_grad=True)
     var y = x.repeat(
@@ -150,7 +150,7 @@ fn test_repeat_1d_to_2d() raises:
     assert_true(x.grad().all_close(Tensor.d1([6.0, 6.0])))
 
 
-fn test_repeat_1d_to_3d() raises:
+def test_repeat_1d_to_3d() raises:
     print("test_repeat_1d_to_3d")
     var x = Tensor.d1([1.0, 2.0], requires_grad=True)
     var y = x.repeat(
@@ -163,7 +163,7 @@ fn test_repeat_1d_to_3d() raises:
     assert_true(x.grad().all_close(Tensor.d1([6.0, 6.0])))
 
 
-fn test_repeat_2d_same_rank() raises:
+def test_repeat_2d_same_rank() raises:
     print("test_repeat_2d_same_rank")
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var y = x.repeat(2, 3)
@@ -183,7 +183,7 @@ fn test_repeat_2d_same_rank() raises:
     assert_true(x.grad().all_close(Tensor.d2([[6.0, 6.0], [6.0, 6.0]])))
 
 
-fn test_repeat_2d_to_3d() raises:
+def test_repeat_2d_to_3d() raises:
     print("test_repeat_2d_to_3d")
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var y = x.repeat(2, 1, 1)  # Add batch dimension
@@ -194,7 +194,7 @@ fn test_repeat_2d_to_3d() raises:
     assert_true(x.grad().all_close(Tensor.d2([[2.0, 2.0], [2.0, 2.0]])))
 
 
-fn test_repeat_3d_same_rank() raises:
+def test_repeat_3d_same_rank() raises:
     print("test_repeat_3d_same_rank")
     var x = Tensor.d3([[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True)
     var y = x.repeat(2, 1, 1)
@@ -205,7 +205,7 @@ fn test_repeat_3d_same_rank() raises:
     assert_true(x.grad().all_close(Tensor.d3([[[2.0, 2.0], [2.0, 2.0]]])))
 
 
-fn test_repeat_3d_all_dims() raises:
+def test_repeat_3d_all_dims() raises:
     print("test_repeat_3d_all_dims")
     var x = Tensor.d3([[[1.0], [2.0]]], requires_grad=True)
     var y = x.repeat(2, 3, 4)
@@ -216,7 +216,7 @@ fn test_repeat_3d_all_dims() raises:
     assert_true(x.grad().all_close(Tensor.d3([[[24.0], [24.0]]])))
 
 
-fn test_repeat_identity_operation() raises:
+def test_repeat_identity_operation() raises:
     print("test_repeat_identity_operation")
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var y = x.repeat(1, 1)  # Repeat once along each dimension = no change
@@ -228,7 +228,7 @@ fn test_repeat_identity_operation() raises:
     assert_true(x.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
 
 
-fn test_repeat_complex_pattern() raises:
+def test_repeat_complex_pattern() raises:
     print("test_repeat_complex_pattern")
     var x = Tensor.d2([[1.0, 2.0]], requires_grad=True)
     var y = x.repeat(3, 2, 1)  # Shape: (1, 2) → (3, 2, 2)
@@ -239,7 +239,7 @@ fn test_repeat_complex_pattern() raises:
     assert_true(x.grad().all_close(Tensor.d2([[6.0, 6.0]])))
 
 
-fn test_repeat_gradient_accumulation() raises:
+def test_repeat_gradient_accumulation() raises:
     print("test_repeat_gradient_accumulation")
     var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var y1 = x.repeat(2)
@@ -251,7 +251,7 @@ fn test_repeat_gradient_accumulation() raises:
     assert_true(x.grad().all_close(Tensor.d1([5.0, 5.0, 5.0])))
 
 
-fn test_repeat_in_computational_graph_1() raises:
+def test_repeat_in_computational_graph_1() raises:
     print("test_repeat_in_computational_graph")
     var a = Tensor.d1([1.0, 2.0], requires_grad=True)
     var b = Tensor.d1([3.0, 4.0], requires_grad=True)
@@ -266,7 +266,7 @@ fn test_repeat_in_computational_graph_1() raises:
     assert_true(b.grad().all_close(Tensor.d1([4.0, 8.0])))  # 4*1, 4*2
 
 
-fn test_repeat_strict_validation() raises:
+def test_repeat_strict_validation() raises:
     print("test_repeat_strict_validation")
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
 
@@ -282,7 +282,7 @@ fn test_repeat_strict_validation() raises:
 
 
 # Consolidated test function
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

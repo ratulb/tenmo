@@ -4,7 +4,7 @@ from tenmo.common_utils import now
 from std.testing import assert_true, TestSuite
 
 
-fn accuracy[
+def accuracy[
     dtype: DType = DType.float32,
     threshold: Scalar[dtype] = Scalar[dtype](0.5),
 ](pred: Tensor[dtype], target: Tensor[dtype]) -> Tuple[Int, Int]:
@@ -15,13 +15,13 @@ fn accuracy[
     return correct, batch_size
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
 
 
-fn test_accuracy_perfect_predictions() raises:
+def test_accuracy_perfect_predictions() raises:
     """Test accuracy with perfect predictions."""
     print("test_accuracy_perfect_predictions")
     comptime dtype = DType.float32
@@ -34,7 +34,7 @@ fn test_accuracy_perfect_predictions() raises:
     assert_true(total == 4)
 
 
-fn test_accuracy_all_wrong_predictions() raises:
+def test_accuracy_all_wrong_predictions() raises:
     """Test accuracy with all wrong predictions."""
     print("test_accuracy_all_wrong_predictions")
     comptime dtype = DType.float32
@@ -47,7 +47,7 @@ fn test_accuracy_all_wrong_predictions() raises:
     assert_true(total == 4)
 
 
-fn test_accuracy_mixed_predictions() raises:
+def test_accuracy_mixed_predictions() raises:
     """Test accuracy with some correct and some wrong."""
     print("test_accuracy_mixed_predictions")
     comptime dtype = DType.float32
@@ -60,7 +60,7 @@ fn test_accuracy_mixed_predictions() raises:
     assert_true(total == 4)
 
 
-fn test_accuracy_threshold_boundary() raises:
+def test_accuracy_threshold_boundary() raises:
     """Test accuracy at threshold boundary (0.5)."""
     print("test_accuracy_threshold_boundary")
     comptime dtype = DType.float32
@@ -76,7 +76,7 @@ fn test_accuracy_threshold_boundary() raises:
     assert_true(total == 3)
 
 
-fn test_accuracy_custom_threshold() raises:
+def test_accuracy_custom_threshold() raises:
     """Test accuracy with custom threshold."""
     print("test_accuracy_custom_threshold")
     comptime dtype = DType.float32
@@ -94,7 +94,7 @@ fn test_accuracy_custom_threshold() raises:
     assert_true(total == 4)
 
 
-fn test_accuracy_single_sample() raises:
+def test_accuracy_single_sample() raises:
     """Test accuracy with single sample."""
     print("test_accuracy_single_sample")
     comptime dtype = DType.float32
@@ -107,7 +107,7 @@ fn test_accuracy_single_sample() raises:
     assert_true(total == 1)
 
 
-fn test_accuracy_large_batch() raises:
+def test_accuracy_large_batch() raises:
     """Test accuracy with larger batch."""
     print("test_accuracy_large_batch")
     comptime dtype = DType.float32
@@ -133,7 +133,7 @@ fn test_accuracy_large_batch() raises:
     assert_true(total == 100)
 
 
-fn test_accuracy_float64() raises:
+def test_accuracy_float64() raises:
     """Test accuracy with float64 dtype."""
     print("test_accuracy_float64")
     comptime dtype = DType.float64
@@ -146,7 +146,7 @@ fn test_accuracy_float64() raises:
     assert_true(total == 3)
 
 
-fn run_all_accuracy_tests() raises:
+def run_all_accuracy_tests() raises:
     """Run all accuracy tests."""
     print("\n=== Running Accuracy Test Suite ===\n")
     start = now()

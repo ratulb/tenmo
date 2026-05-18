@@ -3,13 +3,13 @@ from tenmo.shapes import Shape
 from std.testing import assert_true, TestSuite
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
 
 
-fn test_unsqueeze_scalar_to_1d() raises:
+def test_unsqueeze_scalar_to_1d() raises:
     print("test_unsqueeze_scalar_to_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(7.0, requires_grad=True)  # shape ()
@@ -20,7 +20,7 @@ fn test_unsqueeze_scalar_to_1d() raises:
     assert_true(a.grad().item() == 1.0)
 
 
-fn test_unsqueeze_1d_to_2d_front() raises:
+def test_unsqueeze_1d_to_2d_front() raises:
     print("test_unsqueeze_1d_to_2d_front")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)  # shape (3,)
@@ -32,7 +32,7 @@ fn test_unsqueeze_1d_to_2d_front() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_unsqueeze_1d_to_2d_back() raises:
+def test_unsqueeze_1d_to_2d_back() raises:
     print("test_unsqueeze_1d_to_2d_back")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)  # shape (3,)
@@ -44,7 +44,7 @@ fn test_unsqueeze_1d_to_2d_back() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_unsqueeze_2d_insert_middle_dim() raises:
+def test_unsqueeze_2d_insert_middle_dim() raises:
     print("test_unsqueeze_2d_insert_middle_dim")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -58,7 +58,7 @@ fn test_unsqueeze_2d_insert_middle_dim() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_unsqueeze_3d_insert_front_and_back() raises:
+def test_unsqueeze_3d_insert_front_and_back() raises:
     print("test_unsqueeze_3d_insert_front_and_back")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
@@ -74,7 +74,7 @@ fn test_unsqueeze_3d_insert_front_and_back() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_unsqueeze_chain_grad_flow() raises:
+def test_unsqueeze_chain_grad_flow() raises:
     print("test_unsqueeze_chain_grad_flow")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
@@ -86,7 +86,7 @@ fn test_unsqueeze_chain_grad_flow() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_unsqueeze_multiple_dims() raises:
+def test_unsqueeze_multiple_dims() raises:
     print("test_unsqueeze_multiple_dims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[5.0, 6.0]], requires_grad=True)  # shape (1,2)
@@ -99,7 +99,7 @@ fn test_unsqueeze_multiple_dims() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_unsqueeze_preserves_buffer_sharing() raises:
+def test_unsqueeze_preserves_buffer_sharing() raises:
     print("test_unsqueeze_preserves_buffer_sharing")
     _ = """var a = Tensor[dtype].d1([9.0, 8.0, 7.0], requires_grad=False)
     var u = a.unsqueeze(0)

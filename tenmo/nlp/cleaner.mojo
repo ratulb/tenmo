@@ -57,7 +57,7 @@ struct IMDBTextCleaner(RegisterPassable & ImplicitlyCopyable):
                                     create meaningless n-grams like 'a_i_s'
     """
 
-    fn clean_text(self, text: String) raises -> PythonObject:
+    def clean_text(self, text: String) raises -> PythonObject:
         """Clean ONE document and return a Python word list.
 
         This is the single source of truth for what 'clean' means.
@@ -111,7 +111,7 @@ struct IMDBTextCleaner(RegisterPassable & ImplicitlyCopyable):
         )
         return filter_fn(py_str)
 
-    fn content_words(self, words: PythonObject) raises -> PythonObject:
+    def content_words(self, words: PythonObject) raises -> PythonObject:
         """Filter stopwords from a cleaned word list for n-gram assembly.
 
         Called by SimpleTokenizer.ngramify before assembling bigrams

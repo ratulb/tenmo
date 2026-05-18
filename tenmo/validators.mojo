@@ -17,7 +17,7 @@ from .intarray import IntArray
 
 struct Validator:
     @staticmethod
-    fn validate_repeat_args(
+    def validate_repeat_args(
         original_shape: Shape,
         repeat: IntArray,
     ):
@@ -34,7 +34,7 @@ struct Validator:
                 panic("repeat expects values > 0, got ", String(repeat[i]))
 
     @staticmethod
-    fn check_permutation(permutation: List[Int], axis_length: Int):
+    def check_permutation(permutation: List[Int], axis_length: Int):
         # Must have correct length
         if len(permutation) != axis_length:
             panic(
@@ -64,7 +64,7 @@ struct Validator:
             seen.append(v)
 
     @staticmethod
-    fn validate_dtype_consistency(
+    def validate_dtype_consistency(
         dtype: DType, requires_grad: Bool, label: String
     ):
         if requires_grad:
@@ -77,7 +77,7 @@ struct Validator:
                 )
 
     @staticmethod
-    fn normalize_reduction_axes(shape: Shape, axes: IntArray) -> IntArray:
+    def normalize_reduction_axes(shape: Shape, axes: IntArray) -> IntArray:
         """Normalize reduction axes: handle empty list, negative indices, sort, and deduplicate.
         """
         var rank = shape.rank()
@@ -114,7 +114,7 @@ struct Validator:
 
     @always_inline
     @staticmethod
-    fn validate_and_normalize_axes(
+    def validate_and_normalize_axes(
         shape: Shape,
         axes: IntArray,
         ordered: Bool = True,
@@ -214,7 +214,7 @@ struct Validator:
 
     @always_inline
     @staticmethod
-    fn validate_and_construct_new_shape(
+    def validate_and_construct_new_shape(
         current_shape: Shape, newdims: IntArray
     ) -> Shape:
         """Validate if a tensor can be reshaped from current_shape to new shape.
@@ -316,7 +316,7 @@ struct Validator:
 
     @always_inline
     @staticmethod
-    fn validate_and_compute_slice_metadata(
+    def validate_and_compute_slice_metadata(
         original_shape: Shape,
         original_strides: Strides,
         axis: Int,
@@ -393,7 +393,7 @@ struct Validator:
 
     @always_inline
     @staticmethod
-    fn validate_and_compute_slice_metadata_multi(
+    def validate_and_compute_slice_metadata_multi(
         original_shape: Shape,
         original_strides: Strides,
         axes: List[Int],
@@ -492,7 +492,7 @@ struct Validator:
 
     @always_inline
     @staticmethod
-    fn validate_and_compute_view_metadata(
+    def validate_and_compute_view_metadata(
         original_shape: Shape,
         original_strides: Strides,
         # slices: VariadicListMem[Slice],
@@ -544,7 +544,7 @@ struct Validator:
 
     @always_inline
     @staticmethod
-    fn validate_and_compute_advanced_indexing_metadata(
+    def validate_and_compute_advanced_indexing_metadata(
         original_shape: Shape,
         original_strides: Strides,
         indices: VariadicList[Idx, _],
@@ -663,7 +663,7 @@ struct Validator:
 
     @always_inline
     @staticmethod
-    fn validate_view_params(
+    def validate_view_params(
         storage_size: Int,
         shape: Shape,
         strides: Strides,
@@ -732,7 +732,7 @@ struct Validator:
 
     @staticmethod
     @always_inline
-    fn is_non_overlapping(shape: Shape, strides: Strides) -> Bool:
+    def is_non_overlapping(shape: Shape, strides: Strides) -> Bool:
         """Check if view has self-overlapping positions."""
         rank = shape.rank()
         if rank == 0:
@@ -743,7 +743,7 @@ struct Validator:
             pairs.append((abs(strides[i]), i))
 
         # Sort by stride ascending
-        fn comp_fn(
+        def comp_fn(
             pair_a: Tuple[Int, Int], pair_b: Tuple[Int, Int]
         ) capturing -> Bool:
             return pair_a[0] < pair_b[0]

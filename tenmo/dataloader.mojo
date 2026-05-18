@@ -31,7 +31,7 @@ struct Batch[feature_dtype: DType, label_dtype: DType](
     var labels: Tensor[Self.label_dtype]
     var batch_size: Int
 
-    fn __init__(
+    def __init__(
         out self,
         features: Tensor[Self.feature_dtype],
         labels: Tensor[Self.label_dtype],
@@ -50,39 +50,39 @@ trait Dataset(Sized & Copyable & Movable):
     comptime _feature_dtype: DType
     comptime _label_dtype: DType
 
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         ...
 
-    fn get_features_ptr(
+    def get_features_ptr(
         ref self,
     ) -> UnsafePointer[Scalar[Self._feature_dtype], ImmutAnyOrigin]:
         """Get raw pointer to feature data."""
         ...
 
-    fn get_labels_ptr(
+    def get_labels_ptr(
         ref self,
     ) -> UnsafePointer[Scalar[Self._label_dtype], ImmutAnyOrigin]:
         """Get raw pointer to label data."""
         ...
 
-    fn get_feature_shape(self) -> Shape:
+    def get_feature_shape(self) -> Shape:
         """Get the shape of a single feature sample (excluding batch dimension).
         """
         ...
 
-    fn get_label_shape(self) -> Shape:
+    def get_label_shape(self) -> Shape:
         """Get the shape of a single label (excluding batch dimension)."""
         ...
 
-    fn get_features_per_sample(self) -> Int:
+    def get_features_per_sample(self) -> Int:
         """Total number of elements per feature sample."""
         ...
 
-    fn get_labels_per_sample(self) -> Int:
+    def get_labels_per_sample(self) -> Int:
         """Total number of elements per label."""
         ...
 
-    fn into_loader(
+    def into_loader(
         ref self, batch_size: Int, shuffle: Bool = True, drop_last: Bool = False
     ) -> DataLoader[Self, origin_of(self)]:
         ...
@@ -124,7 +124,7 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
     ]
     var _last_batch_size: Int
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.dataset = copy.dataset
         self.batch_size = copy.batch_size
         self.shuffle_data = copy.shuffle_data
@@ -140,7 +140,7 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
         self._last_batch = copy._last_batch
         self._last_batch_size = copy._last_batch_size
 
-    fn __init__(
+    def __init__(
         out self,
         dataset: Pointer[Self.DatasetSource, Self.origin],
         batch_size: Int,
@@ -236,13 +236,13 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
             self._last_batch_size = 0
             self._last_batch = None
 
-    fn __iter__(mut self) -> ref[self] Self:
+    def __iter__(mut self) -> ref[self] Self:
         self._current_idx = 0
         if self.shuffle_data:
             reshuffle(self._indices)
         return self
 
-    fn __next__(
+    def __next__(
         mut self,
     ) -> ref[self._batch, self._last_batch.value()] Batch[
         Self.DatasetSource._feature_dtype, Self.DatasetSource._label_dtype
@@ -271,7 +271,7 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
             self._current_idx = end_idx
             return current_batch
 
-    fn _fill_batch(
+    def _fill_batch(
         self,
         batch: Batch[
             Self.DatasetSource._feature_dtype, Self.DatasetSource._label_dtype
@@ -344,16 +344,16 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
                     count=self._labels_per_sample,
                 )
 
-    fn __has_next__(self) -> Bool:
+    def __has_next__(self) -> Bool:
         if self.drop_last:
             return (self._current_idx + self.batch_size) <= len(self._indices)
         else:
             return self._current_idx < len(self._indices)
 
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         return self._num_batches
 
-    fn reset(mut self):
+    def reset(mut self):
         """Reset for new epoch."""
         self._current_idx = 0
         if self.shuffle_data:
@@ -386,7 +386,7 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
     var _features_per_sample: Int
     var _labels_per_sample: Int
 
-    fn __init__(
+    def __init__(
         out self,
         features_numpy: PythonObject,
         labels_numpy: PythonObject,
@@ -401,7 +401,7 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
         )
         self = Self(features, labels)
 
-    fn __init__(
+    def __init__(
         out self,
         features: Tensor[Self.feature_dtype],
         labels: Tensor[Self.label_dtype],
@@ -442,32 +442,32 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
         for i in range(self._label_shape.rank()):
             self._labels_per_sample *= self._label_shape[i]
 
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         return self._size
 
-    fn get_features_ptr(
+    def get_features_ptr(
         ref self,
     ) -> UnsafePointer[Scalar[Self.feature_dtype], ImmutAnyOrigin]:
         return self._features.data_ptr().as_immutable()
 
-    fn get_labels_ptr(
+    def get_labels_ptr(
         ref self,
     ) -> UnsafePointer[Scalar[Self.label_dtype], ImmutAnyOrigin]:
         return self._labels.data_ptr().as_immutable()
 
-    fn get_feature_shape(self) -> Shape:
+    def get_feature_shape(self) -> Shape:
         return self._feature_shape
 
-    fn get_label_shape(self) -> Shape:
+    def get_label_shape(self) -> Shape:
         return self._label_shape
 
-    fn get_features_per_sample(self) -> Int:
+    def get_features_per_sample(self) -> Int:
         return self._features_per_sample
 
-    fn get_labels_per_sample(self) -> Int:
+    def get_labels_per_sample(self) -> Int:
         return self._labels_per_sample
 
-    fn __getitem__(
+    def __getitem__(
         self, idx: Int
     ) -> Tuple[Tensor[Self.feature_dtype], Tensor[Self.label_dtype]]:
         """Get single sample - not used by DataLoader."""
@@ -510,7 +510,7 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
 
         return (sample_feature^, sample_label^)
 
-    fn into_loader(
+    def into_loader(
         ref self, batch_size: Int, shuffle: Bool = True, drop_last: Bool = False
     ) -> DataLoader[Self, origin_of(self)]:
         return DataLoader(Pointer(to=self), batch_size, shuffle, drop_last)
@@ -544,7 +544,7 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
     var _label_dim: Int  # For 2D data: equals _labels_per_sample
     var _labels_scalar: Bool
 
-    fn __init__(
+    def __init__(
         out self,
         features: Tensor[Self.feature_dtype],
         labels: Tensor[Self.label_dtype],
@@ -592,52 +592,52 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
         )
         self._labels_scalar = labels_shape.rank() == 1
 
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         return self._size
 
-    fn get_features_ptr(
+    def get_features_ptr(
         ref self,
     ) -> UnsafePointer[Scalar[Self.feature_dtype], ImmutAnyOrigin]:
         return self._features.data_ptr().as_immutable()
 
-    fn get_labels_ptr(
+    def get_labels_ptr(
         ref self,
     ) -> UnsafePointer[Scalar[Self.label_dtype], ImmutAnyOrigin]:
         return self._labels.data_ptr().as_immutable()
 
     # New API methods (required by updated Dataset trait)
-    fn get_feature_shape(self) -> Shape:
+    def get_feature_shape(self) -> Shape:
         """Get the shape of a single feature sample (excluding batch dimension).
         """
         return self._feature_shape
 
-    fn get_label_shape(self) -> Shape:
+    def get_label_shape(self) -> Shape:
         """Get the shape of a single label (excluding batch dimension)."""
         return self._label_shape
 
-    fn get_features_per_sample(self) -> Int:
+    def get_features_per_sample(self) -> Int:
         """Total number of elements per feature sample."""
         return self._features_per_sample
 
-    fn get_labels_per_sample(self) -> Int:
+    def get_labels_per_sample(self) -> Int:
         """Total number of elements per label."""
         return self._labels_per_sample
 
     # Legacy API methods (for backward compatibility)
-    fn get_feature_dim(self) -> Int:
+    def get_feature_dim(self) -> Int:
         """Legacy: Returns total feature elements (same as get_features_per_sample).
         """
         return self._feature_dim
 
-    fn get_label_dim(self) -> Int:
+    def get_label_dim(self) -> Int:
         """Legacy: Returns total label elements."""
         return self._label_dim
 
-    fn is_labels_scalar(self) -> Bool:
+    def is_labels_scalar(self) -> Bool:
         """Legacy: True if labels are scalar (rank 1)."""
         return self._labels_scalar
 
-    fn __getitem__(
+    def __getitem__(
         self, idx: Int
     ) -> Tuple[Tensor[Self.feature_dtype], Tensor[Self.label_dtype]]:
         """Get single sample - preserves original shape."""
@@ -681,7 +681,7 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
 
         return (sample_feature^, sample_label^)
 
-    fn into_loader(
+    def into_loader(
         ref self, batch_size: Int, shuffle: Bool = True, drop_last: Bool = False
     ) -> DataLoader[Self, origin_of(self)]:
         return DataLoader(Pointer(to=self), batch_size, shuffle, drop_last)

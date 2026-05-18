@@ -9,12 +9,12 @@ from std.python import Python, PythonObject
 
 comptime dtype = DType.float32
 
-fn assert_true_1(condition: Bool, msg: String = "Assertion failed") raises:
+def assert_true_1(condition: Bool, msg: String = "Assertion failed") raises:
     if not condition:
         raise Error(msg)
 
 
-fn assert_tensors_equal[
+def assert_tensors_equal[
     dtype: DType
 ](t1: Tensor[dtype], t2: Tensor[dtype]) raises:
     if t1.shape() != t2.shape():
@@ -29,7 +29,7 @@ fn assert_tensors_equal[
 # ============================================================================
 
 
-fn test_tensor_dataset_basic_creation() raises:
+def test_tensor_dataset_basic_creation() raises:
     print("test_tensor_dataset_basic_creation")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6]])
@@ -45,7 +45,7 @@ fn test_tensor_dataset_basic_creation() raises:
     print("Passed")
 
 
-fn test_tensor_dataset_2d_labels() raises:
+def test_tensor_dataset_2d_labels() raises:
     print("test_tensor_dataset_2d_labels")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
@@ -61,7 +61,7 @@ fn test_tensor_dataset_2d_labels() raises:
     print("Passed")
 
 
-fn test_tensor_dataset_getitem_1d_labels() raises:
+def test_tensor_dataset_getitem_1d_labels() raises:
     print("test_tensor_dataset_getitem_1d_labels")
 
     comptime dtype = DType.float32
@@ -78,7 +78,7 @@ fn test_tensor_dataset_getitem_1d_labels() raises:
     print("Passed")
 
 
-fn test_tensor_dataset_getitem_2d_labels() raises:
+def test_tensor_dataset_getitem_2d_labels() raises:
     print("test_tensor_dataset_getitem_2d_labels")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
@@ -94,7 +94,7 @@ fn test_tensor_dataset_getitem_2d_labels() raises:
     print("Passed")
 
 
-fn test_tensor_dataset_getitem_all_indices() raises:
+def test_tensor_dataset_getitem_all_indices() raises:
     print("test_tensor_dataset_getitem_all_indices")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6], [7, 8]])
@@ -127,7 +127,7 @@ fn test_tensor_dataset_getitem_all_indices() raises:
 # ============================================================================
 
 
-fn test_batch_creation() raises:
+def test_batch_creation() raises:
     print("test_batch_creation")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
@@ -143,7 +143,7 @@ fn test_batch_creation() raises:
     print("Passed")
 
 
-fn test_batch_single_sample() raises:
+def test_batch_single_sample() raises:
     print("test_batch_single_sample")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2]])
@@ -160,7 +160,7 @@ fn test_batch_single_sample() raises:
 # ============================================================================
 
 
-fn test_dataloader_basic_iteration() raises:
+def test_dataloader_basic_iteration() raises:
     print("test_dataloader_basic_iteration")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6], [7, 8]])
@@ -180,7 +180,7 @@ fn test_dataloader_basic_iteration() raises:
     print("Passed")
 
 
-fn test_dataloader_batch_size_one() raises:
+def test_dataloader_batch_size_one() raises:
     print("test_dataloader_batch_size_one")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6]])
@@ -200,7 +200,7 @@ fn test_dataloader_batch_size_one() raises:
     print("Passed")
 
 
-fn test_dataloader_partial_last_batch() raises:
+def test_dataloader_partial_last_batch() raises:
     print("test_dataloader_partial_last_batch")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]])
@@ -227,7 +227,7 @@ fn test_dataloader_partial_last_batch() raises:
     print("Passed")
 
 
-fn test_dataloader_drop_last_true() raises:
+def test_dataloader_drop_last_true() raises:
     print("test_dataloader_drop_last_true")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]])
@@ -249,7 +249,7 @@ fn test_dataloader_drop_last_true() raises:
     print("Passed")
 
 
-fn test_dataloader_exact_division() raises:
+def test_dataloader_exact_division() raises:
     print("test_dataloader_exact_division")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6], [7, 8]])
@@ -267,7 +267,7 @@ fn test_dataloader_exact_division() raises:
     print("Passed")
 
 
-fn test_dataloader_content_correctness() raises:
+def test_dataloader_content_correctness() raises:
     print("test_dataloader_content_correctness")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6]])
@@ -304,7 +304,7 @@ fn test_dataloader_content_correctness() raises:
     print("Passed")
 
 
-fn test_dataloader_2d_labels() raises:
+def test_dataloader_2d_labels() raises:
     print("test_dataloader_2d_labels")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4]])
@@ -324,7 +324,7 @@ fn test_dataloader_2d_labels() raises:
     print("Passed")
 
 
-fn test_dataloader_large_batch_size() raises:
+def test_dataloader_large_batch_size() raises:
     print("test_dataloader_large_batch_size")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6]])
@@ -345,7 +345,7 @@ fn test_dataloader_large_batch_size() raises:
     print("Passed")
 
 
-fn test_dataloader_multiple_epochs() raises:
+def test_dataloader_multiple_epochs() raises:
     print("test_dataloader_multiple_epochs")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4]])
@@ -369,7 +369,7 @@ fn test_dataloader_multiple_epochs() raises:
     print("Passed")
 
 
-fn test_dataloader_reshuffle_changes_order() raises:
+def test_dataloader_reshuffle_changes_order() raises:
     print("test_dataloader_reshuffle_changes_order")
     comptime dtype = DType.float32
     # Use a medium-sized dataset to test shuffle
@@ -393,7 +393,7 @@ fn test_dataloader_reshuffle_changes_order() raises:
     print("Passed (shuffle functionality verified)")
 
 
-fn test_dataloader_reshuffle_changes_order_orig() raises:
+def test_dataloader_reshuffle_changes_order_orig() raises:
     print("test_dataloader_reshuffle_changes_order")
     comptime dtype = DType.float32
     # Use a larger dataset to make shuffle more apparent
@@ -427,7 +427,7 @@ fn test_dataloader_reshuffle_changes_order_orig() raises:
     print("Passed (shuffle functionality verified)")
 
 
-fn test_dataloader_single_sample_dataset() raises:
+def test_dataloader_single_sample_dataset() raises:
     print("test_dataloader_single_sample_dataset")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2, 3]])
@@ -447,7 +447,7 @@ fn test_dataloader_single_sample_dataset() raises:
     print("Passed")
 
 
-fn test_dataloader_high_dimensional_features() raises:
+def test_dataloader_high_dimensional_features() raises:
     print("test_dataloader_high_dimensional_features")
     comptime dtype = DType.float32
     var features = Tensor[dtype].d2(
@@ -473,7 +473,7 @@ fn test_dataloader_high_dimensional_features() raises:
     print("Passed")
 
 
-fn test_dataloader_shuffle_quality() raises:
+def test_dataloader_shuffle_quality() raises:
     print("test_dataloader_shuffle_quality")
     comptime dtype = DType.float32
     # Create a dataset with ordered indices
@@ -528,7 +528,7 @@ fn test_dataloader_shuffle_quality() raises:
 # ============================================================================
 
 
-fn main() raises:
+def main() raises:
     _ = """
     # test_multi_epoch_no_memory_growth() #TBE
     # test_shuffle_uses_two_buffers()#TBE
@@ -588,7 +588,7 @@ fn main() raises:
 # ============================================================================
 
 
-fn test_dataset_basic_creation_dl() raises:
+def test_dataset_basic_creation_dl() raises:
     """Test basic dataset creation and indexing."""
     print("test_dataset_basic_creation_dl")
     var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
@@ -598,7 +598,7 @@ fn test_dataset_basic_creation_dl() raises:
     assert_true(len(dataset) == 3)
 
 
-fn test_dataset_getitem_single_sample_dl() raises:
+def test_dataset_getitem_single_sample_dl() raises:
     """Test retrieving single samples."""
     print("test_dataset_getitem_single_sample_dl")
     var features = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).float()
@@ -621,7 +621,7 @@ fn test_dataset_getitem_single_sample_dl() raises:
     assert_true(label1.all_close(expected_label1))
 
 
-fn test_dataset_1d_labels_dl() raises:
+def test_dataset_1d_labels_dl() raises:
     """Test dataset with 1D label vector."""
     print("test_dataset_1d_labels_dl")
     var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
@@ -636,7 +636,7 @@ fn test_dataset_1d_labels_dl() raises:
     assert_true(label.all_close(expected_label))
 
 
-fn test_dataset_multi_dimensional_labels_dl() raises:
+def test_dataset_multi_dimensional_labels_dl() raises:
     """Test dataset with multi-dimensional labels."""
     print("test_dataset_multi_dimensional_labels_dl")
     var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
@@ -651,7 +651,7 @@ fn test_dataset_multi_dimensional_labels_dl() raises:
     assert_true(label.all_close(expected_label))
 
 
-fn test_dataset_features_labels_accessors_dl() raises:
+def test_dataset_features_labels_accessors_dl() raises:
     """Test features() and labels() accessors."""
     print("test_dataset_features_labels_accessors_dl")
     var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
@@ -668,7 +668,7 @@ fn test_dataset_features_labels_accessors_dl() raises:
 # ============================================================================
 
 
-fn test_batch_creation_dl() raises:
+def test_batch_creation_dl() raises:
     """Test batch container creation."""
     print("test_batch_creation_dl")
     var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
@@ -685,7 +685,7 @@ fn test_batch_creation_dl() raises:
 # ============================================================================
 
 
-fn test_dataloader_batch_size_exact_dl() raises:
+def test_dataloader_batch_size_exact_dl() raises:
     """Test dataloader with exact batch division."""
     print("test_dataloader_batch_size_exact_dl")
     var features = Tensor.d2(
@@ -708,7 +708,7 @@ fn test_dataloader_batch_size_exact_dl() raises:
     assert_true(batch_count == 2)
 
 
-fn test_dataloader_batch_size_with_remainder_dl() raises:
+def test_dataloader_batch_size_with_remainder_dl() raises:
     """Test dataloader with incomplete last batch."""
     print("test_dataloader_batch_size_with_remainder_dl")
     var features = Tensor.d2(
@@ -733,7 +733,7 @@ fn test_dataloader_batch_size_with_remainder_dl() raises:
     assert_true(last_batch_size == 1)  # Last batch has 1 sample
 
 
-fn test_dataloader_drop_last_true_dl() raises:
+def test_dataloader_drop_last_true_dl() raises:
     """Test dataloader with drop_last=True."""
     print("test_dataloader_drop_last_true_dl")
     var features = Tensor.d2(
@@ -756,7 +756,7 @@ fn test_dataloader_drop_last_true_dl() raises:
     assert_true(batch_count == 2)
 
 
-fn test_dataloader_single_batch_dl() raises:
+def test_dataloader_single_batch_dl() raises:
     """Test dataloader when batch_size >= dataset size."""
     print("test_dataloader_single_batch_dl")
     var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
@@ -777,7 +777,7 @@ fn test_dataloader_single_batch_dl() raises:
     assert_true(batch_count == 1)
 
 
-fn test_dataloader_batch_size_one_dl() raises:
+def test_dataloader_batch_size_one_dl() raises:
     """Test dataloader with batch_size=1."""
     print("test_dataloader_batch_size_one_dl")
     var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
@@ -803,7 +803,7 @@ fn test_dataloader_batch_size_one_dl() raises:
 # ============================================================================
 
 
-fn test_dataloader_data_correctness_no_shuffle_dl() raises:
+def test_dataloader_data_correctness_no_shuffle_dl() raises:
     """Test that batches contain correct data without shuffling."""
     print("test_dataloader_data_correctness_no_shuffle_dl")
     var features = Tensor.d2(
@@ -832,7 +832,7 @@ fn test_dataloader_data_correctness_no_shuffle_dl() raises:
     assert_true(batch2.labels.all_close(expected_label2))
 
 
-fn test_dataloader_multi_dimensional_features_dl() raises:
+def test_dataloader_multi_dimensional_features_dl() raises:
     """Test dataloader with higher dimensional features."""
     print("test_dataloader_multi_dimensional_features_dl")
     var features = Tensor.d2(
@@ -853,7 +853,7 @@ fn test_dataloader_multi_dimensional_features_dl() raises:
     assert_true(batch.features.shape()[1] == 4)  # feature_dim
 
 
-fn test_dataloader_multi_dimensional_labels_dl() raises:
+def test_dataloader_multi_dimensional_labels_dl() raises:
     """Test dataloader with multi-dimensional labels."""
     print("test_dataloader_multi_dimensional_labels_dl")
     var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
@@ -882,7 +882,7 @@ fn test_dataloader_multi_dimensional_labels_dl() raises:
 # ============================================================================
 
 
-fn test_dataloader_shuffle_changes_order_dl_orig() raises:
+def test_dataloader_shuffle_changes_order_dl_orig() raises:
     """Test that shuffle actually changes the order (probabilistic test)."""
     print("test_dataloader_shuffle_changes_order_dl")
     var features = Tensor[dtype].d2(
@@ -904,7 +904,7 @@ fn test_dataloader_shuffle_changes_order_dl_orig() raises:
     assert_true(sum_features.all_close(expected_sum))
 
 
-fn test_dataloader_shuffle_changes_order_dl() raises:
+def test_dataloader_shuffle_changes_order_dl() raises:
     """Test that shuffle actually changes the order (probabilistic test)."""
     print("test_dataloader_shuffle_changes_order_dl")
     var features = Tensor.d2(
@@ -927,7 +927,7 @@ fn test_dataloader_shuffle_changes_order_dl() raises:
     assert_true((sum_features.item() - expected_sum).__abs__() < 1e-5)
 
 
-fn test_dataloader_shuffle_preserves_all_data_dl() raises:
+def test_dataloader_shuffle_preserves_all_data_dl() raises:
     """Test that shuffle doesn't lose or duplicate data."""
     print("test_dataloader_shuffle_preserves_all_data_dl")
     var features = Tensor.d2(
@@ -969,7 +969,7 @@ fn test_dataloader_shuffle_preserves_all_data_dl() raises:
 # ============================================================================
 
 
-fn test_dataloader_multiple_epochs_dl() raises:
+def test_dataloader_multiple_epochs_dl() raises:
     """Test iterating through dataloader multiple times."""
     print("test_dataloader_multiple_epochs_dl")
     var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
@@ -993,7 +993,7 @@ fn test_dataloader_multiple_epochs_dl() raises:
     assert_true(epoch2_count == 2)
 
 
-fn test_dataloader_reshuffle_between_epochs_dl() raises:
+def test_dataloader_reshuffle_between_epochs_dl() raises:
     """Test that reshuffle=True reshuffles each epoch."""
     print("test_dataloader_reshuffle_between_epochs_dl")
     var features = Tensor.d2(
@@ -1025,7 +1025,7 @@ fn test_dataloader_reshuffle_between_epochs_dl() raises:
 # ============================================================================
 
 
-fn test_dataloader_empty_iteration_drop_last_dl() raises:
+def test_dataloader_empty_iteration_drop_last_dl() raises:
     """Test dataloader when drop_last=True eliminates all batches."""
     print("test_dataloader_empty_iteration_drop_last_dl")
     var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
@@ -1045,7 +1045,7 @@ fn test_dataloader_empty_iteration_drop_last_dl() raises:
     assert_true(batch_count == 0)
 
 
-fn test_dataloader_large_batch_size_dl() raises:
+def test_dataloader_large_batch_size_dl() raises:
     """Test dataloader with batch_size much larger than dataset."""
     print("test_dataloader_large_batch_size_dl")
     var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
@@ -1067,7 +1067,7 @@ fn test_dataloader_large_batch_size_dl() raises:
 # ============================================================================
 
 
-fn run_all_dataloader_tests() raises:
+def run_all_dataloader_tests() raises:
     """Run all dataloader tests."""
     print("\n=== Running DataLoader Test Suite ===\n")
 
@@ -1111,7 +1111,7 @@ fn run_all_dataloader_tests() raises:
 # ========== ZERO-COPY ARCHITECTURE TESTS (CORRECTED) ==========
 
 
-fn test_iterator_copy_is_lightweight() raises:
+def test_iterator_copy_is_lightweight() raises:
     """Verify __iter__ doesn't copy dataset, only metadata."""
     print("test_iterator_copy_is_lightweight")
 
@@ -1145,7 +1145,7 @@ fn test_iterator_copy_is_lightweight() raises:
     print("  Iterator copy is lightweight (<1ms)")
 
 
-fn test_batch_buffers_reused_not_reallocated() raises:
+def test_batch_buffers_reused_not_reallocated() raises:
     """Verify batch buffers are pre-allocated and reused."""
     print("test_batch_buffers_reused_not_reallocated")
 
@@ -1188,7 +1188,7 @@ fn test_batch_buffers_reused_not_reallocated() raises:
     print("  Batch buffers reused (", num_unique_ptrs, "unique buffers)")
 
 
-fn test_no_allocation_during_iteration() raises:
+def test_no_allocation_during_iteration() raises:
     """Verify no memory allocation happens during batch iteration."""
     print("test_no_allocation_during_iteration")
 
@@ -1226,7 +1226,7 @@ fn test_no_allocation_during_iteration() raises:
     print("  No allocation overhead detected")
 
 
-fn test_shuffle_preserves_data_location() raises:
+def test_shuffle_preserves_data_location() raises:
     """Verify shuffle only reorders access, doesn't move data."""
     print("test_shuffle_preserves_data_location")
 
@@ -1262,7 +1262,7 @@ fn test_shuffle_preserves_data_location() raises:
     print("  Data stays in place during shuffle")
 
 
-fn test_memory_overhead_is_minimal() raises:
+def test_memory_overhead_is_minimal() raises:
     """Calculate and verify DataLoader memory overhead."""
     print("test_memory_overhead_is_minimal")
 
@@ -1315,7 +1315,7 @@ fn test_memory_overhead_is_minimal() raises:
     print("  Memory overhead minimal (", overhead_percentage, "%)")
 
 
-fn test_multi_epoch_no_memory_growth() raises:
+def test_multi_epoch_no_memory_growth() raises:
     """Verify memory doesn't grow across epochs."""
     print("test_multi_epoch_no_memory_growth")
 
@@ -1366,7 +1366,7 @@ fn test_multi_epoch_no_memory_growth() raises:
     )
 
 
-fn test_performance_overhead_is_negligible() raises:
+def test_performance_overhead_is_negligible() raises:
     """Measure DataLoader overhead vs raw data access."""
     print("test_performance_overhead_is_negligible")
 
@@ -1412,7 +1412,7 @@ fn test_performance_overhead_is_negligible() raises:
     print("  DataLoader overhead acceptable (<30%)")
 
 
-fn test_dataloader_pointer_semantics() raises:
+def test_dataloader_pointer_semantics() raises:
     """Test that DataLoader properly uses pointer (not copy) to dataset."""
     print("test_dataloader_pointer_semantics")
 
@@ -1447,7 +1447,7 @@ fn test_dataloader_pointer_semantics() raises:
     print("  Loader uses pointer semantics (<10ms creation)")
 
 
-fn test_comparing_copy_vs_reference_semantics() raises:
+def test_comparing_copy_vs_reference_semantics() raises:
     """Demonstrate the difference between copy and reference."""
     print("test_comparing_copy_vs_reference_semantics")
 
@@ -1483,7 +1483,7 @@ fn test_comparing_copy_vs_reference_semantics() raises:
     print("  Pointer-based design is", copy_time / loader_time, "x faster")
 
 
-fn test_shuffle_uses_two_buffers() raises:
+def test_shuffle_uses_two_buffers() raises:
     """Verify that shuffle correctly alternates between _batch and _last_batch.
     """
     print("test_shuffle_uses_two_buffers")
@@ -1531,7 +1531,7 @@ fn test_shuffle_uses_two_buffers() raises:
     print("  Correctly uses 2 pre-allocated buffers (full + remainder)")
 
 
-fn test_no_memory_growth_with_shuffle() raises:
+def test_no_memory_growth_with_shuffle() raises:
     """Verify no memory growth with shuffle (accepts two stable buffers)."""
     print("test_no_memory_growth_with_shuffle")
 
@@ -1599,7 +1599,7 @@ fn test_no_memory_growth_with_shuffle() raises:
 # ==============================================================================
 
 
-fn run_zero_copy_tests() raises:
+def run_zero_copy_tests() raises:
     """Run all zero-copy architecture validation tests."""
     print("\n" + "=" * 70)
     print("ZERO-COPY ARCHITECTURE VALIDATION TESTS")
@@ -1640,7 +1640,7 @@ fn run_zero_copy_tests() raises:
 # ==============================================================================
 
 
-fn test_basic_iteration_no_shuffle() raises:
+def test_basic_iteration_no_shuffle() raises:
     """Test basic iteration without shuffling."""
     print("test_basic_iteration_no_shuffle")
 
@@ -1683,7 +1683,7 @@ fn test_basic_iteration_no_shuffle() raises:
     print("Passed")
 
 
-fn test_basic_iteration_with_shuffle() raises:
+def test_basic_iteration_with_shuffle() raises:
     """Test that shuffle changes order but preserves data."""
     print("test_basic_iteration_with_shuffle")
 
@@ -1722,7 +1722,7 @@ fn test_basic_iteration_with_shuffle() raises:
     print("Passed")
 
 
-fn test_drop_last_true() raises:
+def test_drop_last_true() raises:
     """Test drop_last=True drops incomplete batch."""
     print("test_drop_last_true")
 
@@ -1750,7 +1750,7 @@ fn test_drop_last_true() raises:
     print("Passed")
 
 
-fn test_drop_last_false() raises:
+def test_drop_last_false() raises:
     """Test drop_last=False keeps incomplete batch."""
     print("test_drop_last_false")
 
@@ -1783,7 +1783,7 @@ fn test_drop_last_false() raises:
     print("Passed")
 
 
-fn test_single_batch() raises:
+def test_single_batch() raises:
     """Test when batch_size >= dataset size."""
     print("test_single_batch")
 
@@ -1804,7 +1804,7 @@ fn test_single_batch() raises:
     print("Passed")
 
 
-fn test_batch_size_one() raises:
+def test_batch_size_one() raises:
     """Test batch_size=1 (edge case)."""
     print("test_batch_size_one")
 
@@ -1830,7 +1830,7 @@ fn test_batch_size_one() raises:
 # ==============================================================================
 
 
-fn test_multiple_epochs_no_shuffle() raises:
+def test_multiple_epochs_no_shuffle() raises:
     """Test iterating multiple epochs without shuffle."""
     print("test_multiple_epochs_no_shuffle")
 
@@ -1863,7 +1863,7 @@ fn test_multiple_epochs_no_shuffle() raises:
     print("Passed")
 
 
-fn test_multiple_epochs_with_shuffle() raises:
+def test_multiple_epochs_with_shuffle() raises:
     """Test that shuffle gives different order across epochs."""
     print("test_multiple_epochs_with_shuffle")
 
@@ -1919,7 +1919,7 @@ fn test_multiple_epochs_with_shuffle() raises:
 # ==============================================================================
 
 
-fn test_no_data_loss() raises:
+def test_no_data_loss() raises:
     """Verify no samples are lost during batching."""
     print("test_no_data_loss")
 
@@ -1949,7 +1949,7 @@ fn test_no_data_loss() raises:
     print("Passed")
 
 
-fn test_no_data_duplication() raises:
+def test_no_data_duplication() raises:
     """Verify no samples are duplicated."""
     print("test_no_data_duplication")
 
@@ -1979,7 +1979,7 @@ fn test_no_data_duplication() raises:
     print("Passed")
 
 
-fn test_feature_label_correspondence() raises:
+def test_feature_label_correspondence() raises:
     """Verify features and labels stay paired correctly."""
     print("test_feature_label_correspondence")
 
@@ -2012,7 +2012,7 @@ fn test_feature_label_correspondence() raises:
 # ==============================================================================
 # NUMPY DATASET TESTS
 # ==============================================================================
-fn test_numpy_dataset_integration() raises:
+def test_numpy_dataset_integration() raises:
     """Test NumpyDataset with DataLoader."""
     print("test_numpy_dataset_integration")
 
@@ -2049,7 +2049,7 @@ fn test_numpy_dataset_integration() raises:
 # ==============================================================================
 
 
-fn test_empty_last_batch_handling() raises:
+def test_empty_last_batch_handling() raises:
     """Test exact multiple of batch_size (no partial batch)."""
     print("test_empty_last_batch_handling")
 
@@ -2077,7 +2077,7 @@ fn test_empty_last_batch_handling() raises:
     print("Passed")
 
 
-fn test_large_batch_size() raises:
+def test_large_batch_size() raises:
     """Test batch_size larger than dataset."""
     print("test_large_batch_size")
 
@@ -2098,7 +2098,7 @@ fn test_large_batch_size() raises:
     print("Passed")
 
 
-fn test_stress_many_small_batches() raises:
+def test_stress_many_small_batches() raises:
     """Stress test with many small batches."""
     print("test_stress_many_small_batches")
 
@@ -2122,7 +2122,7 @@ fn test_stress_many_small_batches() raises:
     print("Passed")
 
 
-fn test_stress_large_dataset() raises:
+def test_stress_large_dataset() raises:
     """Stress test with larger dataset (simulating MNIST size)."""
     print("test_stress_large_dataset")
 
@@ -2153,7 +2153,7 @@ fn test_stress_large_dataset() raises:
 # ==============================================================================
 
 
-fn test_performance_no_shuffle() raises:
+def test_performance_no_shuffle() raises:
     """Benchmark no-shuffle performance (should use fast path)."""
     print("test_performance_no_shuffle")
 
@@ -2177,7 +2177,7 @@ fn test_performance_no_shuffle() raises:
     print("Passed")
 
 
-fn test_performance_with_shuffle() raises:
+def test_performance_with_shuffle() raises:
     """Benchmark shuffle performance (should use row-by-row memcpy)."""
     print("test_performance_with_shuffle")
 
@@ -2206,7 +2206,7 @@ fn test_performance_with_shuffle() raises:
 # ==============================================================================
 
 
-fn test_multi_dimensional_labels() raises:
+def test_multi_dimensional_labels() raises:
     """Test with non-scalar labels (multi-output)."""
     print("test_multi_dimensional_labels")
 
@@ -2229,7 +2229,7 @@ fn test_multi_dimensional_labels() raises:
     print("Passed")
 
 
-fn test_single_feature_dimension() raises:
+def test_single_feature_dimension() raises:
     """Test with 1D features (edge case)."""
     print("test_single_feature_dimension")
 
@@ -2255,7 +2255,7 @@ fn test_single_feature_dimension() raises:
 # ==============================================================================
 
 
-fn run_basic_tests() raises:
+def run_basic_tests() raises:
     """Run all basic functionality tests."""
     print("\n" + "=" * 70)
     print("RUNNING BASIC FUNCTIONALITY TESTS")
@@ -2271,7 +2271,7 @@ fn run_basic_tests() raises:
     print("\nAll basic tests passed!\n")
 
 
-fn run_multi_epoch_tests() raises:
+def run_multi_epoch_tests() raises:
     """Run all multi-epoch tests."""
     print("\n" + "=" * 70)
     print("RUNNING MULTI-EPOCH TESTS")
@@ -2283,7 +2283,7 @@ fn run_multi_epoch_tests() raises:
     print("\nAll multi-epoch tests passed!\n")
 
 
-fn run_data_integrity_tests() raises:
+def run_data_integrity_tests() raises:
     """Run all data integrity tests."""
     print("\n" + "=" * 70)
     print("RUNNING DATA INTEGRITY TESTS")
@@ -2296,7 +2296,7 @@ fn run_data_integrity_tests() raises:
     print("\nAll data integrity tests passed!\n")
 
 
-fn run_numpy_integration_tests() raises:
+def run_numpy_integration_tests() raises:
     """Run NumPy dataset integration tests."""
     print("\n" + "=" * 70)
     print("RUNNING NUMPY INTEGRATION TESTS")
@@ -2307,7 +2307,7 @@ fn run_numpy_integration_tests() raises:
     print("\nAll NumPy integration tests passed!\n")
 
 
-fn run_edge_case_tests() raises:
+def run_edge_case_tests() raises:
     """Run all edge case and stress tests."""
     print("\n" + "=" * 70)
     print("RUNNING EDGE CASE & STRESS TESTS")
@@ -2321,7 +2321,7 @@ fn run_edge_case_tests() raises:
     print("\nAll edge case tests passed!\n")
 
 
-fn run_performance_tests() raises:
+def run_performance_tests() raises:
     """Run performance regression tests."""
     print("\n" + "=" * 70)
     print("RUNNING PERFORMANCE TESTS")
@@ -2333,7 +2333,7 @@ fn run_performance_tests() raises:
     print("\nAll performance tests passed!\n")
 
 
-fn run_special_case_tests() raises:
+def run_special_case_tests() raises:
     """Run special case tests."""
     print("\n" + "=" * 70)
     print("RUNNING SPECIAL CASE TESTS")
@@ -2345,7 +2345,7 @@ fn run_special_case_tests() raises:
     print("\nAll special case tests passed!\n")
 
 
-fn run_all_dl_tests() raises:
+def run_all_dl_tests() raises:
     """Run the complete test suite."""
     print("\n" + "=" * 70)
     print("DATALOADER COMPREHENSIVE TEST SUITE")
@@ -2372,7 +2372,7 @@ fn run_all_dl_tests() raises:
 
 
 # HOW TO USE
-fn example_usage() raises:
+def example_usage() raises:
     """Example showing the fixed implementation."""
 
     # Create 4D image data (N, C, H, W)

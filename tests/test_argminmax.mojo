@@ -4,7 +4,7 @@ from tenmo.argminmax import Argmin, Argmax
 from std.sys import has_accelerator
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll argminmax tests passed!")
 
@@ -12,7 +12,7 @@ fn main() raises:
 from std.testing import assert_true, TestSuite
 
 
-fn test_tensor_argmax_keepdims() raises:
+def test_tensor_argmax_keepdims() raises:
     print("test_tensor_argmax_keepdims")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1.0, 5.0, 3.0], [7.0, 2.0, 8.0]])
@@ -30,7 +30,7 @@ fn test_tensor_argmax_keepdims() raises:
 # ==========================================================
 
 
-fn test_tensor_argmax_1d() raises:
+def test_tensor_argmax_1d() raises:
     print("test_tensor_argmax_1d")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([0.5, 2.3, 1.1, 2.3])
@@ -39,7 +39,7 @@ fn test_tensor_argmax_1d() raises:
     print("Passed 1D argmax test")
 
 
-fn test_tensor_argmax_2d_basic() raises:
+def test_tensor_argmax_2d_basic() raises:
     print("test_tensor_argmax_2d_basic")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2(
@@ -52,7 +52,7 @@ fn test_tensor_argmax_2d_basic() raises:
     print("Passed 2D argmax basic test")
 
 
-fn test_tensor_argmax_2d_keepdims() raises:
+def test_tensor_argmax_2d_keepdims() raises:
     print("test_tensor_argmax_2d_keepdims")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1.0, 5.0, 3.0], [7.0, 2.0, 8.0]])
@@ -65,7 +65,7 @@ fn test_tensor_argmax_2d_keepdims() raises:
     print("Passed argmax keepdims test")
 
 
-fn test_tensor_argmax_3d_axis_and_neg() raises:
+def test_tensor_argmax_3d_axis_and_neg() raises:
     print("test_tensor_argmax_3d_axis_and_neg")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(0, 24)
@@ -81,7 +81,7 @@ fn test_tensor_argmax_3d_axis_and_neg() raises:
     print("Passed 3D argmax positive/negative axes test")
 
 
-fn test_tensor_argmax_keepdims_true_false_3d() raises:
+def test_tensor_argmax_keepdims_true_false_3d() raises:
     print("test_tensor_argmax_keepdims_true_false_3d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(0, 24)
@@ -98,7 +98,7 @@ fn test_tensor_argmax_keepdims_true_false_3d() raises:
 # ==========================================================
 
 
-fn test_tensor_argmin_1d() raises:
+def test_tensor_argmin_1d() raises:
     print("test_tensor_argmin_1d")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([5.0, -1.0, 3.0, -1.0])
@@ -107,7 +107,7 @@ fn test_tensor_argmin_1d() raises:
     print("Passed 1D argmin test")
 
 
-fn test_tensor_argmin_2d_basic() raises:
+def test_tensor_argmin_2d_basic() raises:
     print("test_tensor_argmin_2d_basic")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2(
@@ -121,7 +121,7 @@ fn test_tensor_argmin_2d_basic() raises:
     print("Passed 2D argmin basic test")
 
 
-fn test_tensor_argmin_2d_keepdims() raises:
+def test_tensor_argmin_2d_keepdims() raises:
     print("test_tensor_argmin_2d_keepdims")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[5.0, 2.0, 3.0], [1.0, 9.0, 0.5]])
@@ -134,7 +134,7 @@ fn test_tensor_argmin_2d_keepdims() raises:
     print("Passed argmin keepdims test")
 
 
-fn test_tensor_argmin_3d_axis_and_neg() raises:
+def test_tensor_argmin_3d_axis_and_neg() raises:
     print("test_tensor_argmin_3d_axis_and_neg")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(10, 34)
@@ -150,7 +150,7 @@ fn test_tensor_argmin_3d_axis_and_neg() raises:
     print("Passed 3D argmin positive/negative axes test")
 
 
-fn test_tensor_argmin_keepdims_true_false_3d() raises:
+def test_tensor_argmin_keepdims_true_false_3d() raises:
     print("test_tensor_argmin_keepdims_true_false_3d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(10, 34)
@@ -171,7 +171,7 @@ fn test_tensor_argmin_keepdims_true_false_3d() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn test_argmin_1d_basic_cpu() raises:
+def test_argmin_1d_basic_cpu() raises:
     print("test_argmin_1d_basic_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([5.0, 2.0, 8.0, 1.0, 9.0])
@@ -181,7 +181,7 @@ fn test_argmin_1d_basic_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmax_1d_basic_cpu() raises:
+def test_argmax_1d_basic_cpu() raises:
     print("test_argmax_1d_basic_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([5.0, 2.0, 8.0, 1.0, 9.0])
@@ -191,7 +191,7 @@ fn test_argmax_1d_basic_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmin_1d_negative_values_cpu() raises:
+def test_argmin_1d_negative_values_cpu() raises:
     print("test_argmin_1d_negative_values_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([-5.0, -2.0, -8.0, -1.0, -9.0])
@@ -201,7 +201,7 @@ fn test_argmin_1d_negative_values_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmax_1d_negative_values_cpu() raises:
+def test_argmax_1d_negative_values_cpu() raises:
     print("test_argmax_1d_negative_values_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([-5.0, -2.0, -8.0, -1.0, -9.0])
@@ -211,7 +211,7 @@ fn test_argmax_1d_negative_values_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmin_1d_keepdims_cpu() raises:
+def test_argmin_1d_keepdims_cpu() raises:
     print("test_argmin_1d_keepdims_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([5.0, 2.0, 8.0, 1.0, 9.0])
@@ -226,7 +226,7 @@ fn test_argmin_1d_keepdims_cpu() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn test_argmin_2d_axis0_cpu() raises:
+def test_argmin_2d_axis0_cpu() raises:
     print("test_argmin_2d_axis0_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2(
@@ -237,7 +237,7 @@ fn test_argmin_2d_axis0_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmin_2d_axis1_cpu() raises:
+def test_argmin_2d_axis1_cpu() raises:
     print("test_argmin_2d_axis1_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2(
@@ -248,7 +248,7 @@ fn test_argmin_2d_axis1_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmax_2d_axis0_cpu() raises:
+def test_argmax_2d_axis0_cpu() raises:
     print("test_argmax_2d_axis0_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2(
@@ -259,7 +259,7 @@ fn test_argmax_2d_axis0_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmax_2d_axis1_cpu() raises:
+def test_argmax_2d_axis1_cpu() raises:
     print("test_argmax_2d_axis1_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2(
@@ -270,7 +270,7 @@ fn test_argmax_2d_axis1_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmin_2d_keepdims_axis0_cpu() raises:
+def test_argmin_2d_keepdims_axis0_cpu() raises:
     print("test_argmin_2d_keepdims_axis0_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[3.0, 1.0, 4.0], [2.0, 0.5, 6.0]])
@@ -280,7 +280,7 @@ fn test_argmin_2d_keepdims_axis0_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmax_2d_keepdims_axis1_cpu() raises:
+def test_argmax_2d_keepdims_axis1_cpu() raises:
     print("test_argmax_2d_keepdims_axis1_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[3.0, 1.0, 4.0], [2.0, 0.5, 6.0]])
@@ -290,7 +290,7 @@ fn test_argmax_2d_keepdims_axis1_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmin_2d_negative_axis_cpu() raises:
+def test_argmin_2d_negative_axis_cpu() raises:
     print("test_argmin_2d_negative_axis_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[3.0, 1.0, 4.0], [2.0, 0.5, 6.0]])
@@ -299,7 +299,7 @@ fn test_argmin_2d_negative_axis_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmax_2d_single_row_cpu() raises:
+def test_argmax_2d_single_row_cpu() raises:
     print("test_argmax_2d_single_row_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[3.0, 1.0, 4.0, 2.0]])
@@ -308,7 +308,7 @@ fn test_argmax_2d_single_row_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmin_2d_single_column_cpu() raises:
+def test_argmin_2d_single_column_cpu() raises:
     print("test_argmin_2d_single_column_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[3.0], [1.0], [4.0], [2.0]])
@@ -322,7 +322,7 @@ fn test_argmin_2d_single_column_cpu() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn test_argmin_3d_axis0_cpu() raises:
+def test_argmin_3d_axis0_cpu() raises:
     print("test_argmin_3d_axis0_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d3(
@@ -333,7 +333,7 @@ fn test_argmin_3d_axis0_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmin_3d_axis1_cpu() raises:
+def test_argmin_3d_axis1_cpu() raises:
     print("test_argmin_3d_axis1_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d3(
@@ -344,7 +344,7 @@ fn test_argmin_3d_axis1_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmin_3d_axis2_cpu() raises:
+def test_argmin_3d_axis2_cpu() raises:
     print("test_argmin_3d_axis2_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d3(
@@ -355,7 +355,7 @@ fn test_argmin_3d_axis2_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmax_3d_axis0_cpu() raises:
+def test_argmax_3d_axis0_cpu() raises:
     print("test_argmax_3d_axis0_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d3(
@@ -366,7 +366,7 @@ fn test_argmax_3d_axis0_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmax_3d_axis1_cpu() raises:
+def test_argmax_3d_axis1_cpu() raises:
     print("test_argmax_3d_axis1_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d3(
@@ -377,7 +377,7 @@ fn test_argmax_3d_axis1_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmax_3d_axis2_cpu() raises:
+def test_argmax_3d_axis2_cpu() raises:
     print("test_argmax_3d_axis2_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d3(
@@ -388,7 +388,7 @@ fn test_argmax_3d_axis2_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmin_3d_keepdims_cpu() raises:
+def test_argmin_3d_keepdims_cpu() raises:
     print("test_argmin_3d_keepdims_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d3(
@@ -404,7 +404,7 @@ fn test_argmin_3d_keepdims_cpu() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn test_argmin_4d_axis0_cpu() raises:
+def test_argmin_4d_axis0_cpu() raises:
     print("test_argmin_4d_axis0_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d4(
@@ -421,7 +421,7 @@ fn test_argmin_4d_axis0_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmax_4d_axis3_cpu() raises:
+def test_argmax_4d_axis3_cpu() raises:
     print("test_argmax_4d_axis3_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d4(
@@ -438,7 +438,7 @@ fn test_argmax_4d_axis3_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmin_4d_negative_axis_cpu() raises:
+def test_argmin_4d_negative_axis_cpu() raises:
     print("test_argmin_4d_negative_axis_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d4(
@@ -457,7 +457,7 @@ fn test_argmin_4d_negative_axis_cpu() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn test_argmin_all_same_values_cpu() raises:
+def test_argmin_all_same_values_cpu() raises:
     print("test_argmin_all_same_values_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[5.0, 5.0, 5.0], [5.0, 5.0, 5.0]])
@@ -467,7 +467,7 @@ fn test_argmin_all_same_values_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmax_all_same_values_cpu() raises:
+def test_argmax_all_same_values_cpu() raises:
     print("test_argmax_all_same_values_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[5.0, 5.0, 5.0], [5.0, 5.0, 5.0]])
@@ -477,7 +477,7 @@ fn test_argmax_all_same_values_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmin_single_element_cpu() raises:
+def test_argmin_single_element_cpu() raises:
     print("test_argmin_single_element_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[5.0]])
@@ -486,7 +486,7 @@ fn test_argmin_single_element_cpu() raises:
     print("✓ Passed")
 
 
-fn test_argmax_with_zeros_cpu() raises:
+def test_argmax_with_zeros_cpu() raises:
     print("test_argmax_with_zeros_cpu")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[0.0, -1.0, 2.0], [0.0, 0.0, 0.0]])
@@ -500,7 +500,7 @@ fn test_argmax_with_zeros_cpu() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn test_argmin_1d_basic_gpu() raises:
+def test_argmin_1d_basic_gpu() raises:
     comptime if has_accelerator():
         print("test_argmin_1d_basic_gpu")
         comptime dtype = DType.float32
@@ -513,7 +513,7 @@ fn test_argmin_1d_basic_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmax_1d_basic_gpu() raises:
+def test_argmax_1d_basic_gpu() raises:
     comptime if has_accelerator():
         print("test_argmax_1d_basic_gpu")
         comptime dtype = DType.float32
@@ -526,7 +526,7 @@ fn test_argmax_1d_basic_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmin_1d_negative_values_gpu() raises:
+def test_argmin_1d_negative_values_gpu() raises:
     comptime if has_accelerator():
         print("test_argmin_1d_negative_values_gpu")
         comptime dtype = DType.float32
@@ -539,7 +539,7 @@ fn test_argmin_1d_negative_values_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmax_1d_negative_values_gpu() raises:
+def test_argmax_1d_negative_values_gpu() raises:
     comptime if has_accelerator():
         print("test_argmax_1d_negative_values_gpu")
         comptime dtype = DType.float32
@@ -557,7 +557,7 @@ fn test_argmax_1d_negative_values_gpu() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn test_argmin_2d_axis0_gpu() raises:
+def test_argmin_2d_axis0_gpu() raises:
     comptime if has_accelerator():
         print("test_argmin_2d_axis0_gpu")
         comptime dtype = DType.float32
@@ -571,7 +571,7 @@ fn test_argmin_2d_axis0_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmin_2d_axis1_gpu() raises:
+def test_argmin_2d_axis1_gpu() raises:
     comptime if has_accelerator():
         print("test_argmin_2d_axis1_gpu")
         comptime dtype = DType.float32
@@ -585,7 +585,7 @@ fn test_argmin_2d_axis1_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmax_2d_axis0_gpu() raises:
+def test_argmax_2d_axis0_gpu() raises:
     comptime if has_accelerator():
         print("test_argmax_2d_axis0_gpu")
         comptime dtype = DType.float32
@@ -599,7 +599,7 @@ fn test_argmax_2d_axis0_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmax_2d_axis1_gpu() raises:
+def test_argmax_2d_axis1_gpu() raises:
     comptime if has_accelerator():
         print("test_argmax_2d_axis1_gpu")
         comptime dtype = DType.float32
@@ -613,7 +613,7 @@ fn test_argmax_2d_axis1_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmin_2d_keepdims_axis0_gpu() raises:
+def test_argmin_2d_keepdims_axis0_gpu() raises:
     comptime if has_accelerator():
         print("test_argmin_2d_keepdims_axis0_gpu")
         comptime dtype = DType.float32
@@ -626,7 +626,7 @@ fn test_argmin_2d_keepdims_axis0_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmax_2d_keepdims_axis1_gpu() raises:
+def test_argmax_2d_keepdims_axis1_gpu() raises:
     comptime if has_accelerator():
         print("test_argmax_2d_keepdims_axis1_gpu")
         comptime dtype = DType.float32
@@ -639,7 +639,7 @@ fn test_argmax_2d_keepdims_axis1_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmin_2d_negative_axis_gpu() raises:
+def test_argmin_2d_negative_axis_gpu() raises:
     comptime if has_accelerator():
         print("test_argmin_2d_negative_axis_gpu")
         comptime dtype = DType.float32
@@ -656,7 +656,7 @@ fn test_argmin_2d_negative_axis_gpu() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn test_argmin_3d_axis0_gpu() raises:
+def test_argmin_3d_axis0_gpu() raises:
     comptime if has_accelerator():
         print("test_argmin_3d_axis0_gpu")
         comptime dtype = DType.float32
@@ -670,7 +670,7 @@ fn test_argmin_3d_axis0_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmin_3d_axis1_gpu() raises:
+def test_argmin_3d_axis1_gpu() raises:
     comptime if has_accelerator():
         print("test_argmin_3d_axis1_gpu")
         comptime dtype = DType.float32
@@ -684,7 +684,7 @@ fn test_argmin_3d_axis1_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmin_3d_axis2_gpu() raises:
+def test_argmin_3d_axis2_gpu() raises:
     comptime if has_accelerator():
         print("test_argmin_3d_axis2_gpu")
         comptime dtype = DType.float32
@@ -698,7 +698,7 @@ fn test_argmin_3d_axis2_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmax_3d_axis0_gpu() raises:
+def test_argmax_3d_axis0_gpu() raises:
     comptime if has_accelerator():
         print("test_argmax_3d_axis0_gpu")
         comptime dtype = DType.float32
@@ -712,7 +712,7 @@ fn test_argmax_3d_axis0_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmax_3d_axis1_gpu() raises:
+def test_argmax_3d_axis1_gpu() raises:
     comptime if has_accelerator():
         print("test_argmax_3d_axis1_gpu")
         comptime dtype = DType.float32
@@ -726,7 +726,7 @@ fn test_argmax_3d_axis1_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmax_3d_axis2_gpu() raises:
+def test_argmax_3d_axis2_gpu() raises:
     comptime if has_accelerator():
         print("test_argmax_3d_axis2_gpu")
         comptime dtype = DType.float32
@@ -740,7 +740,7 @@ fn test_argmax_3d_axis2_gpu() raises:
         print("✓ Passed")
 
 
-fn test_argmin_3d_keepdims_gpu() raises:
+def test_argmin_3d_keepdims_gpu() raises:
     comptime if has_accelerator():
         print("test_argmin_3d_keepdims_gpu")
         comptime dtype = DType.float32
@@ -759,7 +759,7 @@ fn test_argmin_3d_keepdims_gpu() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn test_argmin_4d_axis0_gpu() raises:
+def test_argmin_4d_axis0_gpu() raises:
     comptime if has_accelerator():
         print("test_argmin_4d_axis0_gpu")
         comptime dtype = DType.float32

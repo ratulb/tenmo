@@ -6,7 +6,7 @@ from layers import Sequential
 # --------------------
 # Gradient checker (safe using parameters_ptrs)
 # --------------------
-fn gradcheck_param[
+def gradcheck_param[
     dtype: DType = DType.float32
 ](
     model: Sequential[dtype],
@@ -83,7 +83,7 @@ from .crossentropy import CrossEntropyLoss
 from layers import Linear, ReLU
 
 
-fn test_gradcheck1() raises:
+def test_gradcheck1() raises:
     var model = Sequential()
     model.append(Linear(4, 5).into())
     model.append(ReLU().into())
@@ -92,7 +92,7 @@ fn test_gradcheck1() raises:
     var x = Tensor.rand([2, 4], requires_grad=True)
     var y = Tensor[DType.int32].d1([1, 2])
 
-    fn criterion[
+    def criterion[
         dtype: DType
     ](logits: Tensor[dtype], target: Tensor[DType.int32]) -> Tensor[dtype]:
         var criterion = CrossEntropyLoss[dtype]()
@@ -118,7 +118,7 @@ fn test_gradcheck1() raises:
 from .mse import MSELoss
 
 
-fn test_gradcheck2() raises:
+def test_gradcheck2() raises:
     var model = Sequential()
     model.append(Linear(4, 5).into())
     model.append(ReLU().into())
@@ -128,7 +128,7 @@ fn test_gradcheck2() raises:
     # Target must match output shape [2, 3]
     var y = Tensor.randint32([2, 3])
 
-    fn mse_loss[
+    def mse_loss[
         dtype: DType
     ](preds: Tensor[dtype], target: Tensor[DType.int32]) -> Tensor[dtype]:
         var mse = MSELoss[dtype]()
@@ -148,6 +148,6 @@ fn test_gradcheck2() raises:
         print(RED, "Gradient check FAILED ❌ (MSE)")
 
 
-fn main() raises:
+def main() raises:
     test_gradcheck1()
     test_gradcheck2()

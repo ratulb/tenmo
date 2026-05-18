@@ -7,7 +7,7 @@ from std.sys import has_accelerator
 
 #Old tests
 
-fn test_tensor_permute_basic() raises:
+def test_tensor_permute_basic() raises:
     comptime dtype = DType.float32
     print("Running test_tensor_permute_basic")
     a = Tensor[dtype].arange(0, 12)
@@ -19,7 +19,7 @@ fn test_tensor_permute_basic() raises:
     print("Passed basic permute test")
 
 
-fn test_tensor_permute_3d_axes() raises:
+def test_tensor_permute_3d_axes() raises:
     comptime dtype = DType.float32
     print("Running test_tensor_permute_3d_axes")
     a = Tensor[dtype].arange(0, 60)
@@ -30,7 +30,7 @@ fn test_tensor_permute_3d_axes() raises:
     print("Passed 3D permutation")
 
 
-fn test_tensor_permute_inverse() raises:
+def test_tensor_permute_inverse() raises:
     comptime dtype = DType.float32
     print("Running test_tensor_permute_inverse")
     a = Tensor[dtype].arange(0, 24)
@@ -42,7 +42,7 @@ fn test_tensor_permute_inverse() raises:
     print("Passed inverse permutation test")
 
 
-fn test_tensor_permute_grad_sum_2d() raises:
+def test_tensor_permute_grad_sum_2d() raises:
     print("test_tensor_permute_grad_sum_2d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(0, 12)
@@ -61,7 +61,7 @@ fn test_tensor_permute_grad_sum_2d() raises:
     print("Passed test_tensor_permute_grad_sum_2d")
 
 
-fn test_tensor_permute_grad_inverse_chain() raises:
+def test_tensor_permute_grad_inverse_chain() raises:
     print("test_tensor_permute_grad_inverse_chain")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(0, 24)
@@ -97,7 +97,7 @@ fn test_tensor_permute_grad_inverse_chain() raises:
     print("Passed test_tensor_permute_grad_inverse_chain")
 
 
-fn test_tensor_permute_grad_partial_ops() raises:
+def test_tensor_permute_grad_partial_ops() raises:
     print("test_tensor_permute_grad_partial_ops")
     comptime dtype = DType.float32
     print(
@@ -118,7 +118,7 @@ fn test_tensor_permute_grad_partial_ops() raises:
     print("Passed test_tensor_permute_grad_partial_ops")
 
 
-fn test_tensor_permute_grad_scaled_sum_3d() raises:
+def test_tensor_permute_grad_scaled_sum_3d() raises:
     print("test_tensor_permute_grad_scaled_sum_3d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(0, 60)
@@ -166,7 +166,7 @@ fn test_tensor_permute_grad_scaled_sum_3d() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_perm_cpu_2d_01() raises:
+def test_perm_cpu_2d_01() raises:
     print("test_perm_cpu_2d_01")
     comptime dtype = DType.float32
     # Identity permutation — no change
@@ -176,7 +176,7 @@ fn test_perm_cpu_2d_01() raises:
     assert_true(result.all_close(a))
 
 
-fn test_perm_cpu_2d_10() raises:
+def test_perm_cpu_2d_10() raises:
     print("test_perm_cpu_2d_10")
     comptime dtype = DType.float32
     # Transpose
@@ -190,7 +190,7 @@ fn test_perm_cpu_2d_10() raises:
     )
 
 
-fn test_perm_cpu_3d_012() raises:
+def test_perm_cpu_3d_012() raises:
     print("test_perm_cpu_3d_012")
     comptime dtype = DType.float32
     # Identity permutation on 3D
@@ -202,7 +202,7 @@ fn test_perm_cpu_3d_012() raises:
     assert_true(result.all_close(a))
 
 
-fn test_perm_cpu_3d_021() raises:
+def test_perm_cpu_3d_021() raises:
     print("test_perm_cpu_3d_021")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
@@ -220,7 +220,7 @@ fn test_perm_cpu_3d_021() raises:
     assert_true(result[[1, 0, 1]] == a[[1, 1, 0]])
 
 
-fn test_perm_cpu_3d_102() raises:
+def test_perm_cpu_3d_102() raises:
     print("test_perm_cpu_3d_102")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
@@ -236,7 +236,7 @@ fn test_perm_cpu_3d_102() raises:
     assert_true(result[[1, 1, 1]] == a[[1, 1, 1]])
 
 
-fn test_perm_cpu_3d_120() raises:
+def test_perm_cpu_3d_120() raises:
     print("test_perm_cpu_3d_120")
     comptime dtype = DType.float32
     # Shape (2,3,4) → permute(1,2,0) → (3,4,2)
@@ -251,7 +251,7 @@ fn test_perm_cpu_3d_120() raises:
                 assert_true(result[[i, j, k]] == a[[k, i, j]])
 
 
-fn test_perm_cpu_3d_201() raises:
+def test_perm_cpu_3d_201() raises:
     print("test_perm_cpu_3d_201")
     comptime dtype = DType.float32
     # Shape (2,3,4) → permute(2,0,1) → (4,2,3)
@@ -266,7 +266,7 @@ fn test_perm_cpu_3d_201() raises:
                 assert_true(result[[i, j, k]] == a[[j, k, i]])
 
 
-fn test_perm_cpu_3d_210() raises:
+def test_perm_cpu_3d_210() raises:
     print("test_perm_cpu_3d_210")
     comptime dtype = DType.float32
     # Shape (2,3,4) → permute(2,1,0) → (4,3,2)
@@ -280,7 +280,7 @@ fn test_perm_cpu_3d_210() raises:
                 assert_true(result[[i, j, k]] == a[[k, j, i]])
 
 
-fn test_perm_cpu_shape_preserved() raises:
+def test_perm_cpu_shape_preserved() raises:
     print("test_perm_cpu_shape_preserved")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(60)
@@ -290,7 +290,7 @@ fn test_perm_cpu_shape_preserved() raises:
     assert_true(result.numels() == 60)
 
 
-fn test_perm_cpu_is_view() raises:
+def test_perm_cpu_is_view() raises:
     print("test_perm_cpu_is_view")
     comptime dtype = DType.float32
     # Permute is a view — same data, different strides
@@ -301,7 +301,7 @@ fn test_perm_cpu_is_view() raises:
     assert_true(result[[0, 1]] == Scalar[dtype](3.0))
 
 
-fn test_perm_cpu_no_grad() raises:
+def test_perm_cpu_no_grad() raises:
     print("test_perm_cpu_no_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
@@ -309,7 +309,7 @@ fn test_perm_cpu_no_grad() raises:
     assert_true(not result.requires_grad)
 
 
-fn test_perm_cpu_requires_grad_propagates() raises:
+def test_perm_cpu_requires_grad_propagates() raises:
     print("test_perm_cpu_requires_grad_propagates")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -317,7 +317,7 @@ fn test_perm_cpu_requires_grad_propagates() raises:
     assert_true(result.requires_grad)
 
 
-fn test_perm_cpu_suppress_grad() raises:
+def test_perm_cpu_suppress_grad() raises:
     print("test_perm_cpu_suppress_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -330,7 +330,7 @@ fn test_perm_cpu_suppress_grad() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_perm_cpu_backward_2d_transpose() raises:
+def test_perm_cpu_backward_2d_transpose() raises:
     print("test_perm_cpu_backward_2d_transpose")
     comptime dtype = DType.float32
     # Transpose backward — inverse of transpose is transpose
@@ -342,7 +342,7 @@ fn test_perm_cpu_backward_2d_transpose() raises:
     assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 3))))
 
 
-fn test_perm_cpu_backward_3d_021() raises:
+def test_perm_cpu_backward_3d_021() raises:
     print("test_perm_cpu_backward_3d_021")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
@@ -355,7 +355,7 @@ fn test_perm_cpu_backward_3d_021() raises:
     assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 2, 2))))
 
 
-fn test_perm_cpu_backward_3d_210() raises:
+def test_perm_cpu_backward_3d_210() raises:
     print("test_perm_cpu_backward_3d_210")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(24)
@@ -367,7 +367,7 @@ fn test_perm_cpu_backward_3d_210() raises:
     assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 3, 4))))
 
 
-fn test_perm_cpu_backward_chain() raises:
+def test_perm_cpu_backward_chain() raises:
     print("test_perm_cpu_backward_chain")
     comptime dtype = DType.float32
     # permute → multiply → sum → backward
@@ -379,7 +379,7 @@ fn test_perm_cpu_backward_chain() raises:
     assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 2), 2.0)))
 
 
-fn test_perm_cpu_backward_double_permute() raises:
+def test_perm_cpu_backward_double_permute() raises:
     print("test_perm_cpu_backward_double_permute")
     comptime dtype = DType.float32
     # permute then inverse permute = identity
@@ -394,7 +394,7 @@ fn test_perm_cpu_backward_double_permute() raises:
     assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 2, 2))))
 
 
-fn test_perm_cpu_backward_gradient_values() raises:
+def test_perm_cpu_backward_gradient_values() raises:
     print("test_perm_cpu_backward_gradient_values")
     comptime dtype = DType.float32
     # Non-uniform upstream gradient
@@ -412,7 +412,7 @@ fn test_perm_cpu_backward_gradient_values() raises:
     )
 
 
-fn test_perm_cpu_backward_multiple_uses() raises:
+def test_perm_cpu_backward_multiple_uses() raises:
     print("test_perm_cpu_backward_multiple_uses")
     comptime dtype = DType.float32
     # Permuted tensor used twice — ZeroGrad ensures no double counting
@@ -430,7 +430,7 @@ fn test_perm_cpu_backward_multiple_uses() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_perm_gpu_2d_identity() raises:
+def test_perm_gpu_2d_identity() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_2d_identity")
         comptime dtype = DType.float32
@@ -445,7 +445,7 @@ fn test_perm_gpu_2d_identity() raises:
         )
 
 
-fn test_perm_gpu_2d_transpose() raises:
+def test_perm_gpu_2d_transpose() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_2d_transpose")
         comptime dtype = DType.float32
@@ -460,7 +460,7 @@ fn test_perm_gpu_2d_transpose() raises:
         )
 
 
-fn test_perm_gpu_3d_021() raises:
+def test_perm_gpu_3d_021() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_3d_021")
         comptime dtype = DType.float32
@@ -480,7 +480,7 @@ fn test_perm_gpu_3d_021() raises:
                     assert_true(result_cpu[[i, j, k]] == a_cpu[[i, k, j]])
 
 
-fn test_perm_gpu_3d_120() raises:
+def test_perm_gpu_3d_120() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_3d_120")
         comptime dtype = DType.float32
@@ -497,7 +497,7 @@ fn test_perm_gpu_3d_120() raises:
                     assert_true(result_cpu[[i, j, k]] == a_cpu[[k, i, j]])
 
 
-fn test_perm_gpu_3d_210() raises:
+def test_perm_gpu_3d_210() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_3d_210")
         comptime dtype = DType.float32
@@ -514,7 +514,7 @@ fn test_perm_gpu_3d_210() raises:
                     assert_true(result_cpu[[i, j, k]] == a_cpu[[k, j, i]])
 
 
-fn test_perm_gpu_shape_preserved() raises:
+def test_perm_gpu_shape_preserved() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_shape_preserved")
         comptime dtype = DType.float32
@@ -526,7 +526,7 @@ fn test_perm_gpu_shape_preserved() raises:
         assert_true(result.numels() == 60)
 
 
-fn test_perm_gpu_no_grad() raises:
+def test_perm_gpu_no_grad() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_no_grad")
         comptime dtype = DType.float32
@@ -537,7 +537,7 @@ fn test_perm_gpu_no_grad() raises:
         assert_true(not result.requires_grad)
 
 
-fn test_perm_gpu_requires_grad_propagates() raises:
+def test_perm_gpu_requires_grad_propagates() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_requires_grad_propagates")
         comptime dtype = DType.float32
@@ -553,7 +553,7 @@ fn test_perm_gpu_requires_grad_propagates() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_perm_gpu_backward_2d_transpose() raises:
+def test_perm_gpu_backward_2d_transpose() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_backward_2d_transpose")
         comptime dtype = DType.float32
@@ -567,7 +567,7 @@ fn test_perm_gpu_backward_2d_transpose() raises:
         assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 3))))
 
 
-fn test_perm_gpu_backward_3d_021() raises:
+def test_perm_gpu_backward_3d_021() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_backward_3d_021")
         comptime dtype = DType.float32
@@ -582,7 +582,7 @@ fn test_perm_gpu_backward_3d_021() raises:
         assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 2, 2))))
 
 
-fn test_perm_gpu_backward_3d_210() raises:
+def test_perm_gpu_backward_3d_210() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_backward_3d_210")
         comptime dtype = DType.float32
@@ -596,7 +596,7 @@ fn test_perm_gpu_backward_3d_210() raises:
         assert_true(a_cpu.grad().all_close(Tensor[dtype].ones(Shape(2, 3, 4))))
 
 
-fn test_perm_gpu_backward_chain() raises:
+def test_perm_gpu_backward_chain() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_backward_chain")
         comptime dtype = DType.float32
@@ -608,7 +608,7 @@ fn test_perm_gpu_backward_chain() raises:
         assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 2), 2.0)))
 
 
-fn test_perm_gpu_backward_double_permute() raises:
+def test_perm_gpu_backward_double_permute() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_backward_double_permute")
         comptime dtype = DType.float32
@@ -624,7 +624,7 @@ fn test_perm_gpu_backward_double_permute() raises:
         assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 2, 2))))
 
 
-fn test_perm_gpu_backward_gradient_values() raises:
+def test_perm_gpu_backward_gradient_values() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_backward_gradient_values")
         comptime dtype = DType.float32
@@ -646,7 +646,7 @@ fn test_perm_gpu_backward_gradient_values() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_perm_parity_2d_transpose() raises:
+def test_perm_parity_2d_transpose() raises:
     comptime if has_accelerator():
         print("test_perm_parity_2d_transpose")
         comptime dtype = DType.float32
@@ -659,7 +659,7 @@ fn test_perm_parity_2d_transpose() raises:
         )
 
 
-fn test_perm_parity_3d_120() raises:
+def test_perm_parity_3d_120() raises:
     comptime if has_accelerator():
         print("test_perm_parity_3d_120")
         comptime dtype = DType.float32
@@ -673,7 +673,7 @@ fn test_perm_parity_3d_120() raises:
         )
 
 
-fn test_perm_parity_3d_210() raises:
+def test_perm_parity_3d_210() raises:
     comptime if has_accelerator():
         print("test_perm_parity_3d_210")
         comptime dtype = DType.float32
@@ -687,7 +687,7 @@ fn test_perm_parity_3d_210() raises:
         )
 
 
-fn test_perm_parity_backward_transpose() raises:
+def test_perm_parity_backward_transpose() raises:
     comptime if has_accelerator():
         print("test_perm_parity_backward_transpose")
         comptime dtype = DType.float32
@@ -707,7 +707,7 @@ fn test_perm_parity_backward_transpose() raises:
         assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
 
 
-fn test_perm_parity_backward_3d() raises:
+def test_perm_parity_backward_3d() raises:
     comptime if has_accelerator():
         print("test_perm_parity_backward_3d")
         comptime dtype = DType.float32
@@ -728,7 +728,7 @@ fn test_perm_parity_backward_3d() raises:
         assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
 
 
-fn test_perm_parity_backward_chain() raises:
+def test_perm_parity_backward_chain() raises:
     comptime if has_accelerator():
         print("test_perm_parity_backward_chain")
         comptime dtype = DType.float32
@@ -748,7 +748,7 @@ fn test_perm_parity_backward_chain() raises:
         assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
 
 
-fn test_perm_parity_using_zero_grad() raises:
+def test_perm_parity_using_zero_grad() raises:
     comptime if has_accelerator():
         print("test_perm_parity_using_zero_grad")
         comptime dtype = DType.float32
@@ -775,7 +775,7 @@ fn test_perm_parity_using_zero_grad() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

@@ -4,7 +4,7 @@ from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 
 
-fn test_2d_transpose_no_axes() raises:
+def test_2d_transpose_no_axes() raises:
     print("test_2d_transpose_no_axes")
     var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
     var b = a.transpose()
@@ -21,7 +21,7 @@ fn test_2d_transpose_no_axes() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_2d_transpose_explicit_axes() raises:
+def test_2d_transpose_explicit_axes() raises:
     print("test_2d_transpose_explicit_axes")
     var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
     var b = a.transpose(1, 0)
@@ -38,7 +38,7 @@ fn test_2d_transpose_explicit_axes() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_3d_transpose_axes_0_1() raises:
+def test_3d_transpose_axes_0_1() raises:
     print("test_3d_transpose_axes_0_1")
     var a = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -61,7 +61,7 @@ fn test_3d_transpose_axes_0_1() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_3d_transpose_axes_1_2() raises:
+def test_3d_transpose_axes_1_2() raises:
     print("test_3d_transpose_axes_1_2")
     var a = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -85,7 +85,7 @@ fn test_3d_transpose_axes_1_2() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_4d_transpose_complex_axes() raises:
+def test_4d_transpose_complex_axes() raises:
     print("test_4d_transpose_complex_axes")
     var a = Tensor.d4(
         [
@@ -111,7 +111,7 @@ fn test_4d_transpose_complex_axes() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_transpose_chain_operations() raises:
+def test_transpose_chain_operations() raises:
     print("test_transpose_chain_operations")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = a.transpose()
@@ -127,7 +127,7 @@ fn test_transpose_chain_operations() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_transpose_with_matmul() raises:
+def test_transpose_with_matmul() raises:
     print("test_transpose_with_matmul")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = Tensor.d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
@@ -149,7 +149,7 @@ fn test_transpose_with_matmul() raises:
     assert_true(b.grad().all_close(expected_b_grad))
 
 
-fn test_transpose_scalar_equivalent() raises:
+def test_transpose_scalar_equivalent() raises:
     print("test_transpose_scalar_equivalent")
     var a = Tensor.scalar(5.0, requires_grad=True)
     var b = a.transpose()
@@ -163,7 +163,7 @@ fn test_transpose_scalar_equivalent() raises:
     assert_true(a.grad().item() == 1.0)
 
 
-fn test_transpose_1d_no_change() raises:
+def test_transpose_1d_no_change() raises:
     print("test_transpose_1d_no_change")
     var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var b = a.transpose()
@@ -194,7 +194,7 @@ fn test_transpose_1d_no_change() raises:
 # ── 1D ────────────────────────────────────────────────────────────────────────
 
 
-fn test_trrev_cpu_1d_forward() raises:
+def test_trrev_cpu_1d_forward() raises:
     print("test_trrev_cpu_1d_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -204,7 +204,7 @@ fn test_trrev_cpu_1d_forward() raises:
     assert_true(t.all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
 
 
-fn test_trrev_cpu_1d_backward() raises:
+def test_trrev_cpu_1d_backward() raises:
     print("test_trrev_cpu_1d_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -217,7 +217,7 @@ fn test_trrev_cpu_1d_backward() raises:
 # ── 2D ────────────────────────────────────────────────────────────────────────
 
 
-fn test_trrev_cpu_2d_forward() raises:
+def test_trrev_cpu_2d_forward() raises:
     print("test_trrev_cpu_2d_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -228,7 +228,7 @@ fn test_trrev_cpu_2d_forward() raises:
     )
 
 
-fn test_trrev_cpu_2d_backward() raises:
+def test_trrev_cpu_2d_backward() raises:
     print("test_trrev_cpu_2d_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -241,7 +241,7 @@ fn test_trrev_cpu_2d_backward() raises:
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_cpu_2d_explicit_axes_forward() raises:
+def test_trrev_cpu_2d_explicit_axes_forward() raises:
     print("test_trrev_cpu_2d_explicit_axes_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
@@ -253,7 +253,7 @@ fn test_trrev_cpu_2d_explicit_axes_forward() raises:
     )
 
 
-fn test_trrev_cpu_2d_explicit_axes_backward() raises:
+def test_trrev_cpu_2d_explicit_axes_backward() raises:
     print("test_trrev_cpu_2d_explicit_axes_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -265,7 +265,7 @@ fn test_trrev_cpu_2d_explicit_axes_backward() raises:
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_cpu_2d_double_transpose_identity() raises:
+def test_trrev_cpu_2d_double_transpose_identity() raises:
     print("test_trrev_cpu_2d_double_transpose_identity")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -275,7 +275,7 @@ fn test_trrev_cpu_2d_double_transpose_identity() raises:
     assert_true(t.all_close(a))
 
 
-fn test_trrev_cpu_2d_double_transpose_backward() raises:
+def test_trrev_cpu_2d_double_transpose_backward() raises:
     print("test_trrev_cpu_2d_double_transpose_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -288,7 +288,7 @@ fn test_trrev_cpu_2d_double_transpose_backward() raises:
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_cpu_2d_transpose_then_contiguous() raises:
+def test_trrev_cpu_2d_transpose_then_contiguous() raises:
     print("test_trrev_cpu_2d_transpose_then_contiguous")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -305,7 +305,7 @@ fn test_trrev_cpu_2d_transpose_then_contiguous() raises:
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_cpu_2d_grad_correctness_weighted() raises:
+def test_trrev_cpu_2d_grad_correctness_weighted() raises:
     print("test_trrev_cpu_2d_grad_correctness_weighted")
     # loss = sum(t * weights) where t = transpose(a)
     # grad_a[i,j] = weights[j,i]
@@ -326,7 +326,7 @@ fn test_trrev_cpu_2d_grad_correctness_weighted() raises:
 # ── 3D ────────────────────────────────────────────────────────────────────────
 
 
-fn test_trrev_cpu_3d_default_axes_forward() raises:
+def test_trrev_cpu_3d_default_axes_forward() raises:
     print("test_trrev_cpu_3d_default_axes_forward")
     comptime dtype = DType.float32
     # Shape (2,3,4) → default transpose reverses axes → (4,3,2)
@@ -344,7 +344,7 @@ fn test_trrev_cpu_3d_default_axes_forward() raises:
     assert_true(t[2, 1, 0] == 6.0)
 
 
-fn test_trrev_cpu_3d_default_axes_backward() raises:
+def test_trrev_cpu_3d_default_axes_backward() raises:
     print("test_trrev_cpu_3d_default_axes_backward")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
@@ -356,7 +356,7 @@ fn test_trrev_cpu_3d_default_axes_backward() raises:
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_cpu_3d_explicit_axes_forward() raises:
+def test_trrev_cpu_3d_explicit_axes_forward() raises:
     print("test_trrev_cpu_3d_explicit_axes_forward")
     comptime dtype = DType.float32
     # Shape (2,3,4), transpose axes (0,2,1) → shape (2,4,3)
@@ -371,7 +371,7 @@ fn test_trrev_cpu_3d_explicit_axes_forward() raises:
     assert_true(t[0, 2, 1] == 6.0)
 
 
-fn test_trrev_cpu_3d_explicit_axes_backward() raises:
+def test_trrev_cpu_3d_explicit_axes_backward() raises:
     print("test_trrev_cpu_3d_explicit_axes_backward")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
@@ -383,7 +383,7 @@ fn test_trrev_cpu_3d_explicit_axes_backward() raises:
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_cpu_3d_transpose_then_contiguous() raises:
+def test_trrev_cpu_3d_transpose_then_contiguous() raises:
     print("test_trrev_cpu_3d_transpose_then_contiguous")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
@@ -399,7 +399,7 @@ fn test_trrev_cpu_3d_transpose_then_contiguous() raises:
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_cpu_3d_chained_transpose_backward() raises:
+def test_trrev_cpu_3d_chained_transpose_backward() raises:
     print("test_trrev_cpu_3d_chained_transpose_backward")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(1.0, 25.0)
@@ -416,7 +416,7 @@ fn test_trrev_cpu_3d_chained_transpose_backward() raises:
 # ── 4D ────────────────────────────────────────────────────────────────────────
 
 
-fn test_trrev_cpu_4d_default_axes_forward() raises:
+def test_trrev_cpu_4d_default_axes_forward() raises:
     print("test_trrev_cpu_4d_default_axes_forward")
     comptime dtype = DType.float32
     # Shape (2,3,4,5) → default transpose → (5,4,3,2)
@@ -430,7 +430,7 @@ fn test_trrev_cpu_4d_default_axes_forward() raises:
     assert_true(t[0, 0, 0, 0] == 0.0)
 
 
-fn test_trrev_cpu_4d_default_axes_backward() raises:
+def test_trrev_cpu_4d_default_axes_backward() raises:
     print("test_trrev_cpu_4d_default_axes_backward")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 120.0)
@@ -442,7 +442,7 @@ fn test_trrev_cpu_4d_default_axes_backward() raises:
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_cpu_4d_explicit_axes_forward() raises:
+def test_trrev_cpu_4d_explicit_axes_forward() raises:
     print("test_trrev_cpu_4d_explicit_axes_forward")
     comptime dtype = DType.float32
     # Shape (2,3,4,5), axes (0,2,1,3) → (2,4,3,5)
@@ -455,7 +455,7 @@ fn test_trrev_cpu_4d_explicit_axes_forward() raises:
     assert_true(t[1, 3, 2, 4] == 119.0)
 
 
-fn test_trrev_cpu_4d_explicit_axes_backward() raises:
+def test_trrev_cpu_4d_explicit_axes_backward() raises:
     print("test_trrev_cpu_4d_explicit_axes_backward")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 120.0)
@@ -470,7 +470,7 @@ fn test_trrev_cpu_4d_explicit_axes_backward() raises:
 # ── Grad flow / accumulation ───────────────────────────────────────────────────
 
 
-fn test_trrev_cpu_grad_flow_through_multiple_ops() raises:
+def test_trrev_cpu_grad_flow_through_multiple_ops() raises:
     print("test_trrev_cpu_grad_flow_through_multiple_ops")
     comptime dtype = DType.float32
     # loss = sum(transpose(a) + transpose(a))
@@ -486,7 +486,7 @@ fn test_trrev_cpu_grad_flow_through_multiple_ops() raises:
     )
 
 
-fn test_trrev_cpu_transpose_contiguous_grad_flow() raises:
+def test_trrev_cpu_transpose_contiguous_grad_flow() raises:
     print("test_trrev_cpu_transpose_contiguous_grad_flow")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -510,7 +510,7 @@ fn test_trrev_cpu_transpose_contiguous_grad_flow() raises:
 # ── 1D ────────────────────────────────────────────────────────────────────────
 
 
-fn test_trrev_gpu_1d_forward() raises:
+def test_trrev_gpu_1d_forward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_1d_forward")
         comptime dtype = DType.float32
@@ -521,7 +521,7 @@ fn test_trrev_gpu_1d_forward() raises:
         assert_true(t.to_cpu().all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
 
 
-fn test_trrev_gpu_1d_backward() raises:
+def test_trrev_gpu_1d_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_1d_backward")
         comptime dtype = DType.float32
@@ -537,7 +537,7 @@ fn test_trrev_gpu_1d_backward() raises:
 # ── 2D ────────────────────────────────────────────────────────────────────────
 
 
-fn test_trrev_gpu_2d_forward() raises:
+def test_trrev_gpu_2d_forward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_2d_forward")
         comptime dtype = DType.float32
@@ -552,7 +552,7 @@ fn test_trrev_gpu_2d_forward() raises:
         )
 
 
-fn test_trrev_gpu_2d_backward() raises:
+def test_trrev_gpu_2d_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_2d_backward")
         comptime dtype = DType.float32
@@ -567,7 +567,7 @@ fn test_trrev_gpu_2d_backward() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_gpu_2d_explicit_axes_forward() raises:
+def test_trrev_gpu_2d_explicit_axes_forward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_2d_explicit_axes_forward")
         comptime dtype = DType.float32
@@ -582,7 +582,7 @@ fn test_trrev_gpu_2d_explicit_axes_forward() raises:
         )
 
 
-fn test_trrev_gpu_2d_explicit_axes_backward() raises:
+def test_trrev_gpu_2d_explicit_axes_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_2d_explicit_axes_backward")
         comptime dtype = DType.float32
@@ -597,7 +597,7 @@ fn test_trrev_gpu_2d_explicit_axes_backward() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_gpu_2d_transpose_then_contiguous() raises:
+def test_trrev_gpu_2d_transpose_then_contiguous() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_2d_transpose_then_contiguous")
         comptime dtype = DType.float32
@@ -619,7 +619,7 @@ fn test_trrev_gpu_2d_transpose_then_contiguous() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_gpu_2d_double_transpose_identity() raises:
+def test_trrev_gpu_2d_double_transpose_identity() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_2d_double_transpose_identity")
         comptime dtype = DType.float32
@@ -631,7 +631,7 @@ fn test_trrev_gpu_2d_double_transpose_identity() raises:
         assert_true(t.to_cpu().all_close(a))
 
 
-fn test_trrev_gpu_2d_double_transpose_backward() raises:
+def test_trrev_gpu_2d_double_transpose_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_2d_double_transpose_backward")
         comptime dtype = DType.float32
@@ -647,7 +647,7 @@ fn test_trrev_gpu_2d_double_transpose_backward() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_gpu_2d_grad_correctness_weighted() raises:
+def test_trrev_gpu_2d_grad_correctness_weighted() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_2d_grad_correctness_weighted")
         comptime dtype = DType.float32
@@ -668,7 +668,7 @@ fn test_trrev_gpu_2d_grad_correctness_weighted() raises:
 # ── 3D ────────────────────────────────────────────────────────────────────────
 
 
-fn test_trrev_gpu_3d_default_axes_forward() raises:
+def test_trrev_gpu_3d_default_axes_forward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_3d_default_axes_forward")
         comptime dtype = DType.float32
@@ -683,7 +683,7 @@ fn test_trrev_gpu_3d_default_axes_forward() raises:
         assert_true(t_cpu[2, 1, 0] == 6.0)
 
 
-fn test_trrev_gpu_3d_default_axes_backward() raises:
+def test_trrev_gpu_3d_default_axes_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_3d_default_axes_backward")
         comptime dtype = DType.float32
@@ -698,7 +698,7 @@ fn test_trrev_gpu_3d_default_axes_backward() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_gpu_3d_explicit_axes_forward() raises:
+def test_trrev_gpu_3d_explicit_axes_forward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_3d_explicit_axes_forward")
         comptime dtype = DType.float32
@@ -715,7 +715,7 @@ fn test_trrev_gpu_3d_explicit_axes_forward() raises:
         assert_true(t_cpu[0, 2, 1] == 6.0)
 
 
-fn test_trrev_gpu_3d_explicit_axes_backward() raises:
+def test_trrev_gpu_3d_explicit_axes_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_3d_explicit_axes_backward")
         comptime dtype = DType.float32
@@ -730,7 +730,7 @@ fn test_trrev_gpu_3d_explicit_axes_backward() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_gpu_3d_transpose_then_contiguous() raises:
+def test_trrev_gpu_3d_transpose_then_contiguous() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_3d_transpose_then_contiguous")
         comptime dtype = DType.float32
@@ -750,7 +750,7 @@ fn test_trrev_gpu_3d_transpose_then_contiguous() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_gpu_3d_chained_transpose_backward() raises:
+def test_trrev_gpu_3d_chained_transpose_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_3d_chained_transpose_backward")
         comptime dtype = DType.float32
@@ -769,7 +769,7 @@ fn test_trrev_gpu_3d_chained_transpose_backward() raises:
 # ── 4D ────────────────────────────────────────────────────────────────────────
 
 
-fn test_trrev_gpu_4d_default_axes_forward() raises:
+def test_trrev_gpu_4d_default_axes_forward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_4d_default_axes_forward")
         comptime dtype = DType.float32
@@ -783,7 +783,7 @@ fn test_trrev_gpu_4d_default_axes_forward() raises:
         assert_true(t_cpu[4, 3, 2, 1] == 119.0)
 
 
-fn test_trrev_gpu_4d_default_axes_backward() raises:
+def test_trrev_gpu_4d_default_axes_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_4d_default_axes_backward")
         comptime dtype = DType.float32
@@ -798,7 +798,7 @@ fn test_trrev_gpu_4d_default_axes_backward() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_trrev_gpu_4d_explicit_axes_forward() raises:
+def test_trrev_gpu_4d_explicit_axes_forward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_4d_explicit_axes_forward")
         comptime dtype = DType.float32
@@ -813,7 +813,7 @@ fn test_trrev_gpu_4d_explicit_axes_forward() raises:
         assert_true(t_cpu[1, 3, 2, 4] == 119.0)
 
 
-fn test_trrev_gpu_4d_explicit_axes_backward() raises:
+def test_trrev_gpu_4d_explicit_axes_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_4d_explicit_axes_backward")
         comptime dtype = DType.float32
@@ -831,7 +831,7 @@ fn test_trrev_gpu_4d_explicit_axes_backward() raises:
 # ── GPU grad flow ──────────────────────────────────────────────────────────────
 
 
-fn test_trrev_gpu_grad_flow_through_multiple_ops() raises:
+def test_trrev_gpu_grad_flow_through_multiple_ops() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_grad_flow_through_multiple_ops")
         comptime dtype = DType.float32
@@ -850,7 +850,7 @@ fn test_trrev_gpu_grad_flow_through_multiple_ops() raises:
         )
 
 
-fn test_trrev_gpu_transpose_contiguous_then_op_backward() raises:
+def test_trrev_gpu_transpose_contiguous_then_op_backward() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_transpose_contiguous_then_op_backward")
         comptime dtype = DType.float32
@@ -873,7 +873,7 @@ fn test_trrev_gpu_transpose_contiguous_then_op_backward() raises:
         )
 
 
-fn test_trrev_gpu_grad_does_not_accumulate_across_separate_passes() raises:
+def test_trrev_gpu_grad_does_not_accumulate_across_separate_passes() raises:
     comptime if has_accelerator():
         print("test_trrev_gpu_grad_does_not_accumulate_across_separate_passes")
         comptime dtype = DType.float32
@@ -892,6 +892,6 @@ fn test_trrev_gpu_grad_does_not_accumulate_across_separate_passes() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll transpose tests passed!")

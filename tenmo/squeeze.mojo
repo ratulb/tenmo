@@ -11,7 +11,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref ancestor = output.ancestry().get(0)
@@ -41,7 +41,7 @@ struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 struct Squeeze[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     # Squeeze specified axes or all dims of size 1 if no axes provided
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         mut tensor: Tensor[Self.dtype],

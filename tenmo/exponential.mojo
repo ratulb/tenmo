@@ -8,7 +8,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct ExponentialBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[
         Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
@@ -25,7 +25,7 @@ struct ExponentialBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct Exponential[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         tensor: Tensor[Self.dtype],

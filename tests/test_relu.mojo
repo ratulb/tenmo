@@ -6,7 +6,7 @@ from tenmo.shapes import Shape
 from std.math import abs
 
 
-fn test_relu_basic() raises:
+def test_relu_basic() raises:
     print("test_relu_basic")
     comptime dtype = DType.float32
 
@@ -20,7 +20,7 @@ fn test_relu_basic() raises:
     assert_true(t.grad() == Tensor[dtype].d1([0.0, 0.0, 1.0, 1.0]))
     print("✓ Passed ReLU forward and backward")
 
-fn test_relu_multidim() raises:
+def test_relu_multidim() raises:
     print("test_relu_multidim")
     comptime dtype = DType.float32
 
@@ -72,7 +72,7 @@ fn test_relu_multidim() raises:
 # ── SECTION 1: CPU FORWARD ───────────────────────────────────────────────────
 # =============================================================================
 
-fn test_rlv_cpu_fwd_all_positive() raises:
+def test_rlv_cpu_fwd_all_positive() raises:
     print("test_rlv_cpu_fwd_all_positive")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=False)
@@ -80,7 +80,7 @@ fn test_rlv_cpu_fwd_all_positive() raises:
     assert_true(out.all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
 
 
-fn test_rlv_cpu_fwd_all_negative() raises:
+def test_rlv_cpu_fwd_all_negative() raises:
     print("test_rlv_cpu_fwd_all_negative")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([-1.0, -2.0, -3.0], requires_grad=False)
@@ -88,7 +88,7 @@ fn test_rlv_cpu_fwd_all_negative() raises:
     assert_true(out.all_close(Tensor[dtype].d1([0.0, 0.0, 0.0])))
 
 
-fn test_rlv_cpu_fwd_mixed() raises:
+def test_rlv_cpu_fwd_mixed() raises:
     print("test_rlv_cpu_fwd_mixed")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([-3.0, 0.0, 2.0, -1.0, 5.0], requires_grad=False)
@@ -96,7 +96,7 @@ fn test_rlv_cpu_fwd_mixed() raises:
     assert_true(out.all_close(Tensor[dtype].d1([0.0, 0.0, 2.0, 0.0, 5.0])))
 
 
-fn test_rlv_cpu_fwd_zeros() raises:
+def test_rlv_cpu_fwd_zeros() raises:
     print("test_rlv_cpu_fwd_zeros")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([0.0, 0.0, 0.0], requires_grad=False)
@@ -104,7 +104,7 @@ fn test_rlv_cpu_fwd_zeros() raises:
     assert_true(out.all_close(Tensor[dtype].d1([0.0, 0.0, 0.0])))
 
 
-fn test_rlv_cpu_fwd_2d() raises:
+def test_rlv_cpu_fwd_2d() raises:
     print("test_rlv_cpu_fwd_2d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[-1.0, 2.0], [3.0, -4.0]], requires_grad=False)
@@ -112,7 +112,7 @@ fn test_rlv_cpu_fwd_2d() raises:
     assert_true(out.all_close(Tensor[dtype].d2([[0.0, 2.0], [3.0, 0.0]])))
 
 
-fn test_rlv_cpu_fwd_3d() raises:
+def test_rlv_cpu_fwd_3d() raises:
     print("test_rlv_cpu_fwd_3d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].full([2, 2, 2], -1.0)
@@ -120,7 +120,7 @@ fn test_rlv_cpu_fwd_3d() raises:
     assert_true(out.all_close(Tensor[dtype].zeros([2, 2, 2])))
 
 
-fn test_rlv_cpu_fwd_4d() raises:
+def test_rlv_cpu_fwd_4d() raises:
     print("test_rlv_cpu_fwd_4d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].full([2, 2, 2, 2], 3.0)
@@ -128,7 +128,7 @@ fn test_rlv_cpu_fwd_4d() raises:
     assert_true(out.all_close(Tensor[dtype].full([2, 2, 2, 2], 3.0)))
 
 
-fn test_rlv_cpu_fwd_scalar() raises:
+def test_rlv_cpu_fwd_scalar() raises:
     print("test_rlv_cpu_fwd_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(-5.0)
@@ -136,7 +136,7 @@ fn test_rlv_cpu_fwd_scalar() raises:
     assert_true(out.all_close(Tensor[dtype].scalar(0.0)))
 
 
-fn test_rlv_cpu_fwd_dtype_float64() raises:
+def test_rlv_cpu_fwd_dtype_float64() raises:
     print("test_rlv_cpu_fwd_dtype_float64")
     comptime dtype = DType.float64
     var a = Tensor[dtype].d1([-1.0, 0.0, 1.0], requires_grad=False)
@@ -148,7 +148,7 @@ fn test_rlv_cpu_fwd_dtype_float64() raises:
 # ── SECTION 2: CPU BACKWARD (mask correctness) ───────────────────────────────
 # =============================================================================
 
-fn test_rlv_cpu_bwd_all_positive() raises:
+def test_rlv_cpu_bwd_all_positive() raises:
     print("test_rlv_cpu_bwd_all_positive")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -159,7 +159,7 @@ fn test_rlv_cpu_bwd_all_positive() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([1.0, 1.0, 1.0])))
 
 
-fn test_rlv_cpu_bwd_all_negative() raises:
+def test_rlv_cpu_bwd_all_negative() raises:
     print("test_rlv_cpu_bwd_all_negative")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([-1.0, -2.0, -3.0], requires_grad=True)
@@ -170,7 +170,7 @@ fn test_rlv_cpu_bwd_all_negative() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 0.0])))
 
 
-fn test_rlv_cpu_bwd_mixed() raises:
+def test_rlv_cpu_bwd_mixed() raises:
     print("test_rlv_cpu_bwd_mixed")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([-1.0, 2.0, -3.0, 4.0], requires_grad=True)
@@ -181,7 +181,7 @@ fn test_rlv_cpu_bwd_mixed() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 0.0, 1.0])))
 
 
-fn test_rlv_cpu_bwd_zero_boundary() raises:
+def test_rlv_cpu_bwd_zero_boundary() raises:
     print("test_rlv_cpu_bwd_zero_boundary")
     comptime dtype = DType.float32
     # At exactly 0: mask = 0 (x > 0 is false)
@@ -192,7 +192,7 @@ fn test_rlv_cpu_bwd_zero_boundary() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 0.0])))
 
 
-fn test_rlv_cpu_bwd_2d() raises:
+def test_rlv_cpu_bwd_2d() raises:
     print("test_rlv_cpu_bwd_2d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[-1.0, 2.0], [3.0, -4.0]], requires_grad=True)
@@ -202,7 +202,7 @@ fn test_rlv_cpu_bwd_2d() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[0.0, 1.0], [1.0, 0.0]])))
 
 
-fn test_rlv_cpu_bwd_3d() raises:
+def test_rlv_cpu_bwd_3d() raises:
     print("test_rlv_cpu_bwd_3d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].full([2, 2, 2], 1.0, requires_grad=True)
@@ -212,7 +212,7 @@ fn test_rlv_cpu_bwd_3d() raises:
     assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 2, 2))))
 
 
-fn test_rlv_cpu_bwd_4d() raises:
+def test_rlv_cpu_bwd_4d() raises:
     print("test_rlv_cpu_bwd_4d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].full([2, 3, 4, 5], -1.0, requires_grad=True)
@@ -222,7 +222,7 @@ fn test_rlv_cpu_bwd_4d() raises:
     assert_true(a.grad().all_close(Tensor[dtype].zeros([2, 3, 4, 5])))
 
 
-fn test_rlv_cpu_bwd_grad_shape_preserved() raises:
+def test_rlv_cpu_bwd_grad_shape_preserved() raises:
     print("test_rlv_cpu_bwd_grad_shape_preserved")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, -1.0, 2.0], [-2.0, 3.0, -3.0]], requires_grad=True)
@@ -236,7 +236,7 @@ fn test_rlv_cpu_bwd_grad_shape_preserved() raises:
 # ── SECTION 3: CPU GRAD FLOW ─────────────────────────────────────────────────
 # =============================================================================
 
-fn test_rlv_cpu_grad_chain_relu_mul() raises:
+def test_rlv_cpu_grad_chain_relu_mul() raises:
     print("test_rlv_cpu_grad_chain_relu_mul")
     comptime dtype = DType.float32
     # y = relu(a) * 2  →  dy/da = 2 * mask
@@ -248,7 +248,7 @@ fn test_rlv_cpu_grad_chain_relu_mul() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 2.0, 2.0])))
 
 
-fn test_rlv_cpu_grad_chain_relu_relu() raises:
+def test_rlv_cpu_grad_chain_relu_relu() raises:
     print("test_rlv_cpu_grad_chain_relu_relu")
     comptime dtype = DType.float32
     # Double relu: second relu is identity for positive outputs of first
@@ -261,7 +261,7 @@ fn test_rlv_cpu_grad_chain_relu_relu() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 1.0])))
 
 
-fn test_rlv_cpu_grad_chain_add_relu() raises:
+def test_rlv_cpu_grad_chain_add_relu() raises:
     print("test_rlv_cpu_grad_chain_add_relu")
     comptime dtype = DType.float32
     # z = relu(a + b)
@@ -275,7 +275,7 @@ fn test_rlv_cpu_grad_chain_add_relu() raises:
     assert_true(b.grad().all_close(Tensor[dtype].d1([1.0, 0.0])))
 
 
-fn test_rlv_cpu_grad_no_grad_tensor() raises:
+def test_rlv_cpu_grad_no_grad_tensor() raises:
     print("test_rlv_cpu_grad_no_grad_tensor")
     comptime dtype = DType.float32
     # requires_grad=False → grad should not be populated
@@ -286,7 +286,7 @@ fn test_rlv_cpu_grad_no_grad_tensor() raises:
     assert_true(not a.requires_grad)
 
 
-fn test_rlv_cpu_grad_scalar_chain() raises:
+def test_rlv_cpu_grad_scalar_chain() raises:
     print("test_rlv_cpu_grad_scalar_chain")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(3.0, requires_grad=True)
@@ -296,7 +296,7 @@ fn test_rlv_cpu_grad_scalar_chain() raises:
     assert_true(a.grad().all_close(Tensor[dtype].scalar(1.0)))
 
 
-fn test_rlv_cpu_grad_large_tensor() raises:
+def test_rlv_cpu_grad_large_tensor() raises:
     print("test_rlv_cpu_grad_large_tensor")
     comptime dtype = DType.float32
     # Large 1-d tensor — exercises SIMD chunking in Buffer.unary_ops_with_mask
@@ -311,7 +311,7 @@ fn test_rlv_cpu_grad_large_tensor() raises:
 # ── SECTION 4: CPU NON-CONTIGUOUS ────────────────────────────────────────────
 # =============================================================================
 
-fn test_rlv_cpu_noncontig_transposed() raises:
+def test_rlv_cpu_noncontig_transposed() raises:
     print("test_rlv_cpu_noncontig_transposed")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[-1.0, 2.0], [3.0, -4.0]], requires_grad=True)
@@ -325,7 +325,7 @@ fn test_rlv_cpu_noncontig_transposed() raises:
     ))
 
 
-fn test_rlv_cpu_noncontig_slice_bwd() raises:
+def test_rlv_cpu_noncontig_slice_bwd() raises:
     print("test_rlv_cpu_noncontig_slice_bwd")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([-2.0, 1.0, -1.0, 3.0, -5.0], requires_grad=True)
@@ -342,7 +342,7 @@ fn test_rlv_cpu_noncontig_slice_bwd() raises:
 # ── SECTION 5: GPU FORWARD ───────────────────────────────────────────────────
 # =============================================================================
 
-fn test_rlv_gpu_fwd_all_positive() raises:
+def test_rlv_gpu_fwd_all_positive() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_fwd_all_positive")
         comptime dtype = DType.float32
@@ -351,7 +351,7 @@ fn test_rlv_gpu_fwd_all_positive() raises:
         assert_true(out.to_cpu().all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
 
 
-fn test_rlv_gpu_fwd_all_negative() raises:
+def test_rlv_gpu_fwd_all_negative() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_fwd_all_negative")
         comptime dtype = DType.float32
@@ -360,7 +360,7 @@ fn test_rlv_gpu_fwd_all_negative() raises:
         assert_true(out.to_cpu().all_close(Tensor[dtype].d1([0.0, 0.0, 0.0])))
 
 
-fn test_rlv_gpu_fwd_mixed() raises:
+def test_rlv_gpu_fwd_mixed() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_fwd_mixed")
         comptime dtype = DType.float32
@@ -369,7 +369,7 @@ fn test_rlv_gpu_fwd_mixed() raises:
         assert_true(out.to_cpu().all_close(Tensor[dtype].d1([0.0, 0.0, 2.0, 0.0, 5.0])))
 
 
-fn test_rlv_gpu_fwd_2d() raises:
+def test_rlv_gpu_fwd_2d() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_fwd_2d")
         comptime dtype = DType.float32
@@ -378,7 +378,7 @@ fn test_rlv_gpu_fwd_2d() raises:
         assert_true(out.to_cpu().all_close(Tensor[dtype].d2([[0.0, 2.0], [3.0, 0.0]])))
 
 
-fn test_rlv_gpu_fwd_3d() raises:
+def test_rlv_gpu_fwd_3d() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_fwd_3d")
         comptime dtype = DType.float32
@@ -387,7 +387,7 @@ fn test_rlv_gpu_fwd_3d() raises:
         assert_true(out.to_cpu().all_close(Tensor[dtype].zeros([2, 3, 4])))
 
 
-fn test_rlv_gpu_fwd_4d() raises:
+def test_rlv_gpu_fwd_4d() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_fwd_4d")
         comptime dtype = DType.float32
@@ -396,7 +396,7 @@ fn test_rlv_gpu_fwd_4d() raises:
         assert_true(out.to_cpu().all_close(Tensor[dtype].full([2, 2, 2, 2], 3.0)))
 
 
-fn test_rlv_gpu_fwd_large() raises:
+def test_rlv_gpu_fwd_large() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_fwd_large")
         comptime dtype = DType.float32
@@ -406,7 +406,7 @@ fn test_rlv_gpu_fwd_large() raises:
         assert_true(out.to_cpu().all_close(Tensor[dtype].full([131072], 2.0)))
 
 
-fn test_rlv_gpu_fwd_dtype_float64() raises:
+def test_rlv_gpu_fwd_dtype_float64() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_fwd_dtype_float64")
         comptime dtype = DType.float64
@@ -419,7 +419,7 @@ fn test_rlv_gpu_fwd_dtype_float64() raises:
 # ── SECTION 6: GPU BACKWARD (mask stays on device) ───────────────────────────
 # =============================================================================
 
-fn test_rlv_gpu_bwd_all_positive() raises:
+def test_rlv_gpu_bwd_all_positive() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_bwd_all_positive")
         comptime dtype = DType.float32
@@ -431,7 +431,7 @@ fn test_rlv_gpu_bwd_all_positive() raises:
         assert_true(a_cpu.grad().all_close(Tensor[dtype].d1([1.0, 1.0, 1.0])))
 
 
-fn test_rlv_gpu_bwd_all_negative() raises:
+def test_rlv_gpu_bwd_all_negative() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_bwd_all_negative")
         comptime dtype = DType.float32
@@ -443,7 +443,7 @@ fn test_rlv_gpu_bwd_all_negative() raises:
         assert_true(a_cpu.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 0.0])))
 
 
-fn test_rlv_gpu_bwd_mixed() raises:
+def test_rlv_gpu_bwd_mixed() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_bwd_mixed")
         comptime dtype = DType.float32
@@ -455,7 +455,7 @@ fn test_rlv_gpu_bwd_mixed() raises:
         assert_true(a_cpu.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 0.0, 1.0])))
 
 
-fn test_rlv_gpu_bwd_zero_boundary() raises:
+def test_rlv_gpu_bwd_zero_boundary() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_bwd_zero_boundary")
         comptime dtype = DType.float32
@@ -467,7 +467,7 @@ fn test_rlv_gpu_bwd_zero_boundary() raises:
         assert_true(a_cpu.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 0.0])))
 
 
-fn test_rlv_gpu_bwd_2d() raises:
+def test_rlv_gpu_bwd_2d() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_bwd_2d")
         comptime dtype = DType.float32
@@ -479,7 +479,7 @@ fn test_rlv_gpu_bwd_2d() raises:
         assert_true(a_cpu.grad().all_close(Tensor[dtype].d2([[0.0, 1.0], [1.0, 0.0]])))
 
 
-fn test_rlv_gpu_bwd_3d() raises:
+def test_rlv_gpu_bwd_3d() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_bwd_3d")
         comptime dtype = DType.float32
@@ -491,7 +491,7 @@ fn test_rlv_gpu_bwd_3d() raises:
         assert_true(a_cpu.grad().all_close(Tensor[dtype].ones(Shape(2, 2, 2))))
 
 
-fn test_rlv_gpu_bwd_large() raises:
+def test_rlv_gpu_bwd_large() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_bwd_large")
         comptime dtype = DType.float32
@@ -504,7 +504,7 @@ fn test_rlv_gpu_bwd_large() raises:
         assert_true(a_cpu.grad().all_close(Tensor[dtype].ones((65536))))
 
 
-fn test_rlv_gpu_bwd_grad_shape_preserved() raises:
+def test_rlv_gpu_bwd_grad_shape_preserved() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_bwd_grad_shape_preserved")
         comptime dtype = DType.float32
@@ -520,7 +520,7 @@ fn test_rlv_gpu_bwd_grad_shape_preserved() raises:
 # ── SECTION 7: GPU GRAD FLOW ─────────────────────────────────────────────────
 # =============================================================================
 
-fn test_rlv_gpu_grad_chain_relu_mul() raises:
+def test_rlv_gpu_grad_chain_relu_mul() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_grad_chain_relu_mul")
         comptime dtype = DType.float32
@@ -533,7 +533,7 @@ fn test_rlv_gpu_grad_chain_relu_mul() raises:
         assert_true(a_cpu.grad().all_close(Tensor[dtype].d1([0.0, 2.0, 2.0])))
 
 
-fn test_rlv_gpu_grad_chain_relu_relu() raises:
+def test_rlv_gpu_grad_chain_relu_relu() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_grad_chain_relu_relu")
         comptime dtype = DType.float32
@@ -546,7 +546,7 @@ fn test_rlv_gpu_grad_chain_relu_relu() raises:
         assert_true(a_cpu.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 1.0])))
 
 
-fn test_rlv_gpu_grad_chain_add_relu() raises:
+def test_rlv_gpu_grad_chain_add_relu() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_grad_chain_add_relu")
         comptime dtype = DType.float32
@@ -562,7 +562,7 @@ fn test_rlv_gpu_grad_chain_add_relu() raises:
         assert_true(b_cpu.grad().all_close(Tensor[dtype].d1([1.0, 0.0])))
 
 
-fn test_rlv_gpu_grad_scalar_chain() raises:
+def test_rlv_gpu_grad_scalar_chain() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_grad_scalar_chain")
         comptime dtype = DType.float32
@@ -579,7 +579,7 @@ fn test_rlv_gpu_grad_scalar_chain() raises:
 # (exercises contiguous_device_state() single-sweep path)
 # =============================================================================
 
-fn test_rlv_gpu_noncontig_transposed_fwd() raises:
+def test_rlv_gpu_noncontig_transposed_fwd() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_noncontig_transposed_fwd")
         comptime dtype = DType.float32
@@ -591,7 +591,7 @@ fn test_rlv_gpu_noncontig_transposed_fwd() raises:
         ))
 
 
-fn test_rlv_gpu_noncontig_transposed_bwd() raises:
+def test_rlv_gpu_noncontig_transposed_bwd() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_noncontig_transposed_bwd")
         comptime dtype = DType.float32
@@ -605,7 +605,7 @@ fn test_rlv_gpu_noncontig_transposed_bwd() raises:
         assert_equal(a_cpu.grad().shape(), a_cpu.shape())
 
 
-fn test_rlv_gpu_noncontig_single_map_to_host() raises:
+def test_rlv_gpu_noncontig_single_map_to_host() raises:
     comptime if has_accelerator():
         # Specifically verifies that non-contiguous GPU input does NOT
         # cause per-element map_to_host calls — exercises the
@@ -626,7 +626,7 @@ fn test_rlv_gpu_noncontig_single_map_to_host() raises:
 # ── SECTION 9: CPU / GPU PARITY ──────────────────────────────────────────────
 # =============================================================================
 
-fn test_rlv_parity_fwd_1d() raises:
+def test_rlv_parity_fwd_1d() raises:
     comptime if has_accelerator():
         print("test_rlv_parity_fwd_1d")
         comptime dtype = DType.float32
@@ -636,7 +636,7 @@ fn test_rlv_parity_fwd_1d() raises:
         assert_true(cpu_out.all_close(gpu_out))
 
 
-fn test_rlv_parity_fwd_2d() raises:
+def test_rlv_parity_fwd_2d() raises:
     comptime if has_accelerator():
         print("test_rlv_parity_fwd_2d")
         comptime dtype = DType.float32
@@ -646,7 +646,7 @@ fn test_rlv_parity_fwd_2d() raises:
         assert_true(cpu_out.all_close(gpu_out))
 
 
-fn test_rlv_parity_bwd_2d() raises:
+def test_rlv_parity_bwd_2d() raises:
     comptime if has_accelerator():
         print("test_rlv_parity_bwd_2d")
         comptime dtype = DType.float32
@@ -671,6 +671,6 @@ fn test_rlv_parity_bwd_2d() raises:
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 # =============================================================================
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll relu tests passed!")

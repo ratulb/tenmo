@@ -11,7 +11,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
@@ -58,7 +58,7 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct Summer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         tensor: Tensor[Self.dtype],

@@ -18,7 +18,7 @@ comptime F64 = DType.float64
 # CPU – Forward pass
 # ===----------------------------------------------------------------------=== #
 
-fn test_sig_cpu_scalar_forward() raises:
+def test_sig_cpu_scalar_forward() raises:
     """Sigmoid of a 0-D (scalar) tensor on CPU."""
     print("test_sig_cpu_scalar_forward")
     var x = Tensor[F32].scalar(0.0)
@@ -27,7 +27,7 @@ fn test_sig_cpu_scalar_forward() raises:
     assert_true(y.all_close(Tensor[F32].scalar(0.5)))
 
 
-fn test_sig_cpu_1d_forward_known_values() raises:
+def test_sig_cpu_1d_forward_known_values() raises:
     """Sigmoid of a 1-D tensor with analytically known values on CPU."""
     print("test_sig_cpu_1d_forward_known_values")
     # sigmoid(0)=0.5  sigmoid(inf)→1  sigmoid(-inf)→0
@@ -38,7 +38,7 @@ fn test_sig_cpu_1d_forward_known_values() raises:
     assert_true(y.all_close[atol=1e-5](expected))
 
 
-fn test_sig_cpu_2d_forward() raises:
+def test_sig_cpu_2d_forward() raises:
     """Sigmoid of a 2-D tensor on CPU."""
     print("test_sig_cpu_2d_forward")
     var x = Tensor[F32].d2([[0.0, 1.0], [-1.0, 2.0]])
@@ -49,7 +49,7 @@ fn test_sig_cpu_2d_forward() raises:
     assert_true(y.all_close[atol=1e-5](expected))
 
 
-fn test_sig_cpu_3d_forward() raises:
+def test_sig_cpu_3d_forward() raises:
     """Sigmoid of a 3-D tensor on CPU."""
     print("test_sig_cpu_3d_forward")
     var x = Tensor[F32].zeros([2, 3, 4])           # sigmoid(0)=0.5 everywhere
@@ -58,7 +58,7 @@ fn test_sig_cpu_3d_forward() raises:
     assert_true(y.all_close[atol=1e-6](expected))
 
 
-fn test_sig_cpu_4d_forward() raises:
+def test_sig_cpu_4d_forward() raises:
     """Sigmoid of a 4-D tensor on CPU."""
     print("test_sig_cpu_4d_forward")
     var x = Tensor[F32].zeros([2, 2, 3, 4])
@@ -67,7 +67,7 @@ fn test_sig_cpu_4d_forward() raises:
     assert_true(y.all_close[atol=1e-6](expected))
 
 
-fn test_sig_cpu_f64_forward() raises:
+def test_sig_cpu_f64_forward() raises:
     """Sigmoid forward with float64 dtype on CPU."""
     print("test_sig_cpu_f64_forward")
     var x = Tensor[F64].d1([0.0, 1.0, -1.0])
@@ -80,7 +80,7 @@ fn test_sig_cpu_f64_forward() raises:
 # CPU – Backward pass
 # ===----------------------------------------------------------------------=== #
 
-fn test_sig_cpu_scalar_backward() raises:
+def test_sig_cpu_scalar_backward() raises:
     """Backward through sigmoid of a 0-D tensor on CPU."""
     print("test_sig_cpu_scalar_backward")
     # d/dx sigmoid(x) = sigmoid(x) * (1 - sigmoid(x))
@@ -92,7 +92,7 @@ fn test_sig_cpu_scalar_backward() raises:
     assert_true(x.grad().all_close[atol=1e-6](Tensor[F32].scalar(0.25)))
 
 
-fn test_sig_cpu_1d_backward() raises:
+def test_sig_cpu_1d_backward() raises:
     """Backward through sigmoid of a 1-D tensor on CPU."""
     print("test_sig_cpu_1d_backward")
     var x = Tensor[F32].d1([0.0, 1.0, -1.0], requires_grad=True)
@@ -105,7 +105,7 @@ fn test_sig_cpu_1d_backward() raises:
     assert_true(x.grad().all_close[atol=1e-5](expected_grad))
 
 
-fn test_sig_cpu_2d_backward() raises:
+def test_sig_cpu_2d_backward() raises:
     """Backward through sigmoid of a 2-D tensor on CPU."""
     print("test_sig_cpu_2d_backward")
     var x = Tensor[F32].d2([[0.0, 2.0], [-2.0, 0.0]], requires_grad=True)
@@ -119,7 +119,7 @@ fn test_sig_cpu_2d_backward() raises:
     assert_true(x.grad().all_close[atol=1e-5](expected_grad))
 
 
-fn test_sig_cpu_3d_backward() raises:
+def test_sig_cpu_3d_backward() raises:
     """Backward through sigmoid of a 3-D tensor on CPU (all-zeros input)."""
     print("test_sig_cpu_3d_backward")
     var x = Tensor[F32].zeros([2, 3, 4], requires_grad=True)
@@ -131,7 +131,7 @@ fn test_sig_cpu_3d_backward() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_sig_cpu_4d_backward() raises:
+def test_sig_cpu_4d_backward() raises:
     """Backward through sigmoid of a 4-D tensor on CPU (all-zeros input)."""
     print("test_sig_cpu_4d_backward")
     var x = Tensor[F32].zeros([2, 2, 3, 4], requires_grad=True)
@@ -142,7 +142,7 @@ fn test_sig_cpu_4d_backward() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_sig_cpu_f64_backward() raises:
+def test_sig_cpu_f64_backward() raises:
     """Backward through sigmoid with float64 on CPU."""
     print("test_sig_cpu_f64_backward")
     var x = Tensor[F64].d1([0.0], requires_grad=True)
@@ -156,7 +156,7 @@ fn test_sig_cpu_f64_backward() raises:
 # CPU – Gradient-flow verifications
 # ===----------------------------------------------------------------------=== #
 
-fn test_sig_cpu_grad_no_grad_leaf() raises:
+def test_sig_cpu_grad_no_grad_leaf() raises:
     """Sigmoid output has no grad when requires_grad=False on leaf."""
     print("test_sig_cpu_grad_no_grad_leaf")
     var x = Tensor[F32].d1([1.0, 2.0], requires_grad=False)
@@ -167,7 +167,7 @@ fn test_sig_cpu_grad_no_grad_leaf() raises:
     assert_true(not x.requires_grad)
 
 
-fn test_sig_cpu_grad_chained_with_add() raises:
+def test_sig_cpu_grad_chained_with_add() raises:
     """Grad flows correctly through sigmoid followed by addition on CPU."""
     print("test_sig_cpu_grad_chained_with_add")
     var x = Tensor[F32].d1([0.0, 1.0], requires_grad=True)
@@ -181,7 +181,7 @@ fn test_sig_cpu_grad_chained_with_add() raises:
     assert_true(x.grad().all_close[atol=1e-5](expected))
 
 
-fn test_sig_cpu_grad_chained_with_mul() raises:
+def test_sig_cpu_grad_chained_with_mul() raises:
     """Grad flows correctly through sigmoid followed by multiplication on CPU."""
     print("test_sig_cpu_grad_chained_with_mul")
     var x = Tensor[F32].d1([0.0, -1.0], requires_grad=True)
@@ -196,7 +196,7 @@ fn test_sig_cpu_grad_chained_with_mul() raises:
     assert_true(x.grad().all_close[atol=1e-5](expected))
 
 
-fn test_sig_cpu_grad_double_sigmoid() raises:
+def test_sig_cpu_grad_double_sigmoid() raises:
     """Grad flows through two stacked sigmoids on CPU."""
     print("test_sig_cpu_grad_double_sigmoid")
     var x = Tensor[F32].d1([0.0], requires_grad=True)
@@ -215,7 +215,7 @@ fn test_sig_cpu_grad_double_sigmoid() raises:
     )
 
 
-fn test_sig_cpu_grad_track_grad_false_no_backward() raises:
+def test_sig_cpu_grad_track_grad_false_no_backward() raises:
     """When track_grad=False, sigmoid output should not participate in autograd."""
     print("test_sig_cpu_grad_track_grad_false_no_backward")
     var x = Tensor[F32].d1([1.0, 2.0], requires_grad=True)
@@ -224,7 +224,7 @@ fn test_sig_cpu_grad_track_grad_false_no_backward() raises:
     assert_true(not y.requires_grad)
 
 
-fn test_sig_cpu_grad_requires_grad_override() raises:
+def test_sig_cpu_grad_requires_grad_override() raises:
     """R[r]equires_grad kwarg overrides default grad tracking on CPU."""
     print("test_sig_cpu_grad_requires_grad_override")
     var x = Tensor[F32].d1([0.0, 1.0], requires_grad=True)
@@ -237,7 +237,7 @@ fn test_sig_cpu_grad_requires_grad_override() raises:
 # GPU – Forward pass
 # ===----------------------------------------------------------------------=== #
 
-fn test_sig_gpu_scalar_forward() raises:
+def test_sig_gpu_scalar_forward() raises:
     print("test_sig_gpu_scalar_forward")
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -246,7 +246,7 @@ fn test_sig_gpu_scalar_forward() raises:
         assert_true(y.to_cpu().all_close[atol=1e-6](Tensor[dtype].scalar(0.5)))
 
 
-fn test_sig_gpu_1d_forward() raises:
+def test_sig_gpu_1d_forward() raises:
     print("test_sig_gpu_1d_forward")
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -256,7 +256,7 @@ fn test_sig_gpu_1d_forward() raises:
         assert_true(y.to_cpu().all_close[atol=1e-5](expected))
 
 
-fn test_sig_gpu_2d_forward() raises:
+def test_sig_gpu_2d_forward() raises:
     print("test_sig_gpu_2d_forward")
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -268,7 +268,7 @@ fn test_sig_gpu_2d_forward() raises:
         assert_true(y.to_cpu().all_close[atol=1e-5](expected))
 
 
-fn test_sig_gpu_3d_forward() raises:
+def test_sig_gpu_3d_forward() raises:
     print("test_sig_gpu_3d_forward")
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -278,7 +278,7 @@ fn test_sig_gpu_3d_forward() raises:
         assert_true(y.to_cpu().all_close[atol=1e-6](expected))
 
 
-fn test_sig_gpu_4d_forward() raises:
+def test_sig_gpu_4d_forward() raises:
     print("test_sig_gpu_4d_forward")
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -288,7 +288,7 @@ fn test_sig_gpu_4d_forward() raises:
         assert_true(y.to_cpu().all_close[atol=1e-6](expected))
 
 
-fn test_sig_gpu_f64_forward() raises:
+def test_sig_gpu_f64_forward() raises:
     print("test_sig_gpu_f64_forward")
     comptime if has_accelerator():
         comptime dtype = DType.float64
@@ -304,7 +304,7 @@ fn test_sig_gpu_f64_forward() raises:
 # GPU – Backward pass
 # ===----------------------------------------------------------------------=== #
 
-fn test_sig_gpu_scalar_backward() raises:
+def test_sig_gpu_scalar_backward() raises:
     print("test_sig_gpu_scalar_backward")
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -317,7 +317,7 @@ fn test_sig_gpu_scalar_backward() raises:
         assert_true(x_cpu.grad().all_close[atol=1e-6](Tensor[dtype].scalar(0.25)))
 
 
-fn test_sig_gpu_1d_backward() raises:
+def test_sig_gpu_1d_backward() raises:
     print("test_sig_gpu_1d_backward")
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -331,7 +331,7 @@ fn test_sig_gpu_1d_backward() raises:
         assert_true(x_cpu.grad().all_close[atol=1e-5](expected))
 
 
-fn test_sig_gpu_2d_backward() raises:
+def test_sig_gpu_2d_backward() raises:
     print("test_sig_gpu_2d_backward")
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -345,7 +345,7 @@ fn test_sig_gpu_2d_backward() raises:
         assert_true(x_cpu.grad().all_close[atol=1e-5](expected))
 
 
-fn test_sig_gpu_3d_backward() raises:
+def test_sig_gpu_3d_backward() raises:
     print("test_sig_gpu_3d_backward")
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -358,7 +358,7 @@ fn test_sig_gpu_3d_backward() raises:
         assert_true(x_cpu.grad().all_close[atol=1e-6](expected))
 
 
-fn test_sig_gpu_4d_backward() raises:
+def test_sig_gpu_4d_backward() raises:
     print("test_sig_gpu_4d_backward")
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -371,7 +371,7 @@ fn test_sig_gpu_4d_backward() raises:
         assert_true(x_cpu.grad().all_close[atol=1e-6](expected))
 
 
-fn test_sig_gpu_f64_backward() raises:
+def test_sig_gpu_f64_backward() raises:
     print("test_sig_gpu_f64_backward")
     comptime if has_accelerator():
         comptime dtype = DType.float64
@@ -387,7 +387,7 @@ fn test_sig_gpu_f64_backward() raises:
 # GPU – Gradient-flow verifications
 # ===----------------------------------------------------------------------=== #
 
-fn test_sig_gpu_grad_chained_with_add() raises:
+def test_sig_gpu_grad_chained_with_add() raises:
     """Grad flows correctly through sigmoid followed by addition on GPU."""
     print("test_sig_gpu_grad_chained_with_add")
     comptime if has_accelerator():
@@ -403,7 +403,7 @@ fn test_sig_gpu_grad_chained_with_add() raises:
         assert_true(x_cpu.grad().all_close[atol=1e-5](expected))
 
 
-fn test_sig_gpu_grad_chained_with_mul() raises:
+def test_sig_gpu_grad_chained_with_mul() raises:
     """Grad flows correctly through sigmoid followed by multiplication on GPU."""
     print("test_sig_gpu_grad_chained_with_mul")
     comptime if has_accelerator():
@@ -420,7 +420,7 @@ fn test_sig_gpu_grad_chained_with_mul() raises:
         assert_true(x_cpu.grad().all_close[atol=1e-5](expected))
 
 
-fn test_sig_gpu_grad_double_sigmoid() raises:
+def test_sig_gpu_grad_double_sigmoid() raises:
     """Grad flows through two stacked sigmoids on GPU."""
     print("test_sig_gpu_grad_double_sigmoid")
     comptime if has_accelerator():
@@ -439,7 +439,7 @@ fn test_sig_gpu_grad_double_sigmoid() raises:
         )
 
 
-fn test_sig_gpu_grad_track_grad_false() raises:
+def test_sig_gpu_grad_track_grad_false() raises:
     """T[t]rack_grad=False on GPU: output must not carry requires_grad."""
     print("test_sig_gpu_grad_track_grad_false")
     comptime if has_accelerator():
@@ -449,7 +449,7 @@ fn test_sig_gpu_grad_track_grad_false() raises:
         assert_true(not y.requires_grad)
 
 
-fn test_sig_gpu_cpu_forward_parity() raises:
+def test_sig_gpu_cpu_forward_parity() raises:
     """CPU and GPU sigmoid produce identical results for the same input."""
     print("test_sig_gpu_cpu_forward_parity")
     comptime if has_accelerator():
@@ -461,7 +461,7 @@ fn test_sig_gpu_cpu_forward_parity() raises:
         assert_true(y_cpu.all_close[atol=1e-6](y_gpu.to_cpu()))
 
 
-fn test_sig_gpu_cpu_backward_parity() raises:
+def test_sig_gpu_cpu_backward_parity() raises:
     """CPU and GPU sigmoid produce identical gradients for the same input."""
     print("test_sig_gpu_cpu_backward_parity")
     comptime if has_accelerator():
@@ -484,6 +484,6 @@ fn test_sig_gpu_cpu_backward_parity() raises:
 # Entry point
 # ===----------------------------------------------------------------------=== #
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll sigmoid tests passed!")

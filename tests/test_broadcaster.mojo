@@ -5,7 +5,7 @@ from tenmo.broadcasthelper import ShapeBroadcaster
 from tenmo.intarray import IntArray
 
 
-fn test_empty_shape_broadcastable() raises:
+def test_empty_shape_broadcastable() raises:
     print("test_empty_shape_broadcastable")
     shape = Shape()
     assert_true(
@@ -34,7 +34,7 @@ fn test_empty_shape_broadcastable() raises:
     )
 
 
-fn test_broadcast_shape() raises:
+def test_broadcast_shape() raises:
     print("test_broadcast_shape")
     shape1 = Shape.of(32, 16)
     shape2 = Shape.of(
@@ -77,7 +77,7 @@ fn test_broadcast_shape() raises:
     )
 
 
-fn test_broadcastable() raises:
+def test_broadcastable() raises:
     print("test_broadcastable")
     comptime dtype = DType.float32
     assert_true(
@@ -104,7 +104,7 @@ fn test_broadcastable() raises:
     )
 
 
-fn test_pad_shapes() raises:
+def test_pad_shapes() raises:
     print("test_pad_shapes")
     shape1 = Shape.of(3, 4)
     shape2 = Shape.of(
@@ -140,6 +140,6 @@ fn test_pad_shapes() raises:
     )
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll broadcaster tests passed!")

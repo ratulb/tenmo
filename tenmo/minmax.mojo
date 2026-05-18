@@ -12,7 +12,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var bwd_arg = (
@@ -50,7 +50,7 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
 @fieldwise_init
 struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         max: Bool, track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],

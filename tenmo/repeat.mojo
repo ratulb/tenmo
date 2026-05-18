@@ -7,7 +7,7 @@ from .tiles import TileBackward, Tile
 @fieldwise_init
 struct Repeat[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         mut self: Tensor[Self.dtype],

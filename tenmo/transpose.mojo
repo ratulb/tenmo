@@ -10,7 +10,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct TransposeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var axes = output.ancestry().backward_fn_arg().get[IntArrayArg]().array
@@ -31,7 +31,7 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct Transpose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         mut self: Tensor[Self.dtype],

@@ -78,12 +78,12 @@ struct IMDBPreprocessor:
 
     var reviews: Optional[List[Review]]
 
-    fn __init__(out self):
+    def __init__(out self):
         self.reviews = Optional(List[Review](capacity=50000))
 
     # ── Loading ───────────────────────────────────────────────────────────────
 
-    fn load_from_folder(mut self, folder_path: String) raises:
+    def load_from_folder(mut self, folder_path: String) raises:
         """Recursively load all pos/neg reviews under folder_path.
 
         Args:
@@ -108,7 +108,7 @@ struct IMDBPreprocessor:
                     var comment = neg_path.joinpath(item.name()).read_text()
                     reviews.append(Review(rating, comment))
 
-    fn extract_rating(self, filename: String) -> Int:
+    def extract_rating(self, filename: String) -> Int:
         """Parse the numeric rating embedded in an IMDB filename.
 
         IMDB filenames follow the pattern '<review_id>_<rating>.txt',
@@ -131,7 +131,7 @@ struct IMDBPreprocessor:
 
     # ── Tokenizer ─────────────────────────────────────────────────────────────
 
-    fn init_tokenizer(
+    def init_tokenizer(
         self,
         min_freq: Int = 5,
         max_n: Int = 1,
@@ -151,7 +151,7 @@ struct IMDBPreprocessor:
 
     # ── Dataset builder ───────────────────────────────────────────────────────
 
-    fn build_datasets(
+    def build_datasets(
         self,
         tokenizer: DefaultTokenizer,
         shuffle: Bool = True,
@@ -212,7 +212,7 @@ struct IMDBPreprocessor:
             input_dataset.swap_elements(idx, j)
             target_dataset.swap_elements(idx, j)
 
-    fn get_labels(self) -> List[Int]:
+    def get_labels(self) -> List[Int]:
         """Return binary labels for all loaded reviews (convenience method).
 
         Returns:
@@ -229,7 +229,7 @@ struct IMDBPreprocessor:
 # =============================================================================
 
 
-fn sigmoid[
+def sigmoid[
     dtype: DType
 ](x: Tensor[dtype]) -> Tensor[dtype] where dtype.is_floating_point():
     """Element-wise sigmoid: σ(x) = 1 / (1 + e^(−x)).
@@ -507,7 +507,7 @@ def compare(
     return x[1] > y[1]
 
 
-fn download(
+def download(
     to: String = "/tmp",
     # url: String = "https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz",
     url: String = "https://huggingface.co/datasets/NolanChai/aclImdb_v1/resolve/main/aclImdb_v1.tar.gz",

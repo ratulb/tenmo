@@ -6,7 +6,7 @@ from .common_utils import panic
 struct MatrixShapeValidator(ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
-    fn validate_matrix_shapes_nd(A_shape: Shape, B_shape: Shape):
+    def validate_matrix_shapes_nd(A_shape: Shape, B_shape: Shape):
         if len(A_shape) < 2 or len(B_shape) < 2:
             panic(
                 "MatrixShapeValidator → validate_matrix_shapes_nd: matmul_nd"
@@ -40,7 +40,7 @@ struct MatrixShapeValidator(ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn validate_matrix_shapes_2d(A_shape: Shape, B_shape: Shape):
+    def validate_matrix_shapes_2d(A_shape: Shape, B_shape: Shape):
         if len(A_shape) != 2 or len(B_shape) != 2:
             panic(
                 "MatrixShapeValidator → validate_matrix_shapes_2d: matmul_2d"

@@ -6,7 +6,7 @@ from tenmo.common_utils import s, i
 # 1D TENSOR chunking TESTS
 # ============================================================================
 
-fn test_chunk_1d_full() raises:
+def test_chunk_1d_full() raises:
     """Test chunking entire 1D tensor."""
     print("test_chunk_1d_full")
 
@@ -20,7 +20,7 @@ fn test_chunk_1d_full() raises:
     assert_true(chunked.all_close[atol=1e-6](x))
 
 
-fn test_chunk_1d_start_only() raises:
+def test_chunk_1d_start_only() raises:
     """Test 1D slice with start index only."""
     print("test_chunk_1d_start_only")
 
@@ -35,7 +35,7 @@ fn test_chunk_1d_start_only() raises:
     assert_true(chunked.all_close[atol=1e-6](expected))
 
 
-fn test_chunk_1d_end_only() raises:
+def test_chunk_1d_end_only() raises:
     """Test 1D slice with end index only."""
     print("test_chunk_1d_end_only")
 
@@ -51,7 +51,7 @@ fn test_chunk_1d_end_only() raises:
     assert_true(chunked.all_close[atol=1e-6](expected))
 
 
-fn test_chunk_1d_start_end() raises:
+def test_chunk_1d_start_end() raises:
     """Test 1D slice with both start and end."""
     print("test_chunk_1d_start_end")
 
@@ -66,7 +66,7 @@ fn test_chunk_1d_start_end() raises:
     assert_true(chunked.all_close[atol=1e-6](expected))
 
 
-fn test_chunk_1d_with_step() raises:
+def test_chunk_1d_with_step() raises:
     """Test 1D slice with step."""
     print("test_chunk_1d_with_step")
 
@@ -80,7 +80,7 @@ fn test_chunk_1d_with_step() raises:
     var expected = Tensor[dtype].d1([1.0, 3.0, 5.0])
     assert_true(chunked.all_close[atol=1e-6](expected))
 
-fn test_chunk_1d_negative_indices() raises:
+def test_chunk_1d_negative_indices() raises:
     """Test 1D slice with negative indices."""
     print("test_chunk_1d_negative_indices")
 
@@ -96,7 +96,7 @@ fn test_chunk_1d_negative_indices() raises:
     assert_true(chunked.all_close[atol=1e-6](expected))
 
 
-fn test_chunk_1d_single_element() raises:
+def test_chunk_1d_single_element() raises:
     """Test 1D slice getting single element range."""
     print("test_chunk_1d_single_element")
 
@@ -114,7 +114,7 @@ fn test_chunk_1d_single_element() raises:
 # 2D TENSOR chunking TESTS
 # ============================================================================
 
-fn test_chunk_2d_full() raises:
+def test_chunk_2d_full() raises:
     """Test chunking entire 2D tensor."""
     print("test_chunk_2d_full")
 
@@ -128,7 +128,7 @@ fn test_chunk_2d_full() raises:
     assert_true(chunked.all_close[atol=1e-6](x))
 
 
-fn test_chunk_2d_single_row() raises:
+def test_chunk_2d_single_row() raises:
     """Test chunking single row from 2D tensor."""
     print("test_chunk_2d_single_row")
 
@@ -144,7 +144,7 @@ fn test_chunk_2d_single_row() raises:
     assert_true(chunked.all_close[atol=1e-6](expected))
 
 
-fn test_chunk_2d_single_column() raises:
+def test_chunk_2d_single_column() raises:
     """Test chunking single column from 2D tensor."""
     print("test_chunk_2d_single_column")
 
@@ -160,7 +160,7 @@ fn test_chunk_2d_single_column() raises:
     assert_true(chunked.all_close[atol=1e-6](expected))
 
 
-fn test_chunk_2d_submatrix() raises:
+def test_chunk_2d_submatrix() raises:
     """Test chunking submatrix from 2D tensor."""
     print("test_chunk_2d_submatrix")
 
@@ -181,7 +181,7 @@ fn test_chunk_2d_submatrix() raises:
     assert_true(chunked.all_close[atol=1e-6](expected))
 
 
-fn test_chunk_2d_rows_subset() raises:
+def test_chunk_2d_rows_subset() raises:
     """Test chunking subset of rows."""
     print("test_chunk_2d_rows_subset")
 
@@ -202,7 +202,7 @@ fn test_chunk_2d_rows_subset() raises:
     assert_true(chunked.all_close[atol=1e-6](expected))
 
 
-fn test_chunk_2d_cols_subset() raises:
+def test_chunk_2d_cols_subset() raises:
     """Test chunking subset of columns."""
     print("test_chunk_2d_cols_subset")
 
@@ -222,7 +222,7 @@ fn test_chunk_2d_cols_subset() raises:
     assert_true(chunked.all_close[atol=1e-6](expected))
 
 
-fn test_chunk_2d_with_step() raises:
+def test_chunk_2d_with_step() raises:
     """Test 2D chunking with step."""
     print("test_chunk_2d_with_step")
 
@@ -247,7 +247,7 @@ fn test_chunk_2d_with_step() raises:
 # 3D TENSOR chunking TESTS
 # ============================================================================
 
-fn test_chunk_3d_full() raises:
+def test_chunk_3d_full() raises:
     """Test chunking entire 3D tensor."""
     print("test_chunk_3d_full")
 
@@ -262,7 +262,7 @@ fn test_chunk_3d_full() raises:
     assert_true(chunked.all_close[atol=1e-6](x))
 
 
-fn test_chunk_3d_single_depth() raises:
+def test_chunk_3d_single_depth() raises:
     """Test chunking single depth slice from 3D tensor."""
     print("test_chunk_3d_single_depth")
 
@@ -278,7 +278,7 @@ fn test_chunk_3d_single_depth() raises:
     assert_true(chunked.shape()[2] == 4)
 
 
-fn test_chunk_3d_subvolume() raises:
+def test_chunk_3d_subvolume() raises:
     """Test chunking subvolume from 3D tensor."""
     print("test_chunk_3d_subvolume")
 
@@ -296,7 +296,7 @@ fn test_chunk_3d_subvolume() raises:
     assert_true(chunked.shape()[2] == 2)
 
 
-fn test_chunk_3d_single_channel() raises:
+def test_chunk_3d_single_channel() raises:
     """Test chunking single channel from 3D tensor (like CNN)."""
     print("test_chunk_3d_single_channel")
 
@@ -310,7 +310,7 @@ fn test_chunk_3d_single_channel() raises:
     assert_true(chunked.shape()[2] == 28)
 
 
-fn test_chunk_3d_spatial_region() raises:
+def test_chunk_3d_spatial_region() raises:
     """Test chunking spatial region from 3D tensor."""
     print("test_chunk_3d_spatial_region")
 
@@ -329,7 +329,7 @@ fn test_chunk_3d_spatial_region() raises:
 # 4D TENSOR chunking TESTS (CNN BATCH)
 # ============================================================================
 
-fn test_chunk_4d_full() raises:
+def test_chunk_4d_full() raises:
     """Test chunking entire 4D tensor."""
     print("test_chunk_4d_full")
 
@@ -344,7 +344,7 @@ fn test_chunk_4d_full() raises:
     assert_true(chunked.shape()[3] == 28)
 
 
-fn test_chunk_4d_single_batch() raises:
+def test_chunk_4d_single_batch() raises:
     """Test chunking single batch element from 4D tensor."""
     print("test_chunk_4d_single_batch")
 
@@ -359,7 +359,7 @@ fn test_chunk_4d_single_batch() raises:
     assert_true(chunked.shape()[3] == 32)
 
 
-fn test_chunk_4d_batch_subset() raises:
+def test_chunk_4d_batch_subset() raises:
     """Test chunking subset of batch."""
     print("test_chunk_4d_batch_subset")
 
@@ -374,7 +374,7 @@ fn test_chunk_4d_batch_subset() raises:
     assert_true(chunked.shape()[3] == 32)
 
 
-fn test_chunk_4d_channel_subset() raises:
+def test_chunk_4d_channel_subset() raises:
     """Test chunking subset of channels from 4D tensor."""
     print("test_chunk_4d_channel_subset")
 
@@ -389,7 +389,7 @@ fn test_chunk_4d_channel_subset() raises:
     assert_true(chunked.shape()[3] == 14)
 
 
-fn test_chunk_4d_spatial_crop() raises:
+def test_chunk_4d_spatial_crop() raises:
     """Test spatial cropping from 4D tensor."""
     print("test_chunk_4d_spatial_crop")
 
@@ -408,7 +408,7 @@ fn test_chunk_4d_spatial_crop() raises:
 # CHAINED chunking TESTS
 # ============================================================================
 
-fn test_chained_chunking_2d() raises:
+def test_chained_chunking_2d() raises:
     """Test chaining multiple chunking operations."""
     print("test_chained_chunking_2d")
 
@@ -430,7 +430,7 @@ fn test_chained_chunking_2d() raises:
     assert_true(chunk2.all_close[atol=1e-6](expected))
 
 
-fn test_chained_chunking_3d() raises:
+def test_chained_chunking_3d() raises:
     """Test chaining slices on 3D tensor."""
     print("test_chained_chunking_3d")
 
@@ -452,7 +452,7 @@ fn test_chained_chunking_3d() raises:
 # IMMUTABILITY TESTS (KEY FOR 'self' vs 'mut self')
 # ============================================================================
 
-fn test_immutable_multiple_slices() raises:
+def test_immutable_multiple_slices() raises:
     """Test that we can create multiple slices from same immutable tensor."""
     print("test_immutable_multiple_slices")
 
@@ -474,7 +474,7 @@ fn test_immutable_multiple_slices() raises:
     assert_true(slice3[0] == 2.0)
 
 
-fn test_immutable_chunk_from_const() raises:
+def test_immutable_chunk_from_const() raises:
     """Test chunking from a const-reference like scenario."""
     print("test_immutable_chunk_from_const")
 
@@ -488,7 +488,7 @@ fn test_immutable_chunk_from_const() raises:
     assert_true(chunked.all_close[atol=1e-6](expected))
 
 
-fn test_immutable_overlapping_slices() raises:
+def test_immutable_overlapping_slices() raises:
     """Test creating overlapping slices (only possible with 'self')."""
     print("test_immutable_overlapping_slices")
 
@@ -519,7 +519,7 @@ fn test_immutable_overlapping_slices() raises:
 # GRADIENT FLOW TESTS
 # ============================================================================
 
-fn test_chunk_backward_1d() raises:
+def test_chunk_backward_1d() raises:
     """Test gradient flow through 1D slice."""
     print("test_chunk_backward_1d")
 
@@ -535,7 +535,7 @@ fn test_chunk_backward_1d() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_chunk_backward_2d() raises:
+def test_chunk_backward_2d() raises:
     """Test gradient flow through 2D slice."""
     print("test_chunk_backward_2d")
 
@@ -565,7 +565,7 @@ fn test_chunk_backward_2d() raises:
 # MAIN TEST RUNNER
 # ============================================================================
 
-fn main() raises:
+def main() raises:
     _ = """
     print("=" * 80)
     print("TENSOR chunking COMPREHENSIVE TEST SUITE")

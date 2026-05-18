@@ -56,7 +56,7 @@ struct LayerNormBwdArg[dtype: DType](ArgumentType):
 @fieldwise_init
 struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref arg = (
@@ -135,7 +135,7 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],
@@ -208,7 +208,7 @@ struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
     var eps: Scalar[Self.dtype]
     var training: Bool
 
-    fn __init__(
+    def __init__(
         out self,
         normalized_shape: Int,
         eps: Scalar[Self.dtype] = Scalar[Self.dtype](1e-5),
@@ -223,7 +223,7 @@ struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
             Shape(normalized_shape), requires_grad=True
         )
 
-    fn __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         if self.training:
             return LayerNormForward[Self.dtype].forward[track_grad=True](
                 x, self.gamma, self.beta, self.eps
@@ -233,7 +233,7 @@ struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
                 x, self.gamma, self.beta, self.eps
             )
 
-    fn parameters(
+    def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
@@ -245,30 +245,30 @@ struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
         )
         return params^
 
-    fn num_parameters(self) -> Int:
+    def num_parameters(self) -> Int:
         return self.gamma.numels() + self.beta.numels()
 
-    fn train(mut self):
+    def train(mut self):
         """Set to training mode."""
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         """Set to evaluation mode — no gradient tracking."""
         self.training = False
 
-    fn to_gpu(deinit self, gpu: Optional[GPU] = None) raises -> Self:
+    def to_gpu(deinit self, gpu: Optional[GPU] = None) raises -> Self:
         """Move gamma and beta to GPU as permanent GPU leaves."""
         var out = self^
         out.gamma = out.gamma.to_gpu(gpu=gpu, stop_grad=True)
         out.beta = out.beta.to_gpu(gpu=gpu, stop_grad=True)
         return out^
 
-    fn to_cpu(deinit self) raises -> Self:
+    def to_cpu(deinit self) raises -> Self:
         """Move gamma and beta back to CPU after training."""
         var out = self^
         out.gamma = out.gamma.to_cpu(stop_grad=True)
         out.beta = out.beta.to_cpu(stop_grad=True)
         return out^
 
-    fn into(self) -> Module[Self.dtype]:
+    def into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), LAYER_NORM)

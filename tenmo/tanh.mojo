@@ -8,7 +8,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[
         Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
@@ -24,7 +24,7 @@ struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct Tanh[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],

@@ -20,7 +20,7 @@ from .common_utils import One, Epsilon
 from std.math import rsqrt
 
 
-fn arithmetic_ops_both_contiguous[
+def arithmetic_ops_both_contiguous[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -113,7 +113,7 @@ fn arithmetic_ops_both_contiguous[
         base_idx += grid_stride * CHUNK_SIZE
 
 
-fn arithmetic_ops_A_contiguous[
+def arithmetic_ops_A_contiguous[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -229,7 +229,7 @@ fn arithmetic_ops_A_contiguous[
         base_idx += grid_stride * CHUNK_SIZE
 
 
-fn arithmetic_ops_B_contiguous[
+def arithmetic_ops_B_contiguous[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -345,7 +345,7 @@ fn arithmetic_ops_B_contiguous[
         base_idx += grid_stride * CHUNK_SIZE
 
 
-fn arithmetic_ops_both_strided[
+def arithmetic_ops_both_strided[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -472,7 +472,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
-    fn launch[
+    def launch[
         op_code: Int,
     ](
         A: NDBuffer[Self.dtype],
@@ -652,7 +652,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
         )
 
     @staticmethod
-    fn launch_config(output_size: Int) -> Tuple[Int, Int]:
+    def launch_config(output_size: Int) -> Tuple[Int, Int]:
         var threads_per_block: Int
         var num_blocks: Int
 

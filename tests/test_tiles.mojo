@@ -5,7 +5,7 @@ from std.sys import has_accelerator
 
 
 # Start of old tests
-fn test_tile_axis_selective_grad() raises:
+def test_tile_axis_selective_grad() raises:
     print("test_tile_axis_selective_grad")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d3(
@@ -20,7 +20,7 @@ fn test_tile_axis_selective_grad() raises:
     )
 
 
-fn test_tile_nonrepeated_axis_stability() raises:
+def test_tile_nonrepeated_axis_stability() raises:
     print("test_tile_nonrepeated_axis_stability")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d3(
@@ -37,7 +37,7 @@ fn test_tile_nonrepeated_axis_stability() raises:
     )
 
 
-fn test_tile_scalar() raises:
+def test_tile_scalar() raises:
     print("test_tile_scalar")
     comptime dtype = DType.float32
     var x = Tensor[dtype].scalar(2.0, requires_grad=True)
@@ -48,7 +48,7 @@ fn test_tile_scalar() raises:
     assert_true(x.grad().all_close(Tensor[dtype].scalar(6.0)))
 
 
-fn test_tile_1d_repeats() raises:
+def test_tile_1d_repeats() raises:
     print("test_tile_1d_repeats")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -59,7 +59,7 @@ fn test_tile_1d_repeats() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d1([4.0, 4.0, 4.0])))
 
 
-fn test_tile_2d_nonuniform_repeats() raises:
+def test_tile_2d_nonuniform_repeats() raises:
     print("test_tile_2d_nonuniform_repeats")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -70,7 +70,7 @@ fn test_tile_2d_nonuniform_repeats() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d2([[6.0, 6.0], [6.0, 6.0]])))
 
 
-fn test_tile_high_dimensional() raises:
+def test_tile_high_dimensional() raises:
     print("test_tile_high_dimensional")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -82,7 +82,7 @@ fn test_tile_high_dimensional() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d1([12.0, 12.0])))
 
 
-fn test_tile_in_computational_graph() raises:
+def test_tile_in_computational_graph() raises:
     print("test_tile_in_computational_graph")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -97,7 +97,7 @@ fn test_tile_in_computational_graph() raises:
     assert_true(b.grad().all_close(Tensor[dtype].d1([3.0, 6.0])))
 
 
-fn test_tensor_tiles_1d() raises:
+def test_tensor_tiles_1d() raises:
     print("test_tensor_tiles_1d")
     comptime dtype = DType.float32
 
@@ -118,7 +118,7 @@ fn test_tensor_tiles_1d() raises:
     print("Passed 1D tiles test")
 
 
-fn test_tensor_tiles_2d() raises:
+def test_tensor_tiles_2d() raises:
     print("test_tensor_tiles_2d")
     comptime dtype = DType.float32
 
@@ -139,7 +139,7 @@ fn test_tensor_tiles_2d() raises:
     print("Passed 2D tiles test")
 
 
-fn test_tensor_tiles_1d_to_2d_with_gradients() raises:
+def test_tensor_tiles_1d_to_2d_with_gradients() raises:
     print("test_tensor_tiles_1d_to_2d_with_gradients")
     comptime dtype = DType.float32
 
@@ -166,7 +166,7 @@ fn test_tensor_tiles_1d_to_2d_with_gradients() raises:
     print("Passed 1D to 2D tiles with gradients test")
 
 
-fn test_tensor_tiles_2d_to_3d_with_gradients() raises:
+def test_tensor_tiles_2d_to_3d_with_gradients() raises:
     print("test_tensor_tiles_2d_to_3d_with_gradients")
     comptime dtype = DType.float32
 
@@ -185,7 +185,7 @@ fn test_tensor_tiles_2d_to_3d_with_gradients() raises:
     print("Passed 2D to 3D tiles with gradients test")
 
 
-fn test_scalar_tiles_1d() raises:
+def test_scalar_tiles_1d() raises:
     print("test_scalar_tiles_1d")
     comptime dtype = DType.float32
     var x = Tensor[dtype].scalar(2.0, requires_grad=True)
@@ -198,7 +198,7 @@ fn test_scalar_tiles_1d() raises:
     assert_true(x.grad().item() == 5.0)
 
 
-fn test_scalar_tiles_2d() raises:
+def test_scalar_tiles_2d() raises:
     print("test_scalar_tiles_2d")
     comptime dtype = DType.float32
     var x = Tensor[dtype].scalar(3.0, requires_grad=True)
@@ -213,7 +213,7 @@ fn test_scalar_tiles_2d() raises:
     assert_true(x.grad().item() == 6.0)
 
 
-fn test_1d_tiles_single_dimension() raises:
+def test_1d_tiles_single_dimension() raises:
     print("test_1d_tiles_single_dimension")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -229,7 +229,7 @@ fn test_1d_tiles_single_dimension() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d1([4.0, 4.0, 4.0])))
 
 
-fn test_1d_tiles_to_2d() raises:
+def test_1d_tiles_to_2d() raises:
     print("test_1d_tiles_to_2d")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -245,7 +245,7 @@ fn test_1d_tiles_to_2d() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d1([6.0, 6.0])))
 
 
-fn test_1d_tiles_multiple_dims() raises:
+def test_1d_tiles_multiple_dims() raises:
     print("test_1d_tiles_multiple_dims")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -258,7 +258,7 @@ fn test_1d_tiles_multiple_dims() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d1([6.0, 6.0])))
 
 
-fn test_2d_tiles_single_dimension() raises:
+def test_2d_tiles_single_dimension() raises:
     print("test_2d_tiles_single_dimension")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -273,7 +273,7 @@ fn test_2d_tiles_single_dimension() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d2([[2.0, 2.0], [2.0, 2.0]])))
 
 
-fn test_2d_tiles_both_dims() raises:
+def test_2d_tiles_both_dims() raises:
     print("test_2d_tiles_both_dims")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)
@@ -289,7 +289,7 @@ fn test_2d_tiles_both_dims() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d2([[6.0, 6.0]])))
 
 
-fn test_2d_tiles_3d_output() raises:
+def test_2d_tiles_3d_output() raises:
     print("test_2d_tiles_3d_output")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -302,7 +302,7 @@ fn test_2d_tiles_3d_output() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d2([[2.0, 2.0], [2.0, 2.0]])))
 
 
-fn test_3d_tiles_single_batch() raises:
+def test_3d_tiles_single_batch() raises:
     print("test_3d_tiles_single_batch")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True)
@@ -316,7 +316,7 @@ fn test_3d_tiles_single_batch() raises:
     )
 
 
-fn test_3d_tiles_all_dims() raises:
+def test_3d_tiles_all_dims() raises:
     print("test_3d_tiles_all_dims")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d3([[[1.0], [2.0]]], requires_grad=True)
@@ -329,7 +329,7 @@ fn test_3d_tiles_all_dims() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d3([[[24.0], [24.0]]])))
 
 
-fn test_tiles_with_leading_singleton_dims() raises:
+def test_tiles_with_leading_singleton_dims() raises:
     print("test_tiles_with_leading_singleton_dims")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -341,7 +341,7 @@ fn test_tiles_with_leading_singleton_dims() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d1([3.0, 3.0])))
 
 
-fn test_tiles_with_trailing_singleton_dims() raises:
+def test_tiles_with_trailing_singleton_dims() raises:
     print("test_tiles_with_trailing_singleton_dims")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -353,7 +353,7 @@ fn test_tiles_with_trailing_singleton_dims() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d1([3.0, 3.0])))
 
 
-fn test_tiles_complex_broadcasting_pattern() raises:
+def test_tiles_complex_broadcasting_pattern() raises:
     print("test_tiles_complex_broadcasting_pattern")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0], [2.0]], requires_grad=True)
@@ -366,7 +366,7 @@ fn test_tiles_complex_broadcasting_pattern() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d2([[6.0], [6.0]])))
 
 
-fn test_tiles_gradient_accumulation() raises:
+def test_tiles_gradient_accumulation() raises:
     print("test_tiles_gradient_accumulation")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -379,7 +379,7 @@ fn test_tiles_gradient_accumulation() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d1([5.0, 5.0, 5.0])))
 
 
-fn test_tiles_in_computational_graph() raises:
+def test_tiles_in_computational_graph() raises:
     print("test_tiles_in_computational_graph")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -398,7 +398,7 @@ fn test_tiles_in_computational_graph() raises:
     assert_true(b.grad().all_close(Tensor[dtype].d1([4.0, 8.0])))
 
 
-fn test_tiles_with_negative_gradient_flow() raises:
+def test_tiles_with_negative_gradient_flow() raises:
     print("test_tiles_with_negative_gradient_flow")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([2.0, 3.0], requires_grad=True)
@@ -411,7 +411,7 @@ fn test_tiles_with_negative_gradient_flow() raises:
     assert_true(x.grad().all_close(Tensor[dtype].d1([-2.0, -2.0])))
 
 
-fn test_tiles_high_dimensional() raises:
+def test_tiles_high_dimensional() raises:
     print("test_tiles_high_dimensional")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -432,7 +432,7 @@ fn test_tiles_high_dimensional() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_tile_cpu_1d_basic() raises:
+def test_tile_cpu_1d_basic() raises:
     print("test_tile_cpu_1d_basic")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -445,7 +445,7 @@ fn test_tile_cpu_1d_basic() raises:
     )
 
 
-fn test_tile_cpu_1d_once() raises:
+def test_tile_cpu_1d_once() raises:
     print("test_tile_cpu_1d_once")
     comptime dtype = DType.float32
     # Tile by 1 — identity
@@ -455,7 +455,7 @@ fn test_tile_cpu_1d_once() raises:
     assert_true(result.all_close(a))
 
 
-fn test_tile_cpu_2d_both_dims() raises:
+def test_tile_cpu_2d_both_dims() raises:
     print("test_tile_cpu_2d_both_dims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -470,7 +470,7 @@ fn test_tile_cpu_2d_both_dims() raises:
     assert_true(result[[2, 1]] == Scalar[dtype](2.0))
 
 
-fn test_tile_cpu_2d_rows_only() raises:
+def test_tile_cpu_2d_rows_only() raises:
     print("test_tile_cpu_2d_rows_only")
     comptime dtype = DType.float32
     # tile([3]) on (2,3) → (2,9) — fewer repeat dims than rank
@@ -479,7 +479,7 @@ fn test_tile_cpu_2d_rows_only() raises:
     assert_true(result.shape() == Shape(2, 9))
 
 
-fn test_tile_cpu_2d_extra_repeat_dims() raises:
+def test_tile_cpu_2d_extra_repeat_dims() raises:
     print("test_tile_cpu_2d_extra_repeat_dims")
     comptime dtype = DType.float32
     # tile([2,3,4]) on (2,3) → (2,6,12) — more repeat dims than rank
@@ -489,7 +489,7 @@ fn test_tile_cpu_2d_extra_repeat_dims() raises:
     assert_true(result.numels() == 144)
 
 
-fn test_tile_cpu_3d_basic() raises:
+def test_tile_cpu_3d_basic() raises:
     print("test_tile_cpu_3d_basic")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
@@ -500,7 +500,7 @@ fn test_tile_cpu_3d_basic() raises:
     assert_true(result.numels() == 16)
 
 
-fn test_tile_cpu_values_preserved() raises:
+def test_tile_cpu_values_preserved() raises:
     print("test_tile_cpu_values_preserved")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([10.0, 20.0])
@@ -510,7 +510,7 @@ fn test_tile_cpu_values_preserved() raises:
         assert_true(result[[i * 2 + 1]] == Scalar[dtype](20.0))
 
 
-fn test_tile_cpu_no_grad() raises:
+def test_tile_cpu_no_grad() raises:
     print("test_tile_cpu_no_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=False)
@@ -518,7 +518,7 @@ fn test_tile_cpu_no_grad() raises:
     assert_true(not result.requires_grad)
 
 
-fn test_tile_cpu_requires_grad() raises:
+def test_tile_cpu_requires_grad() raises:
     print("test_tile_cpu_requires_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -526,7 +526,7 @@ fn test_tile_cpu_requires_grad() raises:
     assert_true(result.requires_grad)
 
 
-fn test_tile_cpu_suppress_grad() raises:
+def test_tile_cpu_suppress_grad() raises:
     print("test_tile_cpu_suppress_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -539,7 +539,7 @@ fn test_tile_cpu_suppress_grad() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_tile_cpu_backward_1d() raises:
+def test_tile_cpu_backward_1d() raises:
     print("test_tile_cpu_backward_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -550,7 +550,7 @@ fn test_tile_cpu_backward_1d() raises:
     assert_true(a.grad().all_close(Tensor[dtype].full(Shape(3), 3.0)))
 
 
-fn test_tile_cpu_backward_2d() raises:
+def test_tile_cpu_backward_2d() raises:
     print("test_tile_cpu_backward_2d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -561,7 +561,7 @@ fn test_tile_cpu_backward_2d() raises:
     assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 2), 6.0)))
 
 
-fn test_tile_cpu_backward_1d_once() raises:
+def test_tile_cpu_backward_1d_once() raises:
     print("test_tile_cpu_backward_1d_once")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -572,7 +572,7 @@ fn test_tile_cpu_backward_1d_once() raises:
     assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(3))))
 
 
-fn test_tile_cpu_backward_chain() raises:
+def test_tile_cpu_backward_chain() raises:
     print("test_tile_cpu_backward_chain")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -583,7 +583,7 @@ fn test_tile_cpu_backward_chain() raises:
     assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2), 8.0)))
 
 
-fn test_tile_cpu_backward_nonuniform_grad() raises:
+def test_tile_cpu_backward_nonuniform_grad() raises:
     print("test_tile_cpu_backward_nonuniform_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -596,7 +596,7 @@ fn test_tile_cpu_backward_nonuniform_grad() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([4.0, 6.0])))
 
 
-fn test_tile_cpu_backward_2d_extra_dims() raises:
+def test_tile_cpu_backward_2d_extra_dims() raises:
     print("test_tile_cpu_backward_2d_extra_dims")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -612,7 +612,7 @@ fn test_tile_cpu_backward_2d_extra_dims() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_tile_gpu_1d_basic() raises:
+def test_tile_gpu_1d_basic() raises:
     comptime if has_accelerator():
         print("test_tile_gpu_1d_basic")
         comptime dtype = DType.float32
@@ -627,7 +627,7 @@ fn test_tile_gpu_1d_basic() raises:
         )
 
 
-fn test_tile_gpu_1d_once() raises:
+def test_tile_gpu_1d_once() raises:
     comptime if has_accelerator():
         print("test_tile_gpu_1d_once")
         comptime dtype = DType.float32
@@ -640,7 +640,7 @@ fn test_tile_gpu_1d_once() raises:
         )
 
 
-fn test_tile_gpu_2d_both_dims() raises:
+def test_tile_gpu_2d_both_dims() raises:
     comptime if has_accelerator():
         print("test_tile_gpu_2d_both_dims")
         comptime dtype = DType.float32
@@ -655,7 +655,7 @@ fn test_tile_gpu_2d_both_dims() raises:
         assert_true(result_cpu[[2, 0]] == Scalar[dtype](1.0))
 
 
-fn test_tile_gpu_2d_rows_only() raises:
+def test_tile_gpu_2d_rows_only() raises:
     comptime if has_accelerator():
         print("test_tile_gpu_2d_rows_only")
         comptime dtype = DType.float32
@@ -665,7 +665,7 @@ fn test_tile_gpu_2d_rows_only() raises:
         assert_true(result.shape() == Shape(2, 9))
 
 
-fn test_tile_gpu_2d_extra_repeat_dims() raises:
+def test_tile_gpu_2d_extra_repeat_dims() raises:
     comptime if has_accelerator():
         print("test_tile_gpu_2d_extra_repeat_dims")
         comptime dtype = DType.float32
@@ -675,7 +675,7 @@ fn test_tile_gpu_2d_extra_repeat_dims() raises:
         assert_true(result.shape() == Shape(2, 6, 12))
 
 
-fn test_tile_gpu_3d_basic() raises:
+def test_tile_gpu_3d_basic() raises:
     comptime if has_accelerator():
         print("test_tile_gpu_3d_basic")
         comptime dtype = DType.float32
@@ -689,7 +689,7 @@ fn test_tile_gpu_3d_basic() raises:
         assert_true(result.shape() == Shape(2, 4, 2))
 
 
-fn test_tile_gpu_values_preserved() raises:
+def test_tile_gpu_values_preserved() raises:
     comptime if has_accelerator():
         print("test_tile_gpu_values_preserved")
         comptime dtype = DType.float32
@@ -701,7 +701,7 @@ fn test_tile_gpu_values_preserved() raises:
             assert_true(result_cpu[[i * 2 + 1]] == Scalar[dtype](20.0))
 
 
-fn test_tile_gpu_no_grad() raises:
+def test_tile_gpu_no_grad() raises:
     comptime if has_accelerator():
         print("test_tile_gpu_no_grad")
         comptime dtype = DType.float32
@@ -710,7 +710,7 @@ fn test_tile_gpu_no_grad() raises:
         assert_true(not result.requires_grad)
 
 
-fn test_tile_gpu_requires_grad() raises:
+def test_tile_gpu_requires_grad() raises:
     comptime if has_accelerator():
         print("test_tile_gpu_requires_grad")
         comptime dtype = DType.float32
@@ -724,7 +724,7 @@ fn test_tile_gpu_requires_grad() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_tile_gpu_backward_1d() raises:
+def test_tile_gpu_backward_1d() raises:
     comptime if has_accelerator():
         print("test_tile_gpu_backward_1d")
         comptime dtype = DType.float32
@@ -736,7 +736,7 @@ fn test_tile_gpu_backward_1d() raises:
         assert_true(a.grad().all_close(Tensor[dtype].full(Shape(3), 3.0)))
 
 
-fn test_tile_gpu_backward_2d() raises:
+def test_tile_gpu_backward_2d() raises:
     comptime if has_accelerator():
         print("test_tile_gpu_backward_2d")
         comptime dtype = DType.float32
@@ -748,7 +748,7 @@ fn test_tile_gpu_backward_2d() raises:
         assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 2), 6.0)))
 
 
-fn test_tile_gpu_backward_chain() raises:
+def test_tile_gpu_backward_chain() raises:
     comptime if has_accelerator():
         print("test_tile_gpu_backward_chain")
         comptime dtype = DType.float32
@@ -760,7 +760,7 @@ fn test_tile_gpu_backward_chain() raises:
         assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2), 8.0)))
 
 
-fn test_tile_gpu_backward_nonuniform_grad() raises:
+def test_tile_gpu_backward_nonuniform_grad() raises:
     comptime if has_accelerator():
         print("test_tile_gpu_backward_nonuniform_grad")
         comptime dtype = DType.float32
@@ -773,7 +773,7 @@ fn test_tile_gpu_backward_nonuniform_grad() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([4.0, 6.0])))
 
 
-fn test_tile_gpu_backward_extra_dims() raises:
+def test_tile_gpu_backward_extra_dims() raises:
     comptime if has_accelerator():
         print("test_tile_gpu_backward_extra_dims")
         comptime dtype = DType.float32
@@ -790,7 +790,7 @@ fn test_tile_gpu_backward_extra_dims() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_tile_parity_1d() raises:
+def test_tile_parity_1d() raises:
     comptime if has_accelerator():
         print("test_tile_parity_1d")
         comptime dtype = DType.float32
@@ -799,7 +799,7 @@ fn test_tile_parity_1d() raises:
         assert_true(a_cpu.tile([3]).all_close(a_gpu.tile([3]).to_cpu()))
 
 
-fn test_tile_parity_2d() raises:
+def test_tile_parity_2d() raises:
     comptime if has_accelerator():
         print("test_tile_parity_2d")
         comptime dtype = DType.float32
@@ -808,7 +808,7 @@ fn test_tile_parity_2d() raises:
         assert_true(a_cpu.tile([2, 3]).all_close(a_gpu.tile([2, 3]).to_cpu()))
 
 
-fn test_tile_parity_extra_dims() raises:
+def test_tile_parity_extra_dims() raises:
     comptime if has_accelerator():
         print("test_tile_parity_extra_dims")
         comptime dtype = DType.float32
@@ -819,7 +819,7 @@ fn test_tile_parity_extra_dims() raises:
         )
 
 
-fn test_tile_parity_backward_1d() raises:
+def test_tile_parity_backward_1d() raises:
     comptime if has_accelerator():
         print("test_tile_parity_backward_1d")
         comptime dtype = DType.float32
@@ -837,7 +837,7 @@ fn test_tile_parity_backward_1d() raises:
         assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
 
 
-fn test_tile_parity_backward_2d() raises:
+def test_tile_parity_backward_2d() raises:
     comptime if has_accelerator():
         print("test_tile_parity_backward_2d")
         comptime dtype = DType.float32
@@ -859,7 +859,7 @@ fn test_tile_parity_backward_2d() raises:
         assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
 
 
-fn test_tile_parity_using_zero_grad() raises:
+def test_tile_parity_using_zero_grad() raises:
     comptime if has_accelerator():
         print("test_tile_parity_using_zero_grad")
         comptime dtype = DType.float32
@@ -884,7 +884,7 @@ fn test_tile_parity_using_zero_grad() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

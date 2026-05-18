@@ -21,7 +21,7 @@ from std.math import log, exp, rsqrt
 # Invert DType.bool
 
 
-fn invert_bool[
+def invert_bool[
     simd_width: Int = simd_width_of[DType.uint8](),
     simd_vectors_per_thread: Int = 2 * simd_width,
 ](
@@ -58,7 +58,7 @@ fn invert_bool[
 # LOG, EXP, TANH, SIGMOID live in float_unary_ops below.
 
 
-fn unary_ops[
+def unary_ops[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -138,7 +138,7 @@ fn unary_ops[
 #     float64 → 1e-12
 
 
-fn float_unary_ops[
+def float_unary_ops[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -212,7 +212,7 @@ fn float_unary_ops[
 # =============================================================================
 
 
-fn unary_ops_with_mask[
+def unary_ops_with_mask[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -300,7 +300,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
     comptime datatype: DType = DType.uint8 if Self.dtype == DType.bool else Self.dtype
 
     @staticmethod
-    fn launch[
+    def launch[
         op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ](A: NDBuffer[Self.dtype]) raises -> NDBuffer[Self.dtype]:
         comptime epsilon_rebinded = rebind[Scalar[Self.datatype]](epsilon)
@@ -399,7 +399,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
     # ──launch_with_mask() ───────────────────────────────────────────────
     @staticmethod
-    fn launch_with_mask[
+    def launch_with_mask[
         op_code: Int,
     ](A: NDBuffer[Self.dtype]) raises -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
@@ -485,7 +485,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
         return (out_ndb^, mask_ndb^)
 
     @staticmethod
-    fn launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
+    def launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
         threads_per_block: Int
         num_blocks: Int
 

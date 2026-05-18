@@ -10,7 +10,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref arg = output.ancestry().backward_fn_arg()
@@ -35,7 +35,7 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
 @fieldwise_init
 struct ReLU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],

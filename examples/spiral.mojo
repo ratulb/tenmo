@@ -51,7 +51,7 @@ from std.random import randn_float64
 from tenmo.intarray import IntArray
 
 
-fn generate_spiral_data(
+def generate_spiral_data(
     n_points: Int = 100, n_rotations: Float64 = 3.0, noise: Float64 = 0.1
 ) -> Tuple[Tensor[DType.float64], Tensor[DType.float64]]:
     """Generate two intertwined spirals.
@@ -98,7 +98,7 @@ fn generate_spiral_data(
     return (X, y)
 
 
-fn accuracy[
+def accuracy[
     dtype: DType
 ](pred: Tensor[dtype], target: Tensor[dtype]) -> Tuple[Int, Int]:
     var correct = 0
@@ -112,7 +112,7 @@ fn accuracy[
     return correct, total
 
 
-fn train_spiral_classifier():
+def train_spiral_classifier():
     """Train a neural network to classify spiral dataset with mini-batch training.
 
     This example demonstrates:
@@ -424,6 +424,6 @@ fn train_spiral_classifier():
     print("=" * 80)
 
 
-fn main():
+def main():
     """Entry point for the spiral classification example."""
     train_spiral_classifier()

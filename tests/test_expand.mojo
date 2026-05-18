@@ -10,7 +10,7 @@ from tenmo.shapes import Shape
 # Basic 1D → 2D expansion (prepend new dimension via broadcast)
 # ------------------------------------------------------------
 
-fn test_expand_1d_to_2d_new_batch_dim() raises:
+def test_expand_1d_to_2d_new_batch_dim() raises:
     print("test_expand_1d_to_2d_new_batch_dim")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)  # shape (3,)
@@ -27,7 +27,7 @@ fn test_expand_1d_to_2d_new_batch_dim() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([4.0, 4.0, 4.0])))
 
 
-fn test_expand_1d_to_3d() raises:
+def test_expand_1d_to_3d() raises:
     print("test_expand_1d_to_3d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)   # shape (2,)
@@ -46,7 +46,7 @@ fn test_expand_1d_to_3d() raises:
 # 2D → 2D expansion (size-1 dim expanded)
 # ------------------------------------------------------------
 
-fn test_expand_2d_row_vector_to_matrix() raises:
+def test_expand_2d_row_vector_to_matrix() raises:
     print("test_expand_2d_row_vector_to_matrix")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]], requires_grad=True)  # shape (1,3)
@@ -62,7 +62,7 @@ fn test_expand_2d_row_vector_to_matrix() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[4.0, 4.0, 4.0]])))
 
 
-fn test_expand_2d_col_vector_to_matrix() raises:
+def test_expand_2d_col_vector_to_matrix() raises:
     print("test_expand_2d_col_vector_to_matrix")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0], [2.0], [3.0]], requires_grad=True)  # shape (3,1)
@@ -80,7 +80,7 @@ fn test_expand_2d_col_vector_to_matrix() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[4.0], [4.0], [4.0]])))
 
 
-fn test_expand_2d_both_dims_size1() raises:
+def test_expand_2d_both_dims_size1() raises:
     print("test_expand_2d_both_dims_size1")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[5.0]], requires_grad=True)   # shape (1,1)
@@ -94,7 +94,7 @@ fn test_expand_2d_both_dims_size1() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[12.0]])))
 
 
-fn test_expand_2d_no_op_same_shape() raises:
+def test_expand_2d_no_op_same_shape() raises:
     print("test_expand_2d_no_op_same_shape")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)  # (2,2)
@@ -111,7 +111,7 @@ fn test_expand_2d_no_op_same_shape() raises:
 # 3D expansions
 # ------------------------------------------------------------
 
-fn test_expand_3d_first_dim() raises:
+def test_expand_3d_first_dim() raises:
     print("test_expand_3d_first_dim")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True)  # (1,2,2)
@@ -126,7 +126,7 @@ fn test_expand_3d_first_dim() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d3([[[5.0, 5.0], [5.0, 5.0]]])))
 
 
-fn test_expand_3d_last_dim() raises:
+def test_expand_3d_last_dim() raises:
     print("test_expand_3d_last_dim")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3([[[1.0], [2.0]], [[3.0], [4.0]]], requires_grad=True)  # (2,2,1)
@@ -140,7 +140,7 @@ fn test_expand_3d_last_dim() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d3([[[6.0], [6.0]], [[6.0], [6.0]]])))
 
 
-fn test_expand_3d_middle_dim() raises:
+def test_expand_3d_middle_dim() raises:
     print("test_expand_3d_middle_dim")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3([[[1.0, 2.0]], [[3.0, 4.0]]], requires_grad=True)  # (2,1,2)
@@ -153,7 +153,7 @@ fn test_expand_3d_middle_dim() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d3([[[5.0, 5.0]], [[5.0, 5.0]]])))
 
 
-fn test_expand_3d_two_dims_broadcast() raises:
+def test_expand_3d_two_dims_broadcast() raises:
     print("test_expand_3d_two_dims_broadcast")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3([[[1.0, 2.0]]], requires_grad=True)  # (1,1,2)
@@ -168,7 +168,7 @@ fn test_expand_3d_two_dims_broadcast() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d3([[[12.0, 12.0]]])))
 
 
-fn test_expand_3d_all_dims_size1() raises:
+def test_expand_3d_all_dims_size1() raises:
     print("test_expand_3d_all_dims_size1")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3([[[7.0]]], requires_grad=True)  # (1,1,1)
@@ -184,7 +184,7 @@ fn test_expand_3d_all_dims_size1() raises:
 # Shape API overload (Shape object, not variadic ints)
 # ------------------------------------------------------------
 
-fn test_expand_shape_api_overload() raises:
+def test_expand_shape_api_overload() raises:
     print("test_expand_shape_api_overload")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)  # (1,2)
@@ -201,7 +201,7 @@ fn test_expand_shape_api_overload() raises:
 # Grad correctness: non-uniform values
 # ------------------------------------------------------------
 
-fn test_expand_grad_non_uniform_values() raises:
+def test_expand_grad_non_uniform_values() raises:
     print("test_expand_grad_non_uniform_values")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)  # (2,2)
@@ -215,7 +215,7 @@ fn test_expand_grad_non_uniform_values() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[3.0, 3.0], [3.0, 3.0]])))
 
 
-fn test_expand_grad_weighted_loss() raises:
+def test_expand_grad_weighted_loss() raises:
     print("test_expand_grad_weighted_loss")
     comptime dtype = DType.float32
     # Simulate bias broadcast: bias (1,4) expanded to (3,4) then used in a loss
@@ -238,7 +238,7 @@ fn test_expand_grad_weighted_loss() raises:
 # Expand then reduce — round-trip grad check
 # ------------------------------------------------------------
 
-fn test_expand_then_sum_axis_round_trip() raises:
+def test_expand_then_sum_axis_round_trip() raises:
     print("test_expand_then_sum_axis_round_trip")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]], requires_grad=True)  # (1,3)
@@ -252,7 +252,7 @@ fn test_expand_then_sum_axis_round_trip() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[5.0, 5.0, 5.0]])))
 
 
-fn test_expand_then_mean_grad() raises:
+def test_expand_then_mean_grad() raises:
     print("test_expand_then_mean_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[2.0, 4.0]], requires_grad=True)  # (1,2)
@@ -270,7 +270,7 @@ fn test_expand_then_mean_grad() raises:
 # Expand in matmul-like broadcast scenario
 # ------------------------------------------------------------
 
-fn test_expand_bias_broadcast_pattern() raises:
+def test_expand_bias_broadcast_pattern() raises:
     print("test_expand_bias_broadcast_pattern")
     comptime dtype = DType.float32
     # Common pattern: bias (1, out) expanded to match batch output (B, out)
@@ -289,7 +289,7 @@ fn test_expand_bias_broadcast_pattern() raises:
 # Grad accumulation across two expand ops on the same tensor
 # ------------------------------------------------------------
 
-fn test_expand_grad_accumulation_two_expands() raises:
+def test_expand_grad_accumulation_two_expands() raises:
     print("test_expand_grad_accumulation_two_expands")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)  # (1,2)
@@ -307,7 +307,7 @@ fn test_expand_grad_accumulation_two_expands() raises:
 # Expand with track_grad=False — no backward registered
 # ------------------------------------------------------------
 
-fn test_expand_no_grad_tracking() raises:
+def test_expand_no_grad_tracking() raises:
     print("test_expand_no_grad_tracking")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)
@@ -320,7 +320,7 @@ fn test_expand_no_grad_tracking() raises:
 # 4D expansion
 # ------------------------------------------------------------
 
-fn test_expand_4d_first_two_dims() raises:
+def test_expand_4d_first_two_dims() raises:
     print("test_expand_4d_first_two_dims")
     comptime dtype = DType.float32
     # (1,1,3,4) → (2,5,3,4)
@@ -341,7 +341,7 @@ fn test_expand_4d_first_two_dims() raises:
     assert_true(a.grad().all_close(Tensor[dtype].full(Shape.of(1, 1, 3, 4), 10.0)))
 
 
-fn test_expand_4d_last_dim_only() raises:
+def test_expand_4d_last_dim_only() raises:
     print("test_expand_4d_last_dim_only")
     comptime dtype = DType.float32
     # (2,3,4,1) → (2,3,4,7)
@@ -359,7 +359,7 @@ fn test_expand_4d_last_dim_only() raises:
 # Expand matches manual repeat behaviour (cross-validate)
 # ------------------------------------------------------------
 
-fn test_expand_matches_manual_tile() raises:
+def test_expand_matches_manual_tile() raises:
     print("test_expand_matches_manual_tile")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)  # (3,)
@@ -381,7 +381,7 @@ fn test_expand_matches_manual_tile() raises:
 # Expand is a view — no data copy (stride-zero check via value)
 # ------------------------------------------------------------
 
-fn test_expand_is_zero_stride_view() raises:
+def test_expand_is_zero_stride_view() raises:
     print("test_expand_is_zero_stride_view")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[10.0, 20.0]], requires_grad=True)  # (1,2)
@@ -398,7 +398,7 @@ fn test_expand_is_zero_stride_view() raises:
 # MAIN
 # ============================================================
 
-fn main() raises:
+def main() raises:
     _ = """
     # 1D → nD
     test_expand_1d_to_2d_new_batch_dim()

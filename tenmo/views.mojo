@@ -17,7 +17,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         comptime if has_accelerator():
@@ -26,7 +26,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return Self.backward_cpu(output)
 
     @staticmethod
-    fn backward_cpu(
+    def backward_cpu(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref bwd_arg = output.ancestry().backward_fn_arg().get[ViewArg]()
@@ -120,7 +120,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ]
 
     @staticmethod
-    fn backward_gpu(
+    def backward_gpu(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref bwd_arg = output.ancestry().backward_fn_arg().get[ViewArg]()
@@ -269,7 +269,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 struct View[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         mut tensor: Tensor[Self.dtype],

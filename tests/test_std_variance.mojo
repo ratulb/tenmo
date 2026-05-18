@@ -3,7 +3,7 @@ from std.testing import assert_true, TestSuite
 from tenmo.common_utils import isnan, isinf
 
 
-fn test_sqrt_backward() raises:
+def test_sqrt_backward() raises:
     var x = Tensor.d1([4.0, 9.0, 16.0, 25.0], requires_grad=True)
     var y = x.sqrt()  # [2.0, 3.0, 4.0, 5.0]
     var s = y.sum()
@@ -17,7 +17,7 @@ fn test_sqrt_backward() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_sqrt_backward_zero_handling() raises:
+def test_sqrt_backward_zero_handling() raises:
     # Test near-zero values (numerical stability)
     var x = Tensor.d1([0.01, 0.04, 1.0], requires_grad=True)
     var y = x.sqrt()
@@ -31,7 +31,7 @@ fn test_sqrt_backward_zero_handling() raises:
     assert_true(x.grad().all_close(expected_grad))
 
 
-fn test_var_backward_global_variance() raises:
+def test_var_backward_global_variance() raises:
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
     var v = x.variance(unbiased=False)  # Population variance
     v.backward()
@@ -46,7 +46,7 @@ fn test_var_backward_global_variance() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_var_backward_unbiased_variance() raises:
+def test_var_backward_unbiased_variance() raises:
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
     var v = x.variance(unbiased=True)  # Sample variance (n-1)
     v.backward()
@@ -58,7 +58,7 @@ fn test_var_backward_unbiased_variance() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_var_backward_with_axis() raises:
+def test_var_backward_with_axis() raises:
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var v = x.variance(axis=0, unbiased=False)  # Variance along rows
     var s = v.sum()
@@ -70,7 +70,7 @@ fn test_var_backward_with_axis() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_std_backward_global_std() raises:
+def test_std_backward_global_std() raises:
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
     var s = x.std(unbiased=False)
     s.backward()
@@ -83,7 +83,7 @@ fn test_std_backward_global_std() raises:
     assert_true(x.grad().all_close[atol=1e-3](expected_grad))
 
 
-fn test_std_backward_unbiased_std() raises:
+def test_std_backward_unbiased_std() raises:
     var x = Tensor.d1([2.0, 4.0, 6.0, 8.0], requires_grad=True)
     var s = x.std(unbiased=True)
     s.backward()
@@ -105,7 +105,7 @@ fn test_std_backward_unbiased_std() raises:
     assert_true(x.grad().all_close[atol=1e-3](expected_grad))
 
 
-fn test_var_backward_chain_rule() raises:
+def test_var_backward_chain_rule() raises:
     var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var v = x.variance(unbiased=False)
     var y = v * 2.0  # Chain another operation
@@ -119,7 +119,7 @@ fn test_var_backward_chain_rule() raises:
     assert_true(x.grad().all_close[atol=1e-5](expected_grad))
 
 
-fn test_std_backward_chain_rule() raises:
+def test_std_backward_chain_rule() raises:
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var s = x.std(unbiased=False)
     var y = s**2  # Square the std (should give variance)
@@ -132,7 +132,7 @@ fn test_std_backward_chain_rule() raises:
     assert_true(x.grad().all_close[atol=1e-5](expected_grad))
 
 
-fn test_var_std_no_grad_tracking() raises:
+def test_var_std_no_grad_tracking() raises:
     var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var v = x.variance[track_grad=False]()
     var s = x.std[track_grad=False]()
@@ -142,7 +142,7 @@ fn test_var_std_no_grad_tracking() raises:
     assert_true(not s.requires_grad)
 
 
-fn test_var_backward_2d_axis_0() raises:
+def test_var_backward_2d_axis_0() raises:
     var x = Tensor.d2([[1.0, 4.0], [3.0, 2.0]], requires_grad=True)
     var v = x.variance(axis=0, keepdims=False, unbiased=False)
     var s = v.sum()
@@ -154,7 +154,7 @@ fn test_var_backward_2d_axis_0() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_var_backward_2d_axis_1() raises:
+def test_var_backward_2d_axis_1() raises:
     var x = Tensor.d2([[1.0, 3.0], [2.0, 4.0]], requires_grad=True)
     var v = x.variance(axis=1, keepdims=False, unbiased=False)
     var s = v.sum()
@@ -166,7 +166,7 @@ fn test_var_backward_2d_axis_1() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_std_backward_numerical_stability() raises:
+def test_std_backward_numerical_stability() raises:
     # Test with values close to zero variance
     var x = Tensor.d1([1.0, 1.001, 0.999, 1.0], requires_grad=True)
     var s = x.std()
@@ -178,7 +178,7 @@ fn test_std_backward_numerical_stability() raises:
     assert_true(not grad.isinf().any())"""
 
 
-fn run_all_var_std_tests() raises:
+def run_all_var_std_tests() raises:
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
     var v = x.variance(unbiased=False)  # Population variance
     v.backward()
@@ -193,7 +193,7 @@ fn run_all_var_std_tests() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_var_backward_unbiased_variance_vs() raises:
+def test_var_backward_unbiased_variance_vs() raises:
     """Test variance backward with Bessel's correction (unbiased=True)."""
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
     var v = x.variance(unbiased=True)  # Sample variance (n-1)
@@ -205,7 +205,7 @@ fn test_var_backward_unbiased_variance_vs() raises:
     var expected_grad = Tensor.d1([-1.0, -0.5, 0.0, 0.5, 1.0])
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
-fn test_var_backward_axis_0_keepdims_false_vs() raises:
+def test_var_backward_axis_0_keepdims_false_vs() raises:
     """Test variance backward along axis 0 without keepdims."""
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var v = x.variance(axis=0, keepdims=False, unbiased=False)  # Shape: (2,)
@@ -218,7 +218,7 @@ fn test_var_backward_axis_0_keepdims_false_vs() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_var_backward_axis_1_keepdims_false_vs() raises:
+def test_var_backward_axis_1_keepdims_false_vs() raises:
     """Test variance backward along axis 1 without keepdims."""
     var x = Tensor.d2([[1.0, 3.0], [2.0, 4.0]], requires_grad=True)
     var v = x.variance(axis=1, keepdims=False, unbiased=False)  # Shape: (2,)
@@ -231,7 +231,7 @@ fn test_var_backward_axis_1_keepdims_false_vs() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_var_backward_axis_0_keepdims_true_vs() raises:
+def test_var_backward_axis_0_keepdims_true_vs() raises:
     """Test variance backward along axis 0 with keepdims."""
     var x = Tensor.d2([[1.0, 4.0], [3.0, 2.0]], requires_grad=True)
     var v = x.variance(axis=0, keepdims=True, unbiased=False)  # Shape: (1, 2)
@@ -244,7 +244,7 @@ fn test_var_backward_axis_0_keepdims_true_vs() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_var_backward_axis_1_keepdims_true_vs() raises:
+def test_var_backward_axis_1_keepdims_true_vs() raises:
     """Test variance backward along axis 1 with keepdims."""
     var x = Tensor.d2([[2.0, 4.0], [1.0, 3.0]], requires_grad=True)
     var v = x.variance(axis=1, keepdims=True, unbiased=False)  # Shape: (2, 1)
@@ -257,7 +257,7 @@ fn test_var_backward_axis_1_keepdims_true_vs() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_var_backward_chain_rule_vs() raises:
+def test_var_backward_chain_rule_vs() raises:
     """Test variance backward with chained operations."""
     var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var v = x.variance(unbiased=False)
@@ -272,7 +272,7 @@ fn test_var_backward_chain_rule_vs() raises:
     assert_true(x.grad().all_close[atol=1e-5](expected_grad))
 
 
-fn test_var_backward_3d_tensor_vs() raises:
+def test_var_backward_3d_tensor_vs() raises:
     """Test variance backward on 3D tensor."""
     var x = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True
@@ -287,7 +287,7 @@ fn test_var_backward_3d_tensor_vs() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_var_no_grad_tracking_vs() raises:
+def test_var_no_grad_tracking_vs() raises:
     """Test variance without gradient tracking."""
     var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var v = x.variance[track_grad=False]()
@@ -296,7 +296,7 @@ fn test_var_no_grad_tracking_vs() raises:
     assert_true(not v.requires_grad)
 
 
-fn test_var_backward_large_values_vs() raises:
+def test_var_backward_large_values_vs() raises:
     """Test variance backward with large values for numerical stability."""
     var x = Tensor.d1([1000.0, 1001.0, 1002.0, 1003.0], requires_grad=True)
     var v = x.variance(unbiased=False)
@@ -313,7 +313,7 @@ fn test_var_backward_large_values_vs() raises:
 # ============================================================================
 
 
-fn test_std_backward_global_std_vs() raises:
+def test_std_backward_global_std_vs() raises:
     """Test std backward for global std (no axis)."""
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
     var s = x.std(unbiased=False)
@@ -331,7 +331,7 @@ fn test_std_backward_global_std_vs() raises:
     assert_true(x.grad().all_close[atol=1e-5](expected_grad))
 
 
-fn test_std_backward_unbiased_std_vs() raises:
+def test_std_backward_unbiased_std_vs() raises:
     """Test std backward with Bessel's correction."""
     var x = Tensor.d1([2.0, 4.0, 6.0, 8.0], requires_grad=True)
     var s = x.std(unbiased=True)
@@ -352,7 +352,7 @@ fn test_std_backward_unbiased_std_vs() raises:
     )
     assert_true(x.grad().all_close[atol=1e-4](expected_grad))
 
-fn test_std_backward_axis_0_keepdims_false_vs() raises:
+def test_std_backward_axis_0_keepdims_false_vs() raises:
     """Test std backward along axis 0 without keepdims."""
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var s = x.std(axis=0, keepdims=False, unbiased=False)
@@ -367,7 +367,7 @@ fn test_std_backward_axis_0_keepdims_false_vs() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_std_backward_axis_1_keepdims_false_vs() raises:
+def test_std_backward_axis_1_keepdims_false_vs() raises:
     """Test std backward along axis 1 without keepdims."""
     var x = Tensor.d2([[1.0, 3.0], [2.0, 4.0]], requires_grad=True)
     var s = x.std(axis=1, keepdims=False, unbiased=False)
@@ -380,7 +380,7 @@ fn test_std_backward_axis_1_keepdims_false_vs() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_std_backward_axis_0_keepdims_true_vs() raises:
+def test_std_backward_axis_0_keepdims_true_vs() raises:
     """Test std backward along axis 0 with keepdims."""
     var x = Tensor.d2([[1.0, 4.0], [3.0, 2.0]], requires_grad=True)
     var s = x.std(axis=0, keepdims=True, unbiased=False)
@@ -393,7 +393,7 @@ fn test_std_backward_axis_0_keepdims_true_vs() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_std_backward_chain_rule_vs() raises:
+def test_std_backward_chain_rule_vs() raises:
     """Test std backward with chained operations."""
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var s = x.std(unbiased=False)
@@ -412,7 +412,7 @@ fn test_std_backward_chain_rule_vs() raises:
     assert_true(abs(grad_sum.item()) < 0.01)
 
 
-fn test_std_backward_numerical_stability_vs() raises:
+def test_std_backward_numerical_stability_vs() raises:
     """Test std backward with values close to zero variance."""
     var x = Tensor.d1([1.0, 1.001, 0.999, 1.0], requires_grad=True)
     var s = x.std()
@@ -427,7 +427,7 @@ fn test_std_backward_numerical_stability_vs() raises:
         assert_true(not isinf(val))
 
 
-fn test_std_no_grad_tracking_vs() raises:
+def test_std_no_grad_tracking_vs() raises:
     """Test std without gradient tracking."""
     var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var s = x.std[track_grad=False]()
@@ -436,7 +436,7 @@ fn test_std_no_grad_tracking_vs() raises:
     assert_true(not s.requires_grad)
 
 
-fn test_std_backward_3d_tensor_vs() raises:
+def test_std_backward_3d_tensor_vs() raises:
     """Test std backward on 3D tensor."""
     var x = Tensor.d3(
         [[[1.0, 3.0], [2.0, 4.0]]], requires_grad=True
@@ -453,7 +453,7 @@ fn test_std_backward_3d_tensor_vs() raises:
 
 
 
-fn test_std_backward_zero_variance_vs() raises:
+def test_std_backward_zero_variance_vs() raises:
     # x = [2,2,2] — zero variance, diff = 0
     # grad = 0/(std*n) = 0/0 without epsilon protection
     # With epsilon: grad = 0/(eps*n) = 0 — safe
@@ -471,7 +471,7 @@ fn test_std_backward_zero_variance_vs() raises:
 # ============================================================================
 
 
-fn test_var_std_relationship_vs() raises:
+def test_var_std_relationship_vs() raises:
     """Test that std² ≈ var in terms of values (not gradients)."""
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0])
     var v = x.variance[track_grad=False](unbiased=False)
@@ -481,7 +481,7 @@ fn test_var_std_relationship_vs() raises:
     assert_true(v.all_close[atol=1e-6](s_squared))
 
 
-fn test_var_std_unbiased_vs_biased_vs() raises:
+def test_var_std_unbiased_vs_biased_vs() raises:
     """Test difference between biased and unbiased estimators."""
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0])
     var v_biased = x.variance[track_grad=False](unbiased=False)
@@ -494,7 +494,7 @@ fn test_var_std_unbiased_vs_biased_vs() raises:
     assert_true(ratio.all_close[atol=1e-6](expected_ratio))
 
 
-fn test_var_backward_single_element_vs() raises:
+def test_var_backward_single_element_vs() raises:
     """Test variance backward with single element (edge case)."""
     var x = Tensor.d1([5.0], requires_grad=True)
     var v = x.variance(unbiased=False)
@@ -505,7 +505,7 @@ fn test_var_backward_single_element_vs() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_std_backward_two_elements_vs() raises:
+def test_std_backward_two_elements_vs() raises:
     """Test std backward with two elements."""
     var x = Tensor.d1([1.0, 3.0], requires_grad=True)
     var s = x.std(unbiased=False)
@@ -517,6 +517,6 @@ fn test_std_backward_two_elements_vs() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll std variance tests passed!")

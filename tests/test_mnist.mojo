@@ -7,7 +7,7 @@ from std.python import Python, PythonObject
 from tenmo.numpy_interop import from_ndarray
 
 
-fn load_mnist_subset(
+def load_mnist_subset(
     num_train: Int = 1000, num_test: Int = 200
 ) raises -> (
     Tensor[DType.float32],
@@ -66,7 +66,7 @@ fn load_mnist_subset(
     return (train_x, train_y, test_x, test_y)
 
 
-fn get_batches(
+def get_batches(
     x: Tensor[DType.float32], y: Tensor[DType.int32], batch_size: Int
 ) -> List[(Tensor[DType.float32], Tensor[DType.int32])]:
     n = x.shape[0]
@@ -88,7 +88,7 @@ fn get_batches(
     return batches
 
 
-fn main() raises:
+def main() raises:
     num_train = 25000
     num_test = 5
     batch_size = 64

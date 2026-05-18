@@ -17,15 +17,15 @@ struct Weights:
     var npz_file: StaticString
     var gpt2_weights: PythonObject
 
-    fn __init__(out self, npz_file: StaticString = "gpt2_weights.npz"):
+    def __init__(out self, npz_file: StaticString = "gpt2_weights.npz"):
         self.npz_file = npz_file
         self.gpt2_weights = None
 
-    fn keys(mut self) raises -> List[String]:
+    def keys(mut self) raises -> List[String]:
         self.load_weights()
         return Self.keys(self.gpt2_weights)
 
-    fn load_weights(mut self):
+    def load_weights(mut self):
         if self.gpt2_weights is None:
             try:
                 np = Python.import_module("numpy")
@@ -33,7 +33,7 @@ struct Weights:
             except e:
                 print(e)
 
-    fn weights(mut self, key: String) raises -> Resultant:
+    def weights(mut self, key: String) raises -> Resultant:
         try:
             self.load_weights()
             np_weights = self.gpt2_weights[key]
@@ -82,7 +82,7 @@ struct Weights:
             return None
 
     @staticmethod
-    fn ndarray_ptr[
+    def ndarray_ptr[
         dtype: DType
     ](ndarray: PythonObject) raises -> UnsafePointer[Scalar[dtype]]:
         return ndarray.__array_interface__["data"][0].unsafe_get_as_pointer[
@@ -90,7 +90,7 @@ struct Weights:
         ]()
 
     @staticmethod
-    fn keys(gpt2_weights: PythonObject) -> List[String]:
+    def keys(gpt2_weights: PythonObject) -> List[String]:
         list = List[String](capacity=148)
         try:
             keys = gpt2_weights.keys()
@@ -101,7 +101,7 @@ struct Weights:
         return list
 
 
-fn main() raises:
+def main() raises:
     print()
     print("GPT2 weight explorer")
     # weights = Weights()
@@ -111,7 +111,7 @@ fn main() raises:
     run()
 
 
-fn run() raises -> None:
+def run() raises -> None:
     weights = Weights()
     print(
         "Available choices:\n 1) Load keys, 2) Load 10 keys at a time, \n 3)"

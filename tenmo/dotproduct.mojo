@@ -20,7 +20,7 @@ from .ndbuffer import NDBuffer
 @fieldwise_init
 struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
@@ -63,7 +63,7 @@ struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct Dot[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](lhs: Tensor[Self.dtype], rhs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
 
@@ -131,7 +131,7 @@ struct Dot[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return out^
 
 
-fn dot_product_32[
+def dot_product_32[
     dtype: DType, BLOCK_SIZE: Int = 512
 ](
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
@@ -215,7 +215,7 @@ fn dot_product_32[
             _ = Atomic.fetch_add(result, accum)
 
 
-fn dot_product_64[
+def dot_product_64[
     dtype: DType,
     BLOCK_SIZE: Int = 512,
 ](
@@ -254,7 +254,7 @@ fn dot_product_64[
 
 struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
-    fn launch[
+    def launch[
         num_blocks: Int = 1,
         threads_per_block: Int = 512,
         suppress_validation: Bool = False,

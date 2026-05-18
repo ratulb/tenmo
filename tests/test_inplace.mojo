@@ -10,7 +10,7 @@ comptime dtype = DType.float32
 # HELPERS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn iop_close[atol: Scalar[dtype] = 1e-5](
+def iop_close[atol: Scalar[dtype] = 1e-5](
     a: Tensor[dtype], b: Tensor[dtype]
 ) raises -> Bool:
     return a.all_close[atol=atol](b)
@@ -20,7 +20,7 @@ fn iop_close[atol: Scalar[dtype] = 1e-5](
 # IADD CPU — Forward
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_iop_cpu_iadd_fwd_1d_same_shape() raises:
+def test_iop_cpu_iadd_fwd_1d_same_shape() raises:
     print("test_iop_cpu_iadd_fwd_1d_same_shape")
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var b = Tensor[dtype].d1([4.0, 5.0, 6.0])
@@ -29,7 +29,7 @@ fn test_iop_cpu_iadd_fwd_1d_same_shape() raises:
     print("passed")
 
 
-fn test_iop_cpu_iadd_fwd_2d_same_shape() raises:
+def test_iop_cpu_iadd_fwd_2d_same_shape() raises:
     print("test_iop_cpu_iadd_fwd_2d_same_shape")
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var b = Tensor[dtype].d2([[10.0, 20.0], [30.0, 40.0]])
@@ -38,7 +38,7 @@ fn test_iop_cpu_iadd_fwd_2d_same_shape() raises:
     print("passed")
 
 
-fn test_iop_cpu_iadd_fwd_3d_same_shape() raises:
+def test_iop_cpu_iadd_fwd_3d_same_shape() raises:
     print("test_iop_cpu_iadd_fwd_3d_same_shape")
     var a = Tensor[dtype].ones(Shape(2, 3, 4))
     var b = Tensor[dtype].ones(Shape(2, 3, 4))
@@ -47,7 +47,7 @@ fn test_iop_cpu_iadd_fwd_3d_same_shape() raises:
     print("passed")
 
 
-fn test_iop_cpu_iadd_fwd_4d_same_shape() raises:
+def test_iop_cpu_iadd_fwd_4d_same_shape() raises:
     print("test_iop_cpu_iadd_fwd_4d_same_shape")
     var a = Tensor[dtype].ones(Shape(2, 3, 4, 5))
     var b = Tensor[dtype].full(Shape(2, 3, 4, 5), 3.0)
@@ -56,7 +56,7 @@ fn test_iop_cpu_iadd_fwd_4d_same_shape() raises:
     print("passed")
 
 
-fn test_iop_cpu_iadd_fwd_broadcast_scalar() raises:
+def test_iop_cpu_iadd_fwd_broadcast_scalar() raises:
     print("test_iop_cpu_iadd_fwd_broadcast_scalar")
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     a += Scalar[dtype](10)
@@ -64,7 +64,7 @@ fn test_iop_cpu_iadd_fwd_broadcast_scalar() raises:
     print("passed")
 
 
-fn test_iop_cpu_iadd_fwd_broadcast_row() raises:
+def test_iop_cpu_iadd_fwd_broadcast_row() raises:
     print("test_iop_cpu_iadd_fwd_broadcast_row")
     var a = Tensor[dtype].ones(Shape(3, 4))
     var b = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])  # (4,) → (3,4)
@@ -77,7 +77,7 @@ fn test_iop_cpu_iadd_fwd_broadcast_row() raises:
     print("passed")
 
 
-fn test_iop_cpu_iadd_fwd_broadcast_col() raises:
+def test_iop_cpu_iadd_fwd_broadcast_col() raises:
     print("test_iop_cpu_iadd_fwd_broadcast_col")
     var a = Tensor[dtype].ones(Shape(3, 4))
     var b = Tensor[dtype].d2([[1.0], [2.0], [3.0]])  # (3,1) → (3,4)
@@ -90,7 +90,7 @@ fn test_iop_cpu_iadd_fwd_broadcast_col() raises:
     print("passed")
 
 
-fn test_iop_cpu_iadd_fwd_large() raises:
+def test_iop_cpu_iadd_fwd_large() raises:
     print("test_iop_cpu_iadd_fwd_large")
     var a = Tensor[dtype].zeros(Shape(64, 128))
     var b = Tensor[dtype].ones(Shape(64, 128))
@@ -103,7 +103,7 @@ fn test_iop_cpu_iadd_fwd_large() raises:
 # ISUB CPU — Forward
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_iop_cpu_isub_fwd_1d_same_shape() raises:
+def test_iop_cpu_isub_fwd_1d_same_shape() raises:
     print("test_iop_cpu_isub_fwd_1d_same_shape")
     var a = Tensor[dtype].d1([5.0, 7.0, 9.0])
     var b = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -112,7 +112,7 @@ fn test_iop_cpu_isub_fwd_1d_same_shape() raises:
     print("passed")
 
 
-fn test_iop_cpu_isub_fwd_2d_same_shape() raises:
+def test_iop_cpu_isub_fwd_2d_same_shape() raises:
     print("test_iop_cpu_isub_fwd_2d_same_shape")
     var a = Tensor[dtype].d2([[10.0, 20.0], [30.0, 40.0]])
     var b = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -121,7 +121,7 @@ fn test_iop_cpu_isub_fwd_2d_same_shape() raises:
     print("passed")
 
 
-fn test_iop_cpu_isub_fwd_broadcast_row() raises:
+def test_iop_cpu_isub_fwd_broadcast_row() raises:
     print("test_iop_cpu_isub_fwd_broadcast_row")
     var a = Tensor[dtype].full(Shape(3, 4), 5.0)
     var b = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])
@@ -134,7 +134,7 @@ fn test_iop_cpu_isub_fwd_broadcast_row() raises:
     print("passed")
 
 
-fn test_iop_cpu_isub_fwd_3d() raises:
+def test_iop_cpu_isub_fwd_3d() raises:
     print("test_iop_cpu_isub_fwd_3d")
     var a = Tensor[dtype].full(Shape(2, 3, 4), 5.0)
     var b = Tensor[dtype].ones(Shape(2, 3, 4))
@@ -143,7 +143,7 @@ fn test_iop_cpu_isub_fwd_3d() raises:
     print("passed")
 
 
-fn test_iop_cpu_isub_fwd_scalar() raises:
+def test_iop_cpu_isub_fwd_scalar() raises:
     print("test_iop_cpu_isub_fwd_scalar")
     var a = Tensor[dtype].d1([10.0, 20.0, 30.0])
     a -= Scalar[dtype](5)
@@ -155,7 +155,7 @@ fn test_iop_cpu_isub_fwd_scalar() raises:
 # IMUL CPU — Forward
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_iop_cpu_imul_fwd_1d_same_shape() raises:
+def test_iop_cpu_imul_fwd_1d_same_shape() raises:
     print("test_iop_cpu_imul_fwd_1d_same_shape")
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var b = Tensor[dtype].d1([2.0, 3.0, 4.0])
@@ -164,7 +164,7 @@ fn test_iop_cpu_imul_fwd_1d_same_shape() raises:
     print("passed")
 
 
-fn test_iop_cpu_imul_fwd_2d_same_shape() raises:
+def test_iop_cpu_imul_fwd_2d_same_shape() raises:
     print("test_iop_cpu_imul_fwd_2d_same_shape")
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var b = Tensor[dtype].d2([[2.0, 2.0], [2.0, 2.0]])
@@ -173,7 +173,7 @@ fn test_iop_cpu_imul_fwd_2d_same_shape() raises:
     print("passed")
 
 
-fn test_iop_cpu_imul_fwd_broadcast_scalar() raises:
+def test_iop_cpu_imul_fwd_broadcast_scalar() raises:
     print("test_iop_cpu_imul_fwd_broadcast_scalar")
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     a *= Scalar[dtype](3)
@@ -181,7 +181,7 @@ fn test_iop_cpu_imul_fwd_broadcast_scalar() raises:
     print("passed")
 
 
-fn test_iop_cpu_imul_fwd_broadcast_row() raises:
+def test_iop_cpu_imul_fwd_broadcast_row() raises:
     print("test_iop_cpu_imul_fwd_broadcast_row")
     var a = Tensor[dtype].full(Shape(3, 4), 2.0)
     var b = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])
@@ -194,7 +194,7 @@ fn test_iop_cpu_imul_fwd_broadcast_row() raises:
     print("passed")
 
 
-fn test_iop_cpu_imul_fwd_3d() raises:
+def test_iop_cpu_imul_fwd_3d() raises:
     print("test_iop_cpu_imul_fwd_3d")
     var a = Tensor[dtype].full(Shape(2, 3, 4), 3.0)
     var b = Tensor[dtype].full(Shape(2, 3, 4), 2.0)
@@ -203,7 +203,7 @@ fn test_iop_cpu_imul_fwd_3d() raises:
     print("passed")
 
 
-fn test_iop_cpu_imul_fwd_zeros() raises:
+def test_iop_cpu_imul_fwd_zeros() raises:
     print("test_iop_cpu_imul_fwd_zeros")
     var a = Tensor[dtype].rand(Shape(4, 5))
     var b = Tensor[dtype].zeros(Shape(4, 5))
@@ -216,7 +216,7 @@ fn test_iop_cpu_imul_fwd_zeros() raises:
 # IDIV CPU — Forward
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_iop_cpu_idiv_fwd_1d_same_shape() raises:
+def test_iop_cpu_idiv_fwd_1d_same_shape() raises:
     print("test_iop_cpu_idiv_fwd_1d_same_shape")
     var a = Tensor[dtype].d1([4.0, 6.0, 8.0])
     var b = Tensor[dtype].d1([2.0, 3.0, 4.0])
@@ -225,7 +225,7 @@ fn test_iop_cpu_idiv_fwd_1d_same_shape() raises:
     print("passed")
 
 
-fn test_iop_cpu_idiv_fwd_2d_same_shape() raises:
+def test_iop_cpu_idiv_fwd_2d_same_shape() raises:
     print("test_iop_cpu_idiv_fwd_2d_same_shape")
     var a = Tensor[dtype].d2([[10.0, 20.0], [30.0, 40.0]])
     var b = Tensor[dtype].d2([[2.0, 4.0], [5.0, 8.0]])
@@ -234,7 +234,7 @@ fn test_iop_cpu_idiv_fwd_2d_same_shape() raises:
     print("passed")
 
 
-fn test_iop_cpu_idiv_fwd_broadcast_scalar() raises:
+def test_iop_cpu_idiv_fwd_broadcast_scalar() raises:
     print("test_iop_cpu_idiv_fwd_broadcast_scalar")
     var a = Tensor[dtype].d1([10.0, 20.0, 30.0])
     a /= Scalar[dtype](10)
@@ -242,7 +242,7 @@ fn test_iop_cpu_idiv_fwd_broadcast_scalar() raises:
     print("passed")
 
 
-fn test_iop_cpu_idiv_fwd_broadcast_row() raises:
+def test_iop_cpu_idiv_fwd_broadcast_row() raises:
     print("test_iop_cpu_idiv_fwd_broadcast_row")
     var a = Tensor[dtype].full(Shape(3, 4), 12.0)
     var b = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])
@@ -256,7 +256,7 @@ fn test_iop_cpu_idiv_fwd_broadcast_row() raises:
 
 
 
-fn test_iop_cpu_idiv_fwd_3d() raises:
+def test_iop_cpu_idiv_fwd_3d() raises:
     print("test_iop_cpu_idiv_fwd_3d")
     var a = Tensor[dtype].full(Shape(2, 3, 4), 6.0)
     var b = Tensor[dtype].full(Shape(2, 3, 4), 2.0)
@@ -269,7 +269,7 @@ fn test_iop_cpu_idiv_fwd_3d() raises:
 # BACKWARD — CPU (grad flow)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_iop_cpu_iadd_bwd_basic() raises:
+def test_iop_cpu_iadd_bwd_basic() raises:
     print("test_iop_cpu_iadd_bwd_basic")
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var b = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
@@ -282,7 +282,7 @@ fn test_iop_cpu_iadd_bwd_basic() raises:
     print("passed")
 
 
-fn test_iop_cpu_isub_bwd_basic() raises:
+def test_iop_cpu_isub_bwd_basic() raises:
     print("test_iop_cpu_isub_bwd_basic")
     var a = Tensor[dtype].d1([5.0, 6.0, 7.0], requires_grad=True)
     var b = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -297,7 +297,7 @@ fn test_iop_cpu_isub_bwd_basic() raises:
     print("passed")
 
 
-fn test_iop_cpu_imul_bwd_basic() raises:
+def test_iop_cpu_imul_bwd_basic() raises:
     print("test_iop_cpu_imul_bwd_basic")
     var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
     var b = Tensor[dtype].d1([3.0, 4.0, 5.0], requires_grad=True)
@@ -310,7 +310,7 @@ fn test_iop_cpu_imul_bwd_basic() raises:
     print("passed")
 
 
-fn test_iop_cpu_idiv_bwd_basic() raises:
+def test_iop_cpu_idiv_bwd_basic() raises:
     print("test_iop_cpu_idiv_bwd_basic")
     var a = Tensor[dtype].d1([4.0, 9.0, 16.0], requires_grad=True)
     var b = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
@@ -329,7 +329,7 @@ fn test_iop_cpu_idiv_bwd_basic() raises:
     print("passed")
 
 
-fn test_iop_cpu_iadd_bwd_2d() raises:
+def test_iop_cpu_iadd_bwd_2d() raises:
     print("test_iop_cpu_iadd_bwd_2d")
     var a = Tensor[dtype].ones(Shape(3, 4), requires_grad=True)
     var b = Tensor[dtype].ones(Shape(3, 4), requires_grad=True)
@@ -341,7 +341,7 @@ fn test_iop_cpu_iadd_bwd_2d() raises:
     print("passed")
 
 
-fn test_iop_cpu_imul_bwd_chain() raises:
+def test_iop_cpu_imul_bwd_chain() raises:
     print("test_iop_cpu_imul_bwd_chain")
     # loss = sum((a * b) * c)
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -364,7 +364,7 @@ fn test_iop_cpu_imul_bwd_chain() raises:
     print("passed")
 
 
-fn test_iop_cpu_iadd_bwd_broadcast() raises:
+def test_iop_cpu_iadd_bwd_broadcast() raises:
     print("test_iop_cpu_iadd_bwd_broadcast")
     var a = Tensor[dtype].ones(Shape(3, 4), requires_grad=True)
     var b = Tensor[dtype].ones(Shape(4), requires_grad=True)
@@ -379,7 +379,7 @@ fn test_iop_cpu_iadd_bwd_broadcast() raises:
     print("passed")
 
 
-fn test_iop_cpu_isub_bwd_3d() raises:
+def test_iop_cpu_isub_bwd_3d() raises:
     print("test_iop_cpu_isub_bwd_3d")
     var a = Tensor[dtype].ones(Shape(2, 3, 4), requires_grad=True)
     var b = Tensor[dtype].ones(Shape(2, 3, 4), requires_grad=True)
@@ -393,7 +393,7 @@ fn test_iop_cpu_isub_bwd_3d() raises:
     print("passed")
 
 
-fn test_iop_cpu_imul_bwd_2d() raises:
+def test_iop_cpu_imul_bwd_2d() raises:
     print("test_iop_cpu_imul_bwd_2d")
     var a = Tensor[dtype].full(Shape(3, 4), 2.0, requires_grad=True)
     var b = Tensor[dtype].full(Shape(3, 4), 3.0, requires_grad=True)
@@ -409,7 +409,7 @@ fn test_iop_cpu_imul_bwd_2d() raises:
     print("passed")
 
 
-fn test_iop_cpu_grad_flow_iadd_isub_combined() raises:
+def test_iop_cpu_grad_flow_iadd_isub_combined() raises:
     print("test_iop_cpu_grad_flow_iadd_isub_combined")
     # loss = sum((a + b) - c)
     var a = Tensor[dtype].ones(Shape(4), requires_grad=True)
@@ -427,7 +427,7 @@ fn test_iop_cpu_grad_flow_iadd_isub_combined() raises:
     print("passed")
 
 
-fn test_iop_cpu_grad_flow_shared_ancestor() raises:
+def test_iop_cpu_grad_flow_shared_ancestor() raises:
     print("test_iop_cpu_grad_flow_shared_ancestor")
     # loss = sum(a + a) → grad_a = 2
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -440,7 +440,7 @@ fn test_iop_cpu_grad_flow_shared_ancestor() raises:
     print("passed")
 
 
-fn test_iop_cpu_grad_flow_deep_chain() raises:
+def test_iop_cpu_grad_flow_deep_chain() raises:
     print("test_iop_cpu_grad_flow_deep_chain")
     # loss = sum(((a + b) * c) - d)
     var a = Tensor[dtype].ones(Shape(3), requires_grad=True)
@@ -466,7 +466,7 @@ fn test_iop_cpu_grad_flow_deep_chain() raises:
 # GPU FORWARD — IADD
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_iop_gpu_iadd_fwd_1d_same_shape() raises:
+def test_iop_gpu_iadd_fwd_1d_same_shape() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_iadd_fwd_1d_same_shape")
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -478,7 +478,7 @@ fn test_iop_gpu_iadd_fwd_1d_same_shape() raises:
         print("passed")
 
 
-fn test_iop_gpu_iadd_fwd_2d_same_shape() raises:
+def test_iop_gpu_iadd_fwd_2d_same_shape() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_iadd_fwd_2d_same_shape")
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
@@ -490,7 +490,7 @@ fn test_iop_gpu_iadd_fwd_2d_same_shape() raises:
         print("passed")
 
 
-fn test_iop_gpu_iadd_fwd_3d() raises:
+def test_iop_gpu_iadd_fwd_3d() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_iadd_fwd_3d")
         var a = Tensor[dtype].ones(Shape(2, 3, 4)).to_gpu()
@@ -502,7 +502,7 @@ fn test_iop_gpu_iadd_fwd_3d() raises:
         print("passed")
 
 
-fn test_iop_gpu_iadd_fwd_4d() raises:
+def test_iop_gpu_iadd_fwd_4d() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_iadd_fwd_4d")
         var a = Tensor[dtype].ones(Shape(2, 3, 4, 5)).to_gpu()
@@ -514,7 +514,7 @@ fn test_iop_gpu_iadd_fwd_4d() raises:
         print("passed")
 
 
-fn test_iop_gpu_iadd_fwd_broadcast_row() raises:
+def test_iop_gpu_iadd_fwd_broadcast_row() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_iadd_fwd_broadcast_row")
         var a = Tensor[dtype].ones(Shape(3, 4)).to_gpu()
@@ -528,7 +528,7 @@ fn test_iop_gpu_iadd_fwd_broadcast_row() raises:
         print("passed")
 
 
-fn test_iop_gpu_iadd_fwd_broadcast_col() raises:
+def test_iop_gpu_iadd_fwd_broadcast_col() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_iadd_fwd_broadcast_col")
         var a = Tensor[dtype].ones(Shape(3, 4)).to_gpu()
@@ -542,7 +542,7 @@ fn test_iop_gpu_iadd_fwd_broadcast_col() raises:
         print("passed")
 
 
-fn test_iop_gpu_iadd_fwd_large() raises:
+def test_iop_gpu_iadd_fwd_large() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_iadd_fwd_large")
         var a = Tensor[dtype].zeros(Shape(64, 128)).to_gpu()
@@ -552,7 +552,7 @@ fn test_iop_gpu_iadd_fwd_large() raises:
         print("passed")
 
 
-fn test_iop_gpu_iadd_fwd_matches_cpu() raises:
+def test_iop_gpu_iadd_fwd_matches_cpu() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_iadd_fwd_matches_cpu")
         var a_cpu = Tensor[dtype].rand(Shape(9, 20))
@@ -570,7 +570,7 @@ fn test_iop_gpu_iadd_fwd_matches_cpu() raises:
 # GPU FORWARD — ISUB
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_iop_gpu_isub_fwd_1d() raises:
+def test_iop_gpu_isub_fwd_1d() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_isub_fwd_1d")
         var a = Tensor[dtype].d1([5.0, 7.0, 9.0]).to_gpu()
@@ -580,7 +580,7 @@ fn test_iop_gpu_isub_fwd_1d() raises:
         print("passed")
 
 
-fn test_iop_gpu_isub_fwd_2d() raises:
+def test_iop_gpu_isub_fwd_2d() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_isub_fwd_2d")
         var a = Tensor[dtype].d2([[10.0, 20.0], [30.0, 40.0]]).to_gpu()
@@ -592,7 +592,7 @@ fn test_iop_gpu_isub_fwd_2d() raises:
         print("passed")
 
 
-fn test_iop_gpu_isub_fwd_matches_cpu() raises:
+def test_iop_gpu_isub_fwd_matches_cpu() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_isub_fwd_matches_cpu")
         var a_cpu = Tensor[dtype].rand(Shape(8, 12))
@@ -606,7 +606,7 @@ fn test_iop_gpu_isub_fwd_matches_cpu() raises:
         print("passed")
 
 
-fn test_iop_gpu_isub_fwd_broadcast_row() raises:
+def test_iop_gpu_isub_fwd_broadcast_row() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_isub_fwd_broadcast_row")
         var a = Tensor[dtype].full(Shape(3, 4), 5.0).to_gpu()
@@ -620,7 +620,7 @@ fn test_iop_gpu_isub_fwd_broadcast_row() raises:
         print("passed")
 
 
-fn test_iop_gpu_isub_fwd_3d() raises:
+def test_iop_gpu_isub_fwd_3d() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_isub_fwd_3d")
         var a = Tensor[dtype].full(Shape(2, 3, 4), 5.0).to_gpu()
@@ -636,7 +636,7 @@ fn test_iop_gpu_isub_fwd_3d() raises:
 # GPU FORWARD — IMUL
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_iop_gpu_imul_fwd_1d() raises:
+def test_iop_gpu_imul_fwd_1d() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_imul_fwd_1d")
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
@@ -646,7 +646,7 @@ fn test_iop_gpu_imul_fwd_1d() raises:
         print("passed")
 
 
-fn test_iop_gpu_imul_fwd_2d() raises:
+def test_iop_gpu_imul_fwd_2d() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_imul_fwd_2d")
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
@@ -658,7 +658,7 @@ fn test_iop_gpu_imul_fwd_2d() raises:
         print("passed")
 
 
-fn test_iop_gpu_imul_fwd_broadcast_row() raises:
+def test_iop_gpu_imul_fwd_broadcast_row() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_imul_fwd_broadcast_row")
         var a = Tensor[dtype].full(Shape(3, 4), 2.0).to_gpu()
@@ -672,7 +672,7 @@ fn test_iop_gpu_imul_fwd_broadcast_row() raises:
         print("passed")
 
 
-fn test_iop_gpu_imul_fwd_3d() raises:
+def test_iop_gpu_imul_fwd_3d() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_imul_fwd_3d")
         var a = Tensor[dtype].full(Shape(2, 3, 4), 3.0).to_gpu()
@@ -684,7 +684,7 @@ fn test_iop_gpu_imul_fwd_3d() raises:
         print("passed")
 
 
-fn test_iop_gpu_imul_fwd_matches_cpu() raises:
+def test_iop_gpu_imul_fwd_matches_cpu() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_imul_fwd_matches_cpu")
         var a_cpu = Tensor[dtype].rand(Shape(9, 20))
@@ -702,7 +702,7 @@ fn test_iop_gpu_imul_fwd_matches_cpu() raises:
 # GPU FORWARD — IDIV
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_iop_gpu_idiv_fwd_1d() raises:
+def test_iop_gpu_idiv_fwd_1d() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_idiv_fwd_1d")
         var a = Tensor[dtype].d1([4.0, 6.0, 8.0]).to_gpu()
@@ -712,7 +712,7 @@ fn test_iop_gpu_idiv_fwd_1d() raises:
         print("passed")
 
 
-fn test_iop_gpu_idiv_fwd_2d() raises:
+def test_iop_gpu_idiv_fwd_2d() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_idiv_fwd_2d")
         var a = Tensor[dtype].full(Shape(3, 4), 12.0).to_gpu()
@@ -724,7 +724,7 @@ fn test_iop_gpu_idiv_fwd_2d() raises:
         print("passed")
 
 
-fn test_iop_gpu_idiv_fwd_broadcast_row() raises:
+def test_iop_gpu_idiv_fwd_broadcast_row() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_idiv_fwd_broadcast_row")
         var a = Tensor[dtype].full(Shape(3, 4), 12.0).to_gpu()
@@ -738,7 +738,7 @@ fn test_iop_gpu_idiv_fwd_broadcast_row() raises:
         print("passed")
 
 
-fn test_iop_gpu_idiv_fwd_matches_cpu() raises:
+def test_iop_gpu_idiv_fwd_matches_cpu() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_idiv_fwd_matches_cpu")
         var a_cpu = Tensor[dtype].rand(Shape(8, 12)) + Scalar[dtype](0.1)
@@ -752,7 +752,7 @@ fn test_iop_gpu_idiv_fwd_matches_cpu() raises:
         print("passed")
 
 
-fn test_iop_gpu_idiv_fwd_3d() raises:
+def test_iop_gpu_idiv_fwd_3d() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_idiv_fwd_3d")
         var a = Tensor[dtype].full(Shape(2, 3, 4), 6.0).to_gpu()
@@ -768,7 +768,7 @@ fn test_iop_gpu_idiv_fwd_3d() raises:
 # GPU BACKWARD — grad flow
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_iop_gpu_iadd_bwd_basic() raises:
+def test_iop_gpu_iadd_bwd_basic() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_iadd_bwd_basic")
         var a = Tensor[dtype].ones(Shape(3), requires_grad=True)
@@ -783,7 +783,7 @@ fn test_iop_gpu_iadd_bwd_basic() raises:
         print("passed")
 
 
-fn test_iop_gpu_isub_bwd_basic() raises:
+def test_iop_gpu_isub_bwd_basic() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_isub_bwd_basic")
         var a = Tensor[dtype].ones(Shape(3), requires_grad=True)
@@ -800,7 +800,7 @@ fn test_iop_gpu_isub_bwd_basic() raises:
         print("passed")
 
 
-fn test_iop_gpu_imul_bwd_basic() raises:
+def test_iop_gpu_imul_bwd_basic() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_imul_bwd_basic")
         var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
@@ -819,7 +819,7 @@ fn test_iop_gpu_imul_bwd_basic() raises:
         print("passed")
 
 
-fn test_iop_gpu_idiv_bwd_basic() raises:
+def test_iop_gpu_idiv_bwd_basic() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_idiv_bwd_basic")
         var a = Tensor[dtype].d1([4.0, 9.0, 16.0], requires_grad=True)
@@ -840,7 +840,7 @@ fn test_iop_gpu_idiv_bwd_basic() raises:
         print("passed")
 
 
-fn test_iop_gpu_iadd_bwd_2d() raises:
+def test_iop_gpu_iadd_bwd_2d() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_iadd_bwd_2d")
         var a = Tensor[dtype].ones(Shape(3, 4), requires_grad=True)
@@ -859,7 +859,7 @@ fn test_iop_gpu_iadd_bwd_2d() raises:
         print("passed")
 
 
-fn test_iop_gpu_imul_bwd_chain() raises:
+def test_iop_gpu_imul_bwd_chain() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_imul_bwd_chain")
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -884,7 +884,7 @@ fn test_iop_gpu_imul_bwd_chain() raises:
         print("passed")
 
 
-fn test_iop_gpu_iadd_bwd_broadcast() raises:
+def test_iop_gpu_iadd_bwd_broadcast() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_iadd_bwd_broadcast")
         var a = Tensor[dtype].ones(Shape(3, 4), requires_grad=True)
@@ -903,7 +903,7 @@ fn test_iop_gpu_iadd_bwd_broadcast() raises:
         print("passed")
 
 
-fn test_iop_gpu_grad_flow_shared_ancestor() raises:
+def test_iop_gpu_grad_flow_shared_ancestor() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_grad_flow_shared_ancestor")
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -917,7 +917,7 @@ fn test_iop_gpu_grad_flow_shared_ancestor() raises:
         print("passed")
 
 
-fn test_iop_gpu_bwd_matches_cpu() raises:
+def test_iop_gpu_bwd_matches_cpu() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_bwd_matches_cpu")
         var a = Tensor[dtype].rand(Shape(4, 5), requires_grad=True)
@@ -944,7 +944,7 @@ fn test_iop_gpu_bwd_matches_cpu() raises:
         print("passed")
 
 
-fn test_iop_gpu_isub_bwd_3d() raises:
+def test_iop_gpu_isub_bwd_3d() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_isub_bwd_3d")
         var a = Tensor[dtype].ones(Shape(2, 3, 4), requires_grad=True)
@@ -962,7 +962,7 @@ fn test_iop_gpu_isub_bwd_3d() raises:
         ))
         print("passed")
 
-fn test_iop_gpu_grad_flow_deep_chain() raises:
+def test_iop_gpu_grad_flow_deep_chain() raises:
     comptime if has_accelerator():
         print("test_iop_gpu_grad_flow_deep_chain")
         var a = Tensor[dtype].ones(Shape(3), requires_grad=True)
@@ -991,7 +991,7 @@ fn test_iop_gpu_grad_flow_deep_chain() raises:
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

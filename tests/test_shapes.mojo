@@ -9,33 +9,26 @@ from tenmo.intarray import IntArray
 # ============================================
 
 
-fn test_shape_default_constructor() raises:
-    print("test_shape_default_constructor")
+def test_shape_default_constructor() raises:
     var s = Shape()
     assert_true(s.rank() == 0, "default constructor should create scalar")
     assert_true(s.num_elements() == 1, "scalar should have 1 element")
-    print("test_shape_default_constructor passed")
 
 
-fn test_shape_void() raises:
-    print("test_shape_void")
+def test_shape_void() raises:
     var s = Shape.Void()
     assert_true(s.rank() == 0, "Void() should create scalar")
     assert_true(s.numels() == 1, "scalar should have 1 element")
-    print("test_shape_void passed")
 
 
-fn test_shape_unit() raises:
-    print("test_shape_unit")
+def test_shape_unit() raises:
     var s = Shape.Unit()
     assert_true(s.rank() == 1, "Unit() should have rank 1")
     assert_true(s[0] == 1, "Unit() dimension should be 1")
     assert_true(s.numels() == 1, "Unit() should have 1 element")
-    print("test_shape_unit passed")
 
 
-fn test_shape_variadic_constructor() raises:
-    print("test_shape_variadic_constructor")
+def test_shape_variadic_constructor() raises:
     var s = Shape(2, 3, 4)
     assert_true(
         s.rank() == 3, "variadic constructor should create rank 3 shape"
@@ -44,11 +37,9 @@ fn test_shape_variadic_constructor() raises:
     assert_true(s[1] == 3, "second dimension should be 3")
     assert_true(s[2] == 4, "third dimension should be 4")
     assert_true(s.numels() == 24, "shape should have 24 elements")
-    print("test_shape_variadic_constructor passed")
 
 
-fn test_shape_list_constructor() raises:
-    print("test_shape_list_constructor")
+def test_shape_list_constructor() raises:
     var lst = List[Int]()
     lst.append(5)
     lst.append(6)
@@ -56,88 +47,70 @@ fn test_shape_list_constructor() raises:
     var s = Shape(lst)
     assert_true(s.rank() == 3, "list constructor should create rank 3 shape")
     assert_true(s.numels() == 210, "shape should have 210 elements")
-    print("test_shape_list_constructor passed")
 
 
-fn test_shape_intarray_constructor() raises:
-    print("test_shape_intarray_constructor")
+def test_shape_intarray_constructor() raises:
     var arr = IntArray(3, 4, 5)
     var s = Shape(arr)
     assert_true(
         s.rank() == 3, "IntArray constructor should create rank 3 shape"
     )
     assert_true(s[1] == 4, "second dimension should be 4")
-    print("test_shape_intarray_constructor passed")
 
 
-fn test_shape_getitem() raises:
-    print("test_shape_getitem")
+def test_shape_getitem() raises:
     var s = Shape(10, 20, 30, 40)
     assert_true(s[0] == 10, "first dimension should be 10")
     assert_true(s[2] == 30, "third dimension should be 30")
     assert_true(s[-1] == 40, "last dimension should be 40")
     assert_true(s[-2] == 30, "second to last should be 30")
-    print("test_shape_getitem passed")
 
 
-fn test_shape_slice() raises:
-    print("test_shape_slice")
+def test_shape_slice() raises:
     var s = Shape(10, 20, 30, 40, 50)
     var sliced = s[1:4]
     assert_true(sliced.rank() == 3, "sliced shape should have rank 3")
     assert_true(sliced[0] == 20, "first element should be 20")
     assert_true(sliced[2] == 40, "last element should be 40")
-    print("test_shape_slice passed")
 
 
-fn test_shape_eq() raises:
-    print("test_shape_eq")
+def test_shape_eq() raises:
     var s1 = Shape(2, 3, 4)
     var s2 = Shape(2, 3, 4)
     var s3 = Shape(2, 3, 5)
     assert_true(s1 == s2, "s1 should equal s2")
     assert_true(not (s1 == s3), "s1 should not equal s3")
-    print("test_shape_eq passed")
 
 
-fn test_shape_eq_list() raises:
-    print("test_shape_eq_list")
+def test_shape_eq_list() raises:
     var s = Shape(2, 3, 4)
     var lst = List[Int]()
     lst.append(2)
     lst.append(3)
     lst.append(4)
     assert_true(s == lst, "shape should equal list")
-    print("test_shape_eq_list passed")
 
 
-fn test_shape_ne() raises:
-    print("test_shape_ne")
+def test_shape_ne() raises:
     var s1 = Shape(2, 3)
     var s2 = Shape(2, 4)
     assert_true(s1 != s2, "s1 should not equal s2")
-    print("test_shape_ne passed")
 
 
-fn test_shape_str() raises:
-    print("test_shape_str")
+def test_shape_str() raises:
     var s = Shape(2, 3, 4)
     var str_repr = s.__str__()
     assert_true(str_repr == "(2, 3, 4)", "string should be '(2, 3, 4)'")
-    print("test_shape_str passed")
 
 
-fn test_shape_tolist() raises:
-    print("test_shape_tolist")
+def test_shape_tolist() raises:
     var s = Shape(5, 10, 15)
     var lst = s.tolist()
     assert_true(len(lst) == 3, "list should have 3 elements")
     assert_true(lst[1] == 10, "second element should be 10")
-    print("test_shape_tolist passed")
 
 
-fn test_shape_add_shape() raises:
-    print("test_shape_add_shape")
+def test_shape_add_shape() raises:
     var s1 = Shape(2, 3)
     var s2 = Shape(4, 5)
     var result = s1 + s2
@@ -145,11 +118,9 @@ fn test_shape_add_shape() raises:
     assert_true(result[0] == 2, "first dimension should be 2")
     assert_true(result[3] == 5, "last dimension should be 5")
     assert_true(result.numels() == 120, "shape should have 120 elements")
-    print("test_shape_add_shape passed")
 
 
-fn test_shape_add_list() raises:
-    print("test_shape_add_list")
+def test_shape_add_list() raises:
     var s = Shape(2, 3)
     var lst = List[Int]()
     lst.append(4)
@@ -157,11 +128,9 @@ fn test_shape_add_list() raises:
     var result = s + lst
     assert_true(result.rank() == 4, "result should have rank 4")
     assert_true(result[2] == 4, "third dimension should be 4")
-    print("test_shape_add_list passed")
 
 
-fn test_shape_radd_list() raises:
-    print("test_shape_radd_list")
+def test_shape_radd_list() raises:
     var s = Shape(4, 5)
     var lst = List[Int]()
     lst.append(2)
@@ -170,48 +139,38 @@ fn test_shape_radd_list() raises:
     assert_true(result.rank() == 4, "result should have rank 4")
     assert_true(result[0] == 2, "first dimension should be 2")
     assert_true(result[3] == 5, "last dimension should be 5")
-    print("test_shape_radd_list passed")
 
 
-fn test_shape_mul_scalar() raises:
-    print("test_shape_mul_scalar")
+def test_shape_mul_scalar() raises:
     var s = Shape(2, 3)
     var result = s * 3
     assert_true(result.rank() == 6, "repeated shape should have rank 6")
     assert_true(result[0] == 2, "first dimension should be 2")
     assert_true(result[4] == 2, "dimension 4 should be 2")
-    print("test_shape_mul_scalar passed")
 
 
-fn test_shape_rmul_scalar() raises:
-    print("test_shape_rmul_scalar")
+def test_shape_rmul_scalar() raises:
     var s = Shape(2, 3)
     var result = 2 * s
     assert_true(result.rank() == 4, "repeated shape should have rank 4")
-    print("test_shape_rmul_scalar passed")
 
 
-fn test_shape_reverse() raises:
-    print("test_shape_reverse")
+def test_shape_reverse() raises:
     var s = Shape(2, 3, 4, 5)
     var rev = s.reverse()
     assert_true(rev[0] == 5, "first dimension should be 5")
     assert_true(rev[3] == 2, "last dimension should be 2")
-    print("test_shape_reverse passed")
 
 
-fn test_shape_replace() raises:
-    print("test_shape_replace")
+def test_shape_replace() raises:
     var s = Shape(2, 3, 4, 5)
     var result = s.replace(1, 10)
     assert_true(result[1] == 10, "second dimension should be 10")
     assert_true(result[0] == 2, "other dimensions unchanged")
     assert_true(result.numels() == 400, "numels should be updated")
-    print("test_shape_replace passed")
 
 
-fn test_shape_permute() raises:
-    print("test_shape_permute")
+def test_shape_permute() raises:
     var s = Shape(10, 20, 30, 40)
     var axes = IntArray(2, 0, 3, 1)
     var result = s.permute(axes)
@@ -219,41 +178,33 @@ fn test_shape_permute() raises:
     assert_true(result[1] == 10, "second dimension should be 10")
     assert_true(result[2] == 40, "third dimension should be 40")
     assert_true(result[3] == 20, "fourth dimension should be 20")
-    print("test_shape_permute passed")
 
 
-fn test_shape_count_axes_of_size() raises:
-    print("test_shape_count_axes_of_size")
+def test_shape_count_axes_of_size() raises:
     var s = Shape(1, 2, 1, 3, 1)
     assert_true(s.count_axes_of_size(1) == 3, "should have 3 axes of size 1")
     assert_true(s.count_axes_of_size(2) == 1, "should have 1 axis of size 2")
-    print("test_shape_count_axes_of_size passed")
 
 
-fn test_shape_indices_of_axes_with_size() raises:
-    print("test_shape_indices_of_axes_with_size")
+def test_shape_indices_of_axes_with_size() raises:
     var s = Shape(1, 2, 1, 3, 1)
     var indices = s.indices_of_axes_with_size(1)
     assert_true(len(indices) == 3, "should find 3 axes")
     assert_true(indices[0] == 0, "first axis at index 0")
     assert_true(indices[1] == 2, "second axis at index 2")
     assert_true(indices[2] == 4, "third axis at index 4")
-    print("test_shape_indices_of_axes_with_size passed")
 
 
-fn test_shape_first_index() raises:
-    print("test_shape_first_index")
+def test_shape_first_index() raises:
     var s = Shape(2, 3, 4)
     var idx = s.first_index()
     assert_true(len(idx) == 3, "first index should have 3 elements")
     assert_true(idx[0] == 0, "all elements should be 0")
     assert_true(idx[1] == 0, "all elements should be 0")
     assert_true(idx[2] == 0, "all elements should be 0")
-    print("test_shape_first_index passed")
 
 
-fn test_shape_compute_output_shape_reduce_all() raises:
-    print("test_shape_compute_output_shape_reduce_all")
+def test_shape_compute_output_shape_reduce_all() raises:
     var s = Shape(2, 3, 4)
     var axes = IntArray()  # Empty = reduce all
     var result_no_keep = s.compute_output_shape(axes, keepdims=False)
@@ -266,11 +217,9 @@ fn test_shape_compute_output_shape_reduce_all() raises:
         result_keep.rank() == 3, "reduce all with keepdims should keep rank"
     )
     assert_true(result_keep[0] == 1, "all dims should be 1")
-    print("test_shape_compute_output_shape_reduce_all passed")
 
 
-fn test_shape_compute_output_shape_single_axis() raises:
-    print("test_shape_compute_output_shape_single_axis")
+def test_shape_compute_output_shape_single_axis() raises:
     var s = Shape(2, 3, 4)
     var axes = IntArray.with_capacity(1)
     axes.append(1)  # Reduce middle axis
@@ -285,12 +234,10 @@ fn test_shape_compute_output_shape_single_axis() raises:
         result_keep.rank() == 3, "result with keepdims should have rank 3"
     )
     assert_true(result_keep[1] == 1, "reduced dim should be 1")
-    print("test_shape_compute_output_shape_single_axis passed")
 
 
 
-fn test_shape_compute_output_shape_multiple_axes() raises:
-    print("test_shape_compute_output_shape_multiple_axes")
+def test_shape_compute_output_shape_multiple_axes() raises:
     var s = Shape(2, 3, 4, 5)
     var axes = IntArray(1, 3)  # Reduce axes 1 and 3
     var result_no_keep = s.compute_output_shape(axes, keepdims=False)
@@ -305,68 +252,21 @@ fn test_shape_compute_output_shape_multiple_axes() raises:
     )
     assert_true(result_keep[1] == 1, "reduced dims should be 1")
     assert_true(result_keep[3] == 1, "reduced dims should be 1")
-    print("test_shape_compute_output_shape_multiple_axes passed")
 
 
-fn test_shape_of() raises:
-    print("test_shape_of")
+def test_shape_of() raises:
     var s = Shape.of(2, 3, 4)
     assert_true(s.rank() == 3, "Shape.of should create rank 3 shape")
     assert_true(s[1] == 3, "second dimension should be 3")
-    print("test_shape_of passed")
 
 
-fn test_shape_product() raises:
-    print("test_shape_product")
+def test_shape_product() raises:
     var s = Shape(2, 3, 4)
     assert_true(Shape.product(s) == 24, "product should be 24")
     var scalar = Shape()
     assert_true(Shape.product(scalar) == 1, "scalar product should be 1")
-    print("test_shape_product passed")
 
-
-fn run_all_shape_tests() raises:
-    print("\n" + "=" * 60)
-    print("RUNNING SHAPE TESTS")
-    print("=" * 60)
-
-    test_shape_default_constructor()
-    test_shape_void()
-    test_shape_unit()
-    test_shape_variadic_constructor()
-    test_shape_list_constructor()
-    test_shape_intarray_constructor()
-    test_shape_getitem()
-    test_shape_slice()
-    test_shape_eq()
-    test_shape_eq_list()
-    test_shape_ne()
-    test_shape_str()
-    test_shape_tolist()
-    test_shape_add_shape()
-    test_shape_add_list()
-    test_shape_radd_list()
-    test_shape_mul_scalar()
-    test_shape_rmul_scalar()
-    test_shape_reverse()
-    test_shape_replace()
-    test_shape_permute()
-    test_shape_count_axes_of_size()
-    test_shape_indices_of_axes_with_size()
-    test_shape_first_index()
-    test_shape_compute_output_shape_reduce_all()
-    test_shape_compute_output_shape_multiple_axes()
-    test_shape_of()
-    test_shape_product()
-    test_shape_compute_output_shape_single_axis()
-
-    print("\n" + "=" * 60)
-    print("ALL SHAPE TESTS PASSED")
-    print("=" * 60)
-
-
-fn test_slice_shape() raises:
-    print("test_slice_shape")
+def test_slice_shape() raises:
     shape = Shape([1, 2, 3, 4])
     assert_true(
         shape[:-1] == Shape.of(1, 2, 3)
@@ -379,8 +279,7 @@ fn test_slice_shape() raises:
     )
 
 
-fn test_negative_indices() raises:
-    print("test_negative_indices")
+def test_negative_indices() raises:
     shape = Shape([1, 2, 3])
     assert_true(
         shape[-1] == 3 and shape[-2] == 2 and shape[-3] == 1,
@@ -388,8 +287,7 @@ fn test_negative_indices() raises:
     )
 
 
-fn test_slice_from() raises:
-    print("test_slice_from")
+def test_slice_from() raises:
     shape = Shape.of(2, 3, 4)
     assert_true(
         shape[0:] == shape,
@@ -409,21 +307,18 @@ fn test_slice_from() raises:
     )
 
 
-fn test_reverse() raises:
-    print("test_reverse")
+def test_reverse() raises:
     shape = Shape.of(1, 2, 3)
     assert_true(
         shape.reverse() == Shape.of(3, 2, 1), "Shape reversal assertion failed"
     )
 
 
-fn test_equivalence() raises:
-    print("test_equivalence")
+def test_equivalence() raises:
     assert_true(Shape(IntArray(1, 4)) == Shape.of(1, 4), "Not equivalent")
 
 
-fn test_empty_shape() raises:
-    print("test_empty_shape")
+def test_empty_shape() raises:
     shape = Shape()
     for each in shape:
         assert_true(
@@ -436,15 +331,13 @@ fn test_empty_shape() raises:
     )
 
 
-fn test_replace() raises:
-    print("test_replace")
+def test_replace() raises:
     shape = Shape.of(3, 4, 2)
     shape = shape.replace(2, 5)
     assert_true(shape == Shape.of(3, 4, 5), "replace assertion failed")
 
 
-fn test_index_iter() raises:
-    print("test_index_iter")
+def test_index_iter() raises:
     shape = Shape.of(1)
     for each in shape:
         assert_true(
@@ -460,8 +353,7 @@ fn test_index_iter() raises:
     )
 
 
-fn test_shape_as_intlist() raises:
-    print("test_shape_as_intlist")
+def test_shape_as_intlist() raises:
     shape = Shape.of(2, 4, 5)
     fa = shape.intarray()
     assert_true(
@@ -470,8 +362,7 @@ fn test_shape_as_intlist() raises:
     )
 
 
-fn test_zip_reversed() raises:
-    print("test_zip_reversed")
+def test_zip_reversed() raises:
     shape1 = Shape.of(1, 2, 3, 4, 5)
     shape2 = Shape.of(6)
     rzipped = shape1.intarray().zip_reversed(shape2.intarray())
@@ -481,7 +372,7 @@ fn test_zip_reversed() raises:
         )
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

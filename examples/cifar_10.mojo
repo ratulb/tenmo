@@ -13,7 +13,7 @@ from tenmo.dataloader import NumpyDataset
 from std.time import perf_counter_ns
 
 
-fn train_cifar_10() raises:
+def train_cifar_10() raises:
     """Train a neural network on CIFAR-10 dataset."""
     print("=" * 80)
     print("CIFAR-10 Training (Profiled)")
@@ -265,7 +265,7 @@ fn train_cifar_10() raises:
     print("=" * 80)
 
 
-fn compute_accuracy[
+def compute_accuracy[
     dtype: DType
 ](pred: Tensor[dtype], target: Tensor[DType.int32]) -> Int64:
     """Compute classification accuracy by comparing argmax predictions to targets.
@@ -280,5 +280,5 @@ fn compute_accuracy[
     return correct
 
 
-fn main() raises:
+def main() raises:
     train_cifar_10()

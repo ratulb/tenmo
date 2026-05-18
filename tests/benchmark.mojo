@@ -7,7 +7,7 @@ from .shapes import Shape
 # ============================================
 # NAIVE MATMUL - Pure scalar loops, no SIMD
 # ============================================
-fn matmul_naive[
+def matmul_naive[
     dtype: DType
 ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
     """Naive triple-loop matmul with no optimizations."""
@@ -34,7 +34,7 @@ fn matmul_naive[
 # ============================================
 # BENCHMARK RUNNER
 # ============================================
-fn benchmark_matmul():
+def benchmark_matmul():
     comptime dtype = DType.float32
 
     print("=" * 60)
@@ -143,7 +143,7 @@ fn benchmark_matmul():
 # ============================================
 # DETAILED TIMING BREAKDOWN
 # ============================================
-fn benchmark_backward_breakdown():
+def benchmark_backward_breakdown():
     comptime dtype = DType.float32
     comptime size = 1024
 
@@ -181,7 +181,7 @@ fn benchmark_backward_breakdown():
 # ============================================
 # MEMORY BANDWIDTH TEST
 # ============================================
-fn benchmark_memory_bandwidth():
+def benchmark_memory_bandwidth():
     """Test if we're compute-bound or memory-bound."""
     comptime dtype = DType.float32
     comptime size = 1024
@@ -213,7 +213,7 @@ fn benchmark_memory_bandwidth():
 # ============================================
 # MAIN
 # ============================================
-fn main():
+def main():
     print("Starting matmul benchmarks...\n")
 
     # Run main benchmark suite

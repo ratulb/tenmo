@@ -21,7 +21,7 @@ from .ndbuffer import NDBuffer
 # Simplification - views becomes contiguous when copied to device and offset becomes 0
 
 
-fn scalar_ops[
+def scalar_ops[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -120,7 +120,7 @@ fn scalar_ops[
 # - Hardcoding dtype sidesteps the constraint entirely
 
 
-fn pow_op_f32[
+def pow_op_f32[
     simd_width: Int = simd_width_of[DType.float32](),
     simd_vectors_per_thread: Int = 2 * simd_width,
 ](
@@ -153,7 +153,7 @@ fn pow_op_f32[
         base_idx += stride * CHUNK_SIZE
 
 
-fn pow_op_f64[
+def pow_op_f64[
     simd_width: Int = simd_width_of[DType.float64](),
     simd_vectors_per_thread: Int = 2 * simd_width,
 ](
@@ -190,7 +190,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
     ImplicitlyCopyable & Movable
 ):
     @staticmethod
-    fn launch[
+    def launch[
         op_code: Int,
     ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) raises -> NDBuffer[
         Self.dtype
@@ -243,7 +243,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
         return out^
 
     @staticmethod
-    fn launch_pow(
+    def launch_pow(
         A: NDBuffer[Self.dtype], exponent: Scalar[Self.dtype]
     ) raises -> NDBuffer[Self.dtype]:
         """
@@ -315,7 +315,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
         return NDBuffer[Self.dtype].with_device_state(device_state^, A.shape)
 
     @staticmethod
-    fn launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
+    def launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
         threads_per_block: Int
         num_blocks: Int
 

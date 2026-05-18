@@ -8,7 +8,7 @@ from tenmo.common_utils import i, s
 # HELPER — manual 2D matmul reference for small matrices
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn matmul_ref[dtype: DType](
+def matmul_ref[dtype: DType](
     A: Tensor[dtype], B: Tensor[dtype]
 ) -> Tensor[dtype]:
     """Naive O(n^3) 2D matmul for reference comparison."""
@@ -31,7 +31,7 @@ fn matmul_ref[dtype: DType](
 # 1. BASELINE — 2D mm
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_batchmm_2d_basic() raises:
+def test_batchmm_2d_basic() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])
@@ -40,7 +40,7 @@ fn test_batchmm_2d_basic() raises:
     assert_true(C.all_close(Tensor[dtype].d2([[19.0, 22.0], [43.0, 50.0]])))
 
 
-fn test_batchmm_2d_non_square() raises:
+def test_batchmm_2d_non_square() raises:
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(1.0, 13.0)
     var A = _tmp0.reshape(3, 4)
@@ -56,7 +56,7 @@ fn test_batchmm_2d_non_square() raises:
 # 2. 3D BATCHED mm
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_batchmm_3d_shape() raises:
+def test_batchmm_3d_shape() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].ones(Shape(4, 3, 5))
     var B = Tensor[dtype].ones(Shape(4, 5, 2))
@@ -64,7 +64,7 @@ fn test_batchmm_3d_shape() raises:
     assert_true(C.shape() == Shape(4, 3, 2))
 
 
-fn test_batchmm_3d_values() raises:
+def test_batchmm_3d_values() raises:
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(1.0, 13.0)
     var A = _tmp0.reshape(2, 2, 3)
@@ -82,7 +82,7 @@ fn test_batchmm_3d_values() raises:
     assert_true(C[i(1), s(), s()].all_close[atol=1e-3](ref1))
 
 
-fn test_batchmm_3d_identity() raises:
+def test_batchmm_3d_identity() raises:
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(1.0, 25.0)
     var A = _tmp0.reshape(3, 4, 2)
@@ -99,7 +99,7 @@ fn test_batchmm_3d_identity() raises:
 # 3. 4D BATCHED mm — attention shapes
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_batchmm_4d_shape_scores() raises:
+def test_batchmm_4d_shape_scores() raises:
     comptime dtype = DType.float32
     var Q = Tensor[dtype].ones(Shape(2, 4, 8, 16))
     var K = Tensor[dtype].ones(Shape(2, 4, 16, 8))
@@ -107,7 +107,7 @@ fn test_batchmm_4d_shape_scores() raises:
     assert_true(scores.shape() == Shape(2, 4, 8, 8))
 
 
-fn test_batchmm_4d_shape_context() raises:
+def test_batchmm_4d_shape_context() raises:
     comptime dtype = DType.float32
     var weights = Tensor[dtype].ones(Shape(2, 4, 8, 8))
     var V       = Tensor[dtype].ones(Shape(2, 4, 8, 16))
@@ -115,7 +115,7 @@ fn test_batchmm_4d_shape_context() raises:
     assert_true(ctx.shape() == Shape(2, 4, 8, 16))
 
 
-fn test_batchmm_4d_scores_values() raises:
+def test_batchmm_4d_scores_values() raises:
     comptime dtype = DType.float32
     var Q  = Tensor[dtype].ones(Shape(1, 1, 2, 3))
     var Kt = Tensor[dtype].ones(Shape(1, 1, 3, 2))
@@ -126,7 +126,7 @@ fn test_batchmm_4d_scores_values() raises:
     ))
 
 
-fn test_batchmm_4d_context_values() raises:
+def test_batchmm_4d_context_values() raises:
     comptime dtype = DType.float32
     var B = 1; var H = 1; var T = 4; var D = 2
     var weights = Tensor[dtype].full(Shape(B, H, T, T), 1.0 / Float32(T))
@@ -141,7 +141,7 @@ fn test_batchmm_4d_context_values() raises:
     assert_true(ctx.all_close[atol=1e-5](expected))
 
 
-fn test_batchmm_4d_multi_head_independent() raises:
+def test_batchmm_4d_multi_head_independent() raises:
     comptime dtype = DType.float32
     var B = 1; var H = 2; var T = 3; var D = 4
     var weights = Tensor[dtype].ones(Shape(B, H, T, T))
@@ -157,7 +157,7 @@ fn test_batchmm_4d_multi_head_independent() raises:
             assert_true(abs(ctx[0, 1, t, d] - Float32(T)) < 1e-4)
 
 
-fn test_batchmm_4d_realistic_attention_shape() raises:
+def test_batchmm_4d_realistic_attention_shape() raises:
     comptime dtype = DType.float32
     var Q  = Tensor[dtype].randn(Shape(2, 4, 16, 8),  mean=0.0, std=0.02)
     var Kt = Tensor[dtype].randn(Shape(2, 4, 8,  16), mean=0.0, std=0.02)
@@ -168,7 +168,7 @@ fn test_batchmm_4d_realistic_attention_shape() raises:
     assert_true(context.shape() == Shape(2, 4, 16, 8))
 
 
-fn test_batchmm_4d_broadcast_batch_dim() raises:
+def test_batchmm_4d_broadcast_batch_dim() raises:
     comptime dtype = DType.float32
     var Q  = Tensor[dtype].ones(Shape(1, 2, 4, 8))
     var Kt = Tensor[dtype].ones(Shape(3, 2, 8, 4))
@@ -180,7 +180,7 @@ fn test_batchmm_4d_broadcast_batch_dim() raises:
 # 4. BACKWARD — CPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_batchmm_4d_backward_scores() raises:
+def test_batchmm_4d_backward_scores() raises:
     comptime dtype = DType.float32
     var B = 1; var H = 2; var T = 3; var D = 4
     var Q  = Tensor[dtype].ones(Shape(B, H, T, D), requires_grad=True)
@@ -196,7 +196,7 @@ fn test_batchmm_4d_backward_scores() raises:
     ))
 
 
-fn test_batchmm_4d_backward_context() raises:
+def test_batchmm_4d_backward_context() raises:
     comptime dtype = DType.float32
     var B = 1; var H = 2; var T = 3; var D = 4
     var W = Tensor[dtype].ones(Shape(B, H, T, T), requires_grad=True)
@@ -212,7 +212,7 @@ fn test_batchmm_4d_backward_context() raises:
     ))
 
 
-fn test_batchmm_4d_backward_full_attention_chain() raises:
+def test_batchmm_4d_backward_full_attention_chain() raises:
     comptime dtype = DType.float32
     var B = 1; var H = 1; var T = 4; var D = 4
     var Q  = Tensor[dtype].ones(Shape(B, H, T, D), requires_grad=True)
@@ -239,7 +239,7 @@ fn test_batchmm_4d_backward_full_attention_chain() raises:
 # 1. BASELINE — 2D mm GPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_batchmm_gpu_2d_basic() raises:
+def test_batchmm_gpu_2d_basic() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
@@ -251,7 +251,7 @@ fn test_batchmm_gpu_2d_basic() raises:
         ))
 
 
-fn test_batchmm_gpu_2d_non_square() raises:
+def test_batchmm_gpu_2d_non_square() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(1.0, 13.0)
@@ -268,7 +268,7 @@ fn test_batchmm_gpu_2d_non_square() raises:
 # 2. 3D BATCHED mm GPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_batchmm_gpu_3d_shape() raises:
+def test_batchmm_gpu_3d_shape() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].ones(Shape(4, 3, 5)).to_gpu()
@@ -277,7 +277,7 @@ fn test_batchmm_gpu_3d_shape() raises:
         assert_true(C.shape() == Shape(4, 3, 2))
 
 
-fn test_batchmm_gpu_3d_values() raises:
+def test_batchmm_gpu_3d_values() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(1.0, 13.0)
@@ -296,7 +296,7 @@ fn test_batchmm_gpu_3d_values() raises:
         assert_true(C[i(1), s(), s()].all_close[atol=1e-3](ref1))
 
 
-fn test_batchmm_gpu_3d_identity() raises:
+def test_batchmm_gpu_3d_identity() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(1.0, 25.0)
@@ -314,7 +314,7 @@ fn test_batchmm_gpu_3d_identity() raises:
 # 3. 4D BATCHED mm GPU — attention shapes
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_batchmm_gpu_4d_shape_scores() raises:
+def test_batchmm_gpu_4d_shape_scores() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var Q = Tensor[dtype].ones(Shape(2, 4, 8, 16)).to_gpu()
@@ -323,7 +323,7 @@ fn test_batchmm_gpu_4d_shape_scores() raises:
         assert_true(scores.shape() == Shape(2, 4, 8, 8))
 
 
-fn test_batchmm_gpu_4d_shape_context() raises:
+def test_batchmm_gpu_4d_shape_context() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var weights = Tensor[dtype].ones(Shape(2, 4, 8, 8)).to_gpu()
@@ -332,7 +332,7 @@ fn test_batchmm_gpu_4d_shape_context() raises:
         assert_true(ctx.shape() == Shape(2, 4, 8, 16))
 
 
-fn test_batchmm_gpu_4d_scores_values() raises:
+def test_batchmm_gpu_4d_scores_values() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var Q  = Tensor[dtype].ones(Shape(1, 1, 2, 3)).to_gpu()
@@ -344,7 +344,7 @@ fn test_batchmm_gpu_4d_scores_values() raises:
         ))
 
 
-fn test_batchmm_gpu_4d_context_values() raises:
+def test_batchmm_gpu_4d_context_values() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var B = 1; var H = 1; var T = 4; var D = 2
@@ -363,7 +363,7 @@ fn test_batchmm_gpu_4d_context_values() raises:
         assert_true(ctx.all_close[atol=1e-5](expected))
 
 
-fn test_batchmm_gpu_4d_multi_head_independent() raises:
+def test_batchmm_gpu_4d_multi_head_independent() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var B = 1; var H = 2; var T = 3; var D = 4
@@ -380,7 +380,7 @@ fn test_batchmm_gpu_4d_multi_head_independent() raises:
                 assert_true(abs(ctx[0, 1, t, d] - Float32(T)) < 1e-4)
 
 
-fn test_batchmm_gpu_4d_realistic_attention_shape() raises:
+def test_batchmm_gpu_4d_realistic_attention_shape() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var Q  = Tensor[dtype].randn(Shape(2, 4, 16, 8),  mean=0.0, std=0.02).to_gpu()
@@ -392,7 +392,7 @@ fn test_batchmm_gpu_4d_realistic_attention_shape() raises:
         assert_true(context.shape() == Shape(2, 4, 16, 8))
 
 
-fn test_batchmm_gpu_4d_broadcast_batch_dim() raises:
+def test_batchmm_gpu_4d_broadcast_batch_dim() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var Q  = Tensor[dtype].ones(Shape(1, 2, 4, 8)).to_gpu()
@@ -405,7 +405,7 @@ fn test_batchmm_gpu_4d_broadcast_batch_dim() raises:
 # 4. BACKWARD — GPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_batchmm_gpu_4d_backward_scores() raises:
+def test_batchmm_gpu_4d_backward_scores() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var B = 1; var H = 2; var T = 3; var D = 4
@@ -422,7 +422,7 @@ fn test_batchmm_gpu_4d_backward_scores() raises:
         ))
 
 
-fn test_batchmm_gpu_4d_backward_context() raises:
+def test_batchmm_gpu_4d_backward_context() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var B = 1; var H = 2; var T = 3; var D = 4
@@ -439,7 +439,7 @@ fn test_batchmm_gpu_4d_backward_context() raises:
         ))
 
 
-fn test_batchmm_gpu_4d_backward_full_attention_chain() raises:
+def test_batchmm_gpu_4d_backward_full_attention_chain() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var B = 1; var H = 1; var T = 4; var D = 4
@@ -463,7 +463,7 @@ fn test_batchmm_gpu_4d_backward_full_attention_chain() raises:
 # 5. CPU / GPU PARITY
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_batchmm_parity_2d() raises:
+def test_batchmm_parity_2d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(1.0, 13.0)
@@ -475,7 +475,7 @@ fn test_batchmm_parity_2d() raises:
         assert_true(cpu_out.all_close[atol=1e-4](gpu_out))
 
 
-fn test_batchmm_parity_3d() raises:
+def test_batchmm_parity_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(1.0, 25.0)
@@ -487,7 +487,7 @@ fn test_batchmm_parity_3d() raises:
         assert_true(cpu_out.all_close[atol=1e-3](gpu_out))
 
 
-fn test_batchmm_parity_4d_scores() raises:
+def test_batchmm_parity_4d_scores() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var Q  = Tensor[dtype].randn(Shape(2, 4, 8, 16), mean=0.0, std=0.02)
@@ -497,7 +497,7 @@ fn test_batchmm_parity_4d_scores() raises:
         assert_true(cpu_out.all_close[atol=1e-4](gpu_out))
 
 
-fn test_batchmm_parity_4d_context() raises:
+def test_batchmm_parity_4d_context() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var W = Tensor[dtype].randn(Shape(2, 4, 8, 8),  mean=0.0, std=0.02)
@@ -507,7 +507,7 @@ fn test_batchmm_parity_4d_context() raises:
         assert_true(cpu_out.all_close[atol=1e-4](gpu_out))
 
 
-fn test_batchmm_parity_4d_backward() raises:
+def test_batchmm_parity_4d_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var B = 1; var H = 2; var T = 4; var D = 4
@@ -530,6 +530,6 @@ fn test_batchmm_parity_4d_backward() raises:
 # MAIN
 # ═════════════════════════════════════════════════════════════════════════════
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll attn matmul tests passed!")

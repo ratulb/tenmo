@@ -12,7 +12,7 @@ from std.utils.numerics import min_finite
 
 
 @always_inline("nodebug")
-fn inf[dtype: DType]() -> Scalar[dtype]:
+def inf[dtype: DType]() -> Scalar[dtype]:
     """Gets a +inf value for the given dtype.
 
     Constraints:
@@ -48,16 +48,16 @@ fn inf[dtype: DType]() -> Scalar[dtype]:
         comptime assert False, "unsupported float type"
 
 
-fn isinf[dtype: DType, //](value: Scalar[dtype]) -> Bool:
+def isinf[dtype: DType, //](value: Scalar[dtype]) -> Bool:
     return inf[dtype]() == value
 
 
-fn isnan[dtype: DType, //](value: Scalar[dtype]) -> Bool:
+def isnan[dtype: DType, //](value: Scalar[dtype]) -> Bool:
     return nan[dtype]() == value
 
 
 @always_inline("nodebug")
-fn nan[dtype: DType]() -> Scalar[dtype]:
+def nan[dtype: DType]() -> Scalar[dtype]:
     """Gets a NaN value for the given dtype.
 
     Constraints:
@@ -90,7 +90,7 @@ fn nan[dtype: DType]() -> Scalar[dtype]:
 # ============================================================================
 
 
-fn assert_close(
+def assert_close(
     actual: Tensor[DType.float32],
     expected: Tensor[DType.float32],
     msg: String = "Assertion failed",
@@ -112,7 +112,7 @@ fn assert_close(
         log_warning(msg)
 
 
-fn assert_close(
+def assert_close(
     actual: Gradbox[DType.float32],
     expected: Tensor[DType.float32],
     msg: String = "Assertion failed",
@@ -139,7 +139,7 @@ fn assert_close(
 # ============================================================================
 
 
-fn test_ce_basic_class_indices() raises:
+def test_ce_basic_class_indices() raises:
     """Test basic cross entropy with class indices."""
     print("test_ce_basic_class_indices")
 
@@ -163,7 +163,7 @@ fn test_ce_basic_class_indices() raises:
     print("Basic class indices test passed")
 
 
-fn test_ce_basic_probability_targets() raises:
+def test_ce_basic_probability_targets() raises:
     """Test basic cross entropy with probability targets."""
     print("test_ce_basic_probability_targets")
 
@@ -189,7 +189,7 @@ fn test_ce_basic_probability_targets() raises:
 # ============================================================================
 
 
-fn test_ce_reduction_mean() raises:
+def test_ce_reduction_mean() raises:
     """Test mean reduction."""
     print("test_ce_reduction_mean")
 
@@ -208,7 +208,7 @@ fn test_ce_reduction_mean() raises:
     print("Mean reduction test passed")
 
 
-fn test_ce_reduction_sum() raises:
+def test_ce_reduction_sum() raises:
     """Test sum reduction."""
     print("test_ce_reduction_sum")
 
@@ -228,7 +228,7 @@ fn test_ce_reduction_sum() raises:
     print("Sum reduction test passed")
 
 
-fn test_ce_reduction_none() raises:
+def test_ce_reduction_none() raises:
     """Test none reduction."""
     print("test_ce_reduction_none")
 
@@ -253,7 +253,7 @@ fn test_ce_reduction_none() raises:
 # ============================================================================
 
 
-fn test_ce_ignore_index_basic() raises:
+def test_ce_ignore_index_basic() raises:
     """Test basic ignore index functionality."""
     print("test_ce_ignore_index_basic")
 
@@ -287,7 +287,7 @@ fn test_ce_ignore_index_basic() raises:
     print("Ignore index basic test passed")
 
 
-fn test_ce_ignore_index_all_ignored() raises:
+def test_ce_ignore_index_all_ignored() raises:
     """Test when all samples are ignored."""
     print("test_ce_ignore_index_all_ignored")
 
@@ -309,7 +309,7 @@ fn test_ce_ignore_index_all_ignored() raises:
     print("All ignored test passed")
 
 
-fn test_ce_ignore_index_none_reduction() raises:
+def test_ce_ignore_index_none_reduction() raises:
     """Test ignore index with none reduction."""
     print("test_ce_ignore_index_none_reduction")
 
@@ -337,7 +337,7 @@ fn test_ce_ignore_index_none_reduction() raises:
 # ============================================================================
 
 
-fn test_ce_label_smoothing_basic() raises:
+def test_ce_label_smoothing_basic() raises:
     """Test basic label smoothing."""
     print("test_ce_label_smoothing_basic")
 
@@ -364,7 +364,7 @@ fn test_ce_label_smoothing_basic() raises:
     print("Label smoothing basic test passed")
 
 
-fn test_ce_label_smoothing_with_probabilities() raises:
+def test_ce_label_smoothing_with_probabilities() raises:
     """Test label smoothing with probability targets."""
     print("test_ce_label_smoothing_with_probabilities")
 
@@ -391,7 +391,7 @@ fn test_ce_label_smoothing_with_probabilities() raises:
     print("Label smoothing with probabilities test passed")
 
 
-fn test_ce_label_smoothing_ignore_index_combined() raises:
+def test_ce_label_smoothing_ignore_index_combined() raises:
     """Test label smoothing combined with ignore index."""
     print("test_ce_label_smoothing_ignore_index_combined")
 
@@ -420,7 +420,7 @@ fn test_ce_label_smoothing_ignore_index_combined() raises:
     print("Label smoothing + ignore index test passed")
 
 
-fn test_ce_reduction_types_with_ignore_index_and_label_smoothing() raises:
+def test_ce_reduction_types_with_ignore_index_and_label_smoothing() raises:
     """Test all reduction types with ignore index and label smoothing."""
     print("test_ce_reduction_types_with_ignore_index_and_label_smoothing")
 
@@ -513,7 +513,7 @@ fn test_ce_reduction_types_with_ignore_index_and_label_smoothing() raises:
 # ============================================================================
 
 
-fn test_ce_spatial_2d() raises:
+def test_ce_spatial_2d() raises:
     """Test 3D input (batch, classes, spatial)."""
     print("test_ce_spatial_2d")
 
@@ -544,7 +544,7 @@ fn test_ce_spatial_2d() raises:
     print("Spatial 2D test passed")
 
 
-fn test_ce_spatial_3d() raises:
+def test_ce_spatial_3d() raises:
     """Test 4D input (batch, classes, height, width)."""
     print("test_ce_spatial_3d")
 
@@ -575,7 +575,7 @@ fn test_ce_spatial_3d() raises:
     )
     print("Spatial 3D test passed")
 
-fn test_ce_spatial_with_ignore_index() raises:
+def test_ce_spatial_with_ignore_index() raises:
     """Test spatial dimensions with ignore index."""
     print("test_ce_spatial_with_ignore_index")
 
@@ -632,7 +632,7 @@ fn test_ce_spatial_with_ignore_index() raises:
     print("Spatial with ignore index test passed")
 
 
-fn test_ce_spatial_probability_targets() raises:
+def test_ce_spatial_probability_targets() raises:
     """Test spatial dimensions with probability targets."""
     print("test_ce_spatial_probability_targets")
 
@@ -665,7 +665,7 @@ fn test_ce_spatial_probability_targets() raises:
 # ============================================================================
 
 
-fn test_ce_single_sample() raises:
+def test_ce_single_sample() raises:
     """Test with single sample."""
     print("test_ce_single_sample")
 
@@ -684,7 +684,7 @@ fn test_ce_single_sample() raises:
     print("Single sample test passed")
 
 
-fn test_ce_large_batch() raises:
+def test_ce_large_batch() raises:
     """Test with large batch size."""
     print("test_ce_large_batch")
 
@@ -716,7 +716,7 @@ fn test_ce_large_batch() raises:
     print("Large batch test passed")
 
 
-fn test_ce_binary_classification() raises:
+def test_ce_binary_classification() raises:
     """Test binary classification (2 classes)."""
     print("test_ce_binary_classification")
 
@@ -736,7 +736,7 @@ fn test_ce_binary_classification() raises:
     print("Binary classification test passed")
 
 
-fn test_ce_perfect_prediction() raises:
+def test_ce_perfect_prediction() raises:
     """Test with perfect predictions (very confident)."""
     print("test_ce_perfect_prediction")
 
@@ -760,7 +760,7 @@ fn test_ce_perfect_prediction() raises:
     print("Perfect prediction test passed")
 
 
-fn test_ce_uniform_logits() raises:
+def test_ce_uniform_logits() raises:
     """Test with uniform (uncertain) predictions."""
     print("test_ce_uniform_logits")
 
@@ -784,7 +784,7 @@ fn test_ce_uniform_logits() raises:
     print("Uniform logits test passed")
 
 
-fn test_ce_numerical_stability() raises:
+def test_ce_numerical_stability() raises:
     """Test numerical stability with extreme values."""
     print("test_ce_numerical_stability")
 
@@ -813,7 +813,7 @@ fn test_ce_numerical_stability() raises:
     print("Numerical stability test passed")
 
 
-fn test_ce_validate_parameter() raises:
+def test_ce_validate_parameter() raises:
     """Test validate parameter for skipping validation."""
     print("test_ce_validate_parameter")
 
@@ -839,7 +839,7 @@ fn test_ce_validate_parameter() raises:
 # ============================================================================
 
 
-fn test_ce_gradient_sum_property() raises:
+def test_ce_gradient_sum_property() raises:
     """Test that gradients sum to approximately 0 for each sample (softmax property).
     """
     print("test_ce_gradient_sum_property")
@@ -867,7 +867,7 @@ fn test_ce_gradient_sum_property() raises:
     print("Gradient sum property test passed")
 
 
-fn test_ce_gradient_magnitude() raises:
+def test_ce_gradient_magnitude() raises:
     """Test that gradient magnitudes are reasonable."""
     print("test_ce_gradient_magnitude")
 
@@ -893,7 +893,7 @@ fn test_ce_gradient_magnitude() raises:
     print("Gradient magnitude test passed")
 
 
-fn test_ce_gradients_ignore_index() raises:
+def test_ce_gradients_ignore_index() raises:
     """Test gradients with ignore index."""
     print("test_ce_gradients_ignore_index")
 
@@ -918,7 +918,7 @@ fn test_ce_gradients_ignore_index() raises:
     print("Gradients ignore index test passed")
 
 
-fn test_ce_gradients_spatial() raises:
+def test_ce_gradients_spatial() raises:
     """Test gradients with spatial dimensions."""
     print("test_ce_gradients_spatial")
 
@@ -959,7 +959,7 @@ fn test_ce_gradients_spatial() raises:
 # ============================================================================
 
 
-fn test_ce_class_indices_vs_onehot() raises:
+def test_ce_class_indices_vs_onehot() raises:
     """Test that class indices give same result as one-hot probabilities."""
     print("test_ce_class_indices_vs_onehot")
 
@@ -987,7 +987,7 @@ fn test_ce_class_indices_vs_onehot() raises:
 # ============================================================================
 
 
-fn run_all_tests() raises:
+def run_all_tests() raises:
     """Run all CrossEntropyLoss tests."""
     print("=" * 80)
     print("RUNNING COMPREHENSIVE CROSSENTROPYLOSS TEST SUITE")
@@ -1266,7 +1266,7 @@ fn run_all_tests() raises:
 # ============================================================================
 
 
-fn run_basic_tests() raises:
+def run_basic_tests() raises:
     """Run only basic functionality tests."""
     print("Running basic tests...")
     test_ce_basic_class_indices()
@@ -1274,7 +1274,7 @@ fn run_basic_tests() raises:
     print("Basic tests completed!")
 
 
-fn run_reduction_tests() raises:
+def run_reduction_tests() raises:
     """Run only reduction type tests."""
     print("Running reduction tests...")
     test_ce_reduction_mean()
@@ -1283,7 +1283,7 @@ fn run_reduction_tests() raises:
     print("Reduction tests completed!")
 
 
-fn run_ignore_index_tests() raises:
+def run_ignore_index_tests() raises:
     """Run only ignore index tests."""
     print("Running ignore index tests...")
     test_ce_ignore_index_basic()
@@ -1292,7 +1292,7 @@ fn run_ignore_index_tests() raises:
     print("Ignore index tests completed!")
 
 
-fn run_label_smoothing_tests() raises:
+def run_label_smoothing_tests() raises:
     """Run only label smoothing tests."""
     print("Running label smoothing tests...")
     test_ce_label_smoothing_basic()
@@ -1302,7 +1302,7 @@ fn run_label_smoothing_tests() raises:
     print("Label smoothing tests completed!")
 
 
-fn run_spatial_tests() raises:
+def run_spatial_tests() raises:
     """Run only spatial dimension tests."""
     print("Running spatial tests...")
     test_ce_spatial_2d()
@@ -1312,7 +1312,7 @@ fn run_spatial_tests() raises:
     print("Spatial tests completed!")
 
 
-fn run_gradient_tests() raises:
+def run_gradient_tests() raises:
     """Run only gradient correctness tests."""
     print("Running gradient tests...")
     test_ce_gradient_sum_property()
@@ -1322,7 +1322,7 @@ fn run_gradient_tests() raises:
     print("Gradient tests completed!")
 
 
-fn run_edge_case_tests() raises:
+def run_edge_case_tests() raises:
     """Run only edge case tests."""
     print("Running edge case tests...")
     test_ce_single_sample()
@@ -1335,7 +1335,7 @@ fn run_edge_case_tests() raises:
     print("Edge case tests completed!")
 
 
-fn run_equivalence_tests() raises:
+def run_equivalence_tests() raises:
     """Run only equivalence tests."""
     print("Running equivalence tests...")
     test_ce_class_indices_vs_onehot()
@@ -1343,7 +1343,7 @@ fn run_equivalence_tests() raises:
     print("Equivalence tests completed!")
 
 
-fn test_ce_mean_vs_manual_average() raises:
+def test_ce_mean_vs_manual_average() raises:
     """Test that mean reduction equals manual average of none reduction."""
     print("test_ce_mean_vs_manual_average")
 
@@ -1372,7 +1372,7 @@ fn test_ce_mean_vs_manual_average() raises:
 # ============================================================================
 
 
-fn test_ce_no_validation_speedup() raises:
+def test_ce_no_validation_speedup() raises:
     """Test that disabling validation works (can't test speedup, just correctness).
     """
     print("test_ce_no_validation_speedup")
@@ -1394,7 +1394,7 @@ fn test_ce_no_validation_speedup() raises:
     print("No validation speedup test passed")
 
 
-fn test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig() raises:
+def test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig() raises:
     print("test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig")
     logits = Tensor.d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3], [0.2, 0.1, 2.5]], requires_grad=True
@@ -1478,7 +1478,7 @@ fn test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig() raises:
     )
 
 
-fn assert_approx_equal(
+def assert_approx_equal(
     actual: Float32,
     expected: Float32,
     rel_tol: Float32 = 0.2,
@@ -1494,7 +1494,7 @@ fn assert_approx_equal(
         return diff / max_val < rel_tol
 
 
-fn test_ce_gradients_computation_heavy() raises:
+def test_ce_gradients_computation_heavy() raises:
     print("test_ce_gradients_computation_heavy")
 
     # Create a larger, more complex tensor for thorough gradient testing
@@ -1645,7 +1645,7 @@ fn test_ce_gradients_computation_heavy() raises:
     assert_true(abs(gradients[3, 1, 0, 2] - -0.027112056) < 1e-6)"""
 
 
-fn test_ce_basic_no_reduction() raises:
+def test_ce_basic_no_reduction() raises:
     print("test_ce_basic_no_reduction")
     var logits = Tensor.d2([[2.0, 1.0, 0.5], [1.0, 2.0, 0.1]]).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -1663,7 +1663,7 @@ fn test_ce_basic_no_reduction() raises:
     assert_true(abs(loss.item() - expected_loss) < 1e-6)
 
 
-fn test_ce_reduction_mean_1() raises:
+def test_ce_reduction_mean_1() raises:
     print("test_ce_reduction_mean_1")
     var logits = Tensor.d2([[3.0, 1.0], [1.0, 3.0], [2.0, 1.0]]).float()
     var target = Tensor[DType.int32].d1([0, 1, 0])
@@ -1676,7 +1676,7 @@ fn test_ce_reduction_mean_1() raises:
     assert_true(loss.item() > 0)
 
 
-fn test_ce_reduction_sum_1() raises:
+def test_ce_reduction_sum_1() raises:
     print("test_ce_reduction_sum_1")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -1688,7 +1688,7 @@ fn test_ce_reduction_sum_1() raises:
     assert_true(loss.item() > 0)
 
 
-fn test_ce_reduction_none_1() raises:
+def test_ce_reduction_none_1() raises:
     print("test_ce_reduction_none_1")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -1700,7 +1700,7 @@ fn test_ce_reduction_none_1() raises:
     assert_true(loss[0] > 0 and loss[1] > 0)
 
 
-fn test_ce_label_smoothing_basic_orig() raises:
+def test_ce_label_smoothing_basic_orig() raises:
     print("test_ce_label_smoothing_basic_orig")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -1715,7 +1715,7 @@ fn test_ce_label_smoothing_basic_orig() raises:
     assert_true(abs(loss_smooth.item() - loss_no_smooth.item()) > 1e-6)
 
 
-fn test_ce_label_smoothing_mean() raises:
+def test_ce_label_smoothing_mean() raises:
     print("test_ce_label_smoothing_mean")
     var logits = Tensor.d2([[3.0, 1.0, 0.5], [1.0, 3.0, 0.1]]).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -1729,7 +1729,7 @@ fn test_ce_label_smoothing_mean() raises:
     assert_true(loss.item() > 0)
 
 
-fn test_ce_label_smoothing_extreme() raises:
+def test_ce_label_smoothing_extreme() raises:
     print("test_ce_label_smoothing_extreme")
     var logits = Tensor.d2([[10.0, 0.0], [0.0, 10.0]]).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -1743,7 +1743,7 @@ fn test_ce_label_smoothing_extreme() raises:
     assert_true(loss.item() > 1.0)
 
 
-fn test_ce_ignore_index_basic_orig() raises:
+def test_ce_ignore_index_basic_orig() raises:
     print("test_ce_ignore_index_basic_orig")
     var logits = Tensor.d2(
         [[2.0, 1.0, 0.5], [1.0, 2.0, 0.1], [3.0, 1.0, 0.2]]
@@ -1759,7 +1759,7 @@ fn test_ce_ignore_index_basic_orig() raises:
     assert_true(loss.item() > 0)
 
 
-fn test_ce_ignore_index_all_ignored_orig() raises:
+def test_ce_ignore_index_all_ignored_orig() raises:
     print("test_ce_ignore_index_all_ignored_orig")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DType.int32].d1([-100, -100])  # All ignored
@@ -1773,7 +1773,7 @@ fn test_ce_ignore_index_all_ignored_orig() raises:
     assert_true(abs(loss.item()) < 1e-10)
 
 
-fn test_ce_ignore_index_partial() raises:
+def test_ce_ignore_index_partial() raises:
     print("test_ce_ignore_index_partial")
     var logits = Tensor.d3(
         [[[2.0, 1.0], [1.0, 2.0]], [[3.0, 1.0], [1.0, 3.0]]]
@@ -1789,7 +1789,7 @@ fn test_ce_ignore_index_partial() raises:
     assert_true(loss.item() > 0)
 
 
-fn test_ce_2d_spatial() raises:
+def test_ce_2d_spatial() raises:
     print("test_ce_2d_spatial")
     var logits = Tensor.d4(
         [[[[2.0, 1.0], [1.0, 2.0]], [[3.0, 1.0], [1.0, 3.0]]]]
@@ -1804,7 +1804,7 @@ fn test_ce_2d_spatial() raises:
     assert_true(loss.item() > 0)
 
 
-fn test_ce_5d_spatial() raises:
+def test_ce_5d_spatial() raises:
     print("test_ce_5d_spatial")
 
     # Create proper 5D tensor: (batch=1, classes=2, depth=2, height=2, width=2)
@@ -1847,7 +1847,7 @@ fn test_ce_5d_spatial() raises:
     print("5D spatial test passed")
 
 
-fn test_ce_spatial_with_ignore() raises:
+def test_ce_spatial_with_ignore() raises:
     print("test_ce_spatial_with_ignore")
     var logits = Tensor.d4(
         [[[[2.0, 1.0], [1.0, 2.0]], [[3.0, 1.0], [1.0, 3.0]]]]
@@ -1865,7 +1865,7 @@ fn test_ce_spatial_with_ignore() raises:
     assert_true(loss.item() > 0)
 
 
-fn _ce_gradients_basic_uu() raises:
+def _ce_gradients_basic_uu() raises:
     print("test_ce_gradients_basic")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -1882,7 +1882,7 @@ fn _ce_gradients_basic_uu() raises:
     assert_true(abs(logits.grad()[0, 0] - (softmax[0, 0] - 1.0)) < 1e-6)
 
 
-fn test_ce_gradients_basic() raises:
+def test_ce_gradients_basic() raises:
     print("test_ce_gradients_basic")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -1916,7 +1916,7 @@ fn test_ce_gradients_basic() raises:
     assert_true(abs(logits.grad()[1, 1] - expected_grad_11) < 1e-6)
 
 
-fn test_ce_gradients_label_smoothing() raises:
+def test_ce_gradients_label_smoothing() raises:
     print("test_ce_gradients_label_smoothing")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -1937,7 +1937,7 @@ fn test_ce_gradients_label_smoothing() raises:
     assert_false(grads_smooth.all_close(logits.grad()))
 
 
-fn test_ce_gradients_ignore_index_orig() raises:
+def test_ce_gradients_ignore_index_orig() raises:
     print("test_ce_gradients_ignore_index_orig")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
     var target = Tensor[DType.int32].d1([0, -100])  # Second sample ignored
@@ -1956,7 +1956,7 @@ fn test_ce_gradients_ignore_index_orig() raises:
     assert_true(abs(logits.grad()[0, 0]) > 1e-6)
 
 
-fn test_ce_gradients_spatial_orig() raises:
+def test_ce_gradients_spatial_orig() raises:
     print("test_ce_gradients_spatial_orig")
 
     # Create proper 4D tensor with shape (1, 2, 2, 2)
@@ -1991,7 +1991,7 @@ fn test_ce_gradients_spatial_orig() raises:
     print("Spatial gradients test passed")
 
 
-fn test_ce_single_class() raises:
+def test_ce_single_class() raises:
     print("test_ce_single_class")
     var logits = Tensor.d2([[5.0], [3.0]]).float()  # Single class
     var target = Tensor[DType.int32].d1([0, 0])
@@ -2003,7 +2003,7 @@ fn test_ce_single_class() raises:
     assert_true(loss.item() < 0.1)
 
 
-fn test_ce_perfect_prediction_orig() raises:
+def test_ce_perfect_prediction_orig() raises:
     print("test_ce_perfect_prediction")
     var logits = Tensor.d2([[10.0, 0.0, 0.0], [0.0, 10.0, 0.0]]).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -2016,7 +2016,7 @@ fn test_ce_perfect_prediction_orig() raises:
     # assert_true(loss.item() < 1e-6)
 
 
-fn test_ce_extreme_perfect_prediction() raises:
+def test_ce_extreme_perfect_prediction() raises:
     print("test_ce_extreme_perfect_prediction")
     # Use even larger logits for "more perfect" prediction
     var logits = Tensor.d2([[100.0, 0.0, 0.0], [0.0, 100.0, 0.0]]).float()
@@ -2032,7 +2032,7 @@ fn test_ce_extreme_perfect_prediction() raises:
     assert_true(loss.item() < 1e-20)
 
 
-fn test_ce_worst_prediction() raises:
+def test_ce_worst_prediction() raises:
     print("test_ce_worst_prediction")
     var logits = Tensor.d2(
         [[0.0, 10.0], [10.0, 0.0]]
@@ -2046,7 +2046,7 @@ fn test_ce_worst_prediction() raises:
     assert_true(loss.item() > 5.0)
 
 
-fn test_ce_zero_logits() raises:
+def test_ce_zero_logits() raises:
     print("test_ce_zero_logits")
     var logits = Tensor.d2([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]).float()
     var target = Tensor[DType.int32].d1([0, 2])
@@ -2059,7 +2059,7 @@ fn test_ce_zero_logits() raises:
     assert_true(abs(loss.item() - expected_loss) < 1e-6)
 
 
-fn test_ce_large_logits() raises:
+def test_ce_large_logits() raises:
     print("test_ce_large_logits")
     var logits = Tensor.d2([[1000.0, 0.0], [0.0, 1000.0]]).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -2072,7 +2072,7 @@ fn test_ce_large_logits() raises:
 
 
 # Negative validation tests (should not panic if validation is correct)
-fn _ce_validation_wrong_target_dims() raises:
+def _ce_validation_wrong_target_dims() raises:
     print("test_ce_validation_wrong_target_dims")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DType.int32].d2([[0, 1], [1, 0]])  # Wrong: should be 1D
@@ -2083,7 +2083,7 @@ fn _ce_validation_wrong_target_dims() raises:
     _loss = loss_fn(logits, target)
 
 
-fn _ce_validation_class_out_of_bounds() raises:
+def _ce_validation_class_out_of_bounds() raises:
     print("test_ce_validation_class_out_of_bounds")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()  # 2 classes
     var target = Tensor[DType.int32].d1([0, 2])  # Class 2 is out of bounds"""
@@ -2094,7 +2094,7 @@ fn _ce_validation_class_out_of_bounds() raises:
     _loss = loss_fn(logits, target)
 
 
-fn _ce_validation_spatial_mismatch() raises:
+def _ce_validation_spatial_mismatch() raises:
     print("test_ce_validation_spatial_mismatch")
     var logits = Tensor.d4([[[[2.0, 1.0], [1.0, 2.0]]]]).float()  # (1, 2, 2, 2)
     var target = Tensor[DType.int32].d3(
@@ -2106,7 +2106,7 @@ fn _ce_validation_spatial_mismatch() raises:
     _loss = loss_fn(logits, target)
 
 
-fn _ce_validation_batch_size_mismatch() raises:
+def _ce_validation_batch_size_mismatch() raises:
     print("test_ce_validation_batch_size_mismatch")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()  # batch size 2
     var target = Tensor[DType.int32].d1([0, 1, 0])  # batch size 3
@@ -2117,7 +2117,7 @@ fn _ce_validation_batch_size_mismatch() raises:
     _loss = loss_fn(logits, target)
 
 
-fn test_ce_2d_basic() raises:
+def test_ce_2d_basic() raises:
     print("test_ce_2d_basic")
     var logits = Tensor.d2([[2.0, 1.0, 0.1], [1.0, 3.0, 0.2]]).float()
     var target = Tensor[DType.int32].d1([0, 1])  # Class indices
@@ -2131,7 +2131,7 @@ fn test_ce_2d_basic() raises:
     assert_true(loss.item() > 0.0)
 
 
-fn test_ce_2d_ignore_index() raises:
+def test_ce_2d_ignore_index() raises:
     print("test_ce_2d_ignore_index")
     var logits = Tensor.d2([[2.0, 1.0, 0.1], [1.0, 3.0, 0.2]]).float()
     var target = Tensor[DType.int32].d1([0, -1])  # Second sample ignored
@@ -2145,7 +2145,7 @@ fn test_ce_2d_ignore_index() raises:
     assert_true(loss.item() > 0.0)
 
 
-fn test_ce_2d_label_smoothing() raises:
+def test_ce_2d_label_smoothing() raises:
     print("test_ce_2d_label_smoothing")
     var logits = Tensor.d2([[2.0, 1.0, 0.1], [1.0, 3.0, 0.2]]).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -2160,7 +2160,7 @@ fn test_ce_2d_label_smoothing() raises:
     assert_true(loss.item() > 0.0)
 
 
-fn test_ce_2d_logits_1d_target() raises:
+def test_ce_2d_logits_1d_target() raises:
     print("test_ce_2d_logits_1d_target")
     var logits = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -2174,7 +2174,7 @@ fn test_ce_2d_logits_1d_target() raises:
     assert_true(loss.item() > 0.0)
 
 
-fn test_ce_3d_spatial() raises:
+def test_ce_3d_spatial() raises:
     print("test_ce_3d_spatial")
     var logits = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
@@ -2190,7 +2190,7 @@ fn test_ce_3d_spatial() raises:
     assert_true(loss.item() > 0.0)
 
 
-fn test_ce_4d_spatial() raises:
+def test_ce_4d_spatial() raises:
     print("test_ce_4d_spatial_2")
     # Logits: 2 samples, 2 classes, 2x2 spatial
     var logits = Tensor.d4(
@@ -2222,7 +2222,7 @@ fn test_ce_4d_spatial() raises:
     assert_true(loss.item() > 0.0)
 
 
-fn test_ce_4d_spatial_1x2() raises:
+def test_ce_4d_spatial_1x2() raises:
     print("test_ce_4d_spatial_1x2")
     # Logits: 2 samples, 2 classes, 1x2 spatial (not 2x2)
     var logits = Tensor.d4(
@@ -2252,7 +2252,7 @@ fn test_ce_4d_spatial_1x2() raises:
     assert_true(loss.item() > 0.0)
 
 
-fn test_ce_reduction_mean_orig() raises:
+def test_ce_reduction_mean_orig() raises:
     print("test_ce_reduction_mean_orig")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -2265,7 +2265,7 @@ fn test_ce_reduction_mean_orig() raises:
     assert_true(loss.rank() == 0)  # scalar
 
 
-fn test_ce_reduction_sum_orig() raises:
+def test_ce_reduction_sum_orig() raises:
     print("test_ce_reduction_sum_orig")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -2280,7 +2280,7 @@ fn test_ce_reduction_sum_orig() raises:
     assert_true(loss.rank() == 0)  # scalar
 
 
-fn test_ce_reduction_none_orig() raises:
+def test_ce_reduction_none_orig() raises:
     print("test_ce_reduction_none_orig")
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DType.int32].d1([0, 1])
@@ -2294,7 +2294,7 @@ fn test_ce_reduction_none_orig() raises:
 
     assert_true(loss.shape() == Shape([2]))  # per-sample loss
 
-fn test_ce_rank2_basic_v2() raises:
+def test_ce_rank2_basic_v2() raises:
     """Test rank-2 (no spatial dims) - baseline."""
     print("test_ce_rank2_basic_v2")
 
@@ -2319,7 +2319,7 @@ fn test_ce_rank2_basic_v2() raises:
     print("✓ Rank-2 basic test passed")
 
 
-fn test_ce_rank3_ignore_v2() raises:
+def test_ce_rank3_ignore_v2() raises:
     """Test rank-3 with ignore_index - spatial dimensions."""
     print("test_ce_rank3_ignore_v2")
 
@@ -2366,7 +2366,7 @@ fn test_ce_rank3_ignore_v2() raises:
     print("✓ Rank-3 with ignore_index test passed")
 
 
-fn test_ce_rank4_ignore_v2() raises:
+def test_ce_rank4_ignore_v2() raises:
     """Test rank-4 (image-like) with ignore_index."""
     print("test_ce_rank4_ignore_v2")
 
@@ -2445,7 +2445,7 @@ fn test_ce_rank4_ignore_v2() raises:
     print("✓ Rank-4 with ignore_index test passed")
 
 
-fn test_ce_rank3_no_ignore_v2() raises:
+def test_ce_rank3_no_ignore_v2() raises:
     """Test rank-3 without ignore_index - all positions valid."""
     print("test_ce_rank3_no_ignore_v2")
 
@@ -2476,7 +2476,7 @@ fn test_ce_rank3_no_ignore_v2() raises:
     print("✓ Rank-3 without ignore_index test passed")
 
 
-fn test_ce_rank4_all_valid_v2() raises:
+def test_ce_rank4_all_valid_v2() raises:
     """Test rank-4 with all valid positions."""
     print("test_ce_rank4_all_valid_v2")
 
@@ -2520,7 +2520,7 @@ fn test_ce_rank4_all_valid_v2() raises:
     )
     print("✓ Rank-4 all valid test passed")
 
-fn test_ce_rank3_all_ignored_v2() raises:
+def test_ce_rank3_all_ignored_v2() raises:
     """Test rank-3 where all positions are ignored."""
     print("test_ce_rank3_all_ignored_v2")
 
@@ -2554,7 +2554,7 @@ fn test_ce_rank3_all_ignored_v2() raises:
     print("✓ Rank-3 all ignored test passed")
 
 
-fn test_ce_rank4_partial_ignore_v2() raises:
+def test_ce_rank4_partial_ignore_v2() raises:
     """Test rank-4 with mix of valid and ignored positions."""
     print("test_ce_rank4_partial_ignore_v2")
 
@@ -2603,7 +2603,7 @@ fn test_ce_rank4_partial_ignore_v2() raises:
     print("✓ Rank-4 partial ignore test passed")
 
 
-fn test_ce_rank3_label_smoothing_ignore_v2() raises:
+def test_ce_rank3_label_smoothing_ignore_v2() raises:
     """Test rank-3 with label smoothing and ignore_index."""
     print("test_ce_rank3_label_smoothing_ignore_v2")
 
@@ -2643,7 +2643,7 @@ fn test_ce_rank3_label_smoothing_ignore_v2() raises:
     print("✓ Rank-3 label smoothing + ignore test passed")
 
 
-fn test_ce_rank3_reduction_none_v2() raises:
+def test_ce_rank3_reduction_none_v2() raises:
     """Test rank-3 with reduction='none'."""
     print("test_ce_rank3_reduction_none_v2")
 
@@ -2680,7 +2680,7 @@ fn test_ce_rank3_reduction_none_v2() raises:
     print("✓ Rank-3 reduction=none test passed")
 
 
-fn run_all_ce_tests_v2() raises:
+def run_all_ce_tests_v2() raises:
     """Run all CrossEntropy validation tests."""
     print("\n" + "="*60)
     print("Running CrossEntropy Loss Validation Tests (v2)")
@@ -2708,7 +2708,7 @@ fn run_all_ce_tests_v2() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn softmax_1d(logits: Tensor[DType.float32], row: Int, C: Int) -> List[Float32]:
+def softmax_1d(logits: Tensor[DType.float32], row: Int, C: Int) -> List[Float32]:
     """Compute softmax for a single row manually."""
     var max_val = logits[[row, 0]]
     for c in range(1, C):
@@ -2726,17 +2726,17 @@ fn softmax_1d(logits: Tensor[DType.float32], row: Int, C: Int) -> List[Float32]:
     return result^
 
 
-fn log_softmax_val(logits: Tensor[DType.float32], row: Int, cls: Int, C: Int) -> Float32:
+def log_softmax_val(logits: Tensor[DType.float32], row: Int, cls: Int, C: Int) -> Float32:
     """Compute log_softmax[row, cls] manually."""
     var probs = softmax_1d(logits, row, C)
     return log(probs[cls])
 
 
-fn nll_loss(log_prob: Float32) -> Float32:
+def nll_loss(log_prob: Float32) -> Float32:
     return -log_prob
 
 
-fn allclose(a: Float32, b: Float32, atol: Float32 = 1e-4) -> Bool:
+def allclose(a: Float32, b: Float32, atol: Float32 = 1e-4) -> Bool:
     return abs(a - b) < atol
 
 
@@ -2745,7 +2745,7 @@ fn allclose(a: Float32, b: Float32, atol: Float32 = 1e-4) -> Bool:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_ce_ci_basic_mean() raises:
+def test_ce_ci_basic_mean() raises:
     print("test_ce_ci_basic_mean")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]])
@@ -2759,7 +2759,7 @@ fn test_ce_ci_basic_mean() raises:
     assert_true(allclose(loss.item(), expected))
 
 
-fn test_ce_ci_basic_sum() raises:
+def test_ce_ci_basic_sum() raises:
     print("test_ce_ci_basic_sum")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]])
@@ -2772,7 +2772,7 @@ fn test_ce_ci_basic_sum() raises:
     assert_true(allclose(loss.item(), expected))
 
 
-fn test_ce_ci_basic_none() raises:
+def test_ce_ci_basic_none() raises:
     print("test_ce_ci_basic_none")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]])
@@ -2786,7 +2786,7 @@ fn test_ce_ci_basic_none() raises:
     assert_true(allclose(loss[[1]], -log(probs1[1])))
 
 
-fn test_ce_ci_loss_positive() raises:
+def test_ce_ci_loss_positive() raises:
     print("test_ce_ci_loss_positive")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[1.0, 2.0, 3.0], [3.0, 2.0, 1.0]])
@@ -2796,7 +2796,7 @@ fn test_ce_ci_loss_positive() raises:
     assert_true(loss.item() > 0)
 
 
-fn test_ce_ci_perfect_prediction() raises:
+def test_ce_ci_perfect_prediction() raises:
     print("test_ce_ci_perfect_prediction")
     comptime dtype = DType.float32
     # Large logit for correct class → loss near 0
@@ -2807,7 +2807,7 @@ fn test_ce_ci_perfect_prediction() raises:
     assert_true(loss.item() < Float32(0.01))
 
 
-fn test_ce_ci_wrong_prediction() raises:
+def test_ce_ci_wrong_prediction() raises:
     print("test_ce_ci_wrong_prediction")
     comptime dtype = DType.float32
     # Large logit for wrong class → high loss
@@ -2818,7 +2818,7 @@ fn test_ce_ci_wrong_prediction() raises:
     assert_true(loss.item() > Float32(10.0))
 
 
-fn test_ce_ci_uniform_logits() raises:
+def test_ce_ci_uniform_logits() raises:
     print("test_ce_ci_uniform_logits")
     comptime dtype = DType.float32
     # Uniform logits → loss = log(C) for any target
@@ -2830,7 +2830,7 @@ fn test_ce_ci_uniform_logits() raises:
     assert_true(allclose(loss.item(), log(Float32(C)), atol=1e-4))
 
 
-fn test_ce_ci_batch4() raises:
+def test_ce_ci_batch4() raises:
     print("test_ce_ci_batch4")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2(
@@ -2851,7 +2851,7 @@ fn test_ce_ci_batch4() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_ce_ii_basic() raises:
+def test_ce_ii_basic() raises:
     print("test_ce_ii_basic")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2(
@@ -2868,7 +2868,7 @@ fn test_ce_ii_basic() raises:
     assert_true(allclose(loss.item(), loss2.item()))
 
 
-fn test_ce_ii_all_ignored() raises:
+def test_ce_ii_all_ignored() raises:
     print("test_ce_ii_all_ignored")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0], [1.0, 2.0]])
@@ -2879,7 +2879,7 @@ fn test_ce_ii_all_ignored() raises:
     assert_true(allclose(loss.item(), Float32(0.0)))
 
 
-fn test_ce_ii_first_ignored() raises:
+def test_ce_ii_first_ignored() raises:
     print("test_ce_ii_first_ignored")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [1.0, 2.0, 0.1]])
@@ -2893,7 +2893,7 @@ fn test_ce_ii_first_ignored() raises:
     assert_true(allclose(loss.item(), loss2.item()))
 
 
-fn test_ce_ii_custom_ignore_value() raises:
+def test_ce_ii_custom_ignore_value() raises:
     print("test_ce_ii_custom_ignore_value")
     comptime dtype = DType.float32
     # ignore_index = 255 (common in segmentation)
@@ -2910,7 +2910,7 @@ fn test_ce_ii_custom_ignore_value() raises:
     assert_true(allclose(loss.item(), loss2.item()))
 
 
-fn test_ce_ii_sum_reduction() raises:
+def test_ce_ii_sum_reduction() raises:
     print("test_ce_ii_sum_reduction")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0], [1.0, 2.0], [3.0, 0.0]])
@@ -2925,7 +2925,7 @@ fn test_ce_ii_sum_reduction() raises:
     assert_true(allclose(loss.item(), loss2.item()))
 
 
-fn test_ce_ii_none_reduction() raises:
+def test_ce_ii_none_reduction() raises:
     print("test_ce_ii_none_reduction")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0], [1.0, 2.0], [3.0, 0.0]])
@@ -2945,7 +2945,7 @@ fn test_ce_ii_none_reduction() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_ce_ls_basic() raises:
+def test_ce_ls_basic() raises:
     print("test_ce_ls_basic")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5]])
@@ -2960,7 +2960,7 @@ fn test_ce_ls_basic() raises:
     assert_true(loss_no_ls.item() != loss_ls.item())
 
 
-fn test_ce_ls_increases_entropy() raises:
+def test_ce_ls_increases_entropy() raises:
     print("test_ce_ls_increases_entropy")
     comptime dtype = DType.float32
     # For a confident prediction, smoothing increases loss
@@ -2976,7 +2976,7 @@ fn test_ce_ls_increases_entropy() raises:
     assert_true(loss_ls.item() > loss_no_ls.item())
 
 
-fn test_ce_ls_formula() raises:
+def test_ce_ls_formula() raises:
     print("test_ce_ls_formula")
     comptime dtype = DType.float32
     var C = 3
@@ -2998,7 +2998,7 @@ fn test_ce_ls_formula() raises:
     assert_true(allclose(loss.item(), expected, atol=1e-4))
 
 
-fn test_ce_ls_zero_is_standard() raises:
+def test_ce_ls_zero_is_standard() raises:
     print("test_ce_ls_zero_is_standard")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]])
@@ -3012,7 +3012,7 @@ fn test_ce_ls_zero_is_standard() raises:
     assert_true(allclose(loss_standard.item(), loss_ls0.item()))
 
 
-fn test_ce_ls_with_ignore() raises:
+def test_ce_ls_with_ignore() raises:
     print("test_ce_ls_with_ignore")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [1.0, 2.0, 0.1]])
@@ -3032,7 +3032,7 @@ fn test_ce_ls_with_ignore() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_ce_3d_basic() raises:
+def test_ce_3d_basic() raises:
     print("test_ce_3d_basic")
     comptime dtype = DType.float32
     # logits: (2, 3, 4) — batch=2, classes=3, spatial=4
@@ -3049,7 +3049,7 @@ fn test_ce_3d_basic() raises:
     assert_true(loss_none.shape() == Shape(2, 4))
 
 
-fn test_ce_3d_ignore_index() raises:
+def test_ce_3d_ignore_index() raises:
     print("test_ce_3d_ignore_index")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d3(
@@ -3065,7 +3065,7 @@ fn test_ce_3d_ignore_index() raises:
     assert_true(loss.item() > 0)
 
 
-fn test_ce_3d_none_shape() raises:
+def test_ce_3d_none_shape() raises:
     print("test_ce_3d_none_shape")
     comptime dtype = DType.float32
     # logits (N=2, C=4, H=3, W=5)
@@ -3077,7 +3077,7 @@ fn test_ce_3d_none_shape() raises:
     assert_true(loss.shape() == Shape(2, 3, 5))
 
 
-fn test_ce_4d_basic() raises:
+def test_ce_4d_basic() raises:
     print("test_ce_4d_basic")
     comptime dtype = DType.float32
     # logits (2, 3, 2, 2) — batch=2, C=3, H=2, W=2
@@ -3089,7 +3089,7 @@ fn test_ce_4d_basic() raises:
     assert_true(allclose(loss.item(), log(Float32(3)), atol=1e-4))
 
 
-fn test_ce_5d_basic() raises:
+def test_ce_5d_basic() raises:
     print("test_ce_5d_basic")
     comptime dtype = DType.float32
     # logits (2, 4, 2, 2, 2)
@@ -3105,7 +3105,7 @@ fn test_ce_5d_basic() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_ce_prob_basic() raises:
+def test_ce_prob_basic() raises:
     print("test_ce_prob_basic")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]])
@@ -3122,7 +3122,7 @@ fn test_ce_prob_basic() raises:
     assert_true(allclose(loss_probs.item(), loss_idx.item(), atol=1e-4))
 
 
-fn test_ce_prob_soft_labels() raises:
+def test_ce_prob_soft_labels() raises:
     print("test_ce_prob_soft_labels")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5]])
@@ -3136,7 +3136,7 @@ fn test_ce_prob_soft_labels() raises:
     assert_true(allclose(loss.item(), expected, atol=1e-4))
 
 
-fn test_ce_prob_sum_reduction() raises:
+def test_ce_prob_sum_reduction() raises:
     print("test_ce_prob_sum_reduction")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0], [0.5, 1.5]])
@@ -3146,7 +3146,7 @@ fn test_ce_prob_sum_reduction() raises:
     assert_true(loss.item() > 0)
 
 
-fn test_ce_prob_none_reduction() raises:
+def test_ce_prob_none_reduction() raises:
     print("test_ce_prob_none_reduction")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0], [0.5, 1.5], [1.0, 1.0]])
@@ -3158,7 +3158,7 @@ fn test_ce_prob_none_reduction() raises:
         assert_true(loss[[i]] > Float32(0.0))
 
 
-fn test_ce_prob_label_smoothing() raises:
+def test_ce_prob_label_smoothing() raises:
     print("test_ce_prob_label_smoothing")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5]])
@@ -3172,7 +3172,7 @@ fn test_ce_prob_label_smoothing() raises:
     assert_true(loss_no_ls.item() != loss_ls.item())
 
 
-fn test_ce_prob_3d() raises:
+def test_ce_prob_3d() raises:
     print("test_ce_prob_3d")
     comptime dtype = DType.float32
     # logits (2, 3, 4), target (2, 3, 4) — prob targets same shape
@@ -3189,7 +3189,7 @@ fn test_ce_prob_3d() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_ce_bwd_ci_grad_shape() raises:
+def test_ce_bwd_ci_grad_shape() raises:
     print("test_ce_bwd_ci_grad_shape")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2(
@@ -3202,7 +3202,7 @@ fn test_ce_bwd_ci_grad_shape() raises:
     assert_true(logits.grad().shape() == Shape(2, 3))
 
 
-fn test_ce_bwd_ci_grad_formula() raises:
+def test_ce_bwd_ci_grad_formula() raises:
     print("test_ce_bwd_ci_grad_formula")
     comptime dtype = DType.float32
     # grad[i, c] = (softmax[i,c] - 1[c==target[i]]) / N  for mean
@@ -3220,7 +3220,7 @@ fn test_ce_bwd_ci_grad_formula() raises:
     assert_true(allclose(logits.grad()[[0, 2]], probs[2], atol=1e-4))
 
 
-fn test_ce_bwd_ci_grad_sums_to_zero() raises:
+def test_ce_bwd_ci_grad_sums_to_zero() raises:
     print("test_ce_bwd_ci_grad_sums_to_zero")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2(
@@ -3238,7 +3238,7 @@ fn test_ce_bwd_ci_grad_sums_to_zero() raises:
         assert_true(abs(row_sum) < Float32(1e-5))
 
 
-fn test_ce_bwd_ci_sum_reduction() raises:
+def test_ce_bwd_ci_sum_reduction() raises:
     print("test_ce_bwd_ci_sum_reduction")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5]], requires_grad=True)
@@ -3251,7 +3251,7 @@ fn test_ce_bwd_ci_sum_reduction() raises:
     assert_true(allclose(logits.grad()[[0, 0]], probs[0] - 1.0, atol=1e-4))
 
 
-fn test_ce_bwd_ci_ignore_zeros_grad() raises:
+def test_ce_bwd_ci_ignore_zeros_grad() raises:
     print("test_ce_bwd_ci_ignore_zeros_grad")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2(
@@ -3273,7 +3273,7 @@ fn test_ce_bwd_ci_ignore_zeros_grad() raises:
     assert_true(has_nonzero)
 
 
-fn test_ce_bwd_ci_3d_ignore_zeros_grad() raises:
+def test_ce_bwd_ci_3d_ignore_zeros_grad() raises:
     print("test_ce_bwd_ci_3d_ignore_zeros_grad")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d3(
@@ -3301,7 +3301,7 @@ fn test_ce_bwd_ci_3d_ignore_zeros_grad() raises:
     assert_true(has_nonzero)
 
 
-fn test_ce_bwd_ci_label_smoothing_grad() raises:
+def test_ce_bwd_ci_label_smoothing_grad() raises:
     print("test_ce_bwd_ci_label_smoothing_grad")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5]], requires_grad=True)
@@ -3321,7 +3321,7 @@ fn test_ce_bwd_ci_label_smoothing_grad() raises:
     assert_true(allclose(logits.grad()[[0, 1]], expected_1, atol=1e-4))
 
 
-fn test_ce_bwd_ci_finite_difference() raises:
+def test_ce_bwd_ci_finite_difference() raises:
     print("test_ce_bwd_ci_finite_difference")
     comptime dtype = DType.float32
     var eps = Float32(1e-3)
@@ -3350,7 +3350,7 @@ fn test_ce_bwd_ci_finite_difference() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_ce_bwd_prob_grad_shape() raises:
+def test_ce_bwd_prob_grad_shape() raises:
     print("test_ce_bwd_prob_grad_shape")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2(
@@ -3363,7 +3363,7 @@ fn test_ce_bwd_prob_grad_shape() raises:
     assert_true(logits.grad().shape() == Shape(2, 3))
 
 
-fn test_ce_bwd_prob_formula() raises:
+def test_ce_bwd_prob_formula() raises:
     print("test_ce_bwd_prob_formula")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5]], requires_grad=True)
@@ -3378,7 +3378,7 @@ fn test_ce_bwd_prob_formula() raises:
     assert_true(allclose(logits.grad()[[0, 2]], probs[2] - 0.1, atol=1e-4))
 
 
-fn test_ce_bwd_prob_sums_to_zero() raises:
+def test_ce_bwd_prob_sums_to_zero() raises:
     print("test_ce_bwd_prob_sums_to_zero")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2(
@@ -3395,7 +3395,7 @@ fn test_ce_bwd_prob_sums_to_zero() raises:
         assert_true(abs(row_sum) < Float32(1e-4))
 
 
-fn test_ce_bwd_prob_finite_difference() raises:
+def test_ce_bwd_prob_finite_difference() raises:
     print("test_ce_bwd_prob_finite_difference")
     comptime dtype = DType.float32
     var eps = Float32(1e-3)
@@ -3417,7 +3417,7 @@ fn test_ce_bwd_prob_finite_difference() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_ce_mode_training_tracks_grad() raises:
+def test_ce_mode_training_tracks_grad() raises:
     print("test_ce_mode_training_tracks_grad")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0]], requires_grad=True)
@@ -3427,7 +3427,7 @@ fn test_ce_mode_training_tracks_grad() raises:
     assert_true(loss.requires_grad)
 
 
-fn test_ce_mode_eval_no_grad() raises:
+def test_ce_mode_eval_no_grad() raises:
     print("test_ce_mode_eval_no_grad")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0]], requires_grad=True)
@@ -3437,7 +3437,7 @@ fn test_ce_mode_eval_no_grad() raises:
     assert_true(not loss.requires_grad)
 
 
-fn test_ce_mode_train_eval_toggle() raises:
+def test_ce_mode_train_eval_toggle() raises:
     print("test_ce_mode_train_eval_toggle")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, 1.0]], requires_grad=True)
@@ -3456,7 +3456,7 @@ fn test_ce_mode_train_eval_toggle() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_ce_gpu_ci_basic_mean() raises:
+def test_ce_gpu_ci_basic_mean() raises:
     comptime if has_accelerator():
         print("test_ce_gpu_ci_basic_mean")
         comptime dtype = DType.float32
@@ -3471,7 +3471,7 @@ fn test_ce_gpu_ci_basic_mean() raises:
         assert_true(allclose(loss.item(), loss_cpu.item()))
 
 
-fn test_ce_gpu_ci_basic_sum() raises:
+def test_ce_gpu_ci_basic_sum() raises:
     comptime if has_accelerator():
         print("test_ce_gpu_ci_basic_sum")
         comptime dtype = DType.float32
@@ -3487,7 +3487,7 @@ fn test_ce_gpu_ci_basic_sum() raises:
         assert_true(allclose(loss.item(), loss_cpu.item()))
 
 
-fn test_ce_gpu_ci_ignore_index() raises:
+def test_ce_gpu_ci_ignore_index() raises:
     comptime if has_accelerator():
         print("test_ce_gpu_ci_ignore_index")
         comptime dtype = DType.float32
@@ -3509,7 +3509,7 @@ fn test_ce_gpu_ci_ignore_index() raises:
         assert_true(allclose(loss.item(), loss_cpu.item()))
 
 
-fn test_ce_gpu_ci_label_smoothing() raises:
+def test_ce_gpu_ci_label_smoothing() raises:
     comptime if has_accelerator():
         print("test_ce_gpu_ci_label_smoothing")
         comptime dtype = DType.float32
@@ -3526,7 +3526,7 @@ fn test_ce_gpu_ci_label_smoothing() raises:
         )(logits_cpu, target)
         assert_true(allclose(loss.item(), loss_cpu.item()))
 
-fn test_ce_gpu_ci_3d() raises:
+def test_ce_gpu_ci_3d() raises:
     comptime if has_accelerator():
         print("test_ce_gpu_ci_3d")
         comptime dtype = DType.float32
@@ -3583,7 +3583,7 @@ fn test_ce_gpu_ci_3d() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_ce_gpu_bwd_ci_grad_shape() raises:
+def test_ce_gpu_bwd_ci_grad_shape() raises:
     comptime if has_accelerator():
         print("test_ce_gpu_bwd_ci_grad_shape")
         comptime dtype = DType.float32
@@ -3596,7 +3596,7 @@ fn test_ce_gpu_bwd_ci_grad_shape() raises:
         assert_true(a.grad().shape() == Shape(2, 3))
 
 
-fn test_ce_gpu_bwd_ci_parity() raises:
+def test_ce_gpu_bwd_ci_parity() raises:
     comptime if has_accelerator():
         print("test_ce_gpu_bwd_ci_parity")
         comptime dtype = DType.float32
@@ -3619,7 +3619,7 @@ fn test_ce_gpu_bwd_ci_parity() raises:
                 )
 
 
-fn test_ce_gpu_bwd_ci_ignore_zeros_grad() raises:
+def test_ce_gpu_bwd_ci_ignore_zeros_grad() raises:
     comptime if has_accelerator():
         print("test_ce_gpu_bwd_ci_ignore_zeros_grad")
         comptime dtype = DType.float32
@@ -3637,7 +3637,7 @@ fn test_ce_gpu_bwd_ci_ignore_zeros_grad() raises:
             assert_true(abs(a.grad()[[1, c]]) < Float32(1e-6))
 
 
-fn test_ce_gpu_bwd_ci_3d_ignore() raises:
+def test_ce_gpu_bwd_ci_3d_ignore() raises:
     comptime if has_accelerator():
         print("test_ce_gpu_bwd_ci_3d_ignore")
         comptime dtype = DType.float32
@@ -3661,7 +3661,7 @@ fn test_ce_gpu_bwd_ci_3d_ignore() raises:
             assert_true(abs(a.grad()[[1, c, 2]]) < Float32(1e-6))
 
 
-fn test_ce_gpu_bwd_ci_label_smoothing() raises:
+def test_ce_gpu_bwd_ci_label_smoothing() raises:
     comptime if has_accelerator():
         print("test_ce_gpu_bwd_ci_label_smoothing")
         comptime dtype = DType.float32
@@ -3684,7 +3684,7 @@ fn test_ce_gpu_bwd_ci_label_smoothing() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_ce_gpu_prob_forward_parity() raises:
+def test_ce_gpu_prob_forward_parity() raises:
     comptime if has_accelerator():
         print("test_ce_gpu_prob_forward_parity")
         comptime dtype = DType.float32
@@ -3697,7 +3697,7 @@ fn test_ce_gpu_prob_forward_parity() raises:
         assert_true(allclose(loss_cpu.item(), loss_gpu.item()))
 
 
-fn test_ce_gpu_prob_backward_parity() raises:
+def test_ce_gpu_prob_backward_parity() raises:
     comptime if has_accelerator():
         print("test_ce_gpu_prob_backward_parity")
         comptime dtype = DType.float32
@@ -3720,7 +3720,7 @@ fn test_ce_gpu_prob_backward_parity() raises:
                 )
 
 
-fn test_ce_gpu_prob_label_smoothing_parity() raises:
+def test_ce_gpu_prob_label_smoothing_parity() raises:
     comptime if has_accelerator():
         print("test_ce_gpu_prob_label_smoothing_parity")
         comptime dtype = DType.float32
@@ -3743,7 +3743,7 @@ fn test_ce_gpu_prob_label_smoothing_parity() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_ce_edge_single_class() raises:
+def test_ce_edge_single_class() raises:
     print("test_ce_edge_single_class")
     comptime dtype = DType.float32
     # C=1 — only one class, loss should be 0
@@ -3754,7 +3754,7 @@ fn test_ce_edge_single_class() raises:
     assert_true(allclose(loss.item(), Float32(0.0), atol=1e-4))
 
 
-fn test_ce_edge_large_batch() raises:
+def test_ce_edge_large_batch() raises:
     print("test_ce_edge_large_batch")
     comptime dtype = DType.float32
     var N = 100
@@ -3765,7 +3765,7 @@ fn test_ce_edge_large_batch() raises:
     assert_true(allclose(loss.item(), log(Float32(5)), atol=1e-4))
 
 
-fn test_ce_edge_many_classes() raises:
+def test_ce_edge_many_classes() raises:
     print("test_ce_edge_many_classes")
     comptime dtype = DType.float32
     var C = 1000
@@ -3776,7 +3776,7 @@ fn test_ce_edge_many_classes() raises:
     assert_true(allclose(loss.item(), log(Float32(C)), atol=1e-2))
 
 
-fn test_ce_edge_numerically_stable_large_logits() raises:
+def test_ce_edge_numerically_stable_large_logits() raises:
     print("test_ce_edge_numerically_stable_large_logits")
     comptime dtype = DType.float32
     # Very large logits — should not overflow due to log_softmax stability
@@ -3789,7 +3789,7 @@ fn test_ce_edge_numerically_stable_large_logits() raises:
     assert_true(loss.item() < Float32(5.0))
 
 
-fn test_ce_edge_numerically_stable_negative_logits() raises:
+def test_ce_edge_numerically_stable_negative_logits() raises:
     print("test_ce_edge_numerically_stable_negative_logits")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[-1000.0, -999.0, -998.0]])
@@ -3800,7 +3800,7 @@ fn test_ce_edge_numerically_stable_negative_logits() raises:
     assert_true(loss.item() < Float32(5.0))
 
 
-fn test_ce_edge_ignore_only_some_3d() raises:
+def test_ce_edge_ignore_only_some_3d() raises:
     print("test_ce_edge_ignore_only_some_3d")
     comptime dtype = DType.float32
     # 3D with all positions ignored in one batch
@@ -3817,7 +3817,7 @@ fn test_ce_edge_ignore_only_some_3d() raises:
     assert_true(allclose(loss.item(), loss2.item()))
 
 
-fn test_ce_edge_zero_grad_no_requires_grad() raises:
+def test_ce_edge_zero_grad_no_requires_grad() raises:
     print("test_ce_edge_zero_grad_no_requires_grad")
     comptime dtype = DType.float32
     # No grad required → loss computed but no autograd
@@ -3833,6 +3833,6 @@ fn test_ce_edge_zero_grad_no_requires_grad() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll cross entropy tests passed!")

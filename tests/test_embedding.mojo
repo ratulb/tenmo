@@ -19,7 +19,7 @@ from tenmo.shared import Reduction
 # SECTION 1 — CPU · Initialisation
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_emb_cpu_init_shape() raises:
+def test_emb_cpu_init_shape() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=10, embedding_dim=4)
     assert_true(emb.weight.shape() == Shape(10, 4))
@@ -29,7 +29,7 @@ fn test_emb_cpu_init_shape() raises:
     assert_true(emb.training)
 
 
-fn test_emb_cpu_init_normal() raises:
+def test_emb_cpu_init_normal() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=100, embedding_dim=16,
@@ -40,7 +40,7 @@ fn test_emb_cpu_init_normal() raises:
     assert_false(emb.weight.all_close(Tensor[dtype].zeros(Shape(100, 16))))
 
 
-fn test_emb_cpu_init_uniform() raises:
+def test_emb_cpu_init_uniform() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=50, embedding_dim=8,
@@ -50,7 +50,7 @@ fn test_emb_cpu_init_uniform() raises:
     assert_false(emb.weight.all_close(Tensor[dtype].zeros(Shape(50, 8))))
 
 
-fn test_emb_cpu_init_xavier() raises:
+def test_emb_cpu_init_xavier() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=20, embedding_dim=8,
@@ -59,7 +59,7 @@ fn test_emb_cpu_init_xavier() raises:
     assert_true(emb.weight.shape() == Shape(20, 8))
 
 
-fn test_emb_cpu_init_kaiming() raises:
+def test_emb_cpu_init_kaiming() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=20, embedding_dim=8,
@@ -68,7 +68,7 @@ fn test_emb_cpu_init_kaiming() raises:
     assert_true(emb.weight.shape() == Shape(20, 8))
 
 
-fn test_emb_cpu_init_zero() raises:
+def test_emb_cpu_init_zero() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=10, embedding_dim=4,
@@ -77,7 +77,7 @@ fn test_emb_cpu_init_zero() raises:
     assert_true(emb.weight.all_close(Tensor[dtype].zeros(Shape(10, 4))))
 
 
-fn test_emb_cpu_init_freeze() raises:
+def test_emb_cpu_init_freeze() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=10, embedding_dim=4,
@@ -86,7 +86,7 @@ fn test_emb_cpu_init_freeze() raises:
     assert_false(emb.weight.requires_grad)
 
 
-fn test_emb_cpu_init_padding_idx_zeros() raises:
+def test_emb_cpu_init_padding_idx_zeros() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=10, embedding_dim=4,
@@ -104,7 +104,7 @@ fn test_emb_cpu_init_padding_idx_zeros() raises:
 # SECTION 2 — CPU · Forward · basic lookup
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_emb_cpu_fwd_single_index() raises:
+def test_emb_cpu_fwd_single_index() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=5, embedding_dim=3, init_method="zero")
     # Set row 2 to known values
@@ -114,7 +114,7 @@ fn test_emb_cpu_fwd_single_index() raises:
     assert_true(result.all_close(Tensor[dtype].d2([[1.0, 2.0, 3.0]])))
 
 
-fn test_emb_cpu_fwd_multiple_indices() raises:
+def test_emb_cpu_fwd_multiple_indices() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=5, embedding_dim=3, init_method="zero")
     emb.weight.fill(Tensor[dtype].d1([1.0, 0.0, 0.0]), i(0), s())
@@ -129,7 +129,7 @@ fn test_emb_cpu_fwd_multiple_indices() raises:
     ])))
 
 
-fn test_emb_cpu_fwd_repeated_index() raises:
+def test_emb_cpu_fwd_repeated_index() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=5, embedding_dim=3, init_method="zero")
     emb.weight.fill(Tensor[dtype].d1([4.0, 5.0, 6.0]), i(3), s())
@@ -142,14 +142,14 @@ fn test_emb_cpu_fwd_repeated_index() raises:
     ])))
 
 
-fn test_emb_cpu_fwd_output_shape() raises:
+def test_emb_cpu_fwd_output_shape() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=100, embedding_dim=64)
     var result = emb([0, 5, 10, 15, 20])
     assert_true(result.shape() == Shape(5, 64))
 
 
-fn test_emb_cpu_fwd_fuse_sum() raises:
+def test_emb_cpu_fwd_fuse_sum() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=5, embedding_dim=3, init_method="zero",
@@ -163,7 +163,7 @@ fn test_emb_cpu_fwd_fuse_sum() raises:
     assert_true(result.all_close(Tensor[dtype].d1([5.0, 7.0, 9.0])))
 
 
-fn test_emb_cpu_fwd_padding_idx_returns_zeros() raises:
+def test_emb_cpu_fwd_padding_idx_returns_zeros() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=5, embedding_dim=3,
@@ -174,7 +174,7 @@ fn test_emb_cpu_fwd_padding_idx_returns_zeros() raises:
     assert_true(result.all_close(Tensor[dtype].zeros(Shape(1, 3))))
 
 
-fn test_emb_cpu_fwd_eval_mode_no_grad() raises:
+def test_emb_cpu_fwd_eval_mode_no_grad() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=5, embedding_dim=3)
     emb.eval()
@@ -182,14 +182,14 @@ fn test_emb_cpu_fwd_eval_mode_no_grad() raises:
     assert_false(result.requires_grad)
 
 
-fn test_emb_cpu_fwd_train_mode_has_grad() raises:
+def test_emb_cpu_fwd_train_mode_has_grad() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=5, embedding_dim=3)
     emb.train()
     var result = emb([0, 1, 2])
     assert_true(result.requires_grad)
 
-fn test_emb_cpu_fwd_int64_tensor_indices() raises:
+def test_emb_cpu_fwd_int64_tensor_indices() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=5, embedding_dim=3, init_method="zero")
     emb.weight.fill(Tensor[dtype].d1([7.0, 8.0, 9.0]), i(2), s())
@@ -203,7 +203,7 @@ fn test_emb_cpu_fwd_int64_tensor_indices() raises:
 # SECTION 3 — CPU · Backward · gradient flows into looked-up rows
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_emb_cpu_bwd_single_index() raises:
+def test_emb_cpu_bwd_single_index() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=5, embedding_dim=3, init_method="zero")
     var result = emb([2])
@@ -219,7 +219,7 @@ fn test_emb_cpu_bwd_single_index() raises:
     assert_true(grad_row0.all_close(Tensor[dtype].zeros(Shape(3))))
 
 
-fn test_emb_cpu_bwd_multiple_indices() raises:
+def test_emb_cpu_bwd_multiple_indices() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=5, embedding_dim=3, init_method="zero")
     var result = emb([0, 1, 2])
@@ -237,7 +237,7 @@ fn test_emb_cpu_bwd_multiple_indices() raises:
         )
 
 
-fn test_emb_cpu_bwd_repeated_index_accumulates() raises:
+def test_emb_cpu_bwd_repeated_index_accumulates() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=5, embedding_dim=3, init_method="zero")
     # Row 2 looked up twice — grad should accumulate (scatter-add)
@@ -251,7 +251,7 @@ fn test_emb_cpu_bwd_repeated_index_accumulates() raises:
     )
 
 
-fn test_emb_cpu_bwd_fuse_sum() raises:
+def test_emb_cpu_bwd_fuse_sum() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=5, embedding_dim=3, init_method="zero",
@@ -280,7 +280,7 @@ fn test_emb_cpu_bwd_fuse_sum() raises:
 
 # ── CPU / MEAN ─────────────────────────────────────────────────────────────────
 
-fn test_emb_cpu_fwd_fuse_mean() raises:
+def test_emb_cpu_fwd_fuse_mean() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=5, embedding_dim=3, init_method="zero",
@@ -294,7 +294,7 @@ fn test_emb_cpu_fwd_fuse_mean() raises:
     assert_true(result.all_close(Tensor[dtype].d1([2.5, 3.5, 4.5])))
 
 
-fn test_emb_cpu_bwd_fuse_mean() raises:
+def test_emb_cpu_bwd_fuse_mean() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=5, embedding_dim=3, init_method="zero",
@@ -320,7 +320,7 @@ fn test_emb_cpu_bwd_fuse_mean() raises:
     )
 
 
-fn test_emb_cpu_bwd_padding_idx_no_grad() raises:
+def test_emb_cpu_bwd_padding_idx_no_grad() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=5, embedding_dim=3,
@@ -341,7 +341,7 @@ fn test_emb_cpu_bwd_padding_idx_no_grad() raises:
     )
 
 
-fn test_emb_cpu_bwd_frozen_no_grad() raises:
+def test_emb_cpu_bwd_frozen_no_grad() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=5, embedding_dim=3,
@@ -352,7 +352,7 @@ fn test_emb_cpu_bwd_frozen_no_grad() raises:
     # No backward needed — weight has no gradbox when frozen
 
 
-fn test_emb_cpu_bwd_chained_linear() raises:
+def test_emb_cpu_bwd_chained_linear() raises:
     comptime dtype = DType.float32
     # Embedding → sum → dot with output weights → sigmoid → MSE
     var emb = Embedding[dtype](
@@ -382,7 +382,7 @@ fn test_emb_cpu_bwd_chained_linear() raises:
 # SECTION 4 — CPU · Freeze / unfreeze / from_pretrained
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_emb_cpu_freeze_unfreeze() raises:
+def test_emb_cpu_freeze_unfreeze() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=5, embedding_dim=3)
     assert_true(emb.weight.requires_grad)
@@ -392,7 +392,7 @@ fn test_emb_cpu_freeze_unfreeze() raises:
     assert_true(emb.weight.requires_grad)
 
 
-fn test_emb_cpu_from_pretrained_values() raises:
+def test_emb_cpu_from_pretrained_values() raises:
     comptime dtype = DType.float32
     var pretrained = Tensor[dtype].d2([
         [1.0, 2.0, 3.0],
@@ -404,21 +404,21 @@ fn test_emb_cpu_from_pretrained_values() raises:
     assert_true(emb.weight.all_close(pretrained))
 
 
-fn test_emb_cpu_from_pretrained_frozen_by_default() raises:
+def test_emb_cpu_from_pretrained_frozen_by_default() raises:
     comptime dtype = DType.float32
     var pretrained = Tensor[dtype].d2([[1.0, 2.0],[3.0, 4.0]])
     var emb = Embedding[dtype].from_pretrained(pretrained)
     assert_false(emb.weight.requires_grad)
 
 
-fn test_emb_cpu_from_pretrained_unfrozen() raises:
+def test_emb_cpu_from_pretrained_unfrozen() raises:
     comptime dtype = DType.float32
     var pretrained = Tensor[dtype].d2([[1.0, 2.0],[3.0, 4.0]])
     var emb = Embedding[dtype].from_pretrained(pretrained, freeze=False)
     assert_true(emb.weight.requires_grad)
 
 
-fn test_emb_cpu_from_pretrained_with_padding() raises:
+def test_emb_cpu_from_pretrained_with_padding() raises:
     comptime dtype = DType.float32
     var pretrained = Tensor[dtype].d2([
         [1.0, 2.0, 3.0],
@@ -432,21 +432,21 @@ fn test_emb_cpu_from_pretrained_with_padding() raises:
     assert_true(emb.weight[i(1), s()].all_close(Tensor[dtype].d1([4.0, 5.0, 6.0])))
 
 
-fn test_emb_cpu_parameters_not_empty_when_grad() raises:
+def test_emb_cpu_parameters_not_empty_when_grad() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=5, embedding_dim=3)
     var params = emb.parameters()
     assert_true(len(params) == 1)
 
 
-fn test_emb_cpu_parameters_empty_when_frozen() raises:
+def test_emb_cpu_parameters_empty_when_frozen() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=5, embedding_dim=3, freeze=True)
     var params = emb.parameters()
     assert_true(len(params) == 0)
 
 
-fn test_emb_cpu_num_parameters() raises:
+def test_emb_cpu_num_parameters() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=100, embedding_dim=16)
     assert_true(emb.num_parameters() == 1600)
@@ -456,7 +456,7 @@ fn test_emb_cpu_num_parameters() raises:
 # SECTION 5 — CPU · max_norm renormalisation
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_emb_cpu_max_norm_clips_large_rows() raises:
+def test_emb_cpu_max_norm_clips_large_rows() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=3, embedding_dim=2,
@@ -470,7 +470,7 @@ fn test_emb_cpu_max_norm_clips_large_rows() raises:
     assert_true(abs(norm - 1.0) < 1e-5)
 
 
-fn test_emb_cpu_max_norm_preserves_small_rows() raises:
+def test_emb_cpu_max_norm_preserves_small_rows() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
         num_embeddings=3, embedding_dim=2,
@@ -487,7 +487,7 @@ fn test_emb_cpu_max_norm_preserves_small_rows() raises:
 # SECTION 6 — GPU · Forward
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_emb_gpu_fwd_basic_lookup() raises:
+def test_emb_gpu_fwd_basic_lookup() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var emb = Embedding[dtype](
@@ -512,7 +512,7 @@ fn test_emb_gpu_fwd_basic_lookup() raises:
         ])))
 
 
-fn test_emb_gpu_fwd_repeated_index() raises:
+def test_emb_gpu_fwd_repeated_index() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var weights = Tensor[dtype].d2([
@@ -529,7 +529,7 @@ fn test_emb_gpu_fwd_repeated_index() raises:
         ])))
 
 
-fn test_emb_gpu_fwd_fuse_sum() raises:
+def test_emb_gpu_fwd_fuse_sum() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var weights = Tensor[dtype].d2([
@@ -545,7 +545,7 @@ fn test_emb_gpu_fwd_fuse_sum() raises:
         assert_true(result.to_cpu().all_close(Tensor[dtype].d1([5.0, 7.0, 9.0])))
 
 
-fn test_emb_gpu_fwd_eval_no_grad() raises:
+def test_emb_gpu_fwd_eval_no_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var weights = Tensor[dtype].d2([[1.0, 2.0],[3.0, 4.0]])
@@ -555,7 +555,7 @@ fn test_emb_gpu_fwd_eval_no_grad() raises:
         assert_false(result.requires_grad)
 
 
-fn test_emb_gpu_fwd_output_shape() raises:
+def test_emb_gpu_fwd_output_shape() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var emb = Embedding[dtype](
@@ -565,7 +565,7 @@ fn test_emb_gpu_fwd_output_shape() raises:
         assert_true(result.shape() == Shape(5, 64))
 
 
-fn test_emb_gpu_fwd_padding_idx_zeros() raises:
+def test_emb_gpu_fwd_padding_idx_zeros() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var weights = Tensor[dtype].d2([
@@ -583,7 +583,7 @@ fn test_emb_gpu_fwd_padding_idx_zeros() raises:
 # SECTION 7 — GPU · Backward
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_emb_gpu_bwd_basic() raises:
+def test_emb_gpu_bwd_basic() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var weights = Tensor[dtype].d2([
@@ -614,7 +614,7 @@ fn test_emb_gpu_bwd_basic() raises:
         )
 
 
-fn test_emb_gpu_bwd_repeated_index_accumulates() raises:
+def test_emb_gpu_bwd_repeated_index_accumulates() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var weights = Tensor[dtype].d2([
@@ -631,7 +631,7 @@ fn test_emb_gpu_bwd_repeated_index_accumulates() raises:
             shared_grad[i(0), s()].to_cpu()
             .all_close(Tensor[dtype].d1([2.0, 2.0, 2.0]))
         )
-fn test_emb_gpu_bwd_fuse_sum() raises:
+def test_emb_gpu_bwd_fuse_sum() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var weights = Tensor[dtype].d2([
@@ -663,7 +663,7 @@ fn test_emb_gpu_bwd_fuse_sum() raises:
 
 # ── GPU / MEAN ────────────────────────────────────────────────────────────────
 
-fn test_emb_gpu_fwd_fuse_mean() raises:
+def test_emb_gpu_fwd_fuse_mean() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var weights = Tensor[dtype].d2([
@@ -679,7 +679,7 @@ fn test_emb_gpu_fwd_fuse_mean() raises:
         assert_true(result.to_cpu().all_close(Tensor[dtype].d1([2.5, 3.5, 4.5])))
 
 
-fn test_emb_gpu_bwd_fuse_mean() raises:
+def test_emb_gpu_bwd_fuse_mean() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var weights = Tensor[dtype].d2([
@@ -708,7 +708,7 @@ fn test_emb_gpu_bwd_fuse_mean() raises:
         )
 
 
-fn test_emb_gpu_bwd_padding_idx_no_grad() raises:
+def test_emb_gpu_bwd_padding_idx_no_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var weights = Tensor[dtype].d2([
@@ -734,7 +734,7 @@ fn test_emb_gpu_bwd_padding_idx_no_grad() raises:
         )
 
 
-fn test_emb_gpu_bwd_chained() raises:
+def test_emb_gpu_bwd_chained() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var weights = Tensor[dtype].d2([

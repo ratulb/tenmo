@@ -41,7 +41,7 @@ from .ndbuffer import NDBuffer
 
 # PATH 1: Both contiguous, same shape, no broadcasting.
 # Linear index maps directly to both A and B.
-fn arithmetic_ops_both_contiguous[
+def arithmetic_ops_both_contiguous[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -108,7 +108,7 @@ fn arithmetic_ops_both_contiguous[
 # B is stride-decomposed through B_strides, which carry
 # stride-0 on any axis where B is broadcast-replicated.
 # Result is written back to A at the same linear index.
-fn arithmetic_ops_A_contiguous[
+def arithmetic_ops_A_contiguous[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -205,7 +205,7 @@ fn arithmetic_ops_A_contiguous[
 # NOTE: This path MUST NOT be taken when needs_broadcasting is
 # true, because then B's physical buffer is smaller than
 # output_size and the linear load at i would be out of bounds.
-fn arithmetic_ops_B_contiguous[
+def arithmetic_ops_B_contiguous[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -295,7 +295,7 @@ fn arithmetic_ops_B_contiguous[
 # Both A and B are stride-decomposed independently.
 # Result is written back at a_idx (A's physical address).
 # Universal fallback: handles all remaining cases correctly.
-fn arithmetic_ops_both_strided[
+def arithmetic_ops_both_strided[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -383,7 +383,7 @@ struct BinaryInplaceOperations[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
-    fn launch[
+    def launch[
         op_code: Int,
     ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]) raises:
         comptime simdwidth = simd_width_of[Self.dtype]()
@@ -594,7 +594,7 @@ struct BinaryInplaceOperations[dtype: DType](
     # The fix is simply to return in the order the caller expects.
     # ──────────────────────────────────────────────────────────
     @staticmethod
-    fn launch_config(output_size: Int) -> Tuple[Int, Int]:
+    def launch_config(output_size: Int) -> Tuple[Int, Int]:
         var threads_per_block: Int
         var num_blocks: Int
 

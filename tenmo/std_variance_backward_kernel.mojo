@@ -145,7 +145,7 @@ from .reduction_kernel import output_to_input_base, rank_to_reduced_offset
 # =============================================================================
 
 
-fn variance_backward_normalize[
+def variance_backward_normalize[
     dtype: DType,
     max_block_size: Int = 512,
 ](
@@ -227,7 +227,7 @@ fn variance_backward_normalize[
 # =============================================================================
 
 
-fn std_backward_normalize[
+def std_backward_normalize[
     dtype: DType,
     max_block_size: Int = 512,
 ](
@@ -441,7 +441,7 @@ struct StdVarianceBackwardKernel[dtype: DType](
         return NDBuffer[Self.dtype].with_device_state(out_state^, out_shape)
 
     @staticmethod
-    fn launch_config(D: Int, outer_size: Int) -> Tuple[Int, Int]:
+    def launch_config(D: Int, outer_size: Int) -> Tuple[Int, Int]:
         """One block per row. Block size = next power-of-two up to 512."""
         var block_size = 1
         while block_size < D and block_size < 512:

@@ -6,7 +6,7 @@ from std.testing import assert_true, TestSuite
 # ============================================================================
 
 
-fn test_concat_axis0_2d() raises:
+def test_concat_axis0_2d() raises:
     """Test concatenation along axis 0 for 2D tensors."""
     print("test_concat_axis0_2d")
 
@@ -32,7 +32,7 @@ fn test_concat_axis0_2d() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_concat_axis1_2d() raises:
+def test_concat_axis1_2d() raises:
     """Test concatenation along axis 1 for 2D tensors."""
     print("test_concat_axis1_2d")
 
@@ -58,7 +58,7 @@ fn test_concat_axis1_2d() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_concat_three_tensors_axis0() raises:
+def test_concat_three_tensors_axis0() raises:
     """Test concatenation of three tensors along axis 0."""
     print("test_concat_three_tensors_axis0")
 
@@ -86,7 +86,7 @@ fn test_concat_three_tensors_axis0() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_concat_1d_tensors() raises:
+def test_concat_1d_tensors() raises:
     """Test concatenation of 1D tensors."""
     print("test_concat_1d_tensors")
 
@@ -113,7 +113,7 @@ fn test_concat_1d_tensors() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_concat_3d_tensors_axis0() raises:
+def test_concat_3d_tensors_axis0() raises:
     """Test concatenation of 3D tensors along axis 0."""
     print("test_concat_3d_tensors_axis0")
 
@@ -151,7 +151,7 @@ fn test_concat_3d_tensors_axis0() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_concat_3d_tensors_axis1() raises:
+def test_concat_3d_tensors_axis1() raises:
     """Test concatenation of 3D tensors along axis 1."""
     print("test_concat_3d_tensors_axis1")
 
@@ -171,7 +171,7 @@ fn test_concat_3d_tensors_axis1() raises:
     assert_true(result.shape()[2] == 2)
 
 
-fn test_concat_3d_tensors_axis2() raises:
+def test_concat_3d_tensors_axis2() raises:
     """Test concatenation of 3D tensors along axis 2."""
     print("test_concat_3d_tensors_axis2")
 
@@ -196,7 +196,7 @@ fn test_concat_3d_tensors_axis2() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_concat_single_tensor() raises:
+def test_concat_single_tensor() raises:
     """Test concatenation of a single tensor (edge case)."""
     print("test_concat_single_tensor")
 
@@ -217,7 +217,7 @@ fn test_concat_single_tensor() raises:
 # ============================================================================
 
 
-fn test_concat_backward_axis0_simple() raises:
+def test_concat_backward_axis0_simple() raises:
     """Test gradient flow through concat along axis 0."""
     print("test_concat_backward_axis0_simple")
 
@@ -241,7 +241,7 @@ fn test_concat_backward_axis0_simple() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad_B))
 
 
-fn test_concat_backward_axis1_simple() raises:
+def test_concat_backward_axis1_simple() raises:
     """Test gradient flow through concat along axis 1."""
     print("test_concat_backward_axis1_simple")
 
@@ -265,7 +265,7 @@ fn test_concat_backward_axis1_simple() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad_B))
 
 
-fn test_concat_backward_weighted_loss() raises:
+def test_concat_backward_weighted_loss() raises:
     """Test gradient flow with weighted loss."""
     print("test_concat_backward_weighted_loss")
 
@@ -297,7 +297,7 @@ fn test_concat_backward_weighted_loss() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad_B))
 
 
-fn test_concat_backward_three_tensors() raises:
+def test_concat_backward_three_tensors() raises:
     """Test gradient flow through concat of three tensors."""
     print("test_concat_backward_three_tensors")
 
@@ -329,7 +329,7 @@ fn test_concat_backward_three_tensors() raises:
     assert_true(C.grad().all_close[atol=1e-6](expected_grad_C))
 
 
-fn test_concat_backward_3d_axis0() raises:
+def test_concat_backward_3d_axis0() raises:
     """Test gradient flow through 3D concat along axis 0."""
     print("test_concat_backward_3d_axis0")
 
@@ -356,7 +356,7 @@ fn test_concat_backward_3d_axis0() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_concat_backward_3d_axis2() raises:
+def test_concat_backward_3d_axis2() raises:
     """Test gradient flow through 3D concat along axis 2."""
     print("test_concat_backward_3d_axis2")
 
@@ -381,7 +381,7 @@ fn test_concat_backward_3d_axis2() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad_B))
 
 
-fn test_concat_backward_chain() raises:
+def test_concat_backward_chain() raises:
     """Test gradient flow through chained operations."""
     print("test_concat_backward_chain")
 
@@ -412,7 +412,7 @@ fn test_concat_backward_chain() raises:
 # ============================================================================
 
 
-fn test_concat_simple_views_axis0() raises:
+def test_concat_simple_views_axis0() raises:
     """Test concatenation of simple views along axis 0."""
     print("test_concat_simple_views_axis0")
 
@@ -444,7 +444,7 @@ fn test_concat_simple_views_axis0() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_concat_views_with_offsets() raises:
+def test_concat_views_with_offsets() raises:
     """Test concatenation of views with different offsets."""
     print("test_concat_views_with_offsets")
 
@@ -465,7 +465,7 @@ fn test_concat_views_with_offsets() raises:
     assert_true(result.all_close[atol=1e-6](base))
 
 
-fn test_concat_reshaped_views() raises:
+def test_concat_reshaped_views() raises:
     """Test concatenation of reshaped views."""
     print("test_concat_reshaped_views")
 
@@ -487,7 +487,7 @@ fn test_concat_reshaped_views() raises:
     assert_true(result.shape()[1] == 3)
 
 
-fn test_concat_nested_views() raises:
+def test_concat_nested_views() raises:
     """Test concatenation of nested views (view of view)."""
     print("test_concat_nested_views")
 
@@ -511,7 +511,7 @@ fn test_concat_nested_views() raises:
     assert_true(result.shape()[1] == 2)
 
 
-fn test_concat_views_backward() raises:
+def test_concat_views_backward() raises:
     """Test gradient flow through concatenated views."""
     print("test_concat_views_backward")
 
@@ -537,7 +537,7 @@ fn test_concat_views_backward() raises:
     assert_true(base2.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_concat_views_with_different_offsets_backward() raises:
+def test_concat_views_with_different_offsets_backward() raises:
     """Test gradient flow through views with different offsets."""
     print("test_concat_views_with_different_offsets_backward")
 
@@ -569,7 +569,7 @@ fn test_concat_views_with_different_offsets_backward() raises:
     assert_true(base.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_concat_mixed_tensors_and_views() raises:
+def test_concat_mixed_tensors_and_views() raises:
     """Test concatenation of mixed tensors and views."""
     print("test_concat_mixed_tensors_and_views")
 
@@ -598,7 +598,7 @@ fn test_concat_mixed_tensors_and_views() raises:
 # ============================================================================
 
 
-fn _concat_empty_dimension() raises:
+def _concat_empty_dimension() raises:
     """Test concatenation when some tensors have size 0 in concat dimension."""
     print("test_concat_empty_dimension")
 
@@ -619,7 +619,7 @@ fn _concat_empty_dimension() raises:
     assert_true(result.shape()[1] == 3)
 
 
-fn test_concat_large_number_of_tensors() raises:
+def test_concat_large_number_of_tensors() raises:
     """Test concatenation of many tensors."""
     print("test_concat_large_number_of_tensors")
 
@@ -649,7 +649,7 @@ fn test_concat_large_number_of_tensors() raises:
     assert_true(last_row.all_close[atol=1e-6](expected_last_row))
 
 
-fn test_concat_requires_grad_propagation() raises:
+def test_concat_requires_grad_propagation() raises:
     """Test that requires_grad is properly set."""
     print("test_concat_requires_grad_propagation")
 
@@ -670,7 +670,7 @@ fn test_concat_requires_grad_propagation() raises:
     assert_true(result2.requires_grad == False)
 
 
-fn test_concat_contiguous_output() raises:
+def test_concat_contiguous_output() raises:
     """Test that concat output is contiguous."""
     print("test_concat_contiguous_output")
 
@@ -688,7 +688,7 @@ fn test_concat_contiguous_output() raises:
     assert_true(result.is_contiguous())
 
 
-fn test_concat_negative_axis() raises:
+def test_concat_negative_axis() raises:
     """Test concatenation with negative axis."""
     print("test_concat_negative_axis")
 
@@ -707,7 +707,7 @@ fn test_concat_negative_axis() raises:
     assert_true(result1.all_close[atol=1e-6](result2))
 
 
-fn test_concat_scalar_to_1d() raises:
+def test_concat_scalar_to_1d() raises:
     """Test concatenation of scalar views to 1D."""
     print("test_concat_scalar_to_1d")
 
@@ -737,7 +737,7 @@ fn test_concat_scalar_to_1d() raises:
 # ============================================================================
 
 
-fn test_concat_in_network_forward() raises:
+def test_concat_in_network_forward() raises:
     """Test concat as part of a network forward pass."""
     print("test_concat_in_network_forward")
 
@@ -768,7 +768,7 @@ fn test_concat_in_network_forward() raises:
     assert_true(branch2.grad().all_close[atol=1e-6](expected_grad_branch2))
 
 
-fn test_concat_multiple_times() raises:
+def test_concat_multiple_times() raises:
     """Test multiple concatenations in sequence."""
     print("test_concat_multiple_times")
 
@@ -798,7 +798,7 @@ fn test_concat_multiple_times() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_concat_view_contiguous_mix() raises:
+def test_concat_view_contiguous_mix() raises:
     """Test concatenation of views that need contiguous conversion."""
     print("test_concat_view_contiguous_mix")
 
@@ -835,7 +835,7 @@ fn test_concat_view_contiguous_mix() raises:
 # ============================================================================
 
 
-fn main() raises:
+def main() raises:
     _ = """
     print("=" * 80)
     print("CONCAT COMPREHENSIVE TEST SUITE")
@@ -902,7 +902,7 @@ fn main() raises:
 # ============================================================================
 
 
-fn test_concat_axis0_basic_ct() raises:
+def test_concat_axis0_basic_ct() raises:
     """Test basic concatenation along axis 0."""
     print("test_concat_axis0_basic_ct")
     comptime dtype = DType.float32
@@ -927,7 +927,7 @@ fn test_concat_axis0_basic_ct() raises:
     assert_true(result[3, 2] == 12.0)
 
 
-fn test_concat_axis1_basic_ct() raises:
+def test_concat_axis1_basic_ct() raises:
     """Test basic concatenation along axis 1."""
     print("test_concat_axis1_basic_ct")
     comptime dtype = DType.float32
@@ -954,7 +954,7 @@ fn test_concat_axis1_basic_ct() raises:
     assert_true(result[1, 2] == 6.0)
 
 
-fn test_concat_three_tensors_ct() raises:
+def test_concat_three_tensors_ct() raises:
     """Test concatenating three tensors."""
     print("test_concat_three_tensors_ct")
     comptime dtype = DType.float32
@@ -980,7 +980,7 @@ fn test_concat_three_tensors_ct() raises:
     assert_true(result[2, 0] == 5.0)
 
 
-fn test_concat_single_tensor_ct() raises:
+def test_concat_single_tensor_ct() raises:
     """Test concatenating a single tensor (should return copy)."""
     print("test_concat_single_tensor_ct")
     comptime dtype = DType.float32
@@ -998,7 +998,7 @@ fn test_concat_single_tensor_ct() raises:
     assert_true(result[1, 1] == 4.0)
 
 
-fn test_concat_1d_tensors_ct() raises:
+def test_concat_1d_tensors_ct() raises:
     """Test concatenating 1D tensors."""
     print("test_concat_1d_tensors_ct")
     comptime dtype = DType.float32
@@ -1019,7 +1019,7 @@ fn test_concat_1d_tensors_ct() raises:
     assert_true(result[4] == 5.0)
 
 
-fn test_concat_3d_tensors_axis0_ct() raises:
+def test_concat_3d_tensors_axis0_ct() raises:
     """Test concatenating 3D tensors along axis 0."""
     print("test_concat_3d_tensors_axis0_ct")
     comptime dtype = DType.float32
@@ -1044,7 +1044,7 @@ fn test_concat_3d_tensors_axis0_ct() raises:
     assert_true(result[2, 0, 0] == 2.0)
 
 
-fn test_concat_3d_tensors_axis1_ct() raises:
+def test_concat_3d_tensors_axis1_ct() raises:
     """Test concatenating 3D tensors along axis 1."""
     print("test_concat_3d_tensors_axis1_ct")
     comptime dtype = DType.float32
@@ -1068,7 +1068,7 @@ fn test_concat_3d_tensors_axis1_ct() raises:
     assert_true(result[0, 2, 0] == 2.0)
 
 
-fn test_concat_3d_tensors_axis2_ct() raises:
+def test_concat_3d_tensors_axis2_ct() raises:
     """Test concatenating 3D tensors along axis 2."""
     print("test_concat_3d_tensors_axis2_ct")
     comptime dtype = DType.float32
@@ -1097,7 +1097,7 @@ fn test_concat_3d_tensors_axis2_ct() raises:
 # ============================================================================
 
 
-fn test_concat_backward_axis0_ct() raises:
+def test_concat_backward_axis0_ct() raises:
     """Test gradient flow for concat along axis 0."""
     print("test_concat_backward_axis0_ct")
     comptime dtype = DType.float32
@@ -1121,7 +1121,7 @@ fn test_concat_backward_axis0_ct() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_concat_backward_axis1_ct() raises:
+def test_concat_backward_axis1_ct() raises:
     """Test gradient flow for concat along axis 1."""
     print("test_concat_backward_axis1_ct")
     comptime dtype = DType.float32
@@ -1145,7 +1145,7 @@ fn test_concat_backward_axis1_ct() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad_B))
 
 
-fn test_concat_backward_weighted_ct() raises:
+def test_concat_backward_weighted_ct() raises:
     """Test gradient flow with weighted loss."""
     print("test_concat_backward_weighted_ct")
     comptime dtype = DType.float32
@@ -1174,7 +1174,7 @@ fn test_concat_backward_weighted_ct() raises:
     assert_true(B.grad().all_close[atol=1e-6](expected_grad_B))
 
 
-fn test_concat_backward_three_tensors_ct() raises:
+def test_concat_backward_three_tensors_ct() raises:
     """Test gradient flow with three tensors."""
     print("test_concat_backward_three_tensors_ct")
     comptime dtype = DType.float32
@@ -1198,7 +1198,7 @@ fn test_concat_backward_three_tensors_ct() raises:
     assert_true(C.grad().all_close[atol=1e-6](Tensor[dtype].ones(C.shape())))
 
 
-fn test_concat_backward_chain_ct() raises:
+def test_concat_backward_chain_ct() raises:
     """Test gradient flow through chain of operations."""
     print("test_concat_backward_chain_ct")
     comptime dtype = DType.float32
@@ -1226,7 +1226,7 @@ fn test_concat_backward_chain_ct() raises:
 # ============================================================================
 
 
-fn test_concat_with_views_ct() raises:
+def test_concat_with_views_ct() raises:
     """Test concatenating views."""
     print("test_concat_with_views_ct")
     comptime dtype = DType.float32
@@ -1250,7 +1250,7 @@ fn test_concat_with_views_ct() raises:
     assert_true(result.all_close[atol=1e-6](base))
 
 
-fn test_concat_views_grad_flow_ct() raises:
+def test_concat_views_grad_flow_ct() raises:
     """Test gradient flow through concatenated views."""
     print("test_concat_views_grad_flow_ct")
     comptime dtype = DType.float32
@@ -1274,7 +1274,7 @@ fn test_concat_views_grad_flow_ct() raises:
     assert_true(base.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_concat_nested_views_ct() raises:
+def test_concat_nested_views_ct() raises:
     """Test concatenating nested views."""
     print("test_concat_nested_views_ct")
 
@@ -1315,7 +1315,7 @@ fn test_concat_nested_views_ct() raises:
     assert_true(base.grad()[18] == 1.0)
 
 
-fn test_concat_view_with_tensor_ct() raises:
+def test_concat_view_with_tensor_ct() raises:
     """Test concatenating view with regular tensor."""
     print("test_concat_view_with_tensor_ct")
     comptime dtype = DType.float32
@@ -1350,7 +1350,7 @@ fn test_concat_view_with_tensor_ct() raises:
     )
 
 
-fn test_concat_scalar_views_ct() raises:
+def test_concat_scalar_views_ct() raises:
     """Test concatenating scalar views (edge case)."""
     print("test_concat_scalar_views_ct")
     comptime dtype = DType.float32
@@ -1389,7 +1389,7 @@ fn test_concat_scalar_views_ct() raises:
 # ============================================================================
 
 
-fn test_concat_different_sizes_axis0_ct() raises:
+def test_concat_different_sizes_axis0_ct() raises:
     """Test concatenating tensors with different sizes along non-concat dims."""
     print("test_concat_different_sizes_axis0_ct")
     comptime dtype = DType.float32
@@ -1417,7 +1417,7 @@ fn test_concat_different_sizes_axis0_ct() raises:
     assert_true(result[7, 0, 0] == 3.0)
 
 
-fn test_concat_contiguous_check_ct() raises:
+def test_concat_contiguous_check_ct() raises:
     """Test that result is contiguous."""
     print("test_concat_contiguous_check_ct")
     comptime dtype = DType.float32
@@ -1435,7 +1435,7 @@ fn test_concat_contiguous_check_ct() raises:
     assert_true(result.is_contiguous())
 
 
-fn test_concat_preserves_values_ct() raises:
+def test_concat_preserves_values_ct() raises:
     """Test that concatenation preserves exact values."""
     print("test_concat_preserves_values_ct")
     comptime dtype = DType.float32
@@ -1463,7 +1463,7 @@ fn test_concat_preserves_values_ct() raises:
 # ============================================================================
 
 
-fn run_all_concat_tests() raises:
+def run_all_concat_tests() raises:
     """Run all concat tests."""
     print("\n=== Running Concat Test Suite ===\n")
 

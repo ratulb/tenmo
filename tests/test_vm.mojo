@@ -4,7 +4,7 @@ from std.testing import assert_true, TestSuite
 from tenmo.strides import Strides
 from tenmo.mnemonics import vm
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
@@ -12,7 +12,7 @@ fn main() raises:
 # ===== BASIC VECTOR-MATRIX TESTS =====
 
 
-fn test_vector_matrix_no_batch() raises:
+def test_vector_matrix_no_batch() raises:
     """Test: v[k] @ M[k,n] -> result[n]."""
     print("test_vector_matrix_no_batch")
     comptime dtype = DType.float32
@@ -50,7 +50,7 @@ fn test_vector_matrix_no_batch() raises:
     print("PASSED\n")
 
 
-fn test_vector_matrix_batch_M_only() raises:
+def test_vector_matrix_batch_M_only() raises:
     """Test: v[k] @ M[batch,k,n] -> result[batch,n]."""
     print("test_vector_matrix_batch_M_only")
     comptime dtype = DType.float32
@@ -105,7 +105,7 @@ fn test_vector_matrix_batch_M_only() raises:
     print("PASSED\n")
 
 
-fn test_vector_matrix_batch_v_only() raises:
+def test_vector_matrix_batch_v_only() raises:
     """Test: v[batch,k] @ M[k,n] -> result[batch,n]."""
     print("test_vector_matrix_batch_v_only")
     comptime dtype = DType.float32
@@ -141,7 +141,7 @@ fn test_vector_matrix_batch_v_only() raises:
     print("PASSED\n")
 
 
-fn test_vector_matrix_both_batched() raises:
+def test_vector_matrix_both_batched() raises:
     """Test: v[batch,k] @ M[batch,k,n] -> result[batch,n]."""
     print("test_vector_matrix_both_batched")
     comptime dtype = DType.float32
@@ -199,7 +199,7 @@ fn test_vector_matrix_both_batched() raises:
     print("PASSED\n")
 
 
-fn test_vector_matrix_broadcast_batch() raises:
+def test_vector_matrix_broadcast_batch() raises:
     """Test: v[3,k] @ M[2,3,k,n] -> result[2,3,n] (broadcasting)."""
     print("test_vector_matrix_broadcast_batch")
     comptime dtype = DType.float32
@@ -309,7 +309,7 @@ fn test_vector_matrix_broadcast_batch() raises:
     print("PASSED\n")
 
 
-fn test_vector_matrix_asymmetric_shapes() raises:
+def test_vector_matrix_asymmetric_shapes() raises:
     """Test: v[batch,k] @ M[batch,k,n] with k≠n to ensure no accidental transposes.
     """
     print("test_vector_matrix_asymmetric_shapes")
@@ -374,7 +374,7 @@ fn test_vector_matrix_asymmetric_shapes() raises:
     print("PASSED\n")
 
 
-fn test_vector_matrix_single_element() raises:
+def test_vector_matrix_single_element() raises:
     """Test: v[k] @ M[k,1] -> result[1] (edge case: n=1)."""
     print("test_vector_matrix_single_element")
     comptime dtype = DType.float32
@@ -402,7 +402,7 @@ fn test_vector_matrix_single_element() raises:
     print("PASSED\n")
 
 
-fn test_vector_matrix_1d_2d_basic() raises:
+def test_vector_matrix_1d_2d_basic() raises:
     print("test_vector_matrix_1d_2d_basic")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -425,7 +425,7 @@ fn test_vector_matrix_1d_2d_basic() raises:
     )
 
 
-fn test_vector_matrix_identity() raises:
+def test_vector_matrix_identity() raises:
     print("test_vector_matrix_identity")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -447,7 +447,7 @@ fn test_vector_matrix_identity() raises:
     )
 
 
-fn test_vector_matrix_zeros() raises:
+def test_vector_matrix_zeros() raises:
     print("test_vector_matrix_zeros")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -470,7 +470,7 @@ fn test_vector_matrix_zeros() raises:
 # ===== BATCHED VECTOR-MATRIX TESTS =====
 
 
-fn test_vector_matrix_2d_2d_batched() raises:
+def test_vector_matrix_2d_2d_batched() raises:
     print("test_vector_matrix_2d_2d_batched")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d2(
@@ -489,7 +489,7 @@ fn test_vector_matrix_2d_2d_batched() raises:
     assert_true(M.grad().all_close(Tensor[dtype].d2([[4.0, 4.0], [6.0, 6.0]])))
 
 
-fn test_vector_matrix_2d_3d_batched() raises:
+def test_vector_matrix_2d_3d_batched() raises:
     print("test_vector_matrix_2d_3d_batched")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d2(
@@ -516,7 +516,7 @@ fn test_vector_matrix_2d_3d_batched() raises:
     )
 
 
-fn test_vector_matrix_broadcast_vector() raises:
+def test_vector_matrix_broadcast_vector() raises:
     print("test_vector_matrix_broadcast_vector")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)  # single vector
@@ -543,7 +543,7 @@ fn test_vector_matrix_broadcast_vector() raises:
     )
 
 
-fn test_vector_matrix_broadcast_matrix() raises:
+def test_vector_matrix_broadcast_matrix() raises:
     print("test_vector_matrix_broadcast_matrix")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d2(
@@ -565,7 +565,7 @@ fn test_vector_matrix_broadcast_matrix() raises:
 # ===== 3D+ BATCH DIMENSION TESTS =====
 
 
-fn test_vector_matrix_3d_3d_high_batch() raises:
+def test_vector_matrix_3d_3d_high_batch() raises:
     print("test_vector_matrix_3d_3d_high_batch")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d3(
@@ -584,7 +584,7 @@ fn test_vector_matrix_3d_3d_high_batch() raises:
     assert_true(M.grad().shape() == Shape(1, 2, 2))
 
 
-fn test_vector_matrix_4d_batch() raises:
+def test_vector_matrix_4d_batch() raises:
     print("test_vector_matrix_4d_batch")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d4(
@@ -605,7 +605,7 @@ fn test_vector_matrix_4d_batch() raises:
 # ===== VIEW TESTS WITH GRADIENTS =====
 
 
-fn test_vector_matrix_with_vector_view() raises:
+def test_vector_matrix_with_vector_view() raises:
     print("test_vector_matrix_with_vector_view")
     comptime dtype = DType.float32
     var base_v = Tensor[dtype].d1([0.0, 1.0, 2.0, 3.0, 4.0], requires_grad=True)
@@ -627,7 +627,7 @@ fn test_vector_matrix_with_vector_view() raises:
     )
 
 
-fn test_vector_matrix_with_matrix_view() raises:
+def test_vector_matrix_with_matrix_view() raises:
     print("test_vector_matrix_with_matrix_view")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -656,7 +656,7 @@ fn test_vector_matrix_with_matrix_view() raises:
 # ===== EDGE CASE TESTS =====
 
 
-fn test_vector_matrix_single_element_orig() raises:
+def test_vector_matrix_single_element_orig() raises:
     print("test_vector_matrix_single_element_orig")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d1(
@@ -672,7 +672,7 @@ fn test_vector_matrix_single_element_orig() raises:
     assert_true(M.grad().all_close(Tensor[dtype].d2([[2.0]])))
 
 
-fn test_vector_matrix_large_dimensions() raises:
+def test_vector_matrix_large_dimensions() raises:
     print("test_vector_matrix_large_dimensions")
     comptime dtype = DType.float32
     # Test with larger dimensions to catch indexing issues
@@ -690,7 +690,7 @@ fn test_vector_matrix_large_dimensions() raises:
     assert_true(v.grad().all_close(Tensor[dtype].d1([1.0, 1.0, 1.0, 0.0])))
 
 
-fn test_vector_matrix_non_contiguous_batch() raises:
+def test_vector_matrix_non_contiguous_batch() raises:
     print("test_vector_matrix_non_contiguous_batch")
     comptime dtype = DType.float32
     var base = Tensor[dtype].d2(
@@ -722,7 +722,7 @@ fn test_vector_matrix_non_contiguous_batch() raises:
 # ------------------- Vector-Matrix / Matrix-Vector Test Suite -------------------
 
 
-fn test_vector_matrix_basic_forward_backward() raises:
+def test_vector_matrix_basic_forward_backward() raises:
     print("test_vector_matrix_basic_forward_backward")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -747,7 +747,7 @@ fn test_vector_matrix_basic_forward_backward() raises:
     assert_true(M.grad().all_close(Tensor[dtype].d2([[1, 1], [2, 2], [3, 3]])))
 
 
-fn test_matrix_vector_basic_forward_backward() raises:
+def test_matrix_vector_basic_forward_backward() raises:
     print("test_matrix_vector_basic_forward_backward")
     comptime dtype = DType.float32
     var M = Tensor[dtype].d2(
@@ -770,7 +770,7 @@ fn test_matrix_vector_basic_forward_backward() raises:
     assert_true(M.grad().all_close(Tensor[dtype].d2([[1, 2, 3], [1, 2, 3]])))
 
 
-fn test_vector_matrix_batched() raises:
+def test_vector_matrix_batched() raises:
     print("test_vector_matrix_batched")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d2(
@@ -793,7 +793,7 @@ fn test_vector_matrix_batched() raises:
     assert_true(M.grad().shape() == M.shape())
 
 
-fn test_vector_matrix_broadcasting() raises:
+def test_vector_matrix_broadcasting() raises:
     print("test_vector_matrix_broadcasting")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d2(
@@ -814,7 +814,7 @@ fn test_vector_matrix_broadcasting() raises:
     )  # sum over batch, double check sums
 
 
-fn test_vector_matrix_with_views() raises:
+def test_vector_matrix_with_views() raises:
     print("test_vector_matrix_with_views")
     comptime dtype = DType.float32
     var base = Tensor[dtype].d1(
@@ -833,7 +833,7 @@ fn test_vector_matrix_with_views() raises:
     assert_true(base.grad().shape() == base.shape())
 
 
-fn test_vector_matrix_singleton_batch() raises:
+def test_vector_matrix_singleton_batch() raises:
     print("test_vector_matrix_singleton_batch")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)  # batch=1
@@ -845,7 +845,7 @@ fn test_vector_matrix_singleton_batch() raises:
     assert_true(M.grad().shape() == M.shape())
 
 
-fn test_vector_matrix_high_dimensional_batch() raises:
+def test_vector_matrix_high_dimensional_batch() raises:
     print("test_vector_matrix_high_dimensional_batch")
     comptime dtype = DType.float32
     var v = Tensor[dtype].d3(
@@ -861,7 +861,7 @@ fn test_vector_matrix_high_dimensional_batch() raises:
     assert_true(M.grad().shape() == M.shape())
 
 
-fn test_matmul_nd_with_view_offset_grad() raises:
+def test_matmul_nd_with_view_offset_grad() raises:
     print("test_matmul_nd_with_view_offset_grad")
     comptime dtype = DType.float32
     var base_A = Tensor[dtype].d3(

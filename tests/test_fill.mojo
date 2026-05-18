@@ -8,7 +8,7 @@ from tenmo.intarray import IntArray
 # ============================================================================
 
 
-fn test_fill_scalar_single_index_1d() raises:
+def test_fill_scalar_single_index_1d() raises:
     """Test filling single element in 1D tensor with scalar."""
     print("test_fill_scalar_single_index_1d")
 
@@ -23,7 +23,7 @@ fn test_fill_scalar_single_index_1d() raises:
     assert_true(x[9] == 9.0)
 
 
-fn test_fill_scalar_single_index_2d() raises:
+def test_fill_scalar_single_index_2d() raises:
     """Test filling single element in 2D tensor with scalar."""
     print("test_fill_scalar_single_index_2d")
 
@@ -37,7 +37,7 @@ fn test_fill_scalar_single_index_2d() raises:
     assert_true(x[2, 3] == 0.0)
 
 
-fn test_fill_scalar_negative_index() raises:
+def test_fill_scalar_negative_index() raises:
     """Test filling with negative index."""
     print("test_fill_scalar_negative_index")
 
@@ -50,7 +50,7 @@ fn test_fill_scalar_negative_index() raises:
     assert_true(x[8] == 8.0)
 
 
-fn test_fill_scalar_3d_index() raises:
+def test_fill_scalar_3d_index() raises:
     """Test filling single element in 3D tensor."""
     print("test_fill_scalar_3d_index")
 
@@ -69,7 +69,7 @@ fn test_fill_scalar_3d_index() raises:
 # ============================================================================
 
 
-fn test_fill_scalar_full_slice_1d() raises:
+def test_fill_scalar_full_slice_1d() raises:
     """Test filling entire 1D tensor with scalar."""
     print("test_fill_scalar_full_slice_1d")
 
@@ -83,7 +83,7 @@ fn test_fill_scalar_full_slice_1d() raises:
     assert_true(x.all_close[atol=1e-6](expected))
 
 
-fn test_fill_scalar_partial_slice_1d() raises:
+def test_fill_scalar_partial_slice_1d() raises:
     """Test filling partial slice in 1D tensor."""
     print("test_fill_scalar_partial_slice_1d")
 
@@ -99,7 +99,7 @@ fn test_fill_scalar_partial_slice_1d() raises:
     assert_true(x[7] == 7.0)
 
 
-fn test_fill_scalar_slice_with_step_1d() raises:
+def test_fill_scalar_slice_with_step_1d() raises:
     """Test filling slice with step in 1D tensor."""
     print("test_fill_scalar_slice_with_step_1d")
 
@@ -115,7 +115,7 @@ fn test_fill_scalar_slice_with_step_1d() raises:
     assert_true(x[3] == 0.0)
 
 
-fn test_fill_scalar_2d_slice_row() raises:
+def test_fill_scalar_2d_slice_row() raises:
     """Test filling entire row in 2D tensor."""
     print("test_fill_scalar_2d_slice_row")
 
@@ -131,7 +131,7 @@ fn test_fill_scalar_2d_slice_row() raises:
     assert_true(x[2, 0] == 0.0)  # Row 2
 
 
-fn test_fill_scalar_2d_slice_col() raises:
+def test_fill_scalar_2d_slice_col() raises:
     """Test filling entire column in 2D tensor."""
     print("test_fill_scalar_2d_slice_col")
 
@@ -147,7 +147,7 @@ fn test_fill_scalar_2d_slice_col() raises:
     assert_true(x[2, 3] == 0.0)  # Other elements
 
 
-fn test_fill_scalar_2d_submatrix() raises:
+def test_fill_scalar_2d_submatrix() raises:
     """Test filling submatrix in 2D tensor."""
     print("test_fill_scalar_2d_submatrix")
 
@@ -163,7 +163,7 @@ fn test_fill_scalar_2d_submatrix() raises:
     assert_true(x[4, 4] == 0.0)  # Outside
 
 
-fn test_fill_scalar_strided_2d() raises:
+def test_fill_scalar_strided_2d() raises:
     """Test filling with strides in 2D (checkerboard pattern)."""
     print("test_fill_scalar_strided_2d")
 
@@ -185,7 +185,7 @@ fn test_fill_scalar_strided_2d() raises:
 # ============================================================================
 
 
-fn test_fill_scalar_array_index_1d() raises:
+def test_fill_scalar_array_index_1d() raises:
     """Test filling specific indices in 1D tensor."""
     print("test_fill_scalar_array_index_1d")
 
@@ -206,7 +206,7 @@ fn test_fill_scalar_array_index_1d() raises:
     assert_true(x[9] == 0.0)
 
 
-fn test_fill_scalar_array_index_2d() raises:
+def test_fill_scalar_array_index_2d() raises:
     """Test filling specific rows in 2D tensor."""
     print("test_fill_scalar_array_index_2d")
 
@@ -222,7 +222,7 @@ fn test_fill_scalar_array_index_2d() raises:
     assert_true(x[i(4), s()] == Tensor[dtype].d1([33.0, 33.0, 33.0]))  # Row 4
 
 
-fn test_fill_scalar_empty_array() raises:
+def test_fill_scalar_empty_array() raises:
     """Test filling with empty index array."""
     print("test_fill_scalar_empty_array")
 
@@ -236,7 +236,7 @@ fn test_fill_scalar_empty_array() raises:
     assert_true(x.all_close[atol=1e-6](expected))
 
 
-fn test_fill_scalar_single_element_array() raises:
+def test_fill_scalar_single_element_array() raises:
     """Test filling with single-element index array."""
     print("test_fill_scalar_single_element_array")
 
@@ -256,7 +256,7 @@ fn test_fill_scalar_single_element_array() raises:
 # ============================================================================
 
 
-fn test_fill_scalar_mixed_int_slice() raises:
+def test_fill_scalar_mixed_int_slice() raises:
     """Test filling with mixed integer and slice indices."""
     print("test_fill_scalar_mixed_int_slice")
 
@@ -274,7 +274,7 @@ fn test_fill_scalar_mixed_int_slice() raises:
     assert_true(x[0, 0, 0] == 0.0)  # Outside
 
 
-fn test_fill_scalar_mixed_array_slice() raises:
+def test_fill_scalar_mixed_array_slice() raises:
     """Test filling with array and slice indices."""
     print("test_fill_scalar_mixed_array_slice")
 
@@ -293,7 +293,7 @@ fn test_fill_scalar_mixed_array_slice() raises:
 # ============================================================================
 # SCALAR FILL TESTS - On Views
 # ============================================================================
-fn test_fill_scalar_on_view_slice() raises:
+def test_fill_scalar_on_view_slice() raises:
     """Test filling on a sliced view."""
     print("test_fill_scalar_on_view_slice")
 
@@ -308,7 +308,7 @@ fn test_fill_scalar_on_view_slice() raises:
     assert_true(x[15] == 15.0)
 
 
-fn test_fill_scalar_on_view_reshape() raises:
+def test_fill_scalar_on_view_reshape() raises:
     """Test filling on reshaped view."""
     print("test_fill_scalar_on_view_reshape")
 
@@ -326,7 +326,7 @@ fn test_fill_scalar_on_view_reshape() raises:
     assert_true(x[7] == 7.0)
 
 
-fn test_fill_scalar_on_strided_view() raises:
+def test_fill_scalar_on_strided_view() raises:
     """Test filling on non-contiguous view."""
     print("test_fill_scalar_on_strided_view")
 
@@ -348,7 +348,7 @@ fn test_fill_scalar_on_strided_view() raises:
 # ============================================================================
 
 
-fn test_fill_tensor_exact_shape() raises:
+def test_fill_tensor_exact_shape() raises:
     """Test filling with tensor of exact shape."""
     print("test_fill_tensor_exact_shape")
 
@@ -363,7 +363,7 @@ fn test_fill_tensor_exact_shape() raises:
     assert_true(x.all_close[atol=1e-6](expected))
 
 
-fn test_fill_tensor_broadcast_1d_to_2d() raises:
+def test_fill_tensor_broadcast_1d_to_2d() raises:
     """Test broadcasting 1D tensor to 2D (row broadcast)."""
     print("test_fill_tensor_broadcast_1d_to_2d")
 
@@ -380,7 +380,7 @@ fn test_fill_tensor_broadcast_1d_to_2d() raises:
     assert_true(x[2, 0] == 1.0)  # Third row
 
 
-fn test_fill_tensor_broadcast_column() raises:
+def test_fill_tensor_broadcast_column() raises:
     """Test broadcasting (3, 1) to (3, 4)."""
     print("test_fill_tensor_broadcast_column")
 
@@ -397,7 +397,7 @@ fn test_fill_tensor_broadcast_column() raises:
     assert_true(x[2, 0] == 30.0)  # Row 2
 
 
-fn test_fill_tensor_broadcast_to_slice() raises:
+def test_fill_tensor_broadcast_to_slice() raises:
     """Test broadcasting tensor to a slice."""
     print("test_fill_tensor_broadcast_to_slice")
 
@@ -414,7 +414,7 @@ fn test_fill_tensor_broadcast_to_slice() raises:
     assert_true(x[2, 0] == 0.0)  # Outside
 
 
-fn test_fill_tensor_broadcast_scalar() raises:
+def test_fill_tensor_broadcast_scalar() raises:
     """Test broadcasting scalar-like (1,) tensor."""
     print("test_fill_tensor_broadcast_scalar")
 
@@ -429,7 +429,7 @@ fn test_fill_tensor_broadcast_scalar() raises:
     assert_true(x.all_close[atol=1e-6](expected))
 
 
-fn test_fill_tensor_broadcast_strided() raises:
+def test_fill_tensor_broadcast_strided() raises:
     """Test broadcasting to strided slice."""
     print("test_fill_tensor_broadcast_strided")
 
@@ -452,7 +452,7 @@ fn test_fill_tensor_broadcast_strided() raises:
 # ============================================================================
 
 
-fn test_fill_tensor_to_view() raises:
+def test_fill_tensor_to_view() raises:
     """Test filling tensor into a view."""
     print("test_fill_tensor_to_view")
 
@@ -470,7 +470,7 @@ fn test_fill_tensor_to_view() raises:
     assert_true(x[10] == 0.0)
 
 
-fn test_fill_tensor_reshaped_view() raises:
+def test_fill_tensor_reshaped_view() raises:
     """Test filling into reshaped view."""
     print("test_fill_tensor_reshaped_view")
 
@@ -494,7 +494,7 @@ fn test_fill_tensor_reshaped_view() raises:
 # ============================================================================
 
 
-fn test_fill_scalar_0d_tensor() raises:
+def test_fill_scalar_0d_tensor() raises:
     """Test filling 0D (scalar) tensor."""
     print("test_fill_scalar_0d_tensor")
 
@@ -506,7 +506,7 @@ fn test_fill_scalar_0d_tensor() raises:
     assert_true(x[[]] == 123.0)
 
 
-fn test_fill_tensor_partial_fill() raises:
+def test_fill_tensor_partial_fill() raises:
     """Test filling only part of tensor."""
     print("test_fill_tensor_partial_fill")
 
@@ -523,7 +523,7 @@ fn test_fill_tensor_partial_fill() raises:
     assert_true(x[3, 3] == 0.0)
 
 
-fn test_fill_contiguous_optimization() raises:
+def test_fill_contiguous_optimization() raises:
     """Test that contiguous fills are optimized."""
     print("test_fill_contiguous_optimization")
 
@@ -543,7 +543,7 @@ fn test_fill_contiguous_optimization() raises:
 # ============================================================================
 
 
-fn test_fill_complex_indexing_scenario() raises:
+def test_fill_complex_indexing_scenario() raises:
     """Test complex real-world indexing scenario."""
     print("test_fill_complex_indexing_scenario")
 
@@ -559,7 +559,7 @@ fn test_fill_complex_indexing_scenario() raises:
         assert_true(x[j, j] == Float32(j))
 
 
-fn test_fill_image_patch_simulation() raises:
+def test_fill_image_patch_simulation() raises:
     """Test filling patches like in image processing."""
     print("test_fill_image_patch_simulation")
 
@@ -582,7 +582,7 @@ fn test_fill_image_patch_simulation() raises:
 # ============================================================================
 
 
-fn main() raises:
+def main() raises:
     _ = """
     print("=" * 80)
     print("TENSOR FILL COMPREHENSIVE TEST SUITE")

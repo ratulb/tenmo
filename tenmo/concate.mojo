@@ -16,7 +16,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var axis = output.ancestry().backward_fn_arg().get[Integer]().value
@@ -86,7 +86,7 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct Concate[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         tensors: List[Tensor[Self.dtype]],

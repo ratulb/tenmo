@@ -25,10 +25,10 @@ struct Review(ImplicitlyCopyable, Movable):
 struct IMDBPreprocessor:
     var reviews: Optional[List[Review]]
 
-    fn __init__(out self):
+    def __init__(out self):
         self.reviews = Optional(List[Review](capacity=50000))
 
-    fn load_from_folder(mut self, folder_path: String) raises:
+    def load_from_folder(mut self, folder_path: String) raises:
         """Load reviews from pos/neg folders."""
         download()
         var pos_path = Path("/tmp") / folder_path / "pos"
@@ -51,7 +51,7 @@ struct IMDBPreprocessor:
                     var comment = neg_path.joinpath(item.name()).read_text()
                     reviews.append(Review(rating, comment))
 
-    fn extract_rating(self, filename: String) -> Int:
+    def extract_rating(self, filename: String) -> Int:
         """Extract rating from filename like '9992_10.txt'."""
         var undscore_sep = StringSlice("_")
         var dot_sep = StringSlice(".txt")
@@ -66,14 +66,14 @@ struct IMDBPreprocessor:
                 return 0
         return 0
 
-    fn get_labels(self) -> List[Int]:
+    def get_labels(self) -> List[Int]:
         """Extract labels (1 for positive, 0 for negative)."""
         var labels = List[Int]()
         for review in self.reviews.value():
             labels.append(1 if review.rating >= 7 else 0)
         return labels^
 
-    fn init_tokenizer(
+    def init_tokenizer(
         self,
         min_freq: Int = 5,
         max_n: Int = 2,
@@ -84,7 +84,7 @@ struct IMDBPreprocessor:
             lines, IMDBTextCleaner(), min_freq=min_freq, max_n=max_n
         )
 
-    fn build_datasets(
+    def build_datasets(
         self,
         tokenizer: DefaultTokenizer,
         shuffle: Bool = True,
@@ -403,7 +403,7 @@ def compare(
     return x[1] > y[1]
 
 
-fn download(
+def download(
     url: String = "https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz",
 ) raises:
     var file_path = Path("/tmp/aclImdb_v1.tar.gz")

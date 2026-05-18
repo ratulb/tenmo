@@ -120,7 +120,7 @@ from .intarray import IntArray
 # =============================================================================
 
 
-fn output_to_input_base(
+def output_to_input_base(
     out_idx: Int,
     in_shape: Array,
     in_strides: Array,
@@ -141,7 +141,7 @@ fn output_to_input_base(
     return input_base
 
 
-fn rank_to_reduced_offset(
+def rank_to_reduced_offset(
     rank: Int, in_shape: Array, in_strides: Array, reduction_axes: Array
 ) -> Int:
     var tmp = rank
@@ -173,7 +173,7 @@ fn rank_to_reduced_offset(
 # =============================================================================
 
 
-fn reduce[
+def reduce[
     dtype: DType,
     max_block_size: Int = 512,
     op_code: Int = SUM,
@@ -295,7 +295,7 @@ fn reduce[
 # =============================================================================
 
 
-fn product_reduce[
+def product_reduce[
     dtype: DType,
     max_block_size: Int = 512,
 ](
@@ -450,7 +450,7 @@ fn product_reduce[
 # =============================================================================
 
 
-fn excl_product_kernel[
+def excl_product_kernel[
     dtype: DType,
     max_block_size: Int = 512,
 ](
@@ -609,7 +609,7 @@ fn excl_product_kernel[
 
 
 @always_inline
-fn _cast_result[dtype: DType](val: Scalar[DType.float64]) -> Scalar[dtype]:
+def _cast_result[dtype: DType](val: Scalar[DType.float64]) -> Scalar[dtype]:
     """Cast float64 log-space result back to dtype.
     Rounds to nearest integer for integral types before casting —
     prevents log/exp precision loss from producing 23 instead of 24.
@@ -626,7 +626,7 @@ fn _cast_result[dtype: DType](val: Scalar[DType.float64]) -> Scalar[dtype]:
 # =============================================================================
 
 
-fn log_sum_exp_f32[
+def log_sum_exp_f32[
     simd_width: Int = simd_width_of[DType.float32](),
     max_block_size: Int = 512,
     epsilon: Scalar[DType.float32] = Epsilon[DType.float32].value(),
@@ -687,7 +687,7 @@ fn log_sum_exp_f32[
         (out_buffer + out_idx)[] = log(max(smem[0], epsilon))
 
 
-fn log_sum_exp_f64[
+def log_sum_exp_f64[
     simd_width: Int = simd_width_of[DType.float64](),
     max_block_size: Int = 512,
     epsilon: Scalar[DType.float64] = Epsilon[DType.float64].value(),
@@ -788,7 +788,7 @@ struct ProductArg[dtype: DType](ArgumentType):
     var reduced_volume: Int
 
     @staticmethod
-    fn Empty() -> ProductArg[Self.dtype]:
+    def Empty() -> ProductArg[Self.dtype]:
         return ProductArg[Self.dtype](
             NDBuffer[Self.dtype].Empty(),
             None,
@@ -848,7 +848,7 @@ struct ProductArg[dtype: DType](ArgumentType):
 # =============================================================================
 
 
-fn welford_reduce[
+def welford_reduce[
     dtype: DType,
     max_block_size: Int = 512,
 ](

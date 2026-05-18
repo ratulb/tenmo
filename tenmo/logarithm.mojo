@@ -9,7 +9,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct LogBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var epsilon = (
@@ -31,7 +31,7 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct Logarithm[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True,
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](

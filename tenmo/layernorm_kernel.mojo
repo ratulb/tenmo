@@ -37,7 +37,7 @@ from .shapes import Shape
 from .array import Array
 
 
-fn layernorm_normalize[
+def layernorm_normalize[
     dtype: DType,
     max_block_size: Int = 512,
 ](
@@ -203,7 +203,7 @@ struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return (out_ndb^, x_hat_ndb^, rstd_ndb^)
 
     @staticmethod
-    fn launch_config(D: Int, outer_size: Int) -> Tuple[Int, Int]:
+    def launch_config(D: Int, outer_size: Int) -> Tuple[Int, Int]:
         """One block per row. Block size = smallest power of 2 >= D, capped at 512."""
         var block_size = 1
         while block_size < D and block_size < 512:

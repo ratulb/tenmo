@@ -7,7 +7,7 @@ from std.testing import assert_true, TestSuite
 # ===== BASIC RESHAPE FUNCTIONALITY =====
 
 
-fn test_reshape_scalar_to_1d() raises:
+def test_reshape_scalar_to_1d() raises:
     print("test_reshape_scalar_to_1d")
     var x = Tensor.scalar(2.0, requires_grad=True)
     var y = x.reshape(1)
@@ -19,7 +19,7 @@ fn test_reshape_scalar_to_1d() raises:
     assert_true(x.grad().item() == 1.0)
 
 
-fn test_reshape_scalar_to_2d() raises:
+def test_reshape_scalar_to_2d() raises:
     print("test_reshape_scalar_to_2d")
     var x = Tensor.scalar(3.0, requires_grad=True)
     var y = x.reshape(1, 1)
@@ -31,7 +31,7 @@ fn test_reshape_scalar_to_2d() raises:
     assert_true(x.grad().item() == 1.0)
 
 
-fn test_reshape_1d_to_1d_same_size() raises:
+def test_reshape_1d_to_1d_same_size() raises:
     print("test_reshape_1d_to_1d_same_size")
     var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var y = x.reshape(3)
@@ -43,7 +43,7 @@ fn test_reshape_1d_to_1d_same_size() raises:
     assert_true(x.grad().all_close(Tensor.d1([1.0, 1.0, 1.0])))
 
 
-fn test_reshape_1d_to_2d() raises:
+def test_reshape_1d_to_2d() raises:
     print("test_reshape_1d_to_2d")
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var y = x.reshape(2, 2)
@@ -55,7 +55,7 @@ fn test_reshape_1d_to_2d() raises:
     assert_true(x.grad().all_close(Tensor.d1([1.0, 1.0, 1.0, 1.0])))
 
 
-fn test_reshape_1d_to_3d() raises:
+def test_reshape_1d_to_3d() raises:
     print("test_reshape_1d_to_3d")
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], requires_grad=True)
     var y = x.reshape(1, 2, 3)
@@ -66,7 +66,7 @@ fn test_reshape_1d_to_3d() raises:
     assert_true(x.grad().all_close(Tensor.d1([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])))
 
 
-fn test_reshape_2d_to_1d() raises:
+def test_reshape_2d_to_1d() raises:
     print("test_reshape_2d_to_1d")
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var y = x.reshape(4)
@@ -78,7 +78,7 @@ fn test_reshape_2d_to_1d() raises:
     assert_true(x.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
 
 
-fn test_reshape_2d_to_3d() raises:
+def test_reshape_2d_to_3d() raises:
     print("test_reshape_2d_to_3d")
     var x = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
     var y = x.reshape(1, 2, 3)
@@ -91,7 +91,7 @@ fn test_reshape_2d_to_3d() raises:
     )
 
 
-fn test_reshape_3d_to_2d() raises:
+def test_reshape_3d_to_2d() raises:
     print("test_reshape_3d_to_2d")
     var x = Tensor.d3([[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True)
     var y = x.reshape(2, 2)
@@ -105,7 +105,7 @@ fn test_reshape_3d_to_2d() raises:
 # ===== RESHAPE WITH STRICT DIMENSION VALIDATION =====
 
 
-fn test_reshape_strict_validation_success() raises:
+def test_reshape_strict_validation_success() raises:
     print("test_reshape_strict_validation_success")
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
 
@@ -119,7 +119,7 @@ fn test_reshape_strict_validation_success() raises:
     assert_true(y3.shape() == Shape(1, 1, 2, 2))
 
 
-fn test_reshape_strict_validation_failure() raises:
+def test_reshape_strict_validation_failure() raises:
     print("test_reshape_strict_validation_failure")
     var _x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
 
@@ -132,7 +132,7 @@ fn test_reshape_strict_validation_failure() raises:
 # ===== RESHAPE GRADIENT FLOW =====
 
 
-fn test_reshape_gradient_preservation() raises:
+def test_reshape_gradient_preservation() raises:
     print("test_reshape_gradient_preservation")
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var y = x.reshape(2, 2)
@@ -144,7 +144,7 @@ fn test_reshape_gradient_preservation() raises:
     assert_true(x.grad().all_close(Tensor.d1([2.0, 2.0, 2.0, 2.0])))
 
 
-fn test_reshape_gradient_accumulation() raises:
+def test_reshape_gradient_accumulation() raises:
     print("test_reshape_gradient_accumulation")
     var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var y1 = x.reshape(3, 1)
@@ -156,7 +156,7 @@ fn test_reshape_gradient_accumulation() raises:
     assert_true(x.grad().all_close(Tensor.d1([2.0, 2.0, 2.0])))
 
 
-fn test_reshape_chain_gradient_flow() raises:
+def test_reshape_chain_gradient_flow() raises:
     print("test_reshape_chain_gradient_flow")
     var x = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
     var y = x.reshape(3, 2)
@@ -173,7 +173,7 @@ fn test_reshape_chain_gradient_flow() raises:
 # ===== RESHAPE WITH COMPUTATIONAL GRAPH =====
 
 
-fn test_reshape_in_complex_graph() raises:
+def test_reshape_in_complex_graph() raises:
     print("test_reshape_in_complex_graph")
     var a = Tensor.d1([1.0, 2.0], requires_grad=True)
     var b = Tensor.d1([3.0, 4.0], requires_grad=True)
@@ -188,7 +188,7 @@ fn test_reshape_in_complex_graph() raises:
     assert_true(b.grad().all_close(Tensor.d1([1.0, 2.0])))  # from a values
 
 
-fn test_reshape_with_arithmetic_ops() raises:
+def test_reshape_with_arithmetic_ops() raises:
     print("test_reshape_with_arithmetic_ops")
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var y = Tensor.d1([5.0, 6.0], requires_grad=True)
@@ -209,7 +209,7 @@ fn test_reshape_with_arithmetic_ops() raises:
     assert_true(y.grad().all_close(Tensor.d1([3.0, 7.0])))
 
 
-fn test_reshape_with_arithmetic_ops_repeat() raises:
+def test_reshape_with_arithmetic_ops_repeat() raises:
     print("test_reshape_with_arithmetic_ops_repeat")
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var y = Tensor.d1([5.0, 6.0], requires_grad=True)
@@ -231,7 +231,7 @@ fn test_reshape_with_arithmetic_ops_repeat() raises:
 # ===== RESHAPE EDGE CASES =====
 
 
-fn test_reshape_singleton_expansion() raises:
+def test_reshape_singleton_expansion() raises:
     print("test_reshape_singleton_expansion")
     var x = Tensor.d1([5.0], requires_grad=True)
     var y = x.reshape(1, 1, 1)
@@ -242,7 +242,7 @@ fn test_reshape_singleton_expansion() raises:
     assert_true(x.grad().item() == 1.0)
 
 
-fn test_reshape_singleton_removal() raises:
+def test_reshape_singleton_removal() raises:
     print("test_reshape_singleton_removal")
     var x = Tensor.d3([[[1.0]], [[2.0]]], requires_grad=True)
     var y = x.reshape(2)
@@ -253,7 +253,7 @@ fn test_reshape_singleton_removal() raises:
     assert_true(x.grad().all_close(Tensor.d3([[[1.0]], [[1.0]]])))
 
 
-fn test_reshape_identity() raises:
+def test_reshape_identity() raises:
     print("test_reshape_identity")
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var y = x.reshape(2, 2)  # Same shape
@@ -264,7 +264,7 @@ fn test_reshape_identity() raises:
     assert_true(x.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
 
 
-fn test_reshape_large_tensor() raises:
+def test_reshape_large_tensor() raises:
     print("test_reshape_large_tensor")
     # Test with larger tensors to ensure no memory issues
     comptime dtype = DType.float32
@@ -285,7 +285,7 @@ fn test_reshape_large_tensor() raises:
 # ===== RESHAPE WITH VIEW COMPATIBILITY =====
 
 
-fn test_reshape_after_view_creates_copy_1() raises:
+def test_reshape_after_view_creates_copy_1() raises:
     print("test_reshape_after_view_creates_copy")
     var x = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
 
@@ -302,7 +302,7 @@ fn test_reshape_after_view_creates_copy_1() raises:
     # Gradients should flow to positions [2,3,5,6] in original x
 
 
-fn test_reshape_after_view_creates_copy_2() raises:
+def test_reshape_after_view_creates_copy_2() raises:
     print("test_reshape_after_view_creates_copy")
     var x = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
 
@@ -318,7 +318,7 @@ fn test_reshape_after_view_creates_copy_2() raises:
     assert_true(y.shape() == Shape(6))
 
 
-fn test_reshape_after_view_creates_copy_3() raises:
+def test_reshape_after_view_creates_copy_3() raises:
     print("test_reshape_after_view_creates_copy")
     var x = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
 
@@ -335,7 +335,7 @@ fn test_reshape_after_view_creates_copy_3() raises:
     # Gradients should flow only to second row of x
 
 
-fn test_reshape_preserves_requires_grad() raises:
+def test_reshape_preserves_requires_grad() raises:
     print("test_reshape_preserves_requires_grad")
     var x1 = Tensor.d1([1.0, 2.0], requires_grad=True)
     var x2 = Tensor.d1([3.0, 4.0], requires_grad=False)
@@ -350,7 +350,7 @@ fn test_reshape_preserves_requires_grad() raises:
 # ===== COMPREHENSIVE TEST FUNCTION =====
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

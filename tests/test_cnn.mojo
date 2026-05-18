@@ -16,7 +16,7 @@ from tenmo.common_utils import i, s
 from tenmo.forwards import Padding
 
 
-fn test_basic_forward() raises:
+def test_basic_forward() raises:
     """Test basic forward pass with known values."""
     print("Test 1: Basic Forward Pass")
 
@@ -43,7 +43,7 @@ fn test_basic_forward() raises:
     print("Basic forward pass correct")
 
 
-fn test_stride() raises:
+def test_stride() raises:
     """Test convolution with stride > 1."""
     print("\nTest 2: Stride")
 
@@ -71,7 +71,7 @@ fn test_stride() raises:
     print("Stride handling correct")
 
 
-fn test_dilation() raises:
+def test_dilation() raises:
     """Test dilated convolution."""
     print("\nTest 3: Dilation")
 
@@ -99,7 +99,7 @@ fn test_dilation() raises:
     print("Dilation handling correct")
 
 
-fn test_padding_same() raises:
+def test_padding_same() raises:
     """Test 'same' padding mode."""
     print("\nTest 4: Same Padding")
 
@@ -117,7 +117,7 @@ fn test_padding_same() raises:
     print("Same padding correct")
 
 
-fn test_padding_explicit() raises:
+def test_padding_explicit() raises:
     """Test explicit padding values."""
     print("\nTest 5: Explicit Padding")
 
@@ -141,7 +141,7 @@ fn test_padding_explicit() raises:
     print("Explicit padding correct")
 
 
-fn test_bias() raises:
+def test_bias() raises:
     """Test bias handling."""
     print("\nTest 6: Bias")
 
@@ -165,7 +165,7 @@ fn test_bias() raises:
     print("Bias handling correct")
 
 
-fn test_multi_channel() raises:
+def test_multi_channel() raises:
     """Test multi-channel input and output."""
     print("\nTest 7: Multi-Channel")
 
@@ -188,7 +188,7 @@ fn test_multi_channel() raises:
     print("Multi-channel correct")
 
 
-fn test_batch() raises:
+def test_batch() raises:
     """Test batched input."""
     print("\nTest 8: Batch Processing")
 
@@ -214,7 +214,7 @@ fn test_batch() raises:
     print("Batch processing correct")
 
 
-fn test_gradient_input() raises:
+def test_gradient_input() raises:
     """Test input gradient with numerical gradient."""
     print("\nTest 9: Input Gradient")
 
@@ -266,7 +266,7 @@ fn test_gradient_input() raises:
     print("Input gradient correct")
 
 
-fn test_gradient_kernel() raises:
+def test_gradient_kernel() raises:
     """Test kernel gradient with numerical gradient."""
     print("\nTest 10: Kernel Gradient")
 
@@ -317,7 +317,7 @@ fn test_gradient_kernel() raises:
     print("Kernel gradient correct")
 
 
-fn test_gradient_bias() raises:
+def test_gradient_bias() raises:
     """Test bias gradient."""
     print("\nTest 11: Bias Gradient")
 
@@ -344,7 +344,7 @@ fn test_gradient_bias() raises:
     print("Bias gradient correct")
 
 
-fn test_gradient_flow() raises:
+def test_gradient_flow() raises:
     """Test full gradient flow through multiple layers."""
     print("\nTest 12: Gradient Flow")
 
@@ -370,7 +370,7 @@ fn test_gradient_flow() raises:
     print("Gradient flow correct")
 
 
-fn test_edge_cases() raises:
+def test_edge_cases() raises:
     """Test edge cases and error conditions."""
     print("\nTest 13: Edge Cases")
 
@@ -393,7 +393,7 @@ fn test_edge_cases() raises:
     print("Edge cases handled correctly")
 
 
-fn test_performance_batch() raises:
+def test_performance_batch() raises:
     """Performance test with realistic batch size."""
     print("\nTest 14: Performance (Batch)")
 
@@ -415,7 +415,7 @@ fn test_performance_batch() raises:
     print("Performance test completed")
 
 
-fn test_numerical_stability() raises:
+def test_numerical_stability() raises:
     """Test with very small and very large values."""
     print("\nTest 15: Numerical Stability")
 
@@ -442,7 +442,7 @@ fn test_numerical_stability() raises:
     print("Numerical stability good")
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 # -------------------------------------------------------------------
@@ -450,7 +450,7 @@ fn main() raises:
 # -------------------------------------------------------------------
 
 
-fn assert_shape_equal[
+def assert_shape_equal[
     dtype: DType, //
 ](tensor: Tensor[dtype], expected: List[Int], test_name: String) raises:
     """Assert tensor has expected shape."""
@@ -479,7 +479,7 @@ fn assert_shape_equal[
     print(test_name + " - Shape correct:", String(actual))
 
 
-fn assert_tensor_close(
+def assert_tensor_close(
     a: Gradbox[DType.float32],
     b: Gradbox[DType.float32],
     test_name: String,
@@ -516,7 +516,7 @@ fn assert_tensor_close(
     print(test_name + " - Values close (max_diff: " + String(max_diff) + ")")
 
 
-fn compute_numerical_gradient(
+def compute_numerical_gradient(
     image: Tensor[DType.float32],
     mut kernel: Tensor[DType.float32],
     bias: Optional[Tensor[DType.float32]],
@@ -609,7 +609,7 @@ fn compute_numerical_gradient(
 # -------------------------------------------------------------------
 
 
-fn test_basic_shapes() raises:
+def test_basic_shapes() raises:
     print("\n" + "=" * 60)
     print("TEST 1: BASIC OUTPUT SHAPES")
     print("=" * 60)
@@ -654,7 +654,7 @@ fn test_basic_shapes() raises:
 # -------------------------------------------------------------------
 
 
-fn test_padding_modes() raises:
+def test_padding_modes() raises:
     print("\n" + "=" * 60)
     print("TEST 2: PADDING MODES")
     print("=" * 60)
@@ -710,7 +710,7 @@ fn test_padding_modes() raises:
 # -------------------------------------------------------------------
 
 
-fn test_stride_2() raises:
+def test_stride_2() raises:
     print("\n" + "=" * 60)
     print("TEST 3: STRIDE")
     print("=" * 60)
@@ -756,7 +756,7 @@ fn test_stride_2() raises:
 # -------------------------------------------------------------------
 
 
-fn test_dilation_2() raises:
+def test_dilation_2() raises:
     print("\n" + "=" * 60)
     print("TEST 4: DILATION")
     print("=" * 60)
@@ -797,7 +797,7 @@ fn test_dilation_2() raises:
 # -------------------------------------------------------------------
 
 
-fn test_bias_2() raises:
+def test_bias_2() raises:
     print("\n" + "=" * 60)
     print("TEST 5: BIAS")
     print("=" * 60)
@@ -855,7 +855,7 @@ fn test_bias_2() raises:
 # -------------------------------------------------------------------
 
 
-fn test_known_values() raises:
+def test_known_values() raises:
     print("\n" + "=" * 60)
     print("TEST 6: KNOWN VALUES")
     print("=" * 60)
@@ -904,7 +904,7 @@ fn test_known_values() raises:
 # -------------------------------------------------------------------
 
 
-fn test_gradient_shapes() raises:
+def test_gradient_shapes() raises:
     print("\n" + "=" * 60)
     print("TEST 7: GRADIENT SHAPES")
     print("=" * 60)
@@ -943,7 +943,7 @@ fn test_gradient_shapes() raises:
 # -------------------------------------------------------------------
 
 
-fn test_gradient_correctness() raises:
+def test_gradient_correctness() raises:
     print("\n" + "=" * 60)
     print("TEST 8: GRADIENT CORRECTNESS (NUMERICAL)")
     print("=" * 60)
@@ -1051,7 +1051,7 @@ fn test_gradient_correctness() raises:
 # -------------------------------------------------------------------
 
 
-fn test_gradient_stride_dilation() raises:
+def test_gradient_stride_dilation() raises:
     print("\n" + "=" * 60)
     print("TEST 9: GRADIENTS WITH STRIDE & DILATION")
     print("=" * 60)
@@ -1126,7 +1126,7 @@ fn test_gradient_stride_dilation() raises:
 # -------------------------------------------------------------------
 
 
-fn test_gradient_accumulation() raises:
+def test_gradient_accumulation() raises:
     print("\n" + "=" * 60)
     print("TEST 10: GRADIENT ACCUMULATION")
     print("=" * 60)
@@ -1171,7 +1171,7 @@ fn test_gradient_accumulation() raises:
 # -------------------------------------------------------------------
 
 
-fn test_batch_processing() raises:
+def test_batch_processing() raises:
     print("test_batch_processing")
     var kernel = Tensor[DType.float32].randn(2, 1, 3, 3)
 
@@ -1218,7 +1218,7 @@ fn test_batch_processing() raises:
     print("\n Batch processing test passed!\n")
 
 
-fn test_edge_cases_2() raises:
+def test_edge_cases_2() raises:
     print("test_edge_cases")
     # Test 12.1: Kernel same size as image (output 1x1)
     var img_small = Tensor[DType.float32].randn(1, 1, 3, 3)
@@ -1271,7 +1271,7 @@ fn test_edge_cases_2() raises:
 # ============================================================================
 
 
-fn test_conv2d_forward_single_batch_single_channel() raises:
+def test_conv2d_forward_single_batch_single_channel() raises:
     """Test basic convolution: single batch, single channel."""
     print("test_conv2d_forward_single_batch_single_channel")
 
@@ -1297,7 +1297,7 @@ fn test_conv2d_forward_single_batch_single_channel() raises:
     assert_true(output.shape()[3] == 2)
 
 
-fn test_conv2d_forward_with_bias() raises:
+def test_conv2d_forward_with_bias() raises:
     """Test convolution with bias."""
     print("test_conv2d_forward_with_bias")
 
@@ -1320,7 +1320,7 @@ fn test_conv2d_forward_with_bias() raises:
     assert_true(output[0, 0, 1, 1] == 14.0)
 
 
-fn test_conv2d_forward_multiple_channels() raises:
+def test_conv2d_forward_multiple_channels() raises:
     """Test convolution with multiple input channels."""
     print("test_conv2d_forward_multiple_channels")
 
@@ -1346,7 +1346,7 @@ fn test_conv2d_forward_multiple_channels() raises:
     assert_true(output[0, 0, 0, 0] == 12.0)
 
 
-fn test_conv2d_forward_multiple_filters() raises:
+def test_conv2d_forward_multiple_filters() raises:
     """Test convolution with multiple output filters."""
     print("test_conv2d_forward_multiple_filters")
 
@@ -1381,7 +1381,7 @@ fn test_conv2d_forward_multiple_filters() raises:
     )
 
 
-fn test_conv2d_forward_batch_processing() raises:
+def test_conv2d_forward_batch_processing() raises:
     """Test convolution with batch dimension."""
     print("test_conv2d_forward_batch_processing")
 
@@ -1414,7 +1414,7 @@ fn test_conv2d_forward_batch_processing() raises:
 # ============================================================================
 
 
-fn test_conv2d_stride_2() raises:
+def test_conv2d_stride_2() raises:
     """Test convolution with stride=2."""
     print("test_conv2d_stride_2")
 
@@ -1439,7 +1439,7 @@ fn test_conv2d_stride_2() raises:
         assert_true(output.buffer.data_buffer()[i] == 4.0)
 
 
-fn test_conv2d_stride_3() raises:
+def test_conv2d_stride_3() raises:
     """Test convolution with stride=3."""
     print("test_conv2d_stride_3")
 
@@ -1468,7 +1468,7 @@ fn test_conv2d_stride_3() raises:
 # ============================================================================
 
 
-fn test_conv2d_padding_valid() raises:
+def test_conv2d_padding_valid() raises:
     """Test 'valid' padding (no padding)."""
     print("test_conv2d_padding_valid")
 
@@ -1489,7 +1489,7 @@ fn test_conv2d_padding_valid() raises:
     assert_true(output.shape()[3] == 3)
 
 
-fn test_conv2d_padding_same() raises:
+def test_conv2d_padding_same() raises:
     """Test 'same' padding (output same size as input)."""
     print("test_conv2d_padding_same")
 
@@ -1510,7 +1510,7 @@ fn test_conv2d_padding_same() raises:
     assert_true(output.shape()[3] == 5)
 
 
-fn test_conv2d_padding_int() raises:
+def test_conv2d_padding_int() raises:
     """Test integer padding (same on all sides)."""
     print("test_conv2d_padding_int")
 
@@ -1534,7 +1534,7 @@ fn test_conv2d_padding_int() raises:
     assert_true(output.shape()[3] == 4)
 
 
-fn test_conv2d_padding_tuple() raises:
+def test_conv2d_padding_tuple() raises:
     """Test tuple padding (height, width)."""
     print("test_conv2d_padding_tuple")
 
@@ -1558,7 +1558,7 @@ fn test_conv2d_padding_tuple() raises:
     assert_true(output.shape()[3] == 7)
 
 
-fn test_conv2d_padding_list_asymmetric() raises:
+def test_conv2d_padding_list_asymmetric() raises:
     """Test list padding (asymmetric padding)."""
     print("test_conv2d_padding_list_asymmetric")
 
@@ -1590,7 +1590,7 @@ fn test_conv2d_padding_list_asymmetric() raises:
 # ============================================================================
 
 
-fn test_conv2d_dilation_2() raises:
+def test_conv2d_dilation_2() raises:
     """Test dilated convolution (atrous convolution)."""
     print("test_conv2d_dilation_2")
 
@@ -1618,7 +1618,7 @@ fn test_conv2d_dilation_2() raises:
     assert_true(output[0, 0, 0, 0] == 9.0)
 
 
-fn test_conv2d_dilation_3() raises:
+def test_conv2d_dilation_3() raises:
     """Test high dilation rate."""
     print("test_conv2d_dilation_3")
 
@@ -1649,7 +1649,7 @@ fn test_conv2d_dilation_3() raises:
 # ============================================================================
 
 
-fn test_conv2d_stride_and_padding() raises:
+def test_conv2d_stride_and_padding() raises:
     """Test combination of stride and padding."""
     print("test_conv2d_stride_and_padding")
 
@@ -1668,7 +1668,7 @@ fn test_conv2d_stride_and_padding() raises:
     assert_true(output.shape()[3] == 3)
 
 
-fn test_conv2d_stride_padding_dilation() raises:
+def test_conv2d_stride_padding_dilation() raises:
     """Test combination of stride, padding, and dilation."""
     print("test_conv2d_stride_padding_dilation")
 
@@ -1705,7 +1705,7 @@ fn test_conv2d_stride_padding_dilation() raises:
     )
 
 
-fn test_conv2d_all_parameters() raises:
+def test_conv2d_all_parameters() raises:
     """Test with all parameters: batch, channels, stride, padding, dilation, bias.
     """
     print("test_conv2d_all_parameters")
@@ -1827,7 +1827,7 @@ fn test_conv2d_all_parameters() raises:
 # ============================================================================
 
 
-fn test_conv2d_backward_simple() raises:
+def test_conv2d_backward_simple() raises:
     """Test basic backward pass."""
     print("test_conv2d_backward_simple")
     comptime dtype = DType.float32
@@ -1854,7 +1854,7 @@ fn test_conv2d_backward_simple() raises:
     assert_true(kernel.grad() == kernel_grad)
 
 
-fn test_conv2d_backward_input_gradient() raises:
+def test_conv2d_backward_input_gradient() raises:
     """Test input gradient computation."""
     print("test_conv2d_backward_input_gradient")
     comptime dtype = DType.float32
@@ -1880,7 +1880,7 @@ fn test_conv2d_backward_input_gradient() raises:
     assert_true(grad_sum > 0)
 
 
-fn test_conv2d_backward_kernel_gradient() raises:
+def test_conv2d_backward_kernel_gradient() raises:
     """Test kernel gradient computation."""
     print("test_conv2d_backward_kernel_gradient")
 
@@ -1905,7 +1905,7 @@ fn test_conv2d_backward_kernel_gradient() raises:
     assert_true(kernel_grad_sum > 0)
 
 
-fn test_conv2d_backward_with_stride() raises:
+def test_conv2d_backward_with_stride() raises:
     """Test backward pass with stride."""
     print("test_conv2d_backward_with_stride")
 
@@ -1933,7 +1933,7 @@ fn test_conv2d_backward_with_stride() raises:
 # ============================================================================
 
 
-fn test_conv2d_edge_1x1_kernel() raises:
+def test_conv2d_edge_1x1_kernel() raises:
     """Test 1x1 convolution (pointwise)."""
     print("test_conv2d_edge_1x1_kernel")
 
@@ -1954,7 +1954,7 @@ fn test_conv2d_edge_1x1_kernel() raises:
     assert_true(output.shape()[3] == 4)
 
 
-fn test_conv2d_edge_large_kernel() raises:
+def test_conv2d_edge_large_kernel() raises:
     """Test with large kernel."""
     print("test_conv2d_edge_large_kernel")
 
@@ -1975,7 +1975,7 @@ fn test_conv2d_edge_large_kernel() raises:
     assert_true(output.shape()[3] == 4)
 
 
-fn test_conv2d_edge_output_size_1() raises:
+def test_conv2d_edge_output_size_1() raises:
     """Test when output size is 1x1."""
     print("test_conv2d_edge_output_size_1")
 

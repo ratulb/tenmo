@@ -11,7 +11,7 @@ from .ancestry import Ancestor
 
 struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
@@ -69,7 +69,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         tensor: Tensor[Self.dtype],
@@ -97,7 +97,7 @@ struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn forward(
+    def forward(
         gradbox: Gradbox[Self.dtype],
         axes: IntArray,
         keepdims: Bool = False,

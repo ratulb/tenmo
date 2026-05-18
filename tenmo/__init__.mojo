@@ -16,7 +16,7 @@
 ```mojo
 from tenmo.tensor import Tensor
 
-fn main() raises:
+def main() raises:
     var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var b = a * 2
     var c = a * 3
@@ -33,7 +33,7 @@ fn main() raises:
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 
-fn main() raises:
+def main() raises:
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var a_gpu = a.to_gpu()
     var b_gpu = Tensor.full(Shape.of(2, 2), 2.0).to_gpu()
@@ -50,7 +50,7 @@ from tenmo.tensor import Tensor
 from tenmo.net import Sequential, Linear, ReLU
 from tenmo.sgd import SGD
 
-fn main() raises:
+def main() raises:
     var model = Sequential[DType.float32]()
     model.append(Linear[DType.float32](784, 128).into(), ReLU[DType.float32]().into())
     var optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)

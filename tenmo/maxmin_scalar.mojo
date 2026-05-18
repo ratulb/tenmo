@@ -16,7 +16,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var scalar = (
@@ -57,7 +57,7 @@ struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var scalar = (
@@ -92,7 +92,7 @@ struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct MaxScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],
@@ -118,7 +118,7 @@ struct MaxScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct MinScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],

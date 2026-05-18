@@ -2,12 +2,12 @@ from std.testing import assert_true, TestSuite
 from tenmo.tensor import Tensor
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
 
-fn test_tensor_linspace_basic() raises:
+def test_tensor_linspace_basic() raises:
     print("test_tensor_linspace_basic")
 
     # Basic linspace: 5 points from 0 to 1
@@ -23,7 +23,7 @@ fn test_tensor_linspace_basic() raises:
     print("Passed linspace basic test")
 
 
-fn test_tensor_linspace_edge_cases() raises:
+def test_tensor_linspace_edge_cases() raises:
     print("test_tensor_linspace_edge_cases")
 
     # Single point
@@ -42,7 +42,7 @@ fn test_tensor_linspace_edge_cases() raises:
     print("Passed linspace edge cases test")
 
 
-fn test_tensor_linspace_precision() raises:
+def test_tensor_linspace_precision() raises:
     print("test_tensor_linspace_precision")
     comptime dtype = DType.float32
     # Test with many points for precision
@@ -55,7 +55,7 @@ fn test_tensor_linspace_precision() raises:
     print("Passed linspace precision test")
 
 
-fn test_tensor_linspace_with_gradients() raises:
+def test_tensor_linspace_with_gradients() raises:
     print("test_tensor_linspace_with_gradients")
 
     # Linspace with requires_grad = True

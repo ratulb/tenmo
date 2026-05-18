@@ -10,7 +10,7 @@ from .strides import Strides
 from .broadcasthelper import ShapeBroadcaster
 
 
-fn vector_matmul_nd[
+def vector_matmul_nd[
     dtype: DType,
     block_size: Int = 256,
 ](
@@ -82,7 +82,7 @@ struct VectorMatmulNdGpu[dtype: DType = DType.float32](
     RegisterPassable & ImplicitlyCopyable & Movable
 ):
     @staticmethod
-    fn launch[
+    def launch[
         block_size: Int = 256,
     ](
         v: NDBuffer[Self.dtype],

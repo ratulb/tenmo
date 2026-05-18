@@ -11,7 +11,7 @@ from .broadcasthelper import ShapeBroadcaster
 
 
 
-fn matrix_vector_nd[
+def matrix_vector_nd[
     dtype: DType,
     block_size: Int = 256,
 ](
@@ -84,7 +84,7 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
-    fn launch[
+    def launch[
         block_size: Int = 256,
     ](
         M: NDBuffer[Self.dtype],

@@ -15,7 +15,7 @@ from tenmo.forwards import Padding
 from tenmo.common_utils import now
 
 
-fn train_mnist() raises:
+def train_mnist() raises:
     """Train a neural network on MNIST dataset."""
     print("=" * 80)
     print("MNIST Training")
@@ -221,7 +221,7 @@ fn train_mnist() raises:
     print("=" * 80)
 
 
-fn compute_accuracy[
+def compute_accuracy[
     dtype: DType
 ](pred: Tensor[dtype], target: Tensor[DType.int32]) -> Int:
     """
@@ -245,5 +245,5 @@ fn compute_accuracy[
     return correct
 
 
-fn main() raises:
+def main() raises:
     train_mnist()

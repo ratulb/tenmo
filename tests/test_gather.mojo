@@ -16,7 +16,7 @@ from tenmo.shared import Reduction
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-fn test_gather_cpu_1d_single_index() raises:
+def test_gather_cpu_1d_single_index() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([10.0, 20.0, 30.0, 40.0, 50.0])
     var idx = IntArray()
@@ -25,7 +25,7 @@ fn test_gather_cpu_1d_single_index() raises:
     assert_true(result.all_close(Tensor[dtype].d1([30.0])))
 
 
-fn test_gather_cpu_1d_contiguous_range() raises:
+def test_gather_cpu_1d_contiguous_range() raises:
     comptime dtype = DType.float32
     # indices [1,2,3] → regular step=1 → view path
     var a = Tensor[dtype].d1([10.0, 20.0, 30.0, 40.0, 50.0])
@@ -37,7 +37,7 @@ fn test_gather_cpu_1d_contiguous_range() raises:
     assert_true(result.all_close(Tensor[dtype].d1([20.0, 30.0, 40.0])))
 
 
-fn test_gather_cpu_1d_strided() raises:
+def test_gather_cpu_1d_strided() raises:
     comptime dtype = DType.float32
     # indices [0,2,4] → regular step=2 → view path
     var a = Tensor[dtype].d1([10.0, 20.0, 30.0, 40.0, 50.0])
@@ -49,7 +49,7 @@ fn test_gather_cpu_1d_strided() raises:
     assert_true(result.all_close(Tensor[dtype].d1([10.0, 30.0, 50.0])))
 
 
-fn test_gather_cpu_1d_irregular() raises:
+def test_gather_cpu_1d_irregular() raises:
     comptime dtype = DType.float32
     # indices [0,1,4] → irregular → copy path
     var a = Tensor[dtype].d1([10.0, 20.0, 30.0, 40.0, 50.0])
@@ -61,7 +61,7 @@ fn test_gather_cpu_1d_irregular() raises:
     assert_true(result.all_close(Tensor[dtype].d1([10.0, 20.0, 50.0])))
 
 
-fn test_gather_cpu_1d_negative_indices() raises:
+def test_gather_cpu_1d_negative_indices() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([10.0, 20.0, 30.0, 40.0, 50.0])
     var idx = IntArray()
@@ -71,7 +71,7 @@ fn test_gather_cpu_1d_negative_indices() raises:
     assert_true(result.all_close(Tensor[dtype].d1([50.0, 30.0])))
 
 
-fn test_gather_cpu_1d_reverse() raises:
+def test_gather_cpu_1d_reverse() raises:
     comptime dtype = DType.float32
     # indices [4,3,2,1,0] → regular step=-1 → view path
     var a = Tensor[dtype].d1([10.0, 20.0, 30.0, 40.0, 50.0])
@@ -92,7 +92,7 @@ fn test_gather_cpu_1d_reverse() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-fn test_gather_cpu_2d_axis0_single_row() raises:
+def test_gather_cpu_2d_axis0_single_row() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
@@ -103,7 +103,7 @@ fn test_gather_cpu_2d_axis0_single_row() raises:
     assert_true(result.all_close(Tensor[dtype].d2([[4.0, 5.0, 6.0]])))
 
 
-fn test_gather_cpu_2d_axis0_contiguous() raises:
+def test_gather_cpu_2d_axis0_contiguous() raises:
     comptime dtype = DType.float32
     # rows 0,1,2 → view path
     var a = Tensor[dtype].d2(
@@ -123,7 +123,7 @@ fn test_gather_cpu_2d_axis0_contiguous() raises:
     )
 
 
-fn test_gather_cpu_2d_axis0_irregular() raises:
+def test_gather_cpu_2d_axis0_irregular() raises:
     comptime dtype = DType.float32
     # Original motivating example: rows 0,1,5
     var a = Tensor[dtype].d2(
@@ -150,7 +150,7 @@ fn test_gather_cpu_2d_axis0_irregular() raises:
     )
 
 
-fn test_gather_cpu_2d_axis0_negative_indices() raises:
+def test_gather_cpu_2d_axis0_negative_indices() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
@@ -164,7 +164,7 @@ fn test_gather_cpu_2d_axis0_negative_indices() raises:
     )
 
 
-fn test_gather_cpu_2d_axis0_strided() raises:
+def test_gather_cpu_2d_axis0_strided() raises:
     comptime dtype = DType.float32
     # rows 0,2 → step=2 → view path
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]])
@@ -180,7 +180,7 @@ fn test_gather_cpu_2d_axis0_strided() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-fn test_gather_cpu_2d_axis1_single_col() raises:
+def test_gather_cpu_2d_axis1_single_col() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
@@ -191,7 +191,7 @@ fn test_gather_cpu_2d_axis1_single_col() raises:
     assert_true(result.all_close(Tensor[dtype].d2([[3.0], [6.0], [9.0]])))
 
 
-fn test_gather_cpu_2d_axis1_contiguous() raises:
+def test_gather_cpu_2d_axis1_contiguous() raises:
     comptime dtype = DType.float32
     # cols 0,1 → view path
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -202,7 +202,7 @@ fn test_gather_cpu_2d_axis1_contiguous() raises:
     assert_true(result.all_close(Tensor[dtype].d2([[1.0, 2.0], [4.0, 5.0]])))
 
 
-fn test_gather_cpu_2d_axis1_irregular() raises:
+def test_gather_cpu_2d_axis1_irregular() raises:
     comptime dtype = DType.float32
     # cols 0,2 → step=2 → view path (happens to be regular)
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -213,7 +213,7 @@ fn test_gather_cpu_2d_axis1_irregular() raises:
     assert_true(result.all_close(Tensor[dtype].d2([[1.0, 3.0], [4.0, 6.0]])))
 
 
-fn test_gather_cpu_2d_axis1_noncontiguous_copy() raises:
+def test_gather_cpu_2d_axis1_noncontiguous_copy() raises:
     comptime dtype = DType.float32
     # cols 0,2,3 → irregular → copy path
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]])
@@ -227,7 +227,7 @@ fn test_gather_cpu_2d_axis1_noncontiguous_copy() raises:
     )
 
 
-fn test_gather_cpu_2d_axis1_negative_axis() raises:
+def test_gather_cpu_2d_axis1_negative_axis() raises:
     comptime dtype = DType.float32
     # axis=-1 should behave like axis=1 for a 2-D tensor
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -243,7 +243,7 @@ fn test_gather_cpu_2d_axis1_negative_axis() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-fn test_gather_cpu_3d_axis0_irregular() raises:
+def test_gather_cpu_3d_axis0_irregular() raises:
     comptime dtype = DType.float32
     # shape (4,2,2), select slabs 0 and 3
     var a = Tensor[dtype].d3(
@@ -267,7 +267,7 @@ fn test_gather_cpu_3d_axis0_irregular() raises:
     )
 
 
-fn test_gather_cpu_3d_axis1_contiguous() raises:
+def test_gather_cpu_3d_axis1_contiguous() raises:
     comptime dtype = DType.float32
     # shape (2,4,2), select rows 1,2 along axis=1 → view path
     var a = Tensor[dtype].d3(
@@ -289,7 +289,7 @@ fn test_gather_cpu_3d_axis1_contiguous() raises:
     )
 
 
-fn test_gather_cpu_3d_axis2_irregular() raises:
+def test_gather_cpu_3d_axis2_irregular() raises:
     comptime dtype = DType.float32
     # shape (2,2,4), pick depth indices 0,3 (step=3, regular) → view path
     var a = Tensor[dtype].d3(
@@ -311,7 +311,7 @@ fn test_gather_cpu_3d_axis2_irregular() raises:
     )
 
 
-fn test_gather_cpu_3d_axis2_copy_path() raises:
+def test_gather_cpu_3d_axis2_copy_path() raises:
     comptime dtype = DType.float32
     # shape (2,2,5), pick indices 0,2,4 (step=2, but let's use 0,1,4 for copy path)
     var a = Tensor[dtype].d3(
@@ -343,7 +343,7 @@ fn test_gather_cpu_3d_axis2_copy_path() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-fn test_gather_cpu_nograd_copy_2d_irregular() raises:
+def test_gather_cpu_nograd_copy_2d_irregular() raises:
     comptime dtype = DType.float32
     # Verify correct VALUES are gathered (no grad check)
     var a = Tensor[dtype].d2(
@@ -372,7 +372,7 @@ fn test_gather_cpu_nograd_copy_2d_irregular() raises:
     assert_false(result.requires_grad)
 
 
-fn test_gather_cpu_nograd_copy_3d_irregular() raises:
+def test_gather_cpu_nograd_copy_3d_irregular() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [
@@ -405,7 +405,7 @@ fn test_gather_cpu_nograd_copy_3d_irregular() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-fn test_gather_gpu_2d_axis0_irregular_copy() raises:
+def test_gather_gpu_2d_axis0_irregular_copy() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -434,7 +434,7 @@ fn test_gather_gpu_2d_axis0_irregular_copy() raises:
         assert_false(result.requires_grad)
 
 
-fn test_gather_gpu_3d_axis0_irregular_copy() raises:
+def test_gather_gpu_3d_axis0_irregular_copy() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -467,7 +467,7 @@ fn test_gather_gpu_3d_axis0_irregular_copy() raises:
         )
 
 
-fn test_gather_gpu_2d_axis1_irregular_copy() raises:
+def test_gather_gpu_2d_axis1_irregular_copy() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]])
@@ -491,7 +491,7 @@ fn test_gather_gpu_2d_axis1_irregular_copy() raises:
 
 # ── CPU / Forward ─────────────────────────────────────────────────────────────
 
-fn test_mcpy_cpu_2d_single_row_first() raises:
+def test_mcpy_cpu_2d_single_row_first() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
     var idx = IntArray()
@@ -500,7 +500,7 @@ fn test_mcpy_cpu_2d_single_row_first() raises:
     assert_true(result.all_close(Tensor[dtype].d2([[1.0, 2.0, 3.0]])))
 
 
-fn test_mcpy_cpu_2d_single_row_last() raises:
+def test_mcpy_cpu_2d_single_row_last() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
     var idx = IntArray()
@@ -509,7 +509,7 @@ fn test_mcpy_cpu_2d_single_row_last() raises:
     assert_true(result.all_close(Tensor[dtype].d2([[7.0, 8.0, 9.0]])))
 
 
-fn test_mcpy_cpu_2d_single_row_middle() raises:
+def test_mcpy_cpu_2d_single_row_middle() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
     var idx = IntArray()
@@ -518,7 +518,7 @@ fn test_mcpy_cpu_2d_single_row_middle() raises:
     assert_true(result.all_close(Tensor[dtype].d2([[4.0, 5.0, 6.0]])))
 
 
-fn test_mcpy_cpu_2d_multi_row_ordered() raises:
+def test_mcpy_cpu_2d_multi_row_ordered() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]])
     var idx = IntArray()
@@ -529,7 +529,7 @@ fn test_mcpy_cpu_2d_multi_row_ordered() raises:
     assert_true(result.all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])))
 
 
-fn test_mcpy_cpu_2d_multi_row_reversed() raises:
+def test_mcpy_cpu_2d_multi_row_reversed() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
     var idx = IntArray()
@@ -540,7 +540,7 @@ fn test_mcpy_cpu_2d_multi_row_reversed() raises:
     assert_true(result.all_close(Tensor[dtype].d2([[5.0, 6.0], [3.0, 4.0], [1.0, 2.0]])))
 
 
-fn test_mcpy_cpu_2d_duplicate_indices() raises:
+def test_mcpy_cpu_2d_duplicate_indices() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
     var idx = IntArray()
@@ -551,7 +551,7 @@ fn test_mcpy_cpu_2d_duplicate_indices() raises:
     assert_true(result.all_close(Tensor[dtype].d2([[3.0, 4.0], [3.0, 4.0], [3.0, 4.0]])))
 
 
-fn test_mcpy_cpu_2d_all_rows_identity() raises:
+def test_mcpy_cpu_2d_all_rows_identity() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
     var idx = IntArray()
@@ -562,7 +562,7 @@ fn test_mcpy_cpu_2d_all_rows_identity() raises:
     assert_true(result.all_close(a))
 
 
-fn test_mcpy_cpu_2d_wide_cols() raises:
+def test_mcpy_cpu_2d_wide_cols() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([
         [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
@@ -579,7 +579,7 @@ fn test_mcpy_cpu_2d_wide_cols() raises:
     ])))
 
 
-fn test_mcpy_cpu_2d_single_col() raises:
+def test_mcpy_cpu_2d_single_col() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0], [2.0], [3.0], [4.0]])
     var idx = IntArray()
@@ -589,7 +589,7 @@ fn test_mcpy_cpu_2d_single_col() raises:
     assert_true(result.all_close(Tensor[dtype].d2([[4.0], [2.0]])))
 
 
-fn test_mcpy_cpu_2d_float64() raises:
+def test_mcpy_cpu_2d_float64() raises:
     comptime dtype = DType.float64
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var idx = IntArray()
@@ -599,7 +599,7 @@ fn test_mcpy_cpu_2d_float64() raises:
     assert_true(result.all_close(Tensor[dtype].d2([[4.0, 5.0, 6.0], [1.0, 2.0, 3.0]])))
 
 
-fn test_mcpy_cpu_2d_float16() raises:
+def test_mcpy_cpu_2d_float16() raises:
     comptime dtype = DType.float16
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
     var idx = IntArray()
@@ -609,7 +609,7 @@ fn test_mcpy_cpu_2d_float16() raises:
     assert_true(result.all_close[atol=1e-2](Tensor[dtype].d2([[1.0, 2.0], [5.0, 6.0]])))
 
 
-fn test_mcpy_cpu_2d_more_output_rows_than_input() raises:
+def test_mcpy_cpu_2d_more_output_rows_than_input() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[10.0, 20.0], [30.0, 40.0]])
     var idx = IntArray()
@@ -626,7 +626,7 @@ fn test_mcpy_cpu_2d_more_output_rows_than_input() raises:
 
 # ── CPU / Grad flow ───────────────────────────────────────────────────────────
 
-fn test_mcpy_cpu_2d_no_grad_flows_to_source() raises:
+def test_mcpy_cpu_2d_no_grad_flows_to_source() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
@@ -643,7 +643,7 @@ fn test_mcpy_cpu_2d_no_grad_flows_to_source() raises:
     assert_true(grad[i(2), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
 
 
-fn test_mcpy_cpu_2d_result_requires_grad() raises:
+def test_mcpy_cpu_2d_result_requires_grad() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var idx = IntArray()
@@ -652,7 +652,7 @@ fn test_mcpy_cpu_2d_result_requires_grad() raises:
     assert_equal(result.requires_grad, True)
 
 
-fn test_mcpy_cpu_2d_grad_through_downstream_op() raises:
+def test_mcpy_cpu_2d_grad_through_downstream_op() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
@@ -674,7 +674,7 @@ fn test_mcpy_cpu_2d_grad_through_downstream_op() raises:
 
 # ── CPU / fuse_sum ────────────────────────────────────────────────────────────
 
-fn test_mcpy_cpu_2d_fuse_sum_basic() raises:
+def test_mcpy_cpu_2d_fuse_sum_basic() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
     var idx = IntArray()
@@ -684,7 +684,7 @@ fn test_mcpy_cpu_2d_fuse_sum_basic() raises:
     assert_true(result.all_close(Tensor[dtype].d1([8.0, 10.0, 12.0])))
 
 
-fn test_mcpy_cpu_2d_fuse_sum_single_index() raises:
+def test_mcpy_cpu_2d_fuse_sum_single_index() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var idx = IntArray()
@@ -693,7 +693,7 @@ fn test_mcpy_cpu_2d_fuse_sum_single_index() raises:
     assert_true(result.all_close(Tensor[dtype].d1([4.0, 5.0, 6.0])))
 
 
-fn test_mcpy_cpu_2d_fuse_sum_all_rows() raises:
+def test_mcpy_cpu_2d_fuse_sum_all_rows() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]])
     var idx = IntArray()
@@ -704,7 +704,7 @@ fn test_mcpy_cpu_2d_fuse_sum_all_rows() raises:
     assert_true(result.all_close(Tensor[dtype].d1([6.0, 6.0])))
 
 
-fn test_mcpy_cpu_2d_fuse_sum_duplicate_indices() raises:
+def test_mcpy_cpu_2d_fuse_sum_duplicate_indices() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var idx = IntArray()
@@ -715,7 +715,7 @@ fn test_mcpy_cpu_2d_fuse_sum_duplicate_indices() raises:
     assert_true(result.all_close(Tensor[dtype].d1([3.0, 6.0])))
 
 
-fn test_mcpy_cpu_2d_fuse_sum_no_grad_flows() raises:
+def test_mcpy_cpu_2d_fuse_sum_no_grad_flows() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
@@ -734,7 +734,7 @@ fn test_mcpy_cpu_2d_fuse_sum_no_grad_flows() raises:
 
 # ── CPU / MEAN forward ──────────────────────────────────────────────────────────
 
-fn test_mcpy_cpu_2d_fuse_mean_basic() raises:
+def test_mcpy_cpu_2d_fuse_mean_basic() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([
         [1.0, 2.0, 3.0],
@@ -750,7 +750,7 @@ fn test_mcpy_cpu_2d_fuse_mean_basic() raises:
     assert_true(result.all_close(Tensor[dtype].d1([2.5, 3.5, 4.5])))
 
 
-fn test_mcpy_cpu_2d_fuse_mean_single_index() raises:
+def test_mcpy_cpu_2d_fuse_mean_single_index() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([
         [1.0, 2.0, 3.0],
@@ -764,7 +764,7 @@ fn test_mcpy_cpu_2d_fuse_mean_single_index() raises:
     assert_true(result.all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
 
 
-fn test_mcpy_cpu_2d_fuse_mean_duplicate_indices() raises:
+def test_mcpy_cpu_2d_fuse_mean_duplicate_indices() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([
         [10.0, 20.0],
@@ -780,7 +780,7 @@ fn test_mcpy_cpu_2d_fuse_mean_duplicate_indices() raises:
     assert_true(result.all_close(Tensor[dtype].d1([50.0/3.0, 80.0/3.0])))
 
 
-fn test_mcpy_cpu_2d_fuse_mean_grad() raises:
+def test_mcpy_cpu_2d_fuse_mean_grad() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
@@ -800,7 +800,7 @@ fn test_mcpy_cpu_2d_fuse_mean_grad() raises:
 
 # ── GPU / Forward ─────────────────────────────────────────────────────────────
 
-fn test_mcpy_gpu_2d_single_row() raises:
+def test_mcpy_gpu_2d_single_row() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
@@ -811,7 +811,7 @@ fn test_mcpy_gpu_2d_single_row() raises:
         assert_true(result.to_cpu().all_close(Tensor[dtype].d2([[4.0, 5.0, 6.0]])))
 
 
-fn test_mcpy_gpu_2d_multi_row_reversed() raises:
+def test_mcpy_gpu_2d_multi_row_reversed() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
@@ -826,7 +826,7 @@ fn test_mcpy_gpu_2d_multi_row_reversed() raises:
         ))
 
 
-fn test_mcpy_gpu_2d_duplicate_indices() raises:
+def test_mcpy_gpu_2d_duplicate_indices() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([
@@ -844,7 +844,7 @@ fn test_mcpy_gpu_2d_duplicate_indices() raises:
         ])))
 
 
-fn test_mcpy_gpu_2d_single_col() raises:
+def test_mcpy_gpu_2d_single_col() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0], [2.0], [3.0], [4.0]])
@@ -856,7 +856,7 @@ fn test_mcpy_gpu_2d_single_col() raises:
         assert_true(result.to_cpu().all_close(Tensor[dtype].d2([[4.0], [1.0]])))
 
 
-fn test_mcpy_gpu_2d_all_rows_identity() raises:
+def test_mcpy_gpu_2d_all_rows_identity() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
@@ -871,7 +871,7 @@ fn test_mcpy_gpu_2d_all_rows_identity() raises:
 
 # ── GPU / Grad flow ───────────────────────────────────────────────────────────
 
-fn test_mcpy_gpu_2d_no_grad_flows_to_source() raises:
+def test_mcpy_gpu_2d_no_grad_flows_to_source() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -890,7 +890,7 @@ fn test_mcpy_gpu_2d_no_grad_flows_to_source() raises:
         assert_true(grad[i(2), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
 
 
-fn test_mcpy_gpu_2d_result_requires_grad() raises:
+def test_mcpy_gpu_2d_result_requires_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -901,7 +901,7 @@ fn test_mcpy_gpu_2d_result_requires_grad() raises:
         assert_equal(result.requires_grad, True)
 
 
-fn test_mcpy_gpu_2d_grad_through_downstream_op() raises:
+def test_mcpy_gpu_2d_grad_through_downstream_op() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -926,7 +926,7 @@ fn test_mcpy_gpu_2d_grad_through_downstream_op() raises:
 
 # ── GPU / fuse_sum ────────────────────────────────────────────────────────────
 
-fn test_mcpy_gpu_2d_fuse_sum_basic() raises:
+def test_mcpy_gpu_2d_fuse_sum_basic() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
@@ -938,7 +938,7 @@ fn test_mcpy_gpu_2d_fuse_sum_basic() raises:
         assert_true(result.to_cpu().all_close(Tensor[dtype].d1([8.0, 10.0, 12.0])))
 
 
-fn test_mcpy_gpu_2d_fuse_sum_duplicate_indices() raises:
+def test_mcpy_gpu_2d_fuse_sum_duplicate_indices() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -951,7 +951,7 @@ fn test_mcpy_gpu_2d_fuse_sum_duplicate_indices() raises:
         assert_true(result.to_cpu().all_close(Tensor[dtype].d1([3.0, 6.0])))
 
 
-fn test_mcpy_gpu_2d_fuse_sum_no_grad_flows() raises:
+def test_mcpy_gpu_2d_fuse_sum_no_grad_flows() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -972,7 +972,7 @@ fn test_mcpy_gpu_2d_fuse_sum_no_grad_flows() raises:
 
 # ── GPU / MEAN forward ──────────────────────────────────────────────────────────
 
-fn test_mcpy_gpu_2d_fuse_mean_basic() raises:
+def test_mcpy_gpu_2d_fuse_mean_basic() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([
@@ -987,7 +987,7 @@ fn test_mcpy_gpu_2d_fuse_mean_basic() raises:
         assert_true(result.to_cpu().all_close(Tensor[dtype].d1([2.5, 3.5, 4.5])))
 
 
-fn test_mcpy_gpu_2d_fuse_mean_duplicate_indices() raises:
+def test_mcpy_gpu_2d_fuse_mean_duplicate_indices() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([
@@ -1003,7 +1003,7 @@ fn test_mcpy_gpu_2d_fuse_mean_duplicate_indices() raises:
         assert_true(result.to_cpu().all_close(Tensor[dtype].d1([50.0/3.0, 80.0/3.0])))
 
 
-fn test_mcpy_gpu_2d_fuse_mean_grad() raises:
+def test_mcpy_gpu_2d_fuse_mean_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -1024,7 +1024,7 @@ fn test_mcpy_gpu_2d_fuse_mean_grad() raises:
 
 # ── CPU / MEAN / CPU–GPU parity ───────────────────────────────────────────────
 
-fn test_mcpy_cpu_gpu_parity_2d_fuse_mean() raises:
+def test_mcpy_cpu_gpu_parity_2d_fuse_mean() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([
@@ -1042,7 +1042,7 @@ fn test_mcpy_cpu_gpu_parity_2d_fuse_mean() raises:
 
 # ── CPU / Higher dimensions ───────────────────────────────────────────────────
 
-fn test_mcpy_cpu_3d_axis0_scalar_path_consistency() raises:
+def test_mcpy_cpu_3d_axis0_scalar_path_consistency() raises:
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].d1(
         [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
@@ -1059,7 +1059,7 @@ fn test_mcpy_cpu_3d_axis0_scalar_path_consistency() raises:
     assert_true(result.all_close(expected))
 
 
-fn test_mcpy_cpu_3d_axis1_scalar_path_consistency() raises:
+def test_mcpy_cpu_3d_axis1_scalar_path_consistency() raises:
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].d1(
         [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
@@ -1078,7 +1078,7 @@ fn test_mcpy_cpu_3d_axis1_scalar_path_consistency() raises:
 
 # ── CPU / CPU↔GPU value parity ────────────────────────────────────────────────
 
-fn test_mcpy_cpu_gpu_parity_2d_axis0() raises:
+def test_mcpy_cpu_gpu_parity_2d_axis0() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([
@@ -1097,7 +1097,7 @@ fn test_mcpy_cpu_gpu_parity_2d_axis0() raises:
         assert_true(cpu_result.all_close(gpu_result))
 
 
-fn test_mcpy_cpu_gpu_parity_2d_fuse_sum() raises:
+def test_mcpy_cpu_gpu_parity_2d_fuse_sum() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([
@@ -1116,7 +1116,7 @@ fn test_mcpy_cpu_gpu_parity_2d_fuse_sum() raises:
 
 # ─── General-case reduction / 3D axis0 SUM forward ────────────
 
-fn test_mcpy_cpu_3d_axis0_sum_general() raises:
+def test_mcpy_cpu_3d_axis0_sum_general() raises:
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].d4([
         [[[1, 2], [3, 4]], [[5, 6], [7, 8]], [[9, 10], [11, 12]]]
@@ -1135,7 +1135,7 @@ fn test_mcpy_cpu_3d_axis0_sum_general() raises:
 
 # ─── General-case reduction / 3D axis0 MEAN forward ───────────
 
-fn test_mcpy_cpu_3d_axis0_mean_general() raises:
+def test_mcpy_cpu_3d_axis0_mean_general() raises:
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].d1(
         [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
@@ -1154,7 +1154,7 @@ fn test_mcpy_cpu_3d_axis0_mean_general() raises:
 
 # ─── General-case reduction / 2D axis1 SUM forward ────────────
 
-fn test_mcpy_cpu_2d_axis1_sum_general() raises:
+def test_mcpy_cpu_2d_axis1_sum_general() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var idx = IntArray()
@@ -1168,7 +1168,7 @@ fn test_mcpy_cpu_2d_axis1_sum_general() raises:
 
 # ─── General-case reduction / 2D axis1 MEAN forward ───────────
 
-fn test_mcpy_cpu_2d_axis1_mean_general() raises:
+def test_mcpy_cpu_2d_axis1_mean_general() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var idx = IntArray()
@@ -1182,7 +1182,7 @@ fn test_mcpy_cpu_2d_axis1_mean_general() raises:
 
 # ─── General-case reduction / 3D axis0 SUM backward ───────────
 
-fn test_mcpy_cpu_3d_axis0_sum_general_grad() raises:
+def test_mcpy_cpu_3d_axis0_sum_general_grad() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]], [[9.0, 10.0], [11.0, 12.0]]],
@@ -1206,7 +1206,7 @@ fn test_mcpy_cpu_3d_axis0_sum_general_grad() raises:
 
 # ─── General-case reduction / 3D axis0 MEAN backward ──────────
 
-fn test_mcpy_cpu_3d_axis0_mean_general_grad() raises:
+def test_mcpy_cpu_3d_axis0_mean_general_grad() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]], [[9.0, 10.0], [11.0, 12.0]]],
@@ -1229,7 +1229,7 @@ fn test_mcpy_cpu_3d_axis0_mean_general_grad() raises:
 
 # ─── General-case reduction / 2D axis1 SUM backward ───────────
 
-fn test_mcpy_cpu_2d_axis1_sum_general_grad() raises:
+def test_mcpy_cpu_2d_axis1_sum_general_grad() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -1249,7 +1249,7 @@ fn test_mcpy_cpu_2d_axis1_sum_general_grad() raises:
 
 # ─── General-case reduction / 2D axis1 MEAN backward ──────────
 
-fn test_mcpy_cpu_2d_axis1_mean_general_grad() raises:
+def test_mcpy_cpu_2d_axis1_mean_general_grad() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -1268,7 +1268,7 @@ fn test_mcpy_cpu_2d_axis1_mean_general_grad() raises:
 
 # ─── GPU: General-case reduction SUM forward ──────────────────
 
-fn test_mcpy_gpu_3d_axis0_sum_general() raises:
+def test_mcpy_gpu_3d_axis0_sum_general() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].d1(
@@ -1285,7 +1285,7 @@ fn test_mcpy_gpu_3d_axis0_sum_general() raises:
         assert_true(result.to_cpu().all_close(expected))
 
 
-fn test_mcpy_gpu_2d_axis1_sum_general() raises:
+def test_mcpy_gpu_2d_axis1_sum_general() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -1300,7 +1300,7 @@ fn test_mcpy_gpu_2d_axis1_sum_general() raises:
 
 # ─── GPU: General-case reduction MEAN forward ─────────────────
 
-fn test_mcpy_gpu_3d_axis0_mean_general() raises:
+def test_mcpy_gpu_3d_axis0_mean_general() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].d1(
@@ -1317,7 +1317,7 @@ fn test_mcpy_gpu_3d_axis0_mean_general() raises:
         assert_true(result.to_cpu().all_close(expected))
 
 
-fn test_mcpy_gpu_2d_axis1_mean_general() raises:
+def test_mcpy_gpu_2d_axis1_mean_general() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -1332,7 +1332,7 @@ fn test_mcpy_gpu_2d_axis1_mean_general() raises:
 
 # ─── GPU: General-case reduction SUM backward ─────────────────
 
-fn test_mcpy_gpu_3d_axis0_sum_general_grad() raises:
+def test_mcpy_gpu_3d_axis0_sum_general_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].d1(
@@ -1355,7 +1355,7 @@ fn test_mcpy_gpu_3d_axis0_sum_general_grad() raises:
         assert_true(grad.all_close[atol=1e-5](expected_grad))
 
 
-fn test_mcpy_gpu_2d_axis1_sum_general_grad() raises:
+def test_mcpy_gpu_2d_axis1_sum_general_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -1374,7 +1374,7 @@ fn test_mcpy_gpu_2d_axis1_sum_general_grad() raises:
 
 # ─── GPU: General-case reduction MEAN backward ────────────────
 
-fn test_mcpy_gpu_3d_axis0_mean_general_grad() raises:
+def test_mcpy_gpu_3d_axis0_mean_general_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].d1(
@@ -1397,7 +1397,7 @@ fn test_mcpy_gpu_3d_axis0_mean_general_grad() raises:
         assert_true(grad.all_close[atol=1e-5](expected_grad))
 
 
-fn test_mcpy_gpu_2d_axis1_mean_general_grad() raises:
+def test_mcpy_gpu_2d_axis1_mean_general_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -1416,7 +1416,7 @@ fn test_mcpy_gpu_2d_axis1_mean_general_grad() raises:
 
 # ─── CPU–GPU parity: general-case reduction ────────────────────
 
-fn test_mcpy_cpu_gpu_parity_3d_axis0_sum_general() raises:
+def test_mcpy_cpu_gpu_parity_3d_axis0_sum_general() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].d1(
@@ -1431,7 +1431,7 @@ fn test_mcpy_cpu_gpu_parity_3d_axis0_sum_general() raises:
         assert_true(cpu_result.all_close[atol=1e-5](gpu_result))
 
 
-fn test_mcpy_cpu_gpu_parity_2d_axis1_sum_general() raises:
+def test_mcpy_cpu_gpu_parity_2d_axis1_sum_general() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -1443,7 +1443,7 @@ fn test_mcpy_cpu_gpu_parity_2d_axis1_sum_general() raises:
         assert_true(cpu_result.all_close[atol=1e-5](gpu_result))
 
 
-fn test_mcpy_cpu_gpu_parity_3d_axis0_mean_general() raises:
+def test_mcpy_cpu_gpu_parity_3d_axis0_mean_general() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].d1(
@@ -1458,7 +1458,7 @@ fn test_mcpy_cpu_gpu_parity_3d_axis0_mean_general() raises:
         assert_true(cpu_result.all_close[atol=1e-5](gpu_result))
 
 
-fn test_mcpy_cpu_gpu_parity_2d_axis1_mean_general() raises:
+def test_mcpy_cpu_gpu_parity_2d_axis1_mean_general() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])

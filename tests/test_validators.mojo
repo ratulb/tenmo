@@ -9,7 +9,7 @@ from tenmo.intarray import IntArray
 # ============================================
 
 
-fn test_validate_axes_empty_reduce_all() raises:
+def test_validate_axes_empty_reduce_all() raises:
     print("test_validate_axes_empty_reduce_all")
     var shape = Shape(2, 3, 4)
     var axes = IntArray()
@@ -21,7 +21,7 @@ fn test_validate_axes_empty_reduce_all() raises:
     print("test_validate_axes_empty_reduce_all passed")
 
 
-fn test_validate_axes_single_axis() raises:
+def test_validate_axes_single_axis() raises:
     print("test_validate_axes_single_axis")
     var shape = Shape(2, 3, 4, 5)
     var axes = IntArray.with_capacity(1)
@@ -32,7 +32,7 @@ fn test_validate_axes_single_axis() raises:
     print("test_validate_axes_single_axis passed")
 
 
-fn test_validate_axes_multiple_axes() raises:
+def test_validate_axes_multiple_axes() raises:
     print("test_validate_axes_multiple_axes")
     var shape = Shape(2, 3, 4, 5, 6)
     var axes = IntArray(1, 3, 4)
@@ -44,7 +44,7 @@ fn test_validate_axes_multiple_axes() raises:
     print("test_validate_axes_multiple_axes passed")
 
 
-fn test_validate_axes_negative_indices() raises:
+def test_validate_axes_negative_indices() raises:
     print("test_validate_axes_negative_indices")
     var shape = Shape(2, 3, 4)
     var axes = IntArray(-1, -2)
@@ -55,7 +55,7 @@ fn test_validate_axes_negative_indices() raises:
     print("test_validate_axes_negative_indices passed")
 
 
-fn test_validate_axes_unordered() raises:
+def test_validate_axes_unordered() raises:
     print("test_validate_axes_unordered")
     var shape = Shape(2, 3, 4, 5)
     var axes = IntArray(3, 0, 2)
@@ -68,7 +68,7 @@ fn test_validate_axes_unordered() raises:
     print("test_validate_axes_unordered passed")
 
 
-fn test_validate_axes_no_sort() raises:
+def test_validate_axes_no_sort() raises:
     print("test_validate_axes_no_sort")
     var shape = Shape(2, 3, 4, 5)
     var axes = IntArray(3, 0, 2)
@@ -81,7 +81,7 @@ fn test_validate_axes_no_sort() raises:
     print("test_validate_axes_no_sort passed")
 
 
-fn test_validate_axes_fill_missing() raises:
+def test_validate_axes_fill_missing() raises:
     print("test_validate_axes_fill_missing")
     var shape = Shape(2, 3, 4, 5)
     var axes = IntArray(1, 3)
@@ -96,7 +96,7 @@ fn test_validate_axes_fill_missing() raises:
     print("test_validate_axes_fill_missing passed")
 
 
-fn test_validate_axes_scalar_empty() raises:
+def test_validate_axes_scalar_empty() raises:
     print("test_validate_axes_scalar_empty")
     var shape = Shape()
     var axes = IntArray()
@@ -105,7 +105,7 @@ fn test_validate_axes_scalar_empty() raises:
     print("test_validate_axes_scalar_empty passed")
 
 
-fn test_validate_axes_scalar_minus_one() raises:
+def test_validate_axes_scalar_minus_one() raises:
     print("test_validate_axes_scalar_minus_one")
     var shape = Shape()
     var axes = IntArray(-1)
@@ -114,7 +114,7 @@ fn test_validate_axes_scalar_minus_one() raises:
     print("test_validate_axes_scalar_minus_one passed")
 
 
-fn test_validate_axes_all_axes() raises:
+def test_validate_axes_all_axes() raises:
     print("test_validate_axes_all_axes")
     var shape = Shape(2, 3, 4)
     var axes = IntArray(0, 1, 2)
@@ -123,7 +123,7 @@ fn test_validate_axes_all_axes() raises:
     print("test_validate_axes_all_axes passed")
 
 
-fn test_reshape_same_shape() raises:
+def test_reshape_same_shape() raises:
     print("test_reshape_same_shape")
     var current = Shape(2, 3, 4)
     var newdims = IntArray(2, 3, 4)
@@ -132,7 +132,7 @@ fn test_reshape_same_shape() raises:
     print("test_reshape_same_shape passed")
 
 
-fn test_reshape_flatten() raises:
+def test_reshape_flatten() raises:
     print("test_reshape_flatten")
     var current = Shape(2, 3, 4)
     var newdims = IntArray(24)
@@ -141,7 +141,7 @@ fn test_reshape_flatten() raises:
     print("test_reshape_flatten passed")
 
 
-fn test_reshape_infer_dimension() raises:
+def test_reshape_infer_dimension() raises:
     print("test_reshape_infer_dimension")
     var current = Shape(2, 3, 4)
     var newdims = IntArray(2, -1)
@@ -150,7 +150,7 @@ fn test_reshape_infer_dimension() raises:
     print("test_reshape_infer_dimension passed")
 
 
-fn test_reshape_infer_middle() raises:
+def test_reshape_infer_middle() raises:
     print("test_reshape_infer_middle")
     var current = Shape(2, 3, 4)
     var newdims = IntArray(2, -1, 2)
@@ -159,7 +159,7 @@ fn test_reshape_infer_middle() raises:
     print("test_reshape_infer_middle passed")
 
 
-fn test_reshape_infer_first() raises:
+def test_reshape_infer_first() raises:
     print("test_reshape_infer_first")
     var current = Shape(2, 3, 4)
     var newdims = IntArray(-1, 12)
@@ -168,7 +168,7 @@ fn test_reshape_infer_first() raises:
     print("test_reshape_infer_first passed")
 
 
-fn test_reshape_scalar_to_scalar() raises:
+def test_reshape_scalar_to_scalar() raises:
     print("test_reshape_scalar_to_scalar")
     var current = Shape()
     var newdims = IntArray()
@@ -177,7 +177,7 @@ fn test_reshape_scalar_to_scalar() raises:
     print("test_reshape_scalar_to_scalar passed")
 
 
-fn test_reshape_scalar_to_one() raises:
+def test_reshape_scalar_to_one() raises:
     print("test_reshape_scalar_to_one")
     var current = Shape()
     var newdims = IntArray(1)
@@ -186,7 +186,7 @@ fn test_reshape_scalar_to_one() raises:
     print("test_reshape_scalar_to_one passed")
 
 
-fn test_reshape_one_to_scalar() raises:
+def test_reshape_one_to_scalar() raises:
     print("test_reshape_one_to_scalar")
     var current = Shape(1)
     var newdims = IntArray()
@@ -195,7 +195,7 @@ fn test_reshape_one_to_scalar() raises:
     print("test_reshape_one_to_scalar passed")
 
 
-fn test_reshape_multidim_to_one() raises:
+def test_reshape_multidim_to_one() raises:
     print("test_reshape_multidim_to_one")
     var current = Shape(1, 1, 1)
     var newdims = IntArray(1)
@@ -204,7 +204,7 @@ fn test_reshape_multidim_to_one() raises:
     print("test_reshape_multidim_to_one passed")
 
 
-fn test_reshape_complex() raises:
+def test_reshape_complex() raises:
     print("test_reshape_complex")
     var current = Shape(6, 4, 5)
     var newdims = IntArray(3, 2, -1, 5)
@@ -213,7 +213,7 @@ fn test_reshape_complex() raises:
     print("test_reshape_complex passed")
 
 
-fn test_reshape_2d_to_3d() raises:
+def test_reshape_2d_to_3d() raises:
     print("test_reshape_2d_to_3d")
     var current = Shape(6, 8)
     var newdims = IntArray(2, 3, 8)
@@ -222,7 +222,7 @@ fn test_reshape_2d_to_3d() raises:
     print("test_reshape_2d_to_3d passed")
 
 
-fn test_reshape_3d_to_2d() raises:
+def test_reshape_3d_to_2d() raises:
     print("test_reshape_3d_to_2d")
     var current = Shape(2, 3, 4)
     var newdims = IntArray(6, 4)
@@ -231,7 +231,7 @@ fn test_reshape_3d_to_2d() raises:
     print("test_reshape_3d_to_2d passed")
 
 
-fn test_reshape_infer_last() raises:
+def test_reshape_infer_last() raises:
     print("test_reshape_infer_last")
     var current = Shape(24)
     var newdims = IntArray(2, 3, -1)
@@ -245,7 +245,7 @@ fn test_reshape_infer_last() raises:
 # ============================================
 
 
-fn run_validate_axes_tests() raises:
+def run_validate_axes_tests() raises:
     print("\n" + "=" * 60)
     print("RUNNING Validator.validate_and_normalize_axes TESTS")
     print("=" * 60)
@@ -266,7 +266,7 @@ fn run_validate_axes_tests() raises:
     print("=" * 60)
 
 
-fn run_validate_reshape_tests() raises:
+def run_validate_reshape_tests() raises:
     print("\n" + "=" * 60)
     print("RUNNING VALIDATE_AND_CONSTRUCT_NEW_SHAPE TESTS")
     print("=" * 60)
@@ -290,7 +290,7 @@ fn run_validate_reshape_tests() raises:
     print("=" * 60)
 
 
-fn run_all_validator_tests() raises:
+def run_all_validator_tests() raises:
     """Run all validator tests."""
     print("\n" + "#" * 60)
     print("# VALIDATOR METHODS TEST SUITE")
@@ -304,7 +304,7 @@ fn run_all_validator_tests() raises:
     print("#" * 60 + "\n")
 
 
-fn test_validate_and_normalize_axes() raises:
+def test_validate_and_normalize_axes() raises:
     print("test_validate_and_normalize_axes")
     shape = Shape([2, 3, 4])
     axes = Validator.validate_and_normalize_axes(shape, IntArray())
@@ -326,7 +326,7 @@ fn test_validate_and_normalize_axes() raises:
     )
 
 
-fn test_validate_new_shape() raises:
+def test_validate_new_shape() raises:
     print("test_validate_new_shape")
     curr_dims = Shape(IntArray([3, 4, 5]))
     new_dims = IntArray([2, -1, 10])
@@ -346,7 +346,7 @@ fn test_validate_new_shape() raises:
     )
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

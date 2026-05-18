@@ -7,7 +7,7 @@ from .intarray import IntArray
 from std.utils.numerics import min_or_neg_inf, max_or_inf
 
 
-fn output_to_input_base(
+def output_to_input_base(
     out_idx: Int,
     in_shape: Array,
     in_strides: Array,
@@ -32,7 +32,7 @@ fn output_to_input_base(
     return input_base
 
 
-fn reduction_idx_to_reduced_offset(
+def reduction_idx_to_reduced_offset(
     reduction_idx: Int,
     in_shape: Array,
     in_strides: Array,
@@ -57,7 +57,7 @@ fn reduction_idx_to_reduced_offset(
     return offset
 
 
-fn reduce_minmax[
+def reduce_minmax[
     dtype: DType,
     max_block_size: Int = 512,
     is_max: Bool = True,
@@ -140,7 +140,7 @@ fn reduce_minmax[
         (out_buffer + out_idx)[] = smem[0]
 
 
-fn build_minmax_mask[
+def build_minmax_mask[
     dtype: DType,
     max_block_size: Int = 512,
     is_max: Bool = True,
@@ -224,7 +224,7 @@ struct ReductionMinMax[dtype: DType = DType.float32](
     RegisterPassable, ImplicitlyCopyable & Movable
 ):
     @staticmethod
-    fn launch[
+    def launch[
         max_block_width: Int = 512,
         is_max: Bool = True,
     ](
@@ -320,7 +320,7 @@ struct ReductionMinMax[dtype: DType = DType.float32](
         return (result_ndb^, mask_ndb^)
 
     @staticmethod
-    fn launch_config[
+    def launch_config[
         max_block_size: Int
     ](total_output: Int, reduced_volume: Int,) -> Tuple[Int, Int]:
         var block_size = 1

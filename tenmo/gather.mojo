@@ -41,7 +41,7 @@ from tenmo.shared import Reduction
 # =============================================================================
 
 
-fn gather_gpu_kernel[
+def gather_gpu_kernel[
     dtype: DType,
     rank: Int,
 ](
@@ -110,7 +110,7 @@ fn gather_gpu_kernel[
         out_idx += gstride
 
 
-fn gather_rows_2d_kernel[
+def gather_rows_2d_kernel[
     dtype: DType
 ](
     out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
@@ -161,7 +161,7 @@ fn gather_rows_2d_kernel[
         c += col_stride
 
 
-fn embedding_bag_kernel[
+def embedding_bag_kernel[
     dtype: DType,
     mean: Bool,
 ](
@@ -226,14 +226,14 @@ fn embedding_bag_kernel[
 # =============================================================================
 
 
-fn _gather_launch_config(total_elements: Int) -> Tuple[Int, Int]:
+def _gather_launch_config(total_elements: Int) -> Tuple[Int, Int]:
     """Returns (threads_per_block, num_blocks) for generic gather kernel."""
     var tpb = 256 if total_elements >= 128 else 128
     var blocks = min((total_elements + tpb - 1) // tpb, 4096)
     return (tpb, blocks)
 
 
-fn _gather_2d_block_cols(in_cols: Int) -> Int:
+def _gather_2d_block_cols(in_cols: Int) -> Int:
     """Nearest power-of-2 thread count for 2-D kernel, capped at 512."""
     if in_cols <= 32:
         return 32
@@ -246,7 +246,7 @@ fn _gather_2d_block_cols(in_cols: Int) -> Int:
     return 512
 
 
-fn _launch_gather_generic[
+def _launch_gather_generic[
     dtype: DType, rank: Int
 ](
     ctx: DeviceContext,
@@ -291,7 +291,7 @@ fn _launch_gather_generic[
 # =============================================================================
 
 
-fn gather_gpu[
+def gather_gpu[
     dtype: DType
 ](
     tensor: NDBuffer[dtype],
@@ -556,7 +556,7 @@ struct GatherArg(ArgumentType):
 @fieldwise_init
 struct GatherBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """Scatter incoming gradient back to the gathered rows.
@@ -611,7 +611,7 @@ struct GatherBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct Gather[dtype: DType](Copyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],
@@ -735,7 +735,7 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         return out^
 
     @staticmethod
-    fn _gather_copy(
+    def _gather_copy(
         self: Tensor[Self.dtype],
         ax: Int,
         normalized: IntArray,

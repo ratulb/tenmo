@@ -1,7 +1,7 @@
 from std.gpu.host import DeviceContext, DeviceAttribute
 
 
-fn main() raises:
+def main() raises:
     var ctx = DeviceContext()
 
     print("\n\n===========Accelerator details============\n\n")

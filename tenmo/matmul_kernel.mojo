@@ -35,7 +35,7 @@ from .broadcasthelper import ShapeBroadcaster
 # Total smem: 8192 bytes — well within 48KB limit
 
 
-fn matmul_2d_tiled[
+def matmul_2d_tiled[
     dtype: DType,
     TILE_SIZE: Int = 32,
 ](
@@ -125,7 +125,7 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
-    fn launch[
+    def launch[
         tile_size: Int = 32,
     ](
         A: NDBuffer[Self.dtype],
@@ -282,7 +282,7 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
         return out^
 
     @staticmethod
-    fn launch_config[
+    def launch_config[
         tile_size: Int
     ](m: Int, n: Int, total_batch: Int) -> Tuple[Dim, Dim]:
         var block = Dim(tile_size, tile_size, 1)

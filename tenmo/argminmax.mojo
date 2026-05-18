@@ -11,7 +11,7 @@ from .ndbuffer import NDBuffer
 from std.sys import has_accelerator
 
 
-fn reduce_argminmax[
+def reduce_argminmax[
     dtype: DType,
     max_block_size: Int = 512,
     is_max: Bool = True,
@@ -125,7 +125,7 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     """
 
     @staticmethod
-    fn reduce[
+    def reduce[
         is_max: Bool,
         max_block_size: Int = 512,
     ](
@@ -167,7 +167,7 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     # ── GPU path ──────────────────────────────────────────────────────────────
 
     @staticmethod
-    fn _gpu_reduce[
+    def _gpu_reduce[
         is_max: Bool,
         max_block_size: Int,
     ](
@@ -218,7 +218,7 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     # ── CPU path ──────────────────────────────────────────────────────────────
 
     @staticmethod
-    fn _cpu_reduce[
+    def _cpu_reduce[
         is_max: Bool,
     ](
         A: NDBuffer[Self.dtype],
@@ -262,7 +262,7 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return out^
 
     @staticmethod
-    fn _launch_config[
+    def _launch_config[
         max_block_size: Int
     ](total_output: Int, reduced_volume: Int) -> Tuple[Int, Int]:
         var block_size = 1
@@ -279,7 +279,7 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
 struct Argmin[dtype: DType]:
     @staticmethod
-    fn argmin(
+    def argmin(
         ndb: NDBuffer[Self.dtype],
         axis: Int = 0,
         keepdims: Bool = False,
@@ -296,7 +296,7 @@ struct Argmin[dtype: DType]:
 
     # Tensor convenience overload
     @staticmethod
-    fn argmin(
+    def argmin(
         tensor: Tensor[Self.dtype],
         axis: Int = 0,
         keepdims: Bool = False,
@@ -315,7 +315,7 @@ struct Argmin[dtype: DType]:
 
 struct Argmax[dtype: DType]:
     @staticmethod
-    fn argmax(
+    def argmax(
         ndb: NDBuffer[Self.dtype],
         axis: Int = 0,
         keepdims: Bool = False,
@@ -332,7 +332,7 @@ struct Argmax[dtype: DType]:
 
     # Tensor convenience overload
     @staticmethod
-    fn argmax(
+    def argmax(
         tensor: Tensor[Self.dtype],
         axis: Int = 0,
         keepdims: Bool = False,

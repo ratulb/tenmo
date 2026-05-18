@@ -12,7 +12,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var bwd_arg = output.ancestry().backward_fn_arg().get[TilesArg]()
@@ -62,7 +62,7 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct Tile[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         mut self: Tensor[Self.dtype],

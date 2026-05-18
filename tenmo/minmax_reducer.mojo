@@ -10,7 +10,7 @@ from std.utils.numerics import min_or_neg_inf, max_or_inf
 @fieldwise_init
 struct MinMaxReducer[dtype: DType](ImplicitlyCopyable):
     @staticmethod
-    fn reduce_minmax[
+    def reduce_minmax[
         is_max: Bool
     ](
         ndb: NDBuffer[Self.dtype],
@@ -41,7 +41,7 @@ struct MinMaxReducer[dtype: DType](ImplicitlyCopyable):
         )
 
     @staticmethod
-    fn _full_reduction_minmax[
+    def _full_reduction_minmax[
         is_max: Bool
     ](ndb: NDBuffer[Self.dtype], shape: Shape,) -> NDBuffer[Self.dtype]:
         var total_elements = shape.num_elements()
@@ -66,7 +66,7 @@ struct MinMaxReducer[dtype: DType](ImplicitlyCopyable):
         return result^
 
     @staticmethod
-    fn _partial_reduction_minmax[
+    def _partial_reduction_minmax[
         is_max: Bool
     ](
         ndb: NDBuffer[Self.dtype],
@@ -80,7 +80,7 @@ struct MinMaxReducer[dtype: DType](ImplicitlyCopyable):
         var result = NDBuffer[ndb.dtype].zeros(out_shape)
 
         @parameter
-        fn compute_output_element(out_flat_idx: Int):
+        def compute_output_element(out_flat_idx: Int):
             var out_idx = IndexCalculator.index_to_coord(
                 out_shape, out_flat_idx
             )
@@ -125,7 +125,7 @@ struct MinMaxReducer[dtype: DType](ImplicitlyCopyable):
         return result^
 
     @staticmethod
-    fn build_minmax_mask[
+    def build_minmax_mask[
         is_max: Bool
     ](
         ndb: NDBuffer[Self.dtype],

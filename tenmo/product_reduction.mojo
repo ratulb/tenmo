@@ -58,7 +58,7 @@ from .validators import Validator
 
 struct ProductBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var bwd_arg = output.ancestry().backward_fn_arg().get[ProductArg[Self.dtype]]()
@@ -139,7 +139,7 @@ struct ProductBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 struct Product[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True,
         store_excl_product: Bool = True,
     ](

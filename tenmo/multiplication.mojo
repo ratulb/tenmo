@@ -19,7 +19,7 @@ struct MultiplyBackwardScalar[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var factor = (
@@ -43,7 +43,7 @@ struct MultiplyBackwardScalar[dtype: DType](
 @fieldwise_init
 struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
@@ -103,7 +103,7 @@ comptime MultiplyBroadcastBackward[dtype: DType] = BroadcastBackward[
 @fieldwise_init
 struct MultiplyScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], factor: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
@@ -127,7 +127,7 @@ struct MultiplyScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct Multiplicator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[
         Self.dtype
@@ -169,7 +169,7 @@ struct Multiplicator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return out^
 
     @staticmethod
-    fn forward(
+    def forward(
         self: Tensor[Self.dtype], other: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         var nd_buffer = self.buffer.arithmetic_ops[Multiply](other.buffer)

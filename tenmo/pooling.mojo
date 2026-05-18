@@ -23,7 +23,7 @@ struct MaxPool2dBwdArg(ArgumentType):
 @fieldwise_init
 struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var bwd_arg = output.ancestry().backward_fn_arg().get[MaxPool2dBwdArg]()
@@ -75,7 +75,7 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
             var grad_in_stride_C = H_in * W_in
 
             @parameter
-            fn scatter_gradients_optimized(idx: Int):
+            def scatter_gradients_optimized(idx: Int):
                 var n = idx // C
                 var c = idx % C
 
@@ -127,7 +127,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var stride: Int
     var padding: Int
 
-    fn __init__(
+    def __init__(
         out self,
         kernel_size: Int = 2,
         stride: Optional[Int] = None,
@@ -138,7 +138,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self.stride = stride.or_else(kernel_size)
         self.padding = padding
 
-    fn __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         if self.training:
             return Self.forward[track_grad=True](
                 x,
@@ -157,7 +157,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             )
 
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         input_tensor: Tensor[Self.dtype],
@@ -297,7 +297,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
     # OPTIMIZED 2×2 POOLING (fully unrolled)
     @staticmethod
-    fn _pool_2x2(
+    def _pool_2x2(
         input_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
         output_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
         argmax_ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin],
@@ -319,7 +319,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         """Fully unrolled 2×2 max pooling."""
 
         @parameter
-        fn pool_nc(idx: Int):
+        def pool_nc(idx: Int):
             var n = idx // C
             var c = idx % C
 
@@ -402,7 +402,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
     # OPTIMIZED 3×3 POOLING (fully unrolled)
     @staticmethod
-    fn _pool_3x3(
+    def _pool_3x3(
         input_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
         output_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
         argmax_ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin],
@@ -424,7 +424,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         """Fully unrolled 3×3 max pooling."""
 
         @parameter
-        fn pool_nc(idx: Int):
+        def pool_nc(idx: Int):
             var n = idx // C
             var c = idx % C
 
@@ -468,7 +468,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
     # GENERIC POOLING (arbitrary kernel size)
     @staticmethod
-    fn _pool_generic(
+    def _pool_generic(
         input_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
         output_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
         argmax_ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin],
@@ -492,7 +492,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         """Generic pooling for arbitrary kernel sizes."""
 
         @parameter
-        fn pool_nc(idx: Int):
+        def pool_nc(idx: Int):
             var n = idx // C
             var c = idx % C
 
@@ -533,19 +533,19 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
         parallelize[pool_nc](N * C)
 
-    fn parameters(
+    def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
-    fn num_parameters(self) -> Int:
+    def num_parameters(self) -> Int:
         return 0
 
-    fn train(mut self):
+    def train(mut self):
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         self.training = False
 
-    fn into(self) -> Module[Self.dtype]:
+    def into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)

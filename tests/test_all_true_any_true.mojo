@@ -9,68 +9,68 @@ from tenmo.shapes import Shape
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_alltrue_cpu_1d_all_true() raises:
+def test_alltrue_cpu_1d_all_true() raises:
     var a = Tensor[DType.bool].d1([True, True, True, True])
     assert_true(a.all_true())
 
 
-fn test_alltrue_cpu_1d_all_false() raises:
+def test_alltrue_cpu_1d_all_false() raises:
     var a = Tensor[DType.bool].d1([False, False, False])
     assert_true(not a.all_true())
 
 
-fn test_alltrue_cpu_1d_mixed() raises:
+def test_alltrue_cpu_1d_mixed() raises:
     var a = Tensor[DType.bool].d1([True, False, True])
     assert_true(not a.all_true())
 
 
-fn test_alltrue_cpu_1d_single_true() raises:
+def test_alltrue_cpu_1d_single_true() raises:
     var a = Tensor[DType.bool].d1([True])
     assert_true(a.all_true())
 
 
-fn test_alltrue_cpu_1d_single_false() raises:
+def test_alltrue_cpu_1d_single_false() raises:
     var a = Tensor[DType.bool].d1([False])
     assert_true(not a.all_true())
 
 
-fn test_alltrue_cpu_1d_last_false() raises:
+def test_alltrue_cpu_1d_last_false() raises:
     # Only last element is False
     var a = Tensor[DType.bool].d1([True, True, True, False])
     assert_true(not a.all_true())
 
 
-fn test_alltrue_cpu_1d_first_false() raises:
+def test_alltrue_cpu_1d_first_false() raises:
     # Only first element is False
     var a = Tensor[DType.bool].d1([False, True, True, True])
     assert_true(not a.all_true())
 
 
-fn test_alltrue_cpu_2d_all_true() raises:
+def test_alltrue_cpu_2d_all_true() raises:
     var a = Tensor[DType.bool].d2([[True, True], [True, True]])
     assert_true(a.all_true())
 
 
-fn test_alltrue_cpu_2d_mixed() raises:
+def test_alltrue_cpu_2d_mixed() raises:
     var a = Tensor[DType.bool].d2([[True, True], [True, False]])
     assert_true(not a.all_true())
 
 
-fn test_alltrue_cpu_3d_all_true() raises:
+def test_alltrue_cpu_3d_all_true() raises:
     var a = Tensor[DType.bool].d3(
         [[[True, True], [True, True]], [[True, True], [True, True]]]
     )
     assert_true(a.all_true())
 
 
-fn test_alltrue_cpu_3d_one_false() raises:
+def test_alltrue_cpu_3d_one_false() raises:
     var a = Tensor[DType.bool].d3(
         [[[True, True], [True, True]], [[True, True], [True, False]]]
     )
     assert_true(not a.all_true())
 
 
-fn test_alltrue_cpu_from_comparison() raises:
+def test_alltrue_cpu_from_comparison() raises:
     comptime dtype = DType.float32
     # Generate bool tensor from comparison
     var a = Tensor[dtype].d1([5.0, 6.0, 7.0])
@@ -78,20 +78,20 @@ fn test_alltrue_cpu_from_comparison() raises:
     assert_true(mask.all_true())
 
 
-fn test_alltrue_cpu_from_comparison_false() raises:
+def test_alltrue_cpu_from_comparison_false() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([3.0, 6.0, 7.0])
     var mask = a > Tensor[dtype].full(Shape(3), 4.0)
     assert_true(not mask.all_true())
 
 
-fn test_alltrue_cpu_large_tensor() raises:
+def test_alltrue_cpu_large_tensor() raises:
     # Large tensor — all True
     var a = Tensor[DType.bool].full(Shape(10000), True)
     assert_true(a.all_true())
 
 
-fn test_alltrue_cpu_large_tensor_one_false() raises:
+def test_alltrue_cpu_large_tensor_one_false() raises:
     # Large tensor with one False in middle
     var a = Tensor[DType.bool].full(Shape(10000), True)
     a[[5000]] = False
@@ -103,66 +103,66 @@ fn test_alltrue_cpu_large_tensor_one_false() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_anytrue_cpu_1d_all_true() raises:
+def test_anytrue_cpu_1d_all_true() raises:
     var a = Tensor[DType.bool].d1([True, True, True])
     assert_true(a.any_true())
 
 
-fn test_anytrue_cpu_1d_all_false() raises:
+def test_anytrue_cpu_1d_all_false() raises:
     var a = Tensor[DType.bool].d1([False, False, False])
     assert_true(not a.any_true())
 
 
-fn test_anytrue_cpu_1d_mixed() raises:
+def test_anytrue_cpu_1d_mixed() raises:
     var a = Tensor[DType.bool].d1([False, True, False])
     assert_true(a.any_true())
 
 
-fn test_anytrue_cpu_1d_single_true() raises:
+def test_anytrue_cpu_1d_single_true() raises:
     var a = Tensor[DType.bool].d1([True])
     assert_true(a.any_true())
 
 
-fn test_anytrue_cpu_1d_single_false() raises:
+def test_anytrue_cpu_1d_single_false() raises:
     var a = Tensor[DType.bool].d1([False])
     assert_true(not a.any_true())
 
 
-fn test_anytrue_cpu_1d_only_last_true() raises:
+def test_anytrue_cpu_1d_only_last_true() raises:
     var a = Tensor[DType.bool].d1([False, False, False, True])
     assert_true(a.any_true())
 
 
-fn test_anytrue_cpu_1d_only_first_true() raises:
+def test_anytrue_cpu_1d_only_first_true() raises:
     var a = Tensor[DType.bool].d1([True, False, False, False])
     assert_true(a.any_true())
 
 
-fn test_anytrue_cpu_2d_all_false() raises:
+def test_anytrue_cpu_2d_all_false() raises:
     var a = Tensor[DType.bool].d2([[False, False], [False, False]])
     assert_true(not a.any_true())
 
 
-fn test_anytrue_cpu_2d_one_true() raises:
+def test_anytrue_cpu_2d_one_true() raises:
     var a = Tensor[DType.bool].d2([[False, False], [False, True]])
     assert_true(a.any_true())
 
 
-fn test_anytrue_cpu_3d_all_false() raises:
+def test_anytrue_cpu_3d_all_false() raises:
     var a = Tensor[DType.bool].d3(
         [[[False, False], [False, False]], [[False, False], [False, False]]]
     )
     assert_true(not a.any_true())
 
 
-fn test_anytrue_cpu_3d_one_true() raises:
+def test_anytrue_cpu_3d_one_true() raises:
     var a = Tensor[DType.bool].d3(
         [[[False, False], [False, False]], [[False, False], [False, True]]]
     )
     assert_true(a.any_true())
 
 
-fn test_anytrue_cpu_from_comparison() raises:
+def test_anytrue_cpu_from_comparison() raises:
     comptime dtype = DType.float32
     # Only one element satisfies condition
     var a = Tensor[dtype].d1([1.0, 2.0, 5.0])
@@ -170,19 +170,19 @@ fn test_anytrue_cpu_from_comparison() raises:
     assert_true(mask.any_true())
 
 
-fn test_anytrue_cpu_from_comparison_none() raises:
+def test_anytrue_cpu_from_comparison_none() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var mask = a > Tensor[dtype].full(Shape(3), 4.0)
     assert_true(not mask.any_true())
 
 
-fn test_anytrue_cpu_large_all_false() raises:
+def test_anytrue_cpu_large_all_false() raises:
     var a = Tensor[DType.bool].full(Shape(10000), False)
     assert_true(not a.any_true())
 
 
-fn test_anytrue_cpu_large_one_true() raises:
+def test_anytrue_cpu_large_one_true() raises:
     var a = Tensor[DType.bool].full(Shape(10000), False)
     a[[5000]] = True
     assert_true(a.any_true())
@@ -193,55 +193,55 @@ fn test_anytrue_cpu_large_one_true() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_alltrue_gpu_1d_all_true() raises:
+def test_alltrue_gpu_1d_all_true() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d1([True, True, True, True]).to_gpu()
         assert_true(a.all_true())
 
 
-fn test_alltrue_gpu_1d_all_false() raises:
+def test_alltrue_gpu_1d_all_false() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d1([False, False, False]).to_gpu()
         assert_true(not a.all_true())
 
 
-fn test_alltrue_gpu_1d_mixed() raises:
+def test_alltrue_gpu_1d_mixed() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d1([True, False, True]).to_gpu()
         assert_true(not a.all_true())
 
 
-fn test_alltrue_gpu_1d_single_true() raises:
+def test_alltrue_gpu_1d_single_true() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d1([True]).to_gpu()
         assert_true(a.all_true())
 
 
-fn test_alltrue_gpu_1d_single_false() raises:
+def test_alltrue_gpu_1d_single_false() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d1([False]).to_gpu()
         assert_true(not a.all_true())
 
 
-fn test_alltrue_gpu_1d_last_false() raises:
+def test_alltrue_gpu_1d_last_false() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d1([True, True, True, False]).to_gpu()
         assert_true(not a.all_true())
 
 
-fn test_alltrue_gpu_2d_all_true() raises:
+def test_alltrue_gpu_2d_all_true() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d2([[True, True], [True, True]]).to_gpu()
         assert_true(a.all_true())
 
 
-fn test_alltrue_gpu_2d_mixed() raises:
+def test_alltrue_gpu_2d_mixed() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d2([[True, True], [True, False]]).to_gpu()
         assert_true(not a.all_true())
 
 
-fn test_alltrue_gpu_3d_all_true() raises:
+def test_alltrue_gpu_3d_all_true() raises:
     comptime if has_accelerator():
         var a = (
             Tensor[DType.bool]
@@ -251,7 +251,7 @@ fn test_alltrue_gpu_3d_all_true() raises:
         assert_true(a.all_true())
 
 
-fn test_alltrue_gpu_3d_one_false() raises:
+def test_alltrue_gpu_3d_one_false() raises:
     comptime if has_accelerator():
         var a = (
             Tensor[DType.bool]
@@ -261,7 +261,7 @@ fn test_alltrue_gpu_3d_one_false() raises:
         assert_true(not a.all_true())
 
 
-fn test_alltrue_gpu_from_comparison() raises:
+def test_alltrue_gpu_from_comparison() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([5.0, 6.0, 7.0]).to_gpu()
@@ -269,7 +269,7 @@ fn test_alltrue_gpu_from_comparison() raises:
         assert_true(mask.all_true())
 
 
-fn test_alltrue_gpu_from_comparison_false() raises:
+def test_alltrue_gpu_from_comparison_false() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([3.0, 6.0, 7.0]).to_gpu()
@@ -277,13 +277,13 @@ fn test_alltrue_gpu_from_comparison_false() raises:
         assert_true(not mask.all_true())
 
 
-fn test_alltrue_gpu_large_all_true() raises:
+def test_alltrue_gpu_large_all_true() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].full(Shape(10000), True).to_gpu()
         assert_true(a.all_true())
 
 
-fn test_alltrue_gpu_large_one_false() raises:
+def test_alltrue_gpu_large_one_false() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].full(Shape(10000), True)
         a[[5000]] = False
@@ -296,55 +296,55 @@ fn test_alltrue_gpu_large_one_false() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_anytrue_gpu_1d_all_true() raises:
+def test_anytrue_gpu_1d_all_true() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d1([True, True, True]).to_gpu()
         assert_true(a.any_true())
 
 
-fn test_anytrue_gpu_1d_all_false() raises:
+def test_anytrue_gpu_1d_all_false() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d1([False, False, False]).to_gpu()
         assert_true(not a.any_true())
 
 
-fn test_anytrue_gpu_1d_mixed() raises:
+def test_anytrue_gpu_1d_mixed() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d1([False, True, False]).to_gpu()
         assert_true(a.any_true())
 
 
-fn test_anytrue_gpu_1d_single_true() raises:
+def test_anytrue_gpu_1d_single_true() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d1([True]).to_gpu()
         assert_true(a.any_true())
 
 
-fn test_anytrue_gpu_1d_single_false() raises:
+def test_anytrue_gpu_1d_single_false() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d1([False]).to_gpu()
         assert_true(not a.any_true())
 
 
-fn test_anytrue_gpu_1d_only_last_true() raises:
+def test_anytrue_gpu_1d_only_last_true() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d1([False, False, False, True]).to_gpu()
         assert_true(a.any_true())
 
 
-fn test_anytrue_gpu_2d_all_false() raises:
+def test_anytrue_gpu_2d_all_false() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d2([[False, False], [False, False]]).to_gpu()
         assert_true(not a.any_true())
 
 
-fn test_anytrue_gpu_2d_one_true() raises:
+def test_anytrue_gpu_2d_one_true() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].d2([[False, False], [False, True]]).to_gpu()
         assert_true(a.any_true())
 
 
-fn test_anytrue_gpu_3d_all_false() raises:
+def test_anytrue_gpu_3d_all_false() raises:
     comptime if has_accelerator():
         var a = (
             Tensor[DType.bool]
@@ -359,7 +359,7 @@ fn test_anytrue_gpu_3d_all_false() raises:
         assert_true(not a.any_true())
 
 
-fn test_anytrue_gpu_3d_one_true() raises:
+def test_anytrue_gpu_3d_one_true() raises:
     comptime if has_accelerator():
         var a = (
             Tensor[DType.bool]
@@ -374,7 +374,7 @@ fn test_anytrue_gpu_3d_one_true() raises:
         assert_true(a.any_true())
 
 
-fn test_anytrue_gpu_from_comparison() raises:
+def test_anytrue_gpu_from_comparison() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 5.0]).to_gpu()
@@ -382,7 +382,7 @@ fn test_anytrue_gpu_from_comparison() raises:
         assert_true(mask.any_true())
 
 
-fn test_anytrue_gpu_from_comparison_none() raises:
+def test_anytrue_gpu_from_comparison_none() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
@@ -390,13 +390,13 @@ fn test_anytrue_gpu_from_comparison_none() raises:
         assert_true(not mask.any_true())
 
 
-fn test_anytrue_gpu_large_all_false() raises:
+def test_anytrue_gpu_large_all_false() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].full(Shape(10000), False).to_gpu()
         assert_true(not a.any_true())
 
 
-fn test_anytrue_gpu_large_one_true() raises:
+def test_anytrue_gpu_large_one_true() raises:
     comptime if has_accelerator():
         var a = Tensor[DType.bool].full(Shape(10000), False)
         a[[5000]] = True
@@ -409,35 +409,35 @@ fn test_anytrue_gpu_large_one_true() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_alltrue_parity_all_true() raises:
+def test_alltrue_parity_all_true() raises:
     comptime if has_accelerator():
         var a_cpu = Tensor[DType.bool].d2([[True, True], [True, True]])
         var a_gpu = a_cpu.to_gpu()
         assert_true(a_cpu.all_true() == a_gpu.all_true())
 
 
-fn test_alltrue_parity_mixed() raises:
+def test_alltrue_parity_mixed() raises:
     comptime if has_accelerator():
         var a_cpu = Tensor[DType.bool].d2([[True, False], [True, True]])
         var a_gpu = a_cpu.to_gpu()
         assert_true(a_cpu.all_true() == a_gpu.all_true())
 
 
-fn test_anytrue_parity_all_false() raises:
+def test_anytrue_parity_all_false() raises:
     comptime if has_accelerator():
         var a_cpu = Tensor[DType.bool].d2([[False, False], [False, False]])
         var a_gpu = a_cpu.to_gpu()
         assert_true(a_cpu.any_true() == a_gpu.any_true())
 
 
-fn test_anytrue_parity_one_true() raises:
+def test_anytrue_parity_one_true() raises:
     comptime if has_accelerator():
         var a_cpu = Tensor[DType.bool].d2([[False, False], [False, True]])
         var a_gpu = a_cpu.to_gpu()
         assert_true(a_cpu.any_true() == a_gpu.any_true())
 
 
-fn test_alltrue_parity_from_comparison() raises:
+def test_alltrue_parity_from_comparison() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([5.0, 6.0, 7.0])
@@ -450,7 +450,7 @@ fn test_alltrue_parity_from_comparison() raises:
         )
 
 
-fn test_anytrue_parity_from_comparison() raises:
+def test_anytrue_parity_from_comparison() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 5.0])
@@ -468,6 +468,6 @@ fn test_anytrue_parity_from_comparison() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll all true any true tests passed!")

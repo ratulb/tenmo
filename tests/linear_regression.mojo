@@ -2,7 +2,7 @@ from tensors import Tensor
 from .shapes import Shape
 
 
-fn main() raises:
+def main() raises:
     # Training data (x: inputs, y: targets)
     var x = Tensor.of(1.0, 2.0, 3.0, 4.0).to_dtype[DType.float32]()
     var y = Tensor.of(5.0, 7.0, 9.0, 11.0).to_dtype[

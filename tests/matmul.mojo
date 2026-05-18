@@ -21,7 +21,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref grad_out = output.gradients()[]
@@ -58,7 +58,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     @always_inline
-    fn forward[
+    def forward[
         track_grad: Bool = True,
     ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         var ndb = A.buffer.matmul_2d(B.buffer)
@@ -77,7 +77,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     @always_inline
-    fn forward(
+    def forward(
         A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         var ndb = A.buffer.matmul_2d(B.buffer)
@@ -86,7 +86,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     @always_inline
-    fn forward(
+    def forward(
         A: Gradbox[Self.dtype], B: Tensor[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         var ndb = A.buffer.matmul_2d(B.buffer)
@@ -97,7 +97,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref grad_out = output.gradients()[]
@@ -138,7 +138,7 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 struct MatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         ref A_shape = A.shape()
@@ -164,7 +164,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn forward(
+    def forward(
         A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         ref A_shape = A.shape()
@@ -179,7 +179,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn forward(
+    def forward(
         A: Gradbox[Self.dtype], B: Tensor[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         ref A_shape = A.shape()
@@ -198,7 +198,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 struct Matmul[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True, mode: Int = mm
     ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         comptime if mode == mm:
@@ -238,20 +238,20 @@ struct Matmul[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn forward(
+    def forward(
         A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         return MatmulNd[Self.dtype].forward(A, B)
 
     @always_inline
     @staticmethod
-    fn forward(
+    def forward(
         A: Gradbox[Self.dtype], B: Tensor[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         return MatmulNd[Self.dtype].forward(A, B)
 
 
-fn classify_matmul(a: Shape, b: Shape) -> Int:
+def classify_matmul(a: Shape, b: Shape) -> Int:
     var rank_a = a.rank()
     var rank_b = b.rank()
 
@@ -273,7 +273,7 @@ from std.sys import argv
 from .blashandle import BLASHandle
 
 
-fn test_gflops_blas() raises:
+def test_gflops_blas() raises:
     comptime dtype = DType.float32
     var M = 128
     var K = 512
@@ -346,7 +346,7 @@ fn test_gflops_blas() raises:
     print("  Operations:        " + String(2 * M * K * N) + " FLOP")
 
 
-fn test_gflops() raises:
+def test_gflops() raises:
     comptime dtype = DType.float32
     var M = 128
     var K = 512
@@ -422,7 +422,7 @@ fn test_gflops() raises:
 from std.testing import assert_true
 
 
-fn main() raises:
+def main() raises:
     test_gflops()
     test_gflops_blas()
     comptime dtype = DType.float64

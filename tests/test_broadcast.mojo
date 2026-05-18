@@ -9,7 +9,7 @@ comptime dtype = DType.float32
 
 
 # Old tests
-fn test_gpu_add_broadcast_scalar_tensor_result() raises:
+def test_gpu_add_broadcast_scalar_tensor_result() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -34,7 +34,7 @@ fn test_gpu_add_broadcast_scalar_tensor_result() raises:
     print("passed")
 
 
-fn test_gpu_mul_scalar_times_matrix_result_scalar() raises:
+def test_gpu_mul_scalar_times_matrix_result_scalar() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -61,7 +61,7 @@ fn test_gpu_mul_scalar_times_matrix_result_scalar() raises:
     print("passed")
 
 
-fn test_gpu_add_scalar_plus_matrix() raises:
+def test_gpu_add_scalar_plus_matrix() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -86,7 +86,7 @@ fn test_gpu_add_scalar_plus_matrix() raises:
     print("passed")
 
 
-fn test_gpu_sub_scalar_minus_matrix() raises:
+def test_gpu_sub_scalar_minus_matrix() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -111,7 +111,7 @@ fn test_gpu_sub_scalar_minus_matrix() raises:
     print("passed")
 
 
-fn test_gpu_mul_scalar_times_scalar() raises:
+def test_gpu_mul_scalar_times_scalar() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -136,7 +136,7 @@ fn test_gpu_mul_scalar_times_scalar() raises:
     print("passed")
 
 
-fn test_gpu_chained_scalar_broadcast() raises:
+def test_gpu_chained_scalar_broadcast() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -167,7 +167,7 @@ fn test_gpu_chained_scalar_broadcast() raises:
     print("passed")
 
 
-fn test_gpu_mul_broadcast_incoming_grad_scalar() raises:
+def test_gpu_mul_broadcast_incoming_grad_scalar() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -193,7 +193,7 @@ fn test_gpu_mul_broadcast_incoming_grad_scalar() raises:
     print("passed")
 
 
-fn test_gpu_add_broadcast_incoming_grad_scalar() raises:
+def test_gpu_add_broadcast_incoming_grad_scalar() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -218,7 +218,7 @@ fn test_gpu_add_broadcast_incoming_grad_scalar() raises:
     print("passed")
 
 
-fn test_gpu_sub_broadcast_incoming_grad_scalar() raises:
+def test_gpu_sub_broadcast_incoming_grad_scalar() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -243,7 +243,7 @@ fn test_gpu_sub_broadcast_incoming_grad_scalar() raises:
     print("passed")
 
 
-fn test_gpu_mul_broadcast_3d_incoming_grad_scalar() raises:
+def test_gpu_mul_broadcast_3d_incoming_grad_scalar() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -268,7 +268,7 @@ fn test_gpu_mul_broadcast_3d_incoming_grad_scalar() raises:
     print("passed")
 
 
-fn test_gpu_mul_broadcast_scalar_row_times_matrix() raises:
+def test_gpu_mul_broadcast_scalar_row_times_matrix() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -296,7 +296,7 @@ fn test_gpu_mul_broadcast_scalar_row_times_matrix() raises:
     print("passed")
 
 
-fn test_gpu_mul_broadcast_col_times_matrix() raises:
+def test_gpu_mul_broadcast_col_times_matrix() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -324,7 +324,7 @@ fn test_gpu_mul_broadcast_col_times_matrix() raises:
     print("passed")
 
 
-fn test_gpu_mul_broadcast_1d_times_2d() raises:
+def test_gpu_mul_broadcast_1d_times_2d() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -352,7 +352,7 @@ fn test_gpu_mul_broadcast_1d_times_2d() raises:
     print("passed")
 
 
-fn test_gpu_mul_broadcast_scalar_times_matrix() raises:
+def test_gpu_mul_broadcast_scalar_times_matrix() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -377,7 +377,7 @@ fn test_gpu_mul_broadcast_scalar_times_matrix() raises:
     print("passed")
 
 
-fn test_gpu_mul_broadcast_3d_batch() raises:
+def test_gpu_mul_broadcast_3d_batch() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -402,7 +402,7 @@ fn test_gpu_mul_broadcast_3d_batch() raises:
     print("passed")
 
 
-fn test_gpu_mul_broadcast_only_lhs_requires_grad() raises:
+def test_gpu_mul_broadcast_only_lhs_requires_grad() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -424,7 +424,7 @@ fn test_gpu_mul_broadcast_only_lhs_requires_grad() raises:
     print("passed")
 
 
-fn test_gpu_mul_broadcast_only_rhs_requires_grad() raises:
+def test_gpu_mul_broadcast_only_rhs_requires_grad() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -446,7 +446,7 @@ fn test_gpu_mul_broadcast_only_rhs_requires_grad() raises:
     print("passed")
 
 
-fn test_gpu_mul_broadcast_large() raises:
+def test_gpu_mul_broadcast_large() raises:
     comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
@@ -479,7 +479,7 @@ fn test_gpu_mul_broadcast_large() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_bcast_cpu_1d_to_2d() raises:
+def test_bcast_cpu_1d_to_2d() raises:
     print("test_bcast_cpu_1d_to_2d")
     comptime dtype = DType.float32
     # (3,) → (2, 3)
@@ -491,7 +491,7 @@ fn test_bcast_cpu_1d_to_2d() raises:
     )
 
 
-fn test_bcast_cpu_scalar_to_1d() raises:
+def test_bcast_cpu_scalar_to_1d() raises:
     print("test_bcast_cpu_scalar_to_1d")
     comptime dtype = DType.float32
     # (1,) → (4,)
@@ -501,7 +501,7 @@ fn test_bcast_cpu_scalar_to_1d() raises:
     assert_true(result.all_close(Tensor[dtype].full(Shape(4), 5.0)))
 
 
-fn test_bcast_cpu_1d_to_3d() raises:
+def test_bcast_cpu_1d_to_3d() raises:
     print("test_bcast_cpu_1d_to_3d")
     comptime dtype = DType.float32
     # (3,) → (2, 4, 3)
@@ -517,7 +517,7 @@ fn test_bcast_cpu_1d_to_3d() raises:
             assert_true(result[[i, j, 2]] == Scalar[dtype](3.0))
 
 
-fn test_bcast_cpu_2d_col_to_2d() raises:
+def test_bcast_cpu_2d_col_to_2d() raises:
     print("test_bcast_cpu_2d_col_to_2d")
     comptime dtype = DType.float32
     # (3, 1) → (3, 4)
@@ -530,7 +530,7 @@ fn test_bcast_cpu_2d_col_to_2d() raises:
         assert_true(result[[2, j]] == Scalar[dtype](3.0))
 
 
-fn test_bcast_cpu_2d_row_to_2d() raises:
+def test_bcast_cpu_2d_row_to_2d() raises:
     print("test_bcast_cpu_2d_row_to_2d")
     comptime dtype = DType.float32
     # (1, 3) → (4, 3)
@@ -543,7 +543,7 @@ fn test_bcast_cpu_2d_row_to_2d() raises:
         assert_true(result[[i, 2]] == Scalar[dtype](3.0))
 
 
-fn test_bcast_cpu_identity() raises:
+def test_bcast_cpu_identity() raises:
     print("test_bcast_cpu_identity")
     comptime dtype = DType.float32
     # Same shape — no change
@@ -553,7 +553,7 @@ fn test_bcast_cpu_identity() raises:
     assert_true(result.all_close(a))
 
 
-fn test_bcast_cpu_3d_to_3d() raises:
+def test_bcast_cpu_3d_to_3d() raises:
     print("test_bcast_cpu_3d_to_3d")
     comptime dtype = DType.float32
     # (1, 2, 1) → (3, 2, 4)
@@ -566,7 +566,7 @@ fn test_bcast_cpu_3d_to_3d() raises:
             assert_true(result[[i, 1, k]] == Scalar[dtype](2.0))
 
 
-fn test_bcast_cpu_values_correct() raises:
+def test_bcast_cpu_values_correct() raises:
     print("test_bcast_cpu_values_correct")
     comptime dtype = DType.float32
     # (2, 1) → (2, 3) — verify each value
@@ -577,7 +577,7 @@ fn test_bcast_cpu_values_correct() raises:
         assert_true(result[[1, j]] == Scalar[dtype](20.0))
 
 
-fn test_bcast_cpu_no_grad() raises:
+def test_bcast_cpu_no_grad() raises:
     print("test_bcast_cpu_no_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=False)
@@ -585,7 +585,7 @@ fn test_bcast_cpu_no_grad() raises:
     assert_true(not result.requires_grad)
 
 
-fn test_bcast_cpu_requires_grad() raises:
+def test_bcast_cpu_requires_grad() raises:
     print("test_bcast_cpu_requires_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -598,7 +598,7 @@ fn test_bcast_cpu_requires_grad() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_bcast_gpu_1d_to_2d() raises:
+def test_bcast_gpu_1d_to_2d() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_1d_to_2d")
         comptime dtype = DType.float32
@@ -613,7 +613,7 @@ fn test_bcast_gpu_1d_to_2d() raises:
         )
 
 
-fn test_bcast_gpu_scalar_to_1d() raises:
+def test_bcast_gpu_scalar_to_1d() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_scalar_to_1d")
         comptime dtype = DType.float32
@@ -626,7 +626,7 @@ fn test_bcast_gpu_scalar_to_1d() raises:
         )
 
 
-fn test_bcast_gpu_1d_to_3d() raises:
+def test_bcast_gpu_1d_to_3d() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_1d_to_3d")
         comptime dtype = DType.float32
@@ -643,7 +643,7 @@ fn test_bcast_gpu_1d_to_3d() raises:
                 assert_true(result_cpu[[i, j, 2]] == Scalar[dtype](3.0))
 
 
-fn test_bcast_gpu_2d_col_to_2d() raises:
+def test_bcast_gpu_2d_col_to_2d() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_2d_col_to_2d")
         comptime dtype = DType.float32
@@ -658,7 +658,7 @@ fn test_bcast_gpu_2d_col_to_2d() raises:
             assert_true(result_cpu[[2, j]] == Scalar[dtype](3.0))
 
 
-fn test_bcast_gpu_2d_row_to_2d() raises:
+def test_bcast_gpu_2d_row_to_2d() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_2d_row_to_2d")
         comptime dtype = DType.float32
@@ -673,7 +673,7 @@ fn test_bcast_gpu_2d_row_to_2d() raises:
             assert_true(result_cpu[[i, 2]] == Scalar[dtype](3.0))
 
 
-fn test_bcast_gpu_identity() raises:
+def test_bcast_gpu_identity() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_identity")
         comptime dtype = DType.float32
@@ -687,7 +687,7 @@ fn test_bcast_gpu_identity() raises:
         )
 
 
-fn test_bcast_gpu_3d_to_3d() raises:
+def test_bcast_gpu_3d_to_3d() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_3d_to_3d")
         comptime dtype = DType.float32
@@ -707,7 +707,7 @@ fn test_bcast_gpu_3d_to_3d() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_bcast_parity_1d_to_2d() raises:
+def test_bcast_parity_1d_to_2d() raises:
     comptime if has_accelerator():
         print("test_bcast_parity_1d_to_2d")
         comptime dtype = DType.float32
@@ -720,7 +720,7 @@ fn test_bcast_parity_1d_to_2d() raises:
         )
 
 
-fn test_bcast_parity_2d_col() raises:
+def test_bcast_parity_2d_col() raises:
     comptime if has_accelerator():
         print("test_bcast_parity_2d_col")
         comptime dtype = DType.float32
@@ -733,7 +733,7 @@ fn test_bcast_parity_2d_col() raises:
         )
 
 
-fn test_bcast_parity_3d() raises:
+def test_bcast_parity_3d() raises:
     comptime if has_accelerator():
         print("test_bcast_parity_3d")
         comptime dtype = DType.float32
@@ -756,7 +756,7 @@ fn test_bcast_parity_3d() raises:
 # SECTION 1 — CPU · Forward correctness · no grad
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_bcast_cpu_fwd_scalar_to_1d() raises:
+def test_bcast_cpu_fwd_scalar_to_1d() raises:
     print("test_bcast_cpu_fwd_scalar_to_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([5.0])
@@ -764,7 +764,7 @@ fn test_bcast_cpu_fwd_scalar_to_1d() raises:
     assert_true(result.all_close(Tensor[dtype].d1([5.0, 5.0, 5.0, 5.0])))
 
 
-fn test_bcast_cpu_fwd_1d_to_2d() raises:
+def test_bcast_cpu_fwd_1d_to_2d() raises:
     print("test_bcast_cpu_fwd_1d_to_2d")
     comptime dtype = DType.float32
     # shape (3,) → (2,3)
@@ -776,7 +776,7 @@ fn test_bcast_cpu_fwd_1d_to_2d() raises:
     ])))
 
 
-fn test_bcast_cpu_fwd_2d_row_to_2d() raises:
+def test_bcast_cpu_fwd_2d_row_to_2d() raises:
     print("test_bcast_cpu_fwd_2d_row_to_2d")
     comptime dtype = DType.float32
     # shape (1,3) → (4,3)
@@ -790,7 +790,7 @@ fn test_bcast_cpu_fwd_2d_row_to_2d() raises:
     ])))
 
 
-fn test_bcast_cpu_fwd_2d_col_to_2d() raises:
+def test_bcast_cpu_fwd_2d_col_to_2d() raises:
     print("test_bcast_cpu_fwd_2d_col_to_2d")
     comptime dtype = DType.float32
     # shape (3,1) → (3,4)
@@ -803,7 +803,7 @@ fn test_bcast_cpu_fwd_2d_col_to_2d() raises:
     ])))
 
 
-fn test_bcast_cpu_fwd_1d_to_3d() raises:
+def test_bcast_cpu_fwd_1d_to_3d() raises:
     print("test_bcast_cpu_fwd_1d_to_3d")
     comptime dtype = DType.float32
     # shape (3,) → (2,4,3)
@@ -820,7 +820,7 @@ fn test_bcast_cpu_fwd_1d_to_3d() raises:
             )
 
 
-fn test_bcast_cpu_fwd_2d_to_3d() raises:
+def test_bcast_cpu_fwd_2d_to_3d() raises:
     print("test_bcast_cpu_fwd_2d_to_3d")
     comptime dtype = DType.float32
     # shape (1,3) → (2,1,3) → (2,4,3)  but broadcast_to goes directly
@@ -831,7 +831,7 @@ fn test_bcast_cpu_fwd_2d_to_3d() raises:
     assert_true(sliced.squeeze().all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
 
 
-fn test_bcast_cpu_fwd_same_shape_noop() raises:
+def test_bcast_cpu_fwd_same_shape_noop() raises:
     print("test_bcast_cpu_fwd_same_shape_noop")
     comptime dtype = DType.float32
     # Broadcasting to the same shape is a valid no-op
@@ -844,7 +844,7 @@ fn test_bcast_cpu_fwd_same_shape_noop() raises:
 # SECTION 2 — CPU · Backward · 1-D cases
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_bcast_cpu_bwd_1d_to_2d_sum_rows() raises:
+def test_bcast_cpu_bwd_1d_to_2d_sum_rows() raises:
     print("test_bcast_cpu_bwd_1d_to_2d_sum_rows")
     comptime dtype = DType.float32
     # a.shape=(3,) broadcast to (2,3); grad must sum over axis 0
@@ -856,7 +856,7 @@ fn test_bcast_cpu_bwd_1d_to_2d_sum_rows() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([2.0, 2.0, 2.0])))
 
 
-fn test_bcast_cpu_bwd_1d_to_3d() raises:
+def test_bcast_cpu_bwd_1d_to_3d() raises:
     print("test_bcast_cpu_bwd_1d_to_3d")
     comptime dtype = DType.float32
     # a.shape=(3,) broadcast to (2,4,3); grad sums over axes 0 and 1
@@ -868,7 +868,7 @@ fn test_bcast_cpu_bwd_1d_to_3d() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([8.0, 8.0, 8.0])))
 
 
-fn test_bcast_cpu_bwd_scalar_to_1d() raises:
+def test_bcast_cpu_bwd_scalar_to_1d() raises:
     print("test_bcast_cpu_bwd_scalar_to_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([3.0], requires_grad=True)
@@ -883,7 +883,7 @@ fn test_bcast_cpu_bwd_scalar_to_1d() raises:
 # SECTION 3 — CPU · Backward · 2-D cases
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_bcast_cpu_bwd_2d_row_to_2d() raises:
+def test_bcast_cpu_bwd_2d_row_to_2d() raises:
     print("test_bcast_cpu_bwd_2d_row_to_2d")
     comptime dtype = DType.float32
     # a.shape=(1,3) broadcast to (4,3); grad sums over axis 0
@@ -895,7 +895,7 @@ fn test_bcast_cpu_bwd_2d_row_to_2d() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[4.0, 4.0, 4.0]])))
 
 
-fn test_bcast_cpu_bwd_2d_col_to_2d() raises:
+def test_bcast_cpu_bwd_2d_col_to_2d() raises:
     print("test_bcast_cpu_bwd_2d_col_to_2d")
     comptime dtype = DType.float32
     # a.shape=(3,1) broadcast to (3,4); grad sums over axis 1
@@ -907,7 +907,7 @@ fn test_bcast_cpu_bwd_2d_col_to_2d() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[4.0], [4.0], [4.0]])))
 
 
-fn test_bcast_cpu_bwd_2d_to_3d() raises:
+def test_bcast_cpu_bwd_2d_to_3d() raises:
     print("test_bcast_cpu_bwd_2d_to_3d")
     comptime dtype = DType.float32
     # a.shape=(1,3) broadcast to (2,4,3)
@@ -919,7 +919,7 @@ fn test_bcast_cpu_bwd_2d_to_3d() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[8.0, 8.0, 8.0]])))
 
 
-fn test_bcast_cpu_bwd_same_shape_noop() raises:
+def test_bcast_cpu_bwd_same_shape_noop() raises:
     print("test_bcast_cpu_bwd_same_shape_noop")
     comptime dtype = DType.float32
     # No axes broadcast — grad passes through unchanged
@@ -934,7 +934,7 @@ fn test_bcast_cpu_bwd_same_shape_noop() raises:
 # SECTION 4 — CPU · Backward · chained ops after broadcast_to
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_bcast_cpu_bwd_chained_add() raises:
+def test_bcast_cpu_bwd_chained_add() raises:
     print("test_bcast_cpu_bwd_chained_add")
     comptime dtype = DType.float32
     # broadcast then add then sum — verify chain rule
@@ -949,7 +949,7 @@ fn test_bcast_cpu_bwd_chained_add() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([3.0, 3.0, 3.0])))
 
 
-fn test_bcast_cpu_bwd_chained_multiply() raises:
+def test_bcast_cpu_bwd_chained_multiply() raises:
     print("test_bcast_cpu_bwd_chained_multiply")
     comptime dtype = DType.float32
     # a.shape=(1,3) broadcast to (2,3) then element-wise multiply
@@ -964,7 +964,7 @@ fn test_bcast_cpu_bwd_chained_multiply() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[5.0, 7.0, 9.0]])))
 
 
-fn test_bcast_cpu_bwd_chained_double_broadcast() raises:
+def test_bcast_cpu_bwd_chained_double_broadcast() raises:
     print("test_bcast_cpu_bwd_chained_double_broadcast")
     comptime dtype = DType.float32
     # Two separate tensors broadcast then added
@@ -979,7 +979,7 @@ fn test_bcast_cpu_bwd_chained_double_broadcast() raises:
     assert_true(b.grad().all_close(Tensor[dtype].d2([[3.0],[3.0],[3.0]])))
 
 
-fn test_bcast_cpu_bwd_3d_partial_broadcast() raises:
+def test_bcast_cpu_bwd_3d_partial_broadcast() raises:
     print("test_bcast_cpu_bwd_3d_partial_broadcast")
     comptime dtype = DType.float32
     # a.shape=(1,1,4) broadcast to (3,2,4)
@@ -995,7 +995,7 @@ fn test_bcast_cpu_bwd_3d_partial_broadcast() raises:
 # SECTION 5 — GPU · Forward correctness
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_bcast_gpu_fwd_1d_to_2d() raises:
+def test_bcast_gpu_fwd_1d_to_2d() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_fwd_1d_to_2d")
         comptime dtype = DType.float32
@@ -1008,7 +1008,7 @@ fn test_bcast_gpu_fwd_1d_to_2d() raises:
         ])))
 
 
-fn test_bcast_gpu_fwd_2d_row_to_2d() raises:
+def test_bcast_gpu_fwd_2d_row_to_2d() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_fwd_2d_row_to_2d")
         comptime dtype = DType.float32
@@ -1023,7 +1023,7 @@ fn test_bcast_gpu_fwd_2d_row_to_2d() raises:
         ])))
 
 
-fn test_bcast_gpu_fwd_2d_col_to_2d() raises:
+def test_bcast_gpu_fwd_2d_col_to_2d() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_fwd_2d_col_to_2d")
         comptime dtype = DType.float32
@@ -1037,7 +1037,7 @@ fn test_bcast_gpu_fwd_2d_col_to_2d() raises:
         ])))
 
 
-fn test_bcast_gpu_fwd_1d_to_3d() raises:
+def test_bcast_gpu_fwd_1d_to_3d() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_fwd_1d_to_3d")
         comptime dtype = DType.float32
@@ -1052,7 +1052,7 @@ fn test_bcast_gpu_fwd_1d_to_3d() raises:
         assert_true(sliced.squeeze().all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
 
 
-fn test_bcast_gpu_fwd_same_shape_noop() raises:
+def test_bcast_gpu_fwd_same_shape_noop() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_fwd_same_shape_noop")
         comptime dtype = DType.float32
@@ -1066,7 +1066,7 @@ fn test_bcast_gpu_fwd_same_shape_noop() raises:
 # SECTION 6 — GPU · Backward · grad flows correctly
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_bcast_gpu_bwd_1d_to_2d() raises:
+def test_bcast_gpu_bwd_1d_to_2d() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_bwd_1d_to_2d")
         comptime dtype = DType.float32
@@ -1078,7 +1078,7 @@ fn test_bcast_gpu_bwd_1d_to_2d() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([2.0, 2.0, 2.0])))
 
 
-fn test_bcast_gpu_bwd_2d_row_to_2d() raises:
+def test_bcast_gpu_bwd_2d_row_to_2d() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_bwd_2d_row_to_2d")
         comptime dtype = DType.float32
@@ -1090,7 +1090,7 @@ fn test_bcast_gpu_bwd_2d_row_to_2d() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d2([[4.0, 4.0, 4.0]])))
 
 
-fn test_bcast_gpu_bwd_2d_col_to_2d() raises:
+def test_bcast_gpu_bwd_2d_col_to_2d() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_bwd_2d_col_to_2d")
         comptime dtype = DType.float32
@@ -1102,7 +1102,7 @@ fn test_bcast_gpu_bwd_2d_col_to_2d() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d2([[4.0],[4.0],[4.0]])))
 
 
-fn test_bcast_gpu_bwd_1d_to_3d() raises:
+def test_bcast_gpu_bwd_1d_to_3d() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_bwd_1d_to_3d")
         comptime dtype = DType.float32
@@ -1115,7 +1115,7 @@ fn test_bcast_gpu_bwd_1d_to_3d() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([8.0, 8.0, 8.0])))
 
 
-fn test_bcast_gpu_bwd_same_shape_noop() raises:
+def test_bcast_gpu_bwd_same_shape_noop() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_bwd_same_shape_noop")
         comptime dtype = DType.float32
@@ -1127,7 +1127,7 @@ fn test_bcast_gpu_bwd_same_shape_noop() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_bcast_gpu_bwd_chained_multiply() raises:
+def test_bcast_gpu_bwd_chained_multiply() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_bwd_chained_multiply")
         comptime dtype = DType.float32
@@ -1142,7 +1142,7 @@ fn test_bcast_gpu_bwd_chained_multiply() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d2([[5.0, 7.0, 9.0]])))
 
 
-fn test_bcast_gpu_bwd_3d_partial_broadcast() raises:
+def test_bcast_gpu_bwd_3d_partial_broadcast() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_bwd_3d_partial_broadcast")
         comptime dtype = DType.float32
@@ -1155,7 +1155,7 @@ fn test_bcast_gpu_bwd_3d_partial_broadcast() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d3([[[6.0, 6.0, 6.0, 6.0]]])))
 
 
-fn test_bcast_gpu_bwd_chained_add() raises:
+def test_bcast_gpu_bwd_chained_add() raises:
     comptime if has_accelerator():
         print("test_bcast_gpu_bwd_chained_add")
         comptime dtype = DType.float32

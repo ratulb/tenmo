@@ -17,7 +17,7 @@ from .common_utils import panic
 from .ancestry import Ancestor
 
 
-fn shuffle_gather[
+def shuffle_gather[
     dtype: DType
 ](
     out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
@@ -47,7 +47,7 @@ fn shuffle_gather[
     out_buffer[tid] = in_buffer[src_flat]
 
 
-fn shuffle_scatter[
+def shuffle_scatter[
     dtype: DType
 ](
     out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
@@ -82,7 +82,7 @@ fn shuffle_scatter[
 @fieldwise_init
 struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn _upload_permutation(
+    def _upload_permutation(
         permutation: List[Int],
         gpu: GPU,
     ) raises -> DeviceBuffer[DType.int64]:
@@ -96,7 +96,7 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return perm_buffer^
 
     @staticmethod
-    fn launch_gather(
+    def launch_gather(
         A: NDBuffer[Self.dtype],
         permutation: List[Int],
         axis: Int,
@@ -147,7 +147,7 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return NDBuffer[Self.dtype].with_device_state(result_state^, shape)
 
     @staticmethod
-    fn launch_scatter(
+    def launch_scatter(
         grad: NDBuffer[Self.dtype],
         permutation: List[Int],
         axis: Int,
@@ -206,7 +206,7 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref bwd_fn_arg = output.ancestry().backward_fn_arg().get[ShuffleArg]()
@@ -252,7 +252,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
 @fieldwise_init
 struct Shuffle[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],

@@ -2,23 +2,23 @@ from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-fn test_item_cpu_scalar_tensor() raises:
+def test_item_cpu_scalar_tensor() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(42.0)
     assert_true(a.item() == 42.0)
 
 
-fn test_item_cpu_1d_tensor() raises:
+def test_item_cpu_1d_tensor() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([7.0])
     assert_true(a.item() == 7.0)
 
 
-fn test_item_cpu_gradbox_scalar() raises:
+def test_item_cpu_gradbox_scalar() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(3.0, requires_grad=True)
     var b = Tensor[dtype].scalar(4.0, requires_grad=True)
@@ -28,7 +28,7 @@ fn test_item_cpu_gradbox_scalar() raises:
     assert_true(c.gradients()[].item() == 1.0)
 
 
-fn test_item_gpu_scalar_tensor() raises:
+def test_item_gpu_scalar_tensor() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].scalar(42.0)
@@ -36,7 +36,7 @@ fn test_item_gpu_scalar_tensor() raises:
         assert_true(a_gpu.item() == 42.0)
 
 
-fn test_item_gpu_1d_tensor() raises:
+def test_item_gpu_1d_tensor() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([7.0])
@@ -44,7 +44,7 @@ fn test_item_gpu_1d_tensor() raises:
         assert_true(a_gpu.item() == 7.0)
 
 
-fn test_item_gpu_gradbox_scalar() raises:
+def test_item_gpu_gradbox_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].scalar(3.0, requires_grad=True)
@@ -60,7 +60,7 @@ fn test_item_gpu_gradbox_scalar() raises:
         assert_true(c_gpu.gradients()[].item() == 1.0)
 
 
-fn test_item_gpu_gradbox_after_backward() raises:
+def test_item_gpu_gradbox_after_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].scalar(3.0, requires_grad=True)
@@ -73,7 +73,7 @@ fn test_item_gpu_gradbox_after_backward() raises:
         assert_true(a.grad().item() == 1.0)
 
 
-fn test_item_gpu_sum_result() raises:
+def test_item_gpu_sum_result() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -82,7 +82,7 @@ fn test_item_gpu_sum_result() raises:
         assert_true(s.item() == 10.0)
 
 
-fn test_item_gpu_mean_result() raises:
+def test_item_gpu_mean_result() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])

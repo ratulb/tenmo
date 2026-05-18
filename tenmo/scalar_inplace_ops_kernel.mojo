@@ -12,7 +12,7 @@ from .ndbuffer import NDBuffer
 # Simplification - views becomes contiguous when copied to device and offset becomes 0
 
 
-fn inplace_scalar_ops[
+def inplace_scalar_ops[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -89,7 +89,7 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
     ImplicitlyCopyable & Movable
 ):
     @staticmethod
-    fn launch[
+    def launch[
         op_code: Int,
     ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) raises:
         var numels = A.numels()
@@ -137,7 +137,7 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
         # return out^
 
     @staticmethod
-    fn launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
+    def launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
         threads_per_block: Int
         num_blocks: Int
 

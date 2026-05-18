@@ -20,7 +20,7 @@ from tenmo.shared import Reduction
 @fieldwise_init
 struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn validate_label_smoothing(ls: Scalar[Self.dtype]):
+    def validate_label_smoothing(ls: Scalar[Self.dtype]):
         if ls < 0 or ls > 1:
             panic(
                 "CrossEntropyLoss: label_smoothing must be in [0, 1], got "
@@ -28,7 +28,7 @@ struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
 
     @staticmethod
-    fn validate_logits_rank(logits_shape: Shape):
+    def validate_logits_rank(logits_shape: Shape):
         if logits_shape.rank() < 2:
             panic(
                 "CrossEntropyLoss: logits must have rank ≥ 2 (N, C, ...), got"
@@ -37,7 +37,7 @@ struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
 
     @staticmethod
-    fn validate_class_indices_shapes(
+    def validate_class_indices_shapes(
         logits_shape: Shape,
         target_shape: Shape,
     ):
@@ -88,7 +88,7 @@ struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 )
 
     @staticmethod
-    fn validate_probability_shapes(
+    def validate_probability_shapes(
         logits_shape: Shape,
         target_shape: Shape,
     ):
@@ -104,7 +104,7 @@ struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
 
     @staticmethod
-    fn validate_target_indices(
+    def validate_target_indices(
         target: Tensor[DType.int32],
         num_classes: Int,
         ignore_index: Int,
@@ -129,7 +129,7 @@ struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 )
 
     @staticmethod
-    fn validate_num_classes(C: Int):
+    def validate_num_classes(C: Int):
         if C < 1:
             panic(
                 "CrossEntropyLoss: num_classes C must be ≥ 1, got " + String(C)
@@ -141,7 +141,7 @@ struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn flatten_spatial_class_indices(
+    def flatten_spatial_class_indices(
         logits: Tensor[Self.dtype],
         target: Tensor[DType.int32],
     ) -> Tuple[
@@ -197,7 +197,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         )
 
     @staticmethod
-    fn flatten_spatial_probabilities(
+    def flatten_spatial_probabilities(
         logits: Tensor[Self.dtype],
         target: Tensor[Self.dtype],
     ) -> Tuple[
@@ -231,7 +231,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return logits_2d, target_2d, M, C, spatial_shape, N
 
     @staticmethod
-    fn build_ignore_mask(
+    def build_ignore_mask(
         target_1d: NDBuffer[DType.int32],
         ignore_index: Int,
     ) -> NDBuffer[Self.dtype]:
@@ -245,7 +245,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ).to_dtype[Self.dtype]()
 
     @staticmethod
-    fn apply_reduction(
+    def apply_reduction(
         losses: NDBuffer[Self.dtype],
         reduction: Reduction,
         N: Int,
@@ -275,7 +275,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn compute_log_softmax_and_softmax(
+    def compute_log_softmax_and_softmax(
         logits_2d: NDBuffer[Self.dtype],
     ) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
@@ -288,7 +288,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return logits_2d.log_softmax(IntArray([1]), validated=True)
 
     @staticmethod
-    fn scale_grad_by_upstream(
+    def scale_grad_by_upstream(
         grad: NDBuffer[Self.dtype],
         upstream: Gradbox[Self.dtype],
         reduction: Reduction,
@@ -331,7 +331,7 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
     """
 
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref bwd_arg = (
@@ -466,7 +466,7 @@ struct CEClassIndicesForward[dtype: DType](
     """
 
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool
     ](
         logits: Tensor[Self.dtype],
@@ -585,7 +585,7 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
     """
 
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref bwd_arg = (
@@ -667,7 +667,7 @@ struct CEProbabilitiesForward[dtype: DType](
     """
 
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool
     ](
         logits: Tensor[Self.dtype],
@@ -769,7 +769,7 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     var label_smoothing: Scalar[Self.dtype]
     var training: Bool
 
-    fn __init__(
+    def __init__(
         out self,
         reduction: Int = 0,
         ignore_index: Int = -100,
@@ -782,7 +782,7 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         self.label_smoothing = label_smoothing
         self.training = training
 
-    fn __init__(
+    def __init__(
         out self,
         reduction: String,
         ignore_index: Int = -100,
@@ -795,21 +795,21 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         self.label_smoothing = label_smoothing
         self.training = training
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.reduction = copy.reduction
         self.ignore_index = copy.ignore_index
         self.label_smoothing = copy.label_smoothing
         self.training = copy.training
 
-    fn train(mut self):
+    def train(mut self):
         """Enable gradient tracking (training mode)."""
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         """Disable gradient tracking (evaluation mode)."""
         self.training = False
 
-    fn __call__(
+    def __call__(
         self,
         logits: Tensor[Self.dtype],
         target: Tensor[DType.int32],
@@ -835,7 +835,7 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 validate,
             )
 
-    fn __call__(
+    def __call__(
         self,
         logits: Tensor[Self.dtype],
         target: Tensor[Self.dtype],

@@ -15,7 +15,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         if not output.parents:
@@ -40,7 +40,7 @@ comptime AddBroadcastBackward[dtype: DType] = BroadcastBackward[
 @fieldwise_init
 struct AddScalar[dtype: DType](Copyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
@@ -63,7 +63,7 @@ struct AddScalar[dtype: DType](Copyable, RegisterPassable):
 @fieldwise_init
 struct Adder[dtype: DType](Copyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[
         Self.dtype
@@ -107,7 +107,7 @@ struct Adder[dtype: DType](Copyable, RegisterPassable):
 @fieldwise_init
 struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.gradbox[]

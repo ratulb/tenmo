@@ -8,7 +8,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct SigmoidBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
@@ -23,7 +23,7 @@ struct SigmoidBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
 struct Sigmoid[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],

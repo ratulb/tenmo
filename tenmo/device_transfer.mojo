@@ -18,7 +18,7 @@ struct Flow(RegisterPassable & Equatable, ImplicitlyCopyable):
     comptime Gpu2Cpu = Flow(1)
     comptime UnMoved = Flow(-1)
 
-    fn __init__(out self, direction: Int = 0):
+    def __init__(out self, direction: Int = 0):
         self.direction = direction
         if direction < -1 or direction > 1:
             panic(
@@ -26,13 +26,13 @@ struct Flow(RegisterPassable & Equatable, ImplicitlyCopyable):
                 " or '-1 → UnMoved'"
             )
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.direction = copy.direction
 
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         return self.direction == other.direction
 
-    fn __ne__(self, other: Self) -> Bool:
+    def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
 
@@ -44,7 +44,7 @@ struct DeviceTransferBwdArg(ArgumentType):
 
 struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var bwd_arg = (
@@ -167,7 +167,7 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
 
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],
@@ -208,7 +208,7 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn forward(
+    def forward(
         self: Gradbox[Self.dtype],
         device: Device,
     ) raises -> Gradbox[Self.dtype]:

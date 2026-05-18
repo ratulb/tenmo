@@ -14,7 +14,7 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         # This is the gradient flowing *into* this broadcasted op.
@@ -62,7 +62,7 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
         return parent_grad_list^
 
     @staticmethod
-    fn upstream_grad_share(
+    def upstream_grad_share(
         self: NDBuffer[Self.dtype],
         other: NDBuffer[Self.dtype],
         upstream_grad: NDBuffer[Self.dtype],
@@ -95,7 +95,7 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
 @fieldwise_init
 struct BroadcastToBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var parent = output.ancestry().get(0)
@@ -124,7 +124,7 @@ struct BroadcastToBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct Broadcast[dtype: DType](Copyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],

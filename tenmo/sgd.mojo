@@ -20,7 +20,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
     var velocities: List[Gradbox[Self.dtype]]
     var use_momentum: Bool
 
-    fn __init__(
+    def __init__(
         out self,
         parameters: List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]],
         lr: Scalar[Self.dtype] = 0.01,
@@ -67,7 +67,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                         )
                     )
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.parameters = copy.parameters.copy()
         self.lr = copy.lr
         self.momentum = copy.momentum
@@ -77,7 +77,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         self.use_momentum = copy.use_momentum
         self.velocities = copy.velocities.copy()
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, deinit take: Self):
         self.parameters = take.parameters^
         self.lr = take.lr
         self.momentum = take.momentum
@@ -89,7 +89,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
 
 
     @always_inline
-    fn _step_no_momentum[
+    def _step_no_momentum[
         simd_w: Int
     ](
         self,
@@ -119,7 +119,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             param_ptr[k] = p - self.lr * g
 
     @always_inline
-    fn _apply_momentum[
+    def _apply_momentum[
         simd_w: Int
     ](
         self,
@@ -157,7 +157,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             param_ptr[k] = p - self.lr * v
 
     @always_inline
-    fn _zero_rows_ptr[
+    def _zero_rows_ptr[
         simd_w: Int
     ](
         self,
@@ -178,7 +178,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 ptr[base + col] = 0
 
     @always_inline
-    fn _step_no_momentum_sparse[
+    def _step_no_momentum_sparse[
         simd_w: Int
     ](
         self,
@@ -210,7 +210,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 param_ptr[base + col] = p - self.lr * g
 
     @always_inline
-    fn _apply_momentum_sparse[
+    def _apply_momentum_sparse[
         simd_w: Int
     ](
         self,
@@ -250,7 +250,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 param_ptr[base + col] = p - self.lr * v
 
     @always_inline
-    fn _apply_clip_norm_to_ptr[
+    def _apply_clip_norm_to_ptr[
         simd_w: Int
     ](
         self,
@@ -269,7 +269,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             grad_ptr[k] *= clip_coef
 
     @always_inline
-    fn _apply_clip_value_to_ptr[
+    def _apply_clip_value_to_ptr[
         simd_w: Int
     ](
         self,
@@ -290,7 +290,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             grad_ptr[k] = max(min_val, min(max_val, grad_ptr[k]))
 
 
-    fn compute_grad_norm(self) -> Scalar[Self.dtype]:
+    def compute_grad_norm(self) -> Scalar[Self.dtype]:
         var total_norm_sq: Scalar[Self.dtype] = 0.0
         comptime simd_w = simd_width_of[Self.dtype]()
 
@@ -341,7 +341,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         return sqrt(total_norm_sq)
 
 
-    fn clip_gradients(mut self):
+    def clip_gradients(mut self):
         comptime simd_w = simd_width_of[Self.dtype]()
 
         if self.clip_norm > 0:
@@ -404,7 +404,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
 
 
     @always_inline
-    fn step(mut self, indices: IntArray = IntArray()):
+    def step(mut self, indices: IntArray = IntArray()):
         """
         Optimized parameter update.
 
@@ -538,7 +538,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 )
 
     @always_inline
-    fn zero_grad(mut self, indices: IntArray = IntArray()):
+    def zero_grad(mut self, indices: IntArray = IntArray()):
         """
         Zero gradients.
 
@@ -571,17 +571,17 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             else:
                 parameter.zero_grad()
 
-    fn set_lr(mut self, lr: Scalar[Self.dtype]):
+    def set_lr(mut self, lr: Scalar[Self.dtype]):
         self.lr = lr
 
-    fn get_lr(self) -> Scalar[Self.dtype]:
+    def get_lr(self) -> Scalar[Self.dtype]:
         return self.lr
 
-    fn set_clip_norm(mut self, clip_norm: Scalar[Self.dtype]):
+    def set_clip_norm(mut self, clip_norm: Scalar[Self.dtype]):
         self.clip_norm = clip_norm
 
-    fn set_clip_value(mut self, clip_value: Scalar[Self.dtype]):
+    def set_clip_value(mut self, clip_value: Scalar[Self.dtype]):
         self.clip_value = clip_value
 
-    fn set_weight_decay(mut self, weight_decay: Scalar[Self.dtype]):
+    def set_weight_decay(mut self, weight_decay: Scalar[Self.dtype]):
         self.weight_decay = weight_decay

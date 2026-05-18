@@ -9,7 +9,7 @@ from tenmo.shapes import Shape
 # =============================================================================
 
 
-fn test_recip_cpu_forward_1d() raises:
+def test_recip_cpu_forward_1d() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 4.0, 8.0])
     var r = x.reciprocal[track_grad=False]()
@@ -17,7 +17,7 @@ fn test_recip_cpu_forward_1d() raises:
     assert_true(r.all_close[atol=1e-6](Tensor[dtype].d1([1.0, 0.5, 0.25, 0.125])))
 
 
-fn test_recip_cpu_forward_2d() raises:
+def test_recip_cpu_forward_2d() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [4.0, 5.0]])
     var r = x.reciprocal[track_grad=False]()
@@ -27,7 +27,7 @@ fn test_recip_cpu_forward_2d() raises:
     ))
 
 
-fn test_recip_cpu_forward_3d() raises:
+def test_recip_cpu_forward_3d() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d3(
         [[[1.0, 2.0], [4.0, 8.0]], [[0.5, 0.25], [10.0, 100.0]]]
@@ -41,21 +41,21 @@ fn test_recip_cpu_forward_3d() raises:
     ))
 
 
-fn test_recip_cpu_forward_negative_values() raises:
+def test_recip_cpu_forward_negative_values() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([-1.0, -2.0, -4.0])
     var r = x.reciprocal[track_grad=False]()
     assert_true(r.all_close[atol=1e-6](Tensor[dtype].d1([-1.0, -0.5, -0.25])))
 
 
-fn test_recip_cpu_forward_scalar() raises:
+def test_recip_cpu_forward_scalar() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].scalar(4.0)
     var r = x.reciprocal[track_grad=False]()
     assert_true(r.all_close[atol=1e-6](Tensor[dtype].scalar(0.25)))
 
 
-fn test_recip_cpu_forward_no_grad() raises:
+def test_recip_cpu_forward_no_grad() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([2.0, 4.0], requires_grad=True)
     var r = x.reciprocal[track_grad=False]()
@@ -67,7 +67,7 @@ fn test_recip_cpu_forward_no_grad() raises:
 # =============================================================================
 
 
-fn test_recip_cpu_backward_1d() raises:
+def test_recip_cpu_backward_1d() raises:
     comptime dtype = DType.float32
     # x = [1, 2, 4], out = [1, 0.5, 0.25]
     # grad = -1/x² = [-1, -0.25, -0.0625]
@@ -81,7 +81,7 @@ fn test_recip_cpu_backward_1d() raises:
     ))
 
 
-fn test_recip_cpu_backward_2d() raises:
+def test_recip_cpu_backward_2d() raises:
     comptime dtype = DType.float32
     # x = [[1,2],[4,8]], grad = -1/x² = [[-1,-0.25],[-0.0625,-0.015625]]
     var x = Tensor[dtype].d2([[1.0, 2.0], [4.0, 8.0]], requires_grad=True)
@@ -94,7 +94,7 @@ fn test_recip_cpu_backward_2d() raises:
     ))
 
 
-fn test_recip_cpu_backward_3d() raises:
+def test_recip_cpu_backward_3d() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d3(
         [[[1.0, 2.0], [4.0, 8.0]], [[1.0, 2.0], [4.0, 8.0]]], requires_grad=True
@@ -111,7 +111,7 @@ fn test_recip_cpu_backward_3d() raises:
     ))
 
 
-fn test_recip_cpu_backward_seed() raises:
+def test_recip_cpu_backward_seed() raises:
     comptime dtype = DType.float32
     # backward with non-unit seed — grad = seed * (-1/x²)
     var x = Tensor[dtype].d1([2.0, 4.0], requires_grad=True)
@@ -124,7 +124,7 @@ fn test_recip_cpu_backward_seed() raises:
     ))
 
 
-fn test_recip_cpu_backward_negative() raises:
+def test_recip_cpu_backward_negative() raises:
     comptime dtype = DType.float32
     # x = [-2, -4], grad = -1/x² = [-0.25, -0.0625]
     # sign of x does not affect grad sign — x² is always positive
@@ -137,7 +137,7 @@ fn test_recip_cpu_backward_negative() raises:
     ))
 
 
-fn test_recip_cpu_backward_grad_accumulation() raises:
+def test_recip_cpu_backward_grad_accumulation() raises:
     comptime dtype = DType.float32
     # x used twice — grads accumulate
     var x = Tensor[dtype].d1([2.0, 4.0], requires_grad=True)
@@ -158,7 +158,7 @@ fn test_recip_cpu_backward_grad_accumulation() raises:
 # =============================================================================
 
 
-fn test_recip_cpu_grad_flow_chain() raises:
+def test_recip_cpu_grad_flow_chain() raises:
     comptime dtype = DType.float32
     # loss = sum(1/x) * 2 — chain rule: grad = 2 * (-1/x²)
     var x = Tensor[dtype].d1([1.0, 2.0, 4.0], requires_grad=True)
@@ -172,7 +172,7 @@ fn test_recip_cpu_grad_flow_chain() raises:
     ))
 
 
-fn test_recip_cpu_grad_flow_double_reciprocal() raises:
+def test_recip_cpu_grad_flow_double_reciprocal() raises:
     comptime dtype = DType.float32
     # loss = sum(1/(1/x)) = sum(x) — grad should be all ones
     var x = Tensor[dtype].d1([1.0, 2.0, 4.0], requires_grad=True)
@@ -184,7 +184,7 @@ fn test_recip_cpu_grad_flow_double_reciprocal() raises:
     assert_true(x.grad().all_close[atol=1e-5](Tensor.ones_like(x)))
 
 
-fn test_recip_cpu_grad_flow_with_multiply() raises:
+def test_recip_cpu_grad_flow_with_multiply() raises:
     comptime dtype = DType.float32
     # loss = sum(x * (1/x)) = sum(1s) = n — grad of x:
     # ∂loss/∂x[i] = 1/x[i] + x[i] * (-1/x[i]²) = 1/x - 1/x = 0
@@ -199,7 +199,7 @@ fn test_recip_cpu_grad_flow_with_multiply() raises:
 
 
 
-fn test_recip_cpu_grad_flow_sum_then_recip() raises:
+def test_recip_cpu_grad_flow_sum_then_recip() raises:
     comptime dtype = DType.float32
     # loss = 1 / sum(x), x = [1,2,3], sum=6
     # ∂loss/∂x[i] = -1/sum(x)² = -1/36
@@ -214,7 +214,7 @@ fn test_recip_cpu_grad_flow_sum_then_recip() raises:
     ))
 
 
-fn test_recip_cpu_consistency_with_divide() raises:
+def test_recip_cpu_consistency_with_divide() raises:
     comptime dtype = DType.float32
     # 1/x should equal 1.0 / x via scalar divide
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -228,7 +228,7 @@ fn test_recip_cpu_consistency_with_divide() raises:
 # =============================================================================
 
 
-fn test_recip_gpu_forward_1d() raises:
+def test_recip_gpu_forward_1d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d1([1.0, 2.0, 4.0, 8.0])
@@ -240,7 +240,7 @@ fn test_recip_gpu_forward_1d() raises:
         ))
 
 
-fn test_recip_gpu_forward_2d() raises:
+def test_recip_gpu_forward_2d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2([[1.0, 2.0], [4.0, 8.0]])
@@ -252,7 +252,7 @@ fn test_recip_gpu_forward_2d() raises:
         ))
 
 
-fn test_recip_gpu_backward_1d() raises:
+def test_recip_gpu_backward_1d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d1([1.0, 2.0, 4.0], requires_grad=True)
@@ -266,7 +266,7 @@ fn test_recip_gpu_backward_1d() raises:
         ))
 
 
-fn test_recip_gpu_backward_2d() raises:
+def test_recip_gpu_backward_2d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2([[1.0, 2.0], [4.0, 8.0]], requires_grad=True)
@@ -280,7 +280,7 @@ fn test_recip_gpu_backward_2d() raises:
         ))
 
 
-fn test_recip_gpu_backward_3d() raises:
+def test_recip_gpu_backward_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d3(
@@ -300,7 +300,7 @@ fn test_recip_gpu_backward_3d() raises:
         ))
 
 
-fn test_recip_gpu_grad_flow_chain() raises:
+def test_recip_gpu_grad_flow_chain() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d1([1.0, 2.0, 4.0], requires_grad=True)
@@ -314,7 +314,7 @@ fn test_recip_gpu_grad_flow_chain() raises:
         ))
 
 
-fn test_recip_gpu_grad_flow_double_reciprocal() raises:
+def test_recip_gpu_grad_flow_double_reciprocal() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d1([1.0, 2.0, 4.0], requires_grad=True)
@@ -326,7 +326,7 @@ fn test_recip_gpu_grad_flow_double_reciprocal() raises:
         assert_true(x.grad().all_close[atol=1e-5](Tensor.ones_like(x)))
 
 
-fn test_recip_gpu_vs_cpu_consistency() raises:
+def test_recip_gpu_vs_cpu_consistency() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x_cpu = Tensor[dtype].d2(
@@ -345,7 +345,7 @@ fn test_recip_gpu_vs_cpu_consistency() raises:
         assert_true(x_cpu.grad().all_close[atol=1e-6](x_gpu.grad().to_cpu()))
 
 
-fn test_recip_gpu_negative_values() raises:
+def test_recip_gpu_negative_values() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d1([-1.0, -2.0, -4.0], requires_grad=True)
@@ -360,7 +360,7 @@ fn test_recip_gpu_negative_values() raises:
             Tensor[dtype].d1([-1.0, -0.25, -0.0625])
         ))
 
-fn test_recip_gpu_grad_accumulation() raises:
+def test_recip_gpu_grad_accumulation() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x1 = Tensor[dtype].d1([2.0, 4.0], requires_grad=True)

@@ -34,7 +34,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
     var training: Bool
     var reduction: Reduction
 
-    fn __init__(
+    def __init__(
         out self,
         num_embeddings: Int,
         embedding_dim: Int,
@@ -110,13 +110,13 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
             self._zero_padding_row()
 
     # ── Forward ───────────────────────────────────────────────────────────────
-    fn __call__(
+    def __call__(
         mut self,
         indices: List[Int],
     ) -> Tensor[Self.dtype]:
         return self.__call__(IntArray(indices))
 
-    fn __call__(
+    def __call__(
         mut self,
         indices: IntArray,
     ) -> Tensor[Self.dtype]:
@@ -154,7 +154,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
 
         return result^
 
-    fn __call__(
+    def __call__(
         mut self,
         indices: Tensor[DType.int64],
     ) -> Tensor[Self.dtype]:
@@ -170,14 +170,14 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
 
     # ── Utilities ─────────────────────────────────────────────────────────────
 
-    fn _zero_padding_row(self):
+    def _zero_padding_row(self):
         """Zero out the padding_idx row — called after init and after updates.
         """
         if self.padding_idx:
             var pad = self.padding_idx.value()
             self.weight.fill(Scalar[Self.dtype](0), i(pad), s())
 
-    fn _apply_max_norm(self, mut result: Tensor[Self.dtype]):
+    def _apply_max_norm(self, mut result: Tensor[Self.dtype]):
         """Renormalise looked-up rows to have norm <= max_norm in-place."""
         if self.max_norm:
             var mn = Scalar[Self.dtype](self.max_norm.value())
@@ -188,11 +188,11 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
                 if norm > mn:
                     result.fill(row * Scalar[Self.dtype](mn / norm), i(k), s())
 
-    fn freeze(mut self):
+    def freeze(mut self):
         """Freeze all embeddings — no gradient computed."""
         self.weight.requires_grad = False
 
-    fn unfreeze(mut self):
+    def unfreeze(mut self):
         """Unfreeze embeddings — gradient computed."""
         self.weight.requires_grad = True
         if self.padding_idx:
@@ -203,7 +203,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
     # ── Pretrained loading ────────────────────────────────────────────────────
 
     @staticmethod
-    fn from_pretrained(
+    def from_pretrained(
         weights: Tensor[Self.dtype],
         padding_idx: Optional[Int] = None,
         max_norm: Optional[Float64] = None,
@@ -246,7 +246,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
 
     # ── Layer protocol ────────────────────────────────────────────────────────
 
-    fn parameters(
+    def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
@@ -258,19 +258,19 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
             )
         return params^
 
-    fn num_parameters(self) -> Int:
+    def num_parameters(self) -> Int:
         return self.weight.numels()
 
-    fn train(mut self):
+    def train(mut self):
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         self.training = False
 
-    fn into(self) -> Module[Self.dtype]:
+    def into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
-    fn to_gpu(
+    def to_gpu(
         deinit self,
         gpu: Optional[GPU] = None,
     ) raises -> Embedding[Self.dtype]:
@@ -279,7 +279,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
         out.weight = weight_gpu^
         return out^
 
-    fn to_cpu(deinit self) raises -> Embedding[Self.dtype]:
+    def to_cpu(deinit self) raises -> Embedding[Self.dtype]:
         var weight_cpu = self.weight.to_cpu(stop_grad=True)
         var out = self^
         out.weight = weight_cpu^

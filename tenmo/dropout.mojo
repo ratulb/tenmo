@@ -36,7 +36,7 @@ struct ArgDropout[dtype: DType](ArgumentType):
 @fieldwise_init
 struct DropoutBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref arg_dropout = (
@@ -86,7 +86,7 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var seed: UInt64  # UInt64 to match PhiloxRandom.seed type
     var fixed_seed: Bool
 
-    fn __init__(out self, p: Scalar[Self.dtype] = Scalar[Self.dtype](0.5)):
+    def __init__(out self, p: Scalar[Self.dtype] = Scalar[Self.dtype](0.5)):
         if p < 0.0 or p >= 1.0:
             panic("Dropout probability must be in [0, 1)")
         self.training = True
@@ -95,14 +95,14 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self.seed = 42
         self.fixed_seed = False
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.training = copy.training
         self.p = copy.p
         self.scale = copy.scale
         self.seed = copy.seed
         self.fixed_seed = copy.fixed_seed
 
-    fn __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         # ── Eval / no-op paths ────────────────────────────────────────────────
         if not self.training or self.p == Scalar[Self.dtype](0.0):
             return x
@@ -218,32 +218,32 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
         return out^
 
-    fn parameters(
+    def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
-    fn num_parameters(self) -> Int:
+    def num_parameters(self) -> Int:
         return 0
 
-    fn train(mut self):
+    def train(mut self):
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         self.training = False
 
-    fn set_seed(mut self, seed_val: UInt64):
+    def set_seed(mut self, seed_val: UInt64):
         """Set Philox seed for reproducible dropout masks."""
         self.seed = seed_val
         self.fixed_seed = True
 
-    fn into(self) -> Module[Self.dtype]:
+    def into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), DROPOUT)
 
-    fn to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
+    def to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
         """No-op — activation layers have no parameters to move."""
         return self
 
-    fn to_cpu(self) raises -> Self:
+    def to_cpu(self) raises -> Self:
         """No-op — no parameters to move."""
         return self

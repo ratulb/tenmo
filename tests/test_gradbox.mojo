@@ -8,7 +8,7 @@ from tenmo.tensor import Tensor
 from tenmo.intarray import IntArray
 
 
-fn main() raises:
+def main() raises:
     _ = """
     run = 1
     for _ in range(run):
@@ -41,7 +41,7 @@ fn main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-fn test_gradbox_unsqueeze_basic() raises:
+def test_gradbox_unsqueeze_basic() raises:
     print("test_gradbox_unsqueeze_basic")
     comptime dtype = DType.float32
     var _tmp0 = Gradbox[dtype].arange(6)
@@ -62,7 +62,7 @@ fn test_gradbox_unsqueeze_basic() raises:
     print("Passed unsqueeze basic test")
 
 
-fn test_gradbox_squeeze_basic() raises:
+def test_gradbox_squeeze_basic() raises:
     print("test_gradbox_squeeze_basic")
     comptime dtype = DType.float32
     var _tmp0 = Gradbox[dtype].arange(6)
@@ -86,7 +86,7 @@ fn test_gradbox_squeeze_basic() raises:
     print("Passed squeeze basic test")
 
 
-fn test_gradbox_squeeze_unsqueeze_symmetry() raises:
+def test_gradbox_squeeze_unsqueeze_symmetry() raises:
     print("test_gradbox_squeeze_unsqueeze_symmetry")
     comptime dtype = DType.float32
     var _tmp0 = Gradbox[dtype].arange(12)
@@ -101,7 +101,7 @@ fn test_gradbox_squeeze_unsqueeze_symmetry() raises:
     print("Passed squeeze-unsqueeze symmetry test")
 
 
-fn test_gradbox_unsqueeze_negative_axes() raises:
+def test_gradbox_unsqueeze_negative_axes() raises:
     print("test_gradbox_unsqueeze_negative_axes")
     comptime dtype = DType.float32
     var _tmp0 = Gradbox[dtype].arange(4)
@@ -122,7 +122,7 @@ fn test_gradbox_unsqueeze_negative_axes() raises:
     print("Passed unsqueeze negative axes test")
 
 
-fn test_gradbox_squeeze_unsqueeze_multiple_axes() raises:
+def test_gradbox_squeeze_unsqueeze_multiple_axes() raises:
     print("test_gradbox_squeeze_unsqueeze_multiple_axes")
     comptime dtype = DType.float32
     var _tmp0 = Gradbox[dtype].arange(8)
@@ -139,7 +139,7 @@ fn test_gradbox_squeeze_unsqueeze_multiple_axes() raises:
     print("Passed squeeze-unsqueeze multiple axes test")
 
 
-fn test_gradbox_permute_basic() raises:
+def test_gradbox_permute_basic() raises:
     comptime dtype = DType.float32
     print("Running test_gradbox_permute_basic")
     g1 = Gradbox[dtype](Shape(3, 4))
@@ -150,7 +150,7 @@ fn test_gradbox_permute_basic() raises:
     print("Passed test_gradbox_permute_basic")
 
 
-fn test_gradbox_permute_3d() raises:
+def test_gradbox_permute_3d() raises:
     comptime dtype = DType.float32
     print("Running test_gradbox_permute_3d")
     g1 = Gradbox[dtype](Shape(3, 4, 5))
@@ -161,7 +161,7 @@ fn test_gradbox_permute_3d() raises:
     print("Passed test_gradbox_permute_3d")
 
 
-fn test_gradbox_permute_inverse() raises:
+def test_gradbox_permute_inverse() raises:
     comptime dtype = DType.float32
     print("Running test_gradbox_permute_inverse")
     g1 = Gradbox[dtype](Shape(2, 3, 4))
@@ -173,7 +173,7 @@ fn test_gradbox_permute_inverse() raises:
     print("Passed test_gradbox_permute_inverse")
 
 
-fn test_gradbox_permute_identity() raises:
+def test_gradbox_permute_identity() raises:
     comptime dtype = DType.float32
     print("Running test_gradbox_permute_identity")
     g1 = Gradbox[dtype](Shape(3, 4, 5))
@@ -184,7 +184,7 @@ fn test_gradbox_permute_identity() raises:
     print("Passed test_gradbox_permute_identity")
 
 
-fn test_gradbox_permute_singleton_dims() raises:
+def test_gradbox_permute_singleton_dims() raises:
     comptime dtype = DType.float32
     print("Running test_gradbox_permute_singleton_dims")
     g1 = Gradbox[dtype](Shape(1, 4, 1))
@@ -196,7 +196,7 @@ fn test_gradbox_permute_singleton_dims() raises:
     print("Passed test_gradbox_permute_singleton_dims")
 
 
-fn test_gradbox_permute_high_rank() raises:
+def test_gradbox_permute_high_rank() raises:
     comptime dtype = DType.float32
     print("Running test_gradbox_permute_high_rank")
     g1 = Gradbox[dtype](Shape(2, 3, 4, 5))
@@ -207,7 +207,7 @@ fn test_gradbox_permute_high_rank() raises:
     print("Passed test_gradbox_permute_high_rank")
 
 
-fn test_gradbox_squeeze_noop() raises:
+def test_gradbox_squeeze_noop() raises:
     print("test_gradbox_squeeze_noop")
     var g = Gradbox[DType.float32].zeros(Shape.of(2, 3), share=False)
     var s = g.squeeze()  # no size-1 axes -> should be same shape
@@ -216,7 +216,7 @@ fn test_gradbox_squeeze_noop() raises:
     assert_true(s.all_close(g.as_tensor(requires_grad=False)))
 
 
-fn test_gradbox_squeeze_remove_all_singletons() raises:
+def test_gradbox_squeeze_remove_all_singletons() raises:
     print("test_gradbox_squeeze_remove_all_singletons")
     comptime dtype = DType.float32
     var g = Gradbox[DType.float32](
@@ -233,7 +233,7 @@ fn test_gradbox_squeeze_remove_all_singletons() raises:
     )
 
 
-fn test_gradbox_squeeze_with_axes_list() raises:
+def test_gradbox_squeeze_with_axes_list() raises:
     print("test_gradbox_squeeze_with_axes_list")
     comptime dtype = DType.float32
     var g = Gradbox[DType.float32](
@@ -253,7 +253,7 @@ fn test_gradbox_squeeze_with_axes_list() raises:
     )
 
 
-fn test_gradbox_squeeze_preserves_value_semantics() raises:
+def test_gradbox_squeeze_preserves_value_semantics() raises:
     print("test_gradbox_squeeze_preserves_value_semantics")
     # create non-shared gradbox and squeeze; result must not be shared (share=False semantics)
     comptime dtype = DType.float32
@@ -269,7 +269,7 @@ fn test_gradbox_squeeze_preserves_value_semantics() raises:
     )
 
 
-fn test_gradbox_squeeze_after_broadcast_and_sum_over_broadcasted_axes() raises:
+def test_gradbox_squeeze_after_broadcast_and_sum_over_broadcasted_axes() raises:
     print("test_gradbox_squeeze_after_broadcast_and_sum_over_broadcasted_axes")
     comptime dtype = DType.float32
     var base = Gradbox[DType.float32](
@@ -296,7 +296,7 @@ fn test_gradbox_squeeze_after_broadcast_and_sum_over_broadcasted_axes() raises:
     )
 
 
-fn test_gradbox_squeeze_integration_with_unsqueeze_backward() raises:
+def test_gradbox_squeeze_integration_with_unsqueeze_backward() raises:
     print("test_gradbox_squeeze_integration_with_unsqueeze_backward")
     # This verifies behaviour of Unsqueeze.backward: gradient of the unsqueezed tensor
     # should be reduced (squeezed) back to original shape. Behaviourally this uses Gradbox.squeeze().
@@ -315,7 +315,7 @@ fn test_gradbox_squeeze_integration_with_unsqueeze_backward() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[1.0, 1.0], [1.0, 1.0]])))
 
 
-fn test_gradbox_squeeze_chain_of_ops() raises:
+def test_gradbox_squeeze_chain_of_ops() raises:
     print("test_gradbox_squeeze_chain_of_ops")
     # chain: Tensor -> Unsqueeze -> some ops -> backward uses Gradbox.squeeze internally
     comptime dtype = DType.float32
@@ -332,7 +332,7 @@ fn test_gradbox_squeeze_chain_of_ops() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d3([[[3.0, 3.0]]])))
 
 
-fn test_gradbox_reverse_division() raises:
+def test_gradbox_reverse_division() raises:
     print("test_gradbox_reverse_division")
     comptime dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
@@ -345,7 +345,7 @@ fn test_gradbox_reverse_division() raises:
     )
 
 
-fn test_gradbox_reverse_subtract() raises:
+def test_gradbox_reverse_subtract() raises:
     print("test_gradbox_reverse_subtract")
     comptime dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
@@ -357,7 +357,7 @@ fn test_gradbox_reverse_subtract() raises:
     )
 
 
-fn test_gradbox_reshape() raises:
+def test_gradbox_reshape() raises:
     print("test_gradbox_reshape")
     comptime dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
@@ -370,7 +370,7 @@ fn test_gradbox_reshape() raises:
     assert_true(gradbox[[1, 2]] == 6 and gradbox[[0, 1]] == 2)
 
 
-fn test_gradbox_inplace_add() raises:
+def test_gradbox_inplace_add() raises:
     print("test_gradbox_inplace_add")
     comptime dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
@@ -390,7 +390,7 @@ fn test_gradbox_inplace_add() raises:
     )
 
 
-fn test_gradbox_is_shared() raises:
+def test_gradbox_is_shared() raises:
     print("test_gradbox_is_shared")
     comptime dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
@@ -401,7 +401,7 @@ fn test_gradbox_is_shared() raises:
     )
 
 
-fn test_seed_gradbox() raises:
+def test_seed_gradbox() raises:
     print("test_seed_gradbox")
     comptime dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])

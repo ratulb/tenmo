@@ -7,7 +7,7 @@ from tenmo.common_utils import now
 from tenmo.dataloader import *
 
 
-fn train_mnist_binary() raises:
+def train_mnist_binary() raises:
     """Train binary classifier: digit 0 vs digit 1."""
     print("=" * 80)
     print("MNIST Binary Classification (0 vs 1)")
@@ -98,12 +98,12 @@ fn train_mnist_binary() raises:
         print("=" * 80 + "\n")
 
 
-fn accuracy[
+def accuracy[
     dtype: DType, //
 ](pred: Tensor[dtype], target: Tensor[dtype]) -> Int:
     var preds = pred.gt(Scalar[dtype](0.5)).to_dtype[dtype]()
     return preds.eq(target).count(Scalar[DType.bool](True))
 
 
-fn main() raises:
+def main() raises:
     train_mnist_binary()

@@ -9,7 +9,7 @@ from tenmo.common_utils import log_debug, s, i as Row
 
 
 # Synthetic dataset generator
-fn make_synthetic_mnist_dataset(
+def make_synthetic_mnist_dataset(
     n_samples: Int,
 ) -> Tuple[Tensor[DType.float32], Tensor[DType.int32]]:
     height = 28
@@ -78,7 +78,7 @@ fn make_synthetic_mnist_dataset(
 
 
 # Batching utility
-fn get_batches(
+def get_batches(
     x: Tensor[DType.float32], y: Tensor[DType.int32], batch_size: Int
 ) -> List[Tuple[Tensor[DType.float32], Tensor[DType.int32]]]:
     n = x.shape()[0]
@@ -98,5 +98,5 @@ fn get_batches(
     return batches^
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

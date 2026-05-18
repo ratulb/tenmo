@@ -16,7 +16,7 @@ from std.time import perf_counter_ns
 from std.sys import has_accelerator
 
 
-fn train_mnist() raises:
+def train_mnist() raises:
     """Train a neural network on MNIST dataset on GPU."""
     comptime if not has_accelerator():
         raise Error("No GPU accelerator found. Use mnist.mojo for CPU training.")
@@ -247,7 +247,7 @@ fn train_mnist() raises:
     print("=" * 80)
 
 
-fn compute_accuracy[
+def compute_accuracy[
     dtype: DType
 ](pred: Tensor[dtype], target: Tensor[DType.int32]) -> Int:
     """Compute classification accuracy by comparing argmax predictions to targets."""
@@ -269,5 +269,5 @@ fn compute_accuracy[
     return correct
 
 
-fn main() raises:
+def main() raises:
     train_mnist()

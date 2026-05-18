@@ -27,7 +27,7 @@ from .device import GPU, DeviceState
 # 5. Chunk/stride pattern mirrors existing kernels exactly.
 #
 
-fn dropout_forward_kernel[
+def dropout_forward_kernel[
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
     simd_vectors_per_thread: Int = 2 * simd_width,
@@ -124,7 +124,7 @@ fn dropout_forward_kernel[
 struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
-    fn launch(
+    def launch(
         A:        NDBuffer[Self.dtype],
         p:        Scalar[Self.dtype],
         scale:    Scalar[Self.dtype],
@@ -195,7 +195,7 @@ struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
         return (out_ndb^, mask_ndb^)
 
     @staticmethod
-    fn launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
+    def launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
         threads_per_block: Int
         num_blocks: Int
 

@@ -41,7 +41,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
     """Backward pass for padding operation - handles all modes."""
 
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
@@ -90,7 +90,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
         return results^
 
     @staticmethod
-    fn _extract_constant(
+    def _extract_constant(
         grad_out: Gradbox[Self.dtype],
         grad_parent: Gradbox[Self.dtype],
         pad: List[Tuple[Int, Int]],
@@ -112,7 +112,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
             grad_parent[coord] += grad_out[grad_out_coord^]
 
     @staticmethod
-    fn _extract_4d_constant_simd(
+    def _extract_4d_constant_simd(
         grad_out: Gradbox[Self.dtype],
         grad_parent: Gradbox[Self.dtype],
         pad: List[Tuple[Int, Int]],
@@ -161,7 +161,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var total_slices = N * C
 
         @parameter
-        fn extract_slice(slice_idx: Int):
+        def extract_slice(slice_idx: Int):
             var n = slice_idx // C
             var c = slice_idx % C
 
@@ -200,7 +200,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
         parallelize[extract_slice](total_slices)
 
     @staticmethod
-    fn _extract_circular(
+    def _extract_circular(
         grad_out: Gradbox[Self.dtype],
         grad_parent: Gradbox[Self.dtype],
         pad: List[Tuple[Int, Int]],
@@ -231,7 +231,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
             grad_parent[in_coord] += grad_out[out_coord]
 
     @staticmethod
-    fn _extract_replicate(
+    def _extract_replicate(
         grad_out: Gradbox[Self.dtype],
         grad_parent: Gradbox[Self.dtype],
         pad: List[Tuple[Int, Int]],
@@ -261,7 +261,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
             grad_parent[in_coord] += grad_out[out_coord]
 
     @staticmethod
-    fn _extract_reflect(
+    def _extract_reflect(
         grad_out: Gradbox[Self.dtype],
         grad_parent: Gradbox[Self.dtype],
         pad: List[Tuple[Int, Int]],
@@ -316,7 +316,7 @@ struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     """
 
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         x: Tensor[Self.dtype],
@@ -372,7 +372,7 @@ struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return result^
 
     @staticmethod
-    fn _pad_constant(
+    def _pad_constant(
         x: Tensor[Self.dtype],
         mut result: Tensor[Self.dtype],
         pad: List[Tuple[Int, Int]],
@@ -387,7 +387,7 @@ struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         Self._copy_to_padded_region(x, result, pad)
 
     @staticmethod
-    fn _copy_to_padded_region(
+    def _copy_to_padded_region(
         x: Tensor[Self.dtype],
         mut result: Tensor[Self.dtype],
         pad: List[Tuple[Int, Int]],
@@ -409,7 +409,7 @@ struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             result[result_indices] = x[coord]
 
     @staticmethod
-    fn _pad_4d_constant_simd(
+    def _pad_4d_constant_simd(
         x: Tensor[Self.dtype],
         mut result: Tensor[Self.dtype],
         pad: List[Tuple[Int, Int]],
@@ -478,7 +478,7 @@ struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var total_slices = N * C
 
         @parameter
-        fn copy_slice(slice_idx: Int):
+        def copy_slice(slice_idx: Int):
             var n = slice_idx // C
             var c = slice_idx % C
 
@@ -515,7 +515,7 @@ struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         parallelize[copy_slice](total_slices)
 
     @staticmethod
-    fn _pad_replicate(
+    def _pad_replicate(
         x: Tensor[Self.dtype],
         mut result: Tensor[Self.dtype],
         pad: List[Tuple[Int, Int]],
@@ -544,7 +544,7 @@ struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             result[out_coord] = x[in_coord]
 
     @staticmethod
-    fn _pad_reflect(
+    def _pad_reflect(
         x: Tensor[Self.dtype],
         mut result: Tensor[Self.dtype],
         pad: List[Tuple[Int, Int]],
@@ -588,7 +588,7 @@ struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             result[out_coord] = x[in_coord]
 
     @staticmethod
-    fn _pad_circular(
+    def _pad_circular(
         x: Tensor[Self.dtype],
         mut result: Tensor[Self.dtype],
         pad: List[Tuple[Int, Int]],

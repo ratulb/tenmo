@@ -135,7 +135,7 @@ struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
     var destroy: DestroyerFn
     var copy_fn: CopyFn
 
-    fn __init__[T: ArgumentType, //](out self, op_code: Int, var arg: T):
+    def __init__[T: ArgumentType, //](out self, op_code: Int, var arg: T):
         var p = alloc[T](1)
         p.init_pointee_move(arg^)
         self.op_code = op_code
@@ -143,56 +143,56 @@ struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
         self.destroy = make_destroyer[T]()
         self.copy_fn = make_copier[T]()
 
-    fn __del__(deinit self):
+    def __del__(deinit self):
         self.destroy(self.ptr)  # calls T.__del__
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, deinit take: Self):
         self.op_code = take.op_code
         self.ptr = take.ptr
         self.destroy = take.destroy
         self.copy_fn = take.copy_fn
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.op_code = copy.op_code
         self.destroy = copy.destroy
         self.copy_fn = copy.copy_fn
         self.ptr = self.copy_fn(copy.ptr)  # deep copy via T.__copyinit__
 
-    fn get[T: ArgumentType](ref self) -> ref[self.ptr] T:
+    def get[T: ArgumentType](ref self) -> ref[self.ptr] T:
         return self.ptr.bitcast[T]()[]
 
     @staticmethod
-    fn null_arg(op_code: Int) -> BackwardFnArg[Self.dtype]:
+    def null_arg(op_code: Int) -> BackwardFnArg[Self.dtype]:
         return BackwardFnArg[Self.dtype](op_code, NullArg(0))
 
     @staticmethod
-    fn boolean_arg(op_code: Int, is_true: Bool) -> BackwardFnArg[Self.dtype]:
+    def boolean_arg(op_code: Int, is_true: Bool) -> BackwardFnArg[Self.dtype]:
         return BackwardFnArg[Self.dtype](op_code, Boolean(is_true))
 
     @staticmethod
-    fn scalar_arg(
+    def scalar_arg(
         op_code: Int, value: Scalar[Self.dtype]
     ) -> BackwardFnArg[Self.dtype]:
         return BackwardFnArg[Self.dtype](op_code, ScalarArg[Self.dtype](value))
 
     @staticmethod
-    fn integer_arg(op_code: Int, value: Int) -> BackwardFnArg[Self.dtype]:
+    def integer_arg(op_code: Int, value: Int) -> BackwardFnArg[Self.dtype]:
         return BackwardFnArg[Self.dtype](op_code, Integer(value))
 
     @staticmethod
-    fn from_intarray(
+    def from_intarray(
         op_code: Int, array: IntArray
     ) -> BackwardFnArg[Self.dtype]:
         return BackwardFnArg[Self.dtype](op_code, IntArrayArg(array))
 
     @staticmethod
-    fn from_buffer(
+    def from_buffer(
         op_code: Int, buffer: Buffer[Self.dtype]
     ) -> BackwardFnArg[Self.dtype]:
         return BackwardFnArg[Self.dtype](op_code, BufferArg[Self.dtype](buffer))
 
     @staticmethod
-    fn from_ndbuffer(
+    def from_ndbuffer(
         op_code: Int, ndb: NDBuffer[Self.dtype]
     ) -> BackwardFnArg[Self.dtype]:
         return BackwardFnArg[Self.dtype](op_code, NDBufferArg[Self.dtype](ndb))
@@ -276,7 +276,7 @@ struct ShuffleArg(ArgumentType):
     var axis: Int
     var permutation: List[Int]
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.axis = copy.axis
         self.permutation = copy.permutation.copy()
 
@@ -286,7 +286,7 @@ struct PadArg(ArgumentType):
     var pad: List[Tuple[Int, Int]]
     var mode: String
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.pad = copy.pad.copy()
         self.mode = copy.mode.copy()
 
@@ -334,7 +334,7 @@ struct StdArg[dtype: DType](ArgumentType):
 @fieldwise_init
 struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     @staticmethod
-    fn invoke(
+    def invoke(
         output: Ancestor[Self.dtype],
     ) -> List[
         Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]

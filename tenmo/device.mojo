@@ -15,10 +15,10 @@ comptime DeviceType = Variant[CPU, GPU]
 struct Device(Equatable, ImplicitlyCopyable, Movable, Writable):
     var kind: DeviceType
 
-    fn __init__(out self):
+    def __init__(out self):
         self.kind = CPU()
 
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         if self.kind.isa[CPU]():
             if other.kind.isa[CPU]():
                 return self.kind[CPU] == other.kind[CPU]
@@ -32,16 +32,16 @@ struct Device(Equatable, ImplicitlyCopyable, Movable, Writable):
                 var other_gpu = other.kind[GPU]
                 return self_gpu == other_gpu
 
-    fn __ne__(self, other: Self) -> Bool:
+    def __ne__(self, other: Self) -> Bool:
         return not self.__eq__(other)
 
-    fn is_cpu(self) -> Bool:
+    def is_cpu(self) -> Bool:
         return self.kind.isa[CPU]()
 
-    fn is_gpu(self) -> Bool:
+    def is_gpu(self) -> Bool:
         return self.kind.isa[GPU]()
 
-    fn write_to[W: Writer](self, mut writer: W):
+    def write_to[W: Writer](self, mut writer: W):
         if self.is_cpu():
             writer.write(self.kind[CPU])
         else:
@@ -52,19 +52,19 @@ struct Device(Equatable, ImplicitlyCopyable, Movable, Writable):
 struct CPU(Equatable, ImplicitlyCopyable, Movable, Writable):
     var id: Int
 
-    fn __init__(out self):
+    def __init__(out self):
         self.id = get_defined_int["CPU", 0]()
 
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         return self.id == other.id
 
-    fn __ne__(self, other: Self) -> Bool:
+    def __ne__(self, other: Self) -> Bool:
         return not self == other
 
-    fn into(self) -> Device:
+    def into(self) -> Device:
         return Device(self)
 
-    fn write_to[W: Writer](self, mut writer: W):
+    def write_to[W: Writer](self, mut writer: W):
         writer.write("CPU[" + String(self.id) + "]")
 
 
@@ -76,45 +76,45 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable, Writable):
     var id: Int64
     var _id: UInt
 
-    fn into(self) -> Device:
+    def into(self) -> Device:
         return Device(self)
 
-    fn __init__(out self, device_id: Int = 0) raises:
+    def __init__(out self, device_id: Int = 0) raises:
         self.device_context = DeviceContext(device_id)
         self.id = Int64(device_id)
         self._id = IDGen.generate_id()
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.device_context = copy.device_context.copy()
         self.id = copy.id
         self._id = copy._id
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, deinit take: Self):
         self.device_context = take.device_context^
         self.id = take.id
         self._id = take._id
 
-    fn write_to[W: Writer](self, mut writer: W):
+    def write_to[W: Writer](self, mut writer: W):
         # Not printing _id
         writer.write("GPU[" + String(self.id) + "]")
 
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         return self._id == other._id
 
-    fn __ne__(self, other: Self) -> Bool:
+    def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    fn __enter__(mut self) -> Self:
+    def __enter__(mut self) -> Self:
         return self
 
-    fn __exit__(mut self):
+    def __exit__(mut self):
         try:
             self.device_context.synchronize()
         except e:
             print(e)
             print("Error synchronizing GPU device context: ", String(e))
 
-    fn __getitem__(self) -> DeviceContext:
+    def __getitem__(self) -> DeviceContext:
         return self.device_context.copy()
 
 
@@ -133,7 +133,7 @@ struct DeviceState[dtype: DType](
     var buffer: DeviceBuffer[Self.datatype]
     var gpu: GPU
 
-    fn __init__(
+    def __init__(
         out self,
         size: Int,
         gpu: Optional[GPU] = None,
@@ -145,7 +145,7 @@ struct DeviceState[dtype: DType](
         self.buffer = device_buffer^
         self.gpu = device_ctx^
 
-    fn __init__[
+    def __init__[
         special: Bool
     ](
         out self,
@@ -157,7 +157,7 @@ struct DeviceState[dtype: DType](
         self.buffer = buffer
         self.gpu = gpu
 
-    fn __init__(
+    def __init__(
         out self,
         buffer: DeviceBuffer[Self.dtype],
         gpu: GPU,
@@ -165,28 +165,28 @@ struct DeviceState[dtype: DType](
         self.buffer = buffer.create_sub_buffer[Self.datatype](0, len(buffer))
         self.gpu = gpu
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.gpu = copy.gpu.copy()
         self.buffer = copy.buffer.copy()
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, deinit take: Self):
         self.buffer = take.buffer^
         self.gpu = take.gpu^
 
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         return self.gpu == other.gpu
 
-    fn __ne__(self, other: Self) -> Bool:
+    def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         return len(self.buffer)
 
     @always_inline
-    fn sync(self) raises:
+    def sync(self) raises:
         self.gpu[].synchronize()
 
-    fn new(
+    def new(
         self,
         size: Int,
         value: Scalar[Self.dtype] = Scalar[Self.dtype](0),
@@ -208,7 +208,7 @@ struct DeviceState[dtype: DType](
         return device_state
 
     @staticmethod
-    fn map_where(
+    def map_where(
         ref ndb: NDBuffer[Self.dtype],
         pred: fn(Scalar[Self.dtype]) -> Bool,
         value: Scalar[Self.dtype],
@@ -226,7 +226,7 @@ struct DeviceState[dtype: DType](
 
         return dst_device_state
 
-    fn fill(self, value: Scalar[Self.dtype], sync: Bool = True) raises:
+    def fill(self, value: Scalar[Self.dtype], sync: Bool = True) raises:
         with self.buffer.map_to_host() as host_buffer:
             comptime if Self.dtype == DType.bool:
                 var storage_val = UInt8(1) if value.cast[
@@ -240,7 +240,7 @@ struct DeviceState[dtype: DType](
         if sync:
             self.sync()
 
-    fn fill(self, ref source: NDBuffer[Self.dtype], sync: Bool = True) raises:
+    def fill(self, ref source: NDBuffer[Self.dtype], sync: Bool = True) raises:
         """Fill the DeviceBuffer from the source NDBuffer."""
         if source.is_on_gpu():
             if source.is_contiguous():
@@ -303,7 +303,7 @@ struct DeviceState[dtype: DType](
         if sync:
             self.sync()
 
-    fn into(
+    def into(
         self, shape: Shape, *, sync: Bool = True
     ) raises -> NDBuffer[Self.dtype]:
         """
@@ -336,17 +336,17 @@ struct DeviceState[dtype: DType](
                 self.sync()
             return NDBuffer[Self.dtype](cpu_buf^, shape)
 
-    fn device_buffer(
+    def device_buffer(
         ref self,
     ) -> ref[self.buffer] DeviceBuffer[Self.datatype]:
         return self.buffer
 
-    fn get_gpu(
+    def get_gpu(
         ref self,
     ) -> ref[self.gpu] GPU:
         return self.gpu
 
-    fn __getitem__(self, index: Int) raises -> Scalar[Self.dtype]:
+    def __getitem__(self, index: Int) raises -> Scalar[Self.dtype]:
         with self.buffer.map_to_host() as host_buffer:
             comptime if Self.dtype == DType.bool:
                 return Scalar[Self.dtype](
@@ -355,7 +355,7 @@ struct DeviceState[dtype: DType](
             else:
                 return host_buffer[index].cast[Self.dtype]()
 
-    fn __setitem__(self, index: Int, value: Scalar[Self.dtype]) raises:
+    def __setitem__(self, index: Int, value: Scalar[Self.dtype]) raises:
         with self.buffer.map_to_host() as host_buffer:
             comptime if Self.dtype == DType.bool:
                 host_buffer[index] = Scalar[Self.datatype](
@@ -364,21 +364,21 @@ struct DeviceState[dtype: DType](
             else:
                 host_buffer[index] = value.cast[Self.datatype]()
 
-    fn load[
+    def load[
         simdwidth: Int = simd_width_of[Self.datatype]()
     ](self, addr: Int) raises -> SIMD[Self.datatype, simdwidth]:
         with self.buffer.map_to_host() as host_buffer:
             var device_ptr = host_buffer.unsafe_ptr()
             return device_ptr.load[width=simdwidth](addr)
 
-    fn store[
+    def store[
         simdwidth: Int = simd_width_of[Self.datatype]()
     ](self, addr: Int, value: SIMD[Self.datatype, simdwidth]) raises:
         with self.buffer.map_to_host() as host_buffer:
             var device_ptr = host_buffer.unsafe_ptr()
             device_ptr.store[width=simdwidth](addr, value)
 
-    fn all_true(self: DeviceState[DType.bool]) -> Bool:
+    def all_true(self: DeviceState[DType.bool]) -> Bool:
         try:
             var length = len(self)
             if length == 0:
@@ -392,7 +392,7 @@ struct DeviceState[dtype: DType](
             print(e)
             return False
 
-    fn any_true(self: DeviceState[DType.bool]) -> Bool:
+    def any_true(self: DeviceState[DType.bool]) -> Bool:
         try:
             var length = len(self)
             if length == 0:

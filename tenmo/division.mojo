@@ -17,7 +17,7 @@ struct TrueDivBackwardScalar[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var scalar = (
@@ -44,7 +44,7 @@ struct RightTrueDivBackwardScalar[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var scalar = (
@@ -74,7 +74,7 @@ struct RightTrueDivBackwardScalar[dtype: DType](
 @fieldwise_init
 struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
@@ -135,7 +135,7 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct DivideScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
@@ -162,7 +162,7 @@ struct DivideScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct DivideByScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
@@ -193,7 +193,7 @@ struct DivideByScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct Divider[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[
         Self.dtype

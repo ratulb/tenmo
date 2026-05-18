@@ -4,7 +4,7 @@ from tenmo.common_utils import panic
 struct Reduction(ImplicitlyCopyable, RegisterPassable):
     var reduction: Int
 
-    fn __init__(out self, reduction: Int = 0):
+    def __init__(out self, reduction: Int = 0):
         self.reduction = reduction
         if reduction < 0 or reduction > 2:
             panic(
@@ -12,7 +12,7 @@ struct Reduction(ImplicitlyCopyable, RegisterPassable):
                 + String(reduction)
             )
 
-    fn __init__(out self, reduction: String):
+    def __init__(out self, reduction: String):
         if reduction == "mean":
             self.reduction = 0
         elif reduction == "sum":
@@ -27,14 +27,14 @@ struct Reduction(ImplicitlyCopyable, RegisterPassable):
                 + "'"
             )
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.reduction = copy.reduction
 
-    fn is_mean(self) -> Bool:
+    def is_mean(self) -> Bool:
         return self.reduction == 0
 
-    fn is_sum(self) -> Bool:
+    def is_sum(self) -> Bool:
         return self.reduction == 1
 
-    fn is_none(self) -> Bool:
+    def is_none(self) -> Bool:
         return self.reduction == 2

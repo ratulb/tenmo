@@ -15,7 +15,7 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     """Backward pass for stack operation."""
 
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
@@ -95,7 +95,7 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         tensors: List[Tensor[Self.dtype]],
@@ -172,7 +172,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn vstack[
+    def vstack[
         track_grad: Bool = True
     ](
         tensors: List[Tensor[Self.dtype]], requires_grad: Optional[Bool] = None
@@ -240,7 +240,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn hstack[
+    def hstack[
         track_grad: Bool = True
     ](
         tensors: List[Tensor[Self.dtype]], requires_grad: Optional[Bool] = None

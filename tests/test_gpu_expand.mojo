@@ -12,7 +12,7 @@ from std.sys import has_accelerator
 # Basic 1D → 2D expansion
 # ------------------------------------------------------------
 
-fn test_gpu_expand_1d_to_2d_new_batch_dim() raises:
+def test_gpu_expand_1d_to_2d_new_batch_dim() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_1d_to_2d_new_batch_dim")
         comptime dtype = DType.float32
@@ -29,7 +29,7 @@ fn test_gpu_expand_1d_to_2d_new_batch_dim() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([4.0, 4.0, 4.0])))
 
 
-fn test_gpu_expand_1d_to_3d() raises:
+def test_gpu_expand_1d_to_3d() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_1d_to_3d")
         comptime dtype = DType.float32
@@ -48,7 +48,7 @@ fn test_gpu_expand_1d_to_3d() raises:
 # 2D → 2D expansions
 # ------------------------------------------------------------
 
-fn test_gpu_expand_2d_row_vector_to_matrix() raises:
+def test_gpu_expand_2d_row_vector_to_matrix() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_2d_row_vector_to_matrix")
         comptime dtype = DType.float32
@@ -65,7 +65,7 @@ fn test_gpu_expand_2d_row_vector_to_matrix() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d2([[4.0, 4.0, 4.0]])))
 
 
-fn test_gpu_expand_2d_col_vector_to_matrix() raises:
+def test_gpu_expand_2d_col_vector_to_matrix() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_2d_col_vector_to_matrix")
         comptime dtype = DType.float32
@@ -84,7 +84,7 @@ fn test_gpu_expand_2d_col_vector_to_matrix() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d2([[4.0], [4.0], [4.0]])))
 
 
-fn test_gpu_expand_2d_both_dims_size1() raises:
+def test_gpu_expand_2d_both_dims_size1() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_2d_both_dims_size1")
         comptime dtype = DType.float32
@@ -98,7 +98,7 @@ fn test_gpu_expand_2d_both_dims_size1() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d2([[12.0]])))
 
 
-fn test_gpu_expand_2d_no_op_same_shape() raises:
+def test_gpu_expand_2d_no_op_same_shape() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_2d_no_op_same_shape")
         comptime dtype = DType.float32
@@ -116,7 +116,7 @@ fn test_gpu_expand_2d_no_op_same_shape() raises:
 # 3D expansions
 # ------------------------------------------------------------
 
-fn test_gpu_expand_3d_first_dim() raises:
+def test_gpu_expand_3d_first_dim() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_3d_first_dim")
         comptime dtype = DType.float32
@@ -131,7 +131,7 @@ fn test_gpu_expand_3d_first_dim() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d3([[[5.0, 5.0], [5.0, 5.0]]])))
 
 
-fn test_gpu_expand_3d_last_dim() raises:
+def test_gpu_expand_3d_last_dim() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_3d_last_dim")
         comptime dtype = DType.float32
@@ -146,7 +146,7 @@ fn test_gpu_expand_3d_last_dim() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d3([[[6.0], [6.0]], [[6.0], [6.0]]])))
 
 
-fn test_gpu_expand_3d_middle_dim() raises:
+def test_gpu_expand_3d_middle_dim() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_3d_middle_dim")
         comptime dtype = DType.float32
@@ -161,7 +161,7 @@ fn test_gpu_expand_3d_middle_dim() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d3([[[5.0, 5.0]], [[5.0, 5.0]]])))
 
 
-fn test_gpu_expand_3d_two_dims_broadcast() raises:
+def test_gpu_expand_3d_two_dims_broadcast() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_3d_two_dims_broadcast")
         comptime dtype = DType.float32
@@ -176,7 +176,7 @@ fn test_gpu_expand_3d_two_dims_broadcast() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d3([[[12.0, 12.0]]])))
 
 
-fn test_gpu_expand_3d_all_dims_size1() raises:
+def test_gpu_expand_3d_all_dims_size1() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_3d_all_dims_size1")
         comptime dtype = DType.float32
@@ -194,7 +194,7 @@ fn test_gpu_expand_3d_all_dims_size1() raises:
 # Shape API overload
 # ------------------------------------------------------------
 
-fn test_gpu_expand_shape_api_overload() raises:
+def test_gpu_expand_shape_api_overload() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_shape_api_overload")
         comptime dtype = DType.float32
@@ -213,7 +213,7 @@ fn test_gpu_expand_shape_api_overload() raises:
 # Grad correctness: non-uniform values
 # ------------------------------------------------------------
 
-fn test_gpu_expand_grad_non_uniform_values() raises:
+def test_gpu_expand_grad_non_uniform_values() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_grad_non_uniform_values")
         comptime dtype = DType.float32
@@ -227,7 +227,7 @@ fn test_gpu_expand_grad_non_uniform_values() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d2([[3.0, 3.0], [3.0, 3.0]])))
 
 
-fn test_gpu_expand_grad_weighted_loss() raises:
+def test_gpu_expand_grad_weighted_loss() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_grad_weighted_loss")
         comptime dtype = DType.float32
@@ -250,7 +250,7 @@ fn test_gpu_expand_grad_weighted_loss() raises:
 # Expand then reduce — round-trip grad check
 # ------------------------------------------------------------
 
-fn test_gpu_expand_then_sum_axis_round_trip() raises:
+def test_gpu_expand_then_sum_axis_round_trip() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_then_sum_axis_round_trip")
         comptime dtype = DType.float32
@@ -264,7 +264,7 @@ fn test_gpu_expand_then_sum_axis_round_trip() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d2([[5.0, 5.0, 5.0]])))
 
 
-fn test_gpu_expand_then_mean_grad() raises:
+def test_gpu_expand_then_mean_grad() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_then_mean_grad")
         comptime dtype = DType.float32
@@ -283,7 +283,7 @@ fn test_gpu_expand_then_mean_grad() raises:
 # Common ML patterns
 # ------------------------------------------------------------
 
-fn test_gpu_expand_bias_broadcast_pattern() raises:
+def test_gpu_expand_bias_broadcast_pattern() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_bias_broadcast_pattern")
         comptime dtype = DType.float32
@@ -298,7 +298,7 @@ fn test_gpu_expand_bias_broadcast_pattern() raises:
         assert_true(bias.grad().all_close(Tensor[dtype].d2([[6.0, 6.0, 6.0]])))
 
 
-fn test_gpu_expand_grad_accumulation_two_expands() raises:
+def test_gpu_expand_grad_accumulation_two_expands() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_grad_accumulation_two_expands")
         comptime dtype = DType.float32
@@ -319,7 +319,7 @@ fn test_gpu_expand_grad_accumulation_two_expands() raises:
 # track_grad=False on GPU
 # ------------------------------------------------------------
 
-fn test_gpu_expand_no_grad_tracking() raises:
+def test_gpu_expand_no_grad_tracking() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_no_grad_tracking")
         comptime dtype = DType.float32
@@ -334,7 +334,7 @@ fn test_gpu_expand_no_grad_tracking() raises:
 # 4D expansions
 # ------------------------------------------------------------
 
-fn test_gpu_expand_4d_first_two_dims() raises:
+def test_gpu_expand_4d_first_two_dims() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_4d_first_two_dims")
         comptime dtype = DType.float32
@@ -355,7 +355,7 @@ fn test_gpu_expand_4d_first_two_dims() raises:
         assert_true(a.grad().all_close(a_ref.grad()))
 
 
-fn test_gpu_expand_4d_last_dim_only() raises:
+def test_gpu_expand_4d_last_dim_only() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_4d_last_dim_only")
         comptime dtype = DType.float32
@@ -373,7 +373,7 @@ fn test_gpu_expand_4d_last_dim_only() raises:
 # GPU forward matches CPU forward (cross-validate)
 # ------------------------------------------------------------
 
-fn test_gpu_expand_matches_cpu_forward() raises:
+def test_gpu_expand_matches_cpu_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_matches_cpu_forward")
         comptime dtype = DType.float32
@@ -392,7 +392,7 @@ fn test_gpu_expand_matches_cpu_forward() raises:
         assert_true(a.grad().all_close(a_copy.grad()))
 
 
-fn test_gpu_expand_matches_cpu_forward_3d() raises:
+def test_gpu_expand_matches_cpu_forward_3d() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_matches_cpu_forward_3d")
         comptime dtype = DType.float32
@@ -416,7 +416,7 @@ fn test_gpu_expand_matches_cpu_forward_3d() raises:
 # Grad lands on CPU, not GPU
 # ------------------------------------------------------------
 
-fn test_gpu_expand_grad_lands_on_cpu() raises:
+def test_gpu_expand_grad_lands_on_cpu() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_grad_lands_on_cpu")
         comptime dtype = DType.float32
@@ -429,7 +429,7 @@ fn test_gpu_expand_grad_lands_on_cpu() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d2([[10.0, 10.0]])))
 
 
-fn test_gpu_expand_cpu_tensor_data_unchanged() raises:
+def test_gpu_expand_cpu_tensor_data_unchanged() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_cpu_tensor_data_unchanged")
         comptime dtype = DType.float32
@@ -447,7 +447,7 @@ fn test_gpu_expand_cpu_tensor_data_unchanged() raises:
 # Chained expand ops on GPU
 # ------------------------------------------------------------
 
-fn test_gpu_expand_chained_two_expands() raises:
+def test_gpu_expand_chained_two_expands() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_chained_two_expands")
         comptime dtype = DType.float32
@@ -464,7 +464,7 @@ fn test_gpu_expand_chained_two_expands() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d3([[[24.0, 24.0]]])))
 
 
-fn test_gpu_expand_then_sum_then_expand() raises:
+def test_gpu_expand_then_sum_then_expand() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_then_sum_then_expand")
         comptime dtype = DType.float32
@@ -483,7 +483,7 @@ fn test_gpu_expand_then_sum_then_expand() raises:
 # Zero-stride view property on GPU
 # ------------------------------------------------------------
 
-fn test_gpu_expand_is_zero_stride_view() raises:
+def test_gpu_expand_is_zero_stride_view() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_is_zero_stride_view")
         comptime dtype = DType.float32
@@ -502,7 +502,7 @@ fn test_gpu_expand_is_zero_stride_view() raises:
 # MAIN
 # ============================================================
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

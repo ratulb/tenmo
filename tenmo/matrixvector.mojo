@@ -16,7 +16,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         comptime simdwidth = simd_width_of[Self.dtype]()
@@ -204,7 +204,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](
 @fieldwise_init
 struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         simdwidth: Int = simd_width_of[Self.dtype]()
     ](M: NDBuffer[Self.dtype], v: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         var M_shape = M.shape
@@ -286,7 +286,7 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return result
 
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
     ](M: Tensor[Self.dtype], v: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         _ = """var M_shape = M.shape()

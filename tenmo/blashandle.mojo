@@ -15,7 +15,7 @@ struct BLASMatmul2dBackward[dtype: DType](
     RegisterPassable & ImplicitlyCopyable
 ):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var bwd_arg = (
@@ -163,11 +163,11 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
     var _handle_ptr: Optional[ArcPointer[OwnedDLHandle]]
     var _error_msg: String
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self._handle_ptr = copy._handle_ptr.copy()
         self._error_msg = copy._error_msg
 
-    fn __init__(out self):
+    def __init__(out self):
         self._error_msg = ""
 
         try:
@@ -180,21 +180,21 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
             self._error_msg = "Failed to load BLAS library: " + String(e)
             self._handle_ptr = None
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, deinit take: Self):
         self._handle_ptr = take._handle_ptr^
         self._error_msg = take._error_msg
 
-    fn lite_handle(self) -> BLASHandleLite[Self.dtype]:
+    def lite_handle(self) -> BLASHandleLite[Self.dtype]:
         return BLASHandleLite[Self.dtype](self._handle_ptr.value()[].borrow())
 
-    fn is_initialized(self) -> Bool:
+    def is_initialized(self) -> Bool:
         return not self._handle_ptr == None
 
-    fn get_error(ref self) -> ref[self._error_msg] String:
+    def get_error(ref self) -> ref[self._error_msg] String:
         return self._error_msg
 
     # REQUIRED PARAMS BEFORE OPTIONAL ==========
-    fn matmul_f32(
+    def matmul_f32(
         self,
         A: UnsafePointer[Float32, MutAnyOrigin],
         B: UnsafePointer[Float32, MutAnyOrigin],
@@ -240,7 +240,7 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
             Int32(N),  # ldc
         )
 
-    fn matmul_f64(
+    def matmul_f64(
         self,
         A: UnsafePointer[Float64, MutAnyOrigin],
         B: UnsafePointer[Float64, MutAnyOrigin],
@@ -282,7 +282,7 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
             Int32(N),
         )
 
-    fn matmul[
+    def matmul[
         track_grad: Bool = True
     ](
         self,
@@ -409,7 +409,7 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
 
         return C^
 
-    fn matmul(
+    def matmul(
         self,
         A: Gradbox[Self.dtype],
         B: Tensor[Self.dtype],
@@ -518,7 +518,7 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
 
         return C^
 
-    fn matmul(
+    def matmul(
         self,
         A: Tensor[Self.dtype],
         B: Gradbox[Self.dtype],
@@ -617,11 +617,11 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
 struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var _handle: _DLHandle
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self._handle = copy._handle.copy()
 
     # ========== REQUIRED PARAMS BEFORE OPTIONAL ==========
-    fn matmul_f32(
+    def matmul_f32(
         self,
         A: UnsafePointer[Float32, MutAnyOrigin],
         B: UnsafePointer[Float32, MutAnyOrigin],
@@ -663,7 +663,7 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             Int32(N),  # ldc
         )
 
-    fn matmul_f64(
+    def matmul_f64(
         self,
         A: UnsafePointer[Float64, MutAnyOrigin],
         B: UnsafePointer[Float64, MutAnyOrigin],
@@ -701,7 +701,7 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             Int32(N),
         )
 
-    fn matmul[
+    def matmul[
         track_grad: Bool = True
     ](
         self,
@@ -832,7 +832,7 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
         return C^
 
-    fn matmul(
+    def matmul(
         self,
         A: Gradbox[Self.dtype],
         B: Tensor[Self.dtype],
@@ -941,7 +941,7 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
         return C^
 
-    fn matmul(
+    def matmul(
         self,
         A: Tensor[Self.dtype],
         B: Gradbox[Self.dtype],

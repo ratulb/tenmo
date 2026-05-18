@@ -7,21 +7,21 @@ from tenmo.tensor import Tensor  # adjust import path to your project
 # 1. FORWARD PASS – CPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_sqrt_fwd_cpu_1d() raises:
+def test_sqrt_fwd_cpu_1d() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([0.0, 1.0, 4.0, 9.0, 16.0])
     var out = a.sqrt()
     assert_true(out.all_close(Tensor[dtype].d1([0.0, 1.0, 2.0, 3.0, 4.0])))
 
 
-fn test_sqrt_fwd_cpu_2d() raises:
+def test_sqrt_fwd_cpu_2d() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 4.0], [9.0, 16.0]])
     var out = a.sqrt()
     assert_true(out.all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])))
 
 
-fn test_sqrt_fwd_cpu_3d() raises:
+def test_sqrt_fwd_cpu_3d() raises:
     comptime dtype = DType.float32
     # shape [2, 2, 2]
     var _tmp0 = Tensor[dtype].arange(1.0, 9.0)
@@ -34,7 +34,7 @@ fn test_sqrt_fwd_cpu_3d() raises:
     assert_true(out.all_close[atol=1e-5](expected))
 
 
-fn test_sqrt_fwd_cpu_scalar_like() raises:
+def test_sqrt_fwd_cpu_scalar_like() raises:
     comptime dtype = DType.float32
     # Single-element tensor behaves like a scalar
     var a = Tensor[dtype].d1([25.0])
@@ -42,14 +42,14 @@ fn test_sqrt_fwd_cpu_scalar_like() raises:
     assert_true(out.all_close(Tensor[dtype].d1([5.0])))
 
 
-fn test_sqrt_fwd_cpu_zero() raises:
+def test_sqrt_fwd_cpu_zero() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([0.0])
     var out = a.sqrt()
     assert_true(out.all_close(Tensor[dtype].d1([0.0])))
 
 
-fn test_sqrt_fwd_cpu_fractional() raises:
+def test_sqrt_fwd_cpu_fractional() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([0.25, 0.5, 2.0])
     var out = a.sqrt()
@@ -64,7 +64,7 @@ fn test_sqrt_fwd_cpu_fractional() raises:
 # 2. BACKWARD PASS – CPU   (grad of sqrt(x) = 1 / (2*sqrt(x)))
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_sqrt_bwd_cpu_1d() raises:
+def test_sqrt_bwd_cpu_1d() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 4.0, 9.0, 16.0], requires_grad=True)
     var loss = a.sqrt().sum()
@@ -77,7 +77,7 @@ fn test_sqrt_bwd_cpu_1d() raises:
     )
 
 
-fn test_sqrt_bwd_cpu_2d() raises:
+def test_sqrt_bwd_cpu_2d() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 4.0], [9.0, 16.0]], requires_grad=True)
     var loss = a.sqrt().sum()
@@ -89,7 +89,7 @@ fn test_sqrt_bwd_cpu_2d() raises:
     )
 
 
-fn test_sqrt_bwd_cpu_3d() raises:
+def test_sqrt_bwd_cpu_3d() raises:
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(1.0, 9.0)
     var a = _tmp0.reshape(2, 2, 2)
@@ -105,7 +105,7 @@ fn test_sqrt_bwd_cpu_3d() raises:
     assert_true(a.grad().all_close[atol=1e-5](expected))
 
 
-fn test_sqrt_bwd_cpu_chain_mul() raises:
+def test_sqrt_bwd_cpu_chain_mul() raises:
     # loss = sum(sqrt(a) * 2)  =>  grad = 1/sqrt(a)
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 4.0, 9.0], requires_grad=True)
@@ -120,7 +120,7 @@ fn test_sqrt_bwd_cpu_chain_mul() raises:
     )
 
 
-fn test_sqrt_bwd_cpu_chain_add() raises:
+def test_sqrt_bwd_cpu_chain_add() raises:
     # loss = sum(sqrt(a) + sqrt(b))  =>  grads = 0.5/sqrt(x)
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([4.0, 9.0], requires_grad=True)
@@ -135,7 +135,7 @@ fn test_sqrt_bwd_cpu_chain_add() raises:
     )
 
 
-fn test_sqrt_bwd_cpu_sqrt_of_sqrt() raises:
+def test_sqrt_bwd_cpu_sqrt_of_sqrt() raises:
     # loss = sum(sqrt(sqrt(a))) = sum(a^0.25)  =>  grad = 0.25 * a^(-0.75)
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 16.0], requires_grad=True)
@@ -151,7 +151,7 @@ fn test_sqrt_bwd_cpu_sqrt_of_sqrt() raises:
 # 3. GRADIENT FLOW VERIFICATION – CPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_sqrt_gradflow_cpu_no_grad_leaf() raises:
+def test_sqrt_gradflow_cpu_no_grad_leaf() raises:
     # Tensor without requires_grad should have no gradient after backward
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([4.0, 9.0])          # no grad
@@ -163,7 +163,7 @@ fn test_sqrt_gradflow_cpu_no_grad_leaf() raises:
     # (structural check; no crash means flow is correct)
 
 
-fn test_sqrt_gradflow_cpu_multi_use_leaf() raises:
+def test_sqrt_gradflow_cpu_multi_use_leaf() raises:
     # a is used twice: loss = sum(sqrt(a) + sqrt(a)) => grad = 1/sqrt(a)
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([4.0, 9.0], requires_grad=True)
@@ -177,7 +177,7 @@ fn test_sqrt_gradflow_cpu_multi_use_leaf() raises:
     )
 
 
-fn test_sqrt_gradflow_cpu_intermediate_reuse_warning() raises:
+def test_sqrt_gradflow_cpu_intermediate_reuse_warning() raises:
     # Demonstrates retained-grad accumulation when backward is called twice.
     # First backward leaves grad on intermediate; second adds on top.
     # We only call backward once per graph here to stay correct.
@@ -193,7 +193,7 @@ fn test_sqrt_gradflow_cpu_intermediate_reuse_warning() raises:
 # 4. FORWARD PASS – GPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_sqrt_fwd_gpu_1d() raises:
+def test_sqrt_fwd_gpu_1d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([0.0, 1.0, 4.0, 9.0, 16.0])
@@ -204,7 +204,7 @@ fn test_sqrt_fwd_gpu_1d() raises:
         )
 
 
-fn test_sqrt_fwd_gpu_2d() raises:
+def test_sqrt_fwd_gpu_2d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[1.0, 4.0], [9.0, 16.0]])
@@ -215,7 +215,7 @@ fn test_sqrt_fwd_gpu_2d() raises:
         )
 
 
-fn test_sqrt_fwd_gpu_3d() raises:
+def test_sqrt_fwd_gpu_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(1.0, 9.0)
@@ -230,7 +230,7 @@ fn test_sqrt_fwd_gpu_3d() raises:
         assert_true(out.to_cpu().all_close[atol=1e-5](expected))
 
 
-fn test_sqrt_fwd_gpu_zero() raises:
+def test_sqrt_fwd_gpu_zero() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_gpu = Tensor[dtype].d1([0.0]).to_gpu()
@@ -238,7 +238,7 @@ fn test_sqrt_fwd_gpu_zero() raises:
         assert_true(out.to_cpu().all_close(Tensor[dtype].d1([0.0])))
 
 
-fn test_sqrt_fwd_gpu_fractional() raises:
+def test_sqrt_fwd_gpu_fractional() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_gpu = Tensor[dtype].d1([0.25, 0.5, 2.0]).to_gpu()
@@ -250,7 +250,7 @@ fn test_sqrt_fwd_gpu_fractional() raises:
         )
 
 
-fn test_sqrt_fwd_gpu_large_tensor() raises:
+def test_sqrt_fwd_gpu_large_tensor() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         # 1024 elements: values 1..1024, expected sqrt(k)
@@ -264,7 +264,7 @@ fn test_sqrt_fwd_gpu_large_tensor() raises:
 # 5. BACKWARD PASS – GPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_sqrt_bwd_gpu_1d() raises:
+def test_sqrt_bwd_gpu_1d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 4.0, 9.0, 16.0], requires_grad=True)
@@ -278,7 +278,7 @@ fn test_sqrt_bwd_gpu_1d() raises:
         )
 
 
-fn test_sqrt_bwd_gpu_2d() raises:
+def test_sqrt_bwd_gpu_2d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[1.0, 4.0], [9.0, 16.0]], requires_grad=True)
@@ -292,7 +292,7 @@ fn test_sqrt_bwd_gpu_2d() raises:
         )
 
 
-fn test_sqrt_bwd_gpu_3d() raises:
+def test_sqrt_bwd_gpu_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(1.0, 9.0)
@@ -309,7 +309,7 @@ fn test_sqrt_bwd_gpu_3d() raises:
         assert_true(a_cpu.grad().all_close[atol=1e-5](expected))
 
 
-fn test_sqrt_bwd_gpu_chain_mul() raises:
+def test_sqrt_bwd_gpu_chain_mul() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 4.0, 9.0], requires_grad=True)
@@ -325,7 +325,7 @@ fn test_sqrt_bwd_gpu_chain_mul() raises:
         )
 
 
-fn test_sqrt_bwd_gpu_chain_add() raises:
+def test_sqrt_bwd_gpu_chain_add() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([4.0, 9.0], requires_grad=True)
@@ -342,7 +342,7 @@ fn test_sqrt_bwd_gpu_chain_add() raises:
         )
 
 
-fn test_sqrt_bwd_gpu_sqrt_of_sqrt() raises:
+def test_sqrt_bwd_gpu_sqrt_of_sqrt() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 16.0], requires_grad=True)
@@ -354,7 +354,7 @@ fn test_sqrt_bwd_gpu_sqrt_of_sqrt() raises:
         )
 
 
-fn test_sqrt_bwd_gpu_large_tensor() raises:
+def test_sqrt_bwd_gpu_large_tensor() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].arange(1.0, 1025.0)
@@ -371,7 +371,7 @@ fn test_sqrt_bwd_gpu_large_tensor() raises:
 # 6. GRADIENT FLOW – GPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_sqrt_gradflow_gpu_no_grad_leaf() raises:
+def test_sqrt_gradflow_gpu_no_grad_leaf() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([4.0, 9.0])          # no grad
@@ -385,7 +385,7 @@ fn test_sqrt_gradflow_gpu_no_grad_leaf() raises:
         )
 
 
-fn test_sqrt_gradflow_gpu_multi_use_leaf() raises:
+def test_sqrt_gradflow_gpu_multi_use_leaf() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([4.0, 9.0], requires_grad=True)
@@ -404,7 +404,7 @@ fn test_sqrt_gradflow_gpu_multi_use_leaf() raises:
 # 7. CPU / GPU PARITY
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_sqrt_parity_fwd_1d() raises:
+def test_sqrt_parity_fwd_1d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -413,7 +413,7 @@ fn test_sqrt_parity_fwd_1d() raises:
         assert_true(cpu_out.all_close[atol=1e-5](gpu_out))
 
 
-fn test_sqrt_parity_bwd_1d() raises:
+def test_sqrt_parity_bwd_1d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
@@ -430,7 +430,7 @@ fn test_sqrt_parity_bwd_1d() raises:
         assert_true(a_cpu.grad().all_close[atol=1e-5](a_gpu_leaf.grad()))
 
 
-fn test_sqrt_parity_bwd_2d() raises:
+def test_sqrt_parity_bwd_2d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[1.0, 4.0], [9.0, 16.0]], requires_grad=True)
@@ -446,7 +446,7 @@ fn test_sqrt_parity_bwd_2d() raises:
         assert_true(a_cpu.grad().all_close[atol=1e-5](a_gpu_leaf.grad()))
 
 
-fn test_sqrt_parity_fwd_3d() raises:
+def test_sqrt_parity_fwd_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(1.0, 9.0)
@@ -456,7 +456,7 @@ fn test_sqrt_parity_fwd_3d() raises:
         assert_true(cpu_out.all_close[atol=1e-5](gpu_out))
 
 
-fn test_sqrt_parity_bwd_3d() raises:
+def test_sqrt_parity_bwd_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(1.0, 9.0)
@@ -480,7 +480,7 @@ fn test_sqrt_parity_bwd_3d() raises:
 # MAIN – run all tests
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

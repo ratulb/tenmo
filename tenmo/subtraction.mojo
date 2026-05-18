@@ -18,7 +18,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct SubBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var signs = output.ancestry().backward_fn_arg().get[IntArrayArg]().array
@@ -44,7 +44,7 @@ struct SubLeftRightBackwardScalar[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var negate = output.ancestry().backward_fn_arg().get[Boolean]().is_true
@@ -70,7 +70,7 @@ comptime SubtractBroadcastBackward[dtype: DType] = BroadcastBackward[
 @fieldwise_init
 struct SubtractScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
@@ -93,7 +93,7 @@ struct SubtractScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct SubtractFromScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
@@ -116,7 +116,7 @@ struct SubtractFromScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct Subtractor[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[
         Self.dtype
@@ -174,7 +174,7 @@ struct Subtractor[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return out^
 
     @staticmethod
-    fn forward(self: Tensor[Self.dtype], other: Gradbox[Self.dtype]) -> Tensor[
+    def forward(self: Tensor[Self.dtype], other: Gradbox[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
         if self.shape() != other.shape():

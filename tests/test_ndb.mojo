@@ -19,7 +19,7 @@ comptime MEDIUM_SIZE = 4
 # ============================================
 
 
-fn ndb_ops_test_arithmetic_add_same_shape_both_contiguous() raises:
+def ndb_ops_test_arithmetic_add_same_shape_both_contiguous() raises:
     print("ndb_ops_test_arithmetic_add_same_shape_both_contiguous")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32].full(Shape(3, 4), 5)
@@ -33,7 +33,7 @@ fn ndb_ops_test_arithmetic_add_same_shape_both_contiguous() raises:
     print("ndb_ops_test_arithmetic_add_same_shape_both_contiguous passed")
 
 
-fn ndb_ops_test_arithmetic_sub_same_shape_both_contiguous() raises:
+def ndb_ops_test_arithmetic_sub_same_shape_both_contiguous() raises:
     print("ndb_ops_test_arithmetic_sub_same_shape_both_contiguous")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32].full(Shape(3, 4), 3)
@@ -46,7 +46,7 @@ fn ndb_ops_test_arithmetic_sub_same_shape_both_contiguous() raises:
     print("ndb_ops_test_arithmetic_sub_same_shape_both_contiguous passed")
 
 
-fn ndb_ops_test_arithmetic_mul_same_shape_both_contiguous() raises:
+def ndb_ops_test_arithmetic_mul_same_shape_both_contiguous() raises:
     print("ndb_ops_test_arithmetic_mul_same_shape_both_contiguous")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 4)
     var b = NDBuffer[DType.int32].full(Shape(3, 4), 3)
@@ -59,7 +59,7 @@ fn ndb_ops_test_arithmetic_mul_same_shape_both_contiguous() raises:
     print("ndb_ops_test_arithmetic_mul_same_shape_both_contiguous passed")
 
 
-fn ndb_ops_test_arithmetic_div_same_shape_both_contiguous() raises:
+def ndb_ops_test_arithmetic_div_same_shape_both_contiguous() raises:
     print("ndb_ops_test_arithmetic_div_same_shape_both_contiguous")
     var a = NDBuffer[DType.float32].full(Shape(3, 4), 10.0)
     var b = NDBuffer[DType.float32].full(Shape(3, 4), 2.0)
@@ -72,7 +72,7 @@ fn ndb_ops_test_arithmetic_div_same_shape_both_contiguous() raises:
     print("ndb_ops_test_arithmetic_div_same_shape_both_contiguous passed")
 
 
-fn ndb_ops_test_arithmetic_self_contiguous_other_noncontiguous() raises:
+def ndb_ops_test_arithmetic_self_contiguous_other_noncontiguous() raises:
     print("ndb_ops_test_arithmetic_self_contiguous_other_noncontiguous")
     var a = NDBuffer[DType.int32].full(Shape(2, 3), 10)
 
@@ -96,7 +96,7 @@ fn ndb_ops_test_arithmetic_self_contiguous_other_noncontiguous() raises:
     print("ndb_ops_test_arithmetic_self_contiguous_other_noncontiguous passed")
 
 
-fn ndb_ops_test_arithmetic_self_noncontiguous_other_contiguous() raises:
+def ndb_ops_test_arithmetic_self_noncontiguous_other_contiguous() raises:
     print("ndb_ops_test_arithmetic_self_noncontiguous_other_contiguous")
 
     # Create non-contiguous self
@@ -118,7 +118,7 @@ fn ndb_ops_test_arithmetic_self_noncontiguous_other_contiguous() raises:
     print("ndb_ops_test_arithmetic_self_noncontiguous_other_contiguous passed")
 
 
-fn ndb_ops_test_arithmetic_both_noncontiguous() raises:
+def ndb_ops_test_arithmetic_both_noncontiguous() raises:
     print("ndb_ops_test_arithmetic_both_noncontiguous")
 
     var a_buffer = Buffer[DType.int32](12)
@@ -139,7 +139,7 @@ fn ndb_ops_test_arithmetic_both_noncontiguous() raises:
     print("ndb_ops_test_arithmetic_both_noncontiguous passed")
 
 
-fn ndb_ops_test_arithmetic_with_offset() raises:
+def ndb_ops_test_arithmetic_with_offset() raises:
     print("ndb_ops_test_arithmetic_with_offset")
 
     # Create buffers with offsets
@@ -165,7 +165,7 @@ fn ndb_ops_test_arithmetic_with_offset() raises:
     print("ndb_ops_test_arithmetic_with_offset passed")
 
 
-fn ndb_ops_test_arithmetic_broadcast_row() raises:
+def ndb_ops_test_arithmetic_broadcast_row() raises:
     print("ndb_ops_test_arithmetic_broadcast_row")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(1, 4))
@@ -181,7 +181,7 @@ fn ndb_ops_test_arithmetic_broadcast_row() raises:
     print("ndb_ops_test_arithmetic_broadcast_row passed")
 
 
-fn ndb_ops_test_arithmetic_broadcast_col() raises:
+def ndb_ops_test_arithmetic_broadcast_col() raises:
     print("ndb_ops_test_arithmetic_broadcast_col")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(3, 1))
@@ -196,7 +196,7 @@ fn ndb_ops_test_arithmetic_broadcast_col() raises:
     print("ndb_ops_test_arithmetic_broadcast_col passed")
 
 
-fn ndb_ops_test_arithmetic_broadcast_scalar() raises:
+def ndb_ops_test_arithmetic_broadcast_scalar() raises:
     print("ndb_ops_test_arithmetic_broadcast_scalar")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape())
@@ -210,7 +210,7 @@ fn ndb_ops_test_arithmetic_broadcast_scalar() raises:
     print("ndb_ops_test_arithmetic_broadcast_scalar passed")
 
 
-fn ndb_ops_test_arithmetic_1d() raises:
+def ndb_ops_test_arithmetic_1d() raises:
     print("ndb_ops_test_arithmetic_1d")
     var a = NDBuffer[DType.float32].full(Shape(10), 2.5)
     var b = NDBuffer[DType.float32].full(Shape(10), 1.5)
@@ -223,7 +223,7 @@ fn ndb_ops_test_arithmetic_1d() raises:
     print("ndb_ops_test_arithmetic_1d passed")
 
 
-fn ndb_ops_test_arithmetic_3d() raises:
+def ndb_ops_test_arithmetic_3d() raises:
     print("ndb_ops_test_arithmetic_3d")
     var a = NDBuffer[DType.int32].full(Shape(2, 3, 4), 10)
     var b = NDBuffer[DType.int32].full(Shape(2, 3, 4), 5)
@@ -242,7 +242,7 @@ fn ndb_ops_test_arithmetic_3d() raises:
 # ============================================
 
 
-fn ndb_ops_test_inplace_add_same_shape_both_contiguous() raises:
+def ndb_ops_test_inplace_add_same_shape_both_contiguous() raises:
     print("ndb_ops_test_inplace_add_same_shape_both_contiguous")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32].full(Shape(3, 4), 5)
@@ -255,7 +255,7 @@ fn ndb_ops_test_inplace_add_same_shape_both_contiguous() raises:
     print("ndb_ops_test_inplace_add_same_shape_both_contiguous passed")
 
 
-fn ndb_ops_test_inplace_sub_same_shape() raises:
+def ndb_ops_test_inplace_sub_same_shape() raises:
     print("ndb_ops_test_inplace_sub_same_shape")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32].full(Shape(3, 4), 3)
@@ -268,7 +268,7 @@ fn ndb_ops_test_inplace_sub_same_shape() raises:
     print("ndb_ops_test_inplace_sub_same_shape passed")
 
 
-fn ndb_ops_test_inplace_mul_same_shape() raises:
+def ndb_ops_test_inplace_mul_same_shape() raises:
     print("ndb_ops_test_inplace_mul_same_shape")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 4)
     var b = NDBuffer[DType.int32].full(Shape(3, 4), 3)
@@ -281,7 +281,7 @@ fn ndb_ops_test_inplace_mul_same_shape() raises:
     print("ndb_ops_test_inplace_mul_same_shape passed")
 
 
-fn ndb_ops_test_inplace_div_same_shape() raises:
+def ndb_ops_test_inplace_div_same_shape() raises:
     print("ndb_ops_test_inplace_div_same_shape")
     var a = NDBuffer[DType.float32].full(Shape(3, 4), 10.0)
     var b = NDBuffer[DType.float32].full(Shape(3, 4), 2.0)
@@ -294,7 +294,7 @@ fn ndb_ops_test_inplace_div_same_shape() raises:
     print("ndb_ops_test_inplace_div_same_shape passed")
 
 
-fn ndb_ops_test_inplace_self_contiguous_other_noncontiguous() raises:
+def ndb_ops_test_inplace_self_contiguous_other_noncontiguous() raises:
     print("ndb_ops_test_inplace_self_contiguous_other_noncontiguous")
     var a = NDBuffer[DType.int32].full(Shape(2, 3), 10)
 
@@ -319,7 +319,7 @@ fn ndb_ops_test_inplace_self_contiguous_other_noncontiguous() raises:
     print("ndb_ops_test_inplace_self_contiguous_other_noncontiguous passed")
 
 
-fn ndb_ops_test_inplace_self_noncontiguous_other_contiguous() raises:
+def ndb_ops_test_inplace_self_noncontiguous_other_contiguous() raises:
     print("ndb_ops_test_inplace_self_noncontiguous_other_contiguous")
 
     var self_buffer = Buffer[DType.int32](12)
@@ -345,7 +345,7 @@ fn ndb_ops_test_inplace_self_noncontiguous_other_contiguous() raises:
     print("ndb_ops_test_inplace_self_noncontiguous_other_contiguous passed")
 
 
-fn ndb_ops_test_inplace_both_noncontiguous() raises:
+def ndb_ops_test_inplace_both_noncontiguous() raises:
     print("ndb_ops_test_inplace_both_noncontiguous")
 
     var a_buffer = Buffer[DType.int32](12)
@@ -373,7 +373,7 @@ fn ndb_ops_test_inplace_both_noncontiguous() raises:
     print("ndb_ops_test_inplace_both_noncontiguous passed")
 
 
-fn ndb_ops_test_inplace_broadcast_row() raises:
+def ndb_ops_test_inplace_broadcast_row() raises:
     print("ndb_ops_test_inplace_broadcast_row")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(1, 4))
@@ -388,7 +388,7 @@ fn ndb_ops_test_inplace_broadcast_row() raises:
     print("ndb_ops_test_inplace_broadcast_row passed")
 
 
-fn ndb_ops_test_inplace_broadcast_col() raises:
+def ndb_ops_test_inplace_broadcast_col() raises:
     print("ndb_ops_test_inplace_broadcast_col")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(3, 1))
@@ -405,7 +405,7 @@ fn ndb_ops_test_inplace_broadcast_col() raises:
     print("ndb_ops_test_inplace_broadcast_col passed")
 
 
-fn ndb_ops_test_inplace_with_offset() raises:
+def ndb_ops_test_inplace_with_offset() raises:
     print("ndb_ops_test_inplace_with_offset")
 
     var a_buffer = Buffer[DType.int32](20)
@@ -440,7 +440,7 @@ fn ndb_ops_test_inplace_with_offset() raises:
 # ============================================
 
 
-fn ndb_ops_test_inplace_scalar_add_contiguous() raises:
+def ndb_ops_test_inplace_scalar_add_contiguous() raises:
     print("ndb_ops_test_inplace_scalar_add_contiguous")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
 
@@ -452,7 +452,7 @@ fn ndb_ops_test_inplace_scalar_add_contiguous() raises:
     print("ndb_ops_test_inplace_scalar_add_contiguous passed")
 
 
-fn ndb_ops_test_inplace_scalar_sub_contiguous() raises:
+def ndb_ops_test_inplace_scalar_sub_contiguous() raises:
     print("ndb_ops_test_inplace_scalar_sub_contiguous")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
 
@@ -464,7 +464,7 @@ fn ndb_ops_test_inplace_scalar_sub_contiguous() raises:
     print("ndb_ops_test_inplace_scalar_sub_contiguous passed")
 
 
-fn ndb_ops_test_inplace_scalar_mul_contiguous() raises:
+def ndb_ops_test_inplace_scalar_mul_contiguous() raises:
     print("ndb_ops_test_inplace_scalar_mul_contiguous")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 4)
 
@@ -476,7 +476,7 @@ fn ndb_ops_test_inplace_scalar_mul_contiguous() raises:
     print("ndb_ops_test_inplace_scalar_mul_contiguous passed")
 
 
-fn ndb_ops_test_inplace_scalar_div_contiguous() raises:
+def ndb_ops_test_inplace_scalar_div_contiguous() raises:
     print("ndb_ops_test_inplace_scalar_div_contiguous")
     var a = NDBuffer[DType.float32].full(Shape(3, 4), 10.0)
 
@@ -488,7 +488,7 @@ fn ndb_ops_test_inplace_scalar_div_contiguous() raises:
     print("ndb_ops_test_inplace_scalar_div_contiguous passed")
 
 
-fn ndb_ops_test_inplace_scalar_noncontiguous() raises:
+def ndb_ops_test_inplace_scalar_noncontiguous() raises:
     print("ndb_ops_test_inplace_scalar_noncontiguous")
 
     var a_buffer = Buffer[DType.int32](12)
@@ -504,7 +504,7 @@ fn ndb_ops_test_inplace_scalar_noncontiguous() raises:
     print("ndb_ops_test_inplace_scalar_noncontiguous passed")
 
 
-fn ndb_ops_test_inplace_scalar_with_offset() raises:
+def ndb_ops_test_inplace_scalar_with_offset() raises:
     print("ndb_ops_test_inplace_scalar_with_offset")
 
     var a_buffer = Buffer[DType.int32](20)
@@ -522,7 +522,7 @@ fn ndb_ops_test_inplace_scalar_with_offset() raises:
     print("ndb_ops_test_inplace_scalar_with_offset passed")
 
 
-fn ndb_ops_test_inplace_scalar_1d() raises:
+def ndb_ops_test_inplace_scalar_1d() raises:
     print("ndb_ops_test_inplace_scalar_1d")
     var a = NDBuffer[DType.float32].full(Shape(10), 2.5)
 
@@ -533,7 +533,7 @@ fn ndb_ops_test_inplace_scalar_1d() raises:
     print("ndb_ops_test_inplace_scalar_1d passed")
 
 
-fn ndb_ops_test_inplace_scalar_3d() raises:
+def ndb_ops_test_inplace_scalar_3d() raises:
     print("ndb_ops_test_inplace_scalar_3d")
     var a = NDBuffer[DType.int32].full(Shape(2, 3, 4), 10)
 
@@ -551,7 +551,7 @@ fn ndb_ops_test_inplace_scalar_3d() raises:
 # ============================================
 
 
-fn ndb_ops_test_scalar_add_contiguous() raises:
+def ndb_ops_test_scalar_add_contiguous() raises:
     print("ndb_ops_test_scalar_add_contiguous")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
 
@@ -565,7 +565,7 @@ fn ndb_ops_test_scalar_add_contiguous() raises:
     print("ndb_ops_test_scalar_add_contiguous passed")
 
 
-fn ndb_ops_test_scalar_sub_contiguous() raises:
+def ndb_ops_test_scalar_sub_contiguous() raises:
     print("ndb_ops_test_scalar_sub_contiguous")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
 
@@ -577,7 +577,7 @@ fn ndb_ops_test_scalar_sub_contiguous() raises:
     print("ndb_ops_test_scalar_sub_contiguous passed")
 
 
-fn ndb_ops_test_scalar_mul_contiguous() raises:
+def ndb_ops_test_scalar_mul_contiguous() raises:
     print("ndb_ops_test_scalar_mul_contiguous")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 4)
 
@@ -589,7 +589,7 @@ fn ndb_ops_test_scalar_mul_contiguous() raises:
     print("ndb_ops_test_scalar_mul_contiguous passed")
 
 
-fn ndb_ops_test_scalar_div_contiguous() raises:
+def ndb_ops_test_scalar_div_contiguous() raises:
     print("ndb_ops_test_scalar_div_contiguous")
     var a = NDBuffer[DType.float32].full(Shape(3, 4), 10.0)
 
@@ -601,7 +601,7 @@ fn ndb_ops_test_scalar_div_contiguous() raises:
     print("ndb_ops_test_scalar_div_contiguous passed")
 
 
-fn ndb_ops_test_scalar_reverse_sub_contiguous() raises:
+def ndb_ops_test_scalar_reverse_sub_contiguous() raises:
     print("ndb_ops_test_scalar_reverse_sub_contiguous")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 3)
 
@@ -613,7 +613,7 @@ fn ndb_ops_test_scalar_reverse_sub_contiguous() raises:
     print("ndb_ops_test_scalar_reverse_sub_contiguous passed")
 
 
-fn ndb_ops_test_scalar_reverse_div_contiguous() raises:
+def ndb_ops_test_scalar_reverse_div_contiguous() raises:
     print("ndb_ops_test_scalar_reverse_div_contiguous")
     var a = NDBuffer[DType.float32].full(Shape(3, 4), 2.0)
 
@@ -624,7 +624,7 @@ fn ndb_ops_test_scalar_reverse_div_contiguous() raises:
             assert_true(abs(result[IntArray(i, j)] - 5.0) < 0.001, "10 / 2 = 5")
 
 
-fn ndb_ops_test_scalar_noncontiguous() raises:
+def ndb_ops_test_scalar_noncontiguous() raises:
     print("ndb_ops_test_scalar_noncontiguous")
 
     var a_buffer = Buffer[DType.int32](12)
@@ -642,7 +642,7 @@ fn ndb_ops_test_scalar_noncontiguous() raises:
     print("ndb_ops_test_scalar_noncontiguous passed")
 
 
-fn ndb_ops_test_scalar_with_offset() raises:
+def ndb_ops_test_scalar_with_offset() raises:
     print("ndb_ops_test_scalar_with_offset")
 
     var a_buffer = Buffer[DType.int32](20)
@@ -660,7 +660,7 @@ fn ndb_ops_test_scalar_with_offset() raises:
     print("ndb_ops_test_scalar_with_offset passed")
 
 
-fn ndb_ops_test_scalar_1d() raises:
+def ndb_ops_test_scalar_1d() raises:
     print("ndb_ops_test_scalar_1d")
     var a = NDBuffer[DType.float32].full(Shape(10), 2.5)
 
@@ -671,7 +671,7 @@ fn ndb_ops_test_scalar_1d() raises:
     print("ndb_ops_test_scalar_1d passed")
 
 
-fn ndb_ops_test_scalar_3d() raises:
+def ndb_ops_test_scalar_3d() raises:
     print("ndb_ops_test_scalar_3d")
     var a = NDBuffer[DType.int32].full(Shape(2, 3, 4), 10)
 
@@ -689,7 +689,7 @@ fn ndb_ops_test_scalar_3d() raises:
 # ============================================
 
 
-fn ndb_ops_test_dunder_add() raises:
+def ndb_ops_test_dunder_add() raises:
     print("ndb_ops_test_dunder_add")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32].full(Shape(3, 4), 5)
@@ -702,7 +702,7 @@ fn ndb_ops_test_dunder_add() raises:
     print("ndb_ops_test_dunder_add passed")
 
 
-fn ndb_ops_test_dunder_sub() raises:
+def ndb_ops_test_dunder_sub() raises:
     print("ndb_ops_test_dunder_sub")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32].full(Shape(3, 4), 3)
@@ -715,7 +715,7 @@ fn ndb_ops_test_dunder_sub() raises:
     print("ndb_ops_test_dunder_sub passed")
 
 
-fn ndb_ops_test_dunder_mul() raises:
+def ndb_ops_test_dunder_mul() raises:
     print("ndb_ops_test_dunder_mul")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 4)
     var b = NDBuffer[DType.int32].full(Shape(3, 4), 3)
@@ -728,7 +728,7 @@ fn ndb_ops_test_dunder_mul() raises:
     print("ndb_ops_test_dunder_mul passed")
 
 
-fn ndb_ops_test_dunder_truediv() raises:
+def ndb_ops_test_dunder_truediv() raises:
     print("ndb_ops_test_dunder_truediv")
     var a = NDBuffer[DType.float32].full(Shape(3, 4), 10.0)
     var b = NDBuffer[DType.float32].full(Shape(3, 4), 2.0)
@@ -743,7 +743,7 @@ fn ndb_ops_test_dunder_truediv() raises:
     print("ndb_ops_test_dunder_truediv passed")
 
 
-fn ndb_ops_test_dunder_mul_scalar() raises:
+def ndb_ops_test_dunder_mul_scalar() raises:
     print("ndb_ops_test_dunder_mul_scalar")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 4)
 
@@ -755,7 +755,7 @@ fn ndb_ops_test_dunder_mul_scalar() raises:
     print("ndb_ops_test_dunder_mul_scalar passed")
 
 
-fn ndb_ops_test_dunder_rmul_scalar() raises:
+def ndb_ops_test_dunder_rmul_scalar() raises:
     print("ndb_ops_test_dunder_rmul_scalar")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 4)
 
@@ -767,7 +767,7 @@ fn ndb_ops_test_dunder_rmul_scalar() raises:
     print("ndb_ops_test_dunder_rmul_scalar passed")
 
 
-fn ndb_ops_test_dunder_iadd() raises:
+def ndb_ops_test_dunder_iadd() raises:
     print("ndb_ops_test_dunder_iadd")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32].full(Shape(3, 4), 5)
@@ -780,7 +780,7 @@ fn ndb_ops_test_dunder_iadd() raises:
     print("ndb_ops_test_dunder_iadd passed")
 
 
-fn ndb_ops_test_dunder_isub() raises:
+def ndb_ops_test_dunder_isub() raises:
     print("ndb_ops_test_dunder_isub")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32].full(Shape(3, 4), 3)
@@ -793,7 +793,7 @@ fn ndb_ops_test_dunder_isub() raises:
     print("ndb_ops_test_dunder_isub passed")
 
 
-fn ndb_ops_test_dunder_imul() raises:
+def ndb_ops_test_dunder_imul() raises:
     print("ndb_ops_test_dunder_imul")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 4)
     var b = NDBuffer[DType.int32].full(Shape(3, 4), 3)
@@ -806,7 +806,7 @@ fn ndb_ops_test_dunder_imul() raises:
     print("ndb_ops_test_dunder_imul passed")
 
 
-fn ndb_ops_test_dunder_itruediv() raises:
+def ndb_ops_test_dunder_itruediv() raises:
     print("ndb_ops_test_dunder_itruediv")
     var a = NDBuffer[DType.float32].full(Shape(3, 4), 10.0)
     var b = NDBuffer[DType.float32].full(Shape(3, 4), 2.0)
@@ -824,7 +824,7 @@ fn ndb_ops_test_dunder_itruediv() raises:
 # ============================================
 
 
-fn ndb_ops_test_scalar_ndbuffer_ops() raises:
+def ndb_ops_test_scalar_ndbuffer_ops() raises:
     print("ndb_ops_test_scalar_ndbuffer_ops")
     var a = NDBuffer[DType.int32](Shape())
     a[IntArray()] = 10
@@ -840,7 +840,7 @@ fn ndb_ops_test_scalar_ndbuffer_ops() raises:
     print("ndb_ops_test_scalar_ndbuffer_ops passed")
 
 
-fn ndb_ops_test_different_dtypes() raises:
+def ndb_ops_test_different_dtypes() raises:
     print("ndb_ops_test_different_dtypes")
 
     # Float64
@@ -863,7 +863,7 @@ fn ndb_ops_test_different_dtypes() raises:
     print("ndb_ops_test_different_dtypes passed")
 
 
-fn ndb_ops_test_large_buffer() raises:
+def ndb_ops_test_large_buffer() raises:
     print("ndb_ops_test_large_buffer")
     var a = NDBuffer[DType.int32].full(Shape(100, 100), 1)
     var b = NDBuffer[DType.int32].full(Shape(100, 100), 2)
@@ -882,7 +882,7 @@ fn ndb_ops_test_large_buffer() raises:
 # ============================================
 
 
-fn run_all_ndb_ops_tests() raises:
+def run_all_ndb_ops_tests() raises:
     print("=" * 60)
     print("Running all NDBuffer ops tests (ndb_ops_*)")
     print("=" * 60)
@@ -963,7 +963,7 @@ fn run_all_ndb_ops_tests() raises:
 # ============================================
 
 
-fn test_copy_from_equal_shaped_both_contiguous_overwrite() raises:
+def test_copy_from_equal_shaped_both_contiguous_overwrite() raises:
     print("test_copy_from_equal_shaped_both_contiguous_overwrite")
     var dest = NDBuffer[DType.int32].full(Shape(3, 4), 0)
     var src = NDBuffer[DType.int32].full(Shape(3, 4), 42)
@@ -976,7 +976,7 @@ fn test_copy_from_equal_shaped_both_contiguous_overwrite() raises:
     print("test_copy_from_equal_shaped_both_contiguous_overwrite passed")
 
 
-fn test_copy_from_equal_shaped_both_contiguous_add() raises:
+def test_copy_from_equal_shaped_both_contiguous_add() raises:
     print("test_copy_from_equal_shaped_both_contiguous_add")
     var dest = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var src = NDBuffer[DType.int32].full(Shape(3, 4), 5)
@@ -989,7 +989,7 @@ fn test_copy_from_equal_shaped_both_contiguous_add() raises:
     print("test_copy_from_equal_shaped_both_contiguous_add passed")
 
 
-fn test_copy_from_equal_shaped_dest_contiguous_src_noncontiguous_overwrite() raises:
+def test_copy_from_equal_shaped_dest_contiguous_src_noncontiguous_overwrite() raises:
     print(
         "test_copy_from_equal_shaped_dest_contiguous_src_noncontiguous_overwrite"
     )
@@ -1024,7 +1024,7 @@ fn test_copy_from_equal_shaped_dest_contiguous_src_noncontiguous_overwrite() rai
     )
 
 
-fn test_copy_from_equal_shaped_dest_noncontiguous_src_contiguous_overwrite() raises:
+def test_copy_from_equal_shaped_dest_noncontiguous_src_contiguous_overwrite() raises:
     print(
         "test_copy_from_equal_shaped_dest_noncontiguous_src_contiguous_overwrite"
     )
@@ -1052,7 +1052,7 @@ fn test_copy_from_equal_shaped_dest_noncontiguous_src_contiguous_overwrite() rai
     )
 
 
-fn test_copy_from_equal_shaped_both_noncontiguous_overwrite() raises:
+def test_copy_from_equal_shaped_both_noncontiguous_overwrite() raises:
     print("test_copy_from_equal_shaped_both_noncontiguous_overwrite")
 
     # Non-contiguous dest
@@ -1083,7 +1083,7 @@ fn test_copy_from_equal_shaped_both_noncontiguous_overwrite() raises:
     print("test_copy_from_equal_shaped_both_noncontiguous_overwrite passed")
 
 
-fn test_copy_from_equal_shaped_both_noncontiguous_add() raises:
+def test_copy_from_equal_shaped_both_noncontiguous_add() raises:
     print("test_copy_from_equal_shaped_both_noncontiguous_add")
 
     # Non-contiguous dest with initial values
@@ -1108,7 +1108,7 @@ fn test_copy_from_equal_shaped_both_noncontiguous_add() raises:
     print("test_copy_from_equal_shaped_both_noncontiguous_add passed")
 
 
-fn test_copy_from_equal_shaped_with_offset() raises:
+def test_copy_from_equal_shaped_with_offset() raises:
     print("test_copy_from_equal_shaped_with_offset")
 
     # Dest with offset (simulating a view into larger buffer)
@@ -1146,7 +1146,7 @@ fn test_copy_from_equal_shaped_with_offset() raises:
     print("test_copy_from_equal_shaped_with_offset passed")
 
 
-fn test_copy_from_equal_shaped_1d() raises:
+def test_copy_from_equal_shaped_1d() raises:
     print("test_copy_from_equal_shaped_1d")
     var dest = NDBuffer[DType.float32].zeros(Shape(10))
     var src = NDBuffer[DType.float32].full(Shape(10), 3.14)
@@ -1158,7 +1158,7 @@ fn test_copy_from_equal_shaped_1d() raises:
     print("test_copy_from_equal_shaped_1d passed")
 
 
-fn test_copy_from_equal_shaped_3d() raises:
+def test_copy_from_equal_shaped_3d() raises:
     print("test_copy_from_equal_shaped_3d")
     var dest = NDBuffer[DType.int32].zeros(Shape(2, 3, 4))
     var src = NDBuffer[DType.int32](Shape(2, 3, 4))
@@ -1181,7 +1181,7 @@ fn test_copy_from_equal_shaped_3d() raises:
     print("test_copy_from_equal_shaped_3d passed")
 
 
-fn test_copy_from_equal_shaped_scalar() raises:
+def test_copy_from_equal_shaped_scalar() raises:
     print("test_copy_from_equal_shaped_scalar")
     var dest = NDBuffer[DType.int32](Shape())
     dest[IntArray()] = 0
@@ -1200,7 +1200,7 @@ fn test_copy_from_equal_shaped_scalar() raises:
 # ============================================
 
 
-fn test_fill_same_shape() raises:
+def test_fill_same_shape() raises:
     print("test_fill_same_shape")
     var dest = NDBuffer[DType.int32].zeros(Shape(3, 4))
     var src = NDBuffer[DType.int32].full(Shape(3, 4), 77)
@@ -1213,7 +1213,7 @@ fn test_fill_same_shape() raises:
     print("test_fill_same_shape passed")
 
 
-fn test_fill_from_scalar_ndbuffer() raises:
+def test_fill_from_scalar_ndbuffer() raises:
     print("test_fill_from_scalar_ndbuffer")
     var dest = NDBuffer[DType.int32].zeros(Shape(3, 4))
     var scalar_src = NDBuffer[DType.int32](Shape())
@@ -1227,7 +1227,7 @@ fn test_fill_from_scalar_ndbuffer() raises:
     print("test_fill_from_scalar_ndbuffer passed")
 
 
-fn test_fill_from_singleton_ndbuffer() raises:
+def test_fill_from_singleton_ndbuffer() raises:
     print("test_fill_from_singleton_ndbuffer")
     var dest = NDBuffer[DType.int32].zeros(Shape(3, 4))
     var singleton_src = NDBuffer[DType.int32].full(Shape(1), 88)
@@ -1240,7 +1240,7 @@ fn test_fill_from_singleton_ndbuffer() raises:
     print("test_fill_from_singleton_ndbuffer passed")
 
 
-fn test_fill_broadcast_row() raises:
+def test_fill_broadcast_row() raises:
     print("test_fill_broadcast_row")
     var dest = NDBuffer[DType.int32].zeros(Shape(3, 4))
     var src = NDBuffer[DType.int32](Shape(1, 4))
@@ -1257,7 +1257,7 @@ fn test_fill_broadcast_row() raises:
     print("test_fill_broadcast_row passed")
 
 
-fn test_fill_broadcast_col() raises:
+def test_fill_broadcast_col() raises:
     print("test_fill_broadcast_col")
     var dest = NDBuffer[DType.int32].zeros(Shape(3, 4))
     var src = NDBuffer[DType.int32](Shape(3, 1))
@@ -1274,7 +1274,7 @@ fn test_fill_broadcast_col() raises:
     print("test_fill_broadcast_col passed")
 
 
-fn test_fill_broadcast_3d() raises:
+def test_fill_broadcast_3d() raises:
     print("test_fill_broadcast_3d")
     var dest = NDBuffer[DType.int32].zeros(Shape(2, 3, 4))
     var src = NDBuffer[DType.int32](Shape(1, 3, 1))
@@ -1293,7 +1293,7 @@ fn test_fill_broadcast_3d() raises:
     print("test_fill_broadcast_3d passed")
 
 
-fn test_fill_self_panics() raises:
+def test_fill_self_panics() raises:
     print("test_fill_self_panics")
     var _ndb = NDBuffer[DType.int32].full(Shape(3, 4), 42)
 
@@ -1303,7 +1303,7 @@ fn test_fill_self_panics() raises:
     print("test_fill_self_panics passed (manual verification needed)")
 
 
-fn test_fill_preserves_dest_structure() raises:
+def test_fill_preserves_dest_structure() raises:
     print("test_fill_preserves_dest_structure")
 
     # Non-contiguous dest
@@ -1326,7 +1326,7 @@ fn test_fill_preserves_dest_structure() raises:
     print("test_fill_preserves_dest_structure passed")
 
 
-fn test_fill_different_dtypes() raises:
+def test_fill_different_dtypes() raises:
     print("test_fill_different_dtypes")
 
     # Float32
@@ -1355,7 +1355,7 @@ fn test_fill_different_dtypes() raises:
 # ============================================
 
 
-fn run_all_copy_fill_tests() raises:
+def run_all_copy_fill_tests() raises:
     print("=" * 60)
     print("Running copy_from_alike and fill tests")
     print("=" * 60)
@@ -1391,7 +1391,7 @@ fn run_all_copy_fill_tests() raises:
 # ============================================
 # Constructor Tests
 # ============================================
-fn test_ndbuffer_from_varargs() raises:
+def test_ndbuffer_from_varargs() raises:
     try:
         print("test_ndbuffer_from_varargs")
         var ndb = NDBuffer[DType.float32](1.0, 2.0, 3.0, 4.0)
@@ -1404,7 +1404,7 @@ fn test_ndbuffer_from_varargs() raises:
         raise e^
 
 
-fn test_ndbuffer_from_shape() raises:
+def test_ndbuffer_from_shape() raises:
     print("test_ndbuffer_from_shape")
     var ndb = NDBuffer[DType.int32](Shape(3, 4))
     assert_true(ndb.shape == Shape(3, 4), "Shape mismatch")
@@ -1413,7 +1413,7 @@ fn test_ndbuffer_from_shape() raises:
     print("test_ndbuffer_from_shape passed")
 
 
-fn test_ndbuffer_zeros() raises:
+def test_ndbuffer_zeros() raises:
     print("test_ndbuffer_zeros")
     var ndb = NDBuffer[DType.float32].zeros(Shape(2, 3))
     for i in range(2):
@@ -1423,7 +1423,7 @@ fn test_ndbuffer_zeros() raises:
     print("test_ndbuffer_zeros passed")
 
 
-fn test_ndbuffer_full() raises:
+def test_ndbuffer_full() raises:
     print("test_ndbuffer_full")
     var ndb = NDBuffer[DType.int32].full(Shape(2, 3), 42)
     for i in range(2):
@@ -1436,7 +1436,7 @@ fn test_ndbuffer_full() raises:
 # ============================================
 # Indexing Tests
 # ============================================
-fn test_ndbuffer_getitem_setitem() raises:
+def test_ndbuffer_getitem_setitem() raises:
     print("test_ndbuffer_getitem_setitem")
     var ndb = NDBuffer[DType.int32](Shape(3, 4))
 
@@ -1455,7 +1455,7 @@ fn test_ndbuffer_getitem_setitem() raises:
     print("test_ndbuffer_getitem_setitem passed")
 
 
-fn test_ndbuffer_item_scalar() raises:
+def test_ndbuffer_item_scalar() raises:
     print("test_ndbuffer_item_scalar")
     var ndb = NDBuffer[DType.float32](Shape(1))
     ndb[IntArray(0)] = 42.5
@@ -1466,7 +1466,7 @@ fn test_ndbuffer_item_scalar() raises:
 # ============================================
 # Arithmetic Tests
 # ============================================
-fn test_ndbuffer_add() raises:
+def test_ndbuffer_add() raises:
     print("test_ndbuffer_add")
     var a = NDBuffer[DType.int32].full(Shape(2, 3), 10)
     var b = NDBuffer[DType.int32].full(Shape(2, 3), 5)
@@ -1479,7 +1479,7 @@ fn test_ndbuffer_add() raises:
     print("test_ndbuffer_add passed")
 
 
-fn test_ndbuffer_mul() raises:
+def test_ndbuffer_mul() raises:
     print("test_ndbuffer_mul")
     var a = NDBuffer[DType.int32].full(Shape(2, 3), 4)
     var b = NDBuffer[DType.int32].full(Shape(2, 3), 3)
@@ -1492,7 +1492,7 @@ fn test_ndbuffer_mul() raises:
     print("test_ndbuffer_mul passed")
 
 
-fn test_ndbuffer_scalar_mul() raises:
+def test_ndbuffer_scalar_mul() raises:
     print("test_ndbuffer_scalar_mul")
     var a = NDBuffer[DType.int32].full(Shape(2, 3), 5)
     var result = a * 3
@@ -1504,7 +1504,7 @@ fn test_ndbuffer_scalar_mul() raises:
     print("test_ndbuffer_scalar_mul passed")
 
 
-fn test_ndbuffer_iadd() raises:
+def test_ndbuffer_iadd() raises:
     print("test_ndbuffer_iadd")
     var a = NDBuffer[DType.int32].full(Shape(2, 3), 10)
     var b = NDBuffer[DType.int32].full(Shape(2, 3), 5)
@@ -1520,7 +1520,7 @@ fn test_ndbuffer_iadd() raises:
 # ============================================
 # Broadcasting Tests
 # ============================================
-fn test_ndbuffer_broadcast_scalar() raises:
+def test_ndbuffer_broadcast_scalar() raises:
     print("test_ndbuffer_broadcast_scalar")
     var a = NDBuffer[DType.int32].full(Shape(2, 3), 10)
     var b = NDBuffer[DType.int32].full(Shape(), 5)  # Scalar
@@ -1534,7 +1534,7 @@ fn test_ndbuffer_broadcast_scalar() raises:
     print("test_ndbuffer_broadcast_scalar passed")
 
 
-fn test_ndbuffer_broadcast_row() raises:
+def test_ndbuffer_broadcast_row() raises:
     print("test_ndbuffer_broadcast_row")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(1, 4))
@@ -1551,7 +1551,7 @@ fn test_ndbuffer_broadcast_row() raises:
     print("test_ndbuffer_broadcast_row passed")
 
 
-fn test_ndbuffer_broadcast_to() raises:
+def test_ndbuffer_broadcast_to() raises:
     print("test_ndbuffer_broadcast_to")
     var a = NDBuffer[DType.int32].full(Shape(1, 3), 5)
     var result = a.broadcast_to(Shape(4, 3))
@@ -1567,7 +1567,7 @@ fn test_ndbuffer_broadcast_to() raises:
 # ============================================
 # Reduction Tests
 # ============================================
-fn test_ndbuffer_sum_all() raises:
+def test_ndbuffer_sum_all() raises:
     print("test_ndbuffer_sum_all")
     var ndb = NDBuffer[DType.int32](Shape(2, 3))
     var val = 1
@@ -1582,7 +1582,7 @@ fn test_ndbuffer_sum_all() raises:
     print("test_ndbuffer_sum_all passed")
 
 
-fn test_ndbuffer_sum_axis() raises:
+def test_ndbuffer_sum_axis() raises:
     try:
         print("test_ndbuffer_sum_axis")
         var ndb = NDBuffer[DType.int32](Shape(2, 3))
@@ -1606,7 +1606,7 @@ fn test_ndbuffer_sum_axis() raises:
         raise e^
 
 
-fn test_ndbuffer_sum_axis_keepdims() raises:
+def test_ndbuffer_sum_axis_keepdims() raises:
     print("test_ndbuffer_sum_axis_keepdims")
     var ndb = NDBuffer[DType.int32](Shape(2, 3))
     var val = 1
@@ -1623,7 +1623,7 @@ fn test_ndbuffer_sum_axis_keepdims() raises:
 # ============================================
 # Contiguity Tests
 # ============================================
-fn test_ndbuffer_contiguous() raises:
+def test_ndbuffer_contiguous() raises:
     print("test_ndbuffer_contiguous")
     var ndb = NDBuffer[DType.int32](Shape(2, 3))
     for i in range(2):
@@ -1640,7 +1640,7 @@ fn test_ndbuffer_contiguous() raises:
     print("test_ndbuffer_contiguous passed")
 
 
-fn test_ndbuffer_contiguous_buffer() raises:
+def test_ndbuffer_contiguous_buffer() raises:
     print("test_ndbuffer_contiguous_buffer")
     var ndb = NDBuffer[DType.int32](Shape(2, 3))
     for i in range(2):
@@ -1657,7 +1657,7 @@ fn test_ndbuffer_contiguous_buffer() raises:
 # ============================================
 # Comparison Tests
 # ============================================
-fn test_ndbuffer_eq() raises:
+def test_ndbuffer_eq() raises:
     print("test_ndbuffer_eq")
     var a = NDBuffer[DType.int32].full(Shape(2, 3), 42)
     var b = NDBuffer[DType.int32].full(Shape(2, 3), 42)
@@ -1668,7 +1668,7 @@ fn test_ndbuffer_eq() raises:
     print("test_ndbuffer_eq passed")
 
 
-fn test_ndbuffer_compare_elementwise() raises:
+def test_ndbuffer_compare_elementwise() raises:
     print("test_ndbuffer_compare_elementwise")
     var a = NDBuffer[DType.int32](Shape(4))
     for i in range(4):
@@ -1682,7 +1682,7 @@ fn test_ndbuffer_compare_elementwise() raises:
     print("test_ndbuffer_compare_elementwise passed")
 
 
-fn test_ndbuffer_all_close() raises:
+def test_ndbuffer_all_close() raises:
     print("test_ndbuffer_all_close")
     var a = NDBuffer[DType.float32].full(Shape(2, 3), 1.0)
     var b = NDBuffer[DType.float32].full(Shape(2, 3), 1.0 + 1e-9)
@@ -1696,7 +1696,7 @@ fn test_ndbuffer_all_close() raises:
 # ============================================
 # Utility Tests
 # ============================================
-fn test_ndbuffer_fill() raises:
+def test_ndbuffer_fill() raises:
     print("test_ndbuffer_fill")
     var ndb = NDBuffer[DType.int32].zeros(Shape(2, 3))
     ndb.fill(99)
@@ -1707,7 +1707,7 @@ fn test_ndbuffer_fill() raises:
     print("test_ndbuffer_fill passed")
 
 
-fn test_ndbuffer_count() raises:
+def test_ndbuffer_count() raises:
     print("test_ndbuffer_count")
     var ndb = NDBuffer[DType.int32](Shape(3, 4))
     for i in range(3):
@@ -1722,7 +1722,7 @@ fn test_ndbuffer_count() raises:
     print("test_ndbuffer_count passed")
 
 
-fn test_ndbuffer_flatten() raises:
+def test_ndbuffer_flatten() raises:
     print("test_ndbuffer_flatten")
     var ndb = NDBuffer[DType.int32](Shape(2, 3, 4))
     for i in range(2):
@@ -1736,7 +1736,7 @@ fn test_ndbuffer_flatten() raises:
     print("test_ndbuffer_flatten passed")
 
 
-fn test_ndbuffer_flatten_partial() raises:
+def test_ndbuffer_flatten_partial() raises:
     print("test_ndbuffer_flatten_partial")
     var ndb = NDBuffer[DType.int32](Shape(2, 3, 4))
 
@@ -1745,7 +1745,7 @@ fn test_ndbuffer_flatten_partial() raises:
     print("test_ndbuffer_flatten_partial passed")
 
 
-fn test_ndbuffer_to_dtype() raises:
+def test_ndbuffer_to_dtype() raises:
     print("test_ndbuffer_to_dtype")
     var ndb = NDBuffer[DType.int32].full(Shape(2, 3), 42)
     var result = ndb.to_dtype[DType.float32]()
@@ -1760,7 +1760,7 @@ fn test_ndbuffer_to_dtype() raises:
 # ============================================
 # Sharing Tests
 # ============================================
-fn test_ndbuffer_share() raises:
+def test_ndbuffer_share() raises:
     try:
         print("test_ndbuffer_share")
         var ndb = NDBuffer[DType.int32].full(Shape(2, 3), 42)
@@ -1782,7 +1782,7 @@ fn test_ndbuffer_share() raises:
 # ============================================
 # SIMD Load/Store Tests
 # ============================================
-fn test_ndbuffer_simd_load_store() raises:
+def test_ndbuffer_simd_load_store() raises:
     try:
         print("test_ndbuffer_simd_load_store")
         var ndb = NDBuffer[DType.float32](Shape(4, 8))
@@ -1813,7 +1813,7 @@ fn test_ndbuffer_simd_load_store() raises:
 # ============================================
 # Test Runner
 # ============================================
-fn run_all_ndbuffer_tests() raises:
+def run_all_ndbuffer_tests() raises:
     print("=" * 60)
     print("Running all NDBuffer tests")
     print("=" * 60)
@@ -1871,13 +1871,13 @@ fn run_all_ndbuffer_tests() raises:
     print("=" * 60)
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
 
 
-fn test_buffer_sum() raises:
+def test_buffer_sum() raises:
     print("test_buffer_sum")
     comptime dtype = DType.int32
     size = 21
@@ -1904,7 +1904,7 @@ fn test_buffer_sum() raises:
     assert_true(result.data_buffer() == Buffer[dtype]([21, 70, 119]))
 
 
-fn test_buffer_sum_all() raises:
+def test_buffer_sum_all() raises:
     try:
         print("test_buffer_sum_all")
         comptime dtype = DType.int32
@@ -1940,7 +1940,7 @@ fn test_buffer_sum_all() raises:
         raise e^
 
 
-fn test_buffer_overwrite() raises:
+def test_buffer_overwrite() raises:
     comptime dtype = DType.int32
     size = 21
     l = List[Scalar[dtype]](capacity=size)
@@ -1953,7 +1953,7 @@ fn test_buffer_overwrite() raises:
     ndb.data_buffer().overwrite(result, 3, 6)
 
 
-fn test_compare_buffer() raises:
+def test_compare_buffer() raises:
     print("test_compare_buffer")
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
@@ -1965,7 +1965,7 @@ fn test_compare_buffer() raises:
     )
 
 
-fn test_compare_scalar() raises:
+def test_compare_scalar() raises:
     print("test_compare_scalar")
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
@@ -1982,7 +1982,7 @@ fn test_compare_scalar() raises:
     )
 
 
-fn test_inplace_broadcast_operations() raises:
+def test_inplace_broadcast_operations() raises:
     print("test_inplace_broadcast_operations")
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
@@ -2003,7 +2003,7 @@ fn test_inplace_broadcast_operations() raises:
     assert_true(ndb.data_buffer() == Buffer[dtype]([1, 2, 3, 4, 5, 6]))
 
 
-fn test_inplace_operations() raises:
+def test_inplace_operations() raises:
     print("test_inplace_operations")
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](
@@ -2066,14 +2066,14 @@ fn test_inplace_operations() raises:
     )
 
 
-fn test_unique() raises:
+def test_unique() raises:
     print("test_unique")
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([2, 2, 3, 4, 2, 6]), Shape(2, 3))
     assert_true(ndb.unique().data_buffer() == Buffer[dtype]([2, 3, 4, 6]))
 
 
-fn test_count() raises:
+def test_count() raises:
     print("test_count")
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([2, 2, 3, 4, 2, 6]), Shape(2, 3))
@@ -2090,7 +2090,7 @@ fn test_count() raises:
     assert_true(share4.count(2) == 1)
 
 
-fn test_scalar_inplace_update() raises:
+def test_scalar_inplace_update() raises:
     print("test_scalar_inplace_update")
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
@@ -2111,7 +2111,7 @@ fn test_scalar_inplace_update() raises:
     )
 
 
-fn test_element_at() raises:
+def test_element_at() raises:
     print("test_element_at")
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
@@ -2119,7 +2119,7 @@ fn test_element_at() raises:
     assert_true(shared.max_index() == 5 and shared.get(shared.max_index()) == 6)
 
 
-fn test_scalar_ops() raises:
+def test_scalar_ops() raises:
     print("test_scalar_ops")
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
@@ -2128,7 +2128,7 @@ fn test_scalar_ops() raises:
     assert_true(result.data_buffer() == Buffer[dtype]([46, 47, 48]))
 
 
-fn test_dtype_conversion() raises:
+def test_dtype_conversion() raises:
     print("test_dtype_conversion")
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
@@ -2143,7 +2143,7 @@ fn test_dtype_conversion() raises:
     )
 
 
-fn test_equal() raises:
+def test_equal() raises:
     print("test_equal")
     comptime dtype = DType.float32
     ndb1 = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
@@ -2153,7 +2153,7 @@ fn test_equal() raises:
     assert_true(result.data_buffer() == Buffer[DType.bool]([True, False, True]))
 
 
-fn test_add() raises:
+def test_add() raises:
     print("test_add")
     comptime dtype = DType.float32
     ndb1 = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
@@ -2167,7 +2167,7 @@ fn test_add() raises:
     )
 
 
-fn test_zero() raises:
+def test_zero() raises:
     print("test_zero")
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Shape(2, 3))
@@ -2177,7 +2177,7 @@ fn test_zero() raises:
     assert_true(ndb.data_buffer() == Buffer[dtype]([42, 42, 42, 0, 0, 0]))
 
 
-fn test_broadcast_fill() raises:
+def test_broadcast_fill() raises:
     print("test_broadcast_fill")
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Shape(2, 3))
@@ -2192,7 +2192,7 @@ fn test_broadcast_fill() raises:
     assert_true(ndb.data_buffer() == Buffer[dtype]([89, 89, 89, 89, 89, 89]))
 
 
-fn test_fill_2() raises:
+def test_fill_2() raises:
     print("test_fill_2")
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Shape(2, 3))
@@ -2327,7 +2327,7 @@ fn test_fill_2() raises:
     )
 
 
-fn test_ndbuffer_fill_orig() raises:
+def test_ndbuffer_fill_orig() raises:
     print("test_ndbuffer_fill")
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Shape(8))
@@ -2399,7 +2399,7 @@ fn test_ndbuffer_fill_orig() raises:
     )
 
 
-fn test_ndbuffer_broadcast_ops() raises:
+def test_ndbuffer_broadcast_ops() raises:
     print("test_ndbuffer_broadcast_ops")
 
     comptime dtype = DType.float32
@@ -2420,7 +2420,7 @@ fn test_ndbuffer_broadcast_ops() raises:
     assert_true(result.data_buffer() == Buffer[dtype]([42, 42, 42, 42, 42, 42]))
 
 
-fn test_ndbuffer_inplace_ops() raises:
+def test_ndbuffer_inplace_ops() raises:
     print("test_ndbuffer_inplace_ops")
 
     comptime dtype = DType.float32
@@ -2453,7 +2453,7 @@ fn test_ndbuffer_inplace_ops() raises:
     assert_true(ndbuffer1.shared(), "NDBuffer buffer nullification failed")
 
 
-fn test_ndbuffer_set_get() raises:
+def test_ndbuffer_set_get() raises:
     print("test_ndbuffer_set_get")
 
     comptime dtype = DType.float32
@@ -2477,7 +2477,7 @@ fn test_ndbuffer_set_get() raises:
 # ── 1D Tests ─────────────────────────────────────────────────
 
 
-fn ndb_minmax_1d_contiguous() raises:
+def ndb_minmax_1d_contiguous() raises:
     print("ndb_minmax_1d_contiguous")
     # offset=0, shape=[5], strides=[1]
     # min = 0, max = 0 + 4*1 = 4
@@ -2488,7 +2488,7 @@ fn ndb_minmax_1d_contiguous() raises:
     print("ndb_minmax_1d_contiguous passed")
 
 
-fn ndb_minmax_1d_with_offset() raises:
+def ndb_minmax_1d_with_offset() raises:
     print("ndb_minmax_1d_with_offset")
     # offset=3, shape=[5], strides=[1]
     # min = 3, max = 3 + 4*1 = 7
@@ -2499,7 +2499,7 @@ fn ndb_minmax_1d_with_offset() raises:
     print("ndb_minmax_1d_with_offset passed")
 
 
-fn ndb_minmax_1d_negative_stride() raises:
+def ndb_minmax_1d_negative_stride() raises:
     print("ndb_minmax_1d_negative_stride")
     # offset=8, shape=[5], strides=[-2]
     # Elements at: 8, 6, 4, 2, 0
@@ -2515,7 +2515,7 @@ fn ndb_minmax_1d_negative_stride() raises:
     print("ndb_minmax_1d_negative_stride passed")
 
 
-fn ndb_minmax_1d_stride_gt1() raises:
+def ndb_minmax_1d_stride_gt1() raises:
     print("ndb_minmax_1d_stride_gt1")
     # offset=0, shape=[4], strides=[3]
     # Elements at: 0, 3, 6, 9
@@ -2527,7 +2527,7 @@ fn ndb_minmax_1d_stride_gt1() raises:
     print("ndb_minmax_1d_stride_gt1 passed")
 
 
-fn ndb_minmax_1d_single_element() raises:
+def ndb_minmax_1d_single_element() raises:
     print("ndb_minmax_1d_single_element")
     # shape=[1] — min and max must always equal offset regardless of stride
     var buf = Buffer[DType.float32](10)
@@ -2544,7 +2544,7 @@ fn ndb_minmax_1d_single_element() raises:
 # ── 2D Tests ─────────────────────────────────────────────────
 
 
-fn ndb_minmax_2d_contiguous() raises:
+def ndb_minmax_2d_contiguous() raises:
     print("ndb_minmax_2d_contiguous")
     # offset=0, shape=[3,4], strides=[4,1]
     # min = 0, max = 0 + 2*4 + 3*1 = 11
@@ -2557,7 +2557,7 @@ fn ndb_minmax_2d_contiguous() raises:
     print("ndb_minmax_2d_contiguous passed")
 
 
-fn ndb_minmax_2d_transposed() raises:
+def ndb_minmax_2d_transposed() raises:
     print("ndb_minmax_2d_transposed")
     # Transpose of shape=[3,4]: shape=[4,3], strides=[1,4]
     # offset=0, min=0, max = 0 + 3*1 + 2*4 = 11
@@ -2570,7 +2570,7 @@ fn ndb_minmax_2d_transposed() raises:
     print("ndb_minmax_2d_transposed passed")
 
 
-fn ndb_minmax_2d_negative_row_stride() raises:
+def ndb_minmax_2d_negative_row_stride() raises:
     print("ndb_minmax_2d_negative_row_stride")
     # Flipped along axis 0: offset=8, shape=[3,4], strides=[-4,1]
     # Row starts: 8, 4, 0  — col walks forward within each row
@@ -2589,7 +2589,7 @@ fn ndb_minmax_2d_negative_row_stride() raises:
     print("ndb_minmax_2d_negative_row_stride passed")
 
 
-fn ndb_minmax_2d_negative_col_stride() raises:
+def ndb_minmax_2d_negative_col_stride() raises:
     print("ndb_minmax_2d_negative_col_stride")
     # Flipped along axis 1: offset=3, shape=[3,4], strides=[4,-1]
     # Col starts: 3, 2, 1, 0 within each row; rows walk forward
@@ -2608,7 +2608,7 @@ fn ndb_minmax_2d_negative_col_stride() raises:
     print("ndb_minmax_2d_negative_col_stride passed")
 
 
-fn ndb_minmax_2d_both_negative_strides() raises:
+def ndb_minmax_2d_both_negative_strides() raises:
     print("ndb_minmax_2d_both_negative_strides")
     # Both axes flipped: offset=11, shape=[3,4], strides=[-4,-1]
     # Walks fully backward from element 11 down to 0
@@ -2623,7 +2623,7 @@ fn ndb_minmax_2d_both_negative_strides() raises:
     print("ndb_minmax_2d_both_negative_strides passed")
 
 
-fn ndb_minmax_2d_with_offset() raises:
+def ndb_minmax_2d_with_offset() raises:
     print("ndb_minmax_2d_with_offset")
     # Slice starting mid-buffer: offset=5, shape=[2,3], strides=[4,1]
     # min = 5, max = 5 + 1*4 + 2*1 = 11
@@ -2639,7 +2639,7 @@ fn ndb_minmax_2d_with_offset() raises:
 # ── 3D Tests ─────────────────────────────────────────────────
 
 
-fn ndb_minmax_3d_contiguous() raises:
+def ndb_minmax_3d_contiguous() raises:
     print("ndb_minmax_3d_contiguous")
     # shape=[2,3,4], strides=[12,4,1], offset=0
     # min = 0, max = 0 + 1*12 + 2*4 + 3*1 = 23
@@ -2652,7 +2652,7 @@ fn ndb_minmax_3d_contiguous() raises:
     print("ndb_minmax_3d_contiguous passed")
 
 
-fn ndb_minmax_3d_mixed_strides() raises:
+def ndb_minmax_3d_mixed_strides() raises:
     print("ndb_minmax_3d_mixed_strides")
     # shape=[2,3,4], strides=[-12,4,-1]
     # dim0 negative: offset=12, walks back
@@ -2670,7 +2670,7 @@ fn ndb_minmax_3d_mixed_strides() raises:
     print("ndb_minmax_3d_mixed_strides passed")
 
 
-fn ndb_minmax_3d_all_negative_strides() raises:
+def ndb_minmax_3d_all_negative_strides() raises:
     print("ndb_minmax_3d_all_negative_strides")
     # shape=[2,3,4], strides=[-12,-4,-1], offset=23
     # Fully reversed — walks from last element back to first
@@ -2685,7 +2685,7 @@ fn ndb_minmax_3d_all_negative_strides() raises:
     print("ndb_minmax_3d_all_negative_strides passed")
 
 
-fn ndb_minmax_3d_with_offset() raises:
+def ndb_minmax_3d_with_offset() raises:
     print("ndb_minmax_3d_with_offset")
     # A 3D slice into a larger buffer
     # shape=[2,2,2], strides=[6,2,1], offset=3
@@ -2702,7 +2702,7 @@ fn ndb_minmax_3d_with_offset() raises:
 # ── 4D Tests ─────────────────────────────────────────────────
 
 
-fn ndb_minmax_4d_contiguous() raises:
+def ndb_minmax_4d_contiguous() raises:
     print("ndb_minmax_4d_contiguous")
     # shape=[2,2,2,2], strides=[8,4,2,1], offset=0
     # min = 0, max = 0 + 1*8 + 1*4 + 1*2 + 1*1 = 15
@@ -2715,7 +2715,7 @@ fn ndb_minmax_4d_contiguous() raises:
     print("ndb_minmax_4d_contiguous passed")
 
 
-fn ndb_minmax_4d_mixed_strides() raises:
+def ndb_minmax_4d_mixed_strides() raises:
     print("ndb_minmax_4d_mixed_strides")
     # shape=[2,2,2,2], strides=[-8,4,-2,1], offset=8+3=11
     # negative dims: 0 and 2
@@ -2736,7 +2736,7 @@ fn ndb_minmax_4d_mixed_strides() raises:
 # ── GPU Tests ────────────────────────────────────────────────
 
 
-fn ndb_minmax_gpu_1d_contiguous() raises:
+def ndb_minmax_gpu_1d_contiguous() raises:
     comptime if has_accelerator():
         print("ndb_minmax_gpu_1d_contiguous")
         comptime dtype = DType.float32
@@ -2751,7 +2751,7 @@ fn ndb_minmax_gpu_1d_contiguous() raises:
         print("ndb_minmax_gpu_1d_contiguous passed")
 
 
-fn ndb_minmax_gpu_2d_contiguous() raises:
+def ndb_minmax_gpu_2d_contiguous() raises:
     comptime if has_accelerator():
         print("ndb_minmax_gpu_2d_contiguous")
         comptime dtype = DType.float32
@@ -2767,7 +2767,7 @@ fn ndb_minmax_gpu_2d_contiguous() raises:
         print("ndb_minmax_gpu_2d_contiguous passed")
 
 
-fn ndb_minmax_gpu_2d_transposed() raises:
+def ndb_minmax_gpu_2d_transposed() raises:
     comptime if has_accelerator():
         print("ndb_minmax_gpu_2d_transposed")
         comptime dtype = DType.float32
@@ -2785,7 +2785,7 @@ fn ndb_minmax_gpu_2d_transposed() raises:
         print("ndb_minmax_gpu_2d_transposed passed")
 
 
-fn ndb_minmax_gpu_2d_flipped_axis0() raises:
+def ndb_minmax_gpu_2d_flipped_axis0() raises:
     comptime if has_accelerator():
         print("ndb_minmax_gpu_2d_flipped_axis0")
         comptime dtype = DType.float32
@@ -2800,7 +2800,7 @@ fn ndb_minmax_gpu_2d_flipped_axis0() raises:
         print("ndb_minmax_gpu_2d_flipped_axis0 passed")
 
 
-fn ndb_minmax_gpu_2d_flipped_axis1() raises:
+def ndb_minmax_gpu_2d_flipped_axis1() raises:
     comptime if has_accelerator():
         print("ndb_minmax_gpu_2d_flipped_axis1")
         comptime dtype = DType.float32
@@ -2815,7 +2815,7 @@ fn ndb_minmax_gpu_2d_flipped_axis1() raises:
         print("ndb_minmax_gpu_2d_flipped_axis1 passed")
 
 
-fn ndb_minmax_gpu_3d_contiguous() raises:
+def ndb_minmax_gpu_3d_contiguous() raises:
     comptime if has_accelerator():
         print("ndb_minmax_gpu_3d_contiguous")
         comptime dtype = DType.float32
@@ -2834,7 +2834,7 @@ fn ndb_minmax_gpu_3d_contiguous() raises:
         print("ndb_minmax_gpu_3d_contiguous passed")
 
 
-fn ndb_minmax_gpu_3d_flipped_all_axes() raises:
+def ndb_minmax_gpu_3d_flipped_all_axes() raises:
     comptime if has_accelerator():
         print("ndb_minmax_gpu_3d_flipped_all_axes")
         comptime dtype = DType.float32
@@ -2847,7 +2847,7 @@ fn ndb_minmax_gpu_3d_flipped_all_axes() raises:
         print("ndb_minmax_gpu_3d_flipped_all_axes passed")
 
 
-fn ndb_minmax_gpu_4d_contiguous() raises:
+def ndb_minmax_gpu_4d_contiguous() raises:
     comptime if has_accelerator():
         print("ndb_minmax_gpu_4d_contiguous")
         comptime dtype = DType.float32

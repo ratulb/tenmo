@@ -6,7 +6,7 @@ from std.sys import has_accelerator
 from std.math import log
 from tenmo.shapes import Shape
 
-fn main() raises:
+def main() raises:
     print("Example: Basic logarithm with epsilon")
 
     comptime dtype = DType.float64
@@ -39,7 +39,7 @@ fn main() raises:
 # ============================================================================
 
 
-fn test_log_forward_basic() raises:
+def test_log_forward_basic() raises:
     """Test basic logarithm computation."""
     print("test_log_forward_basic")
 
@@ -53,7 +53,7 @@ fn test_log_forward_basic() raises:
     assert_true(y.all_close[atol=1e-5](expected))
 
 
-fn test_log_forward_with_epsilon() raises:
+def test_log_forward_with_epsilon() raises:
     """Test logarithm with very small values (epsilon handling)."""
     print("test_log_forward_with_epsilon")
 
@@ -72,7 +72,7 @@ fn test_log_forward_with_epsilon() raises:
     assert_true(abs(y[0] - expected_first) < 1e-6)
 
 
-fn test_log_forward_zero_handling() raises:
+def test_log_forward_zero_handling() raises:
     """Test that zero values are handled safely."""
     print("test_log_forward_zero_handling")
 
@@ -88,7 +88,7 @@ fn test_log_forward_zero_handling() raises:
     assert_true(abs(y[1] - 0.0) < 1e-6)  # log(1) = 0
 
 
-fn test_log_forward_negative_values() raises:
+def test_log_forward_negative_values() raises:
     """Test that negative values are handled (clamped to epsilon)."""
     print("test_log_forward_negative_values")
 
@@ -103,7 +103,7 @@ fn test_log_forward_negative_values() raises:
     assert_true(abs(y[1] - expected_neg) < 1e-6)
 
 
-fn test_log_forward_2d() raises:
+def test_log_forward_2d() raises:
     """Test logarithm on 2D tensor."""
     print("test_log_forward_2d")
 
@@ -116,7 +116,7 @@ fn test_log_forward_2d() raises:
     assert_true(y.all_close[atol=1e-5](expected))
 
 
-fn test_log_forward_e() raises:
+def test_log_forward_e() raises:
     """Test that log(e) = 1."""
     print("test_log_forward_e")
 
@@ -132,7 +132,7 @@ fn test_log_forward_e() raises:
 # ============================================================================
 
 
-fn test_log_backward_basic() raises:
+def test_log_backward_basic() raises:
     """Test basic gradient computation: d/dx log(x) = 1/x."""
     print("test_log_backward_basic")
 
@@ -149,7 +149,7 @@ fn test_log_backward_basic() raises:
     assert_true(x.grad().all_close[atol=1e-5](expected))
 
 
-fn test_log_backward_weighted() raises:
+def test_log_backward_weighted() raises:
     """Test gradient with weighted loss."""
     print("test_log_backward_weighted")
 
@@ -170,7 +170,7 @@ fn test_log_backward_weighted() raises:
     assert_true(x.grad().all_close[atol=1e-5](expected))
 
 
-fn test_log_backward_chain_rule() raises:
+def test_log_backward_chain_rule() raises:
     """Test gradient with chain rule: d/dx log(x^2)."""
     print("test_log_backward_chain_rule")
 
@@ -188,7 +188,7 @@ fn test_log_backward_chain_rule() raises:
     assert_true(x.grad().all_close[atol=1e-4](expected))
 
 
-fn test_log_backward_with_epsilon() raises:
+def test_log_backward_with_epsilon() raises:
     """Test gradient computation with epsilon (small values)."""
     print("test_log_backward_with_epsilon")
 
@@ -208,7 +208,7 @@ fn test_log_backward_with_epsilon() raises:
     assert_true(abs(x.grad()[2] - 0.5) < 1e-5)
 
 
-fn test_log_backward_zero_input() raises:
+def test_log_backward_zero_input() raises:
     """Test gradient with zero input (should use epsilon)."""
     print("test_log_backward_zero_input")
 
@@ -228,7 +228,7 @@ fn test_log_backward_zero_input() raises:
     assert_true(x.grad()[0] > 1e6)  # Should be large
 
 
-fn test_log_backward_2d() raises:
+def test_log_backward_2d() raises:
     """Test gradient computation on 2D tensor."""
     print("test_log_backward_2d")
 
@@ -243,7 +243,7 @@ fn test_log_backward_2d() raises:
     assert_true(x.grad().all_close[atol=1e-5](expected))
 
 
-fn test_log_backward_multiple_uses() raises:
+def test_log_backward_multiple_uses() raises:
     """Test gradient when log output is used multiple times."""
     print("test_log_backward_multiple_uses")
 
@@ -268,7 +268,7 @@ fn test_log_backward_multiple_uses() raises:
 # ============================================================================
 
 
-fn test_log_numerical_stability_large() raises:
+def test_log_numerical_stability_large() raises:
     """Test numerical stability with large values."""
     print("test_log_numerical_stability_large")
 
@@ -283,7 +283,7 @@ fn test_log_numerical_stability_large() raises:
         assert_true(y[i] > 0.0)  # log of large positive is positive
 
 
-fn test_log_numerical_stability_small() raises:
+def test_log_numerical_stability_small() raises:
     """Test numerical stability with very small values."""
     print("test_log_numerical_stability_small")
 
@@ -298,7 +298,7 @@ fn test_log_numerical_stability_small() raises:
         assert_true(not isinf(y[i]))
 
 
-fn test_log_gradient_stability() raises:
+def test_log_gradient_stability() raises:
     """Test that gradients remain stable near zero."""
     print("test_log_gradient_stability")
 
@@ -319,7 +319,7 @@ fn test_log_gradient_stability() raises:
 # ============================================================================
 
 
-fn test_log_single_element() raises:
+def test_log_single_element() raises:
     """Test logarithm of single element tensor."""
     print("test_log_single_element")
 
@@ -332,7 +332,7 @@ fn test_log_single_element() raises:
     assert_true(abs(x.grad()[0] - (1.0 / 2.718281828459045)) < 1e-9)  # 1/e
 
 
-fn test_log_all_ones() raises:
+def test_log_all_ones() raises:
     """Test logarithm of tensor with all ones."""
     print("test_log_all_ones")
 
@@ -347,7 +347,7 @@ fn test_log_all_ones() raises:
     assert_true(x.grad().all_close[atol=1e-6](Tensor[dtype].ones(5)))
 
 
-fn test_log_custom_epsilon_values() raises:
+def test_log_custom_epsilon_values() raises:
     """Test different epsilon values."""
     print("test_log_custom_epsilon_values")
 
@@ -370,7 +370,7 @@ fn test_log_custom_epsilon_values() raises:
 # ============================================================================
 
 
-fn run_all_log_tests() raises:
+def run_all_log_tests() raises:
     """Run all logarithm tests."""
     print("\n" + "=" * 60)
     print("RUNNING COMPREHENSIVE LOGARITHM TEST SUITE")
@@ -422,7 +422,7 @@ fn run_all_log_tests() raises:
 # ── CPU Forward Tests ─────────────────────────────────────────────────────────
 
 
-fn test_log_cpu_1d_basic_forward() raises:
+def test_log_cpu_1d_basic_forward() raises:
     print("test_log_cpu_1d_basic_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -433,7 +433,7 @@ fn test_log_cpu_1d_basic_forward() raises:
     assert_true(result.all_close(expect))
 
 
-fn test_log_cpu_2d_forward() raises:
+def test_log_cpu_2d_forward() raises:
     print("test_log_cpu_2d_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -447,7 +447,7 @@ fn test_log_cpu_2d_forward() raises:
     assert_true(result.all_close(expect))
 
 
-fn test_log_cpu_3d_forward() raises:
+def test_log_cpu_3d_forward() raises:
     print("test_log_cpu_3d_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
@@ -469,7 +469,7 @@ fn test_log_cpu_3d_forward() raises:
     assert_true(result.all_close(expect))
 
 
-fn test_log_cpu_ones_forward() raises:
+def test_log_cpu_ones_forward() raises:
     print("test_log_cpu_ones_forward")
     comptime dtype = DType.float32
     # log(1) = 0
@@ -478,7 +478,7 @@ fn test_log_cpu_ones_forward() raises:
     assert_true(result.all_close(Tensor[dtype].zeros(Shape(4))))
 
 
-fn test_log_cpu_epsilon_clamping() raises:
+def test_log_cpu_epsilon_clamping() raises:
     print("test_log_cpu_epsilon_clamping")
     comptime dtype = DType.float32
     # Values <= 0 should be clamped to epsilon before log
@@ -492,7 +492,7 @@ fn test_log_cpu_epsilon_clamping() raises:
     assert_true(result[[2]] == Float32(0.0))
 
 
-fn test_log_cpu_custom_epsilon() raises:
+def test_log_cpu_custom_epsilon() raises:
     print("test_log_cpu_custom_epsilon")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([0.0, 1.0, 2.0])
@@ -503,7 +503,7 @@ fn test_log_cpu_custom_epsilon() raises:
     assert_true(result[[2]] == log(Float32(2.0)))
 
 
-fn test_log_cpu_large_values() raises:
+def test_log_cpu_large_values() raises:
     print("test_log_cpu_large_values")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([100.0, 1000.0, 10000.0])
@@ -514,7 +514,7 @@ fn test_log_cpu_large_values() raises:
     assert_true(result.all_close(expect))
 
 
-fn test_log_cpu_no_grad() raises:
+def test_log_cpu_no_grad() raises:
     print("test_log_cpu_no_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=False)
@@ -522,7 +522,7 @@ fn test_log_cpu_no_grad() raises:
     assert_true(not result.requires_grad)
 
 
-fn test_log_cpu_requires_grad_propagates() raises:
+def test_log_cpu_requires_grad_propagates() raises:
     print("test_log_cpu_requires_grad_propagates")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -530,7 +530,7 @@ fn test_log_cpu_requires_grad_propagates() raises:
     assert_true(result.requires_grad)
 
 
-fn test_log_cpu_suppress_grad() raises:
+def test_log_cpu_suppress_grad() raises:
     print("test_log_cpu_suppress_grad")
     comptime dtype = DType.float32
     # requires_grad=True on input but suppressed via parameter
@@ -542,7 +542,7 @@ fn test_log_cpu_suppress_grad() raises:
 # ── CPU Backward Tests ────────────────────────────────────────────────────────
 
 
-fn test_log_cpu_1d_backward() raises:
+def test_log_cpu_1d_backward() raises:
     print("test_log_cpu_1d_backward")
     comptime dtype = DType.float32
     # d/dx log(x) = 1/x
@@ -554,7 +554,7 @@ fn test_log_cpu_1d_backward() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([1.0, 0.5, 0.25])))
 
 
-fn test_log_cpu_2d_backward() raises:
+def test_log_cpu_2d_backward() raises:
     print("test_log_cpu_2d_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [4.0, 8.0]], requires_grad=True)
@@ -567,7 +567,7 @@ fn test_log_cpu_2d_backward() raises:
     )
 
 
-fn test_log_cpu_3d_backward() raises:
+def test_log_cpu_3d_backward() raises:
     print("test_log_cpu_3d_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
@@ -586,7 +586,7 @@ fn test_log_cpu_3d_backward() raises:
     )
 
 
-fn test_log_cpu_backward_chain() raises:
+def test_log_cpu_backward_chain() raises:
     print("test_log_cpu_backward_chain")
     comptime dtype = DType.float32
     # Chain: log(x) * 2 → sum → backward
@@ -598,7 +598,7 @@ fn test_log_cpu_backward_chain() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([2.0, 1.0, 0.5])))
 
 
-fn test_log_cpu_backward_epsilon_clamping() raises:
+def test_log_cpu_backward_epsilon_clamping() raises:
     print("test_log_cpu_backward_epsilon_clamping")
     comptime dtype = DType.float32
     # For values <= epsilon, grad = 1/epsilon not 1/x
@@ -615,7 +615,7 @@ fn test_log_cpu_backward_epsilon_clamping() raises:
     assert_true(a.grad()[[2]] == Float32(0.5))
 
 
-fn test_log_cpu_backward_custom_epsilon() raises:
+def test_log_cpu_backward_custom_epsilon() raises:
     print("test_log_cpu_backward_custom_epsilon")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([0.0, 1.0, 4.0], requires_grad=True)
@@ -627,7 +627,7 @@ fn test_log_cpu_backward_custom_epsilon() raises:
     assert_true(a.grad()[[2]] == Float32(0.25))
 
 
-fn test_log_cpu_backward_chained_with_exp() raises:
+def test_log_cpu_backward_chained_with_exp() raises:
     print("test_log_cpu_backward_chained_with_exp")
     comptime dtype = DType.float32
     # log(exp(x)) = x, so grad should be 1.0 everywhere
@@ -641,7 +641,7 @@ fn test_log_cpu_backward_chained_with_exp() raises:
 # ── GPU Forward Tests ─────────────────────────────────────────────────────────
 
 
-fn test_log_gpu_1d_basic_forward() raises:
+def test_log_gpu_1d_basic_forward() raises:
     comptime if has_accelerator():
         print("test_log_gpu_1d_basic_forward")
         comptime dtype = DType.float32
@@ -654,7 +654,7 @@ fn test_log_gpu_1d_basic_forward() raises:
         assert_true(result.to_cpu().all_close(expect))
 
 
-fn test_log_gpu_2d_forward() raises:
+def test_log_gpu_2d_forward() raises:
     comptime if has_accelerator():
         print("test_log_gpu_2d_forward")
         comptime dtype = DType.float32
@@ -670,7 +670,7 @@ fn test_log_gpu_2d_forward() raises:
         assert_true(result.to_cpu().all_close(expect))
 
 
-fn test_log_gpu_3d_forward() raises:
+def test_log_gpu_3d_forward() raises:
     comptime if has_accelerator():
         print("test_log_gpu_3d_forward")
         comptime dtype = DType.float32
@@ -696,7 +696,7 @@ fn test_log_gpu_3d_forward() raises:
         assert_true(result.to_cpu().all_close(expect))
 
 
-fn test_log_gpu_ones_forward() raises:
+def test_log_gpu_ones_forward() raises:
     comptime if has_accelerator():
         print("test_log_gpu_ones_forward")
         comptime dtype = DType.float32
@@ -706,7 +706,7 @@ fn test_log_gpu_ones_forward() raises:
         assert_true(result.to_cpu().all_close(Tensor[dtype].zeros(Shape(4))))
 
 
-fn test_log_gpu_epsilon_clamping() raises:
+def test_log_gpu_epsilon_clamping() raises:
     comptime if has_accelerator():
         print("test_log_gpu_epsilon_clamping")
         comptime dtype = DType.float32
@@ -719,7 +719,7 @@ fn test_log_gpu_epsilon_clamping() raises:
         assert_true(result_cpu[[2]] == Float32(0.0))
 
 
-fn test_log_gpu_large_values() raises:
+def test_log_gpu_large_values() raises:
     comptime if has_accelerator():
         print("test_log_gpu_large_values")
         comptime dtype = DType.float32
@@ -732,7 +732,7 @@ fn test_log_gpu_large_values() raises:
 
 
 # ── GPU Backward Tests ────────────────────────────────────────────────────────
-fn test_log_gpu_1d_backward() raises:
+def test_log_gpu_1d_backward() raises:
     comptime if has_accelerator():
         print("test_log_gpu_1d_backward")
         comptime dtype = DType.float32
@@ -744,7 +744,7 @@ fn test_log_gpu_1d_backward() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([1.0, 0.5, 0.25])))
 
 
-fn test_log_gpu_2d_backward() raises:
+def test_log_gpu_2d_backward() raises:
     comptime if has_accelerator():
         print("test_log_gpu_2d_backward")
         comptime dtype = DType.float32
@@ -758,7 +758,7 @@ fn test_log_gpu_2d_backward() raises:
         )
 
 
-fn test_log_gpu_3d_backward() raises:
+def test_log_gpu_3d_backward() raises:
     comptime if has_accelerator():
         print("test_log_gpu_3d_backward")
         comptime dtype = DType.float32
@@ -782,7 +782,7 @@ fn test_log_gpu_3d_backward() raises:
         )
 
 
-fn test_log_gpu_backward_chain() raises:
+def test_log_gpu_backward_chain() raises:
     comptime if has_accelerator():
         print("test_log_gpu_backward_chain")
         comptime dtype = DType.float32
@@ -794,7 +794,7 @@ fn test_log_gpu_backward_chain() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([2.0, 1.0, 0.5])))
 
 
-fn test_log_gpu_backward_epsilon_clamping() raises:
+def test_log_gpu_backward_epsilon_clamping() raises:
     comptime if has_accelerator():
         print("test_log_gpu_backward_epsilon_clamping")
         comptime dtype = DType.float32
@@ -808,7 +808,7 @@ fn test_log_gpu_backward_epsilon_clamping() raises:
         assert_true(a.grad()[[2]] == Float32(0.5))
 
 
-fn test_log_gpu_backward_chained_with_exp() raises:
+def test_log_gpu_backward_chained_with_exp() raises:
     comptime if has_accelerator():
         print("test_log_gpu_backward_chained_with_exp")
         comptime dtype = DType.float32
@@ -821,7 +821,7 @@ fn test_log_gpu_backward_chained_with_exp() raises:
         assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(3))))
 
 
-fn test_log_gpu_backward_custom_epsilon() raises:
+def test_log_gpu_backward_custom_epsilon() raises:
     comptime if has_accelerator():
         print("test_log_gpu_backward_custom_epsilon")
         comptime dtype = DType.float32
@@ -838,7 +838,7 @@ fn test_log_gpu_backward_custom_epsilon() raises:
 # ── CPU/GPU Parity Tests ──────────────────────────────────────────────────────
 
 
-fn test_log_parity_1d_forward() raises:
+def test_log_parity_1d_forward() raises:
     comptime if has_accelerator():
         print("test_log_parity_1d_forward")
         comptime dtype = DType.float32
@@ -849,7 +849,7 @@ fn test_log_parity_1d_forward() raises:
         assert_true(result_cpu.all_close(result_gpu.to_cpu()))
 
 
-fn test_log_parity_2d_forward() raises:
+def test_log_parity_2d_forward() raises:
     comptime if has_accelerator():
         print("test_log_parity_2d_forward")
         comptime dtype = DType.float32
@@ -860,7 +860,7 @@ fn test_log_parity_2d_forward() raises:
         assert_true(result_cpu.all_close(result_gpu.to_cpu()))
 
 
-fn test_log_parity_1d_backward() raises:
+def test_log_parity_1d_backward() raises:
     comptime if has_accelerator():
         print("test_log_parity_1d_backward")
         comptime dtype = DType.float32
@@ -876,7 +876,7 @@ fn test_log_parity_1d_backward() raises:
         assert_true(a_cpu.grad().all_close(2 * a_gpu.grad().to_cpu()))
 
 
-fn test_log_parity_2d_backward() raises:
+def test_log_parity_2d_backward() raises:
     comptime if has_accelerator():
         print("test_log_parity_2d_backward")
         comptime dtype = DType.float32
@@ -894,7 +894,7 @@ fn test_log_parity_2d_backward() raises:
         assert_true(a_cpu.grad().all_close(2 * a_gpu.grad().to_cpu()))
 
 
-fn test_log_parity_epsilon_clamping() raises:
+def test_log_parity_epsilon_clamping() raises:
     comptime if has_accelerator():
         print("test_log_parity_epsilon_clamping")
         comptime dtype = DType.float32
@@ -910,7 +910,7 @@ fn test_log_parity_epsilon_clamping() raises:
         assert_true(a_cpu.grad().all_close(2 * a_gpu.grad().to_cpu()))
 
 
-fn test_log_parity_chain_exp() raises:
+def test_log_parity_chain_exp() raises:
     comptime if has_accelerator():
         print("test_log_parity_chain_exp")
         comptime dtype = DType.float32

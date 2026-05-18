@@ -11,7 +11,7 @@ struct ShapeBroadcaster(ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn pad_shapes(shape1: Shape, shape2: Shape) -> Tuple[Shape, Shape]:
+    def pad_shapes(shape1: Shape, shape2: Shape) -> Tuple[Shape, Shape]:
         """Pad two shapes with ones to make them the same length."""
         if shape1 == shape2:
             return shape1.copy(), shape2.copy()
@@ -30,7 +30,7 @@ struct ShapeBroadcaster(ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn broadcast_shape[
+    def broadcast_shape[
         validated: Bool = False
     ](this: Shape, that: Shape) -> Shape:
         """Compute the broadcasted shape from two input shapes."""
@@ -75,7 +75,7 @@ struct ShapeBroadcaster(ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn translate_index(
+    def translate_index(
         original_shape: Shape,
         indices: IntArray,
         mask: IntArray,
@@ -132,7 +132,7 @@ struct ShapeBroadcaster(ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn broadcastable(shape1: Shape, shape2: Shape) -> Bool:
+    def broadcastable(shape1: Shape, shape2: Shape) -> Bool:
         """Check if two shapes are broadcastable."""
         var dims1 = shape1.intarray()
         var dims2 = shape2.intarray()
@@ -145,7 +145,7 @@ struct ShapeBroadcaster(ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn expandable_to(own: Shape, target: Shape) -> Bool:
+    def expandable_to(own: Shape, target: Shape) -> Bool:
         """
         Directed broadcast check: can `own` be expanded to exactly `target`?
 
@@ -182,7 +182,7 @@ struct ShapeBroadcaster(ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn broadcast_mask(original_shape: Shape, target_shape: Shape) -> IntArray:
+    def broadcast_mask(original_shape: Shape, target_shape: Shape) -> IntArray:
         """Create a broadcast mask indicating which dimensions are broadcasted.
         """
         var mask = IntArray.with_capacity(target_shape.ndim())
@@ -210,7 +210,7 @@ struct ShapeBroadcaster(ImplicitlyCopyable, RegisterPassable):
         return mask^
 
     @staticmethod
-    fn broadcasted_indices(
+    def broadcasted_indices(
         target_indices: IntArray, target_shape: Shape, source_shape: Shape
     ) -> IntArray:
         # Get coordinates for source tensor given target coordinates
@@ -228,7 +228,7 @@ struct ShapeBroadcaster(ImplicitlyCopyable, RegisterPassable):
         return source_indices^
 
     @staticmethod
-    fn broadcast_strides(
+    def broadcast_strides(
         input_shape: Shape,
         input_strides: Strides,
         broadcast_shape: Shape,

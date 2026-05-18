@@ -12,7 +12,7 @@ from tenmo.mnemonics import MEAN, SUM
 comptime dtype = DType.float32
 
 
-fn close_enough[
+def close_enough[
     dtype: DType
 ](a: Tensor[dtype], b: Tensor[dtype]) raises -> Bool:
     if (a.is_on_cpu() and b.is_on_cpu()) or (a.is_on_gpu() and b.is_on_gpu()):
@@ -28,7 +28,7 @@ fn close_enough[
 # ===============================================================================
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
@@ -37,63 +37,63 @@ fn main() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_v2_tensor_sum_scalar_input() raises:
+def test_v2_tensor_sum_scalar_input() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(7)
     var s = a.sum()
     assert_true(s == Tensor[dtype].scalar(7))
 
 
-fn test_v2_tensor_sum_1d() raises:
+def test_v2_tensor_sum_1d() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1, 2, 3, 4, 5])
     var s = a.sum()
     assert_true(s == Tensor[dtype].scalar(15))
 
 
-fn test_v2_tensor_sum_1d_keepdims() raises:
+def test_v2_tensor_sum_1d_keepdims() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1, 2, 3, 4, 5])
     var s = a.sum(keepdims=True)
     assert_true(s == Tensor[dtype].d1([15]))
 
 
-fn test_v2_tensor_sum_2d_axis0() raises:
+def test_v2_tensor_sum_2d_axis0() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var s = a.sum(axes=[0])
     assert_true(s == Tensor[dtype].d1([5, 7, 9]))
 
 
-fn test_v2_tensor_sum_2d_axis1() raises:
+def test_v2_tensor_sum_2d_axis1() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var s = a.sum(axes=[1])
     assert_true(s == Tensor[dtype].d1([6, 15]))
 
 
-fn test_v2_tensor_sum_2d_axis0_keepdims() raises:
+def test_v2_tensor_sum_2d_axis0_keepdims() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var s = a.sum(axes=[0], keepdims=True)
     assert_true(s == Tensor[dtype].d2([[5, 7, 9]]))
 
 
-fn test_v2_tensor_sum_2d_axis1_keepdims() raises:
+def test_v2_tensor_sum_2d_axis1_keepdims() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var s = a.sum(axes=[1], keepdims=True)
     assert_true(s == Tensor[dtype].d2([[6], [15]]))
 
 
-fn test_v2_tensor_sum_2d_all_axes() raises:
+def test_v2_tensor_sum_2d_all_axes() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var s = a.sum(axes=[0, 1])
     assert_true(s == Tensor[dtype].scalar(21))
 
 
-fn test_v2_tensor_sum_3d_axis0() raises:
+def test_v2_tensor_sum_3d_axis0() raises:
     comptime dtype = DType.float32
     # arange(24).reshape(2,3,4)
     var a = Tensor[dtype].arange(24)
@@ -108,7 +108,7 @@ fn test_v2_tensor_sum_3d_axis0() raises:
     )
 
 
-fn test_v2_tensor_sum_3d_axis1() raises:
+def test_v2_tensor_sum_3d_axis1() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(24)
     a = a.reshape(2, 3, 4)
@@ -118,7 +118,7 @@ fn test_v2_tensor_sum_3d_axis1() raises:
     assert_true(s == Tensor[dtype].d2([[12, 15, 18, 21], [48, 51, 54, 57]]))
 
 
-fn test_v2_tensor_sum_3d_axis2() raises:
+def test_v2_tensor_sum_3d_axis2() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(24)
     a = a.reshape(2, 3, 4)
@@ -128,7 +128,7 @@ fn test_v2_tensor_sum_3d_axis2() raises:
     assert_true(s == Tensor[dtype].d2([[6, 22, 38], [54, 70, 86]]))
 
 
-fn test_v2_tensor_sum_3d_axes_0_2() raises:
+def test_v2_tensor_sum_3d_axes_0_2() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(24)
     a = a.reshape(2, 3, 4)
@@ -140,7 +140,7 @@ fn test_v2_tensor_sum_3d_axes_0_2() raises:
     assert_true(s == Tensor[dtype].d1([60, 92, 124]))
 
 
-fn test_v2_tensor_sum_3d_all_axes_keepdims() raises:
+def test_v2_tensor_sum_3d_all_axes_keepdims() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].ones(2, 3, 4)
     var s = a.sum(axes=[0, 1, 2], keepdims=True)
@@ -148,14 +148,14 @@ fn test_v2_tensor_sum_3d_all_axes_keepdims() raises:
     assert_true(s == Tensor[dtype].d3([[[24]]]))
 
 
-fn test_v2_tensor_sum_zeros() raises:
+def test_v2_tensor_sum_zeros() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].zeros(3, 4)
     var s = a.sum()
     assert_true(s == Tensor[dtype].scalar(0))
 
 
-fn test_v2_tensor_sum_negative_values() raises:
+def test_v2_tensor_sum_negative_values() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[-1, -2], [3, 4]])
     var s = a.sum()
@@ -167,42 +167,42 @@ fn test_v2_tensor_sum_negative_values() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_v2_tensor_mean_1d() raises:
+def test_v2_tensor_mean_1d() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1, 2, 3, 4, 5])
     var m = a.mean()
     assert_true(m.all_close(Tensor[dtype].scalar(3)))
 
 
-fn test_v2_tensor_mean_2d_axis0() raises:
+def test_v2_tensor_mean_2d_axis0() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2, 3], [3, 4, 5]])
     var m = a.mean(axes=[0])
     assert_true(m.all_close(Tensor[dtype].d1([2, 3, 4])))
 
 
-fn test_v2_tensor_mean_2d_axis1() raises:
+def test_v2_tensor_mean_2d_axis1() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var m = a.mean(axes=[1])
     assert_true(m.all_close(Tensor[dtype].d1([2, 5])))
 
 
-fn test_v2_tensor_mean_2d_axis0_keepdims() raises:
+def test_v2_tensor_mean_2d_axis0_keepdims() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2], [3, 4]])
     var m = a.mean(axes=[0], keepdims=True)
     assert_true(m.all_close(Tensor[dtype].d2([[2, 3]])))
 
 
-fn test_v2_tensor_mean_2d_axis1_keepdims() raises:
+def test_v2_tensor_mean_2d_axis1_keepdims() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1, 2], [3, 4]])
     var m = a.mean(axes=[1], keepdims=True)
     assert_true(m.all_close(Tensor[dtype].d2([[1.5], [3.5]])))
 
 
-fn test_v2_tensor_mean_3d_axis1() raises:
+def test_v2_tensor_mean_3d_axis1() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(24)
     a = a.reshape(2, 3, 4)
@@ -212,7 +212,7 @@ fn test_v2_tensor_mean_3d_axis1() raises:
     assert_true(m.all_close(Tensor[dtype].d2([[4, 5, 6, 7], [16, 17, 18, 19]])))
 
 
-fn test_v2_tensor_mean_3d_all_axes() raises:
+def test_v2_tensor_mean_3d_all_axes() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(24)
     a = a.reshape(2, 3, 4)
@@ -221,7 +221,7 @@ fn test_v2_tensor_mean_3d_all_axes() raises:
     assert_true(m.all_close(Tensor[dtype].scalar(11.5)))
 
 
-fn test_v2_tensor_mean_uniform() raises:
+def test_v2_tensor_mean_uniform() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].ones(4, 5) * 3
     var m = a.mean()
@@ -233,7 +233,7 @@ fn test_v2_tensor_mean_uniform() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_v2_ndbuffer_sum_1d() raises:
+def test_v2_ndbuffer_sum_1d() raises:
     var ndb = NDBuffer[DType.float32](Shape(5))
     for i in range(5):
         ndb[IntArray(i)] = Float32(i + 1)  # 1,2,3,4,5
@@ -241,7 +241,7 @@ fn test_v2_ndbuffer_sum_1d() raises:
     assert_true(result[IntArray()] == 15)
 
 
-fn test_v2_ndbuffer_sum_2d_axis0() raises:
+def test_v2_ndbuffer_sum_2d_axis0() raises:
     var ndb = NDBuffer[DType.float32](Shape(2, 3))
     var val = 1
     for i in range(2):
@@ -255,7 +255,7 @@ fn test_v2_ndbuffer_sum_2d_axis0() raises:
     assert_true(result[IntArray(2)] == 9)
 
 
-fn test_v2_ndbuffer_sum_2d_axis1() raises:
+def test_v2_ndbuffer_sum_2d_axis1() raises:
     var ndb = NDBuffer[DType.float32](Shape(2, 3))
     var val = 1
     for i in range(2):
@@ -268,7 +268,7 @@ fn test_v2_ndbuffer_sum_2d_axis1() raises:
     assert_true(result[IntArray(1)] == 15)
 
 
-fn test_v2_ndbuffer_mean_2d_axis0() raises:
+def test_v2_ndbuffer_mean_2d_axis0() raises:
     var ndb = NDBuffer[DType.float32](Shape(2, 3))
     var val = 1
     for i in range(2):
@@ -282,7 +282,7 @@ fn test_v2_ndbuffer_mean_2d_axis0() raises:
     assert_true(result[IntArray(2)] == 4.5)
 
 
-fn test_v2_ndbuffer_mean_2d_axis1() raises:
+def test_v2_ndbuffer_mean_2d_axis1() raises:
     var ndb = NDBuffer[DType.float32](Shape(2, 3))
     var val = 1
     for i in range(2):
@@ -295,7 +295,7 @@ fn test_v2_ndbuffer_mean_2d_axis1() raises:
     assert_true(result[IntArray(1)] == 5.0)
 
 
-fn test_v2_ndbuffer_sum_keepdims() raises:
+def test_v2_ndbuffer_sum_keepdims() raises:
     var ndb = NDBuffer[DType.float32](Shape(2, 3))
     var val = 1
     for i in range(2):
@@ -309,7 +309,7 @@ fn test_v2_ndbuffer_sum_keepdims() raises:
     assert_true(result[IntArray(0, 2)] == 9)
 
 
-fn test_v2_ndbuffer_mean_keepdims() raises:
+def test_v2_ndbuffer_mean_keepdims() raises:
     var ndb = NDBuffer[DType.float32](Shape(2, 3))
     var val = 1
     for i in range(2):
@@ -327,7 +327,7 @@ fn test_v2_ndbuffer_mean_keepdims() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_v2_gpu_tensor_sum_1d() raises:
+def test_v2_gpu_tensor_sum_1d() raises:
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -338,7 +338,7 @@ fn test_v2_gpu_tensor_sum_1d() raises:
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
 
 
-fn test_v2_gpu_tensor_sum_2d_axis0() raises:
+def test_v2_gpu_tensor_sum_2d_axis0() raises:
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -349,7 +349,7 @@ fn test_v2_gpu_tensor_sum_2d_axis0() raises:
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
 
 
-fn test_v2_gpu_tensor_sum_2d_axis1() raises:
+def test_v2_gpu_tensor_sum_2d_axis1() raises:
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -360,7 +360,7 @@ fn test_v2_gpu_tensor_sum_2d_axis1() raises:
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
 
 
-fn test_v2_gpu_tensor_sum_3d_axis1() raises:
+def test_v2_gpu_tensor_sum_3d_axis1() raises:
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -372,7 +372,7 @@ fn test_v2_gpu_tensor_sum_3d_axis1() raises:
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
 
 
-fn test_v2_gpu_tensor_sum_3d_axes_0_2() raises:
+def test_v2_gpu_tensor_sum_3d_axes_0_2() raises:
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -384,7 +384,7 @@ fn test_v2_gpu_tensor_sum_3d_axes_0_2() raises:
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
 
 
-fn test_v2_gpu_tensor_sum_keepdims() raises:
+def test_v2_gpu_tensor_sum_keepdims() raises:
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -396,7 +396,7 @@ fn test_v2_gpu_tensor_sum_keepdims() raises:
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
 
 
-fn test_v2_gpu_tensor_sum_all_axes() raises:
+def test_v2_gpu_tensor_sum_all_axes() raises:
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -407,7 +407,7 @@ fn test_v2_gpu_tensor_sum_all_axes() raises:
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
 
 
-fn test_v2_gpu_tensor_mean_2d_axis0() raises:
+def test_v2_gpu_tensor_mean_2d_axis0() raises:
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -418,7 +418,7 @@ fn test_v2_gpu_tensor_mean_2d_axis0() raises:
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
 
 
-fn test_v2_gpu_tensor_mean_2d_axis1() raises:
+def test_v2_gpu_tensor_mean_2d_axis1() raises:
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -429,7 +429,7 @@ fn test_v2_gpu_tensor_mean_2d_axis1() raises:
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
 
 
-fn test_v2_gpu_tensor_mean_3d_axis1() raises:
+def test_v2_gpu_tensor_mean_3d_axis1() raises:
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -441,7 +441,7 @@ fn test_v2_gpu_tensor_mean_3d_axis1() raises:
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
 
 
-fn test_v2_gpu_tensor_mean_keepdims() raises:
+def test_v2_gpu_tensor_mean_keepdims() raises:
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -453,7 +453,7 @@ fn test_v2_gpu_tensor_mean_keepdims() raises:
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
 
 
-fn test_v2_gpu_tensor_mean_all_axes() raises:
+def test_v2_gpu_tensor_mean_all_axes() raises:
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -470,7 +470,7 @@ fn test_v2_gpu_tensor_mean_all_axes() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_v2_gpu_ndbuffer_sum_2d_axis1() raises:
+def test_v2_gpu_ndbuffer_sum_2d_axis1() raises:
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -483,7 +483,7 @@ fn test_v2_gpu_ndbuffer_sum_2d_axis1() raises:
         assert_true(g_tensor.buffer.all_close(gpu_result))
 
 
-fn test_v2_gpu_ndbuffer_mean_2d_axis0() raises:
+def test_v2_gpu_ndbuffer_mean_2d_axis0() raises:
 
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -496,7 +496,7 @@ fn test_v2_gpu_ndbuffer_mean_2d_axis0() raises:
         assert_true(expected.buffer.all_close(gpu_result))
 
 
-fn test_cpu_grad_flow() raises:
+def test_cpu_grad_flow() raises:
     var A = Tensor[dtype].arange(9 * 30, requires_grad=True)
     var B = Tensor[dtype].arange(30 * 5)
 
@@ -517,7 +517,7 @@ fn test_cpu_grad_flow() raises:
 
 
 
-fn test_gpu_grad_flow() raises:
+def test_gpu_grad_flow() raises:
     comptime if has_accelerator():
         var A = Tensor[dtype].arange(9 * 30, requires_grad=True)
         var B = Tensor[dtype].arange(30 * 5)
@@ -544,7 +544,7 @@ fn test_gpu_grad_flow() raises:
 
 
 
-fn test_vmnd_1d_v_2d_M() raises:
+def test_vmnd_1d_v_2d_M() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         # v = [1, 2, 3],  M = [[1,0],[0,1],[1,1]]
@@ -558,7 +558,7 @@ fn test_vmnd_1d_v_2d_M() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_vmnd_identity_matrix() raises:
+def test_vmnd_identity_matrix() raises:
     """V @ I = v."""
 
     comptime if has_accelerator():
@@ -572,7 +572,7 @@ fn test_vmnd_identity_matrix() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_vmnd_zero_vector() raises:
+def test_vmnd_zero_vector() raises:
     """Zero vector gives zero output."""
 
     comptime if has_accelerator():
@@ -587,7 +587,7 @@ fn test_vmnd_zero_vector() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_vmnd_ones_vector() raises:
+def test_vmnd_ones_vector() raises:
     """Ones vector sums columns of M."""
 
     comptime if has_accelerator():
@@ -602,7 +602,7 @@ fn test_vmnd_ones_vector() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_vmnd_single_output_element() raises:
+def test_vmnd_single_output_element() raises:
     """N=1: output is a scalar-like vector."""
 
     comptime if has_accelerator():
@@ -617,7 +617,7 @@ fn test_vmnd_single_output_element() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_vmnd_large_k() raises:
+def test_vmnd_large_k() raises:
     """Large k to stress the dot product loop."""
 
     comptime if has_accelerator():
@@ -634,7 +634,7 @@ fn test_vmnd_large_k() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_vmnd_large_n() raises:
+def test_vmnd_large_n() raises:
     """N > block_size to exercise multi-block coverage."""
 
     comptime if has_accelerator():
@@ -655,7 +655,7 @@ fn test_vmnd_large_n() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_vmnd_batched_2d_v_3d_M() raises:
+def test_vmnd_batched_2d_v_3d_M() raises:
     """V[b, k] @ M[b, k, n] → out[b, n]."""
 
     comptime if has_accelerator():
@@ -672,7 +672,7 @@ fn test_vmnd_batched_2d_v_3d_M() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_vmnd_batched_3d_v_4d_M() raises:
+def test_vmnd_batched_3d_v_4d_M() raises:
     """V[a, b, k] @ M[a, b, k, n] → out[a, b, n]."""
 
     comptime if has_accelerator():
@@ -687,7 +687,7 @@ fn test_vmnd_batched_3d_v_4d_M() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_vmnd_batched_arange_values() raises:
+def test_vmnd_batched_arange_values() raises:
     """Batched with non-trivial values to catch index mapping errors."""
 
     comptime if has_accelerator():
@@ -709,7 +709,7 @@ fn test_vmnd_batched_arange_values() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_vmnd_broadcast_v1d_M3d() raises:
+def test_vmnd_broadcast_v1d_M3d() raises:
     """V[k] broadcast against M[b, k, n] → out[b, n]."""
 
     comptime if has_accelerator():
@@ -724,7 +724,7 @@ fn test_vmnd_broadcast_v1d_M3d() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_vmnd_broadcast_v2d_M3d() raises:
+def test_vmnd_broadcast_v2d_M3d() raises:
     """V[1, k] broadcast against M[b, k, n] → out[b, n]."""
 
     comptime if has_accelerator():
@@ -739,7 +739,7 @@ fn test_vmnd_broadcast_v2d_M3d() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_vmnd_broadcast_v3d_M2d() raises:
+def test_vmnd_broadcast_v3d_M2d() raises:
     """V[a, b, k] broadcast against M[k, n] → out[a, b, n]."""
 
     comptime if has_accelerator():
@@ -755,7 +755,7 @@ fn test_vmnd_broadcast_v3d_M2d() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_vmnd_broadcast_both_size1() raises:
+def test_vmnd_broadcast_both_size1() raises:
     """Both v and M have a size-1 batch dim that broadcasts."""
 
     comptime if has_accelerator():
@@ -769,7 +769,7 @@ fn test_vmnd_broadcast_both_size1() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_vmnd_broadcast_large_batch() raises:
+def test_vmnd_broadcast_large_batch() raises:
     """Large broadcast batch to stress multi-block output coverage."""
 
     comptime if has_accelerator():
@@ -791,7 +791,7 @@ fn test_vmnd_broadcast_large_batch() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_vmnd_known_values_no_batch() raises:
+def test_vmnd_known_values_no_batch() raises:
     """Hand-computed result verified against GPU."""
 
     comptime if has_accelerator():
@@ -807,11 +807,11 @@ fn test_vmnd_known_values_no_batch() raises:
         assert_true(expected.to_gpu().all_close(gpu_result))
 
 
-fn test_vmnd_known_values_batched() raises:
+def test_vmnd_known_values_batched() raises:
     """Hand-computed batched result verified against GPU."""
 
 
-fn test_vmnd_known_values_broadcast() raises:
+def test_vmnd_known_values_broadcast() raises:
     """Hand-computed broadcast result verified against GPU."""
 
     comptime if has_accelerator():
@@ -833,7 +833,7 @@ fn test_vmnd_known_values_broadcast() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_mvnd_2d_M_1d_v() raises:
+def test_mvnd_2d_M_1d_v() raises:
     """M[m, k] @ v[k] → out[m]. Simplest case, no batch dims."""
 
     comptime if has_accelerator():
@@ -849,7 +849,7 @@ fn test_mvnd_2d_M_1d_v() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mvnd_known_values() raises:
+def test_mvnd_known_values() raises:
     """Hand-computed result verified directly against GPU output."""
 
     comptime if has_accelerator():
@@ -865,7 +865,7 @@ fn test_mvnd_known_values() raises:
         assert_true(close_enough(expected, gpu_result))
 
 
-fn test_mvnd_identity_matrix() raises:
+def test_mvnd_identity_matrix() raises:
     """I @ v = v."""
 
     comptime if has_accelerator():
@@ -879,7 +879,7 @@ fn test_mvnd_identity_matrix() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mvnd_zero_vector() raises:
+def test_mvnd_zero_vector() raises:
     """M @ zero_vector = zero output."""
 
     comptime if has_accelerator():
@@ -894,7 +894,7 @@ fn test_mvnd_zero_vector() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mvnd_ones_vector() raises:
+def test_mvnd_ones_vector() raises:
     """M @ ones = row sums of M."""
 
     comptime if has_accelerator():
@@ -909,7 +909,7 @@ fn test_mvnd_ones_vector() raises:
         assert_true(close_enough(expected, gpu_result))
 
 
-fn test_mvnd_single_row_matrix() raises:
+def test_mvnd_single_row_matrix() raises:
     """M[1, k] @ v[k] → out[1]. Single row edge case."""
 
     comptime if has_accelerator():
@@ -924,7 +924,7 @@ fn test_mvnd_single_row_matrix() raises:
         assert_true(close_enough(expected, gpu_result))
 
 
-fn test_mvnd_single_col_matrix() raises:
+def test_mvnd_single_col_matrix() raises:
     """M[m, 1] @ v[1] → out[m]. k=1 edge case."""
 
     comptime if has_accelerator():
@@ -939,7 +939,7 @@ fn test_mvnd_single_col_matrix() raises:
         assert_true(close_enough(expected, gpu_result))
 
 
-fn test_mvnd_large_k() raises:
+def test_mvnd_large_k() raises:
     """Large k to stress the dot product loop."""
 
     comptime if has_accelerator():
@@ -956,7 +956,7 @@ fn test_mvnd_large_k() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mvnd_large_m() raises:
+def test_mvnd_large_m() raises:
     """M > block_size to exercise multi-block coverage."""
 
     comptime if has_accelerator():
@@ -972,7 +972,7 @@ fn test_mvnd_large_m() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mvnd_negative_values() raises:
+def test_mvnd_negative_values() raises:
     """Negative values in both M and v."""
 
     comptime if has_accelerator():
@@ -992,7 +992,7 @@ fn test_mvnd_negative_values() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_mvnd_batched_3d_M_2d_v() raises:
+def test_mvnd_batched_3d_M_2d_v() raises:
     """M[b, m, k] @ v[b, k] → out[b, m]."""
 
     comptime if has_accelerator():
@@ -1008,7 +1008,7 @@ fn test_mvnd_batched_3d_M_2d_v() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mvnd_batched_4d_M_3d_v() raises:
+def test_mvnd_batched_4d_M_3d_v() raises:
     """M[a, b, m, k] @ v[a, b, k] → out[a, b, m]."""
 
     comptime if has_accelerator():
@@ -1023,7 +1023,7 @@ fn test_mvnd_batched_4d_M_3d_v() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mvnd_batched_arange_values() raises:
+def test_mvnd_batched_arange_values() raises:
     """Batched with non-trivial arange values to catch index mapping errors."""
 
     comptime if has_accelerator():
@@ -1040,7 +1040,7 @@ fn test_mvnd_batched_arange_values() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mvnd_known_values_batched() raises:
+def test_mvnd_known_values_batched() raises:
     """Hand-computed batched result verified directly against GPU."""
 
     comptime if has_accelerator():
@@ -1061,7 +1061,7 @@ fn test_mvnd_known_values_batched() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_mvnd_broadcast_3d_M_1d_v() raises:
+def test_mvnd_broadcast_3d_M_1d_v() raises:
     """M[b, m, k] broadcast against v[k] → out[b, m]."""
 
     comptime if has_accelerator():
@@ -1076,7 +1076,7 @@ fn test_mvnd_broadcast_3d_M_1d_v() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mvnd_broadcast_2d_M_3d_v() raises:
+def test_mvnd_broadcast_2d_M_3d_v() raises:
     """M[m, k] broadcast against v[b, k] → out[b, m]."""
 
     comptime if has_accelerator():
@@ -1092,7 +1092,7 @@ fn test_mvnd_broadcast_2d_M_3d_v() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mvnd_broadcast_4d_M_2d_v() raises:
+def test_mvnd_broadcast_4d_M_2d_v() raises:
     """M[a, b, m, k] broadcast against v[b, k] → out[a, b, m]."""
 
     comptime if has_accelerator():
@@ -1106,7 +1106,7 @@ fn test_mvnd_broadcast_4d_M_2d_v() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mvnd_broadcast_size1_batch() raises:
+def test_mvnd_broadcast_size1_batch() raises:
     """V with size-1 batch dim that broadcasts across M's batch."""
 
     comptime if has_accelerator():
@@ -1120,7 +1120,7 @@ fn test_mvnd_broadcast_size1_batch() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mvnd_broadcast_known_values() raises:
+def test_mvnd_broadcast_known_values() raises:
     """Hand-computed broadcast result verified directly against GPU."""
 
     comptime if has_accelerator():
@@ -1137,7 +1137,7 @@ fn test_mvnd_broadcast_known_values() raises:
         assert_true(close_enough(expected, gpu_result))
 
 
-fn test_mvnd_broadcast_large_batch() raises:
+def test_mvnd_broadcast_large_batch() raises:
     """Large broadcast batch to stress multi-block output coverage."""
 
     comptime if has_accelerator():
@@ -1158,7 +1158,7 @@ fn test_mvnd_broadcast_large_batch() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_mmnd_2d_known_values() raises:
+def test_mmnd_2d_known_values() raises:
     """Hand-computed 2D matmul verified directly against GPU."""
 
     comptime if has_accelerator():
@@ -1175,7 +1175,7 @@ fn test_mmnd_2d_known_values() raises:
         assert_true(close_enough(expected, gpu_result))
 
 
-fn test_mmnd_2d_identity() raises:
+def test_mmnd_2d_identity() raises:
     """A @ I = A."""
 
     comptime if has_accelerator():
@@ -1190,7 +1190,7 @@ fn test_mmnd_2d_identity() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_2d_zero_matrix() raises:
+def test_mmnd_2d_zero_matrix() raises:
     """A @ zeros = zeros."""
 
     comptime if has_accelerator():
@@ -1205,7 +1205,7 @@ fn test_mmnd_2d_zero_matrix() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_2d_ones() raises:
+def test_mmnd_2d_ones() raises:
     """Ones @ ones = matrix of k."""
 
     comptime if has_accelerator():
@@ -1221,7 +1221,7 @@ fn test_mmnd_2d_ones() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_2d_rectangular() raises:
+def test_mmnd_2d_rectangular() raises:
     """Non-square matrices: (m, k) @ (k, n) where m != k != n."""
 
     comptime if has_accelerator():
@@ -1237,7 +1237,7 @@ fn test_mmnd_2d_rectangular() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_2d_negative_values() raises:
+def test_mmnd_2d_negative_values() raises:
     """Negative values in both A and B."""
 
     comptime if has_accelerator():
@@ -1251,7 +1251,7 @@ fn test_mmnd_2d_negative_values() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_2d_single_element() raises:
+def test_mmnd_2d_single_element() raises:
     """(1, k) @ (k, 1) → (1, 1): inner product as matmul."""
 
     comptime if has_accelerator():
@@ -1271,7 +1271,7 @@ fn test_mmnd_2d_single_element() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_mmnd_2d_non_tile_multiple_m() raises:
+def test_mmnd_2d_non_tile_multiple_m() raises:
     """M(m) not a multiple of TILE_SIZE."""
 
     comptime if has_accelerator():
@@ -1285,7 +1285,7 @@ fn test_mmnd_2d_non_tile_multiple_m() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_2d_non_tile_multiple_n() raises:
+def test_mmnd_2d_non_tile_multiple_n() raises:
     """N(n) not a multiple of TILE_SIZE."""
 
     comptime if has_accelerator():
@@ -1299,7 +1299,7 @@ fn test_mmnd_2d_non_tile_multiple_n() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_2d_non_tile_multiple_k() raises:
+def test_mmnd_2d_non_tile_multiple_k() raises:
     """K(k) not a multiple of TILE_SIZE."""
 
     comptime if has_accelerator():
@@ -1313,7 +1313,7 @@ fn test_mmnd_2d_non_tile_multiple_k() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_2d_all_non_tile_multiples() raises:
+def test_mmnd_2d_all_non_tile_multiples() raises:
     """M(m), k, n all non-multiples of TILE_SIZE simultaneously."""
 
     comptime if has_accelerator():
@@ -1329,7 +1329,7 @@ fn test_mmnd_2d_all_non_tile_multiples() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_2d_smaller_than_tile() raises:
+def test_mmnd_2d_smaller_than_tile() raises:
     """M(m), k, n all smaller than TILE_SIZE."""
 
     comptime if has_accelerator():
@@ -1350,7 +1350,7 @@ fn test_mmnd_2d_smaller_than_tile() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_mmnd_2d_large_square() raises:
+def test_mmnd_2d_large_square() raises:
     """Large square matrices well beyond tile size."""
 
     comptime if has_accelerator():
@@ -1364,7 +1364,7 @@ fn test_mmnd_2d_large_square() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_2d_large_rectangular() raises:
+def test_mmnd_2d_large_rectangular() raises:
     """Large rectangular matrices with non-tile-multiple dimensions."""
 
     comptime if has_accelerator():
@@ -1383,7 +1383,7 @@ fn test_mmnd_2d_large_rectangular() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_mmnd_batched_3d_known_values() raises:
+def test_mmnd_batched_3d_known_values() raises:
     """Hand-computed batched matmul verified directly against GPU."""
 
     comptime if has_accelerator():
@@ -1399,7 +1399,7 @@ fn test_mmnd_batched_3d_known_values() raises:
         assert_true(close_enough(expected, gpu_result))
 
 
-fn test_mmnd_batched_3d_arange() raises:
+def test_mmnd_batched_3d_arange() raises:
     """A[b, m, k] @ B[b, k, n] with arange values."""
 
     comptime if has_accelerator():
@@ -1415,7 +1415,7 @@ fn test_mmnd_batched_3d_arange() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_batched_4d() raises:
+def test_mmnd_batched_4d() raises:
     """A[a, b, m, k] @ B[a, b, k, n] — 4D batch."""
 
     comptime if has_accelerator():
@@ -1429,7 +1429,7 @@ fn test_mmnd_batched_4d() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_batched_large_batch() raises:
+def test_mmnd_batched_large_batch() raises:
     """Many batch elements to stress grid.z coverage."""
 
     comptime if has_accelerator():
@@ -1443,7 +1443,7 @@ fn test_mmnd_batched_large_batch() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_batched_non_tile_multiples() raises:
+def test_mmnd_batched_non_tile_multiples() raises:
     """Batched with m, k, n not multiples of TILE_SIZE."""
 
     comptime if has_accelerator():
@@ -1464,7 +1464,7 @@ fn test_mmnd_batched_non_tile_multiples() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-fn test_mmnd_broadcast_3d_A_2d_B() raises:
+def test_mmnd_broadcast_3d_A_2d_B() raises:
     """A[b, m, k] @ B[k, n] — B broadcasts across batch."""
 
     comptime if has_accelerator():
@@ -1480,7 +1480,7 @@ fn test_mmnd_broadcast_3d_A_2d_B() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_broadcast_2d_A_3d_B() raises:
+def test_mmnd_broadcast_2d_A_3d_B() raises:
     """A[m, k] @ B[b, k, n] — A broadcasts across batch."""
 
     comptime if has_accelerator():
@@ -1496,7 +1496,7 @@ fn test_mmnd_broadcast_2d_A_3d_B() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_broadcast_4d_A_3d_B() raises:
+def test_mmnd_broadcast_4d_A_3d_B() raises:
     """A[a, b, m, k] @ B[b, k, n] — B missing leading batch dim."""
 
     comptime if has_accelerator():
@@ -1510,7 +1510,7 @@ fn test_mmnd_broadcast_4d_A_3d_B() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_broadcast_size1_batch_dim() raises:
+def test_mmnd_broadcast_size1_batch_dim() raises:
     """Size-1 batch dim in A broadcasts across B's batch."""
 
     comptime if has_accelerator():
@@ -1526,7 +1526,7 @@ fn test_mmnd_broadcast_size1_batch_dim() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_mmnd_broadcast_known_values() raises:
+def test_mmnd_broadcast_known_values() raises:
     """Hand-computed broadcast result verified directly against GPU."""
 
     comptime if has_accelerator():
@@ -1544,7 +1544,7 @@ fn test_mmnd_broadcast_known_values() raises:
         assert_true(close_enough(expected, gpu_result))
 
 
-fn test_mmnd_broadcast_large() raises:
+def test_mmnd_broadcast_large() raises:
     """Large broadcast batch to stress multi-block and multi-z coverage."""
 
     comptime if has_accelerator():
@@ -1558,7 +1558,7 @@ fn test_mmnd_broadcast_large() raises:
         assert_true(close_enough(cpu_result, gpu_result))
 
 
-fn test_gpu_transfer_fidelity() raises:
+def test_gpu_transfer_fidelity() raises:
     comptime if has_accelerator():
         var B = Tensor[dtype].rand(80, 20)
         var B_gpu = B.to_gpu()
@@ -1566,7 +1566,7 @@ fn test_gpu_transfer_fidelity() raises:
         assert_true(B.all_close(B_back))
 
 
-fn test_ancestry_storage_fidelity() raises:
+def test_ancestry_storage_fidelity() raises:
     comptime if has_accelerator():
         var A = Tensor[dtype].rand(9, 80, requires_grad=True)
         var A_gpu = A.to_gpu()
@@ -1578,7 +1578,7 @@ fn test_ancestry_storage_fidelity() raises:
         assert_true(B.all_close(B_ancestry_back))
 
 
-fn test_forward_matmul_fidelity() raises:
+def test_forward_matmul_fidelity() raises:
     comptime if has_accelerator():
         var A = Tensor[dtype].rand(9, 80, requires_grad=True)
         var B = Tensor[dtype].rand(80, 20)
@@ -1589,7 +1589,7 @@ fn test_forward_matmul_fidelity() raises:
         assert_true(C_cpu.all_close(C_gpu.to_cpu()))
 
 
-fn test_backward_grad_A_fidelity() raises:
+def test_backward_grad_A_fidelity() raises:
     comptime if has_accelerator():
         var AA = Tensor[dtype].arange(9 * 30, requires_grad=True)
         var A = AA.reshape(9, 30)
@@ -1616,7 +1616,7 @@ fn test_backward_grad_A_fidelity() raises:
         )
 
 
-fn test_transposed_matmul_fidelity() raises:
+def test_transposed_matmul_fidelity() raises:
     comptime if has_accelerator():
         var B = Tensor[dtype].rand(80, 20)
         var B_gpu = B.to_gpu()
@@ -1638,7 +1638,7 @@ fn test_transposed_matmul_fidelity() raises:
         assert_true(grad_A_cpu.all_close(grad_A_gpu))
 
 
-fn test_ancestry_transposed_matmul_fidelity() raises:
+def test_ancestry_transposed_matmul_fidelity() raises:
     comptime if has_accelerator():
         var A = Tensor[dtype].rand(9, 80, requires_grad=True)
         var B = Tensor[dtype].rand(80, 20)

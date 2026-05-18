@@ -8,7 +8,7 @@ from tenmo.shapes import Shape
 from tenmo.forwards import Conv2dFused, Padding
 
 
-fn test_pad_constant_2d_symmetric() raises:
+def test_pad_constant_2d_symmetric() raises:
     """Test symmetric constant padding on 2D tensor."""
     print("test_pad_constant_2d_symmetric")
 
@@ -42,7 +42,7 @@ fn test_pad_constant_2d_symmetric() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_pad_constant_2d_asymmetric() raises:
+def test_pad_constant_2d_asymmetric() raises:
     """Test asymmetric constant padding on 2D tensor."""
     print("test_pad_constant_2d_asymmetric")
 
@@ -74,7 +74,7 @@ fn test_pad_constant_2d_asymmetric() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_pad_constant_1d() raises:
+def test_pad_constant_1d() raises:
     """Test constant padding on 1D tensor."""
     print("test_pad_constant_1d")
 
@@ -95,7 +95,7 @@ fn test_pad_constant_1d() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_pad_constant_3d() raises:
+def test_pad_constant_3d() raises:
     """Test constant padding on 3D tensor."""
     print("test_pad_constant_3d")
 
@@ -115,7 +115,7 @@ fn test_pad_constant_3d() raises:
     assert_true(result.shape()[2] == 3)
 
 
-fn test_pad_constant_4d_conv_style() raises:
+def test_pad_constant_4d_conv_style() raises:
     """Test constant padding on 4D tensor (typical for conv layers)."""
     print("test_pad_constant_4d_conv_style")
 
@@ -142,7 +142,7 @@ fn test_pad_constant_4d_conv_style() raises:
     assert_true(result.shape()[3] == 4)
 
 
-fn test_pad_constant_nonzero_value() raises:
+def test_pad_constant_nonzero_value() raises:
     """Test constant padding with non-zero pad value."""
     print("test_pad_constant_nonzero_value")
 
@@ -170,7 +170,7 @@ fn test_pad_constant_nonzero_value() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_pad_zero_padding() raises:
+def test_pad_zero_padding() raises:
     """Test padding with zero on all sides (no-op)."""
     print("test_pad_zero_padding")
 
@@ -192,7 +192,7 @@ fn test_pad_zero_padding() raises:
 # ============================================================================
 
 
-fn test_pad_backward_symmetric() raises:
+def test_pad_backward_symmetric() raises:
     """Test gradient flow through symmetric padding."""
     print("test_pad_backward_symmetric")
 
@@ -214,7 +214,7 @@ fn test_pad_backward_symmetric() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_pad_backward_asymmetric() raises:
+def test_pad_backward_asymmetric() raises:
     """Test gradient flow through asymmetric padding."""
     print("test_pad_backward_asymmetric")
 
@@ -234,7 +234,7 @@ fn test_pad_backward_asymmetric() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_pad_backward_weighted() raises:
+def test_pad_backward_weighted() raises:
     """Test gradient flow with weighted loss."""
     print("test_pad_backward_weighted")
 
@@ -258,7 +258,7 @@ fn test_pad_backward_weighted() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_pad_backward_1d() raises:
+def test_pad_backward_1d() raises:
     """Test gradient flow for 1D padding."""
     print("test_pad_backward_1d")
 
@@ -277,7 +277,7 @@ fn test_pad_backward_1d() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_pad_backward_3d() raises:
+def test_pad_backward_3d() raises:
     """Test gradient flow for 3D padding."""
     print("test_pad_backward_3d")
 
@@ -300,7 +300,7 @@ fn test_pad_backward_3d() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_pad_backward_chain() raises:
+def test_pad_backward_chain() raises:
     """Test gradient flow through chained operations."""
     print("test_pad_backward_chain")
 
@@ -321,7 +321,7 @@ fn test_pad_backward_chain() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_pad_backward_4d_conv_style() raises:
+def test_pad_backward_4d_conv_style() raises:
     """Test gradient flow for 4D tensor (conv layer style)."""
     print("test_pad_backward_4d_conv_style")
 
@@ -351,7 +351,7 @@ fn test_pad_backward_4d_conv_style() raises:
 # ============================================================================
 
 
-fn test_pad_replicate_2d() raises:
+def test_pad_replicate_2d() raises:
     """Test replicate padding mode."""
     print("test_pad_replicate_2d")
 
@@ -381,7 +381,7 @@ fn test_pad_replicate_2d() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_pad_reflect_2d() raises:
+def test_pad_reflect_2d() raises:
     """Test reflect padding mode."""
     print("test_pad_reflect_2d")
 
@@ -410,7 +410,7 @@ fn test_pad_reflect_2d() raises:
 # ============================================================================
 
 
-fn test_pad_for_convolution() raises:
+def test_pad_for_convolution() raises:
     """Test padding for CNN convolution layer."""
     print("test_pad_for_convolution")
 
@@ -441,7 +441,7 @@ fn test_pad_for_convolution() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_pad_selective_dimensions() raises:
+def test_pad_selective_dimensions() raises:
     """Test padding only specific dimensions."""
     print("test_pad_selective_dimensions")
 
@@ -464,7 +464,7 @@ fn test_pad_selective_dimensions() raises:
     assert_true(result.shape()[3] == 11)
 
 
-fn test_pad_requires_grad_propagation() raises:
+def test_pad_requires_grad_propagation() raises:
     """Test requires_grad propagation."""
     print("test_pad_requires_grad_propagation")
 
@@ -486,10 +486,10 @@ fn test_pad_requires_grad_propagation() raises:
 # ============================================================================
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
-fn test_pad_circular_1d_asymmetric() raises:
+def test_pad_circular_1d_asymmetric() raises:
     """Test asymmetric circular padding on 1D tensor."""
     print("test_pad_circular_1d_asymmetric")
 
@@ -510,7 +510,7 @@ fn test_pad_circular_1d_asymmetric() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_pad_circular_2d_symmetric() raises:
+def test_pad_circular_2d_symmetric() raises:
     """Test symmetric circular padding on 2D tensor."""
     print("test_pad_circular_2d_symmetric")
 
@@ -548,7 +548,7 @@ fn test_pad_circular_2d_symmetric() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_pad_circular_2d_asymmetric() raises:
+def test_pad_circular_2d_asymmetric() raises:
     """Test asymmetric circular padding on 2D tensor."""
     print("test_pad_circular_2d_asymmetric")
 
@@ -591,7 +591,7 @@ fn test_pad_circular_2d_asymmetric() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_pad_circular_2d_one_dimension() raises:
+def test_pad_circular_2d_one_dimension() raises:
     """Test circular padding on only one dimension."""
     print("test_pad_circular_2d_one_dimension")
 
@@ -619,7 +619,7 @@ fn test_pad_circular_2d_one_dimension() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_pad_circular_large_padding() raises:
+def test_pad_circular_large_padding() raises:
     """Test circular padding with padding larger than input size."""
     print("test_pad_circular_large_padding")
 
@@ -669,7 +669,7 @@ fn test_pad_circular_large_padding() raises:
     assert_true(result.all_close[atol=1e-6](expected))
 
 
-fn test_pad_circular_3d() raises:
+def test_pad_circular_3d() raises:
     """Test circular padding on 3D tensor."""
     print("test_pad_circular_3d")
 
@@ -689,7 +689,7 @@ fn test_pad_circular_3d() raises:
     assert_true(result.shape()[2] == 3)
 
 
-fn test_pad_circular_single_element() raises:
+def test_pad_circular_single_element() raises:
     """Test circular padding on single element tensor."""
     print("test_pad_circular_single_element")
 
@@ -714,7 +714,7 @@ fn test_pad_circular_single_element() raises:
 # ============================================================================
 
 
-fn test_pad_circular_backward_1d() raises:
+def test_pad_circular_backward_1d() raises:
     """Test gradient flow through circular padding 1D."""
     print("test_pad_circular_backward_1d")
 
@@ -748,7 +748,7 @@ fn test_pad_circular_backward_1d() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_pad_circular_backward_2d() raises:
+def test_pad_circular_backward_2d() raises:
     """Test gradient flow through circular padding 2D."""
     print("test_pad_circular_backward_2d")
 
@@ -807,7 +807,7 @@ fn test_pad_circular_backward_2d() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_pad_circular_backward_weighted() raises:
+def test_pad_circular_backward_weighted() raises:
     """Test gradient flow with weighted loss through circular padding."""
     print("test_pad_circular_backward_weighted")
 
@@ -840,7 +840,7 @@ fn test_pad_circular_backward_weighted() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_pad_circular_backward_chain() raises:
+def test_pad_circular_backward_chain() raises:
     """Test gradient flow through chained operations with circular padding."""
     print("test_pad_circular_backward_chain")
 
@@ -872,7 +872,7 @@ fn test_pad_circular_backward_chain() raises:
 # ============================================================================
 
 
-fn test_circular_vs_replicate_difference() raises:
+def test_circular_vs_replicate_difference() raises:
     """Show difference between circular and replicate padding."""
     print("test_circular_vs_replicate_difference")
 
@@ -896,7 +896,7 @@ fn test_circular_vs_replicate_difference() raises:
     assert_true(replicate[6] == 3.0)  # Replicate repeats edge
 
 
-fn test_circular_periodic_signal() raises:
+def test_circular_periodic_signal() raises:
     """Test circular padding preserves periodicity."""
     print("test_circular_periodic_signal")
 
@@ -929,7 +929,7 @@ fn test_circular_periodic_signal() raises:
     assert_true(expected == result)
 
 
-fn test_pad_symmetric_padding_forward() raises:
+def test_pad_symmetric_padding_forward() raises:
     """Test symmetric padding forward pass."""
     print("\n" + "=" * 80)
     print("TEST: Symmetric Padding Forward")
@@ -973,7 +973,7 @@ fn test_pad_symmetric_padding_forward() raises:
     print("✓ Symmetric padding forward pass correct")
 
 
-fn test_pad_symmetric_padding_backward() raises:
+def test_pad_symmetric_padding_backward() raises:
     """Test symmetric padding backward pass."""
     print("\n" + "=" * 80)
     print("TEST: Symmetric Padding Backward")
@@ -1014,7 +1014,7 @@ fn test_pad_symmetric_padding_backward() raises:
     print("✓ Symmetric padding backward pass correct")
 
 
-fn test_pad_asymmetric_padding_forward() raises:
+def test_pad_asymmetric_padding_forward() raises:
     """Test asymmetric padding forward pass."""
     print("\n" + "=" * 80)
     print("TEST: Asymmetric Padding Forward")
@@ -1066,7 +1066,7 @@ fn test_pad_asymmetric_padding_forward() raises:
     print("✓ Asymmetric padding forward pass correct")
 
 
-fn test_pad_asymmetric_padding_backward() raises:
+def test_pad_asymmetric_padding_backward() raises:
     """Test asymmetric padding backward pass."""
     print("\n" + "=" * 80)
     print("TEST: Asymmetric Padding Backward")
@@ -1112,7 +1112,7 @@ fn test_pad_asymmetric_padding_backward() raises:
     print("✓ Asymmetric padding backward pass correct")
 
 
-fn test_pad_no_padding() raises:
+def test_pad_no_padding() raises:
     """Test valid padding (no padding)."""
     print("\n" + "=" * 80)
     print("TEST: No Padding (Valid)")
@@ -1168,7 +1168,7 @@ fn test_pad_no_padding() raises:
     print("✓ No padding test correct")
 
 
-fn test_pad_same_padding() raises:
+def test_pad_same_padding() raises:
     """Test 'same' padding mode."""
     print("\n" + "=" * 80)
     print("TEST: Same Padding")
@@ -1197,7 +1197,7 @@ fn test_pad_same_padding() raises:
     print("✓ Same padding test correct")
 
 
-fn test_pad_multi_channel() raises:
+def test_pad_multi_channel() raises:
     """Test padding with multiple channels."""
     print("\n" + "=" * 80)
     print("TEST: Multi-Channel Padding")
@@ -1233,7 +1233,7 @@ fn test_pad_multi_channel() raises:
     print("✓ Multi-channel padding test correct")
 
 
-fn test_pad_with_stride() raises:
+def test_pad_with_stride() raises:
     """Test padding with stride > 1."""
     print("\n" + "=" * 80)
     print("TEST: Padding with Stride")
@@ -1262,7 +1262,7 @@ fn test_pad_with_stride() raises:
     print("✓ Stride with padding test correct")
 
 
-fn test_pad_with_dilation() raises:
+def test_pad_with_dilation() raises:
     """Test padding with dilation."""
     print("\n" + "=" * 80)
     print("TEST: Padding with Dilation")
@@ -1292,7 +1292,7 @@ fn test_pad_with_dilation() raises:
     print("✓ Dilation with padding test correct")
 
 
-fn test_pad_tuple_padding() raises:
+def test_pad_tuple_padding() raises:
     """Test tuple padding specification."""
     print("\n" + "=" * 80)
     print("TEST: Tuple Padding")
@@ -1323,7 +1323,7 @@ fn test_pad_tuple_padding() raises:
     print("✓ Tuple padding test correct")
 
 
-fn test_pad_numerical_gradient_check() raises:
+def test_pad_numerical_gradient_check() raises:
     """Numerical gradient verification for padding."""
     print("\n" + "=" * 80)
     print("TEST: Numerical Gradient Check")
@@ -1385,7 +1385,7 @@ fn test_pad_numerical_gradient_check() raises:
     print("✓ Numerical gradient check passed")
 
 
-fn test_pad_kernel_gradient() raises:
+def test_pad_kernel_gradient() raises:
     """Test kernel gradients with padding."""
     print("\n" + "=" * 80)
     print("TEST: Kernel Gradient with Padding")
@@ -1429,7 +1429,7 @@ fn test_pad_kernel_gradient() raises:
     print("✓ Kernel gradient test correct")
 
 
-fn test_pad_bias_gradient() raises:
+def test_pad_bias_gradient() raises:
     """Test bias gradients with padding."""
     print("\n" + "=" * 80)
     print("TEST: Bias Gradient with Padding")
@@ -1462,7 +1462,7 @@ fn test_pad_bias_gradient() raises:
     print("✓ Bias gradient test correct")
 
 
-fn test_pad_large_asymmetric() raises:
+def test_pad_large_asymmetric() raises:
     """Test large asymmetric padding values."""
     print("\n" + "=" * 80)
     print("TEST: Large Asymmetric Padding")
@@ -1517,7 +1517,7 @@ fn test_pad_large_asymmetric() raises:
     print("✓ Large asymmetric padding test correct")
 
 
-fn test_pad_zero_padding_one_side() raises:
+def test_pad_zero_padding_one_side() raises:
     """Test zero padding on one side, non-zero on other."""
     print("\n" + "=" * 80)
     print("TEST: Zero Padding One Side")
@@ -1552,7 +1552,7 @@ fn test_pad_zero_padding_one_side() raises:
     print("✓ Zero padding one side test correct")
 
 
-fn run_all_padding_tests() raises:
+def run_all_padding_tests() raises:
     """Run all padding tests."""
 
     test_pad_symmetric_padding_forward()

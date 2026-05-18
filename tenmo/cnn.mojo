@@ -31,15 +31,15 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
     var initialized: Bool
     var pad_spec: List[Tuple[Int, Int]]
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.initialized = copy.initialized
         self.pad_spec = copy.pad_spec.copy()
 
-    fn __init__(out self):
+    def __init__(out self):
         self.initialized = False
         self.pad_spec = List[Tuple[Int, Int]]()
 
-    fn __call__[
+    def __call__[
         track_grad: Bool
     ](
         mut self,
@@ -79,7 +79,7 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
         return out^
 
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         image: Tensor[Self.dtype],
@@ -102,7 +102,7 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
         return output^
 
     @staticmethod
-    fn invoke[
+    def invoke[
         track_grad: Bool = True
     ](
         image: Tensor[Self.dtype],
@@ -147,7 +147,7 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
         return output^
 
     @staticmethod
-    fn invoke[
+    def invoke[
         track_grad: Bool = True
     ](
         image: Tensor[Self.dtype],
@@ -304,7 +304,7 @@ struct FusedIm2Col[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     """
 
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         padded_image: Tensor[Self.dtype],  # (N, C_in, H_pad, W_pad)
@@ -403,7 +403,7 @@ struct FusedIm2Col[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var total_work = N * H_out * W_out
 
         @parameter
-        fn compute_position(work_idx: Int):
+        def compute_position(work_idx: Int):
             """
             Compute convolution for one output spatial position.
             Processes all output channels with SIMD vectorization.
@@ -558,7 +558,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     """
 
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var bwd_arg = (
@@ -658,7 +658,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     # BIAS GRADIENT
     @always_inline
     @staticmethod
-    fn compute_bias_gradient(
+    def compute_bias_gradient(
         grad_output: Gradbox[Self.dtype],
         N: Int,
         C_out: Int,
@@ -683,7 +683,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var num_spatial = H_out * W_out
 
         @parameter
-        fn accumulate_bias(co: Int):
+        def accumulate_bias(co: Int):
             var accum_vec = SIMD[Self.dtype, simd_w](0)
             var accum_scalar: Scalar[Self.dtype] = 0
             var base_co = co * stride_C
@@ -710,7 +710,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn compute_kernel_gradient(
+    def compute_kernel_gradient(
         grad_output: Gradbox[Self.dtype],
         padded_image: Tensor[Self.dtype],
         N: Int,
@@ -749,7 +749,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var total_work = N * H_out * W_out
 
         @parameter
-        fn extract_patch(work_idx: Int):
+        def extract_patch(work_idx: Int):
             var n = work_idx // (H_out * W_out)
             var spatial = work_idx % (H_out * W_out)
             var oy = spatial // W_out
@@ -806,7 +806,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     # INPUT GRADIENT
     @always_inline
     @staticmethod
-    fn compute_input_gradient(
+    def compute_input_gradient(
         grad_output: Gradbox[Self.dtype],
         kernel: Tensor[Self.dtype],
         N: Int,
@@ -851,7 +851,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var input_stride_C = H_pad * W_pad
 
         @parameter
-        fn compute_input_for_n(n: Int):
+        def compute_input_for_n(n: Int):
             var grad_n_base = n * grad_stride_N
             var input_n_base = n * input_stride_N
 

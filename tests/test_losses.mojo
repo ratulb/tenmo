@@ -9,7 +9,7 @@ from tenmo.intarray import IntArray
 # ============================================================================
 
 
-fn test_mse_loss_perfect_prediction() raises:
+def test_mse_loss_perfect_prediction() raises:
     print("test_mse_loss_perfect_prediction")
     comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -20,7 +20,7 @@ fn test_mse_loss_perfect_prediction() raises:
     )
 
 
-fn test_mse_loss_simple_gradient() raises:
+def test_mse_loss_simple_gradient() raises:
     print("test_mse_loss_simple_gradient")
     comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[2.0, 4.0]], requires_grad=True)
@@ -34,7 +34,7 @@ fn test_mse_loss_simple_gradient() raises:
     assert_true(pred.grad().all_close(expected_grad), "MSE gradient mismatch")
 
 
-fn test_mse_loss_batch_gradient() raises:
+def test_mse_loss_batch_gradient() raises:
     print("test_mse_loss_batch_gradient")
     comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -49,7 +49,7 @@ fn test_mse_loss_batch_gradient() raises:
     )
 
 
-fn test_mse_loss_no_grad_mode() raises:
+def test_mse_loss_no_grad_mode() raises:
     print("test_mse_loss_no_grad_mode")
     comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[2.0, 4.0]], requires_grad=True)
@@ -62,7 +62,7 @@ fn test_mse_loss_no_grad_mode() raises:
     )
 
 
-fn test_mse_loss_struct_train_mode() raises:
+def test_mse_loss_struct_train_mode() raises:
     print("test_mse_loss_struct_train_mode")
     comptime dtype = DType.float32
     var criterion = MSELoss[dtype]()
@@ -78,7 +78,7 @@ fn test_mse_loss_struct_train_mode() raises:
     )
 
 
-fn test_mse_loss_struct_eval_mode() raises:
+def test_mse_loss_struct_eval_mode() raises:
     print("test_mse_loss_struct_eval_mode")
     comptime dtype = DType.float32
     var criterion = MSELoss[dtype]()
@@ -97,7 +97,7 @@ fn test_mse_loss_struct_eval_mode() raises:
 # ============================================================================
 
 
-fn test_bce_loss_perfect_prediction() raises:
+def test_bce_loss_perfect_prediction() raises:
     print("test_bce_loss_perfect_prediction")
     comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[0.9, 0.1], [0.2, 0.8]], requires_grad=True)
@@ -109,7 +109,7 @@ fn test_bce_loss_perfect_prediction() raises:
     )
 
 
-fn test_bce_loss_worst_prediction() raises:
+def test_bce_loss_worst_prediction() raises:
     print("test_bce_loss_worst_prediction")
     comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[0.1, 0.9]], requires_grad=True)
@@ -119,7 +119,7 @@ fn test_bce_loss_worst_prediction() raises:
     assert_true(loss.item() > 1.0, "Bad prediction should have high loss")
 
 
-fn test_bce_loss_gradient_positive_target() raises:
+def test_bce_loss_gradient_positive_target() raises:
     print("test_bce_loss_gradient_positive_target")
     comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[0.6]], requires_grad=True)
@@ -133,7 +133,7 @@ fn test_bce_loss_gradient_positive_target() raises:
     assert_true(grad < 0, "Gradient should be negative when pred < target")
 
 
-fn test_bce_loss_gradient_negative_target() raises:
+def test_bce_loss_gradient_negative_target() raises:
     print("test_bce_loss_gradient_negative_target")
     comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[0.6]], requires_grad=True)
@@ -146,7 +146,7 @@ fn test_bce_loss_gradient_negative_target() raises:
     assert_true(grad > 0, "Gradient should be positive when pred > target")
 
 
-fn test_bce_with_logits_positive_gradient() raises:
+def test_bce_with_logits_positive_gradient() raises:
     print("test_bce_with_logits_positive_gradient")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0]], requires_grad=True)
@@ -162,7 +162,7 @@ fn test_bce_with_logits_positive_gradient() raises:
     )
 
 
-fn test_bce_with_logits_negative_gradient() raises:
+def test_bce_with_logits_negative_gradient() raises:
     print("test_bce_with_logits_negative_gradient")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[-2.0]], requires_grad=True)
@@ -177,7 +177,7 @@ fn test_bce_with_logits_negative_gradient() raises:
     )
 
 
-fn test_bce_loss_boundary_values() raises:
+def test_bce_loss_boundary_values() raises:
     print("test_bce_loss_boundary_values")
     comptime dtype = DType.float32
     # Test with values very close to 0 and 1
@@ -193,7 +193,7 @@ fn test_bce_loss_boundary_values() raises:
     )
 
 
-fn test_bce_loss_clipping() raises:
+def test_bce_loss_clipping() raises:
     print("test_bce_loss_clipping")
     comptime dtype = DType.float32
     # Test extreme values don't cause NaN
@@ -206,7 +206,7 @@ fn test_bce_loss_clipping() raises:
     assert_true(not isinf(loss.item()), "Loss should not be Inf with clipping")
 
 
-fn test_bce_loss_no_grad_mode() raises:
+def test_bce_loss_no_grad_mode() raises:
     print("test_bce_loss_no_grad_mode")
     comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[0.6, 0.4]], requires_grad=True)
@@ -218,7 +218,7 @@ fn test_bce_loss_no_grad_mode() raises:
     )
 
 
-fn test_bce_loss_struct_train_eval() raises:
+def test_bce_loss_struct_train_eval() raises:
     print("test_bce_loss_struct_train_eval")
     comptime dtype = DType.float32
     var criterion = BCELoss[dtype]()
@@ -246,7 +246,7 @@ fn test_bce_loss_struct_train_eval() raises:
 # ============================================================================
 
 
-fn test_bce_with_logits_zero_logits() raises:
+def test_bce_with_logits_zero_logits() raises:
     print("test_bce_with_logits_zero_logits")
     comptime dtype = DType.float32
     # Logits=0 -> sigmoid(0)=0.5
@@ -260,7 +260,7 @@ fn test_bce_with_logits_zero_logits() raises:
     )
 
 
-fn test_bce_with_logits_batch() raises:
+def test_bce_with_logits_batch() raises:
     print("test_bce_with_logits_batch")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2(
@@ -273,7 +273,7 @@ fn test_bce_with_logits_batch() raises:
     assert_true(loss.item() < 1.0, "Well-aligned batch should have low loss")
 
 
-fn test_bce_with_logits_no_grad_mode() raises:
+def test_bce_with_logits_no_grad_mode() raises:
     print("test_bce_with_logits_no_grad_mode")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[1.0]], requires_grad=True)
@@ -285,7 +285,7 @@ fn test_bce_with_logits_no_grad_mode() raises:
     )
 
 
-fn test_bce_with_logits_struct() raises:
+def test_bce_with_logits_struct() raises:
     print("test_bce_with_logits_struct")
     comptime dtype = DType.float32
     var criterion = BCEWithLogitsLoss[dtype]()
@@ -311,7 +311,7 @@ fn test_bce_with_logits_struct() raises:
 # ============================================================================
 
 
-fn test_mse_loss_with_linear_layer() raises:
+def test_mse_loss_with_linear_layer() raises:
     print("test_mse_loss_with_linear_layer")
     comptime dtype = DType.float32
     var layer = Linear[dtype](2, 1, init_method="xavier")
@@ -331,7 +331,7 @@ fn test_mse_loss_with_linear_layer() raises:
     assert_true(layer.bias.has_grad(), "Linear bias should have gradient")
 
 
-fn test_bce_loss_with_sigmoid_output() raises:
+def test_bce_loss_with_sigmoid_output() raises:
     print("test_bce_loss_with_sigmoid_output")
     comptime dtype = DType.float32
     var layer = Linear[dtype](2, 1, init_method="xavier")
@@ -354,7 +354,7 @@ fn test_bce_loss_with_sigmoid_output() raises:
     )
 
 
-fn test_bce_with_logits_end_to_end() raises:
+def test_bce_with_logits_end_to_end() raises:
     print("test_bce_with_logits_end_to_end")
     comptime dtype = DType.float32
     var layer = Linear[dtype](2, 1, init_method="xavier")
@@ -379,7 +379,7 @@ fn test_bce_with_logits_end_to_end() raises:
 # ============================================================================
 
 
-fn test_mse_loss_single_element() raises:
+def test_mse_loss_single_element() raises:
     print("test_mse_loss_single_element")
     comptime dtype = DType.float32
     var pred = Tensor[dtype].d1([5.0], requires_grad=True)
@@ -394,7 +394,7 @@ fn test_mse_loss_single_element() raises:
     )
 
 
-fn test_loss_with_zero_gradient() raises:
+def test_loss_with_zero_gradient() raises:
     print("test_loss_with_zero_gradient")
     comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)
@@ -414,7 +414,7 @@ fn test_loss_with_zero_gradient() raises:
 # ============================================================================
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

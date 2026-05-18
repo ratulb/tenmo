@@ -16,7 +16,7 @@ from .device import DeviceState
 from .ndbuffer import NDBuffer
 
 
-fn atomic_and[
+def atomic_and[
     address_space: AddressSpace,
     //,
     ordering: Consistency = Consistency.SEQUENTIAL,
@@ -36,7 +36,7 @@ fn atomic_and[
             return expected
 
 
-fn all_close[
+def all_close[
     dtype: DType,
     rtol: Scalar[dtype] = 1e-5,
     atol: Scalar[dtype] = 1e-8,
@@ -147,7 +147,7 @@ fn all_close[
 @fieldwise_init
 struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn launch[
+    def launch[
         rtol: Scalar[Self.dtype] = 1e-5,
         atol: Scalar[Self.dtype] = 1e-8,
         treat_nan_equal: Bool = True,
@@ -204,7 +204,7 @@ struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return all_close_result
 
     @staticmethod
-    fn launch_config(output_size: Int) -> Tuple[Int, Int]:
+    def launch_config(output_size: Int) -> Tuple[Int, Int]:
         var threads_per_block: Int
         var num_blocks: Int
 
@@ -229,7 +229,7 @@ struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 # DeviceBuffer in DeviceState[DType.bool] and return GPU NDBuffer[DType.bool].
 
 
-fn compare[
+def compare[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -310,7 +310,7 @@ struct Compare[dtype: DType = DType.float32](
     comptime datatype: DType = DType.uint8 if Self.dtype == DType.bool else Self.dtype
 
     @staticmethod
-    fn launch[
+    def launch[
         op_code: Int,
     ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]) raises -> NDBuffer[
         DType.bool
@@ -360,7 +360,7 @@ struct Compare[dtype: DType = DType.float32](
         )
 
     @staticmethod
-    fn launch_config(output_size: Int) -> Tuple[Int, Int]:
+    def launch_config(output_size: Int) -> Tuple[Int, Int]:
         var threads_per_block: Int
         var num_blocks: Int
 
@@ -381,7 +381,7 @@ struct Compare[dtype: DType = DType.float32](
 # Same pattern as compare — uint8 output, wrapped in DeviceState[DType.bool]
 
 
-fn compare_scalar[
+def compare_scalar[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -455,7 +455,7 @@ struct CompareScalar[dtype: DType = DType.float32](
     comptime datatype: DType = DType.uint8 if Self.dtype == DType.bool else Self.dtype
 
     @staticmethod
-    fn launch[
+    def launch[
         op_code: Int,
     ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) raises -> NDBuffer[
         DType.bool
@@ -523,7 +523,7 @@ struct CompareScalar[dtype: DType = DType.float32](
         return NDBuffer[DType.bool].with_device_state(device_state^, A.shape)
 
     @staticmethod
-    fn launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
+    def launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
         threads_per_block: Int
         num_blocks: Int
 

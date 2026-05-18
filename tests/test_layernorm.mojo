@@ -8,7 +8,7 @@ from std.math import sqrt
 
 
 
-fn test_layernorm_cpu_forward_simple() raises:
+def test_layernorm_cpu_forward_simple() raises:
     comptime dtype = DType.float32
     # x = [[1,2,3,4]], mean=2.5, var=1.25, std=sqrt(1.25)≈1.118
     # x_hat = (x-2.5)/1.118 ≈ [-1.342,-0.447,0.447,1.342]
@@ -23,7 +23,7 @@ fn test_layernorm_cpu_forward_simple() raises:
     assert_true(out_mean.all_close[atol=1e-5](Tensor[dtype].scalar(0.0)))
     assert_true(out_std.all_close[atol=1e-4](Tensor[dtype].scalar(1.0)))
 
-fn test_layernorm_cpu_forward_gamma_beta() raises:
+def test_layernorm_cpu_forward_gamma_beta() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0]])
     # gamma=2, beta=1 → out = 2*x_hat + 1
@@ -37,7 +37,7 @@ fn test_layernorm_cpu_forward_gamma_beta() raises:
     assert_true(out_std.all_close[atol=1e-4](Tensor[dtype].scalar(2.0)))
 
 
-fn test_layernorm_cpu_backward_dgamma_dbeta() raises:
+def test_layernorm_cpu_backward_dgamma_dbeta() raises:
     comptime dtype = DType.float32
     # Simple case: batch=1, D=4
     # d_beta = sum(upstream) over batch = upstream (batch=1)
@@ -57,7 +57,7 @@ fn test_layernorm_cpu_backward_dgamma_dbeta() raises:
     assert_true(gamma_grad_sum.all_close[atol=1e-5](Tensor[dtype].scalar(0.0)))
 
 
-fn test_layernorm_cpu_backward_dx() raises:
+def test_layernorm_cpu_backward_dx() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0, 4.0]], requires_grad=True
@@ -73,7 +73,7 @@ fn test_layernorm_cpu_backward_dx() raises:
     assert_true(x.grad().shape() == Shape(1, 4))
 
 
-fn test_layernorm_cpu_layer_wrapper() raises:
+def test_layernorm_cpu_layer_wrapper() raises:
     comptime dtype = DType.float32
     var ln = LayerNorm[dtype](4)  # normalized_shape=4
     var x = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0]])
@@ -89,7 +89,7 @@ fn test_layernorm_cpu_layer_wrapper() raises:
 # =============================================================================
 
 
-fn test_layernorm_cpu_fwd_1x4_output() raises:
+def test_layernorm_cpu_fwd_1x4_output() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0]])
     var gamma = Tensor[dtype].ones(Shape(4))
@@ -101,7 +101,7 @@ fn test_layernorm_cpu_fwd_1x4_output() raises:
     ))
 
 
-fn test_layernorm_cpu_fwd_2x4_output() raises:
+def test_layernorm_cpu_fwd_2x4_output() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0], [2.0, 4.0, 6.0, 8.0]])
     var gamma = Tensor[dtype].ones(Shape(4))
@@ -115,7 +115,7 @@ fn test_layernorm_cpu_fwd_2x4_output() raises:
         ])
     ))
 
-fn test_layernorm_cpu_fwd_3d_output() raises:
+def test_layernorm_cpu_fwd_3d_output() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d3([
         [[1.0,2.0,3.0,4.0],[5.0,6.0,7.0,8.0],[9.0,10.0,11.0,12.0]],
@@ -137,7 +137,7 @@ fn test_layernorm_cpu_fwd_3d_output() raises:
     assert_true(out.all_close[atol=1e-4](expected))
 
 
-fn test_layernorm_cpu_fwd_gamma_beta_effect() raises:
+def test_layernorm_cpu_fwd_gamma_beta_effect() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0]])
     var gamma = Tensor[dtype].full(Shape(4), Scalar[dtype](2.0))
@@ -154,7 +154,7 @@ fn test_layernorm_cpu_fwd_gamma_beta_effect() raises:
 # =============================================================================
 
 
-fn test_layernorm_cpu_bwd_dx_1x4() raises:
+def test_layernorm_cpu_bwd_dx_1x4() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0]], requires_grad=True)
     var gamma = Tensor[dtype].ones(Shape(4))
@@ -169,7 +169,7 @@ fn test_layernorm_cpu_bwd_dx_1x4() raises:
     ))
 
 
-fn test_layernorm_cpu_bwd_dx_2x4() raises:
+def test_layernorm_cpu_bwd_dx_2x4() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0, 4.0], [2.0, 4.0, 6.0, 8.0]], requires_grad=True
@@ -186,7 +186,7 @@ fn test_layernorm_cpu_bwd_dx_2x4() raises:
     ))
 
 
-fn test_layernorm_cpu_bwd_dx_3d() raises:
+def test_layernorm_cpu_bwd_dx_3d() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d3([
         [[1.0,2.0,3.0,4.0],[5.0,6.0,7.0,8.0],[9.0,10.0,11.0,12.0]],
@@ -209,7 +209,7 @@ fn test_layernorm_cpu_bwd_dx_3d() raises:
 # =============================================================================
 
 
-fn test_layernorm_cpu_bwd_dgamma_dbeta_1x4() raises:
+def test_layernorm_cpu_bwd_dgamma_dbeta_1x4() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0]])
     var gamma = Tensor[dtype].ones(Shape(4), requires_grad=True)
@@ -229,7 +229,7 @@ fn test_layernorm_cpu_bwd_dgamma_dbeta_1x4() raises:
     ))
 
 
-fn test_layernorm_cpu_bwd_dgamma_dbeta_2x4() raises:
+def test_layernorm_cpu_bwd_dgamma_dbeta_2x4() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0,2.0,3.0,4.0],[2.0,4.0,6.0,8.0]])
     var gamma = Tensor[dtype].ones(Shape(4), requires_grad=True)
@@ -246,7 +246,7 @@ fn test_layernorm_cpu_bwd_dgamma_dbeta_2x4() raises:
         Tensor[dtype].full(Shape(4), Scalar[dtype](2.0))
     ))
 
-fn test_layernorm_cpu_bwd_dgamma_dbeta_3d() raises:
+def test_layernorm_cpu_bwd_dgamma_dbeta_3d() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d3([
         [[1.0,2.0,3.0,4.0],[5.0,6.0,7.0,8.0],[9.0,10.0,11.0,12.0]],
@@ -272,7 +272,7 @@ fn test_layernorm_cpu_bwd_dgamma_dbeta_3d() raises:
 # =============================================================================
 
 
-fn test_layernorm_cpu_grad_flow_x_only() raises:
+def test_layernorm_cpu_grad_flow_x_only() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0,2.0,3.0,4.0]], requires_grad=True)
     var gamma = Tensor[dtype].ones(Shape(4))   # no requires_grad
@@ -286,7 +286,7 @@ fn test_layernorm_cpu_grad_flow_x_only() raises:
     ))
 
 
-fn test_layernorm_cpu_grad_flow_all_params() raises:
+def test_layernorm_cpu_grad_flow_all_params() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0,2.0,3.0,4.0],[2.0,4.0,6.0,8.0]], requires_grad=True
@@ -302,7 +302,7 @@ fn test_layernorm_cpu_grad_flow_all_params() raises:
     assert_true(beta.grad().shape() == Shape(4))
 
 
-fn test_layernorm_cpu_layer_params() raises:
+def test_layernorm_cpu_layer_params() raises:
     comptime dtype = DType.float32
     var ln = LayerNorm[dtype](4)
     assert_true(ln.num_parameters() == 8)  # 4 gamma + 4 beta
@@ -310,7 +310,7 @@ fn test_layernorm_cpu_layer_params() raises:
     assert_true(len(params) == 2)
 
 
-fn test_layernorm_cpu_eval_no_grad() raises:
+def test_layernorm_cpu_eval_no_grad() raises:
     comptime dtype = DType.float32
     var ln = LayerNorm[dtype](4)
     ln.eval()
@@ -319,7 +319,7 @@ fn test_layernorm_cpu_eval_no_grad() raises:
     assert_true(not out.requires_grad)
 
 
-fn test_layernorm_cpu_train_has_grad() raises:
+def test_layernorm_cpu_train_has_grad() raises:
     comptime dtype = DType.float32
     var ln = LayerNorm[dtype](4)
     ln.train()
@@ -328,7 +328,7 @@ fn test_layernorm_cpu_train_has_grad() raises:
     assert_true(out.requires_grad)
 
 
-fn test_layernorm_gpu_fwd_1x4_output() raises:
+def test_layernorm_gpu_fwd_1x4_output() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0]]).to_gpu()
@@ -343,7 +343,7 @@ fn test_layernorm_gpu_fwd_1x4_output() raises:
         ))
 
 
-fn test_layernorm_gpu_fwd_2x4_output() raises:
+def test_layernorm_gpu_fwd_2x4_output() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2(
@@ -363,7 +363,7 @@ fn test_layernorm_gpu_fwd_2x4_output() raises:
         ))
 
 
-fn test_layernorm_gpu_fwd_3d_output() raises:
+def test_layernorm_gpu_fwd_3d_output() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d3([
@@ -387,7 +387,7 @@ fn test_layernorm_gpu_fwd_3d_output() raises:
         assert_true(out.to_cpu().all_close[atol=1e-4](expected))
 
 
-fn test_layernorm_gpu_fwd_gamma_beta_effect() raises:
+def test_layernorm_gpu_fwd_gamma_beta_effect() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0]]).to_gpu()
@@ -406,7 +406,7 @@ fn test_layernorm_gpu_fwd_gamma_beta_effect() raises:
 # =============================================================================
 
 
-fn test_layernorm_gpu_bwd_dx_1x4() raises:
+def test_layernorm_gpu_bwd_dx_1x4() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0]], requires_grad=True)
@@ -424,7 +424,7 @@ fn test_layernorm_gpu_bwd_dx_1x4() raises:
         ))
 
 
-fn test_layernorm_gpu_bwd_dx_2x4() raises:
+def test_layernorm_gpu_bwd_dx_2x4() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2(
@@ -444,7 +444,7 @@ fn test_layernorm_gpu_bwd_dx_2x4() raises:
         ))
 
 
-fn test_layernorm_gpu_bwd_dx_3d() raises:
+def test_layernorm_gpu_bwd_dx_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d3([
@@ -469,7 +469,7 @@ fn test_layernorm_gpu_bwd_dx_3d() raises:
 # =============================================================================
 
 
-fn test_layernorm_gpu_bwd_dgamma_dbeta_1x4() raises:
+def test_layernorm_gpu_bwd_dgamma_dbeta_1x4() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0]]).to_gpu()
@@ -492,7 +492,7 @@ fn test_layernorm_gpu_bwd_dgamma_dbeta_1x4() raises:
         ))
 
 
-fn test_layernorm_gpu_bwd_dgamma_dbeta_2x4() raises:
+def test_layernorm_gpu_bwd_dgamma_dbeta_2x4() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2(
@@ -515,7 +515,7 @@ fn test_layernorm_gpu_bwd_dgamma_dbeta_2x4() raises:
         ))
 
 
-fn test_layernorm_gpu_bwd_dgamma_dbeta_3d() raises:
+def test_layernorm_gpu_bwd_dgamma_dbeta_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].d3([
@@ -544,7 +544,7 @@ fn test_layernorm_gpu_bwd_dgamma_dbeta_3d() raises:
 # =============================================================================
 
 
-fn test_layernorm_gpu_vs_cpu_fwd_consistency() raises:
+def test_layernorm_gpu_vs_cpu_fwd_consistency() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x_cpu = Tensor[dtype].d2([[1.0,2.0,3.0,4.0],[2.0,4.0,6.0,8.0]])
@@ -561,7 +561,7 @@ fn test_layernorm_gpu_vs_cpu_fwd_consistency() raises:
         )
         assert_true(out_cpu.all_close[atol=1e-5](out_gpu.to_cpu()))
 
-fn test_layernorm_gpu_vs_cpu_bwd_consistency() raises:
+def test_layernorm_gpu_vs_cpu_bwd_consistency() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x_cpu = Tensor[dtype].d2(
@@ -596,7 +596,7 @@ fn test_layernorm_gpu_vs_cpu_bwd_consistency() raises:
 # =============================================================================
 
 
-fn test_layernorm_gpu_layer_wrapper_fwd() raises:
+def test_layernorm_gpu_layer_wrapper_fwd() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var ln = LayerNorm[dtype](4)
@@ -609,7 +609,7 @@ fn test_layernorm_gpu_layer_wrapper_fwd() raises:
         ))
 
 
-fn test_layernorm_gpu_layer_wrapper_bwd() raises:
+def test_layernorm_gpu_layer_wrapper_bwd() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var ln_gpu = LayerNorm[dtype](4).to_gpu()
@@ -629,7 +629,7 @@ fn test_layernorm_gpu_layer_wrapper_bwd() raises:
             Tensor[dtype].d1([-1.3416, -0.4472, 0.4472, 1.3416]).to_gpu()
         ))
 
-fn test_layernorm_gpu_eval_no_grad() raises:
+def test_layernorm_gpu_eval_no_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var ln = LayerNorm[dtype](4)
@@ -645,7 +645,7 @@ fn test_layernorm_gpu_eval_no_grad() raises:
 # HELPERS
 # ═════════════════════════════════════════════════════════════════════════════
 
-fn layernorm_ref[dtype: DType](
+def layernorm_ref[dtype: DType](
     x: Tensor[dtype],
     gamma: Tensor[dtype],
     beta: Tensor[dtype],
@@ -678,7 +678,7 @@ fn layernorm_ref[dtype: DType](
 # FORWARD — CPU
 # ═════════════════════════════════════════════════════════════════════════════
 
-fn test_layernorm_fwd_cpu_1d_identity_gamma_beta() raises:
+def test_layernorm_fwd_cpu_1d_identity_gamma_beta() raises:
     comptime dtype = DType.float32
     # gamma=ones, beta=zeros => output is just x_hat
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -691,7 +691,7 @@ fn test_layernorm_fwd_cpu_1d_identity_gamma_beta() raises:
     ))
 
 
-fn test_layernorm_fwd_cpu_1d_matches_ref() raises:
+def test_layernorm_fwd_cpu_1d_matches_ref() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
     var gamma = Tensor[dtype].d1([2.0, 1.0, 0.5, 1.0, 2.0])
@@ -701,7 +701,7 @@ fn test_layernorm_fwd_cpu_1d_matches_ref() raises:
     assert_true(out.all_close[atol=1e-5](ref_))
 
 
-fn test_layernorm_fwd_cpu_2d_shape() raises:
+def test_layernorm_fwd_cpu_2d_shape() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var ln = LayerNorm[dtype](3)
@@ -709,7 +709,7 @@ fn test_layernorm_fwd_cpu_2d_shape() raises:
     assert_true(out.shape() == Shape(2, 3))
 
 
-fn test_layernorm_fwd_cpu_2d_matches_ref() raises:
+def test_layernorm_fwd_cpu_2d_matches_ref() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var gamma = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -719,7 +719,7 @@ fn test_layernorm_fwd_cpu_2d_matches_ref() raises:
     assert_true(out.all_close[atol=1e-5](ref_))
 
 
-fn test_layernorm_fwd_cpu_3d_shape() raises:
+def test_layernorm_fwd_cpu_3d_shape() raises:
     comptime dtype = DType.float32
     # Transformer-like: (B=2, T=4, D=8)
     var x = Tensor[dtype].randn(Shape(2, 4, 8), mean=0.0, std=1.0)
@@ -728,7 +728,7 @@ fn test_layernorm_fwd_cpu_3d_shape() raises:
     assert_true(out.shape() == Shape(2, 4, 8))
 
 
-fn test_layernorm_fwd_cpu_3d_matches_ref() raises:
+def test_layernorm_fwd_cpu_3d_matches_ref() raises:
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(1.0, 25.0)
     var x = _tmp0.reshape(2, 3, 4)
@@ -739,7 +739,7 @@ fn test_layernorm_fwd_cpu_3d_matches_ref() raises:
     assert_true(out.all_close[atol=1e-4](ref_))
 
 
-fn test_layernorm_fwd_cpu_output_mean_near_zero() raises:
+def test_layernorm_fwd_cpu_output_mean_near_zero() raises:
     # With gamma=ones, beta=zeros each row should have mean~0
     comptime dtype = DType.float32
     var x = Tensor[dtype].randn(Shape(4, 8), mean=5.0, std=3.0)
@@ -750,7 +750,7 @@ fn test_layernorm_fwd_cpu_output_mean_near_zero() raises:
     assert_true(row_means.all_close[atol=1e-5](Tensor[dtype].zeros_like(row_means)))
 
 
-fn test_layernorm_fwd_cpu_output_std_near_one() raises:
+def test_layernorm_fwd_cpu_output_std_near_one() raises:
     # With gamma=ones, beta=zeros each row should have std~1
     comptime dtype = DType.float32
     var x = Tensor[dtype].randn(Shape(4, 8), mean=5.0, std=3.0)
@@ -760,7 +760,7 @@ fn test_layernorm_fwd_cpu_output_std_near_one() raises:
     assert_true(row_vars.all_close[atol=1e-4](Tensor[dtype].ones_like(row_vars)))
 
 
-fn test_layernorm_fwd_cpu_constant_input() raises:
+def test_layernorm_fwd_cpu_constant_input() raises:
     # Constant input — var=0, eps saves from division by zero
     # output should be beta (since x_hat=0)
     comptime dtype = DType.float32
@@ -774,7 +774,7 @@ fn test_layernorm_fwd_cpu_constant_input() raises:
     ))
 
 
-fn test_layernorm_fwd_cpu_eval_mode_no_grad() raises:
+def test_layernorm_fwd_cpu_eval_mode_no_grad() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].randn(Shape(2, 4), mean=0.0, std=1.0)
     var ln = LayerNorm[dtype](4)
@@ -787,7 +787,7 @@ fn test_layernorm_fwd_cpu_eval_mode_no_grad() raises:
 # BACKWARD — CPU
 # ═════════════════════════════════════════════════════════════════════════════
 
-fn test_layernorm_bwd_cpu_gamma_grad_shape() raises:
+def test_layernorm_bwd_cpu_gamma_grad_shape() raises:
     comptime dtype = DType.float32
     var x     = Tensor[dtype].randn(Shape(2, 4, 8), mean=0.0, std=1.0, requires_grad=True)
     var gamma = Tensor[dtype].ones(Shape(8),  requires_grad=True)
@@ -800,7 +800,7 @@ fn test_layernorm_bwd_cpu_gamma_grad_shape() raises:
     assert_true(x.grad().shape()     == Shape(2, 4, 8))
 
 
-fn test_layernorm_bwd_cpu_beta_grad_equals_sum_upstream() raises:
+def test_layernorm_bwd_cpu_beta_grad_equals_sum_upstream() raises:
     # d_beta = sum(upstream) over all non-D dims
     # upstream = ones (from sum loss) => d_beta = B*T for each element
     comptime dtype = DType.float32
@@ -816,7 +816,7 @@ fn test_layernorm_bwd_cpu_beta_grad_equals_sum_upstream() raises:
         Tensor[dtype].full(Shape(D), Float32(B * T))
     ))
 
-fn test_layernorm_bwd_cpu_gamma_grad_value() raises:
+def test_layernorm_bwd_cpu_gamma_grad_value() raises:
     comptime dtype = DType.float32
     var B = 2; var T = 3; var D = 4
     var _tmp0 = Tensor[dtype].arange(1.0, 25.0)
@@ -846,7 +846,7 @@ fn test_layernorm_bwd_cpu_gamma_grad_value() raises:
         expected_d_gamma = expected_d_gamma.sum[track_grad=False](axes=IntArray(0), keepdims=False)
     assert_true(gamma.grad().all_close[atol=1e-4](expected_d_gamma))
 
-fn test_layernorm_bwd_cpu_dx_grad_sums_to_zero() raises:
+def test_layernorm_bwd_cpu_dx_grad_sums_to_zero() raises:
     # The three-term formula guarantees that dx sums to zero per token
     # (gradient is orthogonal to constant and to x_hat)
     comptime dtype = DType.float32
@@ -862,7 +862,7 @@ fn test_layernorm_bwd_cpu_dx_grad_sums_to_zero() raises:
     assert_true(dx_row_sums.all_close[atol=1e-4](Tensor[dtype].zeros(dx_row_sums.shape())))
 
 
-fn test_layernorm_bwd_cpu_no_grad_input() raises:
+def test_layernorm_bwd_cpu_no_grad_input() raises:
     # If x has no requires_grad, only gamma and beta get grads
     comptime dtype = DType.float32
     var x     = Tensor[dtype].randn(Shape(2, 4), mean=0.0, std=1.0)  # no grad
@@ -875,7 +875,7 @@ fn test_layernorm_bwd_cpu_no_grad_input() raises:
     assert_true(beta.grad().shape()  == Shape(4))
 
 
-fn test_layernorm_bwd_cpu_2d_dx_no_nan() raises:
+def test_layernorm_bwd_cpu_2d_dx_no_nan() raises:
     comptime dtype = DType.float32
     var x     = Tensor[dtype].randn(Shape(4, 8), mean=0.0, std=2.0, requires_grad=True)
     var gamma = Tensor[dtype].ones(Shape(8),  requires_grad=True)
@@ -889,7 +889,7 @@ fn test_layernorm_bwd_cpu_2d_dx_no_nan() raises:
     assert_true(beta.grad().sum().item() == beta.grad().sum().item())
 
 
-fn test_layernorm_bwd_cpu_3d_dx_no_nan() raises:
+def test_layernorm_bwd_cpu_3d_dx_no_nan() raises:
     comptime dtype = DType.float32
     var x     = Tensor[dtype].randn(Shape(2, 4, 8), mean=0.0, std=1.0, requires_grad=True)
     var gamma = Tensor[dtype].ones(Shape(8),  requires_grad=True)
@@ -906,7 +906,7 @@ fn test_layernorm_bwd_cpu_3d_dx_no_nan() raises:
 # GRAD FLOW — CPU
 # ═════════════════════════════════════════════════════════════════════════════
 
-fn test_layernorm_gradflow_cpu_chained_with_linear() raises:
+def test_layernorm_gradflow_cpu_chained_with_linear() raises:
     # LayerNorm -> sum -> backward — grad flows through LN to x
     comptime dtype = DType.float32
     var x     = Tensor[dtype].randn(Shape(2, 4), mean=0.0, std=1.0, requires_grad=True)
@@ -921,7 +921,7 @@ fn test_layernorm_gradflow_cpu_chained_with_linear() raises:
     assert_true(x.grad().sum().item() == x.grad().sum().item())
 
 
-fn test_layernorm_gradflow_cpu_gamma_ones_beta_zeros_dx_sum_zero() raises:
+def test_layernorm_gradflow_cpu_gamma_ones_beta_zeros_dx_sum_zero() raises:
     # Classic property: sum(dx) over last dim == 0 per token
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(1.0, 13.0)
@@ -936,7 +936,7 @@ fn test_layernorm_gradflow_cpu_gamma_ones_beta_zeros_dx_sum_zero() raises:
     assert_true(dx_sums.all_close[atol=1e-4](Tensor[dtype].zeros(dx_sums.shape())))
 
 
-fn test_layernorm_gradflow_cpu_no_grad_no_ancestry() raises:
+def test_layernorm_gradflow_cpu_no_grad_no_ancestry() raises:
     comptime dtype = DType.float32
     var x     = Tensor[dtype].randn(Shape(2, 4), mean=0.0, std=1.0)
     var gamma = Tensor[dtype].ones(Shape(4))
@@ -949,7 +949,7 @@ fn test_layernorm_gradflow_cpu_no_grad_no_ancestry() raises:
 # FORWARD — GPU
 # ═════════════════════════════════════════════════════════════════════════════
 
-fn test_layernorm_fwd_gpu_1d_shape() raises:
+def test_layernorm_fwd_gpu_1d_shape() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -959,7 +959,7 @@ fn test_layernorm_fwd_gpu_1d_shape() raises:
         assert_true(out.shape() == Shape(5))
 
 
-fn test_layernorm_fwd_gpu_2d_matches_cpu() raises:
+def test_layernorm_fwd_gpu_2d_matches_cpu() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x     = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -974,7 +974,7 @@ fn test_layernorm_fwd_gpu_2d_matches_cpu() raises:
         assert_true(cpu_out.all_close[atol=1e-4](gpu_out))
 
 
-fn test_layernorm_fwd_gpu_3d_shape() raises:
+def test_layernorm_fwd_gpu_3d_shape() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x_cpu = Tensor[dtype].randn(Shape(2, 4, 8), mean=0.0, std=1.0)
@@ -984,7 +984,7 @@ fn test_layernorm_fwd_gpu_3d_shape() raises:
         assert_true(out.shape() == Shape(2, 4, 8))
 
 
-fn test_layernorm_fwd_gpu_output_mean_near_zero() raises:
+def test_layernorm_fwd_gpu_output_mean_near_zero() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x_cpu = Tensor[dtype].randn(Shape(4, 8), mean=5.0, std=3.0)
@@ -995,7 +995,7 @@ fn test_layernorm_fwd_gpu_output_mean_near_zero() raises:
         assert_true(row_means.all_close[atol=1e-4](Tensor[dtype].zeros_like(row_means)))
 
 
-fn test_layernorm_fwd_gpu_output_std_near_one() raises:
+def test_layernorm_fwd_gpu_output_std_near_one() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x_cpu = Tensor[dtype].randn(Shape(4, 8), mean=5.0, std=3.0)
@@ -1006,7 +1006,7 @@ fn test_layernorm_fwd_gpu_output_std_near_one() raises:
         assert_true(row_vars.all_close[atol=1e-4](Tensor[dtype].ones_like(row_vars)))
 
 
-fn test_layernorm_fwd_gpu_constant_input() raises:
+def test_layernorm_fwd_gpu_constant_input() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x_cpu   = Tensor[dtype].full(Shape(3, 4), 7.0)
@@ -1022,7 +1022,7 @@ fn test_layernorm_fwd_gpu_constant_input() raises:
 # BACKWARD — GPU
 # ═════════════════════════════════════════════════════════════════════════════
 
-fn test_layernorm_bwd_gpu_grad_shapes() raises:
+def test_layernorm_bwd_gpu_grad_shapes() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x_cpu     = Tensor[dtype].randn(Shape(2, 4, 8), mean=0.0, std=1.0, requires_grad=True)
@@ -1038,7 +1038,7 @@ fn test_layernorm_bwd_gpu_grad_shapes() raises:
         assert_true(beta_cpu.grad().shape()  == Shape(8))
 
 
-fn test_layernorm_bwd_gpu_beta_grad_value() raises:
+def test_layernorm_bwd_gpu_beta_grad_value() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var B = 2; var T = 3; var D = 4
@@ -1055,7 +1055,7 @@ fn test_layernorm_bwd_gpu_beta_grad_value() raises:
         ))
 
 
-fn test_layernorm_bwd_gpu_dx_sum_zero() raises:
+def test_layernorm_bwd_gpu_dx_sum_zero() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x_cpu     = Tensor[dtype].randn(Shape(2, 3, 8), mean=0.0, std=1.0, requires_grad=True)
@@ -1070,7 +1070,7 @@ fn test_layernorm_bwd_gpu_dx_sum_zero() raises:
         assert_true(dx_sums.all_close[atol=1e-4](Tensor[dtype].zeros(dx_sums.shape())))
 
 
-fn test_layernorm_bwd_gpu_no_nan() raises:
+def test_layernorm_bwd_gpu_no_nan() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x_cpu     = Tensor[dtype].randn(Shape(2, 4, 8), mean=0.0, std=1.0, requires_grad=True)
@@ -1090,7 +1090,7 @@ fn test_layernorm_bwd_gpu_no_nan() raises:
 # CPU / GPU PARITY
 # ═════════════════════════════════════════════════════════════════════════════
 
-fn test_layernorm_parity_fwd_2d() raises:
+def test_layernorm_parity_fwd_2d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(1.0, 13.0)
@@ -1104,7 +1104,7 @@ fn test_layernorm_parity_fwd_2d() raises:
         assert_true(cpu_out.all_close[atol=1e-4](gpu_out))
 
 
-fn test_layernorm_parity_fwd_3d() raises:
+def test_layernorm_parity_fwd_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x     = Tensor[dtype].randn(Shape(2, 4, 8), mean=0.0, std=1.0)
@@ -1117,7 +1117,7 @@ fn test_layernorm_parity_fwd_3d() raises:
         assert_true(cpu_out.all_close[atol=1e-4](gpu_out))
 
 
-fn test_layernorm_parity_bwd_beta_grad() raises:
+def test_layernorm_parity_bwd_beta_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x = Tensor[dtype].randn(Shape(2, 3, 4), mean=0.0, std=1.0)
@@ -1144,7 +1144,7 @@ fn test_layernorm_parity_bwd_beta_grad() raises:
         assert_true(gamma_cpu.grad().all_close[atol=1e-4](gamma_gpu.grad()))
 
 
-fn test_layernorm_parity_bwd_dx() raises:
+def test_layernorm_parity_bwd_dx() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var x_data = Tensor[dtype].randn(Shape(2, 3, 4), mean=0.0, std=1.0)
@@ -1174,14 +1174,14 @@ fn test_layernorm_parity_bwd_dx() raises:
 # LAYER WRAPPER TESTS
 # ═════════════════════════════════════════════════════════════════════════════
 
-fn test_layernorm_layer_parameters() raises:
+def test_layernorm_layer_parameters() raises:
     comptime dtype = DType.float32
     var ln = LayerNorm[dtype](8)
     assert_true(ln.num_parameters() == 16)   # gamma(8) + beta(8)
     assert_true(len(ln.parameters()) == 2)
 
 
-fn test_layernorm_layer_train_eval_toggle() raises:
+def test_layernorm_layer_train_eval_toggle() raises:
     comptime dtype = DType.float32
     var ln = LayerNorm[dtype](4)
     var x = Tensor[dtype].randn(Shape(2, 4), mean=0.0, std=1.0, requires_grad=True)
@@ -1193,7 +1193,7 @@ fn test_layernorm_layer_train_eval_toggle() raises:
     assert_true(not out_eval.requires_grad)
 
 
-fn test_layernorm_layer_gamma_ones_beta_zeros_init() raises:
+def test_layernorm_layer_gamma_ones_beta_zeros_init() raises:
     comptime dtype = DType.float32
     var ln = LayerNorm[dtype](4)
     assert_true(ln.gamma.all_close(Tensor[dtype].ones(Shape(4))))

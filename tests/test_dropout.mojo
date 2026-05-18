@@ -11,7 +11,7 @@ from tenmo.shapes import Shape
 # FORWARD PASS TESTS
 # ============================================================================
 
-fn test_dropout_forward_training_mode() raises:
+def test_dropout_forward_training_mode() raises:
     """Test dropout forward pass in training mode - should zero out some elements."""
     print("test_dropout_forward_training_mode")
 
@@ -48,7 +48,7 @@ fn test_dropout_forward_training_mode() raises:
             assert_true(actual.all_close[atol=1e-6](expected))
 
 
-fn test_dropout_forward_eval_mode() raises:
+def test_dropout_forward_eval_mode() raises:
     """Test dropout forward pass in eval mode - should pass through unchanged."""
     print("test_dropout_forward_eval_mode")
 
@@ -65,7 +65,7 @@ fn test_dropout_forward_eval_mode() raises:
     assert_true(out.all_close[atol=1e-6](x))
 
 
-fn test_dropout_forward_preserves_shape() raises:
+def test_dropout_forward_preserves_shape() raises:
     """Test that dropout preserves tensor shape."""
     print("test_dropout_forward_preserves_shape")
 
@@ -88,7 +88,7 @@ fn test_dropout_forward_preserves_shape() raises:
     assert_true(out3.shape() == x3.shape())
 
 
-fn test_dropout_forward_zero_probability() raises:
+def test_dropout_forward_zero_probability() raises:
     """Test dropout with p=0 (no dropout) - all values kept."""
     print("test_dropout_forward_zero_probability")
 
@@ -105,7 +105,7 @@ fn test_dropout_forward_zero_probability() raises:
     assert_true(out.all_close[atol=1e-6](x))
 
 
-fn test_dropout_forward_high_probability() raises:
+def test_dropout_forward_high_probability() raises:
     """Test dropout with p=0.9 - most values should be zero."""
     print("test_dropout_forward_high_probability")
 
@@ -138,7 +138,7 @@ fn test_dropout_forward_high_probability() raises:
             assert_true(actual.all_close[atol=1e-5](expected))
 
 
-fn test_dropout_forward_expected_value_preservation() raises:
+def test_dropout_forward_expected_value_preservation() raises:
     """Test that dropout maintains expected values (inverted dropout property)."""
     print("test_dropout_forward_expected_value_preservation")
 
@@ -168,7 +168,7 @@ fn test_dropout_forward_expected_value_preservation() raises:
     assert_true(actual.all_close[atol=0.3](expected))
 
 
-fn test_dropout_forward_mode_switching() raises:
+def test_dropout_forward_mode_switching() raises:
     """Test switching between training and eval modes."""
     print("test_dropout_forward_mode_switching")
 
@@ -208,7 +208,7 @@ fn test_dropout_forward_mode_switching() raises:
 # ============================================================================
 # BACKWARD PASS TESTS
 # ============================================================================
-fn test_dropout_backward_simple() raises:
+def test_dropout_backward_simple() raises:
     """Test dropout backward pass - gradients should flow through non-dropped elements."""
     print("test_dropout_backward_simple")
 
@@ -244,7 +244,7 @@ fn test_dropout_backward_simple() raises:
             assert_true(actual.all_close[atol=1e-6](expected))
 
 
-fn test_dropout_backward_with_upstream_gradient() raises:
+def test_dropout_backward_with_upstream_gradient() raises:
     """Test dropout backward pass with non-uniform upstream gradients."""
     print("test_dropout_backward_with_upstream_gradient")
 
@@ -291,7 +291,7 @@ fn test_dropout_backward_with_upstream_gradient() raises:
             assert_true(actual.all_close[atol=1e-6](expected))
 
 
-fn test_dropout_backward_2d_tensor() raises:
+def test_dropout_backward_2d_tensor() raises:
     comptime dtype = DType.float32
     """Test dropout backward pass on 2D tensor."""
     print("test_dropout_backward_2d_tensor")
@@ -329,7 +329,7 @@ fn test_dropout_backward_2d_tensor() raises:
             assert_true(actual.all_close[atol=1e-5](expected))
 
 
-fn test_dropout_backward_eval_mode() raises:
+def test_dropout_backward_eval_mode() raises:
     """Test dropout backward in eval mode - gradients should flow unchanged."""
     print("test_dropout_backward_eval_mode")
 
@@ -355,7 +355,7 @@ fn test_dropout_backward_eval_mode() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_dropout_backward_chain_rule() raises:
+def test_dropout_backward_chain_rule() raises:
     """Test dropout backward with chain rule (dropout in middle of computation)."""
     print("test_dropout_backward_chain_rule")
 
@@ -399,7 +399,7 @@ fn test_dropout_backward_chain_rule() raises:
             assert_true(actual.all_close[atol=1e-5](expected))
 
 
-fn test_dropout_backward_3d_tensor() raises:
+def test_dropout_backward_3d_tensor() raises:
     """Test dropout backward on 3D tensor."""
     print("test_dropout_backward_3d_tensor")
 
@@ -434,7 +434,7 @@ fn test_dropout_backward_3d_tensor() raises:
             assert_true(actual.all_close[atol=1e-5](expected))
 
 
-fn test_dropout_backward_no_grad_input() raises:
+def test_dropout_backward_no_grad_input() raises:
     """Test dropout backward when input doesn't require grad."""
     print("test_dropout_backward_no_grad_input")
 
@@ -453,7 +453,7 @@ fn test_dropout_backward_no_grad_input() raises:
     assert_true(out.requires_grad == False)
 
 
-fn test_dropout_backward_multiple_calls() raises:
+def test_dropout_backward_multiple_calls() raises:
     """Test dropout backward with multiple forward calls (different masks)."""
     print("test_dropout_backward_multiple_calls")
 
@@ -492,7 +492,7 @@ fn test_dropout_backward_multiple_calls() raises:
 # EDGE CASES AND SPECIAL TESTS
 # ============================================================================
 
-fn test_dropout_zero_probability_backward() raises:
+def test_dropout_zero_probability_backward() raises:
     """Test dropout backward with p=0 - all gradients should flow through."""
     print("test_dropout_zero_probability_backward")
 
@@ -515,7 +515,7 @@ fn test_dropout_zero_probability_backward() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_dropout_large_tensor_backward() raises:
+def test_dropout_large_tensor_backward() raises:
     """Test dropout backward on large tensor - verify gradient statistics."""
     print("test_dropout_large_tensor_backward")
 
@@ -559,7 +559,7 @@ fn test_dropout_large_tensor_backward() raises:
 # MAIN TEST RUNNER
 # ============================================================================
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll dropout tests passed!")
 
@@ -572,17 +572,17 @@ fn main() raises:
 # HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn count_zeros[dtype: DType](t: Tensor[dtype]) -> Int:
+def count_zeros[dtype: DType](t: Tensor[dtype]) -> Int:
     var count = 0
     for i in range(t.numels()):
         if t.get(i) == 0.0:
             count += 1
     return count
 
-fn count_nonzeros[dtype: DType](t: Tensor[dtype]) -> Int:
+def count_nonzeros[dtype: DType](t: Tensor[dtype]) -> Int:
     return t.numels() - count_zeros(t)
 
-fn all_nonzero_close[dtype: DType](
+def all_nonzero_close[dtype: DType](
     t: Tensor[dtype], expected_val: Scalar[dtype], atol: Scalar[dtype]
 ) -> Bool:
     for i in range(t.numels()):
@@ -597,7 +597,7 @@ fn all_nonzero_close[dtype: DType](
 # 1. FORWARD — CPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_dropout2_fwd_cpu_eval_is_identity() raises:
+def test_dropout2_fwd_cpu_eval_is_identity() raises:
     print("test_dropout2_fwd_cpu_eval_is_identity")
     comptime dtype = DType.float32
     var dropout = Dropout[dtype](p=0.5)
@@ -607,7 +607,7 @@ fn test_dropout2_fwd_cpu_eval_is_identity() raises:
     assert_true(out.all_close(x))
 
 
-fn test_dropout2_fwd_cpu_p0_is_identity() raises:
+def test_dropout2_fwd_cpu_p0_is_identity() raises:
     print("test_dropout2_fwd_cpu_p0_is_identity")
     comptime dtype = DType.float32
     var dropout = Dropout[dtype](p=0.0)
@@ -617,7 +617,7 @@ fn test_dropout2_fwd_cpu_p0_is_identity() raises:
     assert_true(out.all_close(x))
 
 
-fn test_dropout2_fwd_cpu_high_p_many_zeros_1d() raises:
+def test_dropout2_fwd_cpu_high_p_many_zeros_1d() raises:
     print("test_dropout2_fwd_cpu_high_p_many_zeros_1d")
     comptime dtype = DType.float32
     seed(100)
@@ -629,7 +629,7 @@ fn test_dropout2_fwd_cpu_high_p_many_zeros_1d() raises:
     assert_true(count_zeros(out) > 150)
 
 
-fn test_dropout2_fwd_cpu_scale_correct_1d() raises:
+def test_dropout2_fwd_cpu_scale_correct_1d() raises:
     print("test_dropout2_fwd_cpu_scale_correct_1d")
     comptime dtype = DType.float32
     seed(200)
@@ -641,7 +641,7 @@ fn test_dropout2_fwd_cpu_scale_correct_1d() raises:
     assert_true(all_nonzero_close(out, 2.0, 1e-5))
 
 
-fn test_dropout2_fwd_cpu_scale_correct_2d() raises:
+def test_dropout2_fwd_cpu_scale_correct_2d() raises:
     print("test_dropout2_fwd_cpu_scale_correct_2d")
     comptime dtype = DType.float32
     seed(300)
@@ -652,7 +652,7 @@ fn test_dropout2_fwd_cpu_scale_correct_2d() raises:
     assert_true(all_nonzero_close(out, 2.0, 1e-5))
 
 
-fn test_dropout2_fwd_cpu_scale_correct_3d() raises:
+def test_dropout2_fwd_cpu_scale_correct_3d() raises:
     print("test_dropout2_fwd_cpu_scale_correct_3d")
     comptime dtype = DType.float32
     seed(400)
@@ -663,7 +663,7 @@ fn test_dropout2_fwd_cpu_scale_correct_3d() raises:
     assert_true(all_nonzero_close(out, 2.0, 1e-5))
 
 
-fn test_dropout2_fwd_cpu_different_masks_per_call() raises:
+def test_dropout2_fwd_cpu_different_masks_per_call() raises:
     print("test_dropout2_fwd_cpu_different_masks_per_call")
     comptime dtype = DType.float32
     seed(500)
@@ -681,7 +681,7 @@ fn test_dropout2_fwd_cpu_different_masks_per_call() raises:
     assert_true(not same)
 
 
-fn test_dropout2_fwd_cpu_output_shape_preserved_1d() raises:
+def test_dropout2_fwd_cpu_output_shape_preserved_1d() raises:
     print("test_dropout2_fwd_cpu_output_shape_preserved_1d")
     comptime dtype = DType.float32
     seed(600)
@@ -692,7 +692,7 @@ fn test_dropout2_fwd_cpu_output_shape_preserved_1d() raises:
     assert_true(out.shape() == Shape(8))
 
 
-fn test_dropout2_fwd_cpu_output_shape_preserved_2d() raises:
+def test_dropout2_fwd_cpu_output_shape_preserved_2d() raises:
     print("test_dropout2_fwd_cpu_output_shape_preserved_2d")
     comptime dtype = DType.float32
     seed(700)
@@ -703,7 +703,7 @@ fn test_dropout2_fwd_cpu_output_shape_preserved_2d() raises:
     assert_true(out.shape() == Shape(4, 6))
 
 
-fn test_dropout2_fwd_cpu_output_shape_preserved_3d() raises:
+def test_dropout2_fwd_cpu_output_shape_preserved_3d() raises:
     print("test_dropout2_fwd_cpu_output_shape_preserved_3d")
     comptime dtype = DType.float32
     seed(800)
@@ -718,7 +718,7 @@ fn test_dropout2_fwd_cpu_output_shape_preserved_3d() raises:
 # 2. BACKWARD — CPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_dropout2_bwd_cpu_grad_zero_where_dropped_1d() raises:
+def test_dropout2_bwd_cpu_grad_zero_where_dropped_1d() raises:
     print("test_dropout2_bwd_cpu_grad_zero_where_dropped_1d")
     comptime dtype = DType.float32
     seed(1000)
@@ -736,7 +736,7 @@ fn test_dropout2_bwd_cpu_grad_zero_where_dropped_1d() raises:
             assert_true(abs(x.grad().get(i) - 2.0) < 1e-5)
 
 
-fn test_dropout2_bwd_cpu_grad_zero_where_dropped_2d() raises:
+def test_dropout2_bwd_cpu_grad_zero_where_dropped_2d() raises:
     print("test_dropout2_bwd_cpu_grad_zero_where_dropped_2d")
     comptime dtype = DType.float32
     seed(1100)
@@ -753,7 +753,7 @@ fn test_dropout2_bwd_cpu_grad_zero_where_dropped_2d() raises:
             assert_true(abs(x.grad().get(i) - 2.0) < 1e-5)
 
 
-fn test_dropout2_bwd_cpu_grad_zero_where_dropped_3d() raises:
+def test_dropout2_bwd_cpu_grad_zero_where_dropped_3d() raises:
     print("test_dropout2_bwd_cpu_grad_zero_where_dropped_3d")
     comptime dtype = DType.float32
     seed(1200)
@@ -770,7 +770,7 @@ fn test_dropout2_bwd_cpu_grad_zero_where_dropped_3d() raises:
             assert_true(abs(x.grad().get(i) - 2.0) < 1e-5)
 
 
-fn test_dropout2_bwd_cpu_no_grad_leaf_unaffected() raises:
+def test_dropout2_bwd_cpu_no_grad_leaf_unaffected() raises:
     print("test_dropout2_bwd_cpu_no_grad_leaf_unaffected")
     comptime dtype = DType.float32
     seed(1300)
@@ -782,7 +782,7 @@ fn test_dropout2_bwd_cpu_no_grad_leaf_unaffected() raises:
     assert_true(not out.requires_grad)
 
 
-fn test_dropout2_bwd_cpu_high_p_grad_flow() raises:
+def test_dropout2_bwd_cpu_high_p_grad_flow() raises:
     print("test_dropout2_bwd_cpu_high_p_grad_flow")
     comptime dtype = DType.float32
     seed(1400)
@@ -800,7 +800,7 @@ fn test_dropout2_bwd_cpu_high_p_grad_flow() raises:
             assert_true(abs(x.grad().get(i)) < 1e-6)
 
 
-fn test_dropout2_bwd_cpu_chained_with_linear_op() raises:
+def test_dropout2_bwd_cpu_chained_with_linear_op() raises:
     # dropout -> * 3 -> sum -> backward
     print("test_dropout2_bwd_cpu_chained_with_linear_op")
     comptime dtype = DType.float32
@@ -818,7 +818,7 @@ fn test_dropout2_bwd_cpu_chained_with_linear_op() raises:
         assert_true(abs(g) < 1e-6 or abs(g - 6.0) < 1e-5)
 
 
-fn test_dropout2_bwd_cpu_eval_grad_is_ones() raises:
+def test_dropout2_bwd_cpu_eval_grad_is_ones() raises:
     # In eval mode dropout is identity — grad must be 1
     print("test_dropout2_bwd_cpu_eval_grad_is_ones")
     comptime dtype = DType.float32
@@ -831,7 +831,7 @@ fn test_dropout2_bwd_cpu_eval_grad_is_ones() raises:
     assert_true(x.grad().all_close[atol=1e-5](Tensor.ones_like(x)))
 
 
-fn test_dropout2_bwd_cpu_multiple_calls_different_grads() raises:
+def test_dropout2_bwd_cpu_multiple_calls_different_grads() raises:
     print("test_dropout2_bwd_cpu_multiple_calls_different_grads")
     comptime dtype = DType.float32
     seed(1600)
@@ -860,7 +860,7 @@ fn test_dropout2_bwd_cpu_multiple_calls_different_grads() raises:
 # 3. GRAD FLOW VERIFICATION — CPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_dropout2_gradflow_cpu_mask_consistent_fwd_bwd() raises:
+def test_dropout2_gradflow_cpu_mask_consistent_fwd_bwd() raises:
     # The mask used in forward must be the same one used in backward.
     # Verify: wherever out==0, grad==0; wherever out!=0, grad==scale.
     print("test_dropout2_gradflow_cpu_mask_consistent_fwd_bwd")
@@ -882,7 +882,7 @@ fn test_dropout2_gradflow_cpu_mask_consistent_fwd_bwd() raises:
     assert_true(consistent)
 
 
-fn test_dropout2_gradflow_cpu_sum_of_grads_matches_nonzero_count() raises:
+def test_dropout2_gradflow_cpu_sum_of_grads_matches_nonzero_count() raises:
     print("test_dropout2_gradflow_cpu_sum_of_grads_matches_nonzero_count")
     comptime dtype = DType.float32
     seed(1800)
@@ -904,7 +904,7 @@ fn test_dropout2_gradflow_cpu_sum_of_grads_matches_nonzero_count() raises:
 # 4. FORWARD — GPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_dropout2_fwd_gpu_eval_is_identity() raises:
+def test_dropout2_fwd_gpu_eval_is_identity() raises:
     comptime if has_accelerator():
         print("test_dropout2_fwd_gpu_eval_is_identity")
         comptime dtype = DType.float32
@@ -916,7 +916,7 @@ fn test_dropout2_fwd_gpu_eval_is_identity() raises:
         assert_true(out.to_cpu().all_close(x_cpu))
 
 
-fn test_dropout2_fwd_gpu_output_shape_preserved_1d() raises:
+def test_dropout2_fwd_gpu_output_shape_preserved_1d() raises:
     comptime if has_accelerator():
         print("test_dropout2_fwd_gpu_output_shape_preserved_1d")
         comptime dtype = DType.float32
@@ -927,7 +927,7 @@ fn test_dropout2_fwd_gpu_output_shape_preserved_1d() raises:
         assert_true(out.shape() == Shape(64))
 
 
-fn test_dropout2_fwd_gpu_output_shape_preserved_2d() raises:
+def test_dropout2_fwd_gpu_output_shape_preserved_2d() raises:
     comptime if has_accelerator():
         print("test_dropout2_fwd_gpu_output_shape_preserved_2d")
         comptime dtype = DType.float32
@@ -938,7 +938,7 @@ fn test_dropout2_fwd_gpu_output_shape_preserved_2d() raises:
         assert_true(out.shape() == Shape(8, 8))
 
 
-fn test_dropout2_fwd_gpu_output_shape_preserved_3d() raises:
+def test_dropout2_fwd_gpu_output_shape_preserved_3d() raises:
     comptime if has_accelerator():
         print("test_dropout2_fwd_gpu_output_shape_preserved_3d")
         comptime dtype = DType.float32
@@ -949,7 +949,7 @@ fn test_dropout2_fwd_gpu_output_shape_preserved_3d() raises:
         assert_true(out.shape() == Shape(2, 4, 8))
 
 
-fn test_dropout2_fwd_gpu_high_p_many_zeros() raises:
+def test_dropout2_fwd_gpu_high_p_many_zeros() raises:
     comptime if has_accelerator():
         print("test_dropout2_fwd_gpu_high_p_many_zeros")
         comptime dtype = DType.float32
@@ -960,7 +960,7 @@ fn test_dropout2_fwd_gpu_high_p_many_zeros() raises:
         assert_true(count_zeros(out) > 150)
 
 
-fn test_dropout2_fwd_gpu_scale_correct_1d() raises:
+def test_dropout2_fwd_gpu_scale_correct_1d() raises:
     comptime if has_accelerator():
         print("test_dropout2_fwd_gpu_scale_correct_1d")
         comptime dtype = DType.float32
@@ -971,7 +971,7 @@ fn test_dropout2_fwd_gpu_scale_correct_1d() raises:
         assert_true(all_nonzero_close(out, 2.0, 1e-5))
 
 
-fn test_dropout2_fwd_gpu_scale_correct_2d() raises:
+def test_dropout2_fwd_gpu_scale_correct_2d() raises:
     comptime if has_accelerator():
         print("test_dropout2_fwd_gpu_scale_correct_2d")
         comptime dtype = DType.float32
@@ -982,7 +982,7 @@ fn test_dropout2_fwd_gpu_scale_correct_2d() raises:
         assert_true(all_nonzero_close(out, 2.0, 1e-5))
 
 
-fn test_dropout2_fwd_gpu_scale_correct_3d() raises:
+def test_dropout2_fwd_gpu_scale_correct_3d() raises:
     comptime if has_accelerator():
         print("test_dropout2_fwd_gpu_scale_correct_3d")
         comptime dtype = DType.float32
@@ -993,7 +993,7 @@ fn test_dropout2_fwd_gpu_scale_correct_3d() raises:
         assert_true(all_nonzero_close(out, 2.0, 1e-5))
 
 
-fn test_dropout2_fwd_gpu_different_masks_per_call() raises:
+def test_dropout2_fwd_gpu_different_masks_per_call() raises:
     comptime if has_accelerator():
         print("test_dropout2_fwd_gpu_different_masks_per_call")
         comptime dtype = DType.float32
@@ -1014,7 +1014,7 @@ fn test_dropout2_fwd_gpu_different_masks_per_call() raises:
 # 5. BACKWARD — GPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_dropout2_bwd_gpu_grad_zero_where_dropped_1d() raises:
+def test_dropout2_bwd_gpu_grad_zero_where_dropped_1d() raises:
     comptime if has_accelerator():
         print("test_dropout2_bwd_gpu_grad_zero_where_dropped_1d")
         comptime dtype = DType.float32
@@ -1033,7 +1033,7 @@ fn test_dropout2_bwd_gpu_grad_zero_where_dropped_1d() raises:
                 assert_true(abs(x_cpu.grad().get(i) - 2.0) < 1e-5)
 
 
-fn test_dropout2_bwd_gpu_grad_zero_where_dropped_2d() raises:
+def test_dropout2_bwd_gpu_grad_zero_where_dropped_2d() raises:
     comptime if has_accelerator():
         print("test_dropout2_bwd_gpu_grad_zero_where_dropped_2d")
         comptime dtype = DType.float32
@@ -1052,7 +1052,7 @@ fn test_dropout2_bwd_gpu_grad_zero_where_dropped_2d() raises:
                 assert_true(abs(x_cpu.grad().get(i) - 2.0) < 1e-5)
 
 
-fn test_dropout2_bwd_gpu_grad_zero_where_dropped_3d() raises:
+def test_dropout2_bwd_gpu_grad_zero_where_dropped_3d() raises:
     comptime if has_accelerator():
         print("test_dropout2_bwd_gpu_grad_zero_where_dropped_3d")
         comptime dtype = DType.float32
@@ -1071,7 +1071,7 @@ fn test_dropout2_bwd_gpu_grad_zero_where_dropped_3d() raises:
                 assert_true(abs(x_cpu.grad().get(i) - 2.0) < 1e-5)
 
 
-fn test_dropout2_bwd_gpu_no_grad_leaf_unaffected() raises:
+def test_dropout2_bwd_gpu_no_grad_leaf_unaffected() raises:
     comptime if has_accelerator():
         print("test_dropout2_bwd_gpu_no_grad_leaf_unaffected")
         comptime dtype = DType.float32
@@ -1082,7 +1082,7 @@ fn test_dropout2_bwd_gpu_no_grad_leaf_unaffected() raises:
         assert_true(not out.requires_grad)
 
 
-fn test_dropout2_bwd_gpu_high_p_grad_flow() raises:
+def test_dropout2_bwd_gpu_high_p_grad_flow() raises:
     comptime if has_accelerator():
         print("test_dropout2_bwd_gpu_high_p_grad_flow")
         comptime dtype = DType.float32
@@ -1101,7 +1101,7 @@ fn test_dropout2_bwd_gpu_high_p_grad_flow() raises:
                 assert_true(abs(x_cpu.grad().get(i)) < 1e-6)
 
 
-fn test_dropout2_bwd_gpu_chained_with_linear_op() raises:
+def test_dropout2_bwd_gpu_chained_with_linear_op() raises:
     comptime if has_accelerator():
         print("test_dropout2_bwd_gpu_chained_with_linear_op")
         comptime dtype = DType.float32
@@ -1118,7 +1118,7 @@ fn test_dropout2_bwd_gpu_chained_with_linear_op() raises:
             assert_true(abs(g) < 1e-6 or abs(g - 6.0) < 1e-5)
 
 
-fn test_dropout2_bwd_gpu_eval_grad_is_ones() raises:
+def test_dropout2_bwd_gpu_eval_grad_is_ones() raises:
     comptime if has_accelerator():
         print("test_dropout2_bwd_gpu_eval_grad_is_ones")
         comptime dtype = DType.float32
@@ -1136,7 +1136,7 @@ fn test_dropout2_bwd_gpu_eval_grad_is_ones() raises:
 # 6. GRAD FLOW VERIFICATION — GPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_dropout2_gradflow_gpu_mask_consistent_fwd_bwd() raises:
+def test_dropout2_gradflow_gpu_mask_consistent_fwd_bwd() raises:
     comptime if has_accelerator():
         print("test_dropout2_gradflow_gpu_mask_consistent_fwd_bwd")
         comptime dtype = DType.float32
@@ -1158,7 +1158,7 @@ fn test_dropout2_gradflow_gpu_mask_consistent_fwd_bwd() raises:
         assert_true(consistent)
 
 
-fn test_dropout2_gradflow_gpu_sum_of_grads_matches_nonzero_count() raises:
+def test_dropout2_gradflow_gpu_sum_of_grads_matches_nonzero_count() raises:
     comptime if has_accelerator():
         print("test_dropout2_gradflow_gpu_sum_of_grads_matches_nonzero_count")
         comptime dtype = DType.float32
@@ -1181,7 +1181,7 @@ fn test_dropout2_gradflow_gpu_sum_of_grads_matches_nonzero_count() raises:
 # 7. CPU / GPU PARITY
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_dropout2_parity_eval_cpu_gpu_match() raises:
+def test_dropout2_parity_eval_cpu_gpu_match() raises:
     comptime if has_accelerator():
         print("test_dropout2_parity_eval_cpu_gpu_match")
         comptime dtype = DType.float32
@@ -1194,7 +1194,7 @@ fn test_dropout2_parity_eval_cpu_gpu_match() raises:
         assert_true(cpu_out.all_close[atol=1e-5](gpu_out))
 
 
-fn test_dropout2_parity_scale_value_matches() raises:
+def test_dropout2_parity_scale_value_matches() raises:
     comptime if has_accelerator():
         print("test_dropout2_parity_scale_value_matches")
         comptime dtype = DType.float32
@@ -1211,7 +1211,7 @@ fn test_dropout2_parity_scale_value_matches() raises:
         assert_true(all_nonzero_close(gpu_out, 2.0, 1e-5))
 
 
-fn test_dropout2_parity_bwd_grad_scale_matches() raises:
+def test_dropout2_parity_bwd_grad_scale_matches() raises:
     comptime if has_accelerator():
         print("test_dropout2_parity_bwd_grad_scale_matches")
         comptime dtype = DType.float32

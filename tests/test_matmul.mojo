@@ -16,13 +16,13 @@ from tenmo.shapes import Shape
 from tenmo.common_utils import isnan, isinf
 from tenmo.gradbox import Gradbox
 
-fn matmul[
+def matmul[
     dtype: DType, //, track_grad: Bool = True
 ](mut A: Tensor[dtype], mut B: Tensor[dtype]) -> Tensor[dtype]:
     return A.matmul[track_grad=track_grad](B)
 
 
-fn test_basic_2d_times_3d() raises:
+def test_basic_2d_times_3d() raises:
     """Test (2, 4) @ (1, 4, 9) -> (1, 2, 9)."""
     print("=" * 80)
     print("Test 1: Basic 2D  3D Broadcasting (2,4) @ (1,4,9)")
@@ -61,7 +61,7 @@ fn test_basic_2d_times_3d() raises:
     print()
 
 
-fn test_3d_times_2d() raises:
+def test_3d_times_2d() raises:
     """Test (1, 2, 4) @ (4, 9) -> (1, 2, 9)."""
     print("=" * 80)
     print("Test 2: 3D  2D Broadcasting (1,2,4) @ (4,9)")
@@ -101,7 +101,7 @@ fn test_3d_times_2d() raises:
     print()
 
 
-fn test_batch_broadcasting() raises:
+def test_batch_broadcasting() raises:
     """Test (3, 2, 4) @ (1, 4, 9) -> (3, 2, 9)."""
     print("=" * 80)
     print("Test 3: Batch Broadcasting (3,2,4) @ (1,4,9)")
@@ -139,7 +139,7 @@ fn test_batch_broadcasting() raises:
     print()
 
 
-fn test_multi_batch_broadcasting() raises:
+def test_multi_batch_broadcasting() raises:
     """Test (5, 1, 2, 4) @ (1, 3, 4, 9) -> (5, 3, 2, 9)."""
     print("=" * 80)
     print("Test 4: Multi-Batch Broadcasting (5,1,2,4) @ (1,3,4,9)")
@@ -173,7 +173,7 @@ fn test_multi_batch_broadcasting() raises:
     print()
 
 
-fn test_numerical_correctness() raises:
+def test_numerical_correctness() raises:
     """Verify actual values match expected matrix multiplication."""
     print("=" * 80)
     print("Test 5: Numerical Correctness")
@@ -239,7 +239,7 @@ fn test_numerical_correctness() raises:
     print()
 
 
-fn test_gradient_with_numerical_check() raises:
+def test_gradient_with_numerical_check() raises:
     """Numerical gradient verification using finite differences."""
     print("=" * 80)
     print("Test 6: Numerical Gradient Verification")
@@ -302,7 +302,7 @@ fn test_gradient_with_numerical_check() raises:
     print()
 
 
-fn test_symmetric_broadcasting() raises:
+def test_symmetric_broadcasting() raises:
     """Test (1, 3, 2, 4) @ (5, 1, 4, 9) -> (5, 3, 2, 9)."""
     print("=" * 80)
     print("Test 7: Symmetric Broadcasting (1,3,2,4) @ (5,1,4,9)")
@@ -334,7 +334,7 @@ fn test_symmetric_broadcasting() raises:
     print("Backward shapes correct with symmetric broadcasting")
     print()
 
-fn test_complex_broadcasting() raises:
+def test_complex_broadcasting() raises:
     """Test (2, 1, 3, 1, 4, 5) @ (1, 4, 1, 6, 5, 7) -> (2, 4, 3, 6, 4, 7)."""
     print("=" * 80)
     print("Test 8: Complex Multi-Dimensional Broadcasting")
@@ -375,7 +375,7 @@ fn test_complex_broadcasting() raises:
     assert_true(grad_A == Gradbox[dtype].full(Shape(2, 1, 3, 1, 4, 5), 168))
     assert_true(grad_B == Gradbox[dtype].full(Shape(1, 4, 1, 6, 5, 7), 24))
 
-fn test_edge_case_single_batch() raises:
+def test_edge_case_single_batch() raises:
     """Test (1, 2, 3) @ (1, 3, 4) -> (1, 2, 4)."""
     print("=" * 80)
     print("Test 9: Edge Case - Single Batch in Both")
@@ -399,7 +399,7 @@ fn test_edge_case_single_batch() raises:
     print()
 
 
-fn test_large_batch() raises:
+def test_large_batch() raises:
     """Test with larger batch dimensions."""
     print("=" * 80)
     print("Test 10: Large Batch Dimensions")
@@ -430,7 +430,7 @@ fn test_large_batch() raises:
     print()
 
 
-fn test_pytorch_comparison() raises:
+def test_pytorch_comparison() raises:
     """
     Generate same random values and compare against PyTorch.
     This test would need PyTorch integration to run.
@@ -489,7 +489,7 @@ fn test_pytorch_comparison() raises:
     assert_true(B.grad() == B_grad_expected)
 
 
-fn test_gradient_accumulation() raises:
+def test_gradient_accumulation() raises:
     """Test that gradients accumulate correctly with broadcasting."""
     print("=" * 80)
     print("Test 12: Gradient Accumulation with Broadcasting")
@@ -525,7 +525,7 @@ fn test_gradient_accumulation() raises:
     print()
 
 
-fn test_non_contiguous_gradients() raises:
+def test_non_contiguous_gradients() raises:
     """Test gradient computation with various tensor strides."""
     print("=" * 80)
     print("Test 13: Non-Contiguous Memory Patterns")
@@ -558,6 +558,6 @@ fn test_non_contiguous_gradients() raises:
     print()
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll matmul tests passed!")

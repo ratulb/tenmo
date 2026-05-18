@@ -22,7 +22,7 @@ from std.sys import has_accelerator
 # ── 1D ────────────────────────────────────────────────────────────────────────
 
 
-fn test_mmrev_cpu_max_1d_forward() raises:
+def test_mmrev_cpu_max_1d_forward() raises:
     print("test_mmrev_cpu_max_1d_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0])
@@ -31,7 +31,7 @@ fn test_mmrev_cpu_max_1d_forward() raises:
     assert_true(m.item() == 9.0)
 
 
-fn test_mmrev_cpu_max_1d_backward_unique() raises:
+def test_mmrev_cpu_max_1d_backward_unique() raises:
     print("test_mmrev_cpu_max_1d_backward_unique")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([3.0, 1.0, 9.0, 2.0], requires_grad=True)
@@ -42,7 +42,7 @@ fn test_mmrev_cpu_max_1d_backward_unique() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 1.0, 0.0])))
 
 
-fn test_mmrev_cpu_max_1d_backward_tied() raises:
+def test_mmrev_cpu_max_1d_backward_tied() raises:
     print("test_mmrev_cpu_max_1d_backward_tied")
     comptime dtype = DType.float32
     # Two tied maxima — grad split evenly (0.5 each)
@@ -56,7 +56,7 @@ fn test_mmrev_cpu_max_1d_backward_tied() raises:
 # ── 2D ────────────────────────────────────────────────────────────────────────
 
 
-fn test_mmrev_cpu_max_2d_global_forward() raises:
+def test_mmrev_cpu_max_2d_global_forward() raises:
     print("test_mmrev_cpu_max_2d_global_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 7.0], [3.0, 2.0]])
@@ -65,7 +65,7 @@ fn test_mmrev_cpu_max_2d_global_forward() raises:
     assert_true(m.item() == 7.0)
 
 
-fn test_mmrev_cpu_max_2d_axis0_forward() raises:
+def test_mmrev_cpu_max_2d_axis0_forward() raises:
     print("test_mmrev_cpu_max_2d_axis0_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
@@ -74,7 +74,7 @@ fn test_mmrev_cpu_max_2d_axis0_forward() raises:
     assert_true(m.all_close(Tensor[dtype].d1([4.0, 5.0, 6.0])))
 
 
-fn test_mmrev_cpu_max_2d_axis0_keepdims_forward() raises:
+def test_mmrev_cpu_max_2d_axis0_keepdims_forward() raises:
     print("test_mmrev_cpu_max_2d_axis0_keepdims_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
@@ -83,7 +83,7 @@ fn test_mmrev_cpu_max_2d_axis0_keepdims_forward() raises:
     assert_true(m.all_close(Tensor[dtype].d2([[4.0, 5.0, 6.0]])))
 
 
-fn test_mmrev_cpu_max_2d_axis1_forward() raises:
+def test_mmrev_cpu_max_2d_axis1_forward() raises:
     print("test_mmrev_cpu_max_2d_axis1_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
@@ -92,7 +92,7 @@ fn test_mmrev_cpu_max_2d_axis1_forward() raises:
     assert_true(m.all_close(Tensor[dtype].d1([5.0, 6.0])))
 
 
-fn test_mmrev_cpu_max_2d_axis1_keepdims_forward() raises:
+def test_mmrev_cpu_max_2d_axis1_keepdims_forward() raises:
     print("test_mmrev_cpu_max_2d_axis1_keepdims_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
@@ -101,7 +101,7 @@ fn test_mmrev_cpu_max_2d_axis1_keepdims_forward() raises:
     assert_true(m.all_close(Tensor[dtype].d2([[5.0], [6.0]])))
 
 
-fn test_mmrev_cpu_max_2d_axis0_backward() raises:
+def test_mmrev_cpu_max_2d_axis0_backward() raises:
     print("test_mmrev_cpu_max_2d_axis0_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -116,7 +116,7 @@ fn test_mmrev_cpu_max_2d_axis0_backward() raises:
     )
 
 
-fn test_mmrev_cpu_max_2d_axis1_backward() raises:
+def test_mmrev_cpu_max_2d_axis1_backward() raises:
     print("test_mmrev_cpu_max_2d_axis1_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -131,7 +131,7 @@ fn test_mmrev_cpu_max_2d_axis1_backward() raises:
     )
 
 
-fn test_mmrev_cpu_max_2d_axis1_keepdims_backward() raises:
+def test_mmrev_cpu_max_2d_axis1_keepdims_backward() raises:
     print("test_mmrev_cpu_max_2d_axis1_keepdims_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -145,7 +145,7 @@ fn test_mmrev_cpu_max_2d_axis1_keepdims_backward() raises:
     )
 
 
-fn test_mmrev_cpu_max_2d_global_backward() raises:
+def test_mmrev_cpu_max_2d_global_backward() raises:
     print("test_mmrev_cpu_max_2d_global_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 7.0], [3.0, 2.0]], requires_grad=True)
@@ -155,7 +155,7 @@ fn test_mmrev_cpu_max_2d_global_backward() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[0.0, 1.0], [0.0, 0.0]])))
 
 
-fn test_mmrev_cpu_max_2d_tied_backward() raises:
+def test_mmrev_cpu_max_2d_tied_backward() raises:
     print("test_mmrev_cpu_max_2d_tied_backward")
     comptime dtype = DType.float32
     # Two tied maxima in same row
@@ -174,7 +174,7 @@ fn test_mmrev_cpu_max_2d_tied_backward() raises:
 # ── 3D ────────────────────────────────────────────────────────────────────────
 
 
-fn test_mmrev_cpu_max_3d_axis0_forward() raises:
+def test_mmrev_cpu_max_3d_axis0_forward() raises:
     print("test_mmrev_cpu_max_3d_axis0_forward")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
@@ -189,7 +189,7 @@ fn test_mmrev_cpu_max_3d_axis0_forward() raises:
     )
 
 
-fn test_mmrev_cpu_max_3d_axis0_backward() raises:
+def test_mmrev_cpu_max_3d_axis0_backward() raises:
     print("test_mmrev_cpu_max_3d_axis0_backward")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
@@ -206,7 +206,7 @@ fn test_mmrev_cpu_max_3d_axis0_backward() raises:
     assert_true(a.grad().all_close(expected))
 
 
-fn test_mmrev_cpu_max_3d_multi_axis_forward() raises:
+def test_mmrev_cpu_max_3d_multi_axis_forward() raises:
     print("test_mmrev_cpu_max_3d_multi_axis_forward")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
@@ -217,7 +217,7 @@ fn test_mmrev_cpu_max_3d_multi_axis_forward() raises:
     assert_true(m.all_close(Tensor[dtype].d1([15.0, 19.0, 23.0])))
 
 
-fn test_mmrev_cpu_max_3d_multi_axis_backward() raises:
+def test_mmrev_cpu_max_3d_multi_axis_backward() raises:
     print("test_mmrev_cpu_max_3d_multi_axis_backward")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
@@ -238,7 +238,7 @@ fn test_mmrev_cpu_max_3d_multi_axis_backward() raises:
 # ── 4D ────────────────────────────────────────────────────────────────────────
 
 
-fn test_mmrev_cpu_max_4d_axis1_forward() raises:
+def test_mmrev_cpu_max_4d_axis1_forward() raises:
     print("test_mmrev_cpu_max_4d_axis1_forward")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 120.0)
@@ -247,7 +247,7 @@ fn test_mmrev_cpu_max_4d_axis1_forward() raises:
     assert_true(m.shape() == Shape(2, 4, 5))
 
 
-fn test_mmrev_cpu_max_4d_axis1_backward() raises:
+def test_mmrev_cpu_max_4d_axis1_backward() raises:
     print("test_mmrev_cpu_max_4d_axis1_backward")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 120.0)
@@ -266,7 +266,7 @@ fn test_mmrev_cpu_max_4d_axis1_backward() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn test_mmrev_cpu_min_1d_forward() raises:
+def test_mmrev_cpu_min_1d_forward() raises:
     print("test_mmrev_cpu_min_1d_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([3.0, 1.0, 4.0, 1.0, 5.0])
@@ -275,7 +275,7 @@ fn test_mmrev_cpu_min_1d_forward() raises:
     assert_true(m.item() == 1.0)
 
 
-fn test_mmrev_cpu_min_1d_backward_unique() raises:
+def test_mmrev_cpu_min_1d_backward_unique() raises:
     print("test_mmrev_cpu_min_1d_backward_unique")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([3.0, 1.0, 4.0, 2.0], requires_grad=True)
@@ -285,7 +285,7 @@ fn test_mmrev_cpu_min_1d_backward_unique() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 0.0, 0.0])))
 
 
-fn test_mmrev_cpu_min_1d_backward_tied() raises:
+def test_mmrev_cpu_min_1d_backward_tied() raises:
     print("test_mmrev_cpu_min_1d_backward_tied")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 5.0, 1.0, 3.0], requires_grad=True)
@@ -295,7 +295,7 @@ fn test_mmrev_cpu_min_1d_backward_tied() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([0.5, 0.0, 0.5, 0.0])))
 
 
-fn test_mmrev_cpu_min_2d_axis0_forward() raises:
+def test_mmrev_cpu_min_2d_axis0_forward() raises:
     print("test_mmrev_cpu_min_2d_axis0_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
@@ -304,7 +304,7 @@ fn test_mmrev_cpu_min_2d_axis0_forward() raises:
     assert_true(m.all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
 
 
-fn test_mmrev_cpu_min_2d_axis1_forward() raises:
+def test_mmrev_cpu_min_2d_axis1_forward() raises:
     print("test_mmrev_cpu_min_2d_axis1_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
@@ -313,7 +313,7 @@ fn test_mmrev_cpu_min_2d_axis1_forward() raises:
     assert_true(m.all_close(Tensor[dtype].d1([1.0, 2.0])))
 
 
-fn test_mmrev_cpu_min_2d_axis0_backward() raises:
+def test_mmrev_cpu_min_2d_axis0_backward() raises:
     print("test_mmrev_cpu_min_2d_axis0_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -328,7 +328,7 @@ fn test_mmrev_cpu_min_2d_axis0_backward() raises:
     )
 
 
-fn test_mmrev_cpu_min_2d_axis1_backward() raises:
+def test_mmrev_cpu_min_2d_axis1_backward() raises:
     print("test_mmrev_cpu_min_2d_axis1_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -343,7 +343,7 @@ fn test_mmrev_cpu_min_2d_axis1_backward() raises:
     )
 
 
-fn test_mmrev_cpu_min_2d_keepdims_backward() raises:
+def test_mmrev_cpu_min_2d_keepdims_backward() raises:
     print("test_mmrev_cpu_min_2d_keepdims_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -357,7 +357,7 @@ fn test_mmrev_cpu_min_2d_keepdims_backward() raises:
     )
 
 
-fn test_mmrev_cpu_min_3d_axis2_forward() raises:
+def test_mmrev_cpu_min_3d_axis2_forward() raises:
     print("test_mmrev_cpu_min_3d_axis2_forward")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
@@ -370,7 +370,7 @@ fn test_mmrev_cpu_min_3d_axis2_forward() raises:
     )
 
 
-fn test_mmrev_cpu_min_3d_axis2_backward() raises:
+def test_mmrev_cpu_min_3d_axis2_backward() raises:
     print("test_mmrev_cpu_min_3d_axis2_backward")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
@@ -392,7 +392,7 @@ fn test_mmrev_cpu_min_3d_axis2_backward() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn test_mmrev_cpu_max_grad_flow_chained() raises:
+def test_mmrev_cpu_max_grad_flow_chained() raises:
     print("test_mmrev_cpu_max_grad_flow_chained")
     comptime dtype = DType.float32
     # loss = max(max(a, axis=1), axis=0)  → scalar
@@ -409,7 +409,7 @@ fn test_mmrev_cpu_max_grad_flow_chained() raises:
     )
 
 
-fn test_mmrev_cpu_min_grad_flow_chained() raises:
+def test_mmrev_cpu_min_grad_flow_chained() raises:
     print("test_mmrev_cpu_min_chained")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -425,7 +425,7 @@ fn test_mmrev_cpu_min_grad_flow_chained() raises:
     )
 
 
-fn test_mmrev_cpu_max_then_matmul_grad() raises:
+def test_mmrev_cpu_max_then_matmul_grad() raises:
     print("test_mmrev_cpu_max_then_matmul_grad")
     comptime dtype = DType.float32
     # loss = sum(max(a, axis=1, keepdims=True) * ones)
@@ -443,7 +443,7 @@ fn test_mmrev_cpu_max_then_matmul_grad() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn test_mmrev_gpu_max_1d_forward() raises:
+def test_mmrev_gpu_max_1d_forward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_1d_forward")
         comptime dtype = DType.float32
@@ -454,7 +454,7 @@ fn test_mmrev_gpu_max_1d_forward() raises:
         assert_true(m.to_cpu().item() == 9.0)
 
 
-fn test_mmrev_gpu_max_1d_backward_unique() raises:
+def test_mmrev_gpu_max_1d_backward_unique() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_1d_backward_unique")
         comptime dtype = DType.float32
@@ -467,7 +467,7 @@ fn test_mmrev_gpu_max_1d_backward_unique() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 1.0, 0.0])))
 
 
-fn test_mmrev_gpu_max_1d_backward_tied() raises:
+def test_mmrev_gpu_max_1d_backward_tied() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_1d_backward_tied")
         comptime dtype = DType.float32
@@ -480,7 +480,7 @@ fn test_mmrev_gpu_max_1d_backward_tied() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.5, 0.0, 0.5])))
 
 
-fn test_mmrev_gpu_max_2d_axis0_forward() raises:
+def test_mmrev_gpu_max_2d_axis0_forward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_2d_axis0_forward")
         comptime dtype = DType.float32
@@ -491,7 +491,7 @@ fn test_mmrev_gpu_max_2d_axis0_forward() raises:
         assert_true(m.to_cpu().all_close(Tensor[dtype].d1([4.0, 5.0, 6.0])))
 
 
-fn test_mmrev_gpu_max_2d_axis0_keepdims_forward() raises:
+def test_mmrev_gpu_max_2d_axis0_keepdims_forward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_2d_axis0_keepdims_forward")
         comptime dtype = DType.float32
@@ -502,7 +502,7 @@ fn test_mmrev_gpu_max_2d_axis0_keepdims_forward() raises:
         assert_true(m.to_cpu().all_close(Tensor[dtype].d2([[4.0, 5.0, 6.0]])))
 
 
-fn test_mmrev_gpu_max_2d_axis1_forward() raises:
+def test_mmrev_gpu_max_2d_axis1_forward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_2d_axis1_forward")
         comptime dtype = DType.float32
@@ -513,7 +513,7 @@ fn test_mmrev_gpu_max_2d_axis1_forward() raises:
         assert_true(m.to_cpu().all_close(Tensor[dtype].d1([5.0, 6.0])))
 
 
-fn test_mmrev_gpu_max_2d_axis1_keepdims_forward() raises:
+def test_mmrev_gpu_max_2d_axis1_keepdims_forward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_2d_axis1_keepdims_forward")
         comptime dtype = DType.float32
@@ -523,7 +523,7 @@ fn test_mmrev_gpu_max_2d_axis1_keepdims_forward() raises:
         assert_true(m.shape() == Shape(2, 1))
         assert_true(m.to_cpu().all_close(Tensor[dtype].d2([[5.0], [6.0]])))
 
-fn test_mmrev_gpu_max_2d_axis0_backward() raises:
+def test_mmrev_gpu_max_2d_axis0_backward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_2d_axis0_backward")
         comptime dtype = DType.float32
@@ -542,7 +542,7 @@ fn test_mmrev_gpu_max_2d_axis0_backward() raises:
         )
 
 
-fn test_mmrev_gpu_max_2d_axis1_backward() raises:
+def test_mmrev_gpu_max_2d_axis1_backward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_2d_axis1_backward")
         comptime dtype = DType.float32
@@ -561,7 +561,7 @@ fn test_mmrev_gpu_max_2d_axis1_backward() raises:
         )
 
 
-fn test_mmrev_gpu_max_2d_axis1_keepdims_backward() raises:
+def test_mmrev_gpu_max_2d_axis1_keepdims_backward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_2d_axis1_keepdims_backward")
         comptime dtype = DType.float32
@@ -580,7 +580,7 @@ fn test_mmrev_gpu_max_2d_axis1_keepdims_backward() raises:
         )
 
 
-fn test_mmrev_gpu_max_2d_global_backward() raises:
+def test_mmrev_gpu_max_2d_global_backward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_2d_global_backward")
         comptime dtype = DType.float32
@@ -595,7 +595,7 @@ fn test_mmrev_gpu_max_2d_global_backward() raises:
         )
 
 
-fn test_mmrev_gpu_max_2d_tied_backward() raises:
+def test_mmrev_gpu_max_2d_tied_backward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_2d_tied_backward")
         comptime dtype = DType.float32
@@ -614,7 +614,7 @@ fn test_mmrev_gpu_max_2d_tied_backward() raises:
         )
 
 
-fn test_mmrev_gpu_max_3d_axis0_forward() raises:
+def test_mmrev_gpu_max_3d_axis0_forward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_3d_axis0_forward")
         comptime dtype = DType.float32
@@ -630,7 +630,7 @@ fn test_mmrev_gpu_max_3d_axis0_forward() raises:
         )
 
 
-fn test_mmrev_gpu_max_3d_axis0_backward() raises:
+def test_mmrev_gpu_max_3d_axis0_backward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_3d_axis0_backward")
         comptime dtype = DType.float32
@@ -649,7 +649,7 @@ fn test_mmrev_gpu_max_3d_axis0_backward() raises:
         assert_true(a.grad().all_close(expected))
 
 
-fn test_mmrev_gpu_max_3d_multi_axis_forward() raises:
+def test_mmrev_gpu_max_3d_multi_axis_forward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_3d_multi_axis_forward")
         comptime dtype = DType.float32
@@ -661,7 +661,7 @@ fn test_mmrev_gpu_max_3d_multi_axis_forward() raises:
         assert_true(m.to_cpu().all_close(Tensor[dtype].d1([15.0, 19.0, 23.0])))
 
 
-fn test_mmrev_gpu_max_3d_multi_axis_backward() raises:
+def test_mmrev_gpu_max_3d_multi_axis_backward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_3d_multi_axis_backward")
         comptime dtype = DType.float32
@@ -680,7 +680,7 @@ fn test_mmrev_gpu_max_3d_multi_axis_backward() raises:
         assert_true(a.grad().all_close(expected))
 
 
-fn test_mmrev_gpu_max_4d_axis1_forward() raises:
+def test_mmrev_gpu_max_4d_axis1_forward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_4d_axis1_forward")
         comptime dtype = DType.float32
@@ -691,7 +691,7 @@ fn test_mmrev_gpu_max_4d_axis1_forward() raises:
         assert_true(m.shape() == Shape(2, 4, 5))
 
 
-fn test_mmrev_gpu_max_4d_axis1_backward() raises:
+def test_mmrev_gpu_max_4d_axis1_backward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_4d_axis1_backward")
         comptime dtype = DType.float32
@@ -712,7 +712,7 @@ fn test_mmrev_gpu_max_4d_axis1_backward() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn test_mmrev_gpu_min_1d_forward() raises:
+def test_mmrev_gpu_min_1d_forward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_min_1d_forward")
         comptime dtype = DType.float32
@@ -723,7 +723,7 @@ fn test_mmrev_gpu_min_1d_forward() raises:
         assert_true(m.to_cpu().item() == 1.0)
 
 
-fn test_mmrev_gpu_min_1d_backward_unique() raises:
+def test_mmrev_gpu_min_1d_backward_unique() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_min_1d_backward_unique")
         comptime dtype = DType.float32
@@ -736,7 +736,7 @@ fn test_mmrev_gpu_min_1d_backward_unique() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 0.0, 0.0])))
 
 
-fn test_mmrev_gpu_min_1d_backward_tied() raises:
+def test_mmrev_gpu_min_1d_backward_tied() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_min_1d_backward_tied")
         comptime dtype = DType.float32
@@ -749,7 +749,7 @@ fn test_mmrev_gpu_min_1d_backward_tied() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([0.5, 0.0, 0.5, 0.0])))
 
 
-fn test_mmrev_gpu_min_2d_axis0_forward() raises:
+def test_mmrev_gpu_min_2d_axis0_forward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_min_2d_axis0_forward")
         comptime dtype = DType.float32
@@ -760,7 +760,7 @@ fn test_mmrev_gpu_min_2d_axis0_forward() raises:
         assert_true(m.to_cpu().all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
 
 
-fn test_mmrev_gpu_min_2d_axis1_forward() raises:
+def test_mmrev_gpu_min_2d_axis1_forward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_min_2d_axis1_forward")
         comptime dtype = DType.float32
@@ -771,7 +771,7 @@ fn test_mmrev_gpu_min_2d_axis1_forward() raises:
         assert_true(m.to_cpu().all_close(Tensor[dtype].d1([1.0, 2.0])))
 
 
-fn test_mmrev_gpu_min_2d_axis0_backward() raises:
+def test_mmrev_gpu_min_2d_axis0_backward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_min_2d_axis0_backward")
         comptime dtype = DType.float32
@@ -790,7 +790,7 @@ fn test_mmrev_gpu_min_2d_axis0_backward() raises:
         )
 
 
-fn test_mmrev_gpu_min_2d_axis1_backward() raises:
+def test_mmrev_gpu_min_2d_axis1_backward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_min_2d_axis1_backward")
         comptime dtype = DType.float32
@@ -809,7 +809,7 @@ fn test_mmrev_gpu_min_2d_axis1_backward() raises:
         )
 
 
-fn test_mmrev_gpu_min_2d_keepdims_backward() raises:
+def test_mmrev_gpu_min_2d_keepdims_backward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_min_2d_keepdims_backward")
         comptime dtype = DType.float32
@@ -828,7 +828,7 @@ fn test_mmrev_gpu_min_2d_keepdims_backward() raises:
         )
 
 
-fn test_mmrev_gpu_min_3d_axis2_forward() raises:
+def test_mmrev_gpu_min_3d_axis2_forward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_min_3d_axis2_forward")
         comptime dtype = DType.float32
@@ -844,7 +844,7 @@ fn test_mmrev_gpu_min_3d_axis2_forward() raises:
         )
 
 
-fn test_mmrev_gpu_min_3d_axis2_backward() raises:
+def test_mmrev_gpu_min_3d_axis2_backward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_min_3d_axis2_backward")
         comptime dtype = DType.float32
@@ -868,7 +868,7 @@ fn test_mmrev_gpu_min_3d_axis2_backward() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn test_mmrev_gpu_max_grad_flow_chained() raises:
+def test_mmrev_gpu_max_grad_flow_chained() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_grad_flow_chained")
         comptime dtype = DType.float32
@@ -888,7 +888,7 @@ fn test_mmrev_gpu_max_grad_flow_chained() raises:
         )
 
 
-fn test_mmrev_gpu_min_grad_flow_chained() raises:
+def test_mmrev_gpu_min_grad_flow_chained() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_min_grad_flow_chained")
         comptime dtype = DType.float32
@@ -908,7 +908,7 @@ fn test_mmrev_gpu_min_grad_flow_chained() raises:
         )
 
 
-fn test_mmrev_gpu_max_then_op_grad_flow() raises:
+def test_mmrev_gpu_max_then_op_grad_flow() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_then_op_grad_flow")
         comptime dtype = DType.float32
@@ -925,7 +925,7 @@ fn test_mmrev_gpu_max_then_op_grad_flow() raises:
         )
 
 
-fn test_mmrev_gpu_grad_lands_on_cpu() raises:
+def test_mmrev_gpu_grad_lands_on_cpu() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_grad_lands_on_cpu")
         comptime dtype = DType.float32
@@ -950,7 +950,7 @@ fn test_mmrev_gpu_grad_lands_on_cpu() raises:
 # ============================================================================
 
 
-fn test_scalar_input() raises:
+def test_scalar_input() raises:
     """Test scalar tensor input - should pass through unchanged."""
     print("test_scalar_input")
     comptime dtype = DType.float32
@@ -981,7 +981,7 @@ fn test_scalar_input() raises:
 # ============================================================================
 
 
-fn test_full_reduction_vectorized() raises:
+def test_full_reduction_vectorized() raises:
     """Test full reduction - all axes reduced to scalar (vectorized implementation).
     """
     print("test_full_reduction_vectorized")
@@ -1048,7 +1048,7 @@ fn test_full_reduction_vectorized() raises:
     assert_true(d.grad()[IntArray(0)] == 0.0)
 
 
-fn test_full_reduction_with_negative() raises:
+def test_full_reduction_with_negative() raises:
     """Test full reduction with negative values."""
     print("test_full_reduction_with_negative")
     comptime dtype = DType.float32
@@ -1075,7 +1075,7 @@ fn test_full_reduction_with_negative() raises:
     assert_true(b.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 0.0, 1.0, 0.0])))
 
 
-fn test_max_min_mixed() raises:
+def test_max_min_mixed() raises:
     print("test_max_min_mixed")
     comptime dtype = DType.float32
 
@@ -1208,7 +1208,7 @@ fn test_max_min_mixed() raises:
     assert_true(e.grad().all_close(Tensor[dtype].d2([[0.0, 1.0], [0.0, 1.0]])))
 
 
-fn test_max_min() raises:
+def test_max_min() raises:
     print("test_max_min")
     comptime dtype = DType.float32
     a = Tensor[dtype].d2(
@@ -1246,7 +1246,7 @@ fn test_max_min() raises:
 # ============================================================================
 
 
-fn test_partial_reduction_single_axis() raises:
+def test_partial_reduction_single_axis() raises:
     """Test partial reduction along single axis (parallelized)."""
     print("test_partial_reduction_single_axis")
     comptime dtype = DType.float32
@@ -1294,7 +1294,7 @@ fn test_partial_reduction_single_axis() raises:
     assert_true(a.grad().all_close(expected))
 
 
-fn test_partial_reduction_with_ties() raises:
+def test_partial_reduction_with_ties() raises:
     """Test partial reduction with tied values (gradient splitting)."""
     print("test_partial_reduction_with_ties")
     comptime dtype = DType.float32
@@ -1342,7 +1342,7 @@ fn test_partial_reduction_with_ties() raises:
     assert_true(b.grad().all_close[atol=1e-5](expected))
 
 
-fn test_partial_reduction_3d() raises:
+def test_partial_reduction_3d() raises:
     """Test partial reduction on 3D tensors."""
     print("test_partial_reduction_3d")
     comptime dtype = DType.float32
@@ -1380,7 +1380,7 @@ fn test_partial_reduction_3d() raises:
     assert_true(a.grad().all_close(expected))
 
 
-fn test_partial_reduction_multiple_axes() raises:
+def test_partial_reduction_multiple_axes() raises:
     """Test reduction along multiple axes simultaneously."""
     print("test_partial_reduction_multiple_axes")
     comptime dtype = DType.float32
@@ -1423,7 +1423,7 @@ fn test_partial_reduction_multiple_axes() raises:
 # ============================================================================
 
 
-fn test_keepdims() raises:
+def test_keepdims() raises:
     """Test keepdims parameter (affects gradient broadcasting)."""
     print("test_keepdims")
     comptime dtype = DType.float32
@@ -1467,7 +1467,7 @@ fn test_keepdims() raises:
 # ============================================================================
 
 
-fn test_edge_cases_extreme_values() raises:
+def test_edge_cases_extreme_values() raises:
     """Test extreme values (infinity, very large/small)."""
     print("test_edge_cases_extreme_values")
     comptime dtype = DType.float32
@@ -1499,7 +1499,7 @@ fn test_edge_cases_extreme_values() raises:
     assert_true(c.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 0.0])))
 
 
-fn test_edge_cases_all_same() raises:
+def test_edge_cases_all_same() raises:
     """Test when all values are identical."""
     print("test_edge_cases_all_same")
     comptime dtype = DType.float64
@@ -1532,7 +1532,7 @@ fn test_edge_cases_all_same() raises:
             assert_true(c.grad()[IntArray(i, j)] - expected_val < 1e-6)
 
 
-fn test_edge_cases_single_element() raises:
+def test_edge_cases_single_element() raises:
     """Test single element reductions."""
     print("test_edge_cases_single_element")
     comptime dtype = DType.float32
@@ -1552,7 +1552,7 @@ fn test_edge_cases_single_element() raises:
     assert_true(b.grad().all_close(Tensor[dtype].d2([[1.0], [1.0]])))
 
 
-fn test_edge_cases_large_tensor() raises:
+def test_edge_cases_large_tensor() raises:
     """Test large tensors to stress parallelization."""
     print("test_edge_cases_large_tensor")
     comptime dtype = DType.float32
@@ -1590,7 +1590,7 @@ fn test_edge_cases_large_tensor() raises:
 # ============================================================================
 
 
-fn test_gradient_accumulation() raises:
+def test_gradient_accumulation() raises:
     """Test that gradients accumulate correctly across multiple backwards."""
     print("test_gradient_accumulation")
     comptime dtype = DType.float32
@@ -1623,7 +1623,7 @@ fn test_gradient_accumulation() raises:
 # ============================================================================
 
 
-fn test_no_gradient_tracking() raises:
+def test_no_gradient_tracking() raises:
     """Test behavior when requires_grad=False."""
     print("test_no_gradient_tracking")
     comptime dtype = DType.float32
@@ -1646,7 +1646,7 @@ fn test_no_gradient_tracking() raises:
 # ============================================================================
 
 
-fn test_mixed_min_max_operations() raises:
+def test_mixed_min_max_operations() raises:
     """Test alternating min/max operations."""
     print("test_mixed_min_max_operations")
     comptime dtype = DType.float32
@@ -1713,7 +1713,7 @@ fn test_mixed_min_max_operations() raises:
 # ============================================================================
 
 
-fn test_negative_axis_indexing() raises:
+def test_negative_axis_indexing() raises:
     """Test negative axis indices (e.g., -1 for last axis)."""
     print("test_negative_axis_indexing")
     comptime dtype = DType.float32
@@ -1758,7 +1758,7 @@ fn test_negative_axis_indexing() raises:
 # ============================================================================
 
 
-fn test_high_dimensional_tensors() raises:
+def test_high_dimensional_tensors() raises:
     """Test 4D and 5D tensors."""
     print("test_high_dimensional_tensors")
     comptime dtype = DType.float32
@@ -1792,7 +1792,7 @@ fn test_high_dimensional_tensors() raises:
 # ============================================================================
 
 
-fn test_empty_reduction_axis() raises:
+def test_empty_reduction_axis() raises:
     """Test reduction when axis list is empty."""
     print("test_empty_reduction_axis")
     comptime dtype = DType.float32
@@ -1809,7 +1809,7 @@ fn test_empty_reduction_axis() raises:
 # ============================================================================
 
 
-fn test_numerical_stability() raises:
+def test_numerical_stability() raises:
     """Test numerical edge cases."""
     print("test_numerical_stability")
     comptime dtype = DType.float32
@@ -1843,7 +1843,7 @@ fn test_numerical_stability() raises:
 # ============================================================================
 
 
-fn test_many_ties() raises:
+def test_many_ties() raises:
     """Test performance with many tied values."""
     print("test_many_ties")
     comptime dtype = DType.float32
@@ -1887,7 +1887,7 @@ fn test_many_ties() raises:
 # ============================================================================
 
 
-fn test_chained_operations() raises:
+def test_chained_operations() raises:
     """Test max/min in chains with other operations."""
     print("test_chained_operations")
     comptime dtype = DType.float32
@@ -1917,7 +1917,7 @@ fn test_chained_operations() raises:
 # ============================================================================
 
 
-fn test_backwards_compatibility() raises:
+def test_backwards_compatibility() raises:
     """Ensure new implementation matches old behavior exactly."""
     print("test_backwards_compatibility")
     comptime dtype = DType.float32
@@ -1959,7 +1959,7 @@ fn test_backwards_compatibility() raises:
 # ============================================================================
 
 
-fn run_all_minmax_tests() raises:
+def run_all_minmax_tests() raises:
     """
     Runs the complete test suite for optimized min/max implementation.
     Tests all code paths: scalar, vectorized full reduction, parallelized partial reduction.
@@ -2060,6 +2060,6 @@ fn run_all_minmax_tests() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll minmax tests passed!")

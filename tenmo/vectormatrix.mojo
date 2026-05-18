@@ -15,7 +15,7 @@ struct VectorMatmulNdBackward[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
-    fn backward[
+    def backward[
         simdwidth: Int = simd_width_of[Self.dtype]()
     ](output: Ancestor[Self.dtype]) -> List[
         Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
@@ -209,7 +209,7 @@ struct VectorMatmulNdBackward[dtype: DType](
 @fieldwise_init
 struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         simdwidth: Int = simd_width_of[Self.dtype]()
     ](v: NDBuffer[Self.dtype], M: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         var v_shape = v.shape
@@ -338,7 +338,7 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return result
 
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
     ](v: Tensor[Self.dtype], M: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         var out: NDBuffer[Self.dtype]

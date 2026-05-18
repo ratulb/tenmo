@@ -7,7 +7,7 @@ from tenmo.common_utils import s
 
 comptime dtype = DType.float32
 
-fn test_sgd_basic() raises:
+def test_sgd_basic() raises:
     """Test 1: Basic SGD without momentum."""
     print("\n=== Test 1: Basic SGD ===")
     comptime dtype = DType.float32
@@ -28,7 +28,7 @@ fn test_sgd_basic() raises:
     assert_true(param.grad() == Tensor[dtype].full(Shape(2, 2), 0.0))
 
 
-fn test_sgd_momentum() raises:
+def test_sgd_momentum() raises:
     """Test 2: SGD with momentum."""
     print("\n=== Test 2: SGD with Momentum ===")
     comptime dtype = DType.float32
@@ -56,7 +56,7 @@ fn test_sgd_momentum() raises:
     assert_true(param == Tensor[dtype].full(Shape(2, 2), 0.71))
 
 
-fn test_sgd_weight_decay() raises:
+def test_sgd_weight_decay() raises:
     """Test 3: SGD with weight decay."""
     print("\n=== Test 3: Weight Decay ===")
     comptime dtype = DType.float32
@@ -75,7 +75,7 @@ fn test_sgd_weight_decay() raises:
     assert_true(param == Tensor[dtype].full(Shape(2, 2), 0.899))
 
 
-fn test_sgd_grad_norm_clipping() raises:
+def test_sgd_grad_norm_clipping() raises:
     """Test 4: Gradient norm clipping."""
     print("\n=== Test 4: Gradient norm Clipping ===")
     comptime dtype = DType.float32
@@ -97,7 +97,7 @@ fn test_sgd_grad_norm_clipping() raises:
     assert_true(param == Tensor[dtype].full(Shape(2, 2), 0.95))
 
 
-fn test_sgd_value_clipping() raises:
+def test_sgd_value_clipping() raises:
     """Test 5: Gradient value clipping."""
     print("\n=== Test 5: Value Clipping ===")
     comptime dtype = DType.float32
@@ -116,7 +116,7 @@ fn test_sgd_value_clipping() raises:
 
 # ── CPU Tests ─────────────────────────────────────────────────────────────────
 
-fn test_sgd_cpu_vanilla_single_step() raises:
+def test_sgd_cpu_vanilla_single_step() raises:
     print("test_sgd_cpu_vanilla_single_step")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -135,7 +135,7 @@ fn test_sgd_cpu_vanilla_single_step() raises:
     print("passed")
 
 
-fn test_sgd_cpu_vanilla_multiple_steps() raises:
+def test_sgd_cpu_vanilla_multiple_steps() raises:
     print("test_sgd_cpu_vanilla_multiple_steps")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -149,7 +149,7 @@ fn test_sgd_cpu_vanilla_multiple_steps() raises:
     print("passed")
 
 
-fn test_sgd_cpu_vanilla_2d() raises:
+def test_sgd_cpu_vanilla_2d() raises:
     print("test_sgd_cpu_vanilla_2d")
     var w = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -162,7 +162,7 @@ fn test_sgd_cpu_vanilla_2d() raises:
     print("passed")
 
 
-fn test_sgd_cpu_zero_grad() raises:
+def test_sgd_cpu_zero_grad() raises:
     print("test_sgd_cpu_zero_grad")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -176,7 +176,7 @@ fn test_sgd_cpu_zero_grad() raises:
     print("passed")
 
 
-fn test_sgd_cpu_weight_decay() raises:
+def test_sgd_cpu_weight_decay() raises:
     print("test_sgd_cpu_weight_decay")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -195,7 +195,7 @@ fn test_sgd_cpu_weight_decay() raises:
     print("passed")
 
 
-fn test_sgd_cpu_momentum_single_step() raises:
+def test_sgd_cpu_momentum_single_step() raises:
     print("test_sgd_cpu_momentum_single_step")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -208,7 +208,7 @@ fn test_sgd_cpu_momentum_single_step() raises:
     print("passed")
 
 
-fn test_sgd_cpu_momentum_multiple_steps() raises:
+def test_sgd_cpu_momentum_multiple_steps() raises:
     print("test_sgd_cpu_momentum_multiple_steps")
     var w = Tensor[dtype].d1([1.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -227,7 +227,7 @@ fn test_sgd_cpu_momentum_multiple_steps() raises:
     print("passed")
 
 
-fn test_sgd_cpu_clip_value() raises:
+def test_sgd_cpu_clip_value() raises:
     print("test_sgd_cpu_clip_value")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -240,7 +240,7 @@ fn test_sgd_cpu_clip_value() raises:
     print("passed")
 
 
-fn test_sgd_cpu_multiple_parameters() raises:
+def test_sgd_cpu_multiple_parameters() raises:
     print("test_sgd_cpu_multiple_parameters")
     var w1 = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var w2 = Tensor[dtype].d1([3.0, 4.0], requires_grad=True)
@@ -256,7 +256,7 @@ fn test_sgd_cpu_multiple_parameters() raises:
     print("passed")
 
 
-fn test_sgd_cpu_backward_integration() raises:
+def test_sgd_cpu_backward_integration() raises:
     print("test_sgd_cpu_backward_integration")
     # Simple linear: loss = sum(w * x)
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -272,7 +272,7 @@ fn test_sgd_cpu_backward_integration() raises:
     print("passed")
 
 
-fn test_sgd_cpu_set_lr() raises:
+def test_sgd_cpu_set_lr() raises:
     print("test_sgd_cpu_set_lr")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -291,7 +291,7 @@ fn test_sgd_cpu_set_lr() raises:
 
 # ── GPU Tests ─────────────────────────────────────────────────────────────────
 
-fn test_sgd_gpu_vanilla_single_step() raises:
+def test_sgd_gpu_vanilla_single_step() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_vanilla_single_step")
@@ -307,7 +307,7 @@ fn test_sgd_gpu_vanilla_single_step() raises:
     print("passed")
 
 
-fn test_sgd_gpu_vanilla_matches_cpu() raises:
+def test_sgd_gpu_vanilla_matches_cpu() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_vanilla_matches_cpu")
@@ -330,7 +330,7 @@ fn test_sgd_gpu_vanilla_matches_cpu() raises:
     print("passed")
 
 
-fn test_sgd_gpu_vanilla_multiple_steps() raises:
+def test_sgd_gpu_vanilla_multiple_steps() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_vanilla_multiple_steps")
@@ -347,7 +347,7 @@ fn test_sgd_gpu_vanilla_multiple_steps() raises:
     print("passed")
 
 
-fn test_sgd_gpu_weight_decay() raises:
+def test_sgd_gpu_weight_decay() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_weight_decay")
@@ -367,7 +367,7 @@ fn test_sgd_gpu_weight_decay() raises:
     print("passed")
 
 
-fn test_sgd_gpu_momentum_single_step() raises:
+def test_sgd_gpu_momentum_single_step() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_momentum_single_step")
@@ -382,7 +382,7 @@ fn test_sgd_gpu_momentum_single_step() raises:
     print("passed")
 
 
-fn test_sgd_gpu_momentum_multiple_steps() raises:
+def test_sgd_gpu_momentum_multiple_steps() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_momentum_multiple_steps")
@@ -398,7 +398,7 @@ fn test_sgd_gpu_momentum_multiple_steps() raises:
     print("passed")
 
 
-fn test_sgd_gpu_momentum_matches_cpu() raises:
+def test_sgd_gpu_momentum_matches_cpu() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_momentum_matches_cpu")
@@ -421,7 +421,7 @@ fn test_sgd_gpu_momentum_matches_cpu() raises:
     print("passed")
 
 
-fn test_sgd_gpu_clip_value() raises:
+def test_sgd_gpu_clip_value() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_clip_value")
@@ -436,7 +436,7 @@ fn test_sgd_gpu_clip_value() raises:
     print("passed")
 
 
-fn test_sgd_gpu_clip_value_matches_cpu() raises:
+def test_sgd_gpu_clip_value_matches_cpu() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_clip_value_matches_cpu")
@@ -458,7 +458,7 @@ fn test_sgd_gpu_clip_value_matches_cpu() raises:
     print("passed")
 
 
-fn test_sgd_gpu_clip_norm_matches_cpu() raises:
+def test_sgd_gpu_clip_norm_matches_cpu() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_clip_norm_matches_cpu")
@@ -480,7 +480,7 @@ fn test_sgd_gpu_clip_norm_matches_cpu() raises:
     print("passed")
 
 
-fn test_sgd_gpu_multiple_parameters() raises:
+def test_sgd_gpu_multiple_parameters() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_multiple_parameters")
@@ -500,7 +500,7 @@ fn test_sgd_gpu_multiple_parameters() raises:
     print("passed")
 
 
-fn test_sgd_gpu_zero_grad() raises:
+def test_sgd_gpu_zero_grad() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_zero_grad")
@@ -517,7 +517,7 @@ fn test_sgd_gpu_zero_grad() raises:
     print("passed")
 
 
-fn test_sgd_gpu_backward_integration() raises:
+def test_sgd_gpu_backward_integration() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_backward_integration")
@@ -538,7 +538,7 @@ fn test_sgd_gpu_backward_integration() raises:
     print("passed")
 
 
-fn test_sgd_gpu_backward_integration_matches_cpu() raises:
+def test_sgd_gpu_backward_integration_matches_cpu() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_backward_integration_matches_cpu")
@@ -566,7 +566,7 @@ fn test_sgd_gpu_backward_integration_matches_cpu() raises:
     print("passed")
 
 
-fn test_sgd_gpu_large_tensor() raises:
+def test_sgd_gpu_large_tensor() raises:
     if not has_accelerator():
         return
     print("test_sgd_gpu_large_tensor")
@@ -588,7 +588,7 @@ fn test_sgd_gpu_large_tensor() raises:
     print("passed")
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

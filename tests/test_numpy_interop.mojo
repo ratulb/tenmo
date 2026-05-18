@@ -4,13 +4,13 @@ from tenmo.numpy_interop import to_ndarray, from_ndarray
 from std.testing import assert_true, TestSuite
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
 
 
-fn test_scalar_tensor_conversion() raises:
+def test_scalar_tensor_conversion() raises:
     print("test_scalar_tensor_conversion")
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(42)
@@ -19,7 +19,7 @@ fn test_scalar_tensor_conversion() raises:
     assert_true((a_back == a))
 
 
-fn test_1d_tensor_random() raises:
+def test_1d_tensor_random() raises:
     print("test_1d_tensor_random")
     comptime dtype = DType.float32
     var a = Tensor[DType.float32].arange(10)
@@ -28,7 +28,7 @@ fn test_1d_tensor_random() raises:
     assert_true((a_back == a))
 
 
-fn test_2d_tensor_random() raises:
+def test_2d_tensor_random() raises:
     print("test_2d_tensor_random")
     comptime dtype = DType.float32
     var a = Tensor[DType.float32].d2([[1.5, 2.5], [3.5, 4.5]])
@@ -37,7 +37,7 @@ fn test_2d_tensor_random() raises:
     assert_true((a_back == a))
 
 
-fn test_3d_tensor_random() raises:
+def test_3d_tensor_random() raises:
     print("test_3d_tensor_random")
     comptime dtype = DType.float32
     var a = Tensor[DType.float32].d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
@@ -46,7 +46,7 @@ fn test_3d_tensor_random() raises:
     assert_true((a_back == a))
 
 
-fn test_4d_tensor_random() raises:
+def test_4d_tensor_random() raises:
     print("test_4d_tensor_random")
     comptime dtype = DType.float32
     var a = Tensor[DType.float32].d4(
@@ -60,7 +60,7 @@ fn test_4d_tensor_random() raises:
     assert_true((a_back == a))
 
 
-fn test_views_1d_2d() raises:
+def test_views_1d_2d() raises:
     print("test_views_1d_2d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(16)
@@ -72,7 +72,7 @@ fn test_views_1d_2d() raises:
     _ = a
 
 
-fn test_views_3d_4d() raises:
+def test_views_3d_4d() raises:
     print("test_views_3d_4d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(64)
@@ -84,7 +84,7 @@ fn test_views_3d_4d() raises:
     _ = a
 
 
-fn test_bool_tensor() raises:
+def test_bool_tensor() raises:
     print("test_bool_tensor")
     comptime dtype = DType.float32
     var b = Tensor[DType.bool].full([3, 3], True)
@@ -93,7 +93,7 @@ fn test_bool_tensor() raises:
     assert_true((b_back == b))
 
 
-fn test_copy_vs_zero_copy() raises:
+def test_copy_vs_zero_copy() raises:
     print("test_copy_vs_zero_copy")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(5)
@@ -108,7 +108,7 @@ fn test_copy_vs_zero_copy() raises:
     assert_true((a_zero == a))
 
 
-fn test_random_tensor_large() raises:
+def test_random_tensor_large() raises:
     print("test_random_tensor_large")
     comptime dtype = DType.float32
     var a = Tensor[DType.float32].arange(120)
@@ -118,7 +118,7 @@ fn test_random_tensor_large() raises:
     assert_true((b_back == b))
 
 
-fn test_1d_tensor_to_numpy_and_back() raises:
+def test_1d_tensor_to_numpy_and_back() raises:
     print("test_1d_tensor_to_numpy_and_back")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(10)
@@ -128,7 +128,7 @@ fn test_1d_tensor_to_numpy_and_back() raises:
     assert_true((a == a_back))
 
 
-fn test_2d_tensor_to_numpy_and_back() raises:
+def test_2d_tensor_to_numpy_and_back() raises:
     print("test_2d_tensor_to_numpy_and_back")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -138,7 +138,7 @@ fn test_2d_tensor_to_numpy_and_back() raises:
     assert_true((a == a_back))
 
 
-fn test_tensor_view_to_numpy_and_back() raises:
+def test_tensor_view_to_numpy_and_back() raises:
     print("test_tensor_view_to_numpy_and_back")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(16)
@@ -151,7 +151,7 @@ fn test_tensor_view_to_numpy_and_back() raises:
     _ = a
 
 
-fn test_bool_tensor_to_numpy_and_back() raises:
+def test_bool_tensor_to_numpy_and_back() raises:
     print("test_bool_tensor_to_numpy_and_back")
     comptime dtype = DType.float32
     var b = Tensor[DType.bool].full([3, 3], True)
@@ -161,7 +161,7 @@ fn test_bool_tensor_to_numpy_and_back() raises:
     assert_true((b_back == b))
 
 
-fn test_copy_vs_zero_copy_behavior() raises:
+def test_copy_vs_zero_copy_behavior() raises:
     print("test_copy_vs_zero_copy_behavior")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(5)

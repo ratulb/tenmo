@@ -71,14 +71,14 @@ struct Layout(ImplicitlyCopyable & Movable & Equatable):
     var offset: Int
     var _contiguous: Bool
 
-    fn __init__(out self):
+    def __init__(out self):
         """Initialize an empty Layout with zero dimensions."""
         self.shape = Shape()
         self.strides = Strides.Zero()
         self.offset = 0
         self._contiguous = True
 
-    fn __init__(
+    def __init__(
         out self,
         shape: Shape,
         strides: Strides,
@@ -90,21 +90,21 @@ struct Layout(ImplicitlyCopyable & Movable & Equatable):
         self.offset = offset
         self._contiguous = strides.is_contiguous(shape)
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         """Copy Layout with deep copy of shape and strides."""
         self.shape = copy.shape.copy()
         self.strides = copy.strides.copy()
         self.offset = copy.offset
         self._contiguous = copy._contiguous
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, deinit take: Self):
         """Move Layout by transferring ownership of shape and strides."""
         self.shape = take.shape^
         self.strides = take.strides^
         self.offset = take.offset
         self._contiguous = take._contiguous
 
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         """Check if two Layouts are equal."""
         return (
             self.shape == other.shape
@@ -112,27 +112,27 @@ struct Layout(ImplicitlyCopyable & Movable & Equatable):
             and self.offset == other.offset
         )
 
-    fn __ne__(self, other: Self) -> Bool:
+    def __ne__(self, other: Self) -> Bool:
         """Check if two Layouts are not equal."""
         return not self.__eq__(other)
 
     @always_inline
-    fn is_contiguous(self) -> Bool:
+    def is_contiguous(self) -> Bool:
         """Return True if the layout represents contiguous memory."""
         return self._contiguous
 
     @always_inline
-    fn num_elements(self) -> Int:
+    def num_elements(self) -> Int:
         """Return the total number of elements in the layout."""
         return self.shape.num_elements()
 
     @always_inline
-    fn rank(self) -> Int:
+    def rank(self) -> Int:
         """Return the number of dimensions in the layout."""
         return self.shape.rank()
 
     @always_inline
-    fn max_index(self) -> Int:
+    def max_index(self) -> Int:
         """Return the maximum linear index addressable in this layout."""
         var max_idx = self.offset
         for i in range(self.shape.rank()):
@@ -141,7 +141,7 @@ struct Layout(ImplicitlyCopyable & Movable & Equatable):
         return max_idx
 
     @always_inline
-    fn min_index(self) -> Int:
+    def min_index(self) -> Int:
         """Return the minimum linear index addressable in this layout."""
         var min_idx = self.offset
         for i in range(self.shape.rank()):
@@ -150,7 +150,7 @@ struct Layout(ImplicitlyCopyable & Movable & Equatable):
         return min_idx
 
     @always_inline
-    fn offset_at(self, indices: IntArray) -> Int:
+    def offset_at(self, indices: IntArray) -> Int:
         """Return the absolute linear offset for given multidimensional indices.
         """
         if indices.size() != self.rank():
@@ -175,44 +175,44 @@ struct Storage[dtype: DType](ImplicitlyCopyable & Movable):
     var buffer: Buffer[Self.dtype]
     var device_state: Optional[DeviceState[Self.dtype]]
 
-    fn __init__(out self):
+    def __init__(out self):
         """Initialize empty Storage with no buffer and no device state."""
         self.buffer = Buffer[Self.dtype]()
         self.device_state = None
 
-    fn __init__(out self, var buffer: Buffer[Self.dtype]):
+    def __init__(out self, var buffer: Buffer[Self.dtype]):
         """Initialize Storage with a CPU buffer."""
         self.buffer = buffer^
         self.device_state = None
 
-    fn __init__(out self, var device_state: DeviceState[Self.dtype]):
+    def __init__(out self, var device_state: DeviceState[Self.dtype]):
         """Initialize Storage with a GPU device state."""
         self.buffer = Buffer[Self.dtype]()
         self.device_state = Optional(device_state^)
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         """Copy Storage with refcount bump for buffer and device_state."""
         self.buffer = copy.buffer.copy()
         self.device_state = copy.device_state.copy()
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, deinit take: Self):
         """Move Storage by transferring ownership of buffer and device_state."""
         self.buffer = take.buffer^
         self.device_state = take.device_state^
 
     @always_inline
-    fn is_on_gpu(self) -> Bool:
+    def is_on_gpu(self) -> Bool:
         """Return True if data resides on GPU."""
         comptime if has_accelerator():
             return self.device_state is not None
         return False
 
     @always_inline
-    fn is_on_cpu(self) -> Bool:
+    def is_on_cpu(self) -> Bool:
         """Return True if data resides on CPU."""
         return not self.is_on_gpu()
 
-    fn copy(self) -> Self:
+    def copy(self) -> Self:
         """Explicit copy — refcount bump only, no data copy."""
         return self
 
@@ -242,79 +242,79 @@ struct NDBuffer[dtype: DType](
     # =================================================================
 
     @always_inline
-    fn shape(ref self) -> ref[self.layout.shape] Shape:
+    def shape(ref self) -> ref[self.layout.shape] Shape:
         """Forward to layout.shape for backward compatibility."""
         return self.layout.shape
 
     @always_inline
-    fn strides(ref self) -> ref[self.layout.strides] Strides:
+    def strides(ref self) -> ref[self.layout.strides] Strides:
         """Forward to layout.strides for backward compatibility."""
         return self.layout.strides
 
     @always_inline
-    fn offset(self) -> Int:
+    def offset(self) -> Int:
         """Forward to layout.offset for backward compatibility."""
         return self.layout.offset
 
     @always_inline
-    fn buffer(ref self) -> ref[self.storage.buffer] Buffer[Self.dtype]:
+    def buffer(ref self) -> ref[self.storage.buffer] Buffer[Self.dtype]:
         """Forward t.storage.buffer for backward compatibility."""
         return self.storage.buffer
 
     @always_inline
-    fn device_state(
+    def device_state(
         ref self,
     ) -> ref[self.storage.device_state] Optional[DeviceState[Self.dtype]]:
         """Forward t.storage.device_state for backward compatibility."""
         return self.storage.device_state
 
     @always_inline
-    fn _contiguous(self) -> Bool:
+    def _contiguous(self) -> Bool:
         """Forward to layout._contiguous for backward compatibility."""
         return self.layout._contiguous
 
     @always_inline
-    fn is_on_gpu(self) -> Bool:
+    def is_on_gpu(self) -> Bool:
         """Return True if data resides on GPU."""
         return self.storage.is_on_gpu()
 
     @always_inline
-    fn is_on_cpu(self) -> Bool:
+    def is_on_cpu(self) -> Bool:
         """Return True if data resides on CPU."""
         return self.storage.is_on_cpu()
 
     @always_inline
-    fn is_contiguous(self) -> Bool:
+    def is_contiguous(self) -> Bool:
         """Return True if the underlying data is contiguous in memory."""
         return self.layout.is_contiguous()
 
     @always_inline
-    fn max_index(self) -> Int:
+    def max_index(self) -> Int:
         """Return the maximum linear index addressable in this buffer."""
         return self.layout.max_index()
 
     @always_inline
-    fn min_index(self) -> Int:
+    def min_index(self) -> Int:
         """Return the minimum linear index addressable in this buffer."""
         return self.layout.min_index()
 
     @always_inline
-    fn numels(self) -> Int:
+    def numels(self) -> Int:
         """Return the total number of elements in the buffer."""
         return self.layout.num_elements()
 
     @always_inline
-    fn rank(self) -> Int:
+    def rank(self) -> Int:
         """Return the number of dimensions in the buffer."""
         return self.layout.rank()
 
     @always_inline
-    fn size(self) -> Int:
+    def size(self) -> Int:
         """Return the size of the underlying buffer."""
         return self.storage.buffer.size
 
     @always_inline
-    fn data_ptr[
+    def data_ptr[
         origin: Origin, address_space: AddressSpace, //
     ](ref[origin, address_space] self) -> UnsafePointer[
         Scalar[Self.dtype], origin, address_space=address_space
@@ -331,14 +331,14 @@ struct NDBuffer[dtype: DType](
     # Constructors.
     # =================================================================
 
-    fn __init__(out self, *values: Scalar[Self.dtype]):
+    def __init__(out self, *values: Scalar[Self.dtype]):
         """Initialize NDBuffer from variadic scalar values."""
         var buffer = Buffer[Self.dtype](len(values))
         for i in range(len(values)):
             buffer[i] = values[i]
         self = NDBuffer[Self.dtype](buffer^)
 
-    fn __init__(
+    def __init__(
         out self,
         var buffer: Buffer[Self.dtype] = Buffer[Self.dtype](),
         shape: Optional[Shape] = None,
@@ -364,7 +364,7 @@ struct NDBuffer[dtype: DType](
             self.layout = Layout(_shape, _strides, offset)
             self.storage = Storage[Self.dtype](buffer^)
 
-    fn __init__(
+    def __init__(
         out self,
         shape: Shape,
         strides: Optional[Strides] = None,
@@ -376,7 +376,7 @@ struct NDBuffer[dtype: DType](
         self.layout = Layout(shape, _strides, offset)
         self.storage = Storage[Self.dtype](buf^)
 
-    fn __init__(
+    def __init__(
         out self,
         device_buffer: DeviceBuffer[Self.dtype],
         shape: Shape,
@@ -393,19 +393,19 @@ struct NDBuffer[dtype: DType](
         self.layout = Layout(shape, Strides.default(shape), 0)
         self.storage = Storage[Self.dtype](buffer^)
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, deinit take: Self):
         """Move NDBuffer by transferring layout an.storage ownership."""
         self.layout = take.layout^
         self.storage = take.storage^
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         """Copy NDBuffer with deep copy of layout and refcount bump fo.storage.
         """
         self.layout = copy.layout.copy()
         self.storage = copy.storage.copy()
 
     @staticmethod
-    fn with_device_state(
+    def with_device_state(
         var device_state: DeviceState[Self.dtype], shape: Shape
     ) -> NDBuffer[Self.dtype]:
         """Create an NDBuffer that owns a GPU device state with given shape."""
@@ -416,7 +416,7 @@ struct NDBuffer[dtype: DType](
 
     @staticmethod
     @always_inline
-    fn Empty() -> NDBuffer[Self.dtype]:
+    def Empty() -> NDBuffer[Self.dtype]:
         """Return an empty NDBuffer."""
         return NDBuffer[Self.dtype](Buffer[Self.dtype]())
 
@@ -426,7 +426,7 @@ struct NDBuffer[dtype: DType](
 
     @staticmethod
     @always_inline
-    fn zeros(
+    def zeros(
         shape: Shape, device: Device = CPU().into()
     ) -> NDBuffer[Self.dtype]:
         """Create a zero-initialized NDBuffer on the specified device."""
@@ -449,7 +449,7 @@ struct NDBuffer[dtype: DType](
 
     @staticmethod
     @always_inline
-    fn full(
+    def full(
         shape: Shape, scalar: Scalar[Self.dtype], device: Device = CPU().into()
     ) -> NDBuffer[Self.dtype]:
         """Create an NDBuffer filled with a scalar value on the specified device.
@@ -473,7 +473,7 @@ struct NDBuffer[dtype: DType](
 
     @staticmethod
     @always_inline
-    fn arange(
+    def arange(
         args: VariadicList[Scalar[Self.dtype], _],
     ) -> NDBuffer[Self.dtype]:
         """Create an NDBuffer with evenly spaced values."""
@@ -483,7 +483,7 @@ struct NDBuffer[dtype: DType](
 
     @staticmethod
     @always_inline
-    fn arange(
+    def arange(
         *args: Scalar[Self.dtype],
     ) -> NDBuffer[Self.dtype]:
         """Create an NDBuffer with evenly spaced values."""
@@ -491,7 +491,7 @@ struct NDBuffer[dtype: DType](
 
     @staticmethod
     @always_inline
-    fn linspace(
+    def linspace(
         start: Scalar[Self.dtype],
         end: Scalar[Self.dtype],
         steps: Int,
@@ -502,7 +502,7 @@ struct NDBuffer[dtype: DType](
         return NDBuffer[Self.dtype](buffer^, shape^)
 
     @staticmethod
-    fn onehot(
+    def onehot(
         indices: NDBuffer[Self.dtype],
         num_classes: Int,
         device: Optional[Device] = None,
@@ -539,7 +539,7 @@ struct NDBuffer[dtype: DType](
     # Device management.
     # =================================================================
 
-    fn get_gpu(
+    def get_gpu(
         ref self,
     ) raises -> ref[self.storage.device_state.value().gpu] GPU:
         """Return a reference to the GPU device if buffer is on GPU."""
@@ -554,31 +554,31 @@ struct NDBuffer[dtype: DType](
                 " accelerator"
             )
 
-    fn to_cpu(self) raises -> Self:
+    def to_cpu(self) raises -> Self:
         """Move the buffer to CPU, returning a new NDBuffer."""
         var _, nd_buffer = self.to_device(CPU().into())
         return nd_buffer^
 
-    fn to_gpu(self, gpu: GPU) raises -> Self:
+    def to_gpu(self, gpu: GPU) raises -> Self:
         """Move the buffer to the specified GPU, returning a new NDBuffer."""
         if self.storage.buffer.size == 0:
             raise "NDBuffer -> to_gpu(): Empty buffer"
         return self.to_device(gpu.into())[1]
 
-    fn device(self) -> Device:
+    def device(self) -> Device:
         """Return the device where the buffer resides."""
         comptime if has_accelerator():
             if self.is_on_gpu():
                 return self.storage.device_state.value().get_gpu().into()
         return CPU().into()
 
-    fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
+    def device_context(self) -> Optional[ArcPointer[DeviceContext]]:
         """Return the device context if buffer is on GPU."""
         if self.is_on_gpu():
             return self.storage.device_state.value().gpu[]
         return None
 
-    fn get_device_state(
+    def get_device_state(
         ref self,
     ) raises -> ref[self.storage.device_state.value()] DeviceState[Self.dtype]:
         """Return a reference to the DeviceState if buffer is on GPU."""
@@ -586,13 +586,13 @@ struct NDBuffer[dtype: DType](
             return self.storage.device_state.value()
         raise "Not on any device"
 
-    fn gpu_id(self) -> Int64:
+    def gpu_id(self) -> Int64:
         """Return the GPU ID if buffer is on GPU, otherwise -1."""
         if self.is_on_gpu():
             return self.storage.device_state.value().get_gpu().id
         return -1
 
-    fn to_device(
+    def to_device(
         self, device: Device
     ) raises -> Tuple[Int, NDBuffer[Self.dtype]]:
         """
@@ -638,7 +638,7 @@ struct NDBuffer[dtype: DType](
             result.copy_from_alike[overwrite=True, validate=False](viewed^)
             return 0, result^
 
-    fn sync(self):
+    def sync(self):
         """Synchronize the device buffer if on GPU."""
         comptime if has_accelerator():
             if self.is_on_gpu():
@@ -652,42 +652,42 @@ struct NDBuffer[dtype: DType](
     # Data access and manipulation.
     # =================================================================
 
-    fn __getitem__(self, indices: IntArray) -> Scalar[Self.dtype]:
+    def __getitem__(self, indices: IntArray) -> Scalar[Self.dtype]:
         """Return the element at the given multidimensional indices."""
         index = IndexCalculator.flatten_index(
             self.layout.shape, indices, self.layout.strides, self.layout.offset
         )
         return self.get(index)
 
-    fn __setitem__(self, indices: IntArray, value: Scalar[Self.dtype]):
+    def __setitem__(self, indices: IntArray, value: Scalar[Self.dtype]):
         """Set the element at the given multidimensional indices."""
         index = IndexCalculator.flatten_index(
             self.layout.shape, indices, self.layout.strides, self.layout.offset
         )
         self.set(index, value)
 
-    fn __getitem__(self, indices: List[Int]) -> Scalar[Self.dtype]:
+    def __getitem__(self, indices: List[Int]) -> Scalar[Self.dtype]:
         """Return the element at the given multidimensional indices."""
         index = IndexCalculator.flatten_index(
             self.layout.shape, indices, self.layout.strides, self.layout.offset
         )
         return self.get(index)
 
-    fn __setitem__(self, indices: List[Int], value: Scalar[Self.dtype]):
+    def __setitem__(self, indices: List[Int], value: Scalar[Self.dtype]):
         """Set the element at the given multidimensional indices."""
         index = IndexCalculator.flatten_index(
             self.layout.shape, indices, self.layout.strides, self.layout.offset
         )
         self.set(index, value)
 
-    fn __getitem__(self, indices: VariadicList[Int, _]) -> Scalar[Self.dtype]:
+    def __getitem__(self, indices: VariadicList[Int, _]) -> Scalar[Self.dtype]:
         """Return the element at the given multidimensional indices."""
         index = IndexCalculator.flatten_index(
             self.layout.shape, indices, self.layout.strides, self.layout.offset
         )
         return self.get(index)
 
-    fn __setitem__(
+    def __setitem__(
         self, indices: VariadicList[Int, _], value: Scalar[Self.dtype]
     ):
         """Set the element at the given multidimensional indices."""
@@ -697,7 +697,7 @@ struct NDBuffer[dtype: DType](
         self.set(index, value)
 
     @always_inline
-    fn item(self) -> Scalar[Self.dtype]:
+    def item(self) -> Scalar[Self.dtype]:
         """Return the scalar value for a zero-dimensional or singleton buffer.
         """
         if self.layout.shape != Shape(1) and self.layout.shape != Shape():
@@ -708,7 +708,7 @@ struct NDBuffer[dtype: DType](
             )
         return self.get(0)
 
-    fn get(self, index: Int) -> Scalar[Self.dtype]:
+    def get(self, index: Int) -> Scalar[Self.dtype]:
         """Return the element at the given linear index."""
         idx = index + self.max_index() if index < 0 else index
         if idx < 0 or idx > self.max_index():
@@ -729,7 +729,7 @@ struct NDBuffer[dtype: DType](
                 return Scalar[Self.dtype](0)
         return self.data_ptr()[idx]
 
-    fn set(self, index: Int, value: Scalar[Self.dtype]):
+    def set(self, index: Int, value: Scalar[Self.dtype]):
         """Set the element at the given linear index."""
         idx = index + self.max_index() if index < 0 else index
         if idx < 0 or idx > self.max_index():
@@ -753,7 +753,7 @@ struct NDBuffer[dtype: DType](
             ptr[idx] = value
 
     @always_inline
-    fn load[
+    def load[
         simdwidth: Int = simd_width_of[Self.dtype](), validated: Bool = False
     ](self, row: Int, col: Int) -> SIMD[Self.dtype, simdwidth]:
         """SIMD load of a row segment from a 2D NDBuffer."""
@@ -817,7 +817,7 @@ struct NDBuffer[dtype: DType](
         return self.data_ptr().load[width=simdwidth](addr)
 
     @always_inline
-    fn store[
+    def store[
         simdwidth: Int = simd_width_of[Self.dtype](), validated: Bool = False
     ](self, row: Int, col: Int, value: SIMD[Self.dtype, simdwidth]):
         """SIMD store of a row segment into a 2D NDBuffer."""
@@ -882,7 +882,7 @@ struct NDBuffer[dtype: DType](
             ptr.store[width=simdwidth](addr, value)
 
     @always_inline
-    fn index_iterator(
+    def index_iterator(
         self,
     ) -> IndexIterator[
         origin_of(self.layout.shape), origin_of(self.layout.strides)
@@ -895,17 +895,17 @@ struct NDBuffer[dtype: DType](
         )
 
     @always_inline
-    fn data_buffer(ref self) -> ref[self.storage.buffer] Buffer[Self.dtype]:
+    def data_buffer(ref self) -> ref[self.storage.buffer] Buffer[Self.dtype]:
         """Return a reference to the underlying Buffer."""
         return self.storage.buffer
 
     @always_inline
-    fn is_scalar(self) -> Bool:
+    def is_scalar(self) -> Bool:
         """Return True if the buffer is a scalar (zero-dimensional)."""
         return self.numels() == 1 and self.layout.shape == Shape()
 
     @always_inline
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         """Return the total number of elements."""
         return self.layout.shape.num_elements()
 
@@ -913,7 +913,7 @@ struct NDBuffer[dtype: DType](
     # Buffer operations.
     # =================================================================
 
-    fn fill(self, value: Scalar[Self.dtype]):
+    def fill(self, value: Scalar[Self.dtype]):
         """Fill all elements with the given scalar value."""
         comptime if has_accelerator():
             if self.is_on_gpu():
@@ -928,7 +928,7 @@ struct NDBuffer[dtype: DType](
             self.fill_cpu(value)
 
     @always_inline
-    fn fill_cpu(self, value: Scalar[Self.dtype]):
+    def fill_cpu(self, value: Scalar[Self.dtype]):
         """Fill all elements on CPU with the given scalar value."""
         ref buffer = self.data_buffer()
         if self.is_contiguous():
@@ -940,7 +940,7 @@ struct NDBuffer[dtype: DType](
             for index in self.index_iterator():
                 (ptr + index)[] = value
 
-    fn fill(self, cpu_buffer: NDBuffer[Self.dtype]):
+    def fill(self, cpu_buffer: NDBuffer[Self.dtype]):
         """Fill this NDBuffer from a CPU NDBuffer."""
         if cpu_buffer.is_scalar() or cpu_buffer.layout.shape == Shape.Unit():
             self.fill(cpu_buffer.item())
@@ -961,7 +961,7 @@ struct NDBuffer[dtype: DType](
         else:
             self.fill_cpu(cpu_buffer)
 
-    fn fill_cpu(self, other: NDBuffer[Self.dtype]):
+    def fill_cpu(self, other: NDBuffer[Self.dtype]):
         """Fill this CPU buffer from another CPU buffer."""
         if self.__is__(other):
             panic("NDBuffer → fill_cpu: cannot fill with self")
@@ -1000,7 +1000,7 @@ struct NDBuffer[dtype: DType](
                 )
                 self[coord] = other[src_coord]
 
-    fn zero(self):
+    def zero(self):
         """Set all elements to zero."""
         self.fill(Scalar[Self.dtype](0))
 
@@ -1019,7 +1019,7 @@ struct NDBuffer[dtype: DType](
                 index += 1
             return buffer^
 
-    fn contiguous_device_state(self) raises -> DeviceState[Self.dtype]:
+    def contiguous_device_state(self) raises -> DeviceState[Self.dtype]:
         """Return a fresh independent contiguous DeviceState. Caller must ensure self is on GPU.
         """
         ref curr_state = self.storage.device_state.value()
@@ -1034,7 +1034,7 @@ struct NDBuffer[dtype: DType](
 
         return new_state^
 
-    fn contiguous(
+    def contiguous(
         self, new_shape: Optional[Shape] = None
     ) -> NDBuffer[Self.dtype]:
         """Return a contiguous copy of the buffer, optionally with new shape."""
@@ -1066,11 +1066,11 @@ struct NDBuffer[dtype: DType](
     # View and sharing operations.
     # =================================================================
 
-    fn shared(self) -> Bool:
+    def shared(self) -> Bool:
         """Check if underlying buffer is shared."""
         return self.storage.buffer.is_shared()
 
-    fn share(
+    def share(
         mut self,
         shape: Optional[Shape] = None,
         strides: Optional[Strides] = None,
@@ -1114,7 +1114,7 @@ struct NDBuffer[dtype: DType](
     # Shape manipulation.
     # =================================================================
 
-    fn reshape(
+    def reshape(
         self, new_shape: Shape, validated: Bool = False
     ) -> NDBuffer[Self.dtype]:
         """Return a reshaped view of the buffer."""
@@ -1127,7 +1127,7 @@ struct NDBuffer[dtype: DType](
                 return self.reshape_gpu(shape)
         return self.contiguous(shape)
 
-    fn reshape_gpu(
+    def reshape_gpu(
         self,
         shape: Shape,
     ) -> NDBuffer[Self.dtype]:
@@ -1145,7 +1145,7 @@ struct NDBuffer[dtype: DType](
             out = NDBuffer[Self.dtype].Empty()
         return out^
 
-    fn transpose(
+    def transpose(
         mut self,
         axes: IntArray = IntArray(),
         *,
@@ -1168,7 +1168,7 @@ struct NDBuffer[dtype: DType](
             var view = self.share(new_shape, new_strides, self.layout.offset)
             return view.contiguous()
 
-    fn flatten(
+    def flatten(
         self,
         start_dim: Int = 0,
         end_dim: Optional[Int] = None,
@@ -1191,7 +1191,7 @@ struct NDBuffer[dtype: DType](
         )
         return self.contiguous(new_shape)
 
-    fn squeeze(
+    def squeeze(
         mut self, axes: IntArray, *, shared: Bool = True
     ) -> NDBuffer[Self.dtype]:
         """Remove dimensions of size 1."""
@@ -1246,7 +1246,7 @@ struct NDBuffer[dtype: DType](
             var view = self.share(new_shape, new_strides, self.layout.offset)
             return view.contiguous()
 
-    fn unsqueeze(
+    def unsqueeze(
         mut self, axes: IntArray, *, shared: Bool = True
     ) -> NDBuffer[Self.dtype]:
         """Insert dimensions of size 1 at specified axes."""
@@ -1303,7 +1303,7 @@ struct NDBuffer[dtype: DType](
             var view = self.share(new_shape, new_strides, self.layout.offset)
             return view.contiguous()
 
-    fn permute(
+    def permute(
         mut self, perm: IntArray, *, shared: Bool = True
     ) -> NDBuffer[Self.dtype]:
         """Permute the axes of the buffer."""
@@ -1348,7 +1348,7 @@ struct NDBuffer[dtype: DType](
             var view = self.share(new_shape, new_strides, self.layout.offset)
             return view.contiguous()
 
-    fn broadcast_to(self, target_shape: Shape) -> NDBuffer[Self.dtype]:
+    def broadcast_to(self, target_shape: Shape) -> NDBuffer[Self.dtype]:
         """
         Broadcast this NDBuffer to target_shape.
         Uses stride=0 trick for broadcast dims — pure metadata, no data copy.
@@ -1390,7 +1390,7 @@ struct NDBuffer[dtype: DType](
     # Type conversion.
     # =================================================================
 
-    fn to_dtype[NewType: DType](self) -> NDBuffer[NewType]:
+    def to_dtype[NewType: DType](self) -> NDBuffer[NewType]:
         """Convert the buffer to a different data type."""
         comptime if has_accelerator():
             if self.is_on_gpu():
@@ -1417,14 +1417,14 @@ struct NDBuffer[dtype: DType](
     # Comparison operations.
     # =================================================================
 
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         """Return True if all elements are equal."""
         var ndb = self.compare[Equal](other)
         if ndb.is_on_gpu():
             return ndb.storage.device_state.value().all_true()
         return ndb.storage.buffer.all_true()
 
-    fn __ne__(self, other: Self) -> Bool:
+    def __ne__(self, other: Self) -> Bool:
         """Return True if any elements are not equal."""
         var ndb = self.compare[NotEqual](other)
         if ndb.is_on_gpu():
@@ -1432,7 +1432,7 @@ struct NDBuffer[dtype: DType](
         return ndb.storage.buffer.all_true()
 
     @always_inline
-    fn compare[
+    def compare[
         op_code: Int,
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
         DType.bool
@@ -1470,7 +1470,7 @@ struct NDBuffer[dtype: DType](
         return result^
 
     @always_inline
-    fn compare_cpu[
+    def compare_cpu[
         op_code: Int,
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
         DType.bool
@@ -1517,7 +1517,7 @@ struct NDBuffer[dtype: DType](
             return NDBuffer[DType.bool](buffer^, self.layout.shape)
 
     @always_inline
-    fn compare_scalar[
+    def compare_scalar[
         op_code: Int,
     ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
         DType.bool
@@ -1544,7 +1544,7 @@ struct NDBuffer[dtype: DType](
         return result^
 
     @always_inline
-    fn compare_scalar_cpu[
+    def compare_scalar_cpu[
         op_code: Int,
     ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
         DType.bool
@@ -1582,7 +1582,7 @@ struct NDBuffer[dtype: DType](
             return NDBuffer[DType.bool](buffer^, self.layout.shape)
 
     @always_inline
-    fn all_close[
+    def all_close[
         rtol: Scalar[Self.dtype] = 1e-5,
         atol: Scalar[Self.dtype] = 1e-8,
     ](self, other: Self) -> Bool:
@@ -1629,7 +1629,7 @@ struct NDBuffer[dtype: DType](
 
         return result
 
-    fn all_true(self: NDBuffer[DType.bool]) -> Bool:
+    def all_true(self: NDBuffer[DType.bool]) -> Bool:
         """Return True if all elements are True."""
         comptime if has_accelerator():
             if self.is_on_gpu():
@@ -1648,7 +1648,7 @@ struct NDBuffer[dtype: DType](
                 return False
         return True
 
-    fn any_true(self: NDBuffer[DType.bool]) -> Bool:
+    def any_true(self: NDBuffer[DType.bool]) -> Bool:
         """Return True if any element is True."""
         comptime if has_accelerator():
             if self.is_on_gpu():
@@ -1672,139 +1672,139 @@ struct NDBuffer[dtype: DType](
     # =================================================================
 
     @always_inline
-    fn __add__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def __add__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Element-wise addition of two buffers."""
         return self.arithmetic_ops[Add](other)
 
     @always_inline
-    fn __sub__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def __sub__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Element-wise subtraction of two buffers."""
         return self.arithmetic_ops[Subtract](other)
 
     @always_inline
-    fn __mul__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def __mul__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Element-wise multiplication of two buffers."""
         return self.arithmetic_ops[Multiply](other)
 
     @always_inline
-    fn __truediv__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def __truediv__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Element-wise division of two buffers."""
         return self.arithmetic_ops[Divide](other)
 
     @always_inline
-    fn __add__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def __add__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Add a scalar to each element."""
         return self.scalar_ops[Add](scalar)
 
     @always_inline
-    fn __sub__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def __sub__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Subtract a scalar from each element."""
         return self.scalar_ops[Subtract](scalar)
 
     @always_inline
-    fn __mul__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def __mul__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Multiply each element by a scalar."""
         return self.scalar_ops[Multiply](scalar)
 
     @always_inline
-    fn __truediv__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def __truediv__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Divide each element by a scalar."""
         return self.scalar_ops[Divide](scalar)
 
     @always_inline
-    fn __rmul__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def __rmul__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Multiply each element by a scalar (commutative)."""
         return self.__mul__(scalar)
 
     @always_inline
-    fn __rtruediv__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def __rtruediv__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Divide a scalar by each element."""
         return self.scalar_ops[ReverseDivide](scalar)
 
     @always_inline
-    fn __neg__(self) -> NDBuffer[Self.dtype]:
+    def __neg__(self) -> NDBuffer[Self.dtype]:
         """Negate each element."""
         return self.unary_ops[NEGATE]()
 
     @always_inline
-    fn __pow__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def __pow__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Raise each element to a scalar power."""
         return self.scalar_ops[POW](scalar)
 
     @always_inline
-    fn __imul__(self, factor: Scalar[Self.dtype]):
+    def __imul__(self, factor: Scalar[Self.dtype]):
         """In-place multiplication by a scalar."""
         self.inplace_scalar_ops[Multiply](factor)
 
     @always_inline
-    fn __iadd__(self, scalar: Scalar[Self.dtype]):
+    def __iadd__(self, scalar: Scalar[Self.dtype]):
         """In-place addition of a scalar."""
         self.inplace_scalar_ops[Add](scalar)
 
     @always_inline
-    fn __isub__(self, scalar: Scalar[Self.dtype]):
+    def __isub__(self, scalar: Scalar[Self.dtype]):
         """In-place subtraction of a scalar."""
         self.inplace_scalar_ops[Subtract](scalar)
 
-    fn __itruediv__(self, scalar: Scalar[Self.dtype]):
+    def __itruediv__(self, scalar: Scalar[Self.dtype]):
         """In-place division by a scalar."""
         self.inplace_scalar_ops[Divide](scalar)
 
     @always_inline
-    fn __imul__(self, other: NDBuffer[Self.dtype]):
+    def __imul__(self, other: NDBuffer[Self.dtype]):
         """In-place element-wise multiplication."""
         self.inplace_ops[Multiply](other)
 
     @always_inline
-    fn __iadd__(self, other: NDBuffer[Self.dtype]):
+    def __iadd__(self, other: NDBuffer[Self.dtype]):
         """In-place element-wise addition."""
         self.inplace_ops[Add](other)
 
     @always_inline
-    fn __isub__(self, other: NDBuffer[Self.dtype]):
+    def __isub__(self, other: NDBuffer[Self.dtype]):
         """In-place element-wise subtraction."""
         self.inplace_ops[Subtract](other)
 
-    fn __itruediv__(self, other: NDBuffer[Self.dtype]):
+    def __itruediv__(self, other: NDBuffer[Self.dtype]):
         """In-place element-wise division."""
         self.inplace_ops[Divide](other)
 
     @always_inline
-    fn max(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def max(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Element-wise maximum with a scalar."""
         return self.scalar_ops[MAX](scalar)
 
     @always_inline
-    fn min(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def min(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Element-wise minimum with a scalar."""
         return self.scalar_ops[MIN](scalar)
 
     @always_inline
-    fn log[
+    def log[
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ](self) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Natural logarithm of each element."""
         return self.float_unary_ops[LOG, epsilon]()
 
     @always_inline
-    fn exp(self) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+    def exp(self) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Exponential of each element."""
         return self.float_unary_ops[EXP]()
 
     @always_inline
-    fn sigmoid(
+    def sigmoid(
         self,
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Sigmoid activation function applied to each element."""
         return self.float_unary_ops[SIGMOID_FORWARD]()
 
     @always_inline
-    fn tanh(self) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+    def tanh(self) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Hyperbolic tangent applied to each element."""
         return self.float_unary_ops[TANH_FORWARD]()
 
     @always_inline
-    fn clamp(
+    def clamp(
         self: NDBuffer[Self.dtype],
         lower_bound: Scalar[Self.dtype],
         upper_bound: Scalar[Self.dtype],
@@ -1832,7 +1832,7 @@ struct NDBuffer[dtype: DType](
 
             return NDBuffer[Self.dtype](result_buffer^, self.layout.shape)
 
-    fn clamp_in_place(
+    def clamp_in_place(
         self: NDBuffer[Self.dtype],
         lower_bound: Scalar[Self.dtype],
         upper_bound: Scalar[Self.dtype],
@@ -1851,7 +1851,7 @@ struct NDBuffer[dtype: DType](
     # =================================================================
 
     @always_inline
-    fn arithmetic_ops[
+    def arithmetic_ops[
         op_code: Int,
     ](
         self: NDBuffer[Self.dtype],
@@ -1895,7 +1895,7 @@ struct NDBuffer[dtype: DType](
         return out^
 
     @always_inline
-    fn arithmetic_ops_cpu[
+    def arithmetic_ops_cpu[
         op_code: Int,
     ](
         self: NDBuffer[Self.dtype],
@@ -1969,7 +1969,7 @@ struct NDBuffer[dtype: DType](
             return NDBuffer[Self.dtype](result_buffer^, self.layout.shape)
 
     @always_inline
-    fn broadcast_buffer[
+    def broadcast_buffer[
         op_code: Int,
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
         Self.dtype
@@ -1981,7 +1981,7 @@ struct NDBuffer[dtype: DType](
             return self.broadcast_nd_buffer[op_code](other)
 
     @always_inline
-    fn broadcast_scalar_buffer[
+    def broadcast_scalar_buffer[
         op_code: Int
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
         Self.dtype
@@ -2010,7 +2010,7 @@ struct NDBuffer[dtype: DType](
         return NDBuffer[Self.dtype](buffer^, result_shape)
 
     @always_inline
-    fn broadcast_nd_buffer[
+    def broadcast_nd_buffer[
         op_code: Int
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
         Self.dtype
@@ -2046,7 +2046,7 @@ struct NDBuffer[dtype: DType](
         return NDBuffer[Self.dtype](buffer^, result_shape)
 
     @always_inline
-    fn scalar_ops[
+    def scalar_ops[
         op_code: Int,
     ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
         Self.dtype
@@ -2087,7 +2087,7 @@ struct NDBuffer[dtype: DType](
         return out^
 
     @always_inline
-    fn scalar_ops_cpu[
+    def scalar_ops_cpu[
         op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
         Self.dtype
@@ -2119,7 +2119,7 @@ struct NDBuffer[dtype: DType](
             return NDBuffer[Self.dtype](result_buffer^, self.layout.shape)
 
     @always_inline
-    fn inplace_ops[
+    def inplace_ops[
         op_code: Int,
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]):
         """In-place element-wise operation with another buffer."""
@@ -2154,7 +2154,7 @@ struct NDBuffer[dtype: DType](
             self.inplace_ops_cpu[op_code](other)
 
     @always_inline
-    fn inplace_ops_cpu[
+    def inplace_ops_cpu[
         op_code: Int,
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]):
         """In-place element-wise operation with another buffer on CPU."""
@@ -2231,7 +2231,7 @@ struct NDBuffer[dtype: DType](
                     )
 
     @always_inline
-    fn inplace_scalar_ops[
+    def inplace_scalar_ops[
         op_code: Int,
     ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]):
         """In-place scalar operation on all elements."""
@@ -2260,7 +2260,7 @@ struct NDBuffer[dtype: DType](
             self.inplace_scalar_ops_cpu[op_code](scalar)
 
     @always_inline
-    fn inplace_scalar_ops_cpu[
+    def inplace_scalar_ops_cpu[
         op_code: Int,
     ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]):
         """In-place scalar operation on all elements on CPU."""
@@ -2284,7 +2284,7 @@ struct NDBuffer[dtype: DType](
     # =================================================================
 
     @always_inline
-    fn unary_ops[
+    def unary_ops[
         op_code: Int,
     ](self: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Apply unary operation to each element."""
@@ -2312,7 +2312,7 @@ struct NDBuffer[dtype: DType](
         return out^
 
     @always_inline
-    fn unary_ops_cpu[
+    def unary_ops_cpu[
         op_code: Int
     ](self: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         """Apply unary operation to each element on CPU."""
@@ -2343,7 +2343,7 @@ struct NDBuffer[dtype: DType](
             return NDBuffer[Self.dtype](result_buffer^, self.layout.shape)
 
     @always_inline
-    fn float_unary_ops[
+    def float_unary_ops[
         op_code: Int,
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](self: NDBuffer[Self.dtype]) -> NDBuffer[
@@ -2376,7 +2376,7 @@ struct NDBuffer[dtype: DType](
         return out^
 
     @always_inline
-    fn float_unary_ops_cpu[
+    def float_unary_ops_cpu[
         op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ](self: NDBuffer[Self.dtype]) -> NDBuffer[
         Self.dtype
@@ -2402,7 +2402,7 @@ struct NDBuffer[dtype: DType](
             return NDBuffer[Self.dtype](result_buffer^, self.layout.shape)
 
     @always_inline
-    fn unary_ops_with_mask[
+    def unary_ops_with_mask[
         op_code: Int,
     ](self: NDBuffer[Self.dtype]) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
@@ -2434,7 +2434,7 @@ struct NDBuffer[dtype: DType](
         return (out^, mask^)
 
     @always_inline
-    fn unary_ops_with_mask_cpu[
+    def unary_ops_with_mask_cpu[
         op_code: Int,
     ](self: NDBuffer[Self.dtype]) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
@@ -2478,7 +2478,7 @@ struct NDBuffer[dtype: DType](
     # Reduction operations.
     # =================================================================
 
-    fn sum_all(self) -> Scalar[Self.dtype]:
+    def sum_all(self) -> Scalar[Self.dtype]:
         """Return the sum of all elements."""
         if self.is_contiguous():
             var start = self.layout.offset
@@ -2490,13 +2490,13 @@ struct NDBuffer[dtype: DType](
                 accum_sum += self.storage.buffer[index]
             return accum_sum
 
-    fn sum(
+    def sum(
         self, normalized_axes: IntArray, keepdims: Bool = False
     ) -> NDBuffer[Self.dtype]:
         """Return the sum over specified axes."""
         return self.reduce[mean=False](normalized_axes, keepdims)
 
-    fn reduce[
+    def reduce[
         mean: Bool = False
     ](self, normalized_axes: IntArray, keepdims: Bool = False) -> NDBuffer[
         Self.dtype
@@ -2525,7 +2525,7 @@ struct NDBuffer[dtype: DType](
 
         return out^
 
-    fn reduce_cpu[
+    def reduce_cpu[
         mean: Bool = False
     ](self, normalized_axes: IntArray, keepdims: Bool,) -> NDBuffer[Self.dtype]:
         """Reduce over specified axes on CPU with optional mean calculation."""
@@ -2572,7 +2572,7 @@ struct NDBuffer[dtype: DType](
 
         return out^
 
-    fn log_sum(
+    def log_sum(
         self, normalized_axes: IntArray, keepdims: Bool = False
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Return log(sum(exp(x))) over specified axes."""
@@ -2591,7 +2591,7 @@ struct NDBuffer[dtype: DType](
         else:
             return self.reduce_log_sum_cpu(normalized_axes, keepdims)
 
-    fn reduce_log_sum_cpu(
+    def reduce_log_sum_cpu(
         self, normalized_axes: IntArray, keepdims: Bool
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Return log(sum(exp(x))) over specified axes on CPU."""
@@ -2622,7 +2622,7 @@ struct NDBuffer[dtype: DType](
 
         return out^
 
-    fn minmax[
+    def minmax[
         is_max: Bool
     ](
         self, axes: IntArray, keepdims: Bool = False, paired: Bool = False
@@ -2652,7 +2652,7 @@ struct NDBuffer[dtype: DType](
         else:
             return self.minmax_cpu[is_max](normalized_axes, keepdims, paired)
 
-    fn minmax_cpu[
+    def minmax_cpu[
         is_max: Bool
     ](
         self,
@@ -2676,7 +2676,7 @@ struct NDBuffer[dtype: DType](
     # Softmax operations.
     # =================================================================
 
-    fn softmax(
+    def softmax(
         self, axes: IntArray, validated: Bool = False
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Apply softmax activation over specified axes."""
@@ -2689,7 +2689,7 @@ struct NDBuffer[dtype: DType](
         var exp_sum = stable_exp.sum(normalized_axes, keepdims=True)
         return stable_exp / exp_sum
 
-    fn log_softmax(
+    def log_softmax(
         self, axes: IntArray, validated: Bool = False
     ) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
@@ -2705,7 +2705,7 @@ struct NDBuffer[dtype: DType](
         var exp_sum = stable_exp.sum(normalized_axes, keepdims=True)
         return stable - log_sum_exp, stable_exp / exp_sum
 
-    fn _softmax_components(
+    def _softmax_components(
         self, normalized_axes: IntArray
     ) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
@@ -2722,7 +2722,7 @@ struct NDBuffer[dtype: DType](
     # Matrix multiplication.
     # =================================================================
 
-    fn matmul_2d(
+    def matmul_2d(
         A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
     ) -> NDBuffer[Self.dtype]:
         """2D matrix multiplication."""
@@ -2762,7 +2762,7 @@ struct NDBuffer[dtype: DType](
 
         return C^
 
-    fn matmul_2d_cpu(
+    def matmul_2d_cpu(
         A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
     ) -> NDBuffer[Self.dtype]:
         """2D matrix multiplication on CPU."""
@@ -2796,7 +2796,7 @@ struct NDBuffer[dtype: DType](
             var num_tiles_i = (m + tile_size - 1) // tile_size
 
             @parameter
-            fn process_row_tile(tile_idx: Int):
+            def process_row_tile(tile_idx: Int):
                 var i_tile = tile_idx * tile_size
                 var i_end = min(i_tile + tile_size, m)
 
@@ -2871,7 +2871,7 @@ struct NDBuffer[dtype: DType](
 
         return C^
 
-    fn matmul_nd(
+    def matmul_nd(
         A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
     ) -> NDBuffer[Self.dtype]:
         """Batch matrix multiplication."""
@@ -2927,7 +2927,7 @@ struct NDBuffer[dtype: DType](
 
         return C^
 
-    fn matmul_nd_cpu(
+    def matmul_nd_cpu(
         A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
     ) -> NDBuffer[Self.dtype]:
         """Batch matrix multiplication on CPU."""
@@ -3004,7 +3004,7 @@ struct NDBuffer[dtype: DType](
         var total_tiles = total_batch * num_tiles_i
 
         @parameter
-        fn process_tile(flat_idx: Int):
+        def process_tile(flat_idx: Int):
             var batch = flat_idx // num_tiles_i
             var tile_idx = flat_idx % num_tiles_i
 
@@ -3120,7 +3120,7 @@ struct NDBuffer[dtype: DType](
     # Copy and fill operations.
     # =================================================================
 
-    fn copy_from_alike[
+    def copy_from_alike[
         overwrite: Bool = True, validate: Bool = True
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]):
         """Copy data from another buffer with matching shape."""
@@ -3206,7 +3206,7 @@ struct NDBuffer[dtype: DType](
     # Counting and unique operations.
     # =================================================================
 
-    fn count(self, key: Scalar[Self.dtype]) -> Int:
+    def count(self, key: Scalar[Self.dtype]) -> Int:
         """Count occurrences of key in the buffer."""
         comptime if has_accelerator():
             if self.is_on_gpu():
@@ -3266,7 +3266,7 @@ struct NDBuffer[dtype: DType](
                 _count += 1
         return _count
 
-    fn unique(self) -> NDBuffer[Self.dtype]:
+    def unique(self) -> NDBuffer[Self.dtype]:
         """Return a buffer containing unique values."""
         comptime if has_accelerator():
             if self.is_on_gpu():
@@ -3329,7 +3329,7 @@ struct NDBuffer[dtype: DType](
     # Map operations.
     # =================================================================
 
-    fn map_where(
+    def map_where(
         self, pred: fn(Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
     ) -> NDBuffer[Self.dtype]:
         """Replace elements where predicate is true with given value."""
@@ -3351,7 +3351,7 @@ struct NDBuffer[dtype: DType](
         return self.map_where_cpu(pred, value)
 
     @always_inline
-    fn map_where_cpu(
+    def map_where_cpu(
         self, pred: fn(Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
     ) -> NDBuffer[Self.dtype]:
         """Replace elements where predicate is true with given value on CPU."""
@@ -3362,7 +3362,7 @@ struct NDBuffer[dtype: DType](
             index += 1
         return NDBuffer[Self.dtype](buffer^, self.layout.shape)
 
-    fn map[
+    def map[
         map_buffer: fn(Buffer[Self.dtype]) -> Buffer[Self.dtype],
         map_element: fn(Scalar[Self.dtype]) -> Scalar[Self.dtype],
     ](self) -> Buffer[Self.dtype]:
@@ -3379,7 +3379,7 @@ struct NDBuffer[dtype: DType](
                 index += 1
             return buffer^
 
-    fn map_to_bool(
+    def map_to_bool(
         self,
         pred: fn(Scalar[Self.dtype]) -> Bool,
     ) -> NDBuffer[DType.bool]:
@@ -3403,7 +3403,7 @@ struct NDBuffer[dtype: DType](
     # Shuffle operation.
     # =================================================================
 
-    fn shuffle(
+    def shuffle(
         self,
         permutation: List[Int],
         axis: Int,
@@ -3422,7 +3422,7 @@ struct NDBuffer[dtype: DType](
     # =================================================================
 
     @always_inline
-    fn sum_over_broadcasted_axes(
+    def sum_over_broadcasted_axes(
         extended_buffer: NDBuffer[Self.dtype], target_shape: Shape
     ) -> NDBuffer[Self.dtype]:
         """Reduce broadcasted dimensions to match target shape."""
@@ -3450,7 +3450,7 @@ struct NDBuffer[dtype: DType](
     # =================================================================
 
     @always_inline
-    fn __is__(self, other: NDBuffer[Self.dtype]) -> Bool:
+    def __is__(self, other: NDBuffer[Self.dtype]) -> Bool:
         """Check if two buffers share the same underlying data."""
         if self.is_on_cpu() and other.is_on_cpu():
             return self.data_ptr() == other.data_ptr()
@@ -3467,7 +3467,7 @@ struct NDBuffer[dtype: DType](
 
     @staticmethod
     @always_inline
-    fn scalar_fn[
+    def scalar_fn[
         op_code: Int,
     ](
         lhs: Scalar[Self.dtype],
@@ -3500,7 +3500,7 @@ struct NDBuffer[dtype: DType](
 
     @staticmethod
     @always_inline
-    fn unary_fn_helper[
+    def unary_fn_helper[
         op_code: Int
     ](scalar: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
         """Apply unary operation to a scalar."""
@@ -3513,7 +3513,7 @@ struct NDBuffer[dtype: DType](
 
     @staticmethod
     @always_inline
-    fn float_unary_fn_helper[
+    def float_unary_fn_helper[
         op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ](scalar: Scalar[Self.dtype]) -> Scalar[
         Self.dtype
@@ -3534,7 +3534,7 @@ struct NDBuffer[dtype: DType](
     # String representation.
     # =================================================================
 
-    fn __str__(self) -> String:
+    def __str__(self) -> String:
         """Return a string representation of the buffer."""
         s = String("NDBuffer [")
         s += "Shape: " + String(self.layout.shape)
@@ -3553,7 +3553,7 @@ struct NDBuffer[dtype: DType](
         s += "]"
         return s
 
-    fn print(self, num_first: Int = 10, num_last: Int = 10):
+    def print(self, num_first: Int = 10, num_last: Int = 10):
         """Print the buffer contents."""
         print(
             "\n",
@@ -3569,10 +3569,10 @@ struct NDBuffer[dtype: DType](
             num_last=num_last,
         )
 
-    fn __repr__(self) -> String:
+    def __repr__(self) -> String:
         """Return a string representation of the buffer."""
         return self.__str__()
 
-    fn write_to[W: Writer](self, mut writer: W):
+    def write_to[W: Writer](self, mut writer: W):
         """Write the string representation to a writer."""
         writer.write(self.__str__())

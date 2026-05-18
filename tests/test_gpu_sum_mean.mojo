@@ -13,7 +13,7 @@ comptime dtype = DType.float32
 # ============================================================
 
 
-fn test_gpu_sum_full_reduction_scalar_grad() raises:
+def test_gpu_sum_full_reduction_scalar_grad() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_full_reduction_scalar_grad")
         comptime dtype = DType.float32
@@ -28,7 +28,7 @@ fn test_gpu_sum_full_reduction_scalar_grad() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_gpu_sum_axis0_no_keepdims() raises:
+def test_gpu_sum_axis0_no_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_axis0_no_keepdims")
         comptime dtype = DType.float32
@@ -43,7 +43,7 @@ fn test_gpu_sum_axis0_no_keepdims() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_gpu_sum_axis1_no_keepdims() raises:
+def test_gpu_sum_axis1_no_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_axis1_no_keepdims")
         comptime dtype = DType.float32
@@ -59,7 +59,7 @@ fn test_gpu_sum_axis1_no_keepdims() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_gpu_sum_axis0_keepdims() raises:
+def test_gpu_sum_axis0_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_axis0_keepdims")
         comptime dtype = DType.float32
@@ -72,7 +72,7 @@ fn test_gpu_sum_axis0_keepdims() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_gpu_sum_axis1_keepdims() raises:
+def test_gpu_sum_axis1_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_axis1_keepdims")
         comptime dtype = DType.float32
@@ -85,7 +85,7 @@ fn test_gpu_sum_axis1_keepdims() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_gpu_sum_multi_axis_no_keepdims() raises:
+def test_gpu_sum_multi_axis_no_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_multi_axis_no_keepdims")
         comptime dtype = DType.float32
@@ -102,7 +102,7 @@ fn test_gpu_sum_multi_axis_no_keepdims() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_gpu_sum_multi_axis_keepdims() raises:
+def test_gpu_sum_multi_axis_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_multi_axis_keepdims")
         comptime dtype = DType.float32
@@ -117,7 +117,7 @@ fn test_gpu_sum_multi_axis_keepdims() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_gpu_sum_3d_axis1_keepdims() raises:
+def test_gpu_sum_3d_axis1_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_3d_axis1_keepdims")
         comptime dtype = DType.float32
@@ -136,7 +136,7 @@ fn test_gpu_sum_3d_axis1_keepdims() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_gpu_sum_negative_axis() raises:
+def test_gpu_sum_negative_axis() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_negative_axis")
         comptime dtype = DType.float32
@@ -151,7 +151,7 @@ fn test_gpu_sum_negative_axis() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_gpu_sum_4d_middle_axes() raises:
+def test_gpu_sum_4d_middle_axes() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_4d_middle_axes")
         comptime dtype = DType.float32
@@ -170,7 +170,7 @@ fn test_gpu_sum_4d_middle_axes() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_gpu_sum_grad_accumulation() raises:
+def test_gpu_sum_grad_accumulation() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_grad_accumulation")
         comptime dtype = DType.float32
@@ -189,7 +189,7 @@ fn test_gpu_sum_grad_accumulation() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d2([[2.0, 2.0], [2.0, 2.0]])))
 
 
-fn test_gpu_sum_matches_cpu() raises:
+def test_gpu_sum_matches_cpu() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_matches_cpu")
         comptime dtype = DType.float32
@@ -213,7 +213,7 @@ fn test_gpu_sum_matches_cpu() raises:
 # ============================================================
 
 
-fn test_gpu_mean_full_reduction_scalar_grad() raises:
+def test_gpu_mean_full_reduction_scalar_grad() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_full_reduction_scalar_grad")
         comptime dtype = DType.float32
@@ -228,7 +228,7 @@ fn test_gpu_mean_full_reduction_scalar_grad() raises:
         )
 
 
-fn test_gpu_mean_axis0_no_keepdims() raises:
+def test_gpu_mean_axis0_no_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_axis0_no_keepdims")
         comptime dtype = DType.float32
@@ -242,7 +242,7 @@ fn test_gpu_mean_axis0_no_keepdims() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d2([[0.5, 0.5], [0.5, 0.5]])))
 
 
-fn test_gpu_mean_axis1_no_keepdims() raises:
+def test_gpu_mean_axis1_no_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_axis1_no_keepdims")
         comptime dtype = DType.float32
@@ -261,7 +261,7 @@ fn test_gpu_mean_axis1_no_keepdims() raises:
         assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_gpu_mean_axis0_keepdims() raises:
+def test_gpu_mean_axis0_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_axis0_keepdims")
         comptime dtype = DType.float32
@@ -274,7 +274,7 @@ fn test_gpu_mean_axis0_keepdims() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d2([[0.5, 0.5], [0.5, 0.5]])))
 
 
-fn test_gpu_mean_axis1_keepdims() raises:
+def test_gpu_mean_axis1_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_axis1_keepdims")
         comptime dtype = DType.float32
@@ -289,7 +289,7 @@ fn test_gpu_mean_axis1_keepdims() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d2([[0.5, 0.5], [0.5, 0.5]])))
 
 
-fn test_gpu_mean_3d_axis1_no_keepdims() raises:
+def test_gpu_mean_3d_axis1_no_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_3d_axis1_no_keepdims")
         comptime dtype = DType.float32
@@ -314,7 +314,7 @@ fn test_gpu_mean_3d_axis1_no_keepdims() raises:
         )
 
 
-fn test_gpu_mean_3d_axis1_keepdims() raises:
+def test_gpu_mean_3d_axis1_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_3d_axis1_keepdims")
         comptime dtype = DType.float32
@@ -337,7 +337,7 @@ fn test_gpu_mean_3d_axis1_keepdims() raises:
         )
 
 
-fn test_gpu_mean_multi_axis_no_keepdims() raises:
+def test_gpu_mean_multi_axis_no_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_multi_axis_no_keepdims")
         comptime dtype = DType.float32
@@ -361,7 +361,7 @@ fn test_gpu_mean_multi_axis_no_keepdims() raises:
         )
 
 
-fn test_gpu_mean_multi_axis_keepdims() raises:
+def test_gpu_mean_multi_axis_keepdims() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_multi_axis_keepdims")
         comptime dtype = DType.float32
@@ -382,7 +382,7 @@ fn test_gpu_mean_multi_axis_keepdims() raises:
         )
 
 
-fn test_gpu_mean_negative_axis() raises:
+def test_gpu_mean_negative_axis() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_negative_axis")
         comptime dtype = DType.float32
@@ -406,7 +406,7 @@ fn test_gpu_mean_negative_axis() raises:
         )
 
 
-fn test_gpu_mean_4d_middle_axes() raises:
+def test_gpu_mean_4d_middle_axes() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_4d_middle_axes")
         comptime dtype = DType.float32
@@ -427,7 +427,7 @@ fn test_gpu_mean_4d_middle_axes() raises:
         assert_true(a.grad().all_close(a_copy.grad()))
 
 
-fn test_gpu_mean_matches_cpu() raises:
+def test_gpu_mean_matches_cpu() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_matches_cpu")
         comptime dtype = DType.float32
@@ -446,7 +446,7 @@ fn test_gpu_mean_matches_cpu() raises:
         assert_true(a.grad().all_close(a_copy.grad()))
 
 
-fn test_gpu_mean_grad_accumulation() raises:
+def test_gpu_mean_grad_accumulation() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_grad_accumulation")
         comptime dtype = DType.float32
@@ -468,7 +468,7 @@ fn test_gpu_mean_grad_accumulation() raises:
 # ============================================================
 
 
-fn test_gpu_sum_grad_lands_on_cpu() raises:
+def test_gpu_sum_grad_lands_on_cpu() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_grad_lands_on_cpu")
         comptime dtype = DType.float32
@@ -481,7 +481,7 @@ fn test_gpu_sum_grad_lands_on_cpu() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_gpu_mean_grad_lands_on_cpu() raises:
+def test_gpu_mean_grad_lands_on_cpu() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_grad_lands_on_cpu")
         comptime dtype = DType.float32
@@ -495,7 +495,7 @@ fn test_gpu_mean_grad_lands_on_cpu() raises:
         )
 
 
-fn test_gpu_sum_cpu_tensor_unchanged_after_transfer() raises:
+def test_gpu_sum_cpu_tensor_unchanged_after_transfer() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_cpu_tensor_unchanged_after_transfer")
         comptime dtype = DType.float32
@@ -508,7 +508,7 @@ fn test_gpu_sum_cpu_tensor_unchanged_after_transfer() raises:
         assert_true(a.all_close(a_snapshot))
 
 
-fn test_gpu_sum_chained_ops_grad_flow() raises:
+def test_gpu_sum_chained_ops_grad_flow() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_chained_ops_grad_flow")
         comptime dtype = DType.float32
@@ -525,7 +525,7 @@ fn test_gpu_sum_chained_ops_grad_flow() raises:
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_gpu_mean_chained_with_sum_grad_flow() raises:
+def test_gpu_mean_chained_with_sum_grad_flow() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_chained_with_sum_grad_flow")
         comptime dtype = DType.float32
@@ -552,7 +552,7 @@ fn test_gpu_mean_chained_with_sum_grad_flow() raises:
 # ── Sum forward tests ─────────────────────────────────────────────────────────
 
 
-fn test_gpu_sum_full_reduction_forward() raises:
+def test_gpu_sum_full_reduction_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_full_reduction_forward")
         var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
@@ -562,7 +562,7 @@ fn test_gpu_sum_full_reduction_forward() raises:
         assert_true(s_cpu.all_close(s_gpu.to_cpu()))
 
 
-fn test_gpu_sum_axis0_forward() raises:
+def test_gpu_sum_axis0_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_axis0_forward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -572,7 +572,7 @@ fn test_gpu_sum_axis0_forward() raises:
         assert_true(s_cpu.all_close(s_gpu.to_cpu()))
 
 
-fn test_gpu_sum_axis1_forward() raises:
+def test_gpu_sum_axis1_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_axis1_forward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -582,7 +582,7 @@ fn test_gpu_sum_axis1_forward() raises:
         assert_true(s_cpu.all_close(s_gpu.to_cpu()))
 
 
-fn test_gpu_sum_axis0_keepdims_forward() raises:
+def test_gpu_sum_axis0_keepdims_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_axis0_keepdims_forward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -592,7 +592,7 @@ fn test_gpu_sum_axis0_keepdims_forward() raises:
         assert_true(s_cpu.all_close(s_gpu.to_cpu()))
 
 
-fn test_gpu_sum_axis1_keepdims_forward() raises:
+def test_gpu_sum_axis1_keepdims_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_axis1_keepdims_forward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -602,7 +602,7 @@ fn test_gpu_sum_axis1_keepdims_forward() raises:
         assert_true(s_cpu.all_close(s_gpu.to_cpu()))
 
 
-fn test_gpu_sum_3d_axis0_forward() raises:
+def test_gpu_sum_3d_axis0_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_3d_axis0_forward")
         var a = Tensor[dtype].d3(
@@ -614,7 +614,7 @@ fn test_gpu_sum_3d_axis0_forward() raises:
         assert_true(s_cpu.all_close(s_gpu.to_cpu()))
 
 
-fn test_gpu_sum_3d_axis1_forward() raises:
+def test_gpu_sum_3d_axis1_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_3d_axis1_forward")
         var a = Tensor[dtype].d3(
@@ -626,7 +626,7 @@ fn test_gpu_sum_3d_axis1_forward() raises:
         assert_true(s_cpu.all_close(s_gpu.to_cpu()))
 
 
-fn test_gpu_sum_3d_axis2_forward() raises:
+def test_gpu_sum_3d_axis2_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_3d_axis2_forward")
         var a = Tensor[dtype].d3(
@@ -638,7 +638,7 @@ fn test_gpu_sum_3d_axis2_forward() raises:
         assert_true(s_cpu.all_close(s_gpu.to_cpu()))
 
 
-fn test_gpu_sum_3d_axis1_keepdims_forward() raises:
+def test_gpu_sum_3d_axis1_keepdims_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_3d_axis1_keepdims_forward")
         var a = Tensor[dtype].d3(
@@ -650,7 +650,7 @@ fn test_gpu_sum_3d_axis1_keepdims_forward() raises:
         assert_true(s_cpu.all_close(s_gpu.to_cpu()))
 
 
-fn test_gpu_sum_multi_axis_forward() raises:
+def test_gpu_sum_multi_axis_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_multi_axis_forward")
         var a = Tensor[dtype].d3(
@@ -662,7 +662,7 @@ fn test_gpu_sum_multi_axis_forward() raises:
         assert_true(s_cpu.all_close(s_gpu.to_cpu()))
 
 
-fn test_gpu_sum_large_tensor_forward() raises:
+def test_gpu_sum_large_tensor_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_large_tensor_forward")
         var a = Tensor[dtype].rand(32, 64, requires_grad=True)
@@ -675,7 +675,7 @@ fn test_gpu_sum_large_tensor_forward() raises:
 # ── Sum backward tests ────────────────────────────────────────────────────────
 
 
-fn test_gpu_sum_full_reduction_backward() raises:
+def test_gpu_sum_full_reduction_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_full_reduction_backward")
         var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
@@ -689,7 +689,7 @@ fn test_gpu_sum_full_reduction_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_sum_axis0_backward() raises:
+def test_gpu_sum_axis0_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_axis0_backward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -703,7 +703,7 @@ fn test_gpu_sum_axis0_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_sum_axis1_backward() raises:
+def test_gpu_sum_axis1_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_axis1_backward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -717,7 +717,7 @@ fn test_gpu_sum_axis1_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_sum_axis0_keepdims_backward() raises:
+def test_gpu_sum_axis0_keepdims_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_axis0_keepdims_backward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -731,7 +731,7 @@ fn test_gpu_sum_axis0_keepdims_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_sum_axis1_keepdims_backward() raises:
+def test_gpu_sum_axis1_keepdims_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_axis1_keepdims_backward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -745,7 +745,7 @@ fn test_gpu_sum_axis1_keepdims_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_sum_3d_axis1_backward() raises:
+def test_gpu_sum_3d_axis1_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_3d_axis1_backward")
         var a = Tensor[dtype].d3(
@@ -761,7 +761,7 @@ fn test_gpu_sum_3d_axis1_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_sum_3d_axis1_keepdims_backward() raises:
+def test_gpu_sum_3d_axis1_keepdims_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_3d_axis1_keepdims_backward")
         var a = Tensor[dtype].d3(
@@ -777,7 +777,7 @@ fn test_gpu_sum_3d_axis1_keepdims_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_sum_multi_axis_backward() raises:
+def test_gpu_sum_multi_axis_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_multi_axis_backward")
         var a = Tensor[dtype].d3(
@@ -793,7 +793,7 @@ fn test_gpu_sum_multi_axis_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_sum_large_tensor_backward() raises:
+def test_gpu_sum_large_tensor_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_large_tensor_backward")
         var a = Tensor[dtype].rand(32, 64, requires_grad=True)
@@ -807,7 +807,7 @@ fn test_gpu_sum_large_tensor_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_sum_grad_flows_to_cpu() raises:
+def test_gpu_sum_grad_flows_to_cpu() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_grad_flows_to_cpu")
         var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
@@ -821,7 +821,7 @@ fn test_gpu_sum_grad_flows_to_cpu() raises:
 # ── Mean forward tests ────────────────────────────────────────────────────────
 
 
-fn test_gpu_mean_full_reduction_forward() raises:
+def test_gpu_mean_full_reduction_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_full_reduction_forward")
         var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
@@ -831,7 +831,7 @@ fn test_gpu_mean_full_reduction_forward() raises:
         assert_true(m_cpu.all_close(m_gpu.to_cpu()))
 
 
-fn test_gpu_mean_axis0_forward() raises:
+def test_gpu_mean_axis0_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_axis0_forward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -841,7 +841,7 @@ fn test_gpu_mean_axis0_forward() raises:
         assert_true(m_cpu.all_close(m_gpu.to_cpu()))
 
 
-fn test_gpu_mean_axis1_forward() raises:
+def test_gpu_mean_axis1_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_axis1_forward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -851,7 +851,7 @@ fn test_gpu_mean_axis1_forward() raises:
         assert_true(m_cpu.all_close(m_gpu.to_cpu()))
 
 
-fn test_gpu_mean_axis0_keepdims_forward() raises:
+def test_gpu_mean_axis0_keepdims_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_axis0_keepdims_forward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -861,7 +861,7 @@ fn test_gpu_mean_axis0_keepdims_forward() raises:
         assert_true(m_cpu.all_close(m_gpu.to_cpu()))
 
 
-fn test_gpu_mean_axis1_keepdims_forward() raises:
+def test_gpu_mean_axis1_keepdims_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_axis1_keepdims_forward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -871,7 +871,7 @@ fn test_gpu_mean_axis1_keepdims_forward() raises:
         assert_true(m_cpu.all_close(m_gpu.to_cpu()))
 
 
-fn test_gpu_mean_3d_axis0_forward() raises:
+def test_gpu_mean_3d_axis0_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_3d_axis0_forward")
         var a = Tensor[dtype].d3(
@@ -883,7 +883,7 @@ fn test_gpu_mean_3d_axis0_forward() raises:
         assert_true(m_cpu.all_close(m_gpu.to_cpu()))
 
 
-fn test_gpu_mean_3d_axis1_forward() raises:
+def test_gpu_mean_3d_axis1_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_3d_axis1_forward")
         var a = Tensor[dtype].d3(
@@ -895,7 +895,7 @@ fn test_gpu_mean_3d_axis1_forward() raises:
         assert_true(m_cpu.all_close(m_gpu.to_cpu()))
 
 
-fn test_gpu_mean_3d_axis2_forward() raises:
+def test_gpu_mean_3d_axis2_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_3d_axis2_forward")
         var a = Tensor[dtype].d3(
@@ -907,7 +907,7 @@ fn test_gpu_mean_3d_axis2_forward() raises:
         assert_true(m_cpu.all_close(m_gpu.to_cpu()))
 
 
-fn test_gpu_mean_3d_axis1_keepdims_forward() raises:
+def test_gpu_mean_3d_axis1_keepdims_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_3d_axis1_keepdims_forward")
         var a = Tensor[dtype].d3(
@@ -919,7 +919,7 @@ fn test_gpu_mean_3d_axis1_keepdims_forward() raises:
         assert_true(m_cpu.all_close(m_gpu.to_cpu()))
 
 
-fn test_gpu_mean_multi_axis_forward() raises:
+def test_gpu_mean_multi_axis_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_multi_axis_forward")
         var a = Tensor[dtype].d3(
@@ -931,7 +931,7 @@ fn test_gpu_mean_multi_axis_forward() raises:
         assert_true(m_cpu.all_close(m_gpu.to_cpu()))
 
 
-fn test_gpu_mean_large_tensor_forward() raises:
+def test_gpu_mean_large_tensor_forward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_large_tensor_forward")
         var a = Tensor[dtype].rand(32, 64, requires_grad=True)
@@ -944,7 +944,7 @@ fn test_gpu_mean_large_tensor_forward() raises:
 # ── Mean backward tests ───────────────────────────────────────────────────────
 
 
-fn test_gpu_mean_full_reduction_backward() raises:
+def test_gpu_mean_full_reduction_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_full_reduction_backward")
         var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
@@ -958,7 +958,7 @@ fn test_gpu_mean_full_reduction_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_mean_axis0_backward() raises:
+def test_gpu_mean_axis0_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_axis0_backward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -972,7 +972,7 @@ fn test_gpu_mean_axis0_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_mean_axis1_backward() raises:
+def test_gpu_mean_axis1_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_axis1_backward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -986,7 +986,7 @@ fn test_gpu_mean_axis1_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_mean_axis0_keepdims_backward() raises:
+def test_gpu_mean_axis0_keepdims_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_axis0_keepdims_backward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -1000,7 +1000,7 @@ fn test_gpu_mean_axis0_keepdims_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_mean_axis1_keepdims_backward() raises:
+def test_gpu_mean_axis1_keepdims_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_axis1_keepdims_backward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -1014,7 +1014,7 @@ fn test_gpu_mean_axis1_keepdims_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_mean_3d_axis1_backward() raises:
+def test_gpu_mean_3d_axis1_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_3d_axis1_backward")
         var a = Tensor[dtype].d3(
@@ -1030,7 +1030,7 @@ fn test_gpu_mean_3d_axis1_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_mean_3d_axis1_keepdims_backward() raises:
+def test_gpu_mean_3d_axis1_keepdims_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_3d_axis1_keepdims_backward")
         var a = Tensor[dtype].d3(
@@ -1046,7 +1046,7 @@ fn test_gpu_mean_3d_axis1_keepdims_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_mean_multi_axis_backward() raises:
+def test_gpu_mean_multi_axis_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_multi_axis_backward")
         var a = Tensor[dtype].d3(
@@ -1062,7 +1062,7 @@ fn test_gpu_mean_multi_axis_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_mean_large_tensor_backward() raises:
+def test_gpu_mean_large_tensor_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_large_tensor_backward")
         var a = Tensor[dtype].rand(32, 64, requires_grad=True)
@@ -1076,7 +1076,7 @@ fn test_gpu_mean_large_tensor_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_mean_grad_flows_to_cpu() raises:
+def test_gpu_mean_grad_flows_to_cpu() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_grad_flows_to_cpu")
         var a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
@@ -1090,7 +1090,7 @@ fn test_gpu_mean_grad_flows_to_cpu() raises:
 # ── Combined sum+mean chained ops ─────────────────────────────────────────────
 
 
-fn test_gpu_sum_then_mean_backward() raises:
+def test_gpu_sum_then_mean_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_then_mean_backward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -1104,7 +1104,7 @@ fn test_gpu_sum_then_mean_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_mean_then_sum_backward() raises:
+def test_gpu_mean_then_sum_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_then_sum_backward")
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
@@ -1118,7 +1118,7 @@ fn test_gpu_mean_then_sum_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_sum_keepdims_then_mean_backward() raises:
+def test_gpu_sum_keepdims_then_mean_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_sum_keepdims_then_mean_backward")
         var a = Tensor[dtype].d3(
@@ -1134,7 +1134,7 @@ fn test_gpu_sum_keepdims_then_mean_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn test_gpu_mean_keepdims_then_sum_backward() raises:
+def test_gpu_mean_keepdims_then_sum_backward() raises:
     comptime if has_accelerator():
         print("test_gpu_mean_keepdims_then_sum_backward")
         var a = Tensor[dtype].d3(
@@ -1150,7 +1150,7 @@ fn test_gpu_mean_keepdims_then_sum_backward() raises:
         assert_true(a.grad().all_close(a_cpu_grad))
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

@@ -12,12 +12,12 @@ comptime dtype = DType.float32
 # HELPERS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn tensors_close[dtype: DType](
+def tensors_close[dtype: DType](
     a: Tensor[dtype], b: Tensor[dtype],
 ) raises -> Bool:
     return a.all_close[atol= Scalar[dtype](1e-5)](b)
 
-fn gradboxes_close[dtype: DType](
+def gradboxes_close[dtype: DType](
     a: Gradbox[dtype], b: Gradbox[dtype],
 ) raises -> Bool:
     return a.all_close[atol= Scalar[dtype](1e-5)](b)
@@ -27,7 +27,7 @@ fn gradboxes_close[dtype: DType](
 # as_gradbox — CPU
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_as_gradbox_cpu_1d_contiguous() raises:
+def test_as_gradbox_cpu_1d_contiguous() raises:
     print("test_as_gradbox_cpu_1d_contiguous")
     var t = Tensor[dtype].arange(6)
     var g = t.as_gradbox()
@@ -40,7 +40,7 @@ fn test_as_gradbox_cpu_1d_contiguous() raises:
     print("passed")
 
 
-fn test_as_gradbox_cpu_2d_contiguous() raises:
+def test_as_gradbox_cpu_2d_contiguous() raises:
     print("test_as_gradbox_cpu_2d_contiguous")
     var _tmp0 = Tensor[dtype].arange(6)
     var t = _tmp0.reshape(Shape(2, 3))
@@ -54,7 +54,7 @@ fn test_as_gradbox_cpu_2d_contiguous() raises:
     print("passed")
 
 
-fn test_as_gradbox_cpu_3d_contiguous() raises:
+def test_as_gradbox_cpu_3d_contiguous() raises:
     print("test_as_gradbox_cpu_3d_contiguous")
     var _tmp0 = Tensor[dtype].arange(24)
     var t = _tmp0.reshape(Shape(2, 3, 4))
@@ -65,7 +65,7 @@ fn test_as_gradbox_cpu_3d_contiguous() raises:
     print("passed")
 
 
-fn test_as_gradbox_cpu_non_contiguous_transposed() raises:
+def test_as_gradbox_cpu_non_contiguous_transposed() raises:
     print("test_as_gradbox_cpu_non_contiguous_transposed")
     var _tmp0 = Tensor[dtype].arange(6)
     var t = _tmp0.reshape(Shape(2, 3))
@@ -80,7 +80,7 @@ fn test_as_gradbox_cpu_non_contiguous_transposed() raises:
     print("passed")
 
 
-fn test_as_gradbox_cpu_non_contiguous_no_materialise() raises:
+def test_as_gradbox_cpu_non_contiguous_no_materialise() raises:
     print("test_as_gradbox_cpu_non_contiguous_no_materialise")
     var _tmp0 = Tensor[dtype].arange(6)
     var t = _tmp0.reshape(Shape(2, 3))
@@ -93,7 +93,7 @@ fn test_as_gradbox_cpu_non_contiguous_no_materialise() raises:
     print("passed")
 
 
-fn test_as_gradbox_cpu_with_offset() raises:
+def test_as_gradbox_cpu_with_offset() raises:
     print("test_as_gradbox_cpu_with_offset")
     var _tmp0 = Tensor[dtype].arange(12)
     var t = _tmp0.reshape(Shape(3, 4))
@@ -106,7 +106,7 @@ fn test_as_gradbox_cpu_with_offset() raises:
     print("passed")
 
 
-fn test_as_gradbox_cpu_share_true() raises:
+def test_as_gradbox_cpu_share_true() raises:
     print("test_as_gradbox_cpu_share_true")
     var t = Tensor[dtype].arange(4)
     var g = t.as_gradbox(share=True)
@@ -115,7 +115,7 @@ fn test_as_gradbox_cpu_share_true() raises:
     print("passed")
 
 
-fn test_as_gradbox_cpu_4d() raises:
+def test_as_gradbox_cpu_4d() raises:
     print("test_as_gradbox_cpu_4d")
     var _tmp0 = Tensor[dtype].arange(120)
     var t = _tmp0.reshape(Shape(2, 3, 4, 5))
@@ -130,7 +130,7 @@ fn test_as_gradbox_cpu_4d() raises:
 # as_tensor — CPU
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_as_tensor_cpu_1d_contiguous() raises:
+def test_as_tensor_cpu_1d_contiguous() raises:
     print("test_as_tensor_cpu_1d_contiguous")
     var g = Gradbox[dtype](NDBuffer[dtype](1.0, 2.0, 3.0, 4.0))
     var t = g.as_tensor()
@@ -140,7 +140,7 @@ fn test_as_tensor_cpu_1d_contiguous() raises:
     print("passed")
 
 
-fn test_as_tensor_cpu_2d_contiguous() raises:
+def test_as_tensor_cpu_2d_contiguous() raises:
     print("test_as_tensor_cpu_2d_contiguous")
     var g = Gradbox[dtype].zeros(Shape(3, 4))
     var t = g.as_tensor()
@@ -150,7 +150,7 @@ fn test_as_tensor_cpu_2d_contiguous() raises:
     print("passed")
 
 
-fn test_as_tensor_cpu_3d_contiguous() raises:
+def test_as_tensor_cpu_3d_contiguous() raises:
     print("test_as_tensor_cpu_3d_contiguous")
     var g = Gradbox[dtype].full(Shape(2, 3, 4), 7.0)
     var t = g.as_tensor()
@@ -160,7 +160,7 @@ fn test_as_tensor_cpu_3d_contiguous() raises:
     print("passed")
 
 
-fn test_as_tensor_cpu_non_contiguous() raises:
+def test_as_tensor_cpu_non_contiguous() raises:
     print("test_as_tensor_cpu_non_contiguous")
     var _tmp0 = Tensor[dtype].arange(6)
     var base = _tmp0.reshape(Shape(2, 3))
@@ -173,7 +173,7 @@ fn test_as_tensor_cpu_non_contiguous() raises:
     print("passed")
 
 
-fn test_as_tensor_cpu_requires_grad() raises:
+def test_as_tensor_cpu_requires_grad() raises:
     print("test_as_tensor_cpu_requires_grad")
     var g = Gradbox[dtype](NDBuffer[dtype](1.0, 2.0, 3.0))
     var t = g.as_tensor(requires_grad=True)
@@ -182,7 +182,7 @@ fn test_as_tensor_cpu_requires_grad() raises:
     print("passed")
 
 
-fn test_as_tensor_cpu_4d() raises:
+def test_as_tensor_cpu_4d() raises:
     print("test_as_tensor_cpu_4d")
     var g = Gradbox[dtype].rand(Shape(2, 3, 4, 5))
     var t = g.as_tensor()
@@ -191,7 +191,7 @@ fn test_as_tensor_cpu_4d() raises:
     print("passed")
 
 
-fn test_as_tensor_cpu_scalar() raises:
+def test_as_tensor_cpu_scalar() raises:
     print("test_as_tensor_cpu_scalar")
     var g = Gradbox[dtype].full(Shape(), 42.0)
     var t = g.as_tensor()
@@ -204,7 +204,7 @@ fn test_as_tensor_cpu_scalar() raises:
 # roundtrip — CPU
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_roundtrip_tensor_gradbox_tensor_cpu() raises:
+def test_roundtrip_tensor_gradbox_tensor_cpu() raises:
     print("test_roundtrip_tensor_gradbox_tensor_cpu")
     var t = Tensor[dtype].rand(3, 4)
     var t_copy = t.copy()
@@ -214,7 +214,7 @@ fn test_roundtrip_tensor_gradbox_tensor_cpu() raises:
     print("passed")
 
 
-fn test_roundtrip_gradbox_tensor_gradbox_cpu() raises:
+def test_roundtrip_gradbox_tensor_gradbox_cpu() raises:
     print("test_roundtrip_gradbox_tensor_gradbox_cpu")
     var g = Gradbox[dtype].rand(Shape(4, 5))
     var g_copy = g.copy()
@@ -228,7 +228,7 @@ fn test_roundtrip_gradbox_tensor_gradbox_cpu() raises:
 # as_gradbox — GPU
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_as_gradbox_gpu_1d_contiguous() raises:
+def test_as_gradbox_gpu_1d_contiguous() raises:
     comptime if has_accelerator():
         print("test_as_gradbox_gpu_1d_contiguous")
         var t = Tensor[dtype].arange(6).to_gpu()
@@ -245,7 +245,7 @@ fn test_as_gradbox_gpu_1d_contiguous() raises:
         print("passed")
 
 
-fn test_as_gradbox_gpu_2d_contiguous() raises:
+def test_as_gradbox_gpu_2d_contiguous() raises:
     comptime if has_accelerator():
         print("test_as_gradbox_gpu_2d_contiguous")
         var _tmp0 = Tensor[dtype].arange(6)
@@ -263,7 +263,7 @@ fn test_as_gradbox_gpu_2d_contiguous() raises:
         print("passed")
 
 
-fn test_as_gradbox_gpu_3d_contiguous() raises:
+def test_as_gradbox_gpu_3d_contiguous() raises:
     comptime if has_accelerator():
         print("test_as_gradbox_gpu_3d_contiguous")
         var _tmp0 = Tensor[dtype].arange(24)
@@ -276,7 +276,7 @@ fn test_as_gradbox_gpu_3d_contiguous() raises:
         print("passed")
 
 
-fn test_as_gradbox_gpu_4d() raises:
+def test_as_gradbox_gpu_4d() raises:
     comptime if has_accelerator():
         print("test_as_gradbox_gpu_4d")
         var _tmp0 = Tensor[dtype].arange(120)
@@ -289,7 +289,7 @@ fn test_as_gradbox_gpu_4d() raises:
         print("passed")
 
 
-fn test_as_gradbox_gpu_contiguous_false() raises:
+def test_as_gradbox_gpu_contiguous_false() raises:
     comptime if has_accelerator():
         print("test_as_gradbox_gpu_contiguous_false")
         var _tmp0 = Tensor[dtype].arange(6)
@@ -301,7 +301,7 @@ fn test_as_gradbox_gpu_contiguous_false() raises:
         print("passed")
 
 
-fn test_as_gradbox_gpu_values_preserved() raises:
+def test_as_gradbox_gpu_values_preserved() raises:
     comptime if has_accelerator():
         print("test_as_gradbox_gpu_values_preserved")
         var t_cpu = Tensor[dtype].rand(4, 5)
@@ -312,7 +312,7 @@ fn test_as_gradbox_gpu_values_preserved() raises:
         print("passed")
 
 
-fn test_as_gradbox_gpu_large() raises:
+def test_as_gradbox_gpu_large() raises:
     comptime if has_accelerator():
         print("test_as_gradbox_gpu_large")
         var t_cpu = Tensor[dtype].rand(64, 128)
@@ -329,7 +329,7 @@ fn test_as_gradbox_gpu_large() raises:
 # as_tensor — GPU
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_as_tensor_gpu_1d_contiguous() raises:
+def test_as_tensor_gpu_1d_contiguous() raises:
     comptime if has_accelerator():
         print("test_as_tensor_gpu_1d_contiguous")
         var g_cpu = Gradbox[dtype](NDBuffer[dtype](1.0, 2.0, 3.0, 4.0))
@@ -345,7 +345,7 @@ fn test_as_tensor_gpu_1d_contiguous() raises:
         print("passed")
 
 
-fn test_as_tensor_gpu_2d_contiguous() raises:
+def test_as_tensor_gpu_2d_contiguous() raises:
     comptime if has_accelerator():
         print("test_as_tensor_gpu_2d_contiguous")
         var g_cpu = Gradbox[dtype].zeros(Shape(3, 4))
@@ -358,7 +358,7 @@ fn test_as_tensor_gpu_2d_contiguous() raises:
         print("passed")
 
 
-fn test_as_tensor_gpu_3d() raises:
+def test_as_tensor_gpu_3d() raises:
     comptime if has_accelerator():
         print("test_as_tensor_gpu_3d")
         var t_cpu = Tensor[dtype].rand(2, 3, 4)
@@ -371,7 +371,7 @@ fn test_as_tensor_gpu_3d() raises:
         print("passed")
 
 
-fn test_as_tensor_gpu_requires_grad() raises:
+def test_as_tensor_gpu_requires_grad() raises:
     comptime if has_accelerator():
         print("test_as_tensor_gpu_requires_grad")
         var t_cpu = Tensor[dtype].rand(3, 4)
@@ -383,7 +383,7 @@ fn test_as_tensor_gpu_requires_grad() raises:
         print("passed")
 
 
-fn test_as_tensor_gpu_large() raises:
+def test_as_tensor_gpu_large() raises:
     comptime if has_accelerator():
         print("test_as_tensor_gpu_large")
         var t_cpu = Tensor[dtype].rand(64, 128)
@@ -396,7 +396,7 @@ fn test_as_tensor_gpu_large() raises:
         print("passed")
 
 
-fn test_as_tensor_gpu_4d() raises:
+def test_as_tensor_gpu_4d() raises:
     comptime if has_accelerator():
         print("test_as_tensor_gpu_4d")
         var t_cpu = Tensor[dtype].rand(2, 3, 4, 5)
@@ -413,7 +413,7 @@ fn test_as_tensor_gpu_4d() raises:
 # roundtrip — GPU
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn test_roundtrip_tensor_gradbox_tensor_gpu() raises:
+def test_roundtrip_tensor_gradbox_tensor_gpu() raises:
     comptime if has_accelerator():
         print("test_roundtrip_tensor_gradbox_tensor_gpu")
         var t_cpu = Tensor[dtype].rand(3, 4)
@@ -425,7 +425,7 @@ fn test_roundtrip_tensor_gradbox_tensor_gpu() raises:
         print("passed")
 
 
-fn test_roundtrip_gradbox_tensor_gradbox_gpu() raises:
+def test_roundtrip_gradbox_tensor_gradbox_gpu() raises:
     comptime if has_accelerator():
         print("test_roundtrip_gradbox_tensor_gradbox_gpu")
         var g_cpu = Gradbox[dtype].rand(Shape(4, 5))
@@ -438,7 +438,7 @@ fn test_roundtrip_gradbox_tensor_gradbox_gpu() raises:
         print("passed")
 
 
-fn test_roundtrip_cpu_to_gpu_to_cpu() raises:
+def test_roundtrip_cpu_to_gpu_to_cpu() raises:
     comptime if has_accelerator():
         print("test_roundtrip_cpu_to_gpu_to_cpu")
         var t_cpu = Tensor[dtype].rand(5, 6)
@@ -454,6 +454,6 @@ fn test_roundtrip_cpu_to_gpu_to_cpu() raises:
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll transmutation tests passed!")

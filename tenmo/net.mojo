@@ -54,7 +54,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
     var out_features: Int
     var training: Bool
 
-    fn __init__(
+    def __init__(
         out self,
         in_features: Int,
         out_features: Int,
@@ -161,7 +161,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                     Shape(out_features), requires_grad=True
                 )
 
-    fn __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         ref xs_shape = xs.shape()
         ref weight_shape = self.weight.shape()
 
@@ -192,7 +192,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
         return result^
 
-    fn parameters(
+    def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
@@ -207,21 +207,21 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
         return params^
 
-    fn num_parameters(self) -> Int:
+    def num_parameters(self) -> Int:
         return self.weight.numels() + self.bias.numels()
 
-    fn train(mut self):
+    def train(mut self):
         """Set to training mode - enables gradient tracking."""
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         """Set to evaluation mode - disables gradient tracking."""
         self.training = False
 
-    fn into(self) -> Module[Self.dtype]:
+    def into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
-    fn to_gpu(
+    def to_gpu(
         deinit self,
         gpu: Optional[GPU] = None
     ) raises -> Linear[Self.dtype, Self.mode]:
@@ -235,7 +235,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         out.bias   = bias_gpu^
         return out^
 
-    fn to_cpu(deinit self) raises -> Linear[Self.dtype, Self.mode]:
+    def to_cpu(deinit self) raises -> Linear[Self.dtype, Self.mode]:
         """Move this Linear layer back to CPU.
         Consumes self — original GPU Linear is destroyed.
         """
@@ -257,7 +257,7 @@ struct Profile(RegisterPassable & ImplicitlyCopyable):
     var time_blas: Float64
     var profile_samples: Int  # Samples per method
 
-    fn __init__(out self, profile_samples: Int = 10):
+    def __init__(out self, profile_samples: Int = 10):
         self.use_blas = False
         self.profiled = False
         self.call_count = 0
@@ -281,7 +281,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
     var train_profile: Profile
     var validation_profile: Profile
 
-    fn __init__(
+    def __init__(
         out self,
         in_features: Int,
         out_features: Int,
@@ -404,7 +404,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                     Shape(out_features), requires_grad=True
                 )
 
-    fn __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         ref xs_shape = xs.shape()
         ref weight_shape = self.weight.shape()
 
@@ -512,7 +512,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
                 return result^
 
-    fn to_gpu(self, gpu: Optional[GPU] = None) raises -> Linear[Self.dtype, Self.mode]:
+    def to_gpu(self, gpu: Optional[GPU] = None) raises -> Linear[Self.dtype, Self.mode]:
         """LinearBLAS does not support GPU.
 
         BLAS operates on CPU memory. Use Linear for GPU models.
@@ -523,12 +523,12 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         # Unreachable — satisfies compiler
         return Linear[Self.dtype, Self.mode](self.in_features, self.out_features)
 
-    fn to_cpu(self) raises -> Self:
+    def to_cpu(self) raises -> Self:
         panic("LinearBLAS does not support GPU — nothing to transfer back")
         return self  # unreachable
 
     @always_inline
-    fn matmul(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def matmul(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         var result: Tensor[Self.dtype]
 
         if self.training:
@@ -550,7 +550,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         return result^
 
     @always_inline
-    fn matmul_blas(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def matmul_blas(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         var result: Tensor[Self.dtype]
 
         if self.training:
@@ -571,7 +571,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
         return result^
 
-    fn parameters(
+    def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
@@ -586,18 +586,18 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
         return params^
 
-    fn num_parameters(self) -> Int:
+    def num_parameters(self) -> Int:
         return self.weight.numels() + self.bias.numels()
 
-    fn train(mut self):
+    def train(mut self):
         """Set to training mode - enables gradient tracking."""
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         """Set to evaluation mode - disables gradient tracking."""
         self.training = False
 
-    fn into(self) -> Module[Self.dtype]:
+    def into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
 
@@ -605,40 +605,40 @@ struct ReLU[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var training: Bool
     comptime TAG = RELU
 
-    fn __init__(out self):
+    def __init__(out self):
         self.training = True
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.training = copy.training
 
-    fn __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         if self.training:
             return x.relu[track_grad=True]()
         else:
             return x.relu[track_grad=False]()
 
-    fn parameters(
+    def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
-    fn num_parameters(self) -> Int:
+    def num_parameters(self) -> Int:
         return 0
 
-    fn train(mut self):
+    def train(mut self):
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         self.training = False
 
-    fn into(self) -> Module[Self.dtype]:
+    def into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
-    fn to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
+    def to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
         """No-op — activation layer have no parameters to move."""
         return self
 
-    fn to_cpu(self) raises -> Self:
+    def to_cpu(self) raises -> Self:
         """No-op — no parameters to move."""
         return self
 
@@ -646,13 +646,13 @@ struct Sigmoid[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var training: Bool
     comptime TAG = SIGMOID
 
-    fn __init__(out self):
+    def __init__(out self):
         self.training = True
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.training = copy.training
 
-    fn __call__(
+    def __call__(
         self, x: Tensor[Self.dtype]
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
@@ -660,28 +660,28 @@ struct Sigmoid[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         else:
             return x.sigmoid[track_grad=False]()
 
-    fn parameters(
+    def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
-    fn num_parameters(self) -> Int:
+    def num_parameters(self) -> Int:
         return 0
 
-    fn train(mut self):
+    def train(mut self):
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         self.training = False
 
-    fn into(self) -> Module[Self.dtype]:
+    def into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
-    fn to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
+    def to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
         """No-op — activation layer have no parameters to move."""
         return self
 
-    fn to_cpu(self) raises -> Self:
+    def to_cpu(self) raises -> Self:
         """No-op — no parameters to move."""
         return self
 
@@ -689,13 +689,13 @@ struct Tanh[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var training: Bool
     comptime TAG = TANH
 
-    fn __init__(out self):
+    def __init__(out self):
         self.training = True
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.training = copy.training
 
-    fn __call__(
+    def __call__(
         self, x: Tensor[Self.dtype]
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
@@ -703,28 +703,28 @@ struct Tanh[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         else:
             return x.tanh[track_grad=False]()
 
-    fn parameters(
+    def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
-    fn num_parameters(self) -> Int:
+    def num_parameters(self) -> Int:
         return 0
 
-    fn train(mut self):
+    def train(mut self):
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         self.training = False
 
-    fn into(self) -> Module[Self.dtype]:
+    def into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
-    fn to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
+    def to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
         """No-op — activation layer have no parameters to move."""
         return self
 
-    fn to_cpu(self) raises -> Self:
+    def to_cpu(self) raises -> Self:
         """No-op — no parameters to move."""
         return self
 
@@ -757,7 +757,7 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
     var layer: Layer[Self.dtype]
     var tag: Int
 
-    fn __call__(
+    def __call__(
         mut self, mut xs: Tensor[Self.dtype]
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.tag == LINEAR:
@@ -787,7 +787,7 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             panic("Unknown module type")
             return Tensor[Self.dtype].scalar(0)
 
-    fn parameters(
+    def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         if self.tag == LINEAR:
@@ -804,7 +804,7 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
         else:
             return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
-    fn num_parameters(self) -> Int:
+    def num_parameters(self) -> Int:
         if self.tag == LINEAR:
             return self.layer[Linear[Self.dtype, mm]].num_parameters()
         if self.tag == LINEAR_BLAS:
@@ -831,12 +831,12 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
         else:
             return 0
 
-    fn zero_grad(self):
+    def zero_grad(self):
         """Zero all parameter gradients."""
         for parameter in self.parameters():
             parameter[].zero_grad()
 
-    fn train(mut self):
+    def train(mut self):
         """Set module to training mode."""
         if self.tag == LINEAR:
             self.layer[Linear[Self.dtype, mm]].train()
@@ -861,7 +861,7 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
         elif self.tag == LAYER_NORM:
             self.layer[LayerNorm[Self.dtype]].train()
 
-    fn eval(mut self):
+    def eval(mut self):
         """Set module to evaluation mode."""
         if self.tag == LINEAR:
             self.layer[Linear[Self.dtype]].eval()
@@ -886,7 +886,7 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
         elif self.tag == LAYER_NORM:
             self.layer[LayerNorm[Self.dtype]].eval()
 
-    fn to_gpu(mut self, gpu: Optional[GPU] = None) raises -> Module[Self.dtype]:
+    def to_gpu(mut self, gpu: Optional[GPU] = None) raises -> Module[Self.dtype]:
         """Move this module to GPU.
 
         Dispatches to the appropriate layer's to_gpu().
@@ -922,7 +922,7 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             # No parameters — return unchanged
             return self
 
-    fn to_cpu(mut self) raises -> Module[Self.dtype]:
+    def to_cpu(mut self) raises -> Module[Self.dtype]:
         if self.tag == LINEAR:
             var l = self.layer[Linear[Self.dtype, mm]]
             return Module[Self.dtype](Layer[Self.dtype](l.to_cpu()), self.tag)
@@ -948,10 +948,10 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
 struct Sequential[dtype: DType](Copyable & Movable):
     var modules: List[Module[Self.dtype]]
 
-    fn __init__(out self):
+    def __init__(out self):
         self.modules = List[Module[Self.dtype]]()
 
-    fn append(mut self, *ms: Module[Self.dtype]):
+    def append(mut self, *ms: Module[Self.dtype]):
         for m in ms:
             if m.tag == LINEAR_BLAS:
                 panic(
@@ -960,7 +960,7 @@ struct Sequential[dtype: DType](Copyable & Movable):
                 )
             self.modules.append(m)
 
-    fn __call__(
+    def __call__(
         mut self, xs: Tensor[Self.dtype]
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var out = xs
@@ -969,7 +969,7 @@ struct Sequential[dtype: DType](Copyable & Movable):
             out = m(out)
         return out
 
-    fn parameters(
+    def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
@@ -977,24 +977,24 @@ struct Sequential[dtype: DType](Copyable & Movable):
             params.extend(module.parameters())
         return params^
 
-    fn num_parameters(self) -> Int:
+    def num_parameters(self) -> Int:
         var total: Int = 0
         for parameter in self.parameters():
             total += parameter[].numels()
         return total
 
-    fn train(mut self):
+    def train(mut self):
         """Set all modules to training mode."""
         for i in range(len(self.modules)):
             self.modules[i].train()
 
-    fn eval(mut self):
+    def eval(mut self):
         """Set all modules to evaluation mode."""
         for i in range(len(self.modules)):
             self.modules[i].eval()
 
 
-    fn to_gpu(mut self, gpu: Optional[GPU] = None, stop_grad: Bool=True) raises -> Sequential[Self.dtype]:
+    def to_gpu(mut self, gpu: Optional[GPU] = None, stop_grad: Bool=True) raises -> Sequential[Self.dtype]:
         """Move all layers in this Sequential model to GPU.
 
         Each layer's to_gpu() is called. Layers with no parameters
@@ -1035,7 +1035,7 @@ struct Sequential[dtype: DType](Copyable & Movable):
             out.modules.append(self.modules[i].to_gpu(gpu))
         return out^
 
-    fn to_cpu(mut self) raises -> Sequential[Self.dtype]:
+    def to_cpu(mut self) raises -> Sequential[Self.dtype]:
         """Move all layers back to CPU after training.
 
         Example:
@@ -1055,7 +1055,7 @@ struct SequentialBLAS[dtype: DType](Copyable & Movable):
     var modules: List[Module[Self.dtype]]
     var blas_handle: BLASHandle[Self.dtype]
 
-    fn __init__(out self):
+    def __init__(out self):
         self.modules = List[Module[Self.dtype]]()
         self.blas_handle = BLASHandle[Self.dtype]()
 
@@ -1068,7 +1068,7 @@ struct SequentialBLAS[dtype: DType](Copyable & Movable):
                 self.blas_handle.get_error(),
             )
 
-    fn append(mut self, *ms: Module[Self.dtype]):
+    def append(mut self, *ms: Module[Self.dtype]):
         for m in ms:
             if self.blas_handle.is_initialized() and m.tag == LINEAR_BLAS:
                 var linear = m.layer[LinearBLAS[Self.dtype, mm]]
@@ -1078,7 +1078,7 @@ struct SequentialBLAS[dtype: DType](Copyable & Movable):
 
             self.modules.append(m)
 
-    fn __call__(
+    def __call__(
         mut self, xs: Tensor[Self.dtype]
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var out = xs
@@ -1087,7 +1087,7 @@ struct SequentialBLAS[dtype: DType](Copyable & Movable):
             out = m(out)
         return out
 
-    fn parameters(
+    def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
@@ -1095,18 +1095,18 @@ struct SequentialBLAS[dtype: DType](Copyable & Movable):
             params.extend(module.parameters())
         return params^
 
-    fn num_parameters(self) -> Int:
+    def num_parameters(self) -> Int:
         var total: Int = 0
         for parameter in self.parameters():
             total += parameter[].numels()
         return total
 
-    fn train(mut self):
+    def train(mut self):
         """Set all modules to training mode."""
         for i in range(len(self.modules)):
             self.modules[i].train()
 
-    fn eval(mut self):
+    def eval(mut self):
         """Set all modules to evaluation mode."""
         for i in range(len(self.modules)):
             self.modules[i].eval()
@@ -1119,10 +1119,10 @@ struct SequentialBLAS[dtype: DType](Copyable & Movable):
 struct MSELoss[dtype: DType = DType.float32](RegisterPassable):
     var training: Bool
 
-    fn __init__(out self):
+    def __init__(out self):
         self.training = True
 
-    fn __call__(
+    def __call__(
         self, preds: Tensor[Self.dtype], target: Tensor[Self.dtype]
     ) -> Tensor[Self.dtype]:
         if self.training:
@@ -1130,10 +1130,10 @@ struct MSELoss[dtype: DType = DType.float32](RegisterPassable):
         else:
             return preds.mse[track_grad=False](target)
 
-    fn train(mut self):
+    def train(mut self):
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         self.training = False
 
 
@@ -1142,14 +1142,14 @@ struct BCELoss[dtype: DType = DType.float32](RegisterPassable):
     var training: Bool
     var epsilon: Scalar[Self.dtype]
 
-    fn __init__(
+    def __init__(
         out self, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ):
         self.training = True
         self.epsilon = epsilon
 
     # Instance method - respects training mode
-    fn __call__(
+    def __call__(
         self, pred: Tensor[Self.dtype], target: Tensor[Self.dtype]
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
@@ -1159,7 +1159,7 @@ struct BCELoss[dtype: DType = DType.float32](RegisterPassable):
 
     # Static method - can be called directly or via instance
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         pred: Tensor[Self.dtype],
@@ -1197,10 +1197,10 @@ struct BCELoss[dtype: DType = DType.float32](RegisterPassable):
 
         return loss.mean[track_grad]()
 
-    fn train(mut self):
+    def train(mut self):
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         self.training = False
 
 
@@ -1209,14 +1209,14 @@ struct BCEWithLogitsLoss[dtype: DType = DType.float32](RegisterPassable):
     var training: Bool
     var epsilon: Scalar[Self.dtype]
 
-    fn __init__(
+    def __init__(
         out self, epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9)
     ):
         self.training = True
         self.epsilon = epsilon
 
     # Instance method - respects training mode
-    fn __call__(
+    def __call__(
         self, logits: Tensor[Self.dtype], target: Tensor[Self.dtype]
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
@@ -1226,7 +1226,7 @@ struct BCEWithLogitsLoss[dtype: DType = DType.float32](RegisterPassable):
 
     # Static method - can be called directly or via instance
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         logits: Tensor[Self.dtype],
@@ -1267,10 +1267,10 @@ struct BCEWithLogitsLoss[dtype: DType = DType.float32](RegisterPassable):
 
         return loss.mean[track_grad]()
 
-    fn train(mut self):
+    def train(mut self):
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         self.training = False
 
 
@@ -1295,7 +1295,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
     var training: Bool
     var delegate: Conv2dFused[Self.dtype]
 
-    fn __init__(
+    def __init__(
         out self,
         in_channels: Int,
         out_channels: Int,
@@ -1421,7 +1421,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         print("  Kernel size:", kernel_size, "×", kernel_size)
         print("  Parameters:", self.num_parameters())
 
-    fn __call__(mut self, image: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(mut self, image: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         """
         Forward pass.
 
@@ -1470,7 +1470,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
                 requires_grad=False,
             )
 
-    fn parameters(
+    def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         """Return trainable parameters for optimizer."""
@@ -1491,26 +1491,26 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
 
         return params^
 
-    fn num_parameters(self) -> Int:
+    def num_parameters(self) -> Int:
         """Count total parameters."""
         var count = self.weight.numels()
         if self.bias.shape().rank() > 0:
             count += self.bias.numels()
         return count
 
-    fn train(mut self):
+    def train(mut self):
         """Set to training mode."""
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         """Set to evaluation mode."""
         self.training = False
 
-    fn into(self) -> Module[Self.dtype]:
+    def into(self) -> Module[Self.dtype]:
         """Convert to Module for Sequential."""
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
-    fn to_gpu(deinit self, gpu: Optional[GPU] = None) raises -> Conv2D[Self.dtype]:
+    def to_gpu(deinit self, gpu: Optional[GPU] = None) raises -> Conv2D[Self.dtype]:
         """Move this Conv2D layer to GPU.
 
         Consumes self.
@@ -1533,7 +1533,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
 
         return out^
 
-    fn to_cpu(deinit self) raises -> Conv2D[Self.dtype]:
+    def to_cpu(deinit self) raises -> Conv2D[Self.dtype]:
         var weight_cpu = self.weight.to_cpu(stop_grad=True)
         var bias_cpu   = self.bias.to_cpu(stop_grad=True)
         var out = self^
@@ -1549,13 +1549,13 @@ struct Flatten[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     comptime TAG = FLATTEN
     var training: Bool
 
-    fn __init__(out self):
+    def __init__(out self):
         self.training = True
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         self.training = copy.training
 
-    fn __call__(self, mut x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(self, mut x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         ref shape = x.shape()
 
         _ = """if shape.rank() != 4:
@@ -1578,28 +1578,28 @@ struct Flatten[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         else:
             return x.reshape[track_grad=False](batch_size, flattened_size)
 
-    fn parameters(
+    def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
-    fn num_parameters(self) -> Int:
+    def num_parameters(self) -> Int:
         return 0
 
-    fn train(mut self):
+    def train(mut self):
         self.training = True
 
-    fn eval(mut self):
+    def eval(mut self):
         self.training = False
 
-    fn into(self) -> Module[Self.dtype]:
+    def into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
-    fn to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
+    def to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
         """No-op — activation layer have no parameters to move."""
         return self
 
-    fn to_cpu(self) raises -> Self:
+    def to_cpu(self) raises -> Self:
         """No-op — no parameters to move."""
         return self
 

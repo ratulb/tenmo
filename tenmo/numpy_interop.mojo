@@ -7,7 +7,7 @@ from .ndbuffer import NDBuffer
 from .gradbox import Gradbox
 
 
-fn numpy_dtype(dtype: DType) raises -> PythonObject:
+def numpy_dtype(dtype: DType) raises -> PythonObject:
     np = Python.import_module("numpy")
     if dtype == DType.float32:
         return np.float32
@@ -29,7 +29,7 @@ fn numpy_dtype(dtype: DType) raises -> PythonObject:
         raise Error("Unsupported dtype for python interop")
 
 
-fn list_to_tuple(l: List[Int]) raises -> PythonObject:
+def list_to_tuple(l: List[Int]) raises -> PythonObject:
     py = Python.import_module("builtins")
     var py_list_obj: PythonObject = []
     for elem in l:
@@ -38,19 +38,19 @@ fn list_to_tuple(l: List[Int]) raises -> PythonObject:
     return py_tuple
 
 
-fn ndarray_ptr[
+def ndarray_ptr[
     dtype: DType
 ](ndarray: PythonObject) raises -> UnsafePointer[Scalar[dtype], MutAnyOrigin]:
     return ndarray.__array_interface__["data"][0].unsafe_get_as_pointer[dtype]()
 
 
-fn to_ndarray[dtype: DType, //](tensor: Tensor[dtype]) raises -> PythonObject:
+def to_ndarray[dtype: DType, //](tensor: Tensor[dtype]) raises -> PythonObject:
     return to_ndarray(tensor.buffer)
 
-fn to_ndarray[dtype: DType, //](gradbox: Gradbox[dtype]) raises -> PythonObject:
+def to_ndarray[dtype: DType, //](gradbox: Gradbox[dtype]) raises -> PythonObject:
     return to_ndarray(gradbox.buffer)
 
-fn to_ndarray[dtype: DType, //](ndb: NDBuffer[dtype]) raises -> PythonObject:
+def to_ndarray[dtype: DType, //](ndb: NDBuffer[dtype]) raises -> PythonObject:
     np = Python.import_module("numpy")
     shape_tuple = list_to_tuple(ndb.shape.tolist())
     ndarray = np.zeros(shape_tuple, dtype=numpy_dtype(ndb.dtype))
@@ -66,7 +66,7 @@ fn to_ndarray[dtype: DType, //](ndb: NDBuffer[dtype]) raises -> PythonObject:
             idx += 1
     return ndarray
 
-fn from_ndarray[
+def from_ndarray[
     dtype: DType
 ](
     ndarray: PythonObject, requires_grad: Bool = False, copy: Bool = True
@@ -96,13 +96,13 @@ fn from_ndarray[
         )
 
 
-fn save[dtype: DType, //](t: Tensor[dtype], filename: StaticString) raises:
+def save[dtype: DType, //](t: Tensor[dtype], filename: StaticString) raises:
     var python_obj = to_ndarray(t)
     np = Python.import_module("numpy")
     np.savez(filename, array=python_obj)
 
 
-fn load[
+def load[
     dtype: DType
 ](filename: StaticString, requires_grad: Bool = False) raises -> Tensor[dtype]:
     np = Python.import_module("numpy")
@@ -113,23 +113,23 @@ fn load[
     return tenmo_tensor^
 
 
-fn as_nested_list[dtype: DType, //](self: Tensor[dtype]) raises -> PythonObject:
+def as_nested_list[dtype: DType, //](self: Tensor[dtype]) raises -> PythonObject:
     """Convert tensor to a nested Python list retaining shape structure."""
     var ndarray = to_ndarray(self)
     return ndarray.tolist()
 
-fn as_nested_list[dtype: DType, //](self: Gradbox[dtype]) raises -> PythonObject:
+def as_nested_list[dtype: DType, //](self: Gradbox[dtype]) raises -> PythonObject:
     """Convert Gradbox to a nested Python list retaining shape structure."""
     var ndarray = to_ndarray(self)
     return ndarray.tolist()
 
 
-fn as_nested_list[dtype: DType, //](self: NDBuffer[dtype]) raises -> PythonObject:
+def as_nested_list[dtype: DType, //](self: NDBuffer[dtype]) raises -> PythonObject:
     """Convert NDBuffer to a nested Python list retaining shape structure."""
     var ndarray = to_ndarray(self)
     return ndarray.tolist()
 
-fn test_to_ndarray() raises:
+def test_to_ndarray() raises:
     comptime dtype = DType.int32
     o = Tensor[dtype].arange(10)
     a = o.reshape(2, 5)

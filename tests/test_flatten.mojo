@@ -6,7 +6,7 @@ from std.sys import has_accelerator
 
 
 # Old tests
-fn test_flatten_scalar() raises:
+def test_flatten_scalar() raises:
     print("test_flatten_scalar")
     var a = Tensor.scalar(5.0, requires_grad=True)
     var f = a.flatten()
@@ -16,7 +16,7 @@ fn test_flatten_scalar() raises:
     assert_true(a.grad().item() == 1.0)
 
 
-fn test_flatten_1d() raises:
+def test_flatten_1d() raises:
     print("test_flatten_1d")
     var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var f = a.flatten()
@@ -27,7 +27,7 @@ fn test_flatten_1d() raises:
     assert_true(a.grad().all_close(Tensor.d1([1.0, 1.0, 1.0])))
 
 
-fn test_flatten_2d() raises:
+def test_flatten_2d() raises:
     print("test_flatten_2d")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var f = a.flatten()
@@ -38,7 +38,7 @@ fn test_flatten_2d() raises:
     assert_true(a.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
 
 
-fn test_flatten_3d() raises:
+def test_flatten_3d() raises:
     print("test_flatten_3d")
     var a = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -55,7 +55,7 @@ fn test_flatten_3d() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_flatten_keep_grad_chain() raises:
+def test_flatten_keep_grad_chain() raises:
     print("test_flatten_keep_grad_chain")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = a.flatten()
@@ -67,7 +67,7 @@ fn test_flatten_keep_grad_chain() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_flatten_partial_axes() raises:
+def test_flatten_partial_axes() raises:
     print("test_flatten_partial_axes")
     var a = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -86,7 +86,7 @@ fn test_flatten_partial_axes() raises:
 # here
 
 
-fn test_flatten_1d_to_1d() raises:
+def test_flatten_1d_to_1d() raises:
     print("test_flatten_1d_to_1d")
     var a = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var b = a.flatten()
@@ -98,7 +98,7 @@ fn test_flatten_1d_to_1d() raises:
     assert_true(a.grad().all_close(Tensor.d1([1.0, 1.0, 1.0, 1.0])))
 
 
-fn test_flatten_2d_to_1d() raises:
+def test_flatten_2d_to_1d() raises:
     print("test_flatten_2d_to_1d")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = a.flatten()
@@ -110,7 +110,7 @@ fn test_flatten_2d_to_1d() raises:
     assert_true(a.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
 
 
-fn test_flatten_3d_to_1d() raises:
+def test_flatten_3d_to_1d() raises:
     print("test_flatten_3d_to_1d")
     var a = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -129,7 +129,7 @@ fn test_flatten_3d_to_1d() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_flatten_2d_partial_start_dim() raises:
+def test_flatten_2d_partial_start_dim() raises:
     print("test_flatten_2d_partial_start_dim")
     var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
     var b = a.flatten(start_dim=1)  # Should keep first dimension
@@ -143,7 +143,7 @@ fn test_flatten_2d_partial_start_dim() raises:
     )
 
 
-fn test_flatten_3d_partial_dims() raises:
+def test_flatten_3d_partial_dims() raises:
     print("test_flatten_3d_partial_dims")
     var a = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -162,7 +162,7 @@ fn test_flatten_3d_partial_dims() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_flatten_4d_complex() raises:
+def test_flatten_4d_complex() raises:
     print("test_flatten_4d_complex")
     var a = Tensor.d4(
         [
@@ -206,7 +206,7 @@ fn test_flatten_4d_complex() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_flatten_no_grad() raises:
+def test_flatten_no_grad() raises:
     print("test_flatten_no_grad")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
     var b = a.flatten()
@@ -216,7 +216,7 @@ fn test_flatten_no_grad() raises:
     assert_true(not b.requires_grad)
 
 
-fn test_flatten_with_grad_computation() raises:
+def test_flatten_with_grad_computation() raises:
     print("test_flatten_with_grad_computation")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = a.flatten()
@@ -230,7 +230,7 @@ fn test_flatten_with_grad_computation() raises:
     assert_true(a.grad().all_close(Tensor.d2([[2.0, 2.0], [2.0, 2.0]])))
 
 
-fn test_flatten_requires_grad_false() raises:
+def test_flatten_requires_grad_false() raises:
     print("test_flatten_requires_grad_false")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = a.flatten(requires_grad=False)
@@ -240,7 +240,7 @@ fn test_flatten_requires_grad_false() raises:
     assert_true(not b.requires_grad)
 
 
-fn test_flatten_requires_grad_true() raises:
+def test_flatten_requires_grad_true() raises:
     print("test_flatten_requires_grad_true")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
     var b = a.flatten(requires_grad=True)
@@ -250,7 +250,7 @@ fn test_flatten_requires_grad_true() raises:
     assert_true(b.requires_grad)
 
 
-fn test_flatten_grad_accumulation() raises:
+def test_flatten_grad_accumulation() raises:
     print("test_flatten_grad_accumulation")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = a.flatten()
@@ -267,7 +267,7 @@ fn test_flatten_grad_accumulation() raises:
     assert_true(a.grad().all_close(Tensor.d2([[2.0, 2.0], [2.0, 2.0]])))
 
 
-fn test_flatten_view_2d_to_1d() raises:
+def test_flatten_view_2d_to_1d() raises:
     print("test_flatten_view_2d_to_1d")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     # Create flatten view manually using view API
@@ -280,7 +280,7 @@ fn test_flatten_view_2d_to_1d() raises:
     assert_true(a.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
 
 
-fn test_flatten_view_3d_to_1d() raises:
+def test_flatten_view_3d_to_1d() raises:
     print("test_flatten_view_3d_to_1d")
     var a = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -300,7 +300,7 @@ fn test_flatten_view_3d_to_1d() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_flatten_view_with_strides() raises:
+def test_flatten_view_with_strides() raises:
     print("test_flatten_view_with_strides")
     var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
     # Create a strided view then flatten it
@@ -320,7 +320,7 @@ fn test_flatten_view_with_strides() raises:
     )
 
 
-fn test_flatten_view_partial_tensor() raises:
+def test_flatten_view_partial_tensor() raises:
     print("test_flatten_view_partial_tensor")
     var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
     # Create view of a subset then flatten
@@ -341,7 +341,7 @@ fn test_flatten_view_partial_tensor() raises:
     )
 
 
-fn test_flatten_view_complex_chain() raises:
+def test_flatten_view_complex_chain() raises:
     print("test_flatten_view_complex_chain")
     var a = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -371,7 +371,7 @@ fn test_flatten_view_complex_chain() raises:
     assert_true(a.grad().all_close(expected_grad))
 
 
-fn test_flatten_view_grad_accumulation() raises:
+def test_flatten_view_grad_accumulation() raises:
     print("test_flatten_view_grad_accumulation")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var flattened = a.view(shape=Shape(4), strides=Strides(1), offset=0)
@@ -387,7 +387,7 @@ fn test_flatten_view_grad_accumulation() raises:
     assert_true(a.grad().all_close(Tensor.d2([[2.0, 2.0], [2.0, 2.0]])))
 
 
-fn test_flatten_basic_forward() raises:
+def test_flatten_basic_forward() raises:
     print("test_flatten_basic_forward")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
     var f = a.flatten()
@@ -395,7 +395,7 @@ fn test_flatten_basic_forward() raises:
     assert_true(f.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0])))
 
 
-fn test_flatten_start_dim() raises:
+def test_flatten_start_dim() raises:
     print("test_flatten_start_dim")
     var a = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
@@ -408,7 +408,7 @@ fn test_flatten_start_dim() raises:
     )
 
 
-fn test_flatten_full_grad() raises:
+def test_flatten_full_grad() raises:
     print("test_flatten_full_grad")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var f = a.flatten()
@@ -418,7 +418,7 @@ fn test_flatten_full_grad() raises:
     assert_true(a.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
 
 
-fn test_flatten_partial_grad() raises:
+def test_flatten_partial_grad() raises:
     print("test_flatten_partial_grad")
     var a = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -434,14 +434,14 @@ fn test_flatten_partial_grad() raises:
     )
 
 
-fn test_flatten_no_grad_required() raises:
+def test_flatten_no_grad_required() raises:
     print("test_flatten_no_grad_required")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
     var f = a.flatten()
     assert_true(f.requires_grad == False)
 
 
-fn test_flatten_does_not_alias_input() raises:
+def test_flatten_does_not_alias_input() raises:
     print("test_flatten_does_not_alias_input")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var f = a.flatten()
@@ -453,7 +453,7 @@ fn test_flatten_does_not_alias_input() raises:
 # --- View + Expand + Contiguous chain tests ---
 
 
-fn test_flatten_after_expand() raises:
+def test_flatten_after_expand() raises:
     print("test_flatten_after_expand")
     var base = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var exp = base.expand(Shape.of(2, 3))  # shape (2,3)
@@ -464,7 +464,7 @@ fn test_flatten_after_expand() raises:
     assert_true(base.grad().all_close(Tensor.d1([2.0, 2.0, 2.0])))
 
 
-fn test_flatten_after_contiguous() raises:
+def test_flatten_after_contiguous() raises:
     print("test_flatten_after_contiguous")
     var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
     var trans = a.transpose()
@@ -476,7 +476,7 @@ fn test_flatten_after_contiguous() raises:
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_flatten_view_chain() raises:
+def test_flatten_view_chain() raises:
     print("test_flatten_view_chain")
     var a = Tensor.d2(
         [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]], requires_grad=True
@@ -489,7 +489,7 @@ fn test_flatten_view_chain() raises:
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_flatten_after_expand_contiguous_view_chain() raises:
+def test_flatten_after_expand_contiguous_view_chain() raises:
     print("test_flatten_after_expand_contiguous_view_chain")
     var base = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var exp = base.expand(Shape.of(3, 2, 2))  # (3,2,2)
@@ -507,7 +507,7 @@ fn test_flatten_after_expand_contiguous_view_chain() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_flat_cpu_1d_noop() raises:
+def test_flat_cpu_1d_noop() raises:
     print("test_flat_cpu_1d_noop")
     comptime dtype = DType.float32
     # Flatten 1D is identity
@@ -517,7 +517,7 @@ fn test_flat_cpu_1d_noop() raises:
     assert_true(result.all_close(a))
 
 
-fn test_flat_cpu_2d_full() raises:
+def test_flat_cpu_2d_full() raises:
     print("test_flat_cpu_2d_full")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -528,7 +528,7 @@ fn test_flat_cpu_2d_full() raises:
     )
 
 
-fn test_flat_cpu_2d_start0_end0() raises:
+def test_flat_cpu_2d_start0_end0() raises:
     print("test_flat_cpu_2d_start0_end0")
     comptime dtype = DType.float32
     # Flatten only dim 0 — shape (2,3) → (2,3) no change since 1 dim collapsed
@@ -537,7 +537,7 @@ fn test_flat_cpu_2d_start0_end0() raises:
     assert_true(result.shape() == Shape(2, 3))
 
 
-fn test_flat_cpu_2d_start1_end1() raises:
+def test_flat_cpu_2d_start1_end1() raises:
     print("test_flat_cpu_2d_start1_end1")
     comptime dtype = DType.float32
     # Flatten only dim 1 — shape (2,3) → (2,3) no change
@@ -546,7 +546,7 @@ fn test_flat_cpu_2d_start1_end1() raises:
     assert_true(result.shape() == Shape(2, 3))
 
 
-fn test_flat_cpu_3d_full() raises:
+def test_flat_cpu_3d_full() raises:
     print("test_flat_cpu_3d_full")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
@@ -561,7 +561,7 @@ fn test_flat_cpu_3d_full() raises:
     )
 
 
-fn test_flat_cpu_3d_start0_end1() raises:
+def test_flat_cpu_3d_start0_end1() raises:
     print("test_flat_cpu_3d_start0_end1")
     comptime dtype = DType.float32
     # Shape (2,2,2) → flatten(0,1) → (4,2)
@@ -577,7 +577,7 @@ fn test_flat_cpu_3d_start0_end1() raises:
     )
 
 
-fn test_flat_cpu_3d_start1_end2() raises:
+def test_flat_cpu_3d_start1_end2() raises:
     print("test_flat_cpu_3d_start1_end2")
     comptime dtype = DType.float32
     # Shape (2,2,2) → flatten(1,2) → (2,4)
@@ -593,7 +593,7 @@ fn test_flat_cpu_3d_start1_end2() raises:
     )
 
 
-fn test_flat_cpu_4d_middle() raises:
+def test_flat_cpu_4d_middle() raises:
     print("test_flat_cpu_4d_middle")
     comptime dtype = DType.float32
     # Shape (2,3,4,5) → flatten(1,2) → (2,12,5)
@@ -604,7 +604,7 @@ fn test_flat_cpu_4d_middle() raises:
     assert_true(result.numels() == 120)
 
 
-fn test_flat_cpu_4d_start0_end2() raises:
+def test_flat_cpu_4d_start0_end2() raises:
     print("test_flat_cpu_4d_start0_end2")
     comptime dtype = DType.float32
     # Shape (2,3,4,5) → flatten(0,2) → (24,5)
@@ -615,7 +615,7 @@ fn test_flat_cpu_4d_start0_end2() raises:
     assert_true(result.numels() == 120)
 
 
-fn test_flat_cpu_values_preserved() raises:
+def test_flat_cpu_values_preserved() raises:
     print("test_flat_cpu_values_preserved")
     comptime dtype = DType.float32
     # Verify values are preserved after flatten
@@ -626,7 +626,7 @@ fn test_flat_cpu_values_preserved() raises:
         assert_true(result[[i]] == Scalar[dtype](i))
 
 
-fn test_flat_cpu_no_grad() raises:
+def test_flat_cpu_no_grad() raises:
     print("test_flat_cpu_no_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
@@ -634,7 +634,7 @@ fn test_flat_cpu_no_grad() raises:
     assert_true(not result.requires_grad)
 
 
-fn test_flat_cpu_requires_grad_propagates() raises:
+def test_flat_cpu_requires_grad_propagates() raises:
     print("test_flat_cpu_requires_grad_propagates")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -642,7 +642,7 @@ fn test_flat_cpu_requires_grad_propagates() raises:
     assert_true(result.requires_grad)
 
 
-fn test_flat_cpu_suppress_grad() raises:
+def test_flat_cpu_suppress_grad() raises:
     print("test_flat_cpu_suppress_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -655,7 +655,7 @@ fn test_flat_cpu_suppress_grad() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_flat_cpu_backward_2d_full() raises:
+def test_flat_cpu_backward_2d_full() raises:
     print("test_flat_cpu_backward_2d_full")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -668,7 +668,7 @@ fn test_flat_cpu_backward_2d_full() raises:
     assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 3))))
 
 
-fn test_flat_cpu_backward_3d_full() raises:
+def test_flat_cpu_backward_3d_full() raises:
     print("test_flat_cpu_backward_3d_full")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
@@ -681,7 +681,7 @@ fn test_flat_cpu_backward_3d_full() raises:
     assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 2, 2))))
 
 
-fn test_flat_cpu_backward_3d_partial() raises:
+def test_flat_cpu_backward_3d_partial() raises:
     print("test_flat_cpu_backward_3d_partial")
     comptime dtype = DType.float32
     # flatten(1,2) — grad should still reshape back to (2,2,2)
@@ -695,7 +695,7 @@ fn test_flat_cpu_backward_3d_partial() raises:
     assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 2, 2))))
 
 
-fn test_flat_cpu_backward_chain() raises:
+def test_flat_cpu_backward_chain() raises:
     print("test_flat_cpu_backward_chain")
     comptime dtype = DType.float32
     # flatten → multiply → sum → backward
@@ -706,7 +706,7 @@ fn test_flat_cpu_backward_chain() raises:
     assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 2), 3.0)))
 
 
-fn test_flat_cpu_backward_grad_shape() raises:
+def test_flat_cpu_backward_grad_shape() raises:
     print("test_flat_cpu_backward_grad_shape")
     comptime dtype = DType.float32
     # Verify grad has same shape as original tensor
@@ -720,7 +720,7 @@ fn test_flat_cpu_backward_grad_shape() raises:
     assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 3, 4))))
 
 
-fn test_flat_cpu_backward_nonuniform_grad() raises:
+def test_flat_cpu_backward_nonuniform_grad() raises:
     print("test_flat_cpu_backward_nonuniform_grad")
     comptime dtype = DType.float32
     # Non-uniform upstream gradient
@@ -734,7 +734,7 @@ fn test_flat_cpu_backward_nonuniform_grad() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])))
 
 
-fn test_flat_cpu_backward_4d_partial() raises:
+def test_flat_cpu_backward_4d_partial() raises:
     print("test_flat_cpu_backward_4d_partial")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(120)
@@ -752,7 +752,7 @@ fn test_flat_cpu_backward_4d_partial() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_flat_gpu_1d_noop() raises:
+def test_flat_gpu_1d_noop() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_1d_noop")
         comptime dtype = DType.float32
@@ -765,7 +765,7 @@ fn test_flat_gpu_1d_noop() raises:
         )
 
 
-fn test_flat_gpu_2d_full() raises:
+def test_flat_gpu_2d_full() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_2d_full")
         comptime dtype = DType.float32
@@ -780,7 +780,7 @@ fn test_flat_gpu_2d_full() raises:
         )
 
 
-fn test_flat_gpu_3d_full() raises:
+def test_flat_gpu_3d_full() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_3d_full")
         comptime dtype = DType.float32
@@ -799,7 +799,7 @@ fn test_flat_gpu_3d_full() raises:
         )
 
 
-fn test_flat_gpu_3d_start0_end1() raises:
+def test_flat_gpu_3d_start0_end1() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_3d_start0_end1")
         comptime dtype = DType.float32
@@ -820,7 +820,7 @@ fn test_flat_gpu_3d_start0_end1() raises:
         )
 
 
-fn test_flat_gpu_3d_start1_end2() raises:
+def test_flat_gpu_3d_start1_end2() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_3d_start1_end2")
         comptime dtype = DType.float32
@@ -839,7 +839,7 @@ fn test_flat_gpu_3d_start1_end2() raises:
         )
 
 
-fn test_flat_gpu_4d_middle() raises:
+def test_flat_gpu_4d_middle() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_4d_middle")
         comptime dtype = DType.float32
@@ -852,7 +852,7 @@ fn test_flat_gpu_4d_middle() raises:
         assert_true(result.numels() == 120)
 
 
-fn test_flat_gpu_values_preserved() raises:
+def test_flat_gpu_values_preserved() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_values_preserved")
         comptime dtype = DType.float32
@@ -865,7 +865,7 @@ fn test_flat_gpu_values_preserved() raises:
             assert_true(result_cpu[[i]] == Scalar[dtype](i))
 
 
-fn test_flat_gpu_no_grad() raises:
+def test_flat_gpu_no_grad() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_no_grad")
         comptime dtype = DType.float32
@@ -878,7 +878,7 @@ fn test_flat_gpu_no_grad() raises:
         assert_true(not result.requires_grad)
 
 
-fn test_flat_gpu_requires_grad_propagates() raises:
+def test_flat_gpu_requires_grad_propagates() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_requires_grad_propagates")
         comptime dtype = DType.float32
@@ -896,7 +896,7 @@ fn test_flat_gpu_requires_grad_propagates() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_flat_gpu_backward_2d_full() raises:
+def test_flat_gpu_backward_2d_full() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_backward_2d_full")
         comptime dtype = DType.float32
@@ -910,7 +910,7 @@ fn test_flat_gpu_backward_2d_full() raises:
         assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 3))))
 
 
-fn test_flat_gpu_backward_3d_full() raises:
+def test_flat_gpu_backward_3d_full() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_backward_3d_full")
         comptime dtype = DType.float32
@@ -925,7 +925,7 @@ fn test_flat_gpu_backward_3d_full() raises:
         assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 2, 2))))
 
 
-fn test_flat_gpu_backward_3d_partial() raises:
+def test_flat_gpu_backward_3d_partial() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_backward_3d_partial")
         comptime dtype = DType.float32
@@ -940,7 +940,7 @@ fn test_flat_gpu_backward_3d_partial() raises:
         assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(2, 2, 2))))
 
 
-fn test_flat_gpu_backward_chain() raises:
+def test_flat_gpu_backward_chain() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_backward_chain")
         comptime dtype = DType.float32
@@ -952,7 +952,7 @@ fn test_flat_gpu_backward_chain() raises:
         assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 2), 3.0)))
 
 
-fn test_flat_gpu_backward_grad_shape() raises:
+def test_flat_gpu_backward_grad_shape() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_backward_grad_shape")
         comptime dtype = DType.float32
@@ -967,7 +967,7 @@ fn test_flat_gpu_backward_grad_shape() raises:
         assert_true(a_cpu.grad().all_close(Tensor[dtype].ones(Shape(2, 3, 4))))
 
 
-fn test_flat_gpu_backward_nonuniform_grad() raises:
+def test_flat_gpu_backward_nonuniform_grad() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_backward_nonuniform_grad")
         comptime dtype = DType.float32
@@ -982,7 +982,7 @@ fn test_flat_gpu_backward_nonuniform_grad() raises:
         )
 
 
-fn test_flat_gpu_backward_4d_partial() raises:
+def test_flat_gpu_backward_4d_partial() raises:
     comptime if has_accelerator():
         print("test_flat_gpu_backward_4d_partial")
         comptime dtype = DType.float32
@@ -1004,7 +1004,7 @@ fn test_flat_gpu_backward_4d_partial() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn test_flat_parity_2d_full_forward() raises:
+def test_flat_parity_2d_full_forward() raises:
     comptime if has_accelerator():
         print("test_flat_parity_2d_full_forward")
         comptime dtype = DType.float32
@@ -1013,7 +1013,7 @@ fn test_flat_parity_2d_full_forward() raises:
         assert_true(a_cpu.flatten().all_close(a_gpu.flatten().to_cpu()))
 
 
-fn test_flat_parity_3d_partial_forward() raises:
+def test_flat_parity_3d_partial_forward() raises:
     comptime if has_accelerator():
         print("test_flat_parity_3d_partial_forward")
         comptime dtype = DType.float32
@@ -1023,7 +1023,7 @@ fn test_flat_parity_3d_partial_forward() raises:
         assert_true(a_cpu.flatten(1, 2).all_close(a_gpu.flatten(1, 2).to_cpu()))
 
 
-fn test_flat_parity_4d_forward() raises:
+def test_flat_parity_4d_forward() raises:
     comptime if has_accelerator():
         print("test_flat_parity_4d_forward")
         comptime dtype = DType.float32
@@ -1033,7 +1033,7 @@ fn test_flat_parity_4d_forward() raises:
         assert_true(a_cpu.flatten(0, 2).all_close(a_gpu.flatten(0, 2).to_cpu()))
 
 
-fn test_flat_parity_2d_backward() raises:
+def test_flat_parity_2d_backward() raises:
     comptime if has_accelerator():
         print("test_flat_parity_2d_backward")
         comptime dtype = DType.float32
@@ -1055,7 +1055,7 @@ fn test_flat_parity_2d_backward() raises:
         assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
 
 
-fn test_flat_parity_3d_backward() raises:
+def test_flat_parity_3d_backward() raises:
     comptime if has_accelerator():
         print("test_flat_parity_3d_backward")
         comptime dtype = DType.float32
@@ -1076,7 +1076,7 @@ fn test_flat_parity_3d_backward() raises:
         assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
 
 
-fn test_flat_parity_chain_backward() raises:
+def test_flat_parity_chain_backward() raises:
     comptime if has_accelerator():
         print("test_flat_parity_chain_backward")
         comptime dtype = DType.float32
@@ -1098,7 +1098,7 @@ fn test_flat_parity_chain_backward() raises:
         assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
 
 
-fn test_flat_parity_using_zero_grad() raises:
+def test_flat_parity_using_zero_grad() raises:
     comptime if has_accelerator():
         print("test_flat_parity_using_zero_grad")
         comptime dtype = DType.float32
@@ -1125,6 +1125,6 @@ fn test_flat_parity_using_zero_grad() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll flatten tests passed!")

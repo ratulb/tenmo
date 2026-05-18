@@ -12,7 +12,7 @@ from tenmo.indexhelper import IndexCalculator
 # ========== INDEX ITERATOR BENCHMARKS ==========
 
 
-fn benchmark_contiguous_iteration() raises:
+def benchmark_contiguous_iteration() raises:
     """Benchmark: IndexIterator vs coordinate iteration (contiguous)."""
     print("\n" + "=" * 70)
     print("BENCHMARK 1: Contiguous Iteration")
@@ -52,7 +52,7 @@ fn benchmark_contiguous_iteration() raises:
     print("📊 Time saved:", (old_time - new_time) * 1000, "ms")
 
 
-fn benchmark_strided_iteration() raises:
+def benchmark_strided_iteration() raises:
     """Benchmark: IndexIterator vs coordinate iteration (strided)."""
     print("\n" + "=" * 70)
     print("BENCHMARK 2: Strided Iteration (Transpose)")
@@ -90,7 +90,7 @@ fn benchmark_strided_iteration() raises:
     print("📊 Time saved:", (old_time - new_time) * 1000, "ms")
 
 
-fn benchmark_memory_footprint():
+def benchmark_memory_footprint():
     """Compare memory footprint of iterators."""
     print("\n" + "=" * 70)
     print("BENCHMARK 3: Memory Footprint")
@@ -128,7 +128,7 @@ fn benchmark_memory_footprint():
     print("  Recommendation: Inline coords if rank ≤ 8 (99% of cases)")
 
 
-fn benchmark_different_ranks() raises:
+def benchmark_different_ranks() raises:
     """Benchmark how performance scales with rank."""
     print("\n" + "=" * 70)
     print("BENCHMARK 4: Performance vs Rank")
@@ -176,7 +176,7 @@ fn benchmark_different_ranks() raises:
         print("  Per element:", time / Float64(count) * 1e9, "ns\n")
 
 
-fn benchmark_real_world_operations() raises:
+def benchmark_real_world_operations() raises:
     """Benchmark real operations: sum, multiply, etc."""
     print("\n" + "=" * 70)
     print("BENCHMARK 5: Real-World Operations")
@@ -241,7 +241,7 @@ fn benchmark_real_world_operations() raises:
     )
 
 
-fn benchmark_skip_performance() raises:
+def benchmark_skip_performance() raises:
     """Benchmark skip() operation."""
     print("\n" + "=" * 70)
     print("BENCHMARK 6: Skip Performance")
@@ -273,7 +273,7 @@ fn benchmark_skip_performance() raises:
     )
 
 
-fn run_all_benchmarks() raises:
+def run_all_benchmarks() raises:
     """Run complete benchmark suite."""
     print("\n" + "=" * 70)
     print("INDEX ITERATOR BENCHMARK SUITE")
@@ -305,7 +305,7 @@ fn run_all_benchmarks() raises:
 # ========== INDEX ITERATOR COMPREHENSIVE TESTS ==========
 
 
-fn test_contiguous_iteration() raises:
+def test_contiguous_iteration() raises:
     """Test iteration over contiguous tensor."""
     print("test_contiguous_iteration")
 
@@ -325,7 +325,7 @@ fn test_contiguous_iteration() raises:
     print("  ✓ Contiguous iteration produces sequential offsets")
 
 
-fn test_strided_iteration() raises:
+def test_strided_iteration() raises:
     """Test iteration over strided tensor (e.g., transpose)."""
     print("test_strided_iteration")
 
@@ -347,7 +347,7 @@ fn test_strided_iteration() raises:
     print("  ✓ Strided iteration respects stride pattern")
 
 
-fn test_correctness_vs_coordinate_iteration() raises:
+def test_correctness_vs_coordinate_iteration() raises:
     """Verify IndexIterator produces same offsets as coordinate iteration."""
     print("test_correctness_vs_coordinate_iteration")
 
@@ -377,7 +377,7 @@ fn test_correctness_vs_coordinate_iteration() raises:
     print("  ✓ IndexIterator matches coordinate iteration exactly")
 
 
-fn test_edge_cases() raises:
+def test_edge_cases() raises:
     """Test edge cases: 1D, scalar, large rank."""
     print("test_edge_cases")
 
@@ -409,7 +409,7 @@ fn test_edge_cases() raises:
     print("  ✓ 5D tensor: 720 elements")
 
 
-fn test_start_offset() raises:
+def test_start_offset() raises:
     """Test non-zero starting offset."""
     print("test_start_offset")
 
@@ -433,7 +433,7 @@ fn test_start_offset() raises:
     print("  ✓ Start offset respected")
 
 
-fn test_has_next_and_len() raises:
+def test_has_next_and_len() raises:
     """Test __has_next__ and __len__ methods."""
     print("test_has_next_and_len")
 
@@ -461,7 +461,7 @@ fn test_has_next_and_len() raises:
     print("  ✓ __has_next__ and __len__ work correctly")
 
 
-fn test_skip_functionality() raises:
+def test_skip_functionality() raises:
     """Test skip() method."""
     print("test_skip_functionality")
 
@@ -486,7 +486,7 @@ fn test_skip_functionality() raises:
     print("  ✓ Skip works for strided")
 
 
-fn test_no_allocation_overhead() raises:
+def test_no_allocation_overhead() raises:
     """Verify iterator doesn't allocate during iteration."""
     print("test_no_allocation_overhead")
 
@@ -511,7 +511,7 @@ fn test_no_allocation_overhead() raises:
     print("  ✓ No allocation overhead detected")
 
 
-fn run_all_tests() raises:
+def run_all_tests() raises:
     """Run complete test suite."""
     print("\n" + "=" * 70)
     print("INDEX ITERATOR TEST SUITE")
@@ -533,7 +533,7 @@ fn run_all_tests() raises:
 
 # ========== INDEX CALCULATOR TESTS ==========
 
-fn test_flatten_index_with_intarray() raises:
+def test_flatten_index_with_intarray() raises:
     """Test flatten_index with IntArray indices."""
     print("test_flatten_index_with_intarray")
 
@@ -554,7 +554,7 @@ fn test_flatten_index_with_intarray() raises:
     print("  ✓ flatten_index with IntArray works")
 
 
-fn test_flatten_index_from_list_conversion() raises:
+def test_flatten_index_from_list_conversion() raises:
     """Test flatten_index by converting List[Int] to IntArray."""
     print("test_flatten_index_from_list_conversion")
 
@@ -570,7 +570,7 @@ fn test_flatten_index_from_list_conversion() raises:
     print("  ✓ List[Int] to IntArray conversion works")
 
 
-fn test_flatten_index_from_variadic_conversion() raises:
+def test_flatten_index_from_variadic_conversion() raises:
     """Test flatten_index by converting VariadicList to IntArray."""
     print("test_flatten_index_from_variadic_conversion")
 
@@ -585,7 +585,7 @@ fn test_flatten_index_from_variadic_conversion() raises:
 
 
 
-fn test_index_to_coord() raises:
+def test_index_to_coord() raises:
     """Test converting flat index to multi-dimensional coordinates."""
     print("test_index_to_coord")
 
@@ -612,7 +612,7 @@ fn test_index_to_coord() raises:
     print("  ✓ index_to_coord works")
 
 
-fn test_max_index() raises:
+def test_max_index() raises:
     """Test max_index calculation."""
     print("test_max_index")
 
@@ -630,7 +630,7 @@ fn test_max_index() raises:
     print("  ✓ max_index works")
 
 
-fn test_index_calculator_edge_cases() raises:
+def test_index_calculator_edge_cases() raises:
     """Test edge cases for IndexCalculator."""
     print("test_index_calculator_edge_cases")
 
@@ -656,7 +656,7 @@ fn test_index_calculator_edge_cases() raises:
     print("  ✓ IndexCalculator edge cases work")
 
 
-fn run_all_index_calculator_tests() raises:
+def run_all_index_calculator_tests() raises:
     """Run all IndexCalculator tests."""
     print("\n=== INDEX CALCULATOR TESTS ===\n")
 
@@ -670,7 +670,7 @@ fn run_all_index_calculator_tests() raises:
     print("\n✅ All IndexCalculator Tests Passed!\n")
 
 
-fn test_carry_calculation_correctness_idx() raises:
+def test_carry_calculation_correctness_idx() raises:
     """Test that carry calculation is correct (addressing review comment 1)."""
     print("test_carry_calculation_correctness_idx")
 
@@ -687,7 +687,7 @@ fn test_carry_calculation_correctness_idx() raises:
         )
 
 
-fn test_no_division_by_zero_idx() raises:
+def test_no_division_by_zero_idx() raises:
     """Test that divisor never becomes zero (addressing review comment 2)."""
     print("test_no_division_by_zero_idx")
 
@@ -709,7 +709,7 @@ fn test_no_division_by_zero_idx() raises:
     assert_true(iter2.__next__() == 50)
 
 
-fn test_skip_does_not_overshoot_idx() raises:
+def test_skip_does_not_overshoot_idx() raises:
     """Test that skip doesn't go beyond end (addressing review comment 5)."""
     print("test_skip_does_not_overshoot_idx")
 
@@ -727,7 +727,7 @@ fn test_skip_does_not_overshoot_idx() raises:
     assert_true(not iter2.__has_next__(), "Should be at end, not beyond")
 
 
-fn test_skip_incremental_path_idx() raises:
+def test_skip_incremental_path_idx() raises:
     """Test small skip uses incremental path correctly."""
     print("test_skip_incremental_path_idx")
 
@@ -747,7 +747,7 @@ fn test_skip_incremental_path_idx() raises:
     assert_true(iter.__next__() == 21)
 
 
-fn test_skip_direct_path_idx() raises:
+def test_skip_direct_path_idx() raises:
     """Test large skip uses direct computation correctly."""
     print("test_skip_direct_path_idx")
 
@@ -760,7 +760,7 @@ fn test_skip_direct_path_idx() raises:
     assert_true(iter.__next__() == 550)
 
 
-fn test_skip_on_3d_tensor_idx() raises:
+def test_skip_on_3d_tensor_idx() raises:
     """Test skip works correctly on 3D tensor."""
     print("test_skip_on_3d_tensor_idx")
 
@@ -773,7 +773,7 @@ fn test_skip_on_3d_tensor_idx() raises:
     assert_true(iter.__next__() == 61)
 
 
-fn test_skip_boundary_cases_idx() raises:
+def test_skip_boundary_cases_idx() raises:
     """Test skip at various boundaries."""
     print("test_skip_boundary_cases_idx")
 
@@ -796,7 +796,7 @@ fn test_skip_boundary_cases_idx() raises:
     assert_true(not iter.__has_next__())
 
 
-fn test_carry_with_different_strides_idx() raises:
+def test_carry_with_different_strides_idx() raises:
     """Test carry calculation with non-standard strides."""
     print("test_carry_with_different_strides_idx")
 
@@ -813,7 +813,7 @@ fn test_carry_with_different_strides_idx() raises:
         assert_true(offset == expected[i], "Column-major carry failed")
 
 
-fn test_divisor_calculation_multidim_idx() raises:
+def test_divisor_calculation_multidim_idx() raises:
     """Test divisor calculation doesn't fail on various tensor shapes."""
     print("test_divisor_calculation_multidim_idx")
 
@@ -838,7 +838,7 @@ fn test_divisor_calculation_multidim_idx() raises:
             assert_true(iter.__has_next__(), "Should still have elements")
 
 
-fn test_skip_consistency_idx() raises:
+def test_skip_consistency_idx() raises:
     """Test that skip produces same result as repeated __next__."""
     print("test_skip_consistency_idx")
 
@@ -859,7 +859,7 @@ fn test_skip_consistency_idx() raises:
     assert_true(offset1 == offset2, "Skip doesn't match repeated __next__")
 
 
-fn run_all_index_iterator_review_tests() raises:
+def run_all_index_iterator_review_tests() raises:
     """Run all tests addressing review comments."""
     print("\n=== Running IndexIterator Review Tests ===\n")
 
@@ -879,7 +879,7 @@ fn run_all_index_iterator_review_tests() raises:
     print("Your implementation is CORRECT.")
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 

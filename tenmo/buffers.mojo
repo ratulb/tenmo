@@ -59,13 +59,13 @@ struct Buffer[dtype: DType = DType.float32](
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
     ]: Iterator = ElementIterator[Self.dtype, iterable_origin, True]
 
-    fn __init__(out self):
+    def __init__(out self):
         self.size = 0
         self.data = UnsafePointer[Scalar[Self.dtype], MutExternalOrigin]()
         self._refcount = {}
         self.external = False
 
-    fn __init__(out self, size: Int, external: Bool = False):
+    def __init__(out self, size: Int, external: Bool = False):
         if size < 0:
             panic("Buffer size must be >= 0")
         self.size = size
@@ -77,7 +77,7 @@ struct Buffer[dtype: DType = DType.float32](
         else:
             self.data = alloc[Scalar[Self.dtype]](size)
 
-    fn __init__(out self, elems: List[Scalar[Self.dtype]]):
+    def __init__(out self, elems: List[Scalar[Self.dtype]]):
         var length = len(elems)
         self.data = alloc[Scalar[Self.dtype]](length)
         self.size = length
@@ -85,7 +85,7 @@ struct Buffer[dtype: DType = DType.float32](
         self.external = False
         self._refcount = {}
 
-    fn __init__(out self, *elems: Scalar[Self.dtype]):
+    def __init__(out self, *elems: Scalar[Self.dtype]):
         var length = len(elems)
         self.data = alloc[Scalar[Self.dtype]](length)
         self.size = length
@@ -94,13 +94,13 @@ struct Buffer[dtype: DType = DType.float32](
         for i in range(len(self)):
             self.data[i] = elems[i]
 
-    fn __init__[
+    def __init__[
         size: Int, datatype: DType, //
     ](out self: Buffer[datatype], vector: SIMD[datatype, size]):
         self = Buffer[datatype](size)
         self.store[simdwidth=size](0, vector)
 
-    fn __init__(
+    def __init__(
         out self,
         size: Int,
         # data: UnsafePointer[Scalar[Self.dtype], MutExternalOrigin],
@@ -119,15 +119,15 @@ struct Buffer[dtype: DType = DType.float32](
 
     # Shared state management
 
-    fn is_shared(self) -> Bool:
+    def is_shared(self) -> Bool:
         """Check if this buffer has ref counting enabled."""
         return (
             self._refcount
             != UnsafePointer[Atomic[DType.uint64], MutExternalOrigin]()
         )
 
-    # fn shared(mut self) -> Self:
-    fn shared(mut self):
+    # def shared(mut self) -> Self:
+    def shared(mut self):
         """
         Convert this buffer to shared mode (enable ref counting).
 
@@ -167,7 +167,7 @@ struct Buffer[dtype: DType = DType.float32](
         self.data = new_data
         self._refcount = refcount_ptr
 
-    fn ref_count(self) -> UInt64:
+    def ref_count(self) -> UInt64:
         """Count the amount of current references.
 
         Returns:
@@ -179,7 +179,7 @@ struct Buffer[dtype: DType = DType.float32](
     # Copy/Move semantics
     # ========================================
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         """Copy buffer - increment refcount if shared."""
         self.size = copy.size
         self.data = copy.data
@@ -195,14 +195,14 @@ struct Buffer[dtype: DType = DType.float32](
                 self.data = alloc[Scalar[Self.dtype]](self.size)
                 memcpy(dest=self.data, src=copy.data, count=self.size)
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, deinit take: Self):
         """Move buffer - no refcount change."""
         self.size = take.size
         self.data = take.data
         self.external = take.external
         self._refcount = take._refcount
 
-    fn __del__(deinit self):
+    def __del__(deinit self):
         """Destroy buffer - handle both shared and unshared cases."""
         if self.size == 0 or not self.data.__bool__():
             return
@@ -227,7 +227,7 @@ struct Buffer[dtype: DType = DType.float32](
             self.data.free()
             log_debug("Buffer__del__ → freed unshared buffer")
 
-    fn unsafe_ptr[
+    def unsafe_ptr[
         origin: Origin, address_space: AddressSpace, //
     ](ref[origin, address_space] self) -> UnsafePointer[
         Scalar[Self.dtype], origin, address_space=address_space
@@ -247,15 +247,15 @@ struct Buffer[dtype: DType = DType.float32](
             .address_space_cast[address_space]()
         )
 
-    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+    def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return {0, Pointer(to=self)}
 
     @always_inline
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         return self.size
 
     @always_inline
-    fn __getitem__(self, slice: Slice) -> Buffer[Self.dtype]:
+    def __getitem__(self, slice: Slice) -> Buffer[Self.dtype]:
         var start, end, step = slice.indices(len(self))
         var spread = range(start, end, step)
         var result_size = len(spread)
@@ -307,7 +307,7 @@ struct Buffer[dtype: DType = DType.float32](
         return result^
 
     @always_inline
-    fn __getitem__(ref self, index: Int) -> ref[self] Scalar[Self.dtype]:
+    def __getitem__(ref self, index: Int) -> ref[self] Scalar[Self.dtype]:
         debug_assert(
             index >= 0 and index < self.size,
             "Buffer -> __getitem__: index out of bounds",
@@ -317,7 +317,7 @@ struct Buffer[dtype: DType = DType.float32](
         return (self.data + index)[]
 
     @always_inline
-    fn __setitem__(self, index: Int, scalar: Scalar[Self.dtype]):
+    def __setitem__(self, index: Int, scalar: Scalar[Self.dtype]):
         debug_assert(
             index >= 0 and index < self.size,
             "Buffer -> __setitem__: index out of bounds",
@@ -328,7 +328,7 @@ struct Buffer[dtype: DType = DType.float32](
         (self.data + index)[] = scalar
 
     @always_inline
-    fn load[
+    def load[
         simdwidth: Int = 1
     ](self, offset: Int) -> SIMD[Self.dtype, simdwidth]:
         debug_assert(
@@ -341,7 +341,7 @@ struct Buffer[dtype: DType = DType.float32](
         return self.data.load[width=simdwidth](offset)
 
     @always_inline
-    fn store[
+    def store[
         simdwidth: Int = 1
     ](self, offset: Int, values: SIMD[Self.dtype, simdwidth]):
         debug_assert(
@@ -355,7 +355,7 @@ struct Buffer[dtype: DType = DType.float32](
         self.data.store[width=simdwidth](offset, values)
 
     @always_inline
-    fn __add__(
+    def __add__(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[Self.dtype]:
@@ -376,7 +376,7 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops[Add, validate=False](other)
 
     @always_inline
-    fn __iadd__(self, other: Buffer[Self.dtype]):
+    def __iadd__(self, other: Buffer[Self.dtype]):
         comptime assert (
             Self.dtype.is_numeric()
         ), "Buffer → __iadd__(other) is for numeric data types only"
@@ -395,7 +395,7 @@ struct Buffer[dtype: DType = DType.float32](
         self.inplace_ops[Add, False](other)
 
     @always_inline
-    fn __isub__(self, other: Buffer[Self.dtype]):
+    def __isub__(self, other: Buffer[Self.dtype]):
         comptime assert (
             Self.dtype.is_numeric()
         ), "Buffer → __isub__(other) is for numeric data types only"
@@ -414,7 +414,7 @@ struct Buffer[dtype: DType = DType.float32](
         self.inplace_ops[Subtract, False](other)
 
     @always_inline
-    fn __sub__(
+    def __sub__(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[Self.dtype]:
@@ -435,7 +435,7 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops[Subtract, validate=False](other)
 
     @always_inline
-    fn __mul__(
+    def __mul__(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[Self.dtype]:
@@ -453,7 +453,7 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops[Multiply, validate=False](other)
 
     @always_inline
-    fn __imul__(self, other: Buffer[Self.dtype]):
+    def __imul__(self, other: Buffer[Self.dtype]):
         # No constraint checking for Self.dtype - DType.bool multplication allowed
         if self.size != other.size:
             panic(
@@ -472,7 +472,7 @@ struct Buffer[dtype: DType = DType.float32](
         self.inplace_ops[Multiply, False](other)
 
     @always_inline
-    fn inplace_ops_scalar[
+    def inplace_ops_scalar[
         op_code: Int
     ](
         self: Buffer[Self.dtype],
@@ -536,7 +536,7 @@ struct Buffer[dtype: DType = DType.float32](
                 self[i] = self[i] / scalar
 
     @always_inline
-    fn inplace_ops[
+    def inplace_ops[
         op_code: Int, validate: Bool = True
     ](
         self: Buffer[Self.dtype],
@@ -635,7 +635,7 @@ struct Buffer[dtype: DType = DType.float32](
                 self[self_start + idx] = result
 
     @always_inline
-    fn arithmetic_ops[
+    def arithmetic_ops[
         op_code: Int,
         validate: Bool = True,
     ](
@@ -761,7 +761,7 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn arithmetic_ops_scalar[
+    def arithmetic_ops_scalar[
         op_code: Int
     ](
         self: Buffer[Self.dtype],
@@ -848,7 +848,7 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn __truediv__(
+    def __truediv__(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[Self.dtype]:
@@ -873,7 +873,7 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops[Divide, validate=False](other)
 
     @always_inline
-    fn __itruediv__(
+    def __itruediv__(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ):
@@ -897,7 +897,7 @@ struct Buffer[dtype: DType = DType.float32](
         self.inplace_ops[Divide, False](other)
 
     @always_inline
-    fn __iadd__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
+    def __iadd__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
         comptime assert (
             Self.dtype.is_numeric()
         ), "Buffer → __iadd__(scalar) is for numeric data types only"
@@ -905,7 +905,7 @@ struct Buffer[dtype: DType = DType.float32](
         self.inplace_ops_scalar[Add](scalar)
 
     @always_inline
-    fn __isub__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
+    def __isub__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
         comptime assert (
             Self.dtype.is_numeric()
         ), "Buffer → __isub__(scalar) is for numeric data types only"
@@ -913,12 +913,12 @@ struct Buffer[dtype: DType = DType.float32](
         self.inplace_ops_scalar[Subtract](scalar)
 
     @always_inline
-    fn __imul__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
+    def __imul__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
         # No constraint checking for Self.dtype - DType.bool multplication allowed
         self.inplace_ops_scalar[Multiply](scalar)
 
     @always_inline
-    fn __itruediv__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
+    def __itruediv__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
         comptime assert (
             Self.dtype.is_numeric()
         ), "Buffer → __itruediv__(scalar) is for numeric data types only"
@@ -929,7 +929,7 @@ struct Buffer[dtype: DType = DType.float32](
         self.inplace_ops_scalar[Divide](scalar)
 
     @always_inline
-    fn __rsub__(
+    def __rsub__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
         comptime assert (
@@ -939,7 +939,7 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops_scalar[ReverseSubtract](scalar)
 
     @always_inline
-    fn __sub__(
+    def __sub__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
         comptime assert (
@@ -949,7 +949,7 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops_scalar[Subtract](scalar)
 
     @always_inline
-    fn __rmul__(
+    def __rmul__(
         self: Buffer[Self.dtype], factor: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
         comptime assert (
@@ -959,14 +959,14 @@ struct Buffer[dtype: DType = DType.float32](
         return self.__mul__(factor)
 
     @always_inline
-    fn __mul__(
+    def __mul__(
         self: Buffer[Self.dtype], factor: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
         # No constraint checking for Self.dtype - DType.bool multplication allowed
         return self.arithmetic_ops_scalar[Multiply](factor)
 
     @always_inline
-    fn __radd__(
+    def __radd__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
         comptime assert (
@@ -976,7 +976,7 @@ struct Buffer[dtype: DType = DType.float32](
         return self.__add__(scalar)
 
     @always_inline
-    fn __add__(
+    def __add__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
         comptime assert (
@@ -986,7 +986,7 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops_scalar[Add](scalar)
 
     @always_inline
-    fn __truediv__(
+    def __truediv__(
         self: Buffer[Self.dtype],
         divisor: Scalar[Self.dtype],
     ) -> Buffer[Self.dtype]:
@@ -998,7 +998,7 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops_scalar[Divide](divisor)
 
     @always_inline
-    fn __rtruediv__(
+    def __rtruediv__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
         comptime assert Self.dtype.is_numeric(), (
@@ -1009,7 +1009,7 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops_scalar[ReverseDivide](scalar)
 
     @always_inline
-    fn compare_buffer_full[
+    def compare_buffer_full[
         op_code: Int
     ](
         self: Buffer[Self.dtype],
@@ -1093,7 +1093,7 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn compare_scalar_full[
+    def compare_scalar_full[
         op_code: Int
     ](self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Buffer[
         DType.bool
@@ -1161,7 +1161,7 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn select[
+    def select[
         op_code: Int, validate: Bool = True
     ](
         self: Buffer[Self.dtype],
@@ -1234,17 +1234,17 @@ struct Buffer[dtype: DType = DType.float32](
 
         return out^
 
-    fn __abs__(self) -> Buffer[Self.dtype]:
+    def __abs__(self) -> Buffer[Self.dtype]:
         return self.unary_ops[ABS]()
 
-    fn __neg__(self) -> Buffer[Self.dtype]:
+    def __neg__(self) -> Buffer[Self.dtype]:
         return self.unary_ops[NEGATE]()
 
-    fn __invert__(self) -> Buffer[Self.dtype]:
+    def __invert__(self) -> Buffer[Self.dtype]:
         return self.unary_ops[INVERT]()
 
     @always_inline
-    fn unary_ops[
+    def unary_ops[
         op_code: Int,
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](
@@ -1293,7 +1293,7 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     @staticmethod
-    fn unary_ops_helper[
+    def unary_ops_helper[
         op_code: Int,
         smdwidth: Int,
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
@@ -1313,7 +1313,7 @@ struct Buffer[dtype: DType = DType.float32](
             return block
 
     @always_inline
-    fn unary_ops_with_mask[
+    def unary_ops_with_mask[
         op_code: Int
     ](
         self: Buffer[Self.dtype],
@@ -1392,18 +1392,18 @@ struct Buffer[dtype: DType = DType.float32](
 
         return (out^, mask^)
 
-    fn exp(
+    def exp(
         self, start_index: Int = 0, end_index: Optional[Int] = None
     ) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
         return self.float_unary_ops[op_code=EXP](start_index, end_index)
 
-    fn log(
+    def log(
         self, start_index: Int = 0, end_index: Optional[Int] = None
     ) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
         return self.float_unary_ops[op_code=LOG](start_index, end_index)
 
     @always_inline
-    fn float_unary_ops[
+    def float_unary_ops[
         op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ](
         self,
@@ -1465,7 +1465,7 @@ struct Buffer[dtype: DType = DType.float32](
         var dst_data = out.data
 
         @parameter
-        fn process_chunk(chunk_idx: Int):
+        def process_chunk(chunk_idx: Int):
             var out_start = chunk_idx * chunk_size
             var out_end = min(out_start + chunk_size, extent)
 
@@ -1518,7 +1518,7 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn sigmoid(
+    def sigmoid(
         self,
         start_index: Int = 0,
         end_index: Optional[Int] = None,
@@ -1542,21 +1542,21 @@ struct Buffer[dtype: DType = DType.float32](
 
     @staticmethod
     @always_inline
-    fn full(value: Scalar[Self.dtype], size: Int) -> Buffer[Self.dtype]:
+    def full(value: Scalar[Self.dtype], size: Int) -> Buffer[Self.dtype]:
         buffer = Buffer[Self.dtype](size)
         buffer.fill(value)
         return buffer^
 
     @always_inline
     @staticmethod
-    fn arange[
+    def arange[
         max_arange_elements: Int = 10000000  # Safety limit to prevent infinite loops with very small steps
     ](*args: Scalar[Self.dtype]) -> Buffer[Self.dtype]:
         return Self.arange[max_arange_elements](args)
 
     @always_inline
     @staticmethod
-    fn arange[
+    def arange[
         max_arange_elements: Int = 10000000  # Safety limit to prevent infinite loops with very small steps
     ](args: VariadicList[Scalar[Self.dtype], _]) -> Buffer[Self.dtype]:
         comptime assert (
@@ -1617,13 +1617,13 @@ struct Buffer[dtype: DType = DType.float32](
 
     @staticmethod
     @always_inline
-    fn zeros(size: Int) -> Buffer[Self.dtype]:
+    def zeros(size: Int) -> Buffer[Self.dtype]:
         buffer = Buffer[Self.dtype](size)
         memset_zero(buffer.data, size)
         return buffer^
 
     @staticmethod
-    fn linspace(
+    def linspace(
         start: Scalar[Self.dtype],
         end: Scalar[Self.dtype],
         steps: Int,
@@ -1649,11 +1649,11 @@ struct Buffer[dtype: DType = DType.float32](
         return buffer^
 
     @always_inline
-    fn zero(self: Buffer[Self.dtype]):
+    def zero(self: Buffer[Self.dtype]):
         memset_zero(self.data, self.size)
 
     @always_inline
-    fn sum(
+    def sum(
         self: Buffer[Self.dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
@@ -1685,7 +1685,7 @@ struct Buffer[dtype: DType = DType.float32](
         return accum
 
     @always_inline
-    fn product(
+    def product(
         self: Buffer[Self.dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
@@ -1715,7 +1715,7 @@ struct Buffer[dtype: DType = DType.float32](
         return result
 
     @always_inline
-    fn __pow__(
+    def __pow__(
         self: Buffer[Self.dtype],
         exponent: Scalar[Self.dtype],
     ) -> Buffer[Self.dtype]:
@@ -1740,7 +1740,7 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn clamp(
+    def clamp(
         self, lower_bound: Scalar[Self.dtype], upper_bound: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
         comptime assert (
@@ -1766,7 +1766,7 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn clamp_in_place(
+    def clamp_in_place(
         self, lower_bound: Scalar[Self.dtype], upper_bound: Scalar[Self.dtype]
     ):
         comptime assert (
@@ -1788,7 +1788,7 @@ struct Buffer[dtype: DType = DType.float32](
             self[idx] = self[idx].clamp(lower_bound, upper_bound)
 
     @always_inline
-    fn fill(
+    def fill(
         self: Buffer[Self.dtype],
         value: Scalar[Self.dtype],
         start_index: Int = 0,
@@ -1818,7 +1818,7 @@ struct Buffer[dtype: DType = DType.float32](
                 self[idx + start_index] = value
 
     @always_inline
-    fn compare_scalar[
+    def compare_scalar[
         op_code: Int
     ](self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
         total = self.size
@@ -1884,109 +1884,109 @@ struct Buffer[dtype: DType = DType.float32](
         return True
 
     @always_inline
-    fn __eq__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
+    def __eq__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
         return self.compare_scalar[Equal](scalar)
 
     @always_inline
-    fn __ne__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
+    def __ne__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
         return self.compare_scalar[NotEqual](scalar)
 
     @always_inline
-    fn __lt__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
+    def __lt__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
         return self.compare_scalar[LessThan](scalar)
 
     @always_inline
-    fn __le__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
+    def __le__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
         return self.compare_scalar[LessThanEqual](scalar)
 
     @always_inline
-    fn __gt__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
+    def __gt__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
         return self.compare_scalar[GreaterThan](scalar)
 
     @always_inline
-    fn __ge__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
+    def __ge__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
         return self.compare_scalar[GreaterThanEqual](scalar)
 
     @always_inline
-    fn eq(
+    def eq(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[Equal](scalar)
 
     @always_inline
-    fn ne(
+    def ne(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[NotEqual](scalar)
 
     @always_inline
-    fn ge(
+    def ge(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[GreaterThanEqual](scalar)
 
     @always_inline
-    fn gt(
+    def gt(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[GreaterThan](scalar)
 
     @always_inline
-    fn le(
+    def le(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[LessThanEqual](scalar)
 
     @always_inline
-    fn lt(
+    def lt(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[LessThan](scalar)
 
     @always_inline
-    fn eq(
+    def eq(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[Equal](other)
 
     @always_inline
-    fn ne(
+    def ne(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[NotEqual](other)
 
     @always_inline
-    fn lt(
+    def lt(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[LessThan](other)
 
     @always_inline
-    fn le(
+    def le(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[LessThanEqual](other)
 
     @always_inline
-    fn gt(
+    def gt(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[GreaterThan](other)
 
     @always_inline
-    fn ge(
+    def ge(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[GreaterThanEqual](other)
 
     @always_inline
-    fn compare_buffer[
+    def compare_buffer[
         op_code: Int
     ](self: Buffer[Self.dtype], other: Buffer[Self.dtype],) -> Bool:
         if not self.size == other.size:
@@ -2060,42 +2060,42 @@ struct Buffer[dtype: DType = DType.float32](
         return True
 
     @always_inline
-    fn __eq__(
+    def __eq__(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Bool:
         return self.compare_buffer[Equal](other)
 
     @always_inline
-    fn __ne__(
+    def __ne__(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Bool:
         return self.compare_buffer[NotEqual](other)
 
     @always_inline
-    fn __lt__(
+    def __lt__(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Bool:
         return self.compare_buffer[LessThan](other)
 
     @always_inline
-    fn __le__(
+    def __le__(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Bool:
         return self.compare_buffer[LessThanEqual](other)
 
     @always_inline
-    fn __gt__(
+    def __gt__(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Bool:
         return self.compare_buffer[GreaterThan](other)
 
     @always_inline
-    fn __ge__(
+    def __ge__(
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Bool:
@@ -2103,7 +2103,7 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     @staticmethod
-    fn compare_pair[
+    def compare_pair[
         op_code: Int
     ](left: Scalar[Self.dtype], right: Scalar[Self.dtype]) -> Bool:
         comptime if op_code == Equal:
@@ -2120,15 +2120,15 @@ struct Buffer[dtype: DType = DType.float32](
             return left < right
 
     @always_inline
-    fn float(self) -> Buffer[DType.float32]:
+    def float(self) -> Buffer[DType.float32]:
         return self.to_dtype[DType.float32]()
 
     @always_inline
-    fn float64(self) -> Buffer[DType.float64]:
+    def float64(self) -> Buffer[DType.float64]:
         return self.to_dtype[DType.float64]()
 
     @always_inline
-    fn to_dtype[
+    def to_dtype[
         NewType: DType, simdwidth: Int = simd_width_of[NewType]()
     ](self) -> Buffer[NewType]:
         total = self.size
@@ -2165,7 +2165,7 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn dot(
+    def dot(
         lhs: Buffer[Self.dtype],
         rhs: Buffer[Self.dtype],
         start_index: Int = 0,
@@ -2200,7 +2200,7 @@ struct Buffer[dtype: DType = DType.float32](
         return accum
 
     @always_inline
-    fn overwrite(
+    def overwrite(
         self,
         other: Buffer[Self.dtype],
         self_start: Int = 0,
@@ -2212,7 +2212,7 @@ struct Buffer[dtype: DType = DType.float32](
             other, self_start, self_end, other_start, other_end
         )
 
-    fn count(
+    def count(
         self: Buffer[Self.dtype],
         key: Scalar[Self.dtype],
         start_index: Int = 0,
@@ -2268,14 +2268,14 @@ struct Buffer[dtype: DType = DType.float32](
 
         return total
 
-    fn tolist(self: Buffer[Self.dtype]) -> List[Scalar[Self.dtype]]:
+    def tolist(self: Buffer[Self.dtype]) -> List[Scalar[Self.dtype]]:
         var result = List[Scalar[Self.dtype]](capacity=Int(len(self)))
         for i in range(len(self)):
             result.append(self[i])
         return result^
 
     @always_inline
-    fn all_close[
+    def all_close[
         rtol: Scalar[Self.dtype] = 1e-5,
         atol: Scalar[Self.dtype] = 1e-8,
     ](self: Buffer[Self.dtype], other: Buffer[Self.dtype],) -> Bool:
@@ -2292,7 +2292,7 @@ struct Buffer[dtype: DType = DType.float32](
             return True
 
         @parameter
-        fn check_close[smdwidth: Int](idx: Int) -> Bool:
+        def check_close[smdwidth: Int](idx: Int) -> Bool:
             vec1 = self.load[simdwidth=smdwidth](idx)
             vec2 = other.load[simdwidth=smdwidth](idx)
             diff = abs(vec1 - vec2)
@@ -2315,7 +2315,7 @@ struct Buffer[dtype: DType = DType.float32](
         return True
 
     @always_inline
-    fn any(
+    def any(
         self: Buffer[Self.dtype],
         pred: fn(Scalar[Self.dtype]) -> Bool,
     ) -> Bool:
@@ -2326,7 +2326,7 @@ struct Buffer[dtype: DType = DType.float32](
         return False
 
     @always_inline
-    fn all(
+    def all(
         self: Buffer[Self.dtype],
         pred: fn(Scalar[Self.dtype]) -> Bool,
     ) -> Bool:
@@ -2337,7 +2337,7 @@ struct Buffer[dtype: DType = DType.float32](
         return True
 
     @always_inline
-    fn map_to_bool(
+    def map_to_bool(
         self: Buffer[Self.dtype],
         pred: fn(Scalar[Self.dtype]) -> Bool,
     ) -> Buffer[DType.bool]:
@@ -2348,7 +2348,7 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn all_true(self: Buffer[DType.bool]) -> Bool:
+    def all_true(self: Buffer[DType.bool]) -> Bool:
         """Check if all elements in a boolean buffer are True."""
         if self.size == 0:
             return True
@@ -2359,7 +2359,7 @@ struct Buffer[dtype: DType = DType.float32](
         return True
 
     @always_inline
-    fn any_true(self: Buffer[DType.bool]) -> Bool:
+    def any_true(self: Buffer[DType.bool]) -> Bool:
         """Check if any element in a boolean buffer is True."""
         for i in range(self.size):
             if self[i]:
@@ -2367,7 +2367,7 @@ struct Buffer[dtype: DType = DType.float32](
         return False
 
     @always_inline
-    fn map_where(
+    def map_where(
         self: Buffer[Self.dtype],
         pred: fn(Scalar[Self.dtype]) -> Bool,
         value: Scalar[Self.dtype],
@@ -2379,7 +2379,7 @@ struct Buffer[dtype: DType = DType.float32](
             out[i] = value if pred(self[i]) else self[i]
         return out^
 
-    fn string(self) -> String:
+    def string(self) -> String:
         var result = "Buffer["
 
         # Use self.size instead of len(self) - self.size has actual count
@@ -2410,10 +2410,10 @@ struct Buffer[dtype: DType = DType.float32](
         return result
 
     @no_inline
-    fn __str__(self) -> String:
+    def __str__(self) -> String:
         return String.write(self)
 
-    fn write_to[W: Writer](self, mut writer: W):
+    def write_to[W: Writer](self, mut writer: W):
         length = len(self)
         writer.write("Buffer[")
         if length <= 60:
@@ -2435,7 +2435,7 @@ struct Buffer[dtype: DType = DType.float32](
         writer.write(", dtype=", self.dtype, ", size=", length, "]")
 
     @no_inline
-    fn __repr__(self) -> String:
+    def __repr__(self) -> String:
         return self.__str__()
 
 
@@ -2458,10 +2458,10 @@ struct ElementIterator[
     var src: Pointer[Buffer[Self.dtype], Self.origin]
 
     @always_inline
-    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+    def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self
 
-    fn __next__(
+    def __next__(
         mut self,
     ) raises StopIteration -> ref[Self.origin] Self.Element:
         comptime if Self.forward:
@@ -2476,7 +2476,7 @@ struct ElementIterator[
             return self.src[][self.index]
 
     @always_inline
-    fn bounds(self) -> Tuple[Int, Optional[Int]]:
+    def bounds(self) -> Tuple[Int, Optional[Int]]:
         var iter_len: Int
 
         comptime if Self.forward:
@@ -2487,10 +2487,10 @@ struct ElementIterator[
         return (iter_len, {iter_len})
 
     @always_inline
-    fn __has_next__(self) -> Bool:
+    def __has_next__(self) -> Bool:
         return self.__len__() > 0
 
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         comptime if Self.forward:
             return len(self.src[]) - self.index
         else:

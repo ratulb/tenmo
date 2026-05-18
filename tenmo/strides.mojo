@@ -24,12 +24,12 @@ struct Strides(
     var data: IntArray
 
     @staticmethod
-    fn Zero() -> Strides:
+    def Zero() -> Strides:
         """Create an empty strides instance with zero dimensions."""
         return Strides()
 
     @staticmethod
-    fn zeros(rank: Int) -> Strides:
+    def zeros(rank: Int) -> Strides:
         """Create strides filled with zeros for the given rank.
 
         Args:
@@ -40,12 +40,12 @@ struct Strides(
         """
         return Strides(IntArray.filled(rank, 0))
 
-    fn __init__(out self):
+    def __init__(out self):
         """Create an empty strides instance."""
         self.data = IntArray()
 
     @always_inline("nodebug")
-    fn __init__(out self, values: IntArray):
+    def __init__(out self, values: IntArray):
         """Create strides from an IntArray.
 
         Args:
@@ -54,7 +54,7 @@ struct Strides(
         self.data = values
 
     @always_inline("nodebug")
-    fn __init__(out self, values: List[Int]):
+    def __init__(out self, values: List[Int]):
         """Create strides from a Mojo List of integers.
 
         Args:
@@ -63,7 +63,7 @@ struct Strides(
         self.data = IntArray(values)
 
     @always_inline("nodebug")
-    fn __init__(out self, *values: Int):
+    def __init__(out self, *values: Int):
         """Create strides from individual integer values.
 
         Args:
@@ -72,7 +72,7 @@ struct Strides(
         self.data = IntArray(values)
 
     @always_inline("nodebug")
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         """Create a copy of another strides instance.
 
         Args:
@@ -81,7 +81,7 @@ struct Strides(
         self.data = copy.data
 
     @always_inline("nodebug")
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         """Get the number of dimensions (rank) of the strides.
 
         Returns:
@@ -90,7 +90,7 @@ struct Strides(
         return len(self.data)
 
     @always_inline("nodebug")
-    fn array(self) -> Array:
+    def array(self) -> Array:
         """Convert strides to an Array.
 
         Returns:
@@ -103,7 +103,7 @@ struct Strides(
         return result^
 
     @always_inline("nodebug")
-    fn __getitem__(self, i: Int) -> Int:
+    def __getitem__(self, i: Int) -> Int:
         """Get the stride value at the specified dimension index.
 
         Args:
@@ -115,7 +115,7 @@ struct Strides(
         return self.data[i]
 
     @always_inline("nodebug")
-    fn __setitem__(mut self, i: Int, value: Int):
+    def __setitem__(mut self, i: Int, value: Int):
         """Set the stride value at the specified dimension index.
 
         Args:
@@ -125,7 +125,7 @@ struct Strides(
         self.data[i] = value
 
     @always_inline("nodebug")
-    fn __getitem__(self, slice: Slice) -> Self:
+    def __getitem__(self, slice: Slice) -> Self:
         """Get a slice of strides.
 
         Args:
@@ -136,7 +136,7 @@ struct Strides(
         """
         return Strides(self.data[slice])
 
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         """Check if two strides instances are equal.
 
         Args:
@@ -147,7 +147,7 @@ struct Strides(
         """
         return self.data == other.data
 
-    fn __str__(self) -> String:
+    def __str__(self) -> String:
         """Get string representation of the strides.
 
         Returns:
@@ -156,7 +156,7 @@ struct Strides(
         var s = self.data.__str__()
         return "(" + s[byte = 1 : len(s) - 1] + ")"
 
-    fn __repr__(self) -> String:
+    def __repr__(self) -> String:
         """Get official string representation of the strides.
 
         Returns:
@@ -164,7 +164,7 @@ struct Strides(
         """
         return self.__str__()
 
-    fn write_to[W: Writer](self, mut writer: W):
+    def write_to[W: Writer](self, mut writer: W):
         """Write strides to a writer.
 
         Args:
@@ -173,7 +173,7 @@ struct Strides(
         writer.write(self.__str__())
 
     @always_inline
-    fn tolist(self) -> List[Int]:
+    def tolist(self) -> List[Int]:
         """Convert strides to a Mojo List.
 
         Returns:
@@ -182,7 +182,7 @@ struct Strides(
         return self.data.tolist()
 
     @always_inline
-    fn intarray(self) -> IntArray:
+    def intarray(self) -> IntArray:
         """Get the underlying IntArray of the strides.
 
         Returns:
@@ -191,7 +191,7 @@ struct Strides(
         return self.data
 
     @always_inline
-    fn permute(self, axes: IntArray) -> Self:
+    def permute(self, axes: IntArray) -> Self:
         """Reorder dimensions according to the specified permutation.
 
         Args:
@@ -214,7 +214,7 @@ struct Strides(
 
     @staticmethod
     @always_inline
-    fn default(shape: Shape) -> Self:
+    def default(shape: Shape) -> Self:
         """Compute default C-contiguous strides for the given shape.
 
         Args:
@@ -236,7 +236,7 @@ struct Strides(
         return Strides(strides)
 
     @always_inline
-    fn is_contiguous(self, shape: Shape) -> Bool:
+    def is_contiguous(self, shape: Shape) -> Bool:
         """Check if the strides represent a contiguous memory layout for the given shape.
 
         Args:
@@ -267,7 +267,7 @@ struct Strides(
 
     @staticmethod
     @always_inline
-    fn with_capacity(capacity: Int) -> Strides:
+    def with_capacity(capacity: Int) -> Strides:
         """Create an empty strides instance with pre-allocated capacity.
 
         Args:

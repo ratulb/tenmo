@@ -24,7 +24,7 @@ struct VarianceBwdArg[dtype: DType](ArgumentType):
 @fieldwise_init
 struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var bwd_arg = (
@@ -93,7 +93,7 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],

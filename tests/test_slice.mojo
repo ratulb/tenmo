@@ -2,7 +2,7 @@ from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
 
 
-fn test_tensor_slice_1d_basic() raises:
+def test_tensor_slice_1d_basic() raises:
     print("test_tensor_slice_1d_basic")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
@@ -18,7 +18,7 @@ fn test_tensor_slice_1d_basic() raises:
     print("Passed 1D basic slicing tests")
 
 
-fn test_tensor_slice_1d_negative_indices() raises:
+def test_tensor_slice_1d_negative_indices() raises:
     print("test_tensor_slice_1d_negative_indices")
     comptime dtype = DType.float32
 
@@ -35,7 +35,7 @@ fn test_tensor_slice_1d_negative_indices() raises:
     print("Passed 1D negative indices slicing tests")
 
 
-fn test_tensor_slice_1d_step_sizes() raises:
+def test_tensor_slice_1d_step_sizes() raises:
     print("test_tensor_slice_1d_step_sizes")
     comptime dtype = DType.float32
 
@@ -52,7 +52,7 @@ fn test_tensor_slice_1d_step_sizes() raises:
     print("Passed 1D step size slicing tests")
 
 
-fn test_tensor_slice_2d_rows() raises:
+def test_tensor_slice_2d_rows() raises:
     print("test_tensor_slice_2d_rows")
     comptime dtype = DType.float32
 
@@ -71,7 +71,7 @@ fn test_tensor_slice_2d_rows() raises:
     print("Passed 2D row slicing tests")
 
 
-fn test_tensor_slice_2d_columns() raises:
+def test_tensor_slice_2d_columns() raises:
     print("test_tensor_slice_2d_columns")
     comptime dtype = DType.float32
 
@@ -90,7 +90,7 @@ fn test_tensor_slice_2d_columns() raises:
     print("Passed 2D column slicing tests")
 
 
-fn test_tensor_slice_2d_both_dims() raises:
+def test_tensor_slice_2d_both_dims() raises:
     print("test_tensor_slice_2d_both_dims")
     comptime dtype = DType.float32
 
@@ -105,7 +105,7 @@ fn test_tensor_slice_2d_both_dims() raises:
     print("Passed 2D both dimensions slicing tests")
 
 
-fn test_tensor_slice_3d_basic() raises:
+def test_tensor_slice_3d_basic() raises:
     print("test_tensor_slice_3d_basic")
     comptime dtype = DType.float32
 
@@ -142,7 +142,7 @@ fn test_tensor_slice_3d_basic() raises:
     print("Passed 3D basic slicing tests")
 
 
-fn test_tensor_slice_with_gradients() raises:
+def test_tensor_slice_with_gradients() raises:
     print("test_tensor_slice_with_gradients")
     comptime dtype = DType.float32
 
@@ -162,7 +162,7 @@ fn test_tensor_slice_with_gradients() raises:
     print("Passed slicing with gradients test")
 
 
-fn test_tensor_nested_slice_with_gradients() raises:
+def test_tensor_nested_slice_with_gradients() raises:
     print("test_tensor_nested_slice_with_gradients")
     comptime dtype = DType.float32
 
@@ -183,7 +183,7 @@ fn test_tensor_nested_slice_with_gradients() raises:
     print("Passed slicing with gradients test")
 
 
-fn test_tensor_slice_edge_cases() raises:
+def test_tensor_slice_edge_cases() raises:
     print("test_tensor_slice_edge_cases")
     comptime dtype = DType.float32
 
@@ -204,7 +204,7 @@ fn test_tensor_slice_edge_cases() raises:
     print("Passed edge cases slicing tests")
 
 
-fn test_tensor_slice_step_edge_cases() raises:
+def test_tensor_slice_step_edge_cases() raises:
     print("test_tensor_slice_step_edge_cases")
     comptime dtype = DType.float32
 
@@ -222,7 +222,7 @@ fn test_tensor_slice_step_edge_cases() raises:
 
 
 # Consolidated test function
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
@@ -233,7 +233,7 @@ fn main() raises:
 # ============================================================================
 
 
-fn test_slice_1d_full() raises:
+def test_slice_1d_full() raises:
     """Test slicing entire 1D tensor."""
     print("test_slice_1d_full")
 
@@ -247,7 +247,7 @@ fn test_slice_1d_full() raises:
     assert_true(sliced.all_close[atol=1e-6](x))
 
 
-fn test_slice_1d_start_only() raises:
+def test_slice_1d_start_only() raises:
     """Test 1D slice with start index only."""
     print("test_slice_1d_start_only")
 
@@ -262,7 +262,7 @@ fn test_slice_1d_start_only() raises:
     assert_true(sliced.all_close[atol=1e-6](expected))
 
 
-fn test_slice_1d_end_only() raises:
+def test_slice_1d_end_only() raises:
     """Test 1D slice with end index only."""
     print("test_slice_1d_end_only")
 
@@ -277,7 +277,7 @@ fn test_slice_1d_end_only() raises:
     assert_true(sliced.all_close[atol=1e-6](expected))
 
 
-fn test_slice_1d_start_end() raises:
+def test_slice_1d_start_end() raises:
     """Test 1D slice with both start and end."""
     print("test_slice_1d_start_end")
 
@@ -292,7 +292,7 @@ fn test_slice_1d_start_end() raises:
     assert_true(sliced.all_close[atol=1e-6](expected))
 
 
-fn test_slice_1d_with_step() raises:
+def test_slice_1d_with_step() raises:
     """Test 1D slice with step."""
     print("test_slice_1d_with_step")
 
@@ -307,7 +307,7 @@ fn test_slice_1d_with_step() raises:
     assert_true(sliced.all_close[atol=1e-6](expected))
 
 
-fn test_slice_1d_negative_indices() raises:
+def test_slice_1d_negative_indices() raises:
     """Test 1D slice with negative indices."""
     print("test_slice_1d_negative_indices")
 
@@ -322,7 +322,7 @@ fn test_slice_1d_negative_indices() raises:
     assert_true(sliced.all_close[atol=1e-6](expected))
 
 
-fn test_slice_1d_single_element() raises:
+def test_slice_1d_single_element() raises:
     """Test 1D slice getting single element range."""
     print("test_slice_1d_single_element")
 
@@ -341,7 +341,7 @@ fn test_slice_1d_single_element() raises:
 # ============================================================================
 
 
-fn test_slice_2d_full() raises:
+def test_slice_2d_full() raises:
     """Test slicing entire 2D tensor."""
     print("test_slice_2d_full")
 
@@ -357,7 +357,7 @@ fn test_slice_2d_full() raises:
     assert_true(sliced.all_close[atol=1e-6](x))
 
 
-fn test_slice_2d_single_row() raises:
+def test_slice_2d_single_row() raises:
     """Test slicing single row from 2D tensor."""
     print("test_slice_2d_single_row")
 
@@ -375,7 +375,7 @@ fn test_slice_2d_single_row() raises:
     assert_true(sliced.all_close[atol=1e-6](expected))
 
 
-fn test_slice_2d_single_column() raises:
+def test_slice_2d_single_column() raises:
     """Test slicing single column from 2D tensor."""
     print("test_slice_2d_single_column")
 
@@ -393,7 +393,7 @@ fn test_slice_2d_single_column() raises:
     assert_true(sliced.all_close[atol=1e-6](expected))
 
 
-fn test_slice_2d_submatrix() raises:
+def test_slice_2d_submatrix() raises:
     """Test slicing submatrix from 2D tensor."""
     print("test_slice_2d_submatrix")
 
@@ -416,7 +416,7 @@ fn test_slice_2d_submatrix() raises:
     assert_true(sliced.all_close[atol=1e-6](expected))
 
 
-fn test_slice_2d_rows_subset() raises:
+def test_slice_2d_rows_subset() raises:
     """Test slicing subset of rows."""
     print("test_slice_2d_rows_subset")
 
@@ -434,7 +434,7 @@ fn test_slice_2d_rows_subset() raises:
     assert_true(sliced.all_close[atol=1e-6](expected))
 
 
-fn test_slice_2d_cols_subset() raises:
+def test_slice_2d_cols_subset() raises:
     """Test slicing subset of columns."""
     print("test_slice_2d_cols_subset")
 
@@ -452,7 +452,7 @@ fn test_slice_2d_cols_subset() raises:
     assert_true(sliced.all_close[atol=1e-6](expected))
 
 
-fn test_slice_2d_with_step() raises:
+def test_slice_2d_with_step() raises:
     """Test 2D slicing with step."""
     print("test_slice_2d_with_step")
 
@@ -480,7 +480,7 @@ fn test_slice_2d_with_step() raises:
 # ============================================================================
 
 
-fn test_slice_3d_full() raises:
+def test_slice_3d_full() raises:
     """Test slicing entire 3D tensor."""
     print("test_slice_3d_full")
 
@@ -495,7 +495,7 @@ fn test_slice_3d_full() raises:
     assert_true(sliced.all_close[atol=1e-6](x))
 
 
-fn test_slice_3d_single_depth() raises:
+def test_slice_3d_single_depth() raises:
     """Test slicing single depth slice from 3D tensor."""
     print("test_slice_3d_single_depth")
 
@@ -511,7 +511,7 @@ fn test_slice_3d_single_depth() raises:
     assert_true(sliced.shape()[2] == 4)
 
 
-fn test_slice_3d_subvolume() raises:
+def test_slice_3d_subvolume() raises:
     """Test slicing subvolume from 3D tensor."""
     print("test_slice_3d_subvolume")
 
@@ -529,7 +529,7 @@ fn test_slice_3d_subvolume() raises:
     assert_true(sliced.shape()[2] == 2)
 
 
-fn test_slice_3d_single_channel() raises:
+def test_slice_3d_single_channel() raises:
     """Test slicing single channel from 3D tensor (like CNN)."""
     print("test_slice_3d_single_channel")
 
@@ -543,7 +543,7 @@ fn test_slice_3d_single_channel() raises:
     assert_true(sliced.shape()[2] == 28)
 
 
-fn test_slice_3d_spatial_region() raises:
+def test_slice_3d_spatial_region() raises:
     """Test slicing spatial region from 3D tensor."""
     print("test_slice_3d_spatial_region")
 
@@ -563,7 +563,7 @@ fn test_slice_3d_spatial_region() raises:
 # ============================================================================
 
 
-fn test_slice_4d_full() raises:
+def test_slice_4d_full() raises:
     """Test slicing entire 4D tensor."""
     print("test_slice_4d_full")
 
@@ -578,7 +578,7 @@ fn test_slice_4d_full() raises:
     assert_true(sliced.shape()[3] == 28)
 
 
-fn test_slice_4d_single_batch() raises:
+def test_slice_4d_single_batch() raises:
     """Test slicing single batch element from 4D tensor."""
     print("test_slice_4d_single_batch")
 
@@ -593,7 +593,7 @@ fn test_slice_4d_single_batch() raises:
     assert_true(sliced.shape()[3] == 32)
 
 
-fn test_slice_4d_batch_subset() raises:
+def test_slice_4d_batch_subset() raises:
     """Test slicing subset of batch."""
     print("test_slice_4d_batch_subset")
 
@@ -608,7 +608,7 @@ fn test_slice_4d_batch_subset() raises:
     assert_true(sliced.shape()[3] == 32)
 
 
-fn test_slice_4d_channel_subset() raises:
+def test_slice_4d_channel_subset() raises:
     """Test slicing subset of channels from 4D tensor."""
     print("test_slice_4d_channel_subset")
 
@@ -623,7 +623,7 @@ fn test_slice_4d_channel_subset() raises:
     assert_true(sliced.shape()[3] == 14)
 
 
-fn test_slice_4d_spatial_crop() raises:
+def test_slice_4d_spatial_crop() raises:
     """Test spatial cropping from 4D tensor."""
     print("test_slice_4d_spatial_crop")
 
@@ -643,7 +643,7 @@ fn test_slice_4d_spatial_crop() raises:
 # ============================================================================
 
 
-fn test_chained_slicing_2d() raises:
+def test_chained_slicing_2d() raises:
     """Test chaining multiple slicing operations."""
     print("test_chained_slicing_2d")
 
@@ -667,7 +667,7 @@ fn test_chained_slicing_2d() raises:
     assert_true(sliced2.all_close[atol=1e-6](expected))
 
 
-fn test_chained_slicing_3d() raises:
+def test_chained_slicing_3d() raises:
     """Test chaining slices on 3D tensor."""
     print("test_chained_slicing_3d")
 
@@ -690,7 +690,7 @@ fn test_chained_slicing_3d() raises:
 # ============================================================================
 
 
-fn test_immutable_multiple_slices() raises:
+def test_immutable_multiple_slices() raises:
     """Test that we can create multiple slices from same immutable tensor."""
     print("test_immutable_multiple_slices")
 
@@ -712,7 +712,7 @@ fn test_immutable_multiple_slices() raises:
     assert_true(slice3[0] == 2.0)
 
 
-fn test_immutable_slice_from_const() raises:
+def test_immutable_slice_from_const() raises:
     """Test slicing from a const-reference like scenario."""
     print("test_immutable_slice_from_const")
 
@@ -728,7 +728,7 @@ fn test_immutable_slice_from_const() raises:
     assert_true(sliced.all_close[atol=1e-6](expected))
 
 
-fn test_immutable_overlapping_slices() raises:
+def test_immutable_overlapping_slices() raises:
     """Test creating overlapping slices (only possible with 'self')."""
     print("test_immutable_overlapping_slices")
 
@@ -758,7 +758,7 @@ fn test_immutable_overlapping_slices() raises:
 # ============================================================================
 
 
-fn test_slice_backward_1d() raises:
+def test_slice_backward_1d() raises:
     """Test gradient flow through 1D slice."""
     print("test_slice_backward_1d")
 
@@ -774,7 +774,7 @@ fn test_slice_backward_1d() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_slice_backward_2d() raises:
+def test_slice_backward_2d() raises:
     """Test gradient flow through 2D slice."""
     print("test_slice_backward_2d")
 
@@ -794,7 +794,7 @@ fn test_slice_backward_2d() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_slice_backward_chained() raises:
+def test_slice_backward_chained() raises:
     """Test gradient flow through chained slices."""
     print("test_slice_backward_chained")
 
@@ -815,7 +815,7 @@ fn test_slice_backward_chained() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_slice_backward_multiple_paths() raises:
+def test_slice_backward_multiple_paths() raises:
     """Test gradient accumulation from multiple slices."""
     print("test_slice_backward_multiple_paths")
 
@@ -841,7 +841,7 @@ fn test_slice_backward_multiple_paths() raises:
 # ============================================================================
 
 
-fn run_additional_tests() raises:
+def run_additional_tests() raises:
     print("=" * 80)
     print("TENSOR SLICING COMPREHENSIVE TEST SUITE")
     print("Testing API change: 'mut self' → 'self'")

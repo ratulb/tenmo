@@ -126,7 +126,7 @@ def scatter_add_rows_strided_kernel[
     _ = Atomic.fetch_add(target + target_idx, source[source_idx])
 
 
-fn scatter_add_broadcast_kernel[
+def scatter_add_broadcast_kernel[
     dtype: DType
 ](
     target: UnsafePointer[Scalar[dtype], MutAnyOrigin],

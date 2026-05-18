@@ -8,7 +8,7 @@ from tenmo.tensor import Tensor
 # Grad MUST flow back to original CPU tensor
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_devtransfer_cpu2gpu_default_stop_grad_false_1d() raises:
+def test_devtransfer_cpu2gpu_default_stop_grad_false_1d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
@@ -19,7 +19,7 @@ fn test_devtransfer_cpu2gpu_default_stop_grad_false_1d() raises:
         assert_true(a.grad().all_close[atol=1e-5](Tensor.ones_like(a)))
 
 
-fn test_devtransfer_cpu2gpu_default_stop_grad_false_2d() raises:
+def test_devtransfer_cpu2gpu_default_stop_grad_false_2d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -29,7 +29,7 @@ fn test_devtransfer_cpu2gpu_default_stop_grad_false_2d() raises:
         assert_true(a.grad().all_close[atol=1e-5](Tensor.ones_like(a)))
 
 
-fn test_devtransfer_cpu2gpu_default_stop_grad_false_with_mul() raises:
+def test_devtransfer_cpu2gpu_default_stop_grad_false_with_mul() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -45,7 +45,7 @@ fn test_devtransfer_cpu2gpu_default_stop_grad_false_with_mul() raises:
         )
 
 
-fn test_devtransfer_cpu2gpu_default_stop_grad_false_with_chained_ops() raises:
+def test_devtransfer_cpu2gpu_default_stop_grad_false_with_chained_ops() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 4.0], [9.0, 16.0]], requires_grad=True)
@@ -65,7 +65,7 @@ fn test_devtransfer_cpu2gpu_default_stop_grad_false_with_chained_ops() raises:
 # B is a new GPU leaf. Ops on B deposit grad on B, NOT on A.
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_devtransfer_cpu2gpu_stop_grad_true_grad_on_gpu_leaf_1d() raises:
+def test_devtransfer_cpu2gpu_stop_grad_true_grad_on_gpu_leaf_1d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
@@ -83,7 +83,7 @@ fn test_devtransfer_cpu2gpu_stop_grad_true_grad_on_gpu_leaf_1d() raises:
         assert_true(a.grad().all_close[atol=1e-5](Tensor.zeros_like(a)))
 
 
-fn test_devtransfer_cpu2gpu_stop_grad_true_grad_on_gpu_leaf_2d() raises:
+def test_devtransfer_cpu2gpu_stop_grad_true_grad_on_gpu_leaf_2d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -99,7 +99,7 @@ fn test_devtransfer_cpu2gpu_stop_grad_true_grad_on_gpu_leaf_2d() raises:
         assert_true(a.grad().all_close[atol=1e-5](Tensor.zeros_like(a)))
 
 
-fn test_devtransfer_cpu2gpu_stop_grad_true_sum_op() raises:
+def test_devtransfer_cpu2gpu_stop_grad_true_sum_op() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([2.0, 4.0, 6.0], requires_grad=True)
@@ -114,7 +114,7 @@ fn test_devtransfer_cpu2gpu_stop_grad_true_sum_op() raises:
         assert_true(a.grad().all_close[atol=1e-5](Tensor.zeros_like(a)))
 
 
-fn test_devtransfer_cpu2gpu_stop_grad_true_chained_ops() raises:
+def test_devtransfer_cpu2gpu_stop_grad_true_chained_ops() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 4.0, 9.0], requires_grad=True)
@@ -135,7 +135,7 @@ fn test_devtransfer_cpu2gpu_stop_grad_true_chained_ops() raises:
 # Grad MUST flow all the way back to A on CPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_devtransfer_roundtrip_gpu_cpu_stop_grad_false_sum() raises:
+def test_devtransfer_roundtrip_gpu_cpu_stop_grad_false_sum() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
@@ -150,7 +150,7 @@ fn test_devtransfer_roundtrip_gpu_cpu_stop_grad_false_sum() raises:
         )
 
 
-fn test_devtransfer_roundtrip_gpu_cpu_stop_grad_false_2d() raises:
+def test_devtransfer_roundtrip_gpu_cpu_stop_grad_false_2d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -164,7 +164,7 @@ fn test_devtransfer_roundtrip_gpu_cpu_stop_grad_false_2d() raises:
         )
 
 
-fn test_devtransfer_roundtrip_gpu_cpu_stop_grad_false_sqrt() raises:
+def test_devtransfer_roundtrip_gpu_cpu_stop_grad_false_sqrt() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 4.0, 9.0, 16.0], requires_grad=True)
@@ -181,7 +181,7 @@ fn test_devtransfer_roundtrip_gpu_cpu_stop_grad_false_sqrt() raises:
         )
 
 
-fn test_devtransfer_roundtrip_gpu_cpu_stop_grad_false_chained_ops() raises:
+def test_devtransfer_roundtrip_gpu_cpu_stop_grad_false_chained_ops() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 4.0], [9.0, 16.0]], requires_grad=True)
@@ -204,7 +204,7 @@ fn test_devtransfer_roundtrip_gpu_cpu_stop_grad_false_chained_ops() raises:
 # Grad flows back to GPU leaf B, but NOT to A
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_1d() raises:
+def test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_1d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
@@ -222,7 +222,7 @@ fn test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_1d() raises:
         assert_true(a.grad().all_close[atol=1e-5](Tensor.zeros_like(a)))
 
 
-fn test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_2d() raises:
+def test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_2d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -239,7 +239,7 @@ fn test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_2d() raises:
         assert_true(a.grad().all_close[atol=1e-5](Tensor.zeros_like(a)))
 
 
-fn test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_sqrt() raises:
+def test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_sqrt() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 4.0, 9.0, 16.0], requires_grad=True)
@@ -257,7 +257,7 @@ fn test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_sqrt() raises:
         assert_true(a.grad().all_close[atol=1e-5](Tensor.zeros_like(a)))
 
 
-fn test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_chained() raises:
+def test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_chained() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 4.0], [9.0, 16.0]], requires_grad=True)
@@ -279,7 +279,7 @@ fn test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_chained() raises:
 # EXTRA: Both transfers stop_grad=True — grad stays on GPU, never reaches CPU
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_devtransfer_both_stop_grad_true_grad_stays_on_gpu() raises:
+def test_devtransfer_both_stop_grad_true_grad_stays_on_gpu() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -302,7 +302,7 @@ fn test_devtransfer_both_stop_grad_true_grad_stays_on_gpu() raises:
 # Grad must traverse all boundaries back to origin
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn test_devtransfer_multihop_all_stop_grad_false() raises:
+def test_devtransfer_multihop_all_stop_grad_false() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -323,5 +323,5 @@ fn test_devtransfer_multihop_all_stop_grad_false() raises:
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

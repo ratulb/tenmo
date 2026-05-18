@@ -33,7 +33,7 @@ def main() raises:
     print(a[0])
 
 
-fn test_emb_cpu_max_norm_clips_large_rows() raises:
+def test_emb_cpu_max_norm_clips_large_rows() raises:
     print("test_emb_cpu_max_norm_clips_large_rows")
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
@@ -62,7 +62,7 @@ def main_120() raises:
 def main_110() raises:
     test_shape_compute_output_shape_single_axis()
 
-fn test_shape_compute_output_shape_single_axis() raises:
+def test_shape_compute_output_shape_single_axis() raises:
     print("test_shape_compute_output_shape_single_axis")
     var s = Shape(2, 3, 4)
     var axes = IntArray.with_capacity(1)
@@ -113,12 +113,12 @@ def main_100() raises:
     _="""for item in word2index.items():
         print(item.key, item.value)"""
 
-fn main_70() raises:
+def main_70() raises:
     var b = Buffer[dtype]([Scalar[dtype](1), Scalar[dtype](21), Scalar[dtype](9)])
     var r = b.load[3](0)
     print(r+r)
 
-fn test_mcpy_cpu_2d_fuse_sum_duplicate_indices() raises:
+def test_mcpy_cpu_2d_fuse_sum_duplicate_indices() raises:
     print("mcpy_cpu_2d_fuse_sum_duplicate_indices")
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var idx = IntArray()
@@ -192,7 +192,7 @@ def main_40() raises:
     strings = tokenizer.decode(integers)
     print(strings)
 
-fn main_30() raises:
+def main_30() raises:
     var t = Tensor[dtype].scalar(3)
     assert_true(t.all_close(Tensor[DType.float32].scalar(3)))
     print(max(SIMD[dtype, 3](0), SIMD[dtype, 3](-9, 2, -32)))
@@ -205,7 +205,7 @@ fn main_30() raises:
     t.print()
 
 
-fn test_prd_cpu_bwd_all_positive_1d() raises:
+def test_prd_cpu_bwd_all_positive_1d() raises:
     print("test_prd_cpu_bwd_all_positive_1d")
     var a = Tensor[dtype].d1([2, 3, 4], requires_grad=True)
     var out = a.product(IntArray(0))
@@ -216,7 +216,7 @@ fn test_prd_cpu_bwd_all_positive_1d() raises:
     assert_true(a.grad().all_close[atol=1e-4](Tensor[dtype].d1([12, 8, 6])))
 
 
-fn test_prd_cpu_bwd_all_positive_1d_orig() raises:
+def test_prd_cpu_bwd_all_positive_1d_orig() raises:
     print("test_prd_cpu_bwd_all_positive_1d")
     var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
     var result = a.buffer.product_cpu(IntArray(0), False)
@@ -230,7 +230,7 @@ fn test_prd_cpu_bwd_all_positive_1d_orig() raises:
         print("excl[2]:", excl.get(2))
 
 
-fn test_complex_mixed_ops_backward() raises:
+def test_complex_mixed_ops_backward() raises:
     print("test_complex_mixed_ops_backward")
 
     a = Tensor[dtype].d2(
@@ -256,7 +256,7 @@ fn test_complex_mixed_ops_backward() raises:
     assert_true(result == Tensor[dtype].d2([[10.5, 10.5]]))
 
 
-fn test_contig_cpu_1d_slice_view() raises:
+def test_contig_cpu_1d_slice_view() raises:
     print("test_contig_cpu_1d_slice_view")
     # Create a non-contiguous view via transpose of a 2D then flatten — or use
     # a known strided view via unsqueeze + squeeze to produce offset
@@ -278,7 +278,7 @@ fn test_contig_cpu_1d_slice_view() raises:
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
-fn test_expand_1d_to_2d_new_batch_dim() raises:
+def test_expand_1d_to_2d_new_batch_dim() raises:
     print("test_expand_1d_to_2d_new_batch_dim")
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)  # shape (3,)
     var e = a.expand(4, 3)  # shape (4,3)
@@ -294,7 +294,7 @@ fn test_expand_1d_to_2d_new_batch_dim() raises:
     assert_true(a.grad().all_close(Tensor[dtype].d1([4.0, 4.0, 4.0])))
 
 
-fn test_tanh_contiguous_vs_non_contiguous() raises:
+def test_tanh_contiguous_vs_non_contiguous() raises:
     print("test_tanh_contiguous_vs_non_contiguous")
 
     var x_contig = Tensor[dtype].d1([0.0, 1.0, -1.0], requires_grad=True)
@@ -318,7 +318,7 @@ fn test_tanh_contiguous_vs_non_contiguous() raises:
     )
 
 
-fn test_matmul_2d_non_contiguous_both_views() raises:
+def test_matmul_2d_non_contiguous_both_views() raises:
     print("test_matmul_2d_non_contiguous_both_views")
     var base = Tensor[dtype].d2(
         [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
@@ -340,7 +340,7 @@ fn test_matmul_2d_non_contiguous_both_views() raises:
     # validate_matmul_2d_grads(AA, BB, C)
 
 
-fn test_vector_matrix_with_vector_view() raises:
+def test_vector_matrix_with_vector_view() raises:
     print("test_vector_matrix_with_vector_view")
     var base_v = Tensor[dtype].d1([0.0, 1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var v_view = base_v.view(
@@ -362,7 +362,7 @@ fn test_vector_matrix_with_vector_view() raises:
     )
 
 
-fn test_matrix_vector_with_matrix_view() raises:
+def test_matrix_vector_with_matrix_view() raises:
     print("test_matrix_vector_with_matrix_view")
     var base_M = Tensor[dtype].d1(
         [0.0, 0.0, 1.0, 2.0, 3.0, 4.0, 0.0, 0.0], requires_grad=True
@@ -386,7 +386,7 @@ fn test_matrix_vector_with_matrix_view() raises:
     )
 
 
-fn test_slice_backward_chained() raises:
+def test_slice_backward_chained() raises:
     """Test gradient flow through chained slices."""
     print("test_slice_backward_chained")
 
@@ -407,7 +407,7 @@ fn test_slice_backward_chained() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-fn test_rlv_cpu_noncontig_transposed() raises:
+def test_rlv_cpu_noncontig_transposed() raises:
     print("test_rlv_cpu_noncontig_transposed")
     var a = Tensor[dtype].d2([[-1.0, 2.0], [3.0, -4.0]], requires_grad=True)
     var t = a.transpose()  # non-contiguous view
@@ -420,7 +420,7 @@ fn test_rlv_cpu_noncontig_transposed() raises:
     )
 
 
-fn test_flatten_view_partial_tensor() raises:
+def test_flatten_view_partial_tensor() raises:
     print("test_flatten_view_partial_tensor")
     var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
     # Create view of a subset then flatten
@@ -442,7 +442,7 @@ fn test_flatten_view_partial_tensor() raises:
     )
 
 
-fn test_tensor_dot() raises:
+def test_tensor_dot() raises:
     print("test_tensor_dot")
     a = Tensor[dtype].scalar(5, requires_grad=True)
     b = Tensor[dtype].scalar(15, requires_grad=True)

@@ -11,7 +11,7 @@ from std.math import sqrt
 from tenmo.sgd import SGD
 
 
-fn xor_classification() -> None:
+def xor_classification() -> None:
     """Train a minimal neural network to solve XOR."""
 
     comptime dtype = DType.float64
@@ -143,5 +143,5 @@ fn xor_classification() -> None:
         print("Failed: Network did not learn XOR")
 
 
-fn main():
+def main():
     xor_classification()

@@ -6,7 +6,7 @@ from tenmo.common_utils import now
 from std.testing import assert_true, TestSuite
 
 
-fn benchmark_cifar_sizes() raises:
+def benchmark_cifar_sizes() raises:
     print("CIFAR-10 FC Layer Sizes:")
     print("=" * 50)
     comptime dtype = DType.float32
@@ -53,7 +53,7 @@ fn benchmark_cifar_sizes() raises:
     print("Large batch Normal (100 iters):", now() - start, "sec")
 
 
-fn main() raises:
+def main() raises:
     _ = """
     # benchmark_cifar_sizes()
     run_all_blas_tests()
@@ -74,7 +74,7 @@ fn main() raises:
 # ============================================================================
 
 
-fn test_blas_matmul_simple_f32() raises:
+def test_blas_matmul_simple_f32() raises:
     """Test simple 2x2 matrix multiplication."""
     print("test_blas_matmul_simple_f32")
     comptime dtype = DType.float32
@@ -91,7 +91,7 @@ fn test_blas_matmul_simple_f32() raises:
     assert_true(C.all_close[atol=1e-5](expected))
 
 
-fn test_blas_matmul_simple_f64() raises:
+def test_blas_matmul_simple_f64() raises:
     """Test simple matrix multiplication with float64."""
     print("test_blas_matmul_simple_f64")
     comptime dtype = DType.float64
@@ -106,7 +106,7 @@ fn test_blas_matmul_simple_f64() raises:
     assert_true(C.all_close[atol=1e-10](expected))
 
 
-fn test_blas_matmul_identity() raises:
+def test_blas_matmul_identity() raises:
     """Test multiplication with identity matrix."""
     print("test_blas_matmul_identity")
     comptime dtype = DType.float32
@@ -123,7 +123,7 @@ fn test_blas_matmul_identity() raises:
     assert_true(C.all_close[atol=1e-5](A))
 
 
-fn test_blas_matmul_rectangular() raises:
+def test_blas_matmul_rectangular() raises:
     """Test rectangular matrix multiplication."""
     print("test_blas_matmul_rectangular")
     comptime dtype = DType.float32
@@ -147,7 +147,7 @@ fn test_blas_matmul_rectangular() raises:
 # ============================================================================
 # Transpose Tests
 # ============================================================================
-fn test_blas_matmul_transpose_a() raises:
+def test_blas_matmul_transpose_a() raises:
     """Test matrix multiplication with transpose_A=True."""
 
     print("test_blas_matmul_transpose_a")
@@ -170,7 +170,7 @@ fn test_blas_matmul_transpose_a() raises:
     assert_true(abs(C[0, 0] - 35.0) < 1e-5)
 
 
-fn test_blas_matmul_transpose_b() raises:
+def test_blas_matmul_transpose_b() raises:
     """Test matrix multiplication with transpose_B=True."""
     print("test_blas_matmul_transpose_b")
     comptime dtype = DType.float32
@@ -190,7 +190,7 @@ fn test_blas_matmul_transpose_b() raises:
     assert_true(abs(C[0, 0] - 14.0) < 1e-5)
 
 
-fn test_blas_matmul_transpose_both() raises:
+def test_blas_matmul_transpose_both() raises:
     """Test matrix multiplication with both transposes."""
     print("test_blas_matmul_transpose_both")
     comptime dtype = DType.float32
@@ -213,7 +213,7 @@ fn test_blas_matmul_transpose_both() raises:
 # ============================================================================
 
 
-fn test_blas_matmul_large_square() raises:
+def test_blas_matmul_large_square() raises:
     """Test large square matrix multiplication."""
     print("test_blas_matmul_large_square")
     comptime dtype = DType.float32
@@ -232,7 +232,7 @@ fn test_blas_matmul_large_square() raises:
     assert_true(abs(C[N - 1, N - 1] - Float32(N)) < 1e-4)
 
 
-fn test_blas_matmul_large_rectangular() raises:
+def test_blas_matmul_large_rectangular() raises:
     """Test large rectangular matrix multiplication."""
     print("test_blas_matmul_large_rectangular")
     comptime dtype = DType.float32
@@ -255,7 +255,7 @@ fn test_blas_matmul_large_rectangular() raises:
 # ============================================================================
 # Gradient Tests
 # ============================================================================
-fn test_blas_matmul_backward_simple() raises:
+def test_blas_matmul_backward_simple() raises:
     """Test backward pass for simple matmul."""
     print("test_blas_matmul_backward_simple")
     comptime dtype = DType.float32
@@ -285,7 +285,7 @@ fn test_blas_matmul_backward_simple() raises:
     _ = blas^
 
 
-fn test_blas_matmul_backward_single_requires_grad() raises:
+def test_blas_matmul_backward_single_requires_grad() raises:
     """Test backward when only one tensor requires grad."""
     print("test_blas_matmul_backward_single_requires_grad")
     comptime dtype = DType.float32
@@ -306,7 +306,7 @@ fn test_blas_matmul_backward_single_requires_grad() raises:
     _ = blas^
 
 
-fn test_blas_matmul_backward_chain() raises:
+def test_blas_matmul_backward_chain() raises:
     """Test backward through chain of matmuls."""
     print("test_blas_matmul_backward_chain")
     comptime dtype = DType.float32
@@ -336,7 +336,7 @@ fn test_blas_matmul_backward_chain() raises:
 # ============================================================================
 
 
-fn test_blas_vs_native_random() raises:
+def test_blas_vs_native_random() raises:
     """Compare BLAS result with native matmul."""
     print("test_blas_vs_native_random")
     comptime dtype = DType.float32
@@ -352,7 +352,7 @@ fn test_blas_vs_native_random() raises:
     assert_true(C_blas.all_close[atol=1e-4](C_native))
 
 
-fn test_blas_vs_native_transpose_a() raises:
+def test_blas_vs_native_transpose_a() raises:
     """Compare BLAS transpose_A with native implementation."""
     print("test_blas_vs_native_transpose_a")
     comptime dtype = DType.float32
@@ -368,7 +368,7 @@ fn test_blas_vs_native_transpose_a() raises:
     assert_true(C_blas.all_close[atol=1e-4](C_native))
 
 
-fn test_blas_vs_native_transpose_b() raises:
+def test_blas_vs_native_transpose_b() raises:
     """Compare BLAS transpose_B with native implementation."""
     print("test_blas_vs_native_transpose_b")
     comptime dtype = DType.float32
@@ -389,7 +389,7 @@ fn test_blas_vs_native_transpose_b() raises:
 # ============================================================================
 
 
-fn test_blas_performance_small() raises:
+def test_blas_performance_small() raises:
     """Benchmark small matrices."""
     print("test_blas_performance_small")
     comptime dtype = DType.float32
@@ -413,7 +413,7 @@ fn test_blas_performance_small() raises:
     print("  Speedup:", time_native / time_blas, "x")
 
 
-fn test_blas_performance_medium() raises:
+def test_blas_performance_medium() raises:
     """Benchmark medium matrices (typical NN layer)."""
     print("test_blas_performance_medium")
     comptime dtype = DType.float32
@@ -437,7 +437,7 @@ fn test_blas_performance_medium() raises:
     print("  Speedup:", (time_native / time_blas), "x")
 
 
-fn test_blas_performance_large() raises:
+def test_blas_performance_large() raises:
     """Benchmark large matrices."""
     print("test_blas_performance_large")
     comptime dtype = DType.float32
@@ -466,7 +466,7 @@ fn test_blas_performance_large() raises:
 # ============================================================================
 
 
-fn test_blas_matmul_vector_like() raises:
+def test_blas_matmul_vector_like() raises:
     """Test with very thin matrices (vector-like)."""
     print("test_blas_matmul_vector_like")
     comptime dtype = DType.float32
@@ -487,7 +487,7 @@ fn test_blas_matmul_vector_like() raises:
     _ = blas^
 
 
-fn test_blas_matmul_non_contiguous() raises:
+def test_blas_matmul_non_contiguous() raises:
     """Test with non-contiguous input (should be made contiguous)."""
     print("test_blas_matmul_non_contiguous")
     comptime dtype = DType.float32
@@ -508,7 +508,7 @@ fn test_blas_matmul_non_contiguous() raises:
     _ = blas^
 
 
-fn run_all_blas_tests() raises:
+def run_all_blas_tests() raises:
     # Basic tests
     print("--- Basic Matmul Tests ---")
     test_blas_matmul_simple_f32()
@@ -565,7 +565,7 @@ fn run_all_blas_tests() raises:
 # ============================================================================
 
 
-fn test_blas_case_4_Atranspose_Btranspose() raises:
+def test_blas_case_4_Atranspose_Btranspose() raises:
     """Test Case 4: C = A^T @ B^T."""
     print("\n" + "=" * 80)
     print("TEST CASE 4: C = A^T @ B^T")
@@ -637,7 +637,7 @@ fn test_blas_case_4_Atranspose_Btranspose() raises:
     _ = blas^
 
 
-fn test_case_2() raises:
+def test_case_2() raises:
     """Test Case 2: C = A^T @ B (The problematic one)."""
     print("\n" + "=" * 80)
     print("TEST CASE 2: C = A^T @ B")
@@ -694,7 +694,7 @@ fn test_case_2() raises:
     _ = blas^
 
 
-fn test_blas_case_1_A_B() raises:
+def test_blas_case_1_A_B() raises:
     """Test Case 1: C = A @ B (no transposes)."""
     print("\n" + "=" * 80)
     print("TEST CASE 1: C = A @ B")
@@ -754,7 +754,7 @@ fn test_blas_case_1_A_B() raises:
     print("✓ All checks passed!")
 
 
-fn test_blas_case_2_Atranspose_B() raises:
+def test_blas_case_2_Atranspose_B() raises:
     """Test Case 2: C = A^T @ B."""
     print("\n" + "=" * 80)
     print("TEST CASE 2: C = A^T @ B")
@@ -824,7 +824,7 @@ fn test_blas_case_2_Atranspose_B() raises:
     print("✓ All checks passed!")
 
 
-fn test_blas_case_3_A_Btranspose() raises:
+def test_blas_case_3_A_Btranspose() raises:
     """Test Case 3: C = A @ B^T."""
     print("\n" + "=" * 80)
     print("TEST CASE 3: C = A @ B^T")
@@ -876,7 +876,7 @@ fn test_blas_case_3_A_Btranspose() raises:
     print("✓ All checks passed!")
 
 
-fn _case_4_comprehensive() raises:
+def _case_4_comprehensive() raises:
     """
     Test Case 4: C = A^T @ B^T.
     Compare: Native Mojo matmul, BLAS matmul, and PyTorch.
@@ -973,7 +973,7 @@ fn _case_4_comprehensive() raises:
 # ============================================================================
 
 
-fn test_blas_matmul_edge_cases() raises:
+def test_blas_matmul_edge_cases() raises:
     """Test edge cases: different sizes, non-square, etc."""
     print("\n" + "=" * 80)
     print("BLAS MATMUL EDGE CASES")
@@ -1030,7 +1030,7 @@ fn test_blas_matmul_edge_cases() raises:
 # ============================================================================
 
 
-fn test_blas_gradient_accuracy() raises:
+def test_blas_gradient_accuracy() raises:
     """Test gradient accuracy using finite differences."""
     print("\n" + "=" * 80)
     print("BLAS GRADIENT ACCURACY TEST (Finite Differences)")

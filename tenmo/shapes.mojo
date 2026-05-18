@@ -26,7 +26,7 @@ struct Shape(
 
     @staticmethod
     @always_inline
-    fn Void() -> Shape:
+    def Void() -> Shape:
         """Create a void (scalar) shape.
 
         Returns:
@@ -37,7 +37,7 @@ struct Shape(
 
     @staticmethod
     @always_inline
-    fn Unit() -> Shape:
+    def Unit() -> Shape:
         """Create a unit shape with single element.
 
         Returns:
@@ -46,7 +46,7 @@ struct Shape(
         return Shape(1)
 
     @always_inline("nodebug")
-    fn __init__(out self):
+    def __init__(out self):
         """Create an empty (scalar) shape.
 
         Creates a scalar shape with no dimensions, representing a single value.
@@ -56,7 +56,7 @@ struct Shape(
         self._numels = 1
 
     @always_inline("nodebug")
-    fn __init__(out self, *values: Int):
+    def __init__(out self, *values: Int):
         """Create a shape from variadic integer arguments.
 
         Args:
@@ -70,7 +70,7 @@ struct Shape(
         self._numels = self._compute_numels()
 
     @always_inline("nodebug")
-    fn __init__(out self, values: VariadicList[Int, _]):
+    def __init__(out self, values: VariadicList[Int, _]):
         """Create a shape from a VariadicList of integers.
 
         Args:
@@ -84,7 +84,7 @@ struct Shape(
         self._numels = self._compute_numels()
 
     @always_inline("nodebug")
-    fn __init__(out self, values: List[Int]):
+    def __init__(out self, values: List[Int]):
         """Create a shape from a Mojo List of integers.
 
         Args:
@@ -98,7 +98,7 @@ struct Shape(
         self._numels = self._compute_numels()
 
     @always_inline("nodebug")
-    fn __init__(out self, values: IntArray):
+    def __init__(out self, values: IntArray):
         """Create a shape from an IntArray.
 
         Args:
@@ -112,7 +112,7 @@ struct Shape(
         self._numels = self._compute_numels()
 
     @always_inline("nodebug")
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         """Create a copy of another Shape instance.
 
         Args:
@@ -122,7 +122,7 @@ struct Shape(
         self._numels = copy._numels
 
     @always_inline("nodebug")
-    fn _compute_numels(self) -> Int:
+    def _compute_numels(self) -> Int:
         """Compute number of elements, validating dimensions.
 
         Returns:
@@ -143,7 +143,7 @@ struct Shape(
         return prod
 
     @always_inline("nodebug")
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         """Get the rank (number of dimensions) of the shape.
 
         Returns:
@@ -153,7 +153,7 @@ struct Shape(
         return len(self.dims)
 
     @always_inline("nodebug")
-    fn rank(self) -> Int:
+    def rank(self) -> Int:
         """Get the rank (number of dimensions) of the shape.
 
         Returns:
@@ -162,7 +162,7 @@ struct Shape(
         return len(self.dims)
 
     @always_inline("nodebug")
-    fn ndim(self) -> Int:
+    def ndim(self) -> Int:
         """Get the number of dimensions (alias for rank()).
 
         Returns:
@@ -171,7 +171,7 @@ struct Shape(
         return len(self.dims)
 
     @always_inline("nodebug")
-    fn num_elements(self) -> Int:
+    def num_elements(self) -> Int:
         """Get the total number of elements in a tensor with this shape.
 
         Returns:
@@ -180,7 +180,7 @@ struct Shape(
         return self._numels
 
     @always_inline("nodebug")
-    fn numels(self) -> Int:
+    def numels(self) -> Int:
         """Get the total number of elements (alias for num_elements()).
 
         Returns:
@@ -189,7 +189,7 @@ struct Shape(
         return self._numels
 
     @always_inline("nodebug")
-    fn __getitem__(self, idx: Int) -> Int:
+    def __getitem__(self, idx: Int) -> Int:
         """Get the size of a specific dimension.
 
         Args:
@@ -204,7 +204,7 @@ struct Shape(
         return self.dims[idx]
 
     @always_inline
-    fn __getitem__(self, slice: Slice) -> Self:
+    def __getitem__(self, slice: Slice) -> Self:
         """Get a slice of the shape dimensions.
 
         Args:
@@ -217,7 +217,7 @@ struct Shape(
         return Self(s)
 
     @always_inline("nodebug")
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         """Check equality with another Shape.
 
         Args:
@@ -229,7 +229,7 @@ struct Shape(
         return self.dims == other.dims
 
     @always_inline("nodebug")
-    fn __eq__(self, other: List[Int]) -> Bool:
+    def __eq__(self, other: List[Int]) -> Bool:
         """Check equality with a Mojo List.
 
         Args:
@@ -241,7 +241,7 @@ struct Shape(
         return self.dims == other
 
     @always_inline("nodebug")
-    fn __ne__(self, other: Self) -> Bool:
+    def __ne__(self, other: Self) -> Bool:
         """Check inequality with another Shape.
 
         Args:
@@ -253,7 +253,7 @@ struct Shape(
         return not (self.dims == other.dims)
 
     @no_inline
-    fn __str__(self) -> String:
+    def __str__(self) -> String:
         """Get string representation of the shape.
 
         Returns:
@@ -263,7 +263,7 @@ struct Shape(
         return "(" + s[byte=1:len(s)-1] + ")"
 
     @no_inline
-    fn __repr__(self) -> String:
+    def __repr__(self) -> String:
         """Get official string representation of the shape.
 
         Returns:
@@ -272,7 +272,7 @@ struct Shape(
         return self.__str__()
 
     @no_inline
-    fn write_to[W: Writer](self, mut writer: W):
+    def write_to[W: Writer](self, mut writer: W):
         """Write shape to a writer.
 
         Args:
@@ -285,7 +285,7 @@ struct Shape(
     ]: Iterator = ShapeIndexIterator[iterable_origin]
 
     @always_inline("nodebug")
-    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+    def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         """Get iterator over indices of the shape.
 
         Returns:
@@ -294,7 +294,7 @@ struct Shape(
         return {Pointer(to=self).get_immutable()}
 
     @always_inline("nodebug")
-    fn tolist(self) -> List[Int]:
+    def tolist(self) -> List[Int]:
         """Convert shape dimensions to a Mojo List.
 
         Returns:
@@ -303,7 +303,7 @@ struct Shape(
         return self.dims.tolist()
 
     @always_inline("nodebug")
-    fn intarray(self) -> IntArray:
+    def intarray(self) -> IntArray:
         """Get the underlying IntArray of dimensions.
 
         Returns:
@@ -312,7 +312,7 @@ struct Shape(
         return self.dims
 
     @always_inline("nodebug")
-    fn array(self) -> Array:
+    def array(self) -> Array:
         """Convert shape to an Array.
 
         Returns:
@@ -326,7 +326,7 @@ struct Shape(
 
 
     @always_inline("nodebug")
-    fn __add__(self, other: Shape) -> Shape:
+    def __add__(self, other: Shape) -> Shape:
         """Concatenate two shapes.
 
         Args:
@@ -343,7 +343,7 @@ struct Shape(
         return Shape(dims^)
 
     @always_inline("nodebug")
-    fn __add__(self, other: List[Int]) -> Shape:
+    def __add__(self, other: List[Int]) -> Shape:
         """Concatenate shape with a Mojo List.
 
         Args:
@@ -356,7 +356,7 @@ struct Shape(
         return Shape(dims^)
 
     @always_inline("nodebug")
-    fn __radd__(self, other: List[Int]) -> Shape:
+    def __radd__(self, other: List[Int]) -> Shape:
         """Concatenate a Mojo List with a shape.
 
         Args:
@@ -370,7 +370,7 @@ struct Shape(
         return Shape(dims^)
 
     @always_inline("nodebug")
-    fn __mul__(self, factor: Int) -> Shape:
+    def __mul__(self, factor: Int) -> Shape:
         """Repeat shape dimensions.
 
         Args:
@@ -390,7 +390,7 @@ struct Shape(
         return Shape(result)
 
     @always_inline("nodebug")
-    fn __rmul__(self, factor: Int) -> Shape:
+    def __rmul__(self, factor: Int) -> Shape:
         """Repeat shape dimensions (reverse multiplication).
 
         Args:
@@ -405,7 +405,7 @@ struct Shape(
         return self.__mul__(factor)
 
     @always_inline("nodebug")
-    fn reverse(self) -> Self:
+    def reverse(self) -> Self:
         """Return reversed shape.
 
         Returns:
@@ -417,7 +417,7 @@ struct Shape(
         return Shape(self.dims.reversed())
 
     @always_inline("nodebug")
-    fn replace(self, axis: Int, extent: Int) -> Shape:
+    def replace(self, axis: Int, extent: Int) -> Shape:
         """Replace dimension at a specific axis.
 
         Args:
@@ -439,7 +439,7 @@ struct Shape(
         return Shape(result)
 
     @always_inline("nodebug")
-    fn permute(self, axes: IntArray) -> Self:
+    def permute(self, axes: IntArray) -> Self:
         """Reorder dimensions according to specified axes.
 
         Args:
@@ -456,7 +456,7 @@ struct Shape(
         return Shape(result)
 
     @always_inline
-    fn count_axes_of_size(self, size: Int) -> Int:
+    def count_axes_of_size(self, size: Int) -> Int:
         """Count dimensions with a specific size.
 
         Args:
@@ -472,7 +472,7 @@ struct Shape(
         return count
 
     @always_inline("nodebug")
-    fn indices_of_axes_with_size(self, size: Int) -> IntArray:
+    def indices_of_axes_with_size(self, size: Int) -> IntArray:
         """Get indices of dimensions with a specific size.
 
         Args:
@@ -491,7 +491,7 @@ struct Shape(
         return result^
 
     @always_inline("nodebug")
-    fn first_index(self) -> IntArray:
+    def first_index(self) -> IntArray:
         """Get first index (all zeros) for iteration.
 
         Returns:
@@ -500,7 +500,7 @@ struct Shape(
         return IntArray.filled(len(self), 0)
 
     @always_inline("nodebug")
-    fn compute_output_shape(
+    def compute_output_shape(
         self, normalized_axes: IntArray, keepdims: Bool, validated: Bool = False
     ) -> Shape:
         """Compute output shape after a reduction operation.
@@ -558,7 +558,7 @@ struct Shape(
         return Shape(result)
 
     @always_inline("nodebug")
-    fn reduced_shape(self, axes: IntArray) -> Shape:
+    def reduced_shape(self, axes: IntArray) -> Shape:
         """Get the shape with specific axes reduced (dimensions removed).
 
         Args:
@@ -580,7 +580,7 @@ struct Shape(
         return Shape(reduced_axes)
 
     @staticmethod
-    fn of(*dims: Int) -> Shape:
+    def of(*dims: Int) -> Shape:
         """Create a shape from variadic integers (factory method).
 
         Args:
@@ -595,7 +595,7 @@ struct Shape(
         return Shape(dims)
 
     @always_inline
-    fn product(self) -> Int:
+    def product(self) -> Int:
         """Get the total number of elements (alias for num_elements()).
 
         Returns:
@@ -622,7 +622,7 @@ struct ShapeIndexIterator[origin: ImmutOrigin](
     var current: IntArray
     var index: Int
 
-    fn __init__(out self, shape: Pointer[Shape, Self.origin]):
+    def __init__(out self, shape: Pointer[Shape, Self.origin]):
         """Initialize the iterator.
 
         Args:
@@ -632,16 +632,16 @@ struct ShapeIndexIterator[origin: ImmutOrigin](
         self.current = IntArray.filled(shape[].rank(), 0)
         self.index = 0
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         """Create a copy of the iterator."""
         self.shape = copy.shape
         self.current = copy.current
         self.index = copy.index
 
-    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+    def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self
 
-    fn __next__(mut self) raises StopIteration -> Self.Element:
+    def __next__(mut self) raises StopIteration -> Self.Element:
         if not self.__has_next__():
             raise StopIteration()
         var result = self.current
@@ -656,14 +656,14 @@ struct ShapeIndexIterator[origin: ImmutOrigin](
             self.current[i] = 0
         return result
 
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         return self.shape[].num_elements() - self.index
 
     @always_inline
-    fn __has_next__(self) -> Bool:
+    def __has_next__(self) -> Bool:
         return self.__len__() > 0
 
     @always_inline
-    fn bounds(self) -> Tuple[Int, Optional[Int]]:
+    def bounds(self) -> Tuple[Int, Optional[Int]]:
         var iter_len = len(self)
         return (iter_len, {iter_len})

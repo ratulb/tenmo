@@ -21,7 +21,7 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
     ImplicitlyCopyable & Movable
 ):
     @staticmethod
-    fn backward(
+    def backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var bwd_arg = (
@@ -51,7 +51,7 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
 @fieldwise_init
 struct Softmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         this: Tensor[Self.dtype],
@@ -88,7 +88,7 @@ struct Softmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 @fieldwise_init
 struct LogSoftmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         this: Tensor[Self.dtype],

@@ -30,7 +30,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
     var contiguous: Bool
 
     @always_inline("nodebug")
-    fn __init__(
+    def __init__(
         out self,
         shape: Pointer[Shape, Self.shape_origin],
         strides: Pointer[Strides, Self.strides_origin],
@@ -53,7 +53,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         self.coords = IntArray.filled(self.rank, 0)
         self.contiguous = self.strides[].is_contiguous(self.shape[])
 
-    fn __iter__(
+    def __iter__(
         ref self,
     ) -> Self.IteratorType[
         origin_of(self, Self.shape_origin, Self.strides_origin)
@@ -65,7 +65,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         """
         return self
 
-    fn __next__(mut self) raises StopIteration -> Self.Element:
+    def __next__(mut self) raises StopIteration -> Self.Element:
         """Return next memory offset and advance iterator.
 
         Incrementally updates coordinates like an odometer.
@@ -111,7 +111,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         return result
 
     @always_inline("nodebug")
-    fn __has_next__(self) -> Bool:
+    def __has_next__(self) -> Bool:
         """Check if there are more elements to iterate.
 
         Returns:
@@ -119,7 +119,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         """
         return self.current_index < self.total_elements
 
-    fn bounds(self) -> Tuple[Int, Optional[Int]]:
+    def bounds(self) -> Tuple[Int, Optional[Int]]:
         """Get the bounds of the iterator.
 
         Returns:
@@ -129,7 +129,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         return (iter_len, {iter_len})
 
     @always_inline("nodebug")
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         """Get the number of remaining elements.
 
         Returns:
@@ -138,7 +138,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         return self.total_elements - self.current_index
 
     @always_inline("nodebug")
-    fn skip(mut self, n: Int, small_skip: Int = 100):
+    def skip(mut self, n: Int, small_skip: Int = 100):
         """Skip n elements forward efficiently.
 
         Uses hybrid strategy:
@@ -199,7 +199,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
                 remaining %= divisor
 
     @always_inline("nodebug")
-    fn reset(mut self):
+    def reset(mut self):
         """Reset iterator to the beginning.
 
         Resets the current offset, index, and coordinates to their initial values.
@@ -211,7 +211,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
 
 
     @always_inline("nodebug")
-    fn peek(self) -> Int:
+    def peek(self) -> Int:
         """Get current offset without advancing.
 
         Returns:
@@ -230,7 +230,7 @@ struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn flatten_index(
+    def flatten_index(
         shape: Shape, indices: IntArray, strides: Strides, offset: Int = 0
     ) -> Int:
         """Calculate flat (linear) index from multi-dimensional indices.
@@ -297,7 +297,7 @@ struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    fn index_to_coord(shape: Shape, flat_index: Int) -> IntArray:
+    def index_to_coord(shape: Shape, flat_index: Int) -> IntArray:
         """Convert flat (linear) index to multi-dimensional coordinates.
 
         Args:
@@ -329,7 +329,7 @@ struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     @always_inline
-    fn max_index(shape: Shape, strides: Strides, offset: Int) -> Int:
+    def max_index(shape: Shape, strides: Strides, offset: Int) -> Int:
         """Calculate the maximum valid flat index for the given shape and strides.
 
         Args:

@@ -11,7 +11,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct Reciprocal[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn forward[
+    def forward[
         track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],
