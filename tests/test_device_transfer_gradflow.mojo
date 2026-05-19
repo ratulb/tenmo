@@ -8,6 +8,7 @@ from tenmo.tensor import Tensor
 # Grad MUST flow back to original CPU tensor
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_devtransfer_cpu2gpu_default_stop_grad_false_1d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -39,9 +40,7 @@ def test_devtransfer_cpu2gpu_default_stop_grad_false_with_mul() raises:
         var loss = c.sum()
         loss.backward()
         assert_true(
-            a.grad().all_close[atol=1e-5](
-                Tensor[dtype].full_like(a, 3.0)
-            )
+            a.grad().all_close[atol=1e-5](Tensor[dtype].full_like(a, 3.0))
         )
 
 
@@ -65,6 +64,7 @@ def test_devtransfer_cpu2gpu_default_stop_grad_false_with_chained_ops() raises:
 # B is a new GPU leaf. Ops on B deposit grad on B, NOT on A.
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_devtransfer_cpu2gpu_stop_grad_true_grad_on_gpu_leaf_1d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -75,9 +75,9 @@ def test_devtransfer_cpu2gpu_stop_grad_true_grad_on_gpu_leaf_1d() raises:
         loss.backward()
         # B should receive grad = 45.0 everywhere
         assert_true(
-            b.grad().to_cpu().all_close[atol=1e-5](
-                Tensor[dtype].full_like(a, 45.0)
-            )
+            b.grad()
+            .to_cpu()
+            .all_close[atol=1e-5](Tensor[dtype].full_like(a, 45.0))
         )
         # A's grad must be untouched (all zeros / no grad)
         assert_true(a.grad().all_close[atol=1e-5](Tensor.zeros_like(a)))
@@ -92,9 +92,9 @@ def test_devtransfer_cpu2gpu_stop_grad_true_grad_on_gpu_leaf_2d() raises:
         var loss = c.sum()
         loss.backward()
         assert_true(
-            b.grad().to_cpu().all_close[atol=1e-5](
-                Tensor[dtype].full_like(a, 45.0)
-            )
+            b.grad()
+            .to_cpu()
+            .all_close[atol=1e-5](Tensor[dtype].full_like(a, 45.0))
         )
         assert_true(a.grad().all_close[atol=1e-5](Tensor.zeros_like(a)))
 
@@ -107,9 +107,7 @@ def test_devtransfer_cpu2gpu_stop_grad_true_sum_op() raises:
         var loss = b.sum()
         loss.backward()
         # B gets grad of 1.0 per element
-        assert_true(
-            b.grad().to_cpu().all_close[atol=1e-5](Tensor.ones_like(a))
-        )
+        assert_true(b.grad().to_cpu().all_close[atol=1e-5](Tensor.ones_like(a)))
         # A is completely isolated
         assert_true(a.grad().all_close[atol=1e-5](Tensor.zeros_like(a)))
 
@@ -123,9 +121,9 @@ def test_devtransfer_cpu2gpu_stop_grad_true_chained_ops() raises:
         loss.backward()
         # grad deposits on B: 0.5/sqrt(b)
         assert_true(
-            b.grad().to_cpu().all_close[atol=1e-5](
-                Tensor[dtype].d1([0.5, 0.25, 0.16666667])
-            )
+            b.grad()
+            .to_cpu()
+            .all_close[atol=1e-5](Tensor[dtype].d1([0.5, 0.25, 0.16666667]))
         )
         assert_true(a.grad().all_close[atol=1e-5](Tensor.zeros_like(a)))
 
@@ -135,13 +133,14 @@ def test_devtransfer_cpu2gpu_stop_grad_true_chained_ops() raises:
 # Grad MUST flow all the way back to A on CPU
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_devtransfer_roundtrip_gpu_cpu_stop_grad_false_sum() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
-        var b = a.to_gpu()                    # CPU->GPU, stop_grad=False
+        var b = a.to_gpu()  # CPU->GPU, stop_grad=False
         var c = b * Tensor[dtype].full_like(b, 2.0)
-        var d = c.to_cpu(stop_grad=False)     # GPU->CPU, stop_grad=False
+        var d = c.to_cpu(stop_grad=False)  # GPU->CPU, stop_grad=False
         var loss = d.sum()
         loss.backward()
         # grad = 2.0 flows all the way back to A
@@ -204,20 +203,21 @@ def test_devtransfer_roundtrip_gpu_cpu_stop_grad_false_chained_ops() raises:
 # Grad flows back to GPU leaf B, but NOT to A
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_1d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
-        var b = a.to_gpu(stop_grad=True)      # B is GPU leaf, A is cut off
+        var b = a.to_gpu(stop_grad=True)  # B is GPU leaf, A is cut off
         var c = b * Tensor[dtype].full_like(b, 5.0)
-        var d = c.to_cpu(stop_grad=False)     # comes back to CPU
+        var d = c.to_cpu(stop_grad=False)  # comes back to CPU
         var loss = d.sum()
         loss.backward()
         # B receives grad = 5.0, A receives nothing
         assert_true(
-            b.grad().to_cpu().all_close[atol=1e-5](
-                Tensor[dtype].full_like(a, 5.0)
-            )
+            b.grad()
+            .to_cpu()
+            .all_close[atol=1e-5](Tensor[dtype].full_like(a, 5.0))
         )
         assert_true(a.grad().all_close[atol=1e-5](Tensor.zeros_like(a)))
 
@@ -232,9 +232,9 @@ def test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_2d() raises:
         var loss = d.sum()
         loss.backward()
         assert_true(
-            b.grad().to_cpu().all_close[atol=1e-5](
-                Tensor[dtype].full_like(a, 7.0)
-            )
+            b.grad()
+            .to_cpu()
+            .all_close[atol=1e-5](Tensor[dtype].full_like(a, 7.0))
         )
         assert_true(a.grad().all_close[atol=1e-5](Tensor.zeros_like(a)))
 
@@ -250,7 +250,9 @@ def test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_sqrt() raises:
         loss.backward()
         # B is GPU leaf with values same as A: grad = 0.5/sqrt(b)
         assert_true(
-            b.grad().to_cpu().all_close[atol=1e-5](
+            b.grad()
+            .to_cpu()
+            .all_close[atol=1e-5](
                 Tensor[dtype].d1([0.5, 0.25, 0.16666667, 0.125])
             )
         )
@@ -268,7 +270,9 @@ def test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_chained() raises:
         loss.backward()
         # B grad = 1/sqrt(b), A grad = zero
         assert_true(
-            b.grad().to_cpu().all_close[atol=1e-5](
+            b.grad()
+            .to_cpu()
+            .all_close[atol=1e-5](
                 Tensor[dtype].d2([[1.0, 0.5], [0.33333334, 0.25]])
             )
         )
@@ -278,6 +282,7 @@ def test_devtransfer_gpu_stop_grad_true_then_back_to_cpu_chained() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 # EXTRA: Both transfers stop_grad=True — grad stays on GPU, never reaches CPU
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_devtransfer_both_stop_grad_true_grad_stays_on_gpu() raises:
     comptime if has_accelerator():
@@ -289,28 +294,28 @@ def test_devtransfer_both_stop_grad_true_grad_stays_on_gpu() raises:
         var loss = d.sum()
         loss.backward()
         # D is the only leaf backward sees — grad = 1.0 per element
-        assert_true(
-            d.grad().all_close[atol=1e-5](Tensor.ones_like(d))
-        )
+        assert_true(d.grad().all_close[atol=1e-5](Tensor.ones_like(d)))
         # A is completely isolated — never reached by backward
         assert_true(a.grad().all_close[atol=1e-5](Tensor.zeros_like(a)))
         # B is also isolated — no assertion on b.grad() to avoid
         # accessing an unpopulated grad buffer
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # EXTRA: Multi-hop — CPU->GPU->CPU->GPU, stop_grad=False throughout
 # Grad must traverse all boundaries back to origin
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_devtransfer_multihop_all_stop_grad_false() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
-        var b = a.to_gpu()                        # CPU->GPU
+        var b = a.to_gpu()  # CPU->GPU
         var c = b * Tensor[dtype].full_like(b, 2.0)
-        var d = c.to_cpu(stop_grad=False)         # GPU->CPU
+        var d = c.to_cpu(stop_grad=False)  # GPU->CPU
         var e = d * Tensor[dtype].full_like(d, 3.0)
-        var f = e.to_gpu()                        # CPU->GPU again
+        var f = e.to_gpu()  # CPU->GPU again
         var loss = f.sum()
         loss.backward()
         # grad = 2 * 3 = 6 flows all the way back to A
@@ -322,6 +327,7 @@ def test_devtransfer_multihop_all_stop_grad_false() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

@@ -13,6 +13,7 @@ from .intarray import IntArray
 from .ancestry import Ancestor
 from .device import GPU
 
+
 @fieldwise_init
 struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
     """
@@ -267,7 +268,6 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
             requires_grad=requires_grad,
         )
         return output^, pad_spec^
-
 
 
 @fieldwise_init
@@ -560,7 +560,8 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var bwd_arg = (
             output.ancestry().backward_fn_arg().get[FusedIm2ColBwdArg]()
         )
@@ -590,9 +591,6 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             bwd_arg.dilation,
         )
         ref grad_output = output.gradients()[]
-        var results = List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ]()
 
         var padded_image_ref = output.ancestry().get(0)
         var padded_image = Tensor[Self.dtype](
@@ -613,7 +611,8 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_bias = Self.compute_bias_gradient(
                 grad_output, N, C_out, H_out, W_out
             )
-            results.append((bias_ref^, grad_bias^, AddTensor))
+            bias_ref.update_grad(grad_bias^, AddTensor, None)
+            parent_ids.append(bias_ref._id)
 
         # KERNEL GRADIENT
         if kernel.requires_grad:
@@ -632,7 +631,8 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 stride,
                 dilation,
             )
-            results.append((kernel_ref^, grad_kernel^, AddTensor))
+            kernel_ref.update_grad(grad_kernel^, AddTensor, None)
+            parent_ids.append(kernel_ref._id)
 
         # INPUT GRADIENT
         if padded_image.requires_grad:
@@ -651,9 +651,8 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 stride,
                 dilation,
             )
-            results.append((padded_image_ref^, grad_padded^, AddTensor))
-
-        return results^
+            padded_image_ref.update_grad(grad_padded^, AddTensor, None)
+            parent_ids.append(padded_image_ref._id)
 
     # BIAS GRADIENT
     @always_inline

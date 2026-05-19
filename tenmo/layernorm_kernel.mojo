@@ -41,14 +41,14 @@ def layernorm_normalize[
     dtype: DType,
     max_block_size: Int = 512,
 ](
-    out_buffer:   UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     x_hat_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    rstd_buffer:  UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    x_buffer:     UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    mean_buffer:  UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    var_buffer:   UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    rstd_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    x_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    mean_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    var_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     gamma_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    beta_buffer:  UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    beta_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     D: Int,
     outer_size: Int,
     eps: Scalar[dtype],
@@ -79,19 +79,21 @@ def layernorm_normalize[
         max_block_size.is_power_of_two() and max_block_size < 1024
     ), "max_block_size must be a power of 2 less than 1024"
 
-    var bid        = Int(block_idx.x)
-    var tid        = Int(thread_idx.x)
+    var bid = Int(block_idx.x)
+    var tid = Int(thread_idx.x)
     var block_size = Int(block_dim.x)
 
     if bid >= outer_size:
         return
 
-    var row_var  = var_buffer[bid]
+    var row_var = var_buffer[bid]
     var row_mean = mean_buffer[bid]
 
     # rsqrt(var + eps) = 1/sqrt(var + eps)  — rstd directly, no inversion needed
     var safe_var = row_var + eps
-    var rstd     = rsqrt(safe_var if safe_var > Scalar[dtype](0) else Scalar[dtype](eps))
+    var rstd = rsqrt(
+        safe_var if safe_var > Scalar[dtype](0) else Scalar[dtype](eps)
+    )
 
     # Thread 0 writes rstd once per row — cheap, one write per block
     if tid == 0:
@@ -100,26 +102,27 @@ def layernorm_normalize[
     var row_base = bid * D
     var i = tid
     while i < D:
-        var x_i     = x_buffer[row_base + i]
+        var x_i = x_buffer[row_base + i]
         var x_hat_i = (x_i - row_mean) * rstd
-        var out_i   = gamma_buffer[i] * x_hat_i + beta_buffer[i]
+        var out_i = gamma_buffer[i] * x_hat_i + beta_buffer[i]
         x_hat_buffer[row_base + i] = x_hat_i
-        out_buffer[row_base + i]   = out_i
+        out_buffer[row_base + i] = out_i
         i += block_size
 
 
 @fieldwise_init
 struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     def launch(
-        x:     NDBuffer[Self.dtype],   # (*, D) contiguous GPU
-        mean:  NDBuffer[Self.dtype],   # (*, 1) from Welford
-        var_:  NDBuffer[Self.dtype],   # (*, 1) from Welford
-        gamma: NDBuffer[Self.dtype],   # (D,)
-        beta:  NDBuffer[Self.dtype],   # (D,)
-        eps:   Scalar[Self.dtype],
-    ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+        x: NDBuffer[Self.dtype],  # (*, D) contiguous GPU
+        mean: NDBuffer[Self.dtype],  # (*, 1) from Welford
+        var_: NDBuffer[Self.dtype],  # (*, 1) from Welford
+        gamma: NDBuffer[Self.dtype],  # (D,)
+        beta: NDBuffer[Self.dtype],  # (D,)
+        eps: Scalar[Self.dtype],
+    ) raises -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ]:
         """Launch fused LayerNorm normalize kernel.
 
         Returns (out_ndb, x_hat_ndb, rstd_ndb).
@@ -142,27 +145,33 @@ struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         debug_assert(x.is_on_gpu())
         debug_assert(x.is_contiguous())
 
-        var out_shape  = x.shape
-        var D          = out_shape[-1]
+        var out_shape = x.shape
+        var D = out_shape[-1]
         var outer_size = x.numels() // D
-        var numels     = x.numels()
+        var numels = x.numels()
 
         var (threads_per_block, num_blocks) = Self.launch_config(D, outer_size)
 
         ref x_device_state = x.device_state.value()
-        ref gpu            = x_device_state.get_gpu()
+        ref gpu = x_device_state.get_gpu()
         var device_context = gpu[]
 
         var contig_x = x.contiguous_device_state()
 
-        var out_buffer   = device_context.enqueue_create_buffer[Self.dtype](numels)
-        var x_hat_buffer = device_context.enqueue_create_buffer[Self.dtype](numels)
-        var rstd_buffer  = device_context.enqueue_create_buffer[Self.dtype](outer_size)
+        var out_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            numels
+        )
+        var x_hat_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            numels
+        )
+        var rstd_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            outer_size
+        )
 
-        ref mean_state  = mean.device_state.value()
-        ref var_state   = var_.device_state.value()
+        ref mean_state = mean.device_state.value()
+        ref var_state = var_.device_state.value()
         ref gamma_state = gamma.device_state.value()
-        ref beta_state  = beta.device_state.value()
+        ref beta_state = beta.device_state.value()
 
         comptime max_block = 512
         var compiled = device_context.compile_function[
@@ -192,19 +201,26 @@ struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # rstd shape is (*, 1) — same as mean/var from Welford
         var rstd_shape = out_shape[0:-1] + [1]
 
-        var out_state   = DeviceState[Self.dtype](out_buffer^,   gpu)
+        var out_state = DeviceState[Self.dtype](out_buffer^, gpu)
         var x_hat_state = DeviceState[Self.dtype](x_hat_buffer^, gpu)
-        var rstd_state  = DeviceState[Self.dtype](rstd_buffer^,  gpu)
+        var rstd_state = DeviceState[Self.dtype](rstd_buffer^, gpu)
 
-        var out_ndb   = NDBuffer[Self.dtype].with_device_state(out_state^,   out_shape)
-        var x_hat_ndb = NDBuffer[Self.dtype].with_device_state(x_hat_state^, out_shape)
-        var rstd_ndb  = NDBuffer[Self.dtype].with_device_state(rstd_state^,  rstd_shape)
+        var out_ndb = NDBuffer[Self.dtype].with_device_state(
+            out_state^, out_shape
+        )
+        var x_hat_ndb = NDBuffer[Self.dtype].with_device_state(
+            x_hat_state^, out_shape
+        )
+        var rstd_ndb = NDBuffer[Self.dtype].with_device_state(
+            rstd_state^, rstd_shape
+        )
 
         return (out_ndb^, x_hat_ndb^, rstd_ndb^)
 
     @staticmethod
     def launch_config(D: Int, outer_size: Int) -> Tuple[Int, Int]:
-        """One block per row. Block size = smallest power of 2 >= D, capped at 512."""
+        """One block per row. Block size = smallest power of 2 >= D, capped at 512.
+        """
         var block_size = 1
         while block_size < D and block_size < 512:
             block_size <<= 1

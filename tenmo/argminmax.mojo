@@ -347,4 +347,3 @@ struct Argmax[dtype: DType]:
             panic("Argmax tensor failed at ArgMinMaxReducer reduce")
             # Unreachable
             return Tensor[DType.int32].scalar(0)
-

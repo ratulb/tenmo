@@ -78,7 +78,6 @@ def shuffle_scatter[
     out_buffer[dst_flat] = in_buffer[tid]
 
 
-
 @fieldwise_init
 struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
@@ -202,13 +201,13 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return NDBuffer[Self.dtype].with_device_state(result_state^, shape)
 
 
-
 @fieldwise_init
 struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref bwd_fn_arg = output.ancestry().backward_fn_arg().get[ShuffleArg]()
         var axis = bwd_fn_arg.axis
         var permutation = bwd_fn_arg.permutation.copy()
@@ -232,7 +231,8 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
                     gradbox_parent = Gradbox[Self.dtype].zeros(
                         shape, share=False
                     )
-                return [(parent, gradbox_parent^, AddTensor)]
+                parent.update_grad(gradbox_parent^, AddTensor, None)
+                parent_ids.append(parent._id)
 
         # CPU path
         # parent.shape == gradients.shape, only difference is coord postions
@@ -246,7 +246,8 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
             parent_coord[axis] = permutation[grad_coord[axis]]
             gradbox_parent[parent_coord] = gradbox[grad_coord]
 
-        return [(parent, gradbox_parent^, AddTensor)]
+        parent.update_grad(gradbox_parent^, AddTensor, None)
+        parent_ids.append(parent._id)
 
 
 @fieldwise_init

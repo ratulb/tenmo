@@ -7,7 +7,6 @@ from std.sys import has_accelerator
 comptime dtype = DType.float32
 
 
-
 # ============================================================
 # GPU SUM TESTS — forward + backward, all reduction patterns
 # ============================================================
@@ -90,7 +89,8 @@ def test_gpu_sum_multi_axis_no_keepdims() raises:
         print("test_gpu_sum_multi_axis_no_keepdims")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
-            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+            requires_grad=True,
         )
         var a_gpu = a.to_gpu()
         var s_gpu = a_gpu.sum(axes=[0, 2])  # shape (2,)
@@ -107,13 +107,16 @@ def test_gpu_sum_multi_axis_keepdims() raises:
         print("test_gpu_sum_multi_axis_keepdims")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
-            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+            requires_grad=True,
         )
         var a_gpu = a.to_gpu()
         var s_gpu = a_gpu.sum(axes=[0, 2], keepdims=True)  # shape (1,2,1)
         var loss = s_gpu.to_cpu().sum()
         loss.backward()
-        assert_true(s_gpu.to_cpu().all_close(Tensor[dtype].d3([[[14.0], [22.0]]])))
+        assert_true(
+            s_gpu.to_cpu().all_close(Tensor[dtype].d3([[[14.0], [22.0]]]))
+        )
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
 
 
@@ -122,7 +125,8 @@ def test_gpu_sum_3d_axis1_keepdims() raises:
         print("test_gpu_sum_3d_axis1_keepdims")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
-            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+            requires_grad=True,
         )
         var a_gpu = a.to_gpu()
         var s_gpu = a_gpu.sum(axes=[1], keepdims=True)  # shape (2,1,2)
@@ -186,7 +190,9 @@ def test_gpu_sum_grad_accumulation() raises:
         a_gpu.zero_grad()
         loss2.backward()
         # Each backward contributes 1.0 per element → total 2.0 per element
-        assert_true(a.grad().all_close(Tensor[dtype].d2([[2.0, 2.0], [2.0, 2.0]])))
+        assert_true(
+            a.grad().all_close(Tensor[dtype].d2([[2.0, 2.0], [2.0, 2.0]]))
+        )
 
 
 def test_gpu_sum_matches_cpu() raises:
@@ -239,7 +245,9 @@ def test_gpu_mean_axis0_no_keepdims() raises:
         loss.backward()
         assert_true(m_gpu.to_cpu().all_close(Tensor[dtype].d1([2.0, 3.0])))
         # Each element grad = 1/2 = 0.5
-        assert_true(a.grad().all_close(Tensor[dtype].d2([[0.5, 0.5], [0.5, 0.5]])))
+        assert_true(
+            a.grad().all_close(Tensor[dtype].d2([[0.5, 0.5], [0.5, 0.5]]))
+        )
 
 
 def test_gpu_mean_axis1_no_keepdims() raises:
@@ -256,7 +264,10 @@ def test_gpu_mean_axis1_no_keepdims() raises:
         assert_true(m_gpu.to_cpu().all_close(Tensor[dtype].d1([2.0, 5.0])))
         # Each element grad = 1/3
         var expected_grad = Tensor[dtype].d2(
-            [[1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0], [1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0]]
+            [
+                [1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0],
+                [1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0],
+            ]
         )
         assert_true(a.grad().all_close(expected_grad))
 
@@ -267,11 +278,15 @@ def test_gpu_mean_axis0_keepdims() raises:
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
-        var m_gpu = a_gpu.mean(axes=[0], keepdims=True)  # shape (1,2): [[2.0, 3.0]]
+        var m_gpu = a_gpu.mean(
+            axes=[0], keepdims=True
+        )  # shape (1,2): [[2.0, 3.0]]
         var loss = m_gpu.to_cpu().sum()
         loss.backward()
         assert_true(m_gpu.to_cpu().all_close(Tensor[dtype].d2([[2.0, 3.0]])))
-        assert_true(a.grad().all_close(Tensor[dtype].d2([[0.5, 0.5], [0.5, 0.5]])))
+        assert_true(
+            a.grad().all_close(Tensor[dtype].d2([[0.5, 0.5], [0.5, 0.5]]))
+        )
 
 
 def test_gpu_mean_axis1_keepdims() raises:
@@ -286,7 +301,9 @@ def test_gpu_mean_axis1_keepdims() raises:
         var loss = m_gpu.to_cpu().sum()
         loss.backward()
         assert_true(m_gpu.to_cpu().all_close(Tensor[dtype].d2([[1.5], [3.5]])))
-        assert_true(a.grad().all_close(Tensor[dtype].d2([[0.5, 0.5], [0.5, 0.5]])))
+        assert_true(
+            a.grad().all_close(Tensor[dtype].d2([[0.5, 0.5], [0.5, 0.5]]))
+        )
 
 
 def test_gpu_mean_3d_axis1_no_keepdims() raises:
@@ -294,7 +311,8 @@ def test_gpu_mean_3d_axis1_no_keepdims() raises:
         print("test_gpu_mean_3d_axis1_no_keepdims")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
-            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+            requires_grad=True,
         )
         var a_gpu = a.to_gpu()
         var m_gpu = a_gpu.mean(axes=[1])  # shape (2,2)
@@ -319,14 +337,17 @@ def test_gpu_mean_3d_axis1_keepdims() raises:
         print("test_gpu_mean_3d_axis1_keepdims")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
-            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+            requires_grad=True,
         )
         var a_gpu = a.to_gpu()
         var m_gpu = a_gpu.mean(axes=[1], keepdims=True)  # shape (2,1,2)
         var loss = m_gpu.to_cpu().sum()
         loss.backward()
         assert_true(
-            m_gpu.to_cpu().all_close(Tensor[dtype].d3([[[2.0, 3.0]], [[6.0, 7.0]]]))
+            m_gpu.to_cpu().all_close(
+                Tensor[dtype].d3([[[2.0, 3.0]], [[6.0, 7.0]]])
+            )
         )
         assert_true(
             a.grad().all_close(
@@ -342,7 +363,8 @@ def test_gpu_mean_multi_axis_no_keepdims() raises:
         print("test_gpu_mean_multi_axis_no_keepdims")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
-            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+            requires_grad=True,
         )
         var a_gpu = a.to_gpu()
         var m_gpu = a_gpu.mean(axes=[0, 1])  # shape (2,): mean over batch+rows
@@ -366,7 +388,8 @@ def test_gpu_mean_multi_axis_keepdims() raises:
         print("test_gpu_mean_multi_axis_keepdims")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
-            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+            requires_grad=True,
         )
         var a_gpu = a.to_gpu()
         var m_gpu = a_gpu.mean(axes=[0, 1], keepdims=True)  # shape (1,1,2)
@@ -460,7 +483,9 @@ def test_gpu_mean_grad_accumulation() raises:
         sss = m2.to_cpu().sum()
         sss.backward()
         # m1 backward: 0.5 each; m2 backward: 0.5 each → accumulated 1.0 each
-        assert_true(a.grad().all_close(Tensor[dtype].d2([[1.0, 1.0], [1.0, 1.0]])))
+        assert_true(
+            a.grad().all_close(Tensor[dtype].d2([[1.0, 1.0], [1.0, 1.0]]))
+        )
 
 
 # ============================================================
@@ -514,7 +539,8 @@ def test_gpu_sum_chained_ops_grad_flow() raises:
         comptime dtype = DType.float32
         # sum over axis then sum to scalar — two hops back through graph
         var a = Tensor[dtype].d3(
-            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+            requires_grad=True,
         )
         var a_gpu = a.to_gpu()
         var s1 = a_gpu.sum(axes=[2], keepdims=True)  # shape (2,2,1)
@@ -1152,5 +1178,3 @@ def test_gpu_mean_keepdims_then_sum_backward() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-
-

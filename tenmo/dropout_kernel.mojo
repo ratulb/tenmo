@@ -5,7 +5,6 @@ from .ndbuffer import NDBuffer
 from .device import GPU, DeviceState
 
 
-
 # Key design points:
 #
 # 1. Philox RNG — each thread gets an independent random stream:
@@ -27,18 +26,19 @@ from .device import GPU, DeviceState
 # 5. Chunk/stride pattern mirrors existing kernels exactly.
 #
 
+
 def dropout_forward_kernel[
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
     simd_vectors_per_thread: Int = 2 * simd_width,
 ](
-    result:    UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    mask_out:  UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    A:         UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    size:      Int,
-    p:         Scalar[dtype],        # dropout probability
-    scale:     Scalar[dtype],        # 1 / (1 - p)
-    rng_seed:  UInt64,               # forwarded from Dropout.seed
+    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    mask_out: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    size: Int,
+    p: Scalar[dtype],  # dropout probability
+    scale: Scalar[dtype],  # 1 / (1 - p)
+    rng_seed: UInt64,  # forwarded from Dropout.seed
 ):
     """Dropout forward kernel: generates mask via Philox RNG and applies it.
 
@@ -50,8 +50,8 @@ def dropout_forward_kernel[
         result[i]   = A[i] * mask[i]
         mask_out[i] = scale  if rand > p  else 0
     """
-    var tid    = thread_idx.x
-    var gtid   = Int(tid + block_dim.x * block_idx.x)
+    var tid = thread_idx.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
     var stride = Int(block_dim.x * grid_dim.x)
 
     # Independent Philox stream per thread
@@ -60,11 +60,10 @@ def dropout_forward_kernel[
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
-    var zero_s  = Scalar[dtype](0)
+    var zero_s = Scalar[dtype](0)
     var scale_s = scale
 
     while base_idx < size:
-
         comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
@@ -79,14 +78,14 @@ def dropout_forward_kernel[
                 var rand_f32 = rng.step_uniform()  # SIMD[float32, 4]
 
                 var mask_vec = SIMD[dtype, simd_width](0)
-                var res_vec  = SIMD[dtype, simd_width](0)
+                var res_vec = SIMD[dtype, simd_width](0)
 
                 comptime for lane in range(simd_width):
                     # Cast random float32 to dtype for threshold comparison
                     var r = rand_f32[lane % 4].cast[dtype]()
                     var m = scale_s if r > p else zero_s
                     mask_vec[lane] = m
-                    res_vec[lane]  = x_vec[lane] * m
+                    res_vec[lane] = x_vec[lane] * m
 
                 result.store[width=simd_width](i, res_vec)
                 mask_out.store[width=simd_width](i, mask_vec)
@@ -97,8 +96,8 @@ def dropout_forward_kernel[
                     var rand_f32_scalar = rng.step_uniform()
                     var r = rand_f32_scalar[0].cast[dtype]()
                     var x_val = A[i + j]
-                    var m     = scale_s if r > p else zero_s
-                    result[i + j]   = x_val * m
+                    var m = scale_s if r > p else zero_s
+                    result[i + j] = x_val * m
                     mask_out[i + j] = m
 
         base_idx += stride * CHUNK_SIZE
@@ -121,13 +120,13 @@ def dropout_forward_kernel[
 #   The kernel then operates on the flat buffer. No per-element host calls.
 # =============================================================================
 
-struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
+struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def launch(
-        A:        NDBuffer[Self.dtype],
-        p:        Scalar[Self.dtype],
-        scale:    Scalar[Self.dtype],
+        A: NDBuffer[Self.dtype],
+        p: Scalar[Self.dtype],
+        scale: Scalar[Self.dtype],
         rng_seed: UInt64,
     ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         """Launch dropout forward kernel. Returns (output, mask) on GPU.
@@ -147,35 +146,41 @@ struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
         comptime simdwidth = simd_width_of[Self.dtype]()
 
         # Reuse UnaryOpsKernel launch config — same heuristic applies
-        var (threads_per_block, num_blocks) = Self.launch_config(numels, simdwidth)
+        var (threads_per_block, num_blocks) = Self.launch_config(
+            numels, simdwidth
+        )
 
-        ref device_state   = A.device_state.value()
+        ref device_state = A.device_state.value()
         var device_context = device_state.gpu[]
 
         # Non-contiguous fix: single map_to_host sweep → flat contiguous buffer
         var contig_state = A.contiguous_device_state()
 
-        var result_buffer = device_context.enqueue_create_buffer[Self.dtype](numels)
-        var mask_buffer   = device_context.enqueue_create_buffer[Self.dtype](numels)
+        var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            numels
+        )
+        var mask_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            numels
+        )
 
         var compiled = device_context.compile_function[
             dropout_forward_kernel[
                 dtype=Self.dtype,
                 simd_width=simdwidth,
-                simd_vectors_per_thread=2*simdwidth,
+                simd_vectors_per_thread=2 * simdwidth,
             ],
             dropout_forward_kernel[
                 dtype=Self.dtype,
                 simd_width=simdwidth,
-                simd_vectors_per_thread=2*simdwidth,
+                simd_vectors_per_thread=2 * simdwidth,
             ],
         ]()
 
         device_context.enqueue_function(
             compiled,
-            result_buffer,                  # out: dropped values
-            mask_buffer,                    # out: scale mask
-            contig_state.device_buffer(),   # in:  input
+            result_buffer,  # out: dropped values
+            mask_buffer,  # out: scale mask
+            contig_state.device_buffer(),  # in:  input
             numels,
             p,
             scale,
@@ -186,11 +191,17 @@ struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         device_context.synchronize()
 
-        var result_state = DeviceState[Self.dtype](result_buffer^, device_state.gpu)
-        var mask_state   = DeviceState[Self.dtype](mask_buffer^,   device_state.gpu)
+        var result_state = DeviceState[Self.dtype](
+            result_buffer^, device_state.gpu
+        )
+        var mask_state = DeviceState[Self.dtype](mask_buffer^, device_state.gpu)
 
-        var out_ndb  = NDBuffer[Self.dtype].with_device_state(result_state^, A.shape)
-        var mask_ndb = NDBuffer[Self.dtype].with_device_state(mask_state^,   A.shape)
+        var out_ndb = NDBuffer[Self.dtype].with_device_state(
+            result_state^, A.shape
+        )
+        var mask_ndb = NDBuffer[Self.dtype].with_device_state(
+            mask_state^, A.shape
+        )
 
         return (out_ndb^, mask_ndb^)
 

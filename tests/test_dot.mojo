@@ -14,6 +14,7 @@ from std.sys import has_accelerator
 # SECTION 1 — CPU · Forward correctness · vector · vector
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_dot_cpu_fwd_vector_vector_basic() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -62,6 +63,7 @@ def test_dot_cpu_fwd_vector_vector_orthogonal() raises:
 # SECTION 2 — CPU · Forward correctness · scalar · vector and vector · scalar
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_dot_cpu_fwd_scalar_tensor_dot_vector() raises:
     comptime dtype = DType.float32
     # scalar tensor (numels=1) · vector → scalar broadcast then dot
@@ -101,6 +103,7 @@ def test_dot_cpu_fwd_d1_single_dot_scalar_tensor() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION 3 — CPU · Backward · vector · vector
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_dot_cpu_bwd_vector_vector_both_grad() raises:
     comptime dtype = DType.float32
@@ -160,6 +163,7 @@ def test_dot_cpu_bwd_vector_vector_chained() raises:
 # SECTION 4 — CPU · Backward · scalar · vector (broadcast path)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_dot_cpu_bwd_scalar_tensor_dot_vector() raises:
     comptime dtype = DType.float32
     # scalar (numels=1) broadcast to match vector
@@ -207,6 +211,7 @@ def test_dot_cpu_bwd_scalar_tensor_lhs_only() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION 5 — GPU · Forward correctness
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_dot_gpu_fwd_vector_vector_basic() raises:
     comptime if has_accelerator():
@@ -265,6 +270,7 @@ def test_dot_gpu_fwd_orthogonal() raises:
 # SECTION 6 — GPU · Backward · vector · vector
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_dot_gpu_bwd_vector_vector_both_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -305,6 +311,7 @@ def test_dot_gpu_bwd_vector_vector_rhs_only() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION 7 — GPU · Backward · scalar · vector (broadcast path)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_dot_gpu_bwd_scalar_tensor_dot_vector() raises:
     comptime if has_accelerator():
@@ -363,6 +370,7 @@ def test_dot_gpu_bwd_chained() raises:
 # =============================================================================
 # Main
 # =============================================================================
+
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

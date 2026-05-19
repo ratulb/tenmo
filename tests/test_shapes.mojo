@@ -236,7 +236,6 @@ def test_shape_compute_output_shape_single_axis() raises:
     assert_true(result_keep[1] == 1, "reduced dim should be 1")
 
 
-
 def test_shape_compute_output_shape_multiple_axes() raises:
     var s = Shape(2, 3, 4, 5)
     var axes = IntArray(1, 3)  # Reduce axes 1 and 3
@@ -265,6 +264,7 @@ def test_shape_product() raises:
     assert_true(Shape.product(s) == 24, "product should be 24")
     var scalar = Shape()
     assert_true(Shape.product(scalar) == 1, "scalar product should be 1")
+
 
 def test_slice_shape() raises:
     shape = Shape([1, 2, 3, 4])
@@ -374,5 +374,3 @@ def test_zip_reversed() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-
-

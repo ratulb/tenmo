@@ -20,23 +20,16 @@ struct SubBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var signs = output.ancestry().backward_fn_arg().get[IntArrayArg]().array
         ref gradbox = output.gradients()[]
         count = len(output.ancestry())
-        grad_shares = List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ](capacity=count)
         for i in range(count):
             var ancestor = output.ancestry().get(i)
-            grad_shares.append(
-                (
-                    ancestor^,
-                    gradbox,
-                    AddTensor if signs[i] == 0 else SubtractTensor,
-                )
-            )
-        return grad_shares^
+            var op_code = AddTensor if signs[i] == 0 else SubtractTensor
+            ancestor.update_grad(gradbox, op_code, None)
+            parent_ids.append(ancestor._id)
 
 
 @fieldwise_init
@@ -46,17 +39,14 @@ struct SubLeftRightBackwardScalar[dtype: DType](
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var negate = output.ancestry().backward_fn_arg().get[Boolean]().is_true
         ref gradbox = output.gradients()[]
         ref ancestor = output.ancestry().get(0)
-        return [
-            (
-                ancestor,
-                gradbox,
-                SubtractTensor if negate else AddTensor,
-            )
-        ]
+        var op_code = SubtractTensor if negate else AddTensor
+        ancestor.update_grad(gradbox, op_code, None)
+        parent_ids.append(ancestor._id)
 
 
 comptime SubtractBroadcastBackward[dtype: DType] = BroadcastBackward[
@@ -174,12 +164,13 @@ struct Subtractor[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return out^
 
     @staticmethod
-    def forward(self: Tensor[Self.dtype], other: Gradbox[Self.dtype]) -> Tensor[
-        Self.dtype
-    ]:
+    def forward(
+        self: Tensor[Self.dtype], other: Gradbox[Self.dtype]
+    ) -> Tensor[Self.dtype]:
         if self.shape() != other.shape():
             panic(
-                "Tensor subtraction(gradbox) dimension mismatch: shapes don't match "
+                "Tensor subtraction(gradbox) dimension mismatch: shapes don't"
+                " match "
                 + String(self.shape())
                 + " with "
                 + String(other.shape()),

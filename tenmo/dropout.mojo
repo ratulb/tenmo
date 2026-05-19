@@ -38,7 +38,8 @@ struct DropoutBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref arg_dropout = (
             output.ancestry().backward_fn_arg().get[ArgDropout[Self.dtype]]()
         )
@@ -59,7 +60,9 @@ struct DropoutBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             result_ndb = gradbox.buffer * mask_ndb
 
         var gradbox_ancestor = Gradbox[Self.dtype](result_ndb^, share=False)
-        return [(ancestor^, gradbox_ancestor^, AddTensor)]
+        if ancestor.requires_grad:
+            ancestor.update_grad(gradbox_ancestor^, AddTensor, None)
+        parent_ids.append(ancestor._id)
 
 
 @fieldwise_init
@@ -114,7 +117,9 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         comptime if has_accelerator():
             if x.buffer.is_on_gpu():
                 try:
-                    var seed = self.seed if self.fixed_seed else(random_ui64(0, 1000))
+                    var seed = self.seed if self.fixed_seed else (
+                        random_ui64(0, 1000)
+                    )
                     var result = DropoutKernel[Self.dtype].launch(
                         x.buffer,
                         self.p,

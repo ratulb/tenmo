@@ -10,15 +10,16 @@ struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[
-        Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-    ] where Self.dtype.is_floating_point():
+        mut parent_ids: List[UInt],
+    ):
         ref gradbox = output.gradients()[]
         ref parent = output.ancestry().get(0)
         var ndb = output.buffer().arithmetic_ops[TANH_BACKWARD](gradbox.buffer)
         var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
 
-        return [(parent, gradbox_ancestor^, AddTensor)]
+        parent.update_grad(gradbox_ancestor^, AddTensor, None)
+
+        parent_ids.append(parent._id)
 
 
 @fieldwise_init

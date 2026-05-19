@@ -10,7 +10,6 @@ from .strides import Strides
 from .broadcasthelper import ShapeBroadcaster
 
 
-
 def matrix_vector_nd[
     dtype: DType,
     block_size: Int = 256,
@@ -76,7 +75,6 @@ def matrix_vector_nd[
 
     # ── Step 6: write result ──────────────────────────────────────────────────
     out_buffer[tid] = acc
-
 
 
 @fieldwise_init
@@ -170,4 +168,3 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
             device_state^, out_shape
         )
         return out^
-

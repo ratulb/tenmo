@@ -1,5 +1,10 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true, assert_equal, assert_almost_equal, TestSuite
+from std.testing import (
+    assert_true,
+    assert_equal,
+    assert_almost_equal,
+    TestSuite,
+)
 from tenmo.shapes import Shape
 
 # ============================================================================
@@ -488,6 +493,7 @@ def test_pad_requires_grad_propagation() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
+
 
 def test_pad_circular_1d_asymmetric() raises:
     """Test asymmetric circular padding on 1D tensor."""
@@ -1571,5 +1577,3 @@ def run_all_padding_tests() raises:
     test_pad_large_asymmetric()
     test_pad_zero_padding_one_side()
     test_pad_backward_asymmetric()
-
-

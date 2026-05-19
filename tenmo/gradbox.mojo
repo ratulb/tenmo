@@ -55,7 +55,9 @@ struct Gradbox[dtype: DType](
         self._refcount = alloc[Atomic[DType.uint64]](1)
         self._refcount[] = Atomic[DType.uint64](1)
 
-    def __init__(out self, var buffer: NDBuffer[Self.dtype], share: Bool = True):
+    def __init__(
+        out self, var buffer: NDBuffer[Self.dtype], share: Bool = True
+    ):
         """Initialize a Gradbox from an existing NDBuffer.
 
         Args:
@@ -402,7 +404,9 @@ struct Gradbox[dtype: DType](
         Returns:
             A new Gradbox with the sum.
         """
-        var normalized_axes = Validator.validate_and_normalize_axes(self.shape(), axes)
+        var normalized_axes = Validator.validate_and_normalize_axes(
+            self.shape(), axes
+        )
         var nd_buffer = self.buffer.reduce(
             normalized_axes=normalized_axes, keepdims=keepdims
         )
@@ -504,9 +508,9 @@ struct Gradbox[dtype: DType](
 
         return Gradbox[Self.dtype](ndb^, share=False)
 
-    def slice(self, start: Int, end: Int, step: Int = 1, axis: Int = 0) -> Gradbox[
-        Self.dtype
-    ]:
+    def slice(
+        self, start: Int, end: Int, step: Int = 1, axis: Int = 0
+    ) -> Gradbox[Self.dtype]:
         """Slice Gradbox along a single axis with start, end, and step.
 
         Args:
@@ -521,9 +525,7 @@ struct Gradbox[dtype: DType](
             Panic if called on an unshared Gradbox.
         """
         if not self.shared():
-            panic(
-                "Gradbox -> slice: can not call on an unshared gradbox"
-            )
+            panic("Gradbox -> slice: can not call on an unshared gradbox")
         var shape, strides, offset = (
             Validator.validate_and_compute_slice_metadata(
                 self.shape(), self.strides(), axis, start, end, step
@@ -537,7 +539,10 @@ struct Gradbox[dtype: DType](
         var abs_offset = self.offset() + offset
         var shared_buffer = self.buffer.buffer.copy()
         var ndb = NDBuffer[Self.dtype](
-            shared_buffer^, shape=slice_shape^, strides=slice_strides^, offset=abs_offset
+            shared_buffer^,
+            shape=slice_shape^,
+            strides=slice_strides^,
+            offset=abs_offset,
         )
         # ── Propagate device_state for GPU gradboxes ──────────────────────────
         # On GPU the CPU Buffer is empty — the actual data lives in DeviceState.

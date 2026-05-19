@@ -21,6 +21,7 @@ struct Shape(
     Shape instances are immutable - operations that modify dimensions
     return new Shape instances rather than modifying in place.
     """
+
     var dims: IntArray
     var _numels: Int
 
@@ -260,7 +261,7 @@ struct Shape(
             String in the format "(d0, d1, ..., dn)"
         """
         var s = self.dims.__str__()
-        return "(" + s[byte=1:len(s)-1] + ")"
+        return "(" + s[byte = 1 : len(s) - 1] + ")"
 
     @no_inline
     def __repr__(self) -> String:
@@ -323,7 +324,6 @@ struct Shape(
         for i in range(len(self)):
             result[i] = self[i]
         return result^
-
 
     @always_inline("nodebug")
     def __add__(self, other: Shape) -> Shape:

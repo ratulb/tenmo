@@ -11,7 +11,6 @@ def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-
 def test_matrix_vector_no_batch() raises:
     """Test: M[m,k] @ v[k] -> result[m]."""
     print("test_matrix_vector_no_batch")
@@ -742,4 +741,3 @@ def run_all_matrix_vector_tests() raises:
     test_matrix_vector_no_grad()
 
     print("All matrix-vector multiplication tests passed! ✓")
-

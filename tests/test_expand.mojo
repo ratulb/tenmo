@@ -1,6 +1,7 @@
 from std.testing import assert_true, TestSuite
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
+
 # ============================================================
 # EXPAND TESTS — forward shape, values, and backward grad flow
 # ============================================================
@@ -10,11 +11,12 @@ from tenmo.shapes import Shape
 # Basic 1D → 2D expansion (prepend new dimension via broadcast)
 # ------------------------------------------------------------
 
+
 def test_expand_1d_to_2d_new_batch_dim() raises:
     print("test_expand_1d_to_2d_new_batch_dim")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)  # shape (3,)
-    var e = a.expand(4, 3)                                           # shape (4,3)
+    var e = a.expand(4, 3)  # shape (4,3)
     assert_true(e.shape() == Shape.of(4, 3))
     # Every row is [1, 2, 3]
     var expected = Tensor[dtype].d2(
@@ -30,11 +32,11 @@ def test_expand_1d_to_2d_new_batch_dim() raises:
 def test_expand_1d_to_3d() raises:
     print("test_expand_1d_to_3d")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)   # shape (2,)
-    var e = a.expand(3, 4, 2)                                    # shape (3,4,2)
+    var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)  # shape (2,)
+    var e = a.expand(3, 4, 2)  # shape (3,4,2)
     assert_true(e.shape() == Shape.of(3, 4, 2))
     # All slices identical
-    var e_cpu = e.sum(axes=[0, 1])                               # shape (2,)
+    var e_cpu = e.sum(axes=[0, 1])  # shape (2,)
     assert_true(e_cpu.all_close(Tensor[dtype].d1([12.0, 24.0])))
     es = e.sum()
     es.backward()
@@ -46,11 +48,14 @@ def test_expand_1d_to_3d() raises:
 # 2D → 2D expansion (size-1 dim expanded)
 # ------------------------------------------------------------
 
+
 def test_expand_2d_row_vector_to_matrix() raises:
     print("test_expand_2d_row_vector_to_matrix")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]], requires_grad=True)  # shape (1,3)
-    var e = a.expand(4, 3)                                             # shape (4,3)
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0]], requires_grad=True
+    )  # shape (1,3)
+    var e = a.expand(4, 3)  # shape (4,3)
     assert_true(e.shape() == Shape.of(4, 3))
     var expected = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]
@@ -65,13 +70,13 @@ def test_expand_2d_row_vector_to_matrix() raises:
 def test_expand_2d_col_vector_to_matrix() raises:
     print("test_expand_2d_col_vector_to_matrix")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([[1.0], [2.0], [3.0]], requires_grad=True)  # shape (3,1)
-    var e = a.expand(3, 4)                                                # shape (3,4)
+    var a = Tensor[dtype].d2(
+        [[1.0], [2.0], [3.0]], requires_grad=True
+    )  # shape (3,1)
+    var e = a.expand(3, 4)  # shape (3,4)
     assert_true(e.shape() == Shape.of(3, 4))
     var expected = Tensor[dtype].d2(
-        [[1.0, 1.0, 1.0, 1.0],
-         [2.0, 2.0, 2.0, 2.0],
-         [3.0, 3.0, 3.0, 3.0]]
+        [[1.0, 1.0, 1.0, 1.0], [2.0, 2.0, 2.0, 2.0], [3.0, 3.0, 3.0, 3.0]]
     )
     assert_true(e.all_close(expected))
     es = e.sum()
@@ -83,8 +88,8 @@ def test_expand_2d_col_vector_to_matrix() raises:
 def test_expand_2d_both_dims_size1() raises:
     print("test_expand_2d_both_dims_size1")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([[5.0]], requires_grad=True)   # shape (1,1)
-    var e = a.expand(3, 4)                                   # shape (3,4)
+    var a = Tensor[dtype].d2([[5.0]], requires_grad=True)  # shape (1,1)
+    var e = a.expand(3, 4)  # shape (3,4)
     assert_true(e.shape() == Shape.of(3, 4))
     # All 12 elements equal 5.0
     assert_true(e.all_close(Tensor[dtype].full(Shape.of(3, 4), 5.0)))
@@ -97,8 +102,10 @@ def test_expand_2d_both_dims_size1() raises:
 def test_expand_2d_no_op_same_shape() raises:
     print("test_expand_2d_no_op_same_shape")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)  # (2,2)
-    var e = a.expand(2, 2)                                                    # no-op
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )  # (2,2)
+    var e = a.expand(2, 2)  # no-op
     assert_true(e.shape() == Shape.of(2, 2))
     assert_true(e.all_close(a))
     es = e.sum()
@@ -111,56 +118,69 @@ def test_expand_2d_no_op_same_shape() raises:
 # 3D expansions
 # ------------------------------------------------------------
 
+
 def test_expand_3d_first_dim() raises:
     print("test_expand_3d_first_dim")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True)  # (1,2,2)
-    var e = a.expand(5, 2, 2)                                                   # (5,2,2)
+    var a = Tensor[dtype].d3(
+        [[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True
+    )  # (1,2,2)
+    var e = a.expand(5, 2, 2)  # (5,2,2)
     assert_true(e.shape() == Shape.of(5, 2, 2))
     # Sum over expanded dim should give 5x original values
-    var s = e.sum(axes=[0])                  # (2,2)
+    var s = e.sum(axes=[0])  # (2,2)
     assert_true(s.all_close(Tensor[dtype].d2([[5.0, 10.0], [15.0, 20.0]])))
     es = e.sum()
     es.backward()
     # Each element broadcast 5 times
-    assert_true(a.grad().all_close(Tensor[dtype].d3([[[5.0, 5.0], [5.0, 5.0]]])))
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d3([[[5.0, 5.0], [5.0, 5.0]]]))
+    )
 
 
 def test_expand_3d_last_dim() raises:
     print("test_expand_3d_last_dim")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d3([[[1.0], [2.0]], [[3.0], [4.0]]], requires_grad=True)  # (2,2,1)
-    var e = a.expand(2, 2, 6)                                                         # (2,2,6)
+    var a = Tensor[dtype].d3(
+        [[[1.0], [2.0]], [[3.0], [4.0]]], requires_grad=True
+    )  # (2,2,1)
+    var e = a.expand(2, 2, 6)  # (2,2,6)
     assert_true(e.shape() == Shape.of(2, 2, 6))
     # Each slice should repeat 6 times
-    var s = e.sum(axes=[-1])                 # (2,2)
+    var s = e.sum(axes=[-1])  # (2,2)
     assert_true(s.all_close(Tensor[dtype].d2([[6.0, 12.0], [18.0, 24.0]])))
     es = e.sum()
     es.backward()
-    assert_true(a.grad().all_close(Tensor[dtype].d3([[[6.0], [6.0]], [[6.0], [6.0]]])))
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d3([[[6.0], [6.0]], [[6.0], [6.0]]]))
+    )
 
 
 def test_expand_3d_middle_dim() raises:
     print("test_expand_3d_middle_dim")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d3([[[1.0, 2.0]], [[3.0, 4.0]]], requires_grad=True)  # (2,1,2)
-    var e = a.expand(2, 5, 2)                                                     # (2,5,2)
+    var a = Tensor[dtype].d3(
+        [[[1.0, 2.0]], [[3.0, 4.0]]], requires_grad=True
+    )  # (2,1,2)
+    var e = a.expand(2, 5, 2)  # (2,5,2)
     assert_true(e.shape() == Shape.of(2, 5, 2))
-    var s = e.sum(axes=[1])                  # (2,2)
+    var s = e.sum(axes=[1])  # (2,2)
     assert_true(s.all_close(Tensor[dtype].d2([[5.0, 10.0], [15.0, 20.0]])))
     es = e.sum()
     es.backward()
-    assert_true(a.grad().all_close(Tensor[dtype].d3([[[5.0, 5.0]], [[5.0, 5.0]]])))
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d3([[[5.0, 5.0]], [[5.0, 5.0]]]))
+    )
 
 
 def test_expand_3d_two_dims_broadcast() raises:
     print("test_expand_3d_two_dims_broadcast")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3([[[1.0, 2.0]]], requires_grad=True)  # (1,1,2)
-    var e = a.expand(3, 4, 2)                                       # (3,4,2)
+    var e = a.expand(3, 4, 2)  # (3,4,2)
     assert_true(e.shape() == Shape.of(3, 4, 2))
     # col sums: 1*12=12, 2*12=24
-    var s = e.sum(axes=[0, 1])               # (2,)
+    var s = e.sum(axes=[0, 1])  # (2,)
     assert_true(s.all_close(Tensor[dtype].d1([12.0, 24.0])))
     es = e.sum()
     es.backward()
@@ -172,7 +192,7 @@ def test_expand_3d_all_dims_size1() raises:
     print("test_expand_3d_all_dims_size1")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3([[[7.0]]], requires_grad=True)  # (1,1,1)
-    var e = a.expand(2, 3, 4)                                  # (2,3,4)
+    var e = a.expand(2, 3, 4)  # (2,3,4)
     assert_true(e.shape() == Shape.of(2, 3, 4))
     assert_true(e.all_close(Tensor[dtype].full(Shape.of(2, 3, 4), 7.0)))
     es = e.sum()
@@ -184,11 +204,12 @@ def test_expand_3d_all_dims_size1() raises:
 # Shape API overload (Shape object, not variadic ints)
 # ------------------------------------------------------------
 
+
 def test_expand_shape_api_overload() raises:
     print("test_expand_shape_api_overload")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)  # (1,2)
-    var e = a.expand(Shape.of(3, 2))                              # (3,2)
+    var e = a.expand(Shape.of(3, 2))  # (3,2)
     assert_true(e.shape() == Shape.of(3, 2))
     var expected = Tensor[dtype].d2([[1.0, 2.0], [1.0, 2.0], [1.0, 2.0]])
     assert_true(e.all_close(expected))
@@ -201,13 +222,16 @@ def test_expand_shape_api_overload() raises:
 # Grad correctness: non-uniform values
 # ------------------------------------------------------------
 
+
 def test_expand_grad_non_uniform_values() raises:
     print("test_expand_grad_non_uniform_values")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)  # (2,2)
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )  # (2,2)
     # Expand to (2,3,2): prepend batch of 3, no size-1 dim needed — use unsqueeze pattern
-    var a_unsqueezed = a.unsqueeze(0)                     # (1,2,2) — no grad
-    var e = a_unsqueezed.expand(3, 2, 2)                  # (3,2,2)
+    var a_unsqueezed = a.unsqueeze(0)  # (1,2,2) — no grad
+    var e = a_unsqueezed.expand(3, 2, 2)  # (3,2,2)
     assert_true(e.shape() == Shape.of(3, 2, 2))
     es = e.sum()
     es.backward()
@@ -219,13 +243,13 @@ def test_expand_grad_weighted_loss() raises:
     print("test_expand_grad_weighted_loss")
     comptime dtype = DType.float32
     # Simulate bias broadcast: bias (1,4) expanded to (3,4) then used in a loss
-    var bias = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0]], requires_grad=True)  # (1,4)
-    var e = bias.expand(3, 4)                                                   # (3,4)
+    var bias = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0, 4.0]], requires_grad=True
+    )  # (1,4)
+    var e = bias.expand(3, 4)  # (3,4)
     # Weighted sum: multiply by weights before summing
     var weights = Tensor[dtype].d2(
-        [[1.0, 2.0, 1.0, 2.0],
-         [2.0, 1.0, 2.0, 1.0],
-         [1.0, 1.0, 1.0, 1.0]]
+        [[1.0, 2.0, 1.0, 2.0], [2.0, 1.0, 2.0, 1.0], [1.0, 1.0, 1.0, 1.0]]
     )
     var loss = (e * weights).sum()
     loss.backward()
@@ -238,12 +262,13 @@ def test_expand_grad_weighted_loss() raises:
 # Expand then reduce — round-trip grad check
 # ------------------------------------------------------------
 
+
 def test_expand_then_sum_axis_round_trip() raises:
     print("test_expand_then_sum_axis_round_trip")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]], requires_grad=True)  # (1,3)
-    var e = a.expand(5, 3)                                             # (5,3)
-    var s = e.sum(axes=[0], keepdims=True)                             # (1,3)
+    var e = a.expand(5, 3)  # (5,3)
+    var s = e.sum(axes=[0], keepdims=True)  # (1,3)
     # s[0,j] = 5 * a[0,j]
     assert_true(s.all_close(Tensor[dtype].d2([[5.0, 10.0, 15.0]])))
     ss = s.sum()
@@ -256,8 +281,8 @@ def test_expand_then_mean_grad() raises:
     print("test_expand_then_mean_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[2.0, 4.0]], requires_grad=True)  # (1,2)
-    var e = a.expand(4, 2)                                        # (4,2)
-    var m = e.mean(axes=[0])                                      # (2,)
+    var e = a.expand(4, 2)  # (4,2)
+    var m = e.mean(axes=[0])  # (2,)
     # mean: [2.0, 4.0] (same as a, since all rows identical)
     assert_true(m.all_close(Tensor[dtype].d1([2.0, 4.0])))
     ms = m.sum()
@@ -270,15 +295,16 @@ def test_expand_then_mean_grad() raises:
 # Expand in matmul-like broadcast scenario
 # ------------------------------------------------------------
 
+
 def test_expand_bias_broadcast_pattern() raises:
     print("test_expand_bias_broadcast_pattern")
     comptime dtype = DType.float32
     # Common pattern: bias (1, out) expanded to match batch output (B, out)
     var bias = Tensor[dtype].d2([[0.5, 1.0, 1.5]], requires_grad=True)  # (1,3)
-    var e = bias.expand(6, 3)                                             # (6,3)
+    var e = bias.expand(6, 3)  # (6,3)
     assert_true(e.shape() == Shape.of(6, 3))
     # All rows should equal bias
-    var row_sum = e.sum(axes=[0])   # (3,) each col summed = 6 * bias_val
+    var row_sum = e.sum(axes=[0])  # (3,) each col summed = 6 * bias_val
     assert_true(row_sum.all_close(Tensor[dtype].d1([3.0, 6.0, 9.0])))
     es = e.sum()
     es.backward()
@@ -289,12 +315,13 @@ def test_expand_bias_broadcast_pattern() raises:
 # Grad accumulation across two expand ops on the same tensor
 # ------------------------------------------------------------
 
+
 def test_expand_grad_accumulation_two_expands() raises:
     print("test_expand_grad_accumulation_two_expands")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)  # (1,2)
-    var e1 = a.expand(3, 2)                                       # (3,2)
-    var e2 = a.expand(5, 2)                                       # (5,2)
+    var e1 = a.expand(3, 2)  # (3,2)
+    var e2 = a.expand(5, 2)  # (5,2)
     es1 = e1.sum()
     es1.backward()
     es2 = e2.sum()
@@ -306,6 +333,7 @@ def test_expand_grad_accumulation_two_expands() raises:
 # ------------------------------------------------------------
 # Expand with track_grad=False — no backward registered
 # ------------------------------------------------------------
+
 
 def test_expand_no_grad_tracking() raises:
     print("test_expand_no_grad_tracking")
@@ -320,6 +348,7 @@ def test_expand_no_grad_tracking() raises:
 # 4D expansion
 # ------------------------------------------------------------
 
+
 def test_expand_4d_first_two_dims() raises:
     print("test_expand_4d_first_two_dims")
     comptime dtype = DType.float32
@@ -330,7 +359,7 @@ def test_expand_4d_first_two_dims() raises:
     var e = a.expand(2, 5, 3, 4)
     assert_true(e.shape() == Shape.of(2, 5, 3, 4))
     # sum over broadcast dims should equal 10 * original
-    var s = e.sum(axes=[0, 1])   # (3,4)
+    var s = e.sum(axes=[0, 1])  # (3,4)
     var s_ref1 = a_ref.squeeze([0])
     s_ref2 = s_ref1.squeeze([0])
     s_ref = s_ref2 * Scalar[dtype](10)
@@ -338,7 +367,9 @@ def test_expand_4d_first_two_dims() raises:
     es = e.sum()
     es.backward()
     # broadcast count = 2*5 = 10
-    assert_true(a.grad().all_close(Tensor[dtype].full(Shape.of(1, 1, 3, 4), 10.0)))
+    assert_true(
+        a.grad().all_close(Tensor[dtype].full(Shape.of(1, 1, 3, 4), 10.0))
+    )
 
 
 def test_expand_4d_last_dim_only() raises:
@@ -352,28 +383,28 @@ def test_expand_4d_last_dim_only() raises:
     es = e.sum()
     es.backward()
     # each element broadcast 7 times
-    assert_true(a.grad().all_close(Tensor[dtype].full(Shape.of(2, 3, 4, 1), 7.0)))
+    assert_true(
+        a.grad().all_close(Tensor[dtype].full(Shape.of(2, 3, 4, 1), 7.0))
+    )
 
 
 # ------------------------------------------------------------
 # Expand matches manual repeat behaviour (cross-validate)
 # ------------------------------------------------------------
 
+
 def test_expand_matches_manual_tile() raises:
     print("test_expand_matches_manual_tile")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)  # (3,)
-    var e = a.expand(4, 3)                                           # (4,3)
+    var e = a.expand(4, 3)  # (4,3)
     # Manual construction of expected
     var expected = Tensor[dtype].d2(
-        [[1.0, 2.0, 3.0],
-         [1.0, 2.0, 3.0],
-         [1.0, 2.0, 3.0],
-         [1.0, 2.0, 3.0]]
+        [[1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]
     )
     assert_true(e.all_close(expected))
     # Also verify elementwise: e[i,j] == a[j] for all i
-    var col_means = e.mean(axes=[0])   # (3,) should equal a
+    var col_means = e.mean(axes=[0])  # (3,) should equal a
     assert_true(col_means.all_close(a))
 
 
@@ -381,13 +412,14 @@ def test_expand_matches_manual_tile() raises:
 # Expand is a view — no data copy (stride-zero check via value)
 # ------------------------------------------------------------
 
+
 def test_expand_is_zero_stride_view() raises:
     print("test_expand_is_zero_stride_view")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[10.0, 20.0]], requires_grad=True)  # (1,2)
-    var e = a.expand(100, 2)                                        # (100,2)
+    var e = a.expand(100, 2)  # (100,2)
     # All 100 rows must have identical values — confirms stride-0 view
-    var row0 = e.sum(axes=[0])   # (2,) = 100*[10,20]
+    var row0 = e.sum(axes=[0])  # (2,) = 100*[10,20]
     assert_true(row0.all_close(Tensor[dtype].d1([1000.0, 2000.0])))
     es = e.sum()
     es.backward()
@@ -397,6 +429,7 @@ def test_expand_is_zero_stride_view() raises:
 # ============================================================
 # MAIN
 # ============================================================
+
 
 def main() raises:
     _ = """

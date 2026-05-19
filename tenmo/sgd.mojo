@@ -87,7 +87,6 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         self.use_momentum = take.use_momentum
         self.velocities = take.velocities^
 
-
     @always_inline
     def _step_no_momentum[
         simd_w: Int
@@ -289,7 +288,6 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         for k in range(vec_end, num_elements):
             grad_ptr[k] = max(min_val, min(max_val, grad_ptr[k]))
 
-
     def compute_grad_norm(self) -> Scalar[Self.dtype]:
         var total_norm_sq: Scalar[Self.dtype] = 0.0
         comptime simd_w = simd_width_of[Self.dtype]()
@@ -339,7 +337,6 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 total_norm_sq += g * g
 
         return sqrt(total_norm_sq)
-
 
     def clip_gradients(mut self):
         comptime simd_w = simd_width_of[Self.dtype]()
@@ -402,7 +399,6 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                     grad.data_ptr(), num_elements
                 )
 
-
     @always_inline
     def step(mut self, indices: IntArray = IntArray()):
         """
@@ -447,20 +443,34 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                             var grad_ds = grad.buffer.device_state.value()
                             if self.use_momentum:
                                 ref velocity = self.velocities[i]
-                                var vel_ds = velocity.buffer.device_state.value()
+                                var vel_ds = (
+                                    velocity.buffer.device_state.value()
+                                )
                                 with param_ds.buffer.map_to_host() as param_host, grad_ds.buffer.map_to_host() as grad_host, vel_ds.buffer.map_to_host() as vel_host:
                                     self._apply_momentum_sparse[simd_w](
-                                        param_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
-                                        grad_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
-                                        vel_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
-                                        row_width, indices,
+                                        param_host.unsafe_ptr().bitcast[
+                                            Scalar[Self.dtype]
+                                        ](),
+                                        grad_host.unsafe_ptr().bitcast[
+                                            Scalar[Self.dtype]
+                                        ](),
+                                        vel_host.unsafe_ptr().bitcast[
+                                            Scalar[Self.dtype]
+                                        ](),
+                                        row_width,
+                                        indices,
                                     )
                             else:
                                 with param_ds.buffer.map_to_host() as param_host, grad_ds.buffer.map_to_host() as grad_host:
                                     self._step_no_momentum_sparse[simd_w](
-                                        param_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
-                                        grad_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
-                                        row_width, indices,
+                                        param_host.unsafe_ptr().bitcast[
+                                            Scalar[Self.dtype]
+                                        ](),
+                                        grad_host.unsafe_ptr().bitcast[
+                                            Scalar[Self.dtype]
+                                        ](),
+                                        row_width,
+                                        indices,
                                     )
                             param_ds.sync()
                         except e:
@@ -471,13 +481,18 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 if self.use_momentum:
                     ref velocity = self.velocities[i]
                     self._apply_momentum_sparse[simd_w](
-                        parameter.data_ptr(), grad.data_ptr(),
-                        velocity.data_ptr(), row_width, indices,
+                        parameter.data_ptr(),
+                        grad.data_ptr(),
+                        velocity.data_ptr(),
+                        row_width,
+                        indices,
                     )
                 else:
                     self._step_no_momentum_sparse[simd_w](
-                        parameter.data_ptr(), grad.data_ptr(),
-                        row_width, indices,
+                        parameter.data_ptr(),
+                        grad.data_ptr(),
+                        row_width,
+                        indices,
                     )
                 continue
 
@@ -561,12 +576,16 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 if shape.rank() != 2:
                     continue
                 self._zero_rows_ptr[simd_w](
-                    grad.data_ptr(), shape[1], indices,
+                    grad.data_ptr(),
+                    shape[1],
+                    indices,
                 )
                 if self.use_momentum:
                     ref velocity = self.velocities[i]
                     self._zero_rows_ptr[simd_w](
-                        velocity.data_ptr(), shape[1], indices,
+                        velocity.data_ptr(),
+                        shape[1],
+                        indices,
                     )
             else:
                 parameter.zero_grad()

@@ -128,6 +128,7 @@ def make_copier[T: ArgumentType]() -> CopyFn:
 # Stores op_code, type-erased ptr, destroy, and copy_fn.
 # ============================================================================
 
+
 @fieldwise_init
 struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
     var op_code: Int
@@ -206,6 +207,7 @@ struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
 # ScalarArg: Scalar value (used by *_SCALAR ops)
 # ============================================================================
 
+
 @fieldwise_init
 struct NullArg(ArgumentType):
     var zero: UInt8
@@ -213,12 +215,14 @@ struct NullArg(ArgumentType):
 
 # Boolean: Bool (used by BACKWARD_DROPOUT)
 
+
 @fieldwise_init
 struct Boolean(ArgumentType):
     var is_true: Bool
 
 
 # ScalarArg: Scalar value (used by *_SCALAR ops)
+
 
 @fieldwise_init
 struct ScalarArg[dtype: DType](ArgumentType):
@@ -331,137 +335,134 @@ struct StdArg[dtype: DType](ArgumentType):
 # Each branch calls a static backward() method from its module.
 # ============================================================================
 
+
 @fieldwise_init
 struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     @staticmethod
     def invoke(
         output: Ancestor[Self.dtype],
-    ) -> List[
-        Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-    ] where Self.dtype.is_floating_point():
-        if not output.has_ancestry():  # guard!
+        mut parent_ids: List[UInt],
+    ) where Self.dtype.is_floating_point():
+        if not output.has_ancestry():
             print("Inside Backward invoke: output ancestry is not set")
-            return []
+            return
         ref arg = output.ancestry().backward_fn_arg()
         var op_code = arg.op_code
         if op_code == BACKWARD_ADD_SCALAR:
-            return AddBackwardScalar[Self.dtype].backward(output)
-        if op_code == BACKWARD_ADD:
-            return AddBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_ADD_BROADCAST:
-            return AddBroadcastBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_SUB:
-            return SubBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_SUB_SCALAR:
-            return SubLeftRightBackwardScalar[Self.dtype].backward(output)
-        elif op_code == BACKWARD_SUBTRACT_BROADCAST:
-            return SubtractBroadcastBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_MULTIPLY_SCALAR:
-            return MultiplyBackwardScalar[Self.dtype].backward(output)
-        elif op_code == BACKWARD_MULTIPLY:
-            return MultiplyBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_MULTIPLY_BROADCAST:
-            return MultiplyBroadcastBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_DIV_SCALAR:
-            return TrueDivBackwardScalar[Self.dtype].backward(output)
-        elif op_code == BACKWARD_RIGHT_DIV_SCALAR:
-            return RightTrueDivBackwardScalar[Self.dtype].backward(output)
-        elif op_code == BACKWARD_DIVIDE:
-            return DivideBackward[Self.dtype].backward(output)
+            AddBackwardScalar[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_SUM:
-            return SumBackward[Self.dtype].backward(output)
+            SumBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_MEAN:
-            return MeanBackward[Self.dtype].backward(output)
+            MeanBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_RESHAPE:
-            return ReshapeBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_MATMUL_2D:
-            return Matmul2dBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_MATMUL_ND:
-            return MatmulNdBackward[Self.dtype].backward(output)
-        elif op_code == BLAS_BACKWARD_MATMUL_2D:
-            return BLASMatmul2dBackward[Self.dtype].backward(output)
+            ReshapeBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_TRANSPOSE:
-            return TransposeBackward[Self.dtype].backward(output)
+            TransposeBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_PERMUTE:
-            return PermuteBackward[Self.dtype].backward(output)
+            PermuteBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_RELU:
-            return ReLUBackward[Self.dtype].backward(output)
+            ReLUBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_VIEW:
-            return ViewBackward[Self.dtype].backward(output)
+            ViewBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_CE_CLASS_INDICES:
-            return CEClassIndicesBackward[Self.dtype].backward(output)
+            CEClassIndicesBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_CE_PROBABILITIES:
-            return CEProbabilitiesBackward[Self.dtype].backward(output)
+            CEProbabilitiesBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_CONTIGUOUS:
-            return ContiguousBackward[Self.dtype].backward(output)
+            ContiguousBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_SIGMOID:
-            return SigmoidBackward[Self.dtype].backward(output)
+            SigmoidBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_EXPONENTIATION:
-            return ExponentiationBackward[Self.dtype].backward(output)
+            ExponentiationBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_EXPAND:
-            return ExpandBackward[Self.dtype].backward(output)
+            ExpandBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_FLATTEN:
-            return FlattenBackward[Self.dtype].backward(output)
+            FlattenBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_SQUEEZE:
-            return SqueezeBackward[Self.dtype].backward(output)
+            SqueezeBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_UNSQUEEZE:
-            return UnsqueezeBackward[Self.dtype].backward(output)
+            UnsqueezeBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_SHUFFLE:
-            return ShuffleBackward[Self.dtype].backward(output)
+            ShuffleBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_MINMAX:
-            return MinMaxBackward[Self.dtype].backward(output)
+            MinMaxBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_SOFTMAX:
-            return SoftmaxBackward[Self.dtype].backward(output)
+            SoftmaxBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_LOG_SOFTMAX:
-            return LogSoftmaxBackward[Self.dtype].backward(output)
+            LogSoftmaxBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_TILE:
-            return TileBackward[Self.dtype].backward(output)
+            TileBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_TANH:
-            return TanhBackward[Self.dtype].backward(output)
+            TanhBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_LOG:
-            return LogBackward[Self.dtype].backward(output)
+            LogBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_CLIP:
-            return ClipBackward[Self.dtype].backward(output)
+            ClipBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_SQRT:
-            return SqrtBackward[Self.dtype].backward(output)
+            SqrtBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_VARIANCE:
-            return VarianceBackward[Self.dtype].backward(output)
+            VarianceBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_STD:
-            return StdBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_CONCAT:
-            return ConcatBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_STACK:
-            return StackBackward[Self.dtype].backward(output)
+            StdBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_PAD:
-            return PadBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_FUSED_CONV:
-            return FusedCol2ImBackward[Self.dtype].backward(output)
+            PadBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_MAXPOOL2D:
-            return MaxPool2dBackward[Self.dtype].backward(output)
+            MaxPool2dBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_DROPOUT:
-            return DropoutBackward[Self.dtype].backward(output)
+            DropoutBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_DEVICE_TRANSFER:
-            return DeviceTransferBackward[Self.dtype].backward(output)
+            DeviceTransferBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_MAX_SCALAR:
-            return MaxBackwardScalar[Self.dtype].backward(output)
+            MaxBackwardScalar[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_MIN_SCALAR:
-            return MinBackwardScalar[Self.dtype].backward(output)
+            MinBackwardScalar[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_EXPONENTIAL:
-            return ExponentialBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_VECTOR_MATMUL:
-            return VectorMatmulNdBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_MATRIX_VECTOR_MUL:
-            return MatrixVectorMulNdBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_DOT:
-            return DotBackward[Self.dtype].backward(output)
+            ExponentialBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_PRODUCT:
-            return ProductBackward[Self.dtype].backward(output)
-        elif op_code == BACKWARD_LAYER_NORM:
-            return LayerNormBackward[Self.dtype].backward(output)
+            ProductBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_BROADCAST_TO:
-            return BroadcastToBackward[Self.dtype].backward(output)
+            BroadcastToBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_GATHER:
-            return GatherBackward[Self.dtype].backward(output)
-
-        else:
-            return []
+            GatherBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_SUB_SCALAR:
+            SubLeftRightBackwardScalar[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_MULTIPLY_SCALAR:
+            MultiplyBackwardScalar[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_DIV_SCALAR:
+            TrueDivBackwardScalar[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_RIGHT_DIV_SCALAR:
+            RightTrueDivBackwardScalar[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_ADD:
+            AddBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_ADD_BROADCAST:
+            AddBroadcastBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_SUB:
+            SubBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_SUBTRACT_BROADCAST:
+            SubtractBroadcastBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_MULTIPLY:
+            MultiplyBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_MULTIPLY_BROADCAST:
+            MultiplyBroadcastBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_DIVIDE:
+            DivideBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_MATMUL_2D:
+            Matmul2dBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_MATMUL_ND:
+            MatmulNdBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BLAS_BACKWARD_MATMUL_2D:
+            BLASMatmul2dBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_VECTOR_MATMUL:
+            VectorMatmulNdBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_MATRIX_VECTOR_MUL:
+            MatrixVectorMulNdBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_DOT:
+            DotBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_FUSED_CONV:
+            FusedCol2ImBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_LAYER_NORM:
+            LayerNormBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_CONCAT:
+            ConcatBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_STACK:
+            StackBackward[Self.dtype].backward(output, parent_ids)

@@ -228,9 +228,7 @@ def test_tanh_no_grad_mode() raises:
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var y = x.tanh[track_grad=False]()
 
-    assert_true(
-        not y.has_ancestry(), "Should not build graph in no_grad mode"
-    )
+    assert_true(not y.has_ancestry(), "Should not build graph in no_grad mode")
     assert_true(not y.requires_grad, "Output should not require grad")
 
 
@@ -257,9 +255,7 @@ def test_tanh_layer_eval_mode() raises:
     var x = Tensor[dtype].d1([1.0], requires_grad=True)
     var y = activation(x)
 
-    assert_true(
-        not y.has_ancestry(), "Should not build graph in eval mode"
-    )
+    assert_true(not y.has_ancestry(), "Should not build graph in eval mode")
 
 
 def test_tanh_numerical_stability_positive() raises:

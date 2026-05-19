@@ -18,7 +18,8 @@ struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var scalar = (
             output.ancestry()
             .backward_fn_arg()
@@ -50,8 +51,8 @@ struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             mask_float * gradbox.buffer, share=False
         )
 
-        return [(parent_ref^, grad_input^, AddTensor)]
-
+        parent_ref.update_grad(grad_input^, AddTensor, None)
+        parent_ids.append(parent_ref._id)
 
 
 @fieldwise_init
@@ -59,7 +60,8 @@ struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var scalar = (
             output.ancestry()
             .backward_fn_arg()
@@ -86,7 +88,8 @@ struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var grad_input = Gradbox[Self.dtype](
             mask_float * gradbox.buffer, share=False
         )
-        return [(parent_ref^, grad_input^, AddTensor)]
+        parent_ref.update_grad(grad_input^, AddTensor, None)
+        parent_ids.append(parent_ref._id)
 
 
 @fieldwise_init
@@ -139,4 +142,3 @@ struct MinScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^
-

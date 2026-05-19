@@ -10,7 +10,6 @@ from tenmo.intarray import IntArray
 
 def test_fill_scalar_single_index_1d() raises:
     """Test filling single element in 1D tensor with scalar."""
-    print("test_fill_scalar_single_index_1d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(10)
@@ -25,7 +24,6 @@ def test_fill_scalar_single_index_1d() raises:
 
 def test_fill_scalar_single_index_2d() raises:
     """Test filling single element in 2D tensor with scalar."""
-    print("test_fill_scalar_single_index_2d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4)
@@ -39,7 +37,6 @@ def test_fill_scalar_single_index_2d() raises:
 
 def test_fill_scalar_negative_index() raises:
     """Test filling with negative index."""
-    print("test_fill_scalar_negative_index")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(10)
@@ -52,7 +49,6 @@ def test_fill_scalar_negative_index() raises:
 
 def test_fill_scalar_3d_index() raises:
     """Test filling single element in 3D tensor."""
-    print("test_fill_scalar_3d_index")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(2, 3, 4)
@@ -71,7 +67,6 @@ def test_fill_scalar_3d_index() raises:
 
 def test_fill_scalar_full_slice_1d() raises:
     """Test filling entire 1D tensor with scalar."""
-    print("test_fill_scalar_full_slice_1d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(10)
@@ -85,7 +80,6 @@ def test_fill_scalar_full_slice_1d() raises:
 
 def test_fill_scalar_partial_slice_1d() raises:
     """Test filling partial slice in 1D tensor."""
-    print("test_fill_scalar_partial_slice_1d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(10)
@@ -101,7 +95,6 @@ def test_fill_scalar_partial_slice_1d() raises:
 
 def test_fill_scalar_slice_with_step_1d() raises:
     """Test filling slice with step in 1D tensor."""
-    print("test_fill_scalar_slice_with_step_1d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(10)
@@ -117,7 +110,6 @@ def test_fill_scalar_slice_with_step_1d() raises:
 
 def test_fill_scalar_2d_slice_row() raises:
     """Test filling entire row in 2D tensor."""
-    print("test_fill_scalar_2d_slice_row")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4)
@@ -133,7 +125,6 @@ def test_fill_scalar_2d_slice_row() raises:
 
 def test_fill_scalar_2d_slice_col() raises:
     """Test filling entire column in 2D tensor."""
-    print("test_fill_scalar_2d_slice_col")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4)
@@ -149,7 +140,6 @@ def test_fill_scalar_2d_slice_col() raises:
 
 def test_fill_scalar_2d_submatrix() raises:
     """Test filling submatrix in 2D tensor."""
-    print("test_fill_scalar_2d_submatrix")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(5, 5)
@@ -165,7 +155,6 @@ def test_fill_scalar_2d_submatrix() raises:
 
 def test_fill_scalar_strided_2d() raises:
     """Test filling with strides in 2D (checkerboard pattern)."""
-    print("test_fill_scalar_strided_2d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(4, 4)
@@ -187,7 +176,6 @@ def test_fill_scalar_strided_2d() raises:
 
 def test_fill_scalar_array_index_1d() raises:
     """Test filling specific indices in 1D tensor."""
-    print("test_fill_scalar_array_index_1d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(10)
@@ -208,7 +196,6 @@ def test_fill_scalar_array_index_1d() raises:
 
 def test_fill_scalar_array_index_2d() raises:
     """Test filling specific rows in 2D tensor."""
-    print("test_fill_scalar_array_index_2d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(5, 3)
@@ -224,7 +211,6 @@ def test_fill_scalar_array_index_2d() raises:
 
 def test_fill_scalar_empty_array() raises:
     """Test filling with empty index array."""
-    print("test_fill_scalar_empty_array")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].ones(5)
@@ -238,7 +224,6 @@ def test_fill_scalar_empty_array() raises:
 
 def test_fill_scalar_single_element_array() raises:
     """Test filling with single-element index array."""
-    print("test_fill_scalar_single_element_array")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(10)
@@ -258,7 +243,6 @@ def test_fill_scalar_single_element_array() raises:
 
 def test_fill_scalar_mixed_int_slice() raises:
     """Test filling with mixed integer and slice indices."""
-    print("test_fill_scalar_mixed_int_slice")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4, 5)
@@ -276,7 +260,6 @@ def test_fill_scalar_mixed_int_slice() raises:
 
 def test_fill_scalar_mixed_array_slice() raises:
     """Test filling with array and slice indices."""
-    print("test_fill_scalar_mixed_array_slice")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(5, 4)
@@ -295,7 +278,6 @@ def test_fill_scalar_mixed_array_slice() raises:
 # ============================================================================
 def test_fill_scalar_on_view_slice() raises:
     """Test filling on a sliced view."""
-    print("test_fill_scalar_on_view_slice")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(20)
@@ -310,25 +292,22 @@ def test_fill_scalar_on_view_slice() raises:
 
 def test_fill_scalar_on_view_reshape() raises:
     """Test filling on reshaped view."""
-    print("test_fill_scalar_on_view_reshape")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(12)
     var view = x.into_view()
     var reshaped = view.reshape(3, 4)
-    print("View is contiguous: ", view.is_contiguous())
 
     reshaped.fill(77.0, i(1), i(2))  # [1, 2] in reshaped view
 
-    # Should not modify x at flat index 1*4 + 2 = 6, reshape is allocated
-    assert_true(x[6] == 6.0)
+    # Should modify x at flat index 1*4 + 2 = 6, reshape is shared
+    assert_true(x[6] == 77.0)
     assert_true(x[5] == 5.0)
     assert_true(x[7] == 7.0)
 
 
 def test_fill_scalar_on_strided_view() raises:
     """Test filling on non-contiguous view."""
-    print("test_fill_scalar_on_strided_view")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(10)
@@ -350,7 +329,6 @@ def test_fill_scalar_on_strided_view() raises:
 
 def test_fill_tensor_exact_shape() raises:
     """Test filling with tensor of exact shape."""
-    print("test_fill_tensor_exact_shape")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4)
@@ -365,7 +343,6 @@ def test_fill_tensor_exact_shape() raises:
 
 def test_fill_tensor_broadcast_1d_to_2d() raises:
     """Test broadcasting 1D tensor to 2D (row broadcast)."""
-    print("test_fill_tensor_broadcast_1d_to_2d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4)
@@ -382,7 +359,6 @@ def test_fill_tensor_broadcast_1d_to_2d() raises:
 
 def test_fill_tensor_broadcast_column() raises:
     """Test broadcasting (3, 1) to (3, 4)."""
-    print("test_fill_tensor_broadcast_column")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4)
@@ -399,7 +375,6 @@ def test_fill_tensor_broadcast_column() raises:
 
 def test_fill_tensor_broadcast_to_slice() raises:
     """Test broadcasting tensor to a slice."""
-    print("test_fill_tensor_broadcast_to_slice")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(5, 6)
@@ -416,7 +391,6 @@ def test_fill_tensor_broadcast_to_slice() raises:
 
 def test_fill_tensor_broadcast_scalar() raises:
     """Test broadcasting scalar-like (1,) tensor."""
-    print("test_fill_tensor_broadcast_scalar")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4)
@@ -431,7 +405,6 @@ def test_fill_tensor_broadcast_scalar() raises:
 
 def test_fill_tensor_broadcast_strided() raises:
     """Test broadcasting to strided slice."""
-    print("test_fill_tensor_broadcast_strided")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(4, 6)
@@ -454,7 +427,6 @@ def test_fill_tensor_broadcast_strided() raises:
 
 def test_fill_tensor_to_view() raises:
     """Test filling tensor into a view."""
-    print("test_fill_tensor_to_view")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(20)
@@ -472,7 +444,6 @@ def test_fill_tensor_to_view() raises:
 
 def test_fill_tensor_reshaped_view() raises:
     """Test filling into reshaped view."""
-    print("test_fill_tensor_reshaped_view")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(12)
@@ -496,7 +467,6 @@ def test_fill_tensor_reshaped_view() raises:
 
 def test_fill_scalar_0d_tensor() raises:
     """Test filling 0D (scalar) tensor."""
-    print("test_fill_scalar_0d_tensor")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].scalar(0.0)
@@ -508,7 +478,6 @@ def test_fill_scalar_0d_tensor() raises:
 
 def test_fill_tensor_partial_fill() raises:
     """Test filling only part of tensor."""
-    print("test_fill_tensor_partial_fill")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(5, 5)
@@ -525,7 +494,6 @@ def test_fill_tensor_partial_fill() raises:
 
 def test_fill_contiguous_optimization() raises:
     """Test that contiguous fills are optimized."""
-    print("test_fill_contiguous_optimization")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(100)
@@ -545,7 +513,6 @@ def test_fill_contiguous_optimization() raises:
 
 def test_fill_complex_indexing_scenario() raises:
     """Test complex real-world indexing scenario."""
-    print("test_fill_complex_indexing_scenario")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(10, 10)
@@ -561,7 +528,6 @@ def test_fill_complex_indexing_scenario() raises:
 
 def test_fill_image_patch_simulation() raises:
     """Test filling patches like in image processing."""
-    print("test_fill_image_patch_simulation")
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].zeros(8, 8)
@@ -583,83 +549,4 @@ def test_fill_image_patch_simulation() raises:
 
 
 def main() raises:
-    _ = """
-    print("=" * 80)
-    print("TENSOR FILL COMPREHENSIVE TEST SUITE")
-    print("=" * 80)
-
-    print("\n--- SCALAR FILL: Integer Indexing ---")
-    test_fill_scalar_single_index_1d()
-    test_fill_scalar_single_index_2d()
-    test_fill_scalar_negative_index()
-    test_fill_scalar_3d_index()
-
-    print("\n--- SCALAR FILL: Slice Indexing ---")
-    test_fill_scalar_full_slice_1d()
-    test_fill_scalar_partial_slice_1d()
-    test_fill_scalar_slice_with_step_1d()
-    test_fill_scalar_2d_slice_row()
-    test_fill_scalar_2d_slice_col()
-    test_fill_scalar_2d_submatrix()
-    test_fill_scalar_strided_2d()
-
-    print("\n--- SCALAR FILL: Array Indexing ---")
-    test_fill_scalar_array_index_1d()
-    test_fill_scalar_array_index_2d()
-    test_fill_scalar_empty_array()
-    test_fill_scalar_single_element_array()
-
-    print("\n--- SCALAR FILL: Mixed Indexing ---")
-    test_fill_scalar_mixed_int_slice()
-    test_fill_scalar_mixed_array_slice()
-
-    print("\n--- SCALAR FILL: On Views ---")
-    test_fill_scalar_on_view_slice()
-    test_fill_scalar_on_view_reshape()
-    test_fill_scalar_on_strided_view()
-
-    print("\n--- TENSOR FILL: Broadcasting ---")
-    test_fill_tensor_exact_shape()
-    test_fill_tensor_broadcast_1d_to_2d()
-    test_fill_tensor_broadcast_column()
-    test_fill_tensor_broadcast_to_slice()
-    test_fill_tensor_broadcast_scalar()
-    test_fill_tensor_broadcast_strided()
-
-    print("\n--- TENSOR FILL: Views ---")
-    test_fill_tensor_to_view()
-    test_fill_tensor_reshaped_view()
-
-    print("\n--- EDGE CASES ---")
-    test_fill_scalar_0d_tensor()
-    test_fill_tensor_partial_fill()
-    test_fill_contiguous_optimization()
-
-    print("\n--- INTEGRATION TESTS ---")
-    test_fill_complex_indexing_scenario()
-    test_fill_image_patch_simulation()
-
-    print("\n" + "=" * 80)
-    print("ALL FILL TESTS PASSED! ✓")
-    print("=" * 80)
-    print("\nTotal tests run: 35")
-    print("  - Scalar fill (integer): 4 tests")
-    print("  - Scalar fill (slice): 7 tests")
-    print("  - Scalar fill (array): 4 tests")
-    print("  - Scalar fill (mixed): 2 tests")
-    print("  - Scalar fill (views): 3 tests")
-    print("  - Tensor fill (broadcast): 6 tests")
-    print("  - Tensor fill (views): 2 tests")
-    print("  - Edge cases: 3 tests")
-    print("  - Integration: 2 tests")
-    print("\n" + "=" * 80)
-    print("USAGE PATTERNS VALIDATED:")
-    print("✓ x.fill(scalar, i(idx)) - single element")
-    print("✓ x.fill(scalar, s()) - full slice")
-    print("✓ x.fill(scalar, s(start, end)) - partial slice")
-    print("✓ x.fill(scalar, il(indices)) - fancy indexing")
-    print("✓ x.fill(tensor, s(), s()) - broadcasting")
-    print("✓ Works on views and reshaped tensors")
-    print("=" * 80)
-    """
     TestSuite.discover_tests[__functions_in_module()]().run()

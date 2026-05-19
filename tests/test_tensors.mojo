@@ -50,7 +50,6 @@ def test_reshape_slice_sum_backward() raises:
 
 
 def test_shared_tensor_twice() raises:
-
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
 
@@ -69,7 +68,6 @@ def test_shared_tensor_twice() raises:
 
 
 def test_broadcast_and_reuse() raises:
-
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0], [2.0], [3.0]], requires_grad=True
@@ -91,7 +89,6 @@ def test_broadcast_and_reuse() raises:
 
 
 def test_branching_square_add() raises:
-
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([2.0], requires_grad=True)
 
@@ -106,7 +103,6 @@ def test_branching_square_add() raises:
 
 
 def test_merge_of_dependent_branches() raises:
-
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0], requires_grad=True)
 
@@ -123,7 +119,6 @@ def test_merge_of_dependent_branches() raises:
 
 
 def test_square_and_identity_path() raises:
-
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([3.0], requires_grad=True)
 
@@ -483,7 +478,6 @@ def test_unsqueeze() raises:
 
 
 def test_tensor_mean() raises:
-
     comptime dtype = DType.float32
     a = Tensor[dtype].scalar(5.0, requires_grad=True)
     m = a.mean()
@@ -1645,7 +1639,6 @@ def test_sum() raises:
 
 
 def test_broadcast_add_2_tensors() raises:
-
     comptime dtype = DType.float32
     tensor1 = Tensor[dtype].d1([1, 2, 3, 4], requires_grad=True)
     tensor2 = Tensor[dtype].d1([6], requires_grad=True)
@@ -1800,7 +1793,6 @@ def test_broadcast_add_2_tensors() raises:
 
 
 def test_add_2_tensors() raises:
-
     comptime dtype = DType.float32
     tensor_a = Tensor[dtype].rand([128, 128], requires_grad=True)
     tensor_b = Tensor[dtype].rand([128, 128], requires_grad=True)
@@ -2813,7 +2805,6 @@ def test_tensor_scalar_add_mul_pow() raises:
 
 
 def test_slice_grad() raises:
-
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1, 2, 3, 4], requires_grad=True)
     var b = a[1:3]  # [2,3]
@@ -3713,7 +3704,6 @@ def test_vector_matrix_mm_backward_batched_matrix_matrix_grad() raises:
 
 
 def test_max_min_mixed() raises:
-
     comptime dtype = DType.float32
     # Test 1: Basic max reduction along axis 1
     var a = Tensor[dtype].d2(
@@ -4633,7 +4623,6 @@ def test_flatten_gradient_correctness_strided_view() raises:
 
 
 def test_flatten_gradient_correctness() raises:
-
     comptime dtype = DType.float32
     var a = (
         Tensor[dtype]
@@ -4818,7 +4807,6 @@ def test_complex_mixed_ops_backward() raises:
 
 
 def test_view_chain_with_hidden_elements() raises:
-
     comptime dtype = DType.float32
     var l: List[List[Scalar[DType.float32]]] = [
         [1, 2, 3, 4, 5, 6],

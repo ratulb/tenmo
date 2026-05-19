@@ -20,37 +20,46 @@ def test_relu_basic() raises:
     assert_true(t.grad() == Tensor[dtype].d1([0.0, 0.0, 1.0, 1.0]))
     print("✓ Passed ReLU forward and backward")
 
+
 def test_relu_multidim() raises:
     print("test_relu_multidim")
     comptime dtype = DType.float32
 
     # 2×3 input tensor
-    var t = Tensor[dtype].d2([
-        [-1.0, 2.0, 0.0],
-        [3.0, -4.0, 5.0],
-    ])
+    var t = Tensor[dtype].d2(
+        [
+            [-1.0, 2.0, 0.0],
+            [3.0, -4.0, 5.0],
+        ]
+    )
     t.requires_grad_(True)
 
     # Apply ReLU
     var out = t.relu()
-    assert_true(out == Tensor[dtype].d2([
-        [0.0, 2.0, 0.0],
-        [3.0, 0.0, 5.0],
-    ]))
+    assert_true(
+        out
+        == Tensor[dtype].d2(
+            [
+                [0.0, 2.0, 0.0],
+                [3.0, 0.0, 5.0],
+            ]
+        )
+    )
 
     # Backward on sum of outputs
     s = out.sum()
     s.backward()
 
     # Gradient should be 1 where input > 0, else 0
-    var expected_grad = Tensor[dtype].d2([
-        [0.0, 1.0, 0.0],
-        [1.0, 0.0, 1.0],
-    ])
+    var expected_grad = Tensor[dtype].d2(
+        [
+            [0.0, 1.0, 0.0],
+            [1.0, 0.0, 1.0],
+        ]
+    )
     assert_true(t.grad() == expected_grad)
 
     print("✓ Passed ReLU multidimensional forward/backward test")
-
 
 
 # =============================================================================
@@ -71,6 +80,7 @@ def test_relu_multidim() raises:
 # =============================================================================
 # ── SECTION 1: CPU FORWARD ───────────────────────────────────────────────────
 # =============================================================================
+
 
 def test_rlv_cpu_fwd_all_positive() raises:
     print("test_rlv_cpu_fwd_all_positive")
@@ -147,6 +157,7 @@ def test_rlv_cpu_fwd_dtype_float64() raises:
 # =============================================================================
 # ── SECTION 2: CPU BACKWARD (mask correctness) ───────────────────────────────
 # =============================================================================
+
 
 def test_rlv_cpu_bwd_all_positive() raises:
     print("test_rlv_cpu_bwd_all_positive")
@@ -225,7 +236,9 @@ def test_rlv_cpu_bwd_4d() raises:
 def test_rlv_cpu_bwd_grad_shape_preserved() raises:
     print("test_rlv_cpu_bwd_grad_shape_preserved")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([[1.0, -1.0, 2.0], [-2.0, 3.0, -3.0]], requires_grad=True)
+    var a = Tensor[dtype].d2(
+        [[1.0, -1.0, 2.0], [-2.0, 3.0, -3.0]], requires_grad=True
+    )
     var out = a.relu()
     var loss = out.sum()
     loss.backward()
@@ -235,6 +248,7 @@ def test_rlv_cpu_bwd_grad_shape_preserved() raises:
 # =============================================================================
 # ── SECTION 3: CPU GRAD FLOW ─────────────────────────────────────────────────
 # =============================================================================
+
 
 def test_rlv_cpu_grad_chain_relu_mul() raises:
     print("test_rlv_cpu_grad_chain_relu_mul")
@@ -311,18 +325,19 @@ def test_rlv_cpu_grad_large_tensor() raises:
 # ── SECTION 4: CPU NON-CONTIGUOUS ────────────────────────────────────────────
 # =============================================================================
 
+
 def test_rlv_cpu_noncontig_transposed() raises:
     print("test_rlv_cpu_noncontig_transposed")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[-1.0, 2.0], [3.0, -4.0]], requires_grad=True)
-    var t = a.transpose()           # non-contiguous view
+    var t = a.transpose()  # non-contiguous view
     var out = t.relu()
     var loss = out.sum()
     loss.backward()
     # transpose relu forward: max(0, [[−1,3],[2,−4]]) = [[0,3],[2,0]]
-    assert_true(out.contiguous().all_close(
-        Tensor[dtype].d2([[0.0, 3.0], [2.0, 0.0]])
-    ))
+    assert_true(
+        out.contiguous().all_close(Tensor[dtype].d2([[0.0, 3.0], [2.0, 0.0]]))
+    )
 
 
 def test_rlv_cpu_noncontig_slice_bwd() raises:
@@ -341,6 +356,7 @@ def test_rlv_cpu_noncontig_slice_bwd() raises:
 # =============================================================================
 # ── SECTION 5: GPU FORWARD ───────────────────────────────────────────────────
 # =============================================================================
+
 
 def test_rlv_gpu_fwd_all_positive() raises:
     comptime if has_accelerator():
@@ -366,7 +382,9 @@ def test_rlv_gpu_fwd_mixed() raises:
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([-3.0, 0.0, 2.0, -1.0, 5.0]).to_gpu()
         var out = a.relu()
-        assert_true(out.to_cpu().all_close(Tensor[dtype].d1([0.0, 0.0, 2.0, 0.0, 5.0])))
+        assert_true(
+            out.to_cpu().all_close(Tensor[dtype].d1([0.0, 0.0, 2.0, 0.0, 5.0]))
+        )
 
 
 def test_rlv_gpu_fwd_2d() raises:
@@ -375,7 +393,9 @@ def test_rlv_gpu_fwd_2d() raises:
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[-1.0, 2.0], [3.0, -4.0]]).to_gpu()
         var out = a.relu()
-        assert_true(out.to_cpu().all_close(Tensor[dtype].d2([[0.0, 2.0], [3.0, 0.0]])))
+        assert_true(
+            out.to_cpu().all_close(Tensor[dtype].d2([[0.0, 2.0], [3.0, 0.0]]))
+        )
 
 
 def test_rlv_gpu_fwd_3d() raises:
@@ -393,7 +413,9 @@ def test_rlv_gpu_fwd_4d() raises:
         comptime dtype = DType.float32
         var a = Tensor[dtype].full([2, 2, 2, 2], 3.0).to_gpu()
         var out = a.relu()
-        assert_true(out.to_cpu().all_close(Tensor[dtype].full([2, 2, 2, 2], 3.0)))
+        assert_true(
+            out.to_cpu().all_close(Tensor[dtype].full([2, 2, 2, 2], 3.0))
+        )
 
 
 def test_rlv_gpu_fwd_large() raises:
@@ -418,6 +440,7 @@ def test_rlv_gpu_fwd_dtype_float64() raises:
 # =============================================================================
 # ── SECTION 6: GPU BACKWARD (mask stays on device) ───────────────────────────
 # =============================================================================
+
 
 def test_rlv_gpu_bwd_all_positive() raises:
     comptime if has_accelerator():
@@ -452,7 +475,9 @@ def test_rlv_gpu_bwd_mixed() raises:
         var out = a.relu()
         var loss = out.sum()
         loss.backward()
-        assert_true(a_cpu.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 0.0, 1.0])))
+        assert_true(
+            a_cpu.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 0.0, 1.0]))
+        )
 
 
 def test_rlv_gpu_bwd_zero_boundary() raises:
@@ -471,12 +496,16 @@ def test_rlv_gpu_bwd_2d() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_bwd_2d")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].d2([[-1.0, 2.0], [3.0, -4.0]], requires_grad=True)
+        var a_cpu = Tensor[dtype].d2(
+            [[-1.0, 2.0], [3.0, -4.0]], requires_grad=True
+        )
         var a = a_cpu.to_gpu()
         var out = a.relu()
         var loss = out.sum()
         loss.backward()
-        assert_true(a_cpu.grad().all_close(Tensor[dtype].d2([[0.0, 1.0], [1.0, 0.0]])))
+        assert_true(
+            a_cpu.grad().all_close(Tensor[dtype].d2([[0.0, 1.0], [1.0, 0.0]]))
+        )
 
 
 def test_rlv_gpu_bwd_3d() raises:
@@ -508,7 +537,9 @@ def test_rlv_gpu_bwd_grad_shape_preserved() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_bwd_grad_shape_preserved")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].d2([[1.0, -1.0, 2.0], [-2.0, 3.0, -3.0]], requires_grad=True)
+        var a_cpu = Tensor[dtype].d2(
+            [[1.0, -1.0, 2.0], [-2.0, 3.0, -3.0]], requires_grad=True
+        )
         var a = a_cpu.to_gpu()
         var out = a.relu()
         var loss = out.sum()
@@ -519,6 +550,7 @@ def test_rlv_gpu_bwd_grad_shape_preserved() raises:
 # =============================================================================
 # ── SECTION 7: GPU GRAD FLOW ─────────────────────────────────────────────────
 # =============================================================================
+
 
 def test_rlv_gpu_grad_chain_relu_mul() raises:
     comptime if has_accelerator():
@@ -579,23 +611,26 @@ def test_rlv_gpu_grad_scalar_chain() raises:
 # (exercises contiguous_device_state() single-sweep path)
 # =============================================================================
 
+
 def test_rlv_gpu_noncontig_transposed_fwd() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_noncontig_transposed_fwd")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[-1.0, 2.0], [3.0, -4.0]]).to_gpu()
-        var t = a.transpose()       # non-contiguous on GPU
+        var t = a.transpose()  # non-contiguous on GPU
         var out = t.relu()
-        assert_true(out.to_cpu().all_close(
-            Tensor[dtype].d2([[0.0, 3.0], [2.0, 0.0]])
-        ))
+        assert_true(
+            out.to_cpu().all_close(Tensor[dtype].d2([[0.0, 3.0], [2.0, 0.0]]))
+        )
 
 
 def test_rlv_gpu_noncontig_transposed_bwd() raises:
     comptime if has_accelerator():
         print("test_rlv_gpu_noncontig_transposed_bwd")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].d2([[-1.0, 2.0], [3.0, -4.0]], requires_grad=True)
+        var a_cpu = Tensor[dtype].d2(
+            [[-1.0, 2.0], [3.0, -4.0]], requires_grad=True
+        )
         var a = a_cpu.to_gpu()
         var t = a.transpose()
         var out = t.relu()
@@ -626,6 +661,7 @@ def test_rlv_gpu_noncontig_single_map_to_host() raises:
 # ── SECTION 9: CPU / GPU PARITY ──────────────────────────────────────────────
 # =============================================================================
 
+
 def test_rlv_parity_fwd_1d() raises:
     comptime if has_accelerator():
         print("test_rlv_parity_fwd_1d")
@@ -651,13 +687,17 @@ def test_rlv_parity_bwd_2d() raises:
         print("test_rlv_parity_bwd_2d")
         comptime dtype = DType.float32
 
-        var a_cpu = Tensor[dtype].d2([[-1.0, 2.0], [3.0, -4.0]], requires_grad=True)
+        var a_cpu = Tensor[dtype].d2(
+            [[-1.0, 2.0], [3.0, -4.0]], requires_grad=True
+        )
         var out_cpu = a_cpu.relu()
         var loss_cpu = out_cpu.sum()
         loss_cpu.backward()
         var cpu_grad = a_cpu.grad()
 
-        var a_cpu2 = Tensor[dtype].d2([[-1.0, 2.0], [3.0, -4.0]], requires_grad=True)
+        var a_cpu2 = Tensor[dtype].d2(
+            [[-1.0, 2.0], [3.0, -4.0]], requires_grad=True
+        )
         var a_gpu = a_cpu2.to_gpu()
         var out_gpu = a_gpu.relu()
         var loss_gpu = out_gpu.sum()
@@ -670,6 +710,7 @@ def test_rlv_parity_bwd_2d() raises:
 # =============================================================================
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 # =============================================================================
+
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

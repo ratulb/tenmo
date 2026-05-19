@@ -11,7 +11,8 @@ struct ContiguousBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         ref parent_shape = parent.shape()
@@ -33,9 +34,9 @@ struct ContiguousBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             for coord in parent_shape:
                 parent_gradbox[coord] = gradbox[coord]
 
-        return [
-            (parent, parent_gradbox^, AddTensor),
-        ]
+        parent.update_grad(parent_gradbox^, AddTensor, None)
+
+        parent_ids.append(parent._id)
 
 
 struct Contiguous[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -60,4 +61,3 @@ struct Contiguous[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^
-

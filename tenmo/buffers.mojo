@@ -714,7 +714,10 @@ struct Buffer[dtype: DType = DType.float32](
                     * (One[Self.dtype].value() - self_block)
                 )
             elif op_code == SQRT_BACKWARD:
-                op_result = other_block * (One[Self.dtype].value() / (epsilon + Scalar[Self.dtype](2) * sqrt(self_block)))
+                op_result = other_block * (
+                    One[Self.dtype].value()
+                    / (epsilon + Scalar[Self.dtype](2) * sqrt(self_block))
+                )
             else:  # Tanh backward
                 # fused tanh backward pass.
                 # self = tanh output (already computed in forward).
@@ -750,7 +753,13 @@ struct Buffer[dtype: DType = DType.float32](
                     * (One[Self.dtype].value() - self[self_start + i])
                 )
             elif op_code == SQRT_BACKWARD:
-                out[i] = other[other_start + i] * (One[Self.dtype].value() / (epsilon + Scalar[Self.dtype](2) * sqrt(self[self_start + i])))
+                out[i] = other[other_start + i] * (
+                    One[Self.dtype].value()
+                    / (
+                        epsilon
+                        + Scalar[Self.dtype](2) * sqrt(self[self_start + i])
+                    )
+                )
 
             else:  # Tanh backward
                 out[i] = other[other_start + i] * (

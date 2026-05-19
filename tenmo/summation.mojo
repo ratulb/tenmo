@@ -13,7 +13,8 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
         var (axes, keepdims) = bwd_arg.axes, bwd_arg.keepdims
         ref gradbox = output.gradients()[]
@@ -27,9 +28,7 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 shape, gradbox.item(), share=False, device=gradbox.device()
             )
         else:
-            # Handle keepdims=False case (need to reshape gradient)
             if not keepdims:
-                # Determine axes/unsqueeze (insert dims of size 1)
                 axes = (
                     gradbox.shape()
                     .intarray()
@@ -39,20 +38,15 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     )
                 )
                 unsqueezed_shape = Shape(axes)
-
                 unsqueezed_grad = gradbox.reshape(unsqueezed_shape)
                 grad_contrib = unsqueezed_grad.broadcast_to(shape, share=False)
             else:
-                # keepdims=True: shapes match except for broadcasting
                 grad_contrib = gradbox.broadcast_to(shape, share=False)
 
-        return [
-            (
-                ancestor^,
-                grad_contrib^,
-                AddTensor,
-            )
-        ]
+        if ancestor.requires_grad:
+            ancestor.update_grad(grad_contrib^, AddTensor, None)
+
+        parent_ids.append(ancestor._id)
 
 
 @fieldwise_init

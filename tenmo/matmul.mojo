@@ -23,14 +23,11 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
-
-        var result = List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ]()
 
         # GRADIENT FOR A: dL/dA = grad_out × B^T
         if A.requires_grad:
@@ -40,7 +37,8 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
             var grad_A = Gradbox[Self.dtype](ndb^, share=False)
 
-            result.append((A, grad_A^, AddTensor))
+            A.update_grad(grad_A^, AddTensor, None)
+            parent_ids.append(A._id)
 
         # GRADIENT FOR B: dL/dB = A^T × grad_out
         if B.requires_grad:
@@ -49,9 +47,8 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var ndb = A_buffer_transposed.matmul_2d(grad_out.buffer)
             var grad_B = Gradbox[Self.dtype](ndb^, share=False)
 
-            result.append((B^, grad_B^, AddTensor))
-
-        return result^
+            B.update_grad(grad_B^, AddTensor, None)
+            parent_ids.append(B._id)
 
 
 @fieldwise_init
@@ -99,7 +96,8 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
@@ -108,9 +106,6 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         ref A_shape = A_buffer.shape
         ref B_shape = B_buffer.shape
-        var results = List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ]()
 
         if A.requires_grad:
             var B_transposed = B_buffer.transpose(axes=IntArray(-1, -2))
@@ -120,7 +115,8 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
             var final_grad_A = A_batch_grad^.sum_over_broadcasted_axes(A_shape)
 
-            results.append((A, final_grad_A^, AddTensor))
+            A.update_grad(final_grad_A^, AddTensor, None)
+            parent_ids.append(A._id)
 
         if B.requires_grad:
             var A_transposed = A_buffer.transpose(axes=IntArray(-1, -2))
@@ -130,8 +126,8 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             var final_grad_B = B_batch_grad^.sum_over_broadcasted_axes(B_shape)
 
-            results.append((B^, final_grad_B^, AddTensor))
-        return results^
+            B.update_grad(final_grad_B^, AddTensor, None)
+            parent_ids.append(B._id)
 
 
 @fieldwise_init
@@ -266,4 +262,3 @@ def classify_matmul(a: Shape, b: Shape) -> Int:
             return mm
         else:
             return invalid
-

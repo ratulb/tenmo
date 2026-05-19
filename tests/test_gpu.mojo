@@ -328,7 +328,6 @@ def test_v2_ndbuffer_mean_keepdims() raises:
 
 
 def test_v2_gpu_tensor_sum_1d() raises:
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1, 2, 3, 4, 5])
@@ -339,7 +338,6 @@ def test_v2_gpu_tensor_sum_1d() raises:
 
 
 def test_v2_gpu_tensor_sum_2d_axis0() raises:
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
@@ -350,7 +348,6 @@ def test_v2_gpu_tensor_sum_2d_axis0() raises:
 
 
 def test_v2_gpu_tensor_sum_2d_axis1() raises:
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
@@ -361,7 +358,6 @@ def test_v2_gpu_tensor_sum_2d_axis1() raises:
 
 
 def test_v2_gpu_tensor_sum_3d_axis1() raises:
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].arange(24)
@@ -373,7 +369,6 @@ def test_v2_gpu_tensor_sum_3d_axis1() raises:
 
 
 def test_v2_gpu_tensor_sum_3d_axes_0_2() raises:
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].arange(24)
@@ -385,7 +380,6 @@ def test_v2_gpu_tensor_sum_3d_axes_0_2() raises:
 
 
 def test_v2_gpu_tensor_sum_keepdims() raises:
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].arange(24)
@@ -397,7 +391,6 @@ def test_v2_gpu_tensor_sum_keepdims() raises:
 
 
 def test_v2_gpu_tensor_sum_all_axes() raises:
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].ones(2, 3, 4)
@@ -408,7 +401,6 @@ def test_v2_gpu_tensor_sum_all_axes() raises:
 
 
 def test_v2_gpu_tensor_mean_2d_axis0() raises:
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1, 2, 3], [3, 4, 5]])
@@ -419,7 +411,6 @@ def test_v2_gpu_tensor_mean_2d_axis0() raises:
 
 
 def test_v2_gpu_tensor_mean_2d_axis1() raises:
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
@@ -430,7 +421,6 @@ def test_v2_gpu_tensor_mean_2d_axis1() raises:
 
 
 def test_v2_gpu_tensor_mean_3d_axis1() raises:
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].arange(24)
@@ -442,7 +432,6 @@ def test_v2_gpu_tensor_mean_3d_axis1() raises:
 
 
 def test_v2_gpu_tensor_mean_keepdims() raises:
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].arange(24)
@@ -454,7 +443,6 @@ def test_v2_gpu_tensor_mean_keepdims() raises:
 
 
 def test_v2_gpu_tensor_mean_all_axes() raises:
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].arange(24)
@@ -471,7 +459,6 @@ def test_v2_gpu_tensor_mean_all_axes() raises:
 
 
 def test_v2_gpu_ndbuffer_sum_2d_axis1() raises:
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
@@ -484,7 +471,6 @@ def test_v2_gpu_ndbuffer_sum_2d_axis1() raises:
 
 
 def test_v2_gpu_ndbuffer_mean_2d_axis0() raises:
-
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1, 2, 3], [3, 4, 5]])
@@ -516,7 +502,6 @@ def test_cpu_grad_flow() raises:
     assert_true(A_grad.all_close(A_grad_expected))
 
 
-
 def test_gpu_grad_flow() raises:
     comptime if has_accelerator():
         var A = Tensor[dtype].arange(9 * 30, requires_grad=True)
@@ -541,7 +526,6 @@ def test_gpu_grad_flow() raises:
         A_grad_expected = A_grad_expected.reshape(Shape(9 * 30))
 
         assert_true(A_grad.all_close(A_grad_expected))
-
 
 
 def test_vmnd_1d_v_2d_M() raises:
@@ -809,6 +793,17 @@ def test_vmnd_known_values_no_batch() raises:
 
 def test_vmnd_known_values_batched() raises:
     """Hand-computed batched result verified against GPU."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        # batch 0: v=[1,0] @ M=[[1,2],[3,4]] = [1, 2]
+        # batch 1: v=[0,1] @ M=[[5,6],[7,8]] = [7, 8]
+        var v = Tensor[dtype].d2([[1, 0], [0, 1]])
+        var M = Tensor[dtype].d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
+        var expected = Tensor[dtype].d2([[1, 2], [7, 8]])
+        var v_gpu = v.to_gpu()
+        var M_gpu = M.to_gpu()
+        var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
+        assert_true(expected.to_gpu().all_close(gpu_result))
 
 
 def test_vmnd_known_values_broadcast() raises:
@@ -1611,9 +1606,7 @@ def test_backward_grad_A_fidelity() raises:
 
         var _tmp1 = AA.grad().to_gpu()
         var _tmp2 = _tmp1.reshape(Shape(9, 30))
-        assert_true(
-            _tmp2.all_close(A_gpu.grad() * 2)
-        )
+        assert_true(_tmp2.all_close(A_gpu.grad() * 2))
 
 
 def test_transposed_matmul_fidelity() raises:
@@ -1633,7 +1626,6 @@ def test_transposed_matmul_fidelity() raises:
         )
         var grad_A_GPU = Tensor[dtype](grad_A_ndb^)
         var grad_A_gpu = grad_A_GPU.to_cpu()
-
 
         assert_true(grad_A_cpu.all_close(grad_A_gpu))
 
@@ -1660,6 +1652,5 @@ def test_ancestry_transposed_matmul_fidelity() raises:
         )
         var grad_A_ANC = Tensor[dtype](grad_A_anc_ndb^)
         var grad_A_anc = grad_A_ANC.to_cpu()
-
 
         assert_true(grad_A_cpu.all_close(grad_A_anc))

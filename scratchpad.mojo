@@ -23,8 +23,21 @@ from std.collections import InlineArray
 
 comptime dtype = DType.float32
 
-
 def main() raises:
+    test_tile_scalar()
+
+def test_tile_scalar() raises:
+    print("test_tile_scalar")
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].scalar(2.0, requires_grad=True)
+    var y = x.tile(3, 2)
+    var loss = y.sum()
+    loss.backward()
+    assert_true(y.shape() == Shape(3, 2))
+    x.grad().print()
+    assert_true(x.grad().all_close(Tensor[dtype].scalar(6.0)))
+
+def main_130() raises:
     # Fixed size, stack allocated
     # Elements must be SAME type
     # Designed for uninitialized memory management

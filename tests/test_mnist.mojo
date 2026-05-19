@@ -39,15 +39,14 @@ def load_mnist_subset(
     test_images, test_labels = test_data[0], test_data[1]
     test_images_small = test_images[:num_test]
     test_labels_small = test_labels[:num_test]
-    
+
     train_images_small = train_images_small.astype(np.float32)
     test_images_small = test_images_small.astype(np.float32)
     train_images_small /= 255.0
     test_images_small /= 255.0
 
-    
     train_labels_small = train_labels_small.astype(np.int32)
-    test_labels_small  = test_labels_small.astype(np.int32)
+    test_labels_small = test_labels_small.astype(np.int32)
 
     # Convert to Mojo Tensor
     var train_x = from_ndarray[DType.float32](train_images_small, False)
@@ -80,8 +79,12 @@ def get_batches(
     while i < n:
         end = min(i + batch_size, n)
 
-        x_batch = xs.slice(i, end).contiguous[track_grad=False]()  # shape: (batch_size, 784)
-        y_batch = ys.slice(i, end).contiguous[track_grad=False]()  # shape: (batch_size,)
+        x_batch = xs.slice(i, end).contiguous[
+            track_grad=False
+        ]()  # shape: (batch_size, 784)
+        y_batch = ys.slice(i, end).contiguous[
+            track_grad=False
+        ]()  # shape: (batch_size,)
         batches.append((x_batch^, y_batch^))
         i += batch_size
 
@@ -93,7 +96,7 @@ def main() raises:
     num_test = 5
     batch_size = 64
     epochs = 25
-    lr=Scalar[DType.float32](0.001)
+    lr = Scalar[DType.float32](0.001)
 
     var (train_x, train_y, test_x, test_y) = load_mnist_subset(
         num_train, num_test
@@ -135,11 +138,13 @@ def main() raises:
             optimizer.step()
             optimizer.zero_grad()
 
-            epoch_loss += loss.item() * yb.shape[0] 
+            epoch_loss += loss.item() * yb.shape[0]
             var preds = logits.argmax(axis=1)
-            correct += (preds == yb).to_dtype[DType.int32]().sum().item().__int__()
+            correct += (
+                (preds == yb).to_dtype[DType.int32]().sum().item().__int__()
+            )
             total += yb.shape[0]
-            loss.free() 
+            loss.free()
             xb.free()
             yb.free()
         print(

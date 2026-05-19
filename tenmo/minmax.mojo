@@ -14,7 +14,8 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var bwd_arg = (
             output.ancestry().backward_fn_arg().get[MinMaxArg[Self.dtype]]()
         )
@@ -29,7 +30,9 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var mask_grad = Gradbox[Self.dtype](mask, share=False)
 
         if shape.rank() == 0:
-            return [(ancestor, mask_grad^, AddTensor)]
+            ancestor.update_grad(mask_grad^, AddTensor, None)
+            parent_ids.append(ancestor._id)
+            return
 
         var grad_expanded: Gradbox[Self.dtype]
         if gradbox.shape() == Shape():
@@ -44,7 +47,8 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
             grad_expanded = gradbox.broadcast_to(shape, share=False)
 
         var grad_contrib = grad_expanded * mask_grad
-        return [(ancestor, grad_contrib^, AddTensor)]
+        ancestor.update_grad(grad_contrib^, AddTensor, None)
+        parent_ids.append(ancestor._id)
 
 
 @fieldwise_init

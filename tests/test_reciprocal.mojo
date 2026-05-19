@@ -14,7 +14,9 @@ def test_recip_cpu_forward_1d() raises:
     var x = Tensor[dtype].d1([1.0, 2.0, 4.0, 8.0])
     var r = x.reciprocal[track_grad=False]()
     assert_true(r.shape() == Shape(4))
-    assert_true(r.all_close[atol=1e-6](Tensor[dtype].d1([1.0, 0.5, 0.25, 0.125])))
+    assert_true(
+        r.all_close[atol=1e-6](Tensor[dtype].d1([1.0, 0.5, 0.25, 0.125]))
+    )
 
 
 def test_recip_cpu_forward_2d() raises:
@@ -22,9 +24,9 @@ def test_recip_cpu_forward_2d() raises:
     var x = Tensor[dtype].d2([[1.0, 2.0], [4.0, 5.0]])
     var r = x.reciprocal[track_grad=False]()
     assert_true(r.shape() == Shape(2, 2))
-    assert_true(r.all_close[atol=1e-6](
-        Tensor[dtype].d2([[1.0, 0.5], [0.25, 0.2]])
-    ))
+    assert_true(
+        r.all_close[atol=1e-6](Tensor[dtype].d2([[1.0, 0.5], [0.25, 0.2]]))
+    )
 
 
 def test_recip_cpu_forward_3d() raises:
@@ -34,11 +36,13 @@ def test_recip_cpu_forward_3d() raises:
     )
     var r = x.reciprocal[track_grad=False]()
     assert_true(r.shape() == Shape(2, 2, 2))
-    assert_true(r.all_close[atol=1e-5](
-        Tensor[dtype].d3(
-            [[[1.0, 0.5], [0.25, 0.125]], [[2.0, 4.0], [0.1, 0.01]]]
+    assert_true(
+        r.all_close[atol=1e-5](
+            Tensor[dtype].d3(
+                [[[1.0, 0.5], [0.25, 0.125]], [[2.0, 4.0], [0.1, 0.01]]]
+            )
         )
-    ))
+    )
 
 
 def test_recip_cpu_forward_negative_values() raises:
@@ -76,9 +80,9 @@ def test_recip_cpu_backward_1d() raises:
     var loss = r.sum()
     loss.backward()
     assert_true(x.grad().shape() == Shape(3))
-    assert_true(x.grad().all_close[atol=1e-6](
-        Tensor[dtype].d1([-1.0, -0.25, -0.0625])
-    ))
+    assert_true(
+        x.grad().all_close[atol=1e-6](Tensor[dtype].d1([-1.0, -0.25, -0.0625]))
+    )
 
 
 def test_recip_cpu_backward_2d() raises:
@@ -89,9 +93,11 @@ def test_recip_cpu_backward_2d() raises:
     var loss = r.sum()
     loss.backward()
     assert_true(x.grad().shape() == Shape(2, 2))
-    assert_true(x.grad().all_close[atol=1e-6](
-        Tensor[dtype].d2([[-1.0, -0.25], [-0.0625, -0.015625]])
-    ))
+    assert_true(
+        x.grad().all_close[atol=1e-6](
+            Tensor[dtype].d2([[-1.0, -0.25], [-0.0625, -0.015625]])
+        )
+    )
 
 
 def test_recip_cpu_backward_3d() raises:
@@ -103,12 +109,16 @@ def test_recip_cpu_backward_3d() raises:
     var loss = r.sum()
     loss.backward()
     assert_true(x.grad().shape() == Shape(2, 2, 2))
-    assert_true(x.grad().all_close[atol=1e-6](
-        Tensor[dtype].d3(
-            [[[-1.0, -0.25], [-0.0625, -0.015625]],
-             [[-1.0, -0.25], [-0.0625, -0.015625]]]
+    assert_true(
+        x.grad().all_close[atol=1e-6](
+            Tensor[dtype].d3(
+                [
+                    [[-1.0, -0.25], [-0.0625, -0.015625]],
+                    [[-1.0, -0.25], [-0.0625, -0.015625]],
+                ]
+            )
         )
-    ))
+    )
 
 
 def test_recip_cpu_backward_seed() raises:
@@ -119,9 +129,9 @@ def test_recip_cpu_backward_seed() raises:
     var loss = r.sum()
     loss.backward(Scalar[dtype](3.0))
     # grad = 3 * (-1/x²) = 3 * [-0.25, -0.0625] = [-0.75, -0.1875]
-    assert_true(x.grad().all_close[atol=1e-6](
-        Tensor[dtype].d1([-0.75, -0.1875])
-    ))
+    assert_true(
+        x.grad().all_close[atol=1e-6](Tensor[dtype].d1([-0.75, -0.1875]))
+    )
 
 
 def test_recip_cpu_backward_negative() raises:
@@ -132,9 +142,9 @@ def test_recip_cpu_backward_negative() raises:
     var r = x.reciprocal[track_grad=True]()
     var loss = r.sum()
     loss.backward()
-    assert_true(x.grad().all_close[atol=1e-6](
-        Tensor[dtype].d1([-0.25, -0.0625])
-    ))
+    assert_true(
+        x.grad().all_close[atol=1e-6](Tensor[dtype].d1([-0.25, -0.0625]))
+    )
 
 
 def test_recip_cpu_backward_grad_accumulation() raises:
@@ -148,9 +158,7 @@ def test_recip_cpu_backward_grad_accumulation() raises:
     var loss2 = r2.sum()
     loss2.backward()
     # each backward adds -1/x² — total = 2 * [-0.25, -0.0625]
-    assert_true(x.grad().all_close[atol=1e-6](
-        Tensor[dtype].d1([-0.5, -0.125])
-    ))
+    assert_true(x.grad().all_close[atol=1e-6](Tensor[dtype].d1([-0.5, -0.125])))
 
 
 # =============================================================================
@@ -167,9 +175,9 @@ def test_recip_cpu_grad_flow_chain() raises:
     var loss = scaled.sum()
     loss.backward()
     # grad = 2 * (-1/x²) = [-2, -0.5, -0.125]
-    assert_true(x.grad().all_close[atol=1e-6](
-        Tensor[dtype].d1([-2.0, -0.5, -0.125])
-    ))
+    assert_true(
+        x.grad().all_close[atol=1e-6](Tensor[dtype].d1([-2.0, -0.5, -0.125]))
+    )
 
 
 def test_recip_cpu_grad_flow_double_reciprocal() raises:
@@ -193,10 +201,9 @@ def test_recip_cpu_grad_flow_with_multiply() raises:
     var product = x * r
     var loss = product.sum()
     loss.backward()
-    assert_true(x.grad().all_close[atol=1e-5](
-        Tensor[dtype].d1([0.0, 0.0, 0.0])
-    ))
-
+    assert_true(
+        x.grad().all_close[atol=1e-5](Tensor[dtype].d1([0.0, 0.0, 0.0]))
+    )
 
 
 def test_recip_cpu_grad_flow_sum_then_recip() raises:
@@ -209,9 +216,11 @@ def test_recip_cpu_grad_flow_sum_then_recip() raises:
     var loss = r.sum()
     loss.backward()
     # grad = -1/36 for each element
-    assert_true(x.grad().all_close[atol=1e-6](
-        Tensor[dtype].d1([-0.027778, -0.027778, -0.027778])
-    ))
+    assert_true(
+        x.grad().all_close[atol=1e-6](
+            Tensor[dtype].d1([-0.027778, -0.027778, -0.027778])
+        )
+    )
 
 
 def test_recip_cpu_consistency_with_divide() raises:
@@ -235,9 +244,11 @@ def test_recip_gpu_forward_1d() raises:
         var x_gpu = x.to_gpu()
         var r = x_gpu.reciprocal[track_grad=False]()
         assert_true(r.shape() == Shape(4))
-        assert_true(r.to_cpu().all_close[atol=1e-6](
-            Tensor[dtype].d1([1.0, 0.5, 0.25, 0.125])
-        ))
+        assert_true(
+            r.to_cpu().all_close[atol=1e-6](
+                Tensor[dtype].d1([1.0, 0.5, 0.25, 0.125])
+            )
+        )
 
 
 def test_recip_gpu_forward_2d() raises:
@@ -247,9 +258,11 @@ def test_recip_gpu_forward_2d() raises:
         var x_gpu = x.to_gpu()
         var r = x_gpu.reciprocal[track_grad=False]()
         assert_true(r.shape() == Shape(2, 2))
-        assert_true(r.to_cpu().all_close[atol=1e-6](
-            Tensor[dtype].d2([[1.0, 0.5], [0.25, 0.125]])
-        ))
+        assert_true(
+            r.to_cpu().all_close[atol=1e-6](
+                Tensor[dtype].d2([[1.0, 0.5], [0.25, 0.125]])
+            )
+        )
 
 
 def test_recip_gpu_backward_1d() raises:
@@ -261,9 +274,11 @@ def test_recip_gpu_backward_1d() raises:
         var loss = r.sum()
         loss.backward()
         assert_true(x.grad().shape() == Shape(3))
-        assert_true(x.grad().all_close[atol=1e-6](
-            Tensor[dtype].d1([-1.0, -0.25, -0.0625])
-        ))
+        assert_true(
+            x.grad().all_close[atol=1e-6](
+                Tensor[dtype].d1([-1.0, -0.25, -0.0625])
+            )
+        )
 
 
 def test_recip_gpu_backward_2d() raises:
@@ -275,9 +290,11 @@ def test_recip_gpu_backward_2d() raises:
         var loss = r.sum()
         loss.backward()
         assert_true(x.grad().shape() == Shape(2, 2))
-        assert_true(x.grad().all_close[atol=1e-6](
-            Tensor[dtype].d2([[-1.0, -0.25], [-0.0625, -0.015625]])
-        ))
+        assert_true(
+            x.grad().all_close[atol=1e-6](
+                Tensor[dtype].d2([[-1.0, -0.25], [-0.0625, -0.015625]])
+            )
+        )
 
 
 def test_recip_gpu_backward_3d() raises:
@@ -292,12 +309,16 @@ def test_recip_gpu_backward_3d() raises:
         var loss = r.sum()
         loss.backward()
         assert_true(x.grad().shape() == Shape(2, 2, 2))
-        assert_true(x.grad().all_close[atol=1e-6](
-            Tensor[dtype].d3(
-                [[[-1.0, -0.25], [-0.0625, -0.015625]],
-                 [[-1.0, -0.25], [-0.0625, -0.015625]]]
+        assert_true(
+            x.grad().all_close[atol=1e-6](
+                Tensor[dtype].d3(
+                    [
+                        [[-1.0, -0.25], [-0.0625, -0.015625]],
+                        [[-1.0, -0.25], [-0.0625, -0.015625]],
+                    ]
+                )
             )
-        ))
+        )
 
 
 def test_recip_gpu_grad_flow_chain() raises:
@@ -309,9 +330,11 @@ def test_recip_gpu_grad_flow_chain() raises:
         var scaled = r * Tensor[dtype].scalar(2.0).to_gpu()
         var loss = scaled.sum()
         loss.backward()
-        assert_true(x.grad().all_close[atol=1e-6](
-            Tensor[dtype].d1([-2.0, -0.5, -0.125])
-        ))
+        assert_true(
+            x.grad().all_close[atol=1e-6](
+                Tensor[dtype].d1([-2.0, -0.5, -0.125])
+            )
+        )
 
 
 def test_recip_gpu_grad_flow_double_reciprocal() raises:
@@ -332,9 +355,11 @@ def test_recip_gpu_vs_cpu_consistency() raises:
         var x_cpu = Tensor[dtype].d2(
             [[1.0, 2.0, 4.0], [0.5, 0.25, 8.0]], requires_grad=True
         )
-        var x_gpu = Tensor[dtype].d2(
-            [[1.0, 2.0, 4.0], [0.5, 0.25, 8.0]], requires_grad=True
-        ).to_gpu()
+        var x_gpu = (
+            Tensor[dtype]
+            .d2([[1.0, 2.0, 4.0], [0.5, 0.25, 8.0]], requires_grad=True)
+            .to_gpu()
+        )
         var r_cpu = x_cpu.reciprocal[track_grad=True]()
         var r_gpu = x_gpu.reciprocal[track_grad=True]()
         assert_true(r_cpu.all_close[atol=1e-6](r_gpu.to_cpu()))
@@ -351,14 +376,19 @@ def test_recip_gpu_negative_values() raises:
         var x = Tensor[dtype].d1([-1.0, -2.0, -4.0], requires_grad=True)
         var x_gpu = x.to_gpu()
         var r = x_gpu.reciprocal[track_grad=True]()
-        assert_true(r.to_cpu().all_close[atol=1e-6](
-            Tensor[dtype].d1([-1.0, -0.5, -0.25])
-        ))
+        assert_true(
+            r.to_cpu().all_close[atol=1e-6](
+                Tensor[dtype].d1([-1.0, -0.5, -0.25])
+            )
+        )
         var loss = r.sum()
         loss.backward()
-        assert_true(x.grad().all_close[atol=1e-6](
-            Tensor[dtype].d1([-1.0, -0.25, -0.0625])
-        ))
+        assert_true(
+            x.grad().all_close[atol=1e-6](
+                Tensor[dtype].d1([-1.0, -0.25, -0.0625])
+            )
+        )
+
 
 def test_recip_gpu_grad_accumulation() raises:
     comptime if has_accelerator():
@@ -374,12 +404,13 @@ def test_recip_gpu_grad_accumulation() raises:
         var loss2 = r2.sum()
         loss2.backward()
         # x1 and x2 each get one backward — same grad
-        assert_true(x1.grad().all_close[atol=1e-6](
-            Tensor[dtype].d1([-0.25, -0.0625])
-        ))
-        assert_true(x2.grad().all_close[atol=1e-6](
-            Tensor[dtype].d1([-0.25, -0.0625])
-        ))
+        assert_true(
+            x1.grad().all_close[atol=1e-6](Tensor[dtype].d1([-0.25, -0.0625]))
+        )
+        assert_true(
+            x2.grad().all_close[atol=1e-6](Tensor[dtype].d1([-0.25, -0.0625]))
+        )
+
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

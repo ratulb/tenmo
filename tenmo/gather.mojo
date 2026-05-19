@@ -350,10 +350,16 @@ def gather_gpu[
                 embedding_bag_kernel[datatype, True],
             ]()
             ctx.enqueue_function(
-                compiled, out_dev, in_dev,
-                tensor.shape[0], in_cols, tensor.strides[0],
-                idx_dev, n_indices,
-                grid_dim=1, block_dim=block_cols,
+                compiled,
+                out_dev,
+                in_dev,
+                tensor.shape[0],
+                in_cols,
+                tensor.strides[0],
+                idx_dev,
+                n_indices,
+                grid_dim=1,
+                block_dim=block_cols,
             )
         else:
             var compiled = ctx.compile_function[
@@ -361,10 +367,16 @@ def gather_gpu[
                 embedding_bag_kernel[datatype, False],
             ]()
             ctx.enqueue_function(
-                compiled, out_dev, in_dev,
-                tensor.shape[0], in_cols, tensor.strides[0],
-                idx_dev, n_indices,
-                grid_dim=1, block_dim=block_cols,
+                compiled,
+                out_dev,
+                in_dev,
+                tensor.shape[0],
+                in_cols,
+                tensor.strides[0],
+                idx_dev,
+                n_indices,
+                grid_dim=1,
+                block_dim=block_cols,
             )
         ctx.synchronize()
         var out_shape = Shape(in_cols)
@@ -558,7 +570,8 @@ struct GatherBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         """Scatter incoming gradient back to the gathered rows.
 
         Forward:  out[k]                = src[indices[k]]
@@ -577,30 +590,22 @@ struct GatherBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         padding_idx from there. GatherBackward scales by 1/n for MEAN,
         then signals the engine to use scatter-add semantics and clears
         its own gradbox via ZeroGrad.
-
-        Returns:
-            - (parent, incoming_grad, ScatterAddTensor): engine does scatter-add.
-            - (output, incoming_grad, ZeroGrad):         clears this node's grad.
         """
         var parent = output.ancestry().get(0)
         ref incoming_grad = output.gradbox[]
-        ref bwd_arg = (
-            output.ancestry()
-            .backward_fn_arg()
-            .get[GatherArg]()
-        )
+        ref bwd_arg = output.ancestry().backward_fn_arg().get[GatherArg]()
+
+        var extra_arg = output.ancestry().backward_fn_arg()
 
         if bwd_arg.reduction.is_mean():
             var n = Scalar[Self.dtype](len(bwd_arg.indices))
-            return [
-                (parent^, incoming_grad / n, ScatterAddTensor),
-                (output, incoming_grad, ZeroGrad),
-            ]
+            parent.update_grad(incoming_grad / n, ScatterAddTensor, extra_arg)
         else:
-            return [
-                (parent^, incoming_grad, ScatterAddTensor),
-                (output, incoming_grad, ZeroGrad),
-            ]
+            parent.update_grad(incoming_grad, ScatterAddTensor, extra_arg)
+
+        output.gradbox[].zero_grad()
+
+        parent_ids.append(parent._id)
 
 
 # =============================================================================
@@ -689,12 +694,20 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
             normalized.append(idx)
 
         # ── Copy / fused embedding-bag (CPU or GPU kernel) ────────────────────
-        var is_fast_path = (reduction.is_sum() or reduction.is_mean()) and ax == 0 and rank == 2
+        var is_fast_path = (
+            (reduction.is_sum() or reduction.is_mean())
+            and ax == 0
+            and rank == 2
+        )
 
         var out: Tensor[Self.dtype]
         comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
-            if grad_required and not is_fast_path and (reduction.is_sum() or reduction.is_mean()):
+            if (
+                grad_required
+                and not is_fast_path
+                and (reduction.is_sum() or reduction.is_mean())
+            ):
                 # General case with grad: standard gather, wire GatherBackward
                 # (NONE), then chain sum/mean so backward flows through both ops.
                 out = Self._gather_copy(
@@ -723,7 +736,9 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
                     out.add_ancestry(bfa^, self)
         else:
             out = Self._gather_copy(
-                self, ax=ax, normalized=normalized,
+                self,
+                ax=ax,
+                normalized=normalized,
                 reduction=reduction if is_fast_path else Reduction(2),
             )
             if not is_fast_path:
@@ -761,7 +776,11 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         var rank = shape.rank()
 
         # ── Fast path: rank==2, ax==0, SUM or MEAN ────────────────────────────
-        if (reduction.is_sum() or reduction.is_mean()) and ax == 0 and rank == 2:
+        if (
+            (reduction.is_sum() or reduction.is_mean())
+            and ax == 0
+            and rank == 2
+        ):
             comptime if has_accelerator():
                 if self.is_on_gpu():
                     try:
@@ -807,9 +826,7 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
 
         var out_shape_arr = IntArray.with_capacity(rank)
         for d in range(rank):
-            out_shape_arr.append(
-                len(normalized) if d == ax else shape[d]
-            )
+            out_shape_arr.append(len(normalized) if d == ax else shape[d])
 
         var gathered = Tensor[Self.dtype].zeros(
             Shape(out_shape_arr), requires_grad=False, device=self.device()

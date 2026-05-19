@@ -17,17 +17,16 @@ from .broadcast import Broadcast
 from .device import DeviceState
 from .ndbuffer import NDBuffer
 
+
 @fieldwise_init
 struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref gradbox = output.gradients()[]
         var scalar_grad_value = gradbox.item()  # Scalar
-        var grad_shares: List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ] = []
         var tensor_lhs_ref = output.ancestry().get(0)
         var tensor_rhs_ref = output.ancestry().get(1)
 
@@ -45,7 +44,8 @@ struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var gradbox_lhs = grad_tensor.as_gradbox(
                 share=False, contiguous=False
             )
-            grad_shares.append((tensor_lhs_ref, gradbox_lhs^, AddTensor))
+            tensor_lhs_ref.update_grad(gradbox_lhs^, AddTensor, None)
+            parent_ids.append(tensor_lhs_ref._id)
 
         if tensor_rhs.requires_grad:
             var grad_tensor = tensor_lhs.__mul__[track_grad=False](
@@ -54,10 +54,8 @@ struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var gradbox_rhs = grad_tensor.as_gradbox(
                 share=False, contiguous=False
             )
-
-            grad_shares.append((tensor_rhs_ref^, gradbox_rhs^, AddTensor))
-
-        return grad_shares^
+            tensor_rhs_ref.update_grad(gradbox_rhs^, AddTensor, None)
+            parent_ids.append(tensor_rhs_ref._id)
 
 
 @fieldwise_init
@@ -66,7 +64,6 @@ struct Dot[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def forward[
         track_grad: Bool = True
     ](lhs: Tensor[Self.dtype], rhs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
-
         # ── Broadcast scalar → vector if needed ──────────────────────────────
         # A scalar tensor (rank=0 or numels=1) is broadcast to match the other.
         # broadcast_to wires grad correctly so chain rule is preserved.
@@ -333,7 +330,8 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
             )
 
         device_context.synchronize()
-        var device_state = DeviceState[Self.dtype](result_buffer^, A_device_state.get_gpu())
+        var device_state = DeviceState[Self.dtype](
+            result_buffer^, A_device_state.get_gpu()
+        )
         var ndb = NDBuffer[Self.dtype].with_device_state(device_state^, Shape())
         return Tensor[Self.dtype](ndb^, requires_grad=False)
-

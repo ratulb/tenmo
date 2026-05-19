@@ -238,14 +238,12 @@ def test_maxmin_cpu_max_then_min_chained() raises:
     comptime dtype = DType.float32
     # clamp(x, 2.0, 6.0) = min(max(x, 2.0), 6.0)
     var a = Tensor[dtype].d1([1.0, 3.0, 5.0, 7.0, 9.0], requires_grad=True)
-    var b = a.max(2.0)   # clamp low
-    var c = b.min(6.0)   # clamp high
+    var b = a.max(2.0)  # clamp low
+    var c = b.min(6.0)  # clamp high
     var loss = c.sum()
     loss.backward()
     # Grad = 1.0 only where 2.0 < a < 6.0, i.e. a=3.0 and a=5.0
-    assert_true(
-        a.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 1.0, 0.0, 0.0]))
-    )
+    assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 1.0, 0.0, 0.0])))
 
 
 def test_maxmin_cpu_negated_grad_flow() raises:
@@ -481,9 +479,7 @@ def test_maxmin_gpu_max_then_min_chained() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         # clamp(x, 2.0, 6.0) = min(max(x, 2.0), 6.0)
-        var a = Tensor[dtype].d1(
-            [1.0, 3.0, 5.0, 7.0, 9.0], requires_grad=True
-        )
+        var a = Tensor[dtype].d1([1.0, 3.0, 5.0, 7.0, 9.0], requires_grad=True)
         var a_gpu = a.to_gpu()
         var b = a_gpu.max(2.0)
         var c = b.min(6.0)
@@ -557,5 +553,3 @@ def test_maxmin_gpu_parity_min() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-
-

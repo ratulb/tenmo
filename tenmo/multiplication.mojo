@@ -21,7 +21,8 @@ struct MultiplyBackwardScalar[dtype: DType](
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var factor = (
             output.ancestry()
             .backward_fn_arg()
@@ -31,13 +32,8 @@ struct MultiplyBackwardScalar[dtype: DType](
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         scaled_gradbox = gradbox * factor
-        return [
-            (
-                ancestor^,
-                scaled_gradbox^,
-                AddTensor,
-            )
-        ]
+        ancestor.update_grad(scaled_gradbox^, AddTensor, None)
+        parent_ids.append(ancestor._id)
 
 
 @fieldwise_init
@@ -45,7 +41,8 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref gradbox = output.gradients()[]
         count = len(output.ancestry())
         var ancestor_lhs = output.ancestry().get(0)
@@ -56,11 +53,9 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 * gradbox
             )
             gradbox_prod = gradbox_prod * Scalar[Self.dtype](2)
-            return [(ancestor_lhs^, gradbox_prod^, AddTensor)]
-
-        var grad_shares = List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ](capacity=2)
+            ancestor_lhs.update_grad(gradbox_prod^, AddTensor, None)
+            parent_ids.append(ancestor_lhs._id)
+            return
 
         var ancestor_rhs = output.ancestry().get(1)
 
@@ -68,28 +63,15 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var gradbox_prod = gradbox * Gradbox[Self.dtype](
                 ancestor_rhs.buffer(), share=False
             )
-
-            grad_shares.append(
-                (
-                    ancestor_lhs,
-                    gradbox_prod^,
-                    AddTensor,
-                )
-            )
+            ancestor_lhs.update_grad(gradbox_prod^, AddTensor, None)
+            parent_ids.append(ancestor_lhs._id)
 
         if ancestor_rhs.requires_grad:
             var gradbox_prod = gradbox * Gradbox[Self.dtype](
                 ancestor_lhs.buffer(), share=False
             )
-            grad_shares.append(
-                (
-                    ancestor_rhs^,
-                    gradbox_prod^,
-                    AddTensor,
-                )
-            )
-
-        return grad_shares^
+            ancestor_rhs.update_grad(gradbox_prod^, AddTensor, None)
+            parent_ids.append(ancestor_rhs._id)
 
 
 comptime MultiplyBroadcastBackward[dtype: DType] = BroadcastBackward[

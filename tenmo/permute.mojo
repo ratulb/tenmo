@@ -1,6 +1,6 @@
 from .tensor import Tensor
 from .backpropagation import BackwardFnArg, IntArrayArg, BACKWARD_PERMUTE
-from .mnemonics import AddTensor, ZeroGrad
+from .mnemonics import AddTensor
 from .intarray import IntArray
 from .shapes import Shape
 from .strides import Strides
@@ -15,7 +15,8 @@ struct PermuteBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         """
         Backward pass for permute.
         Apply inverse permutation to upstream gradients.
@@ -33,10 +34,10 @@ struct PermuteBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # Apply inverse permutation — GPU safe via NDBuffer.permute
         var parent_gradbox = gradbox.permute(inverted^)
-        return [
-            (parent^, parent_gradbox^, AddTensor),
-            (output, gradbox, ZeroGrad),
-        ]
+        if parent.requires_grad:
+            parent.update_grad(parent_gradbox^, AddTensor, None)
+        parent_ids.append(parent._id)
+        gradbox.zero_grad()
 
 
 @fieldwise_init

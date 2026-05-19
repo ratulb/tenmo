@@ -13,7 +13,8 @@ struct SqrtBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var epsilon = (
             output.ancestry()
             .backward_fn_arg()
@@ -22,12 +23,14 @@ struct SqrtBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         )
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
-        var parent_buffer = parent.buffer()
-        ref shape = parent.shape()
-        var ndb = parent.buffer().arithmetic_ops[SQRT_BACKWARD](gradbox.buffer, epsilon)
+        var ndb = parent.buffer().arithmetic_ops[SQRT_BACKWARD](
+            gradbox.buffer, epsilon
+        )
         var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
 
-        return [(parent^, gradbox_ancestor^, AddTensor)]
+        parent.update_grad(gradbox_ancestor^, AddTensor, None)
+
+        parent_ids.append(parent._id)
 
 
 @fieldwise_init

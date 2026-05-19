@@ -762,4 +762,3 @@ struct Validator:
             required_stride *= shape[dim]
 
         return True
-

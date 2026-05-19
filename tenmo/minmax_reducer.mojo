@@ -201,4 +201,3 @@ struct MinMaxReducer[dtype: DType](ImplicitlyCopyable):
                         mask[full_idx] = inv
 
         return mask^
-

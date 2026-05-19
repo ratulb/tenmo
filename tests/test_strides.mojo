@@ -144,7 +144,6 @@ def test_compute_default_strides() raises:
         "stride compute assertion 1 failed",
     )
 
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-
-

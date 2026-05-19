@@ -331,4 +331,3 @@ struct ReductionMinMax[dtype: DType = DType.float32](
                 break
         # total_output -> num_blocks
         return (block_size, total_output)
-

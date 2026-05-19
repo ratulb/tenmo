@@ -5,7 +5,8 @@ from std.testing import assert_true, TestSuite
 from tenmo.permute import Permute
 from std.sys import has_accelerator
 
-#Old tests
+# Old tests
+
 
 def test_tensor_permute_basic() raises:
     comptime dtype = DType.float32
@@ -159,7 +160,7 @@ def test_tensor_permute_grad_scaled_sum_3d() raises:
     print("Passed test_tensor_permute_grad_scaled_sum_3d")
 
 
-#End of old tests
+# End of old tests
 
 # ═════════════════════════════════════════════════════════════════════════════
 # CPU Forward Tests
@@ -184,9 +185,7 @@ def test_perm_cpu_2d_10() raises:
     var result = a.permute(IntArray(1, 0))
     assert_true(result.shape() == Shape(3, 2))
     assert_true(
-        result.all_close(
-            Tensor[dtype].d2([[1.0, 4.0], [2.0, 5.0], [3.0, 6.0]])
-        )
+        result.all_close(Tensor[dtype].d2([[1.0, 4.0], [2.0, 5.0], [3.0, 6.0]]))
     )
 
 
@@ -334,7 +333,9 @@ def test_perm_cpu_backward_2d_transpose() raises:
     print("test_perm_cpu_backward_2d_transpose")
     comptime dtype = DType.float32
     # Transpose backward — inverse of transpose is transpose
-    var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
     var result = a.permute(IntArray(1, 0))
     var loss = result.sum()
     loss.backward()
@@ -405,11 +406,7 @@ def test_perm_cpu_backward_gradient_values() raises:
     var loss = (result * weights).sum()
     loss.backward()
     # grad[i,j] = weights[j,i] (inverse permute of weights)
-    assert_true(
-        a.grad().all_close(
-            Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]])
-        )
-    )
+    assert_true(a.grad().all_close(Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]])))
 
 
 def test_perm_cpu_backward_multiple_uses() raises:
@@ -464,9 +461,11 @@ def test_perm_gpu_3d_021() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_3d_021")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d3(
-            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
-        ).to_gpu()
+        var a = (
+            Tensor[dtype]
+            .d3([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
+            .to_gpu()
+        )
         var result = a.permute(IntArray(0, 2, 1))
         assert_true(result.is_on_gpu())
         assert_true(result.shape() == Shape(2, 2, 2))
@@ -530,9 +529,11 @@ def test_perm_gpu_no_grad() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_no_grad")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2(
-            [[1.0, 2.0], [3.0, 4.0]], requires_grad=False
-        ).to_gpu()
+        var a = (
+            Tensor[dtype]
+            .d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
+            .to_gpu()
+        )
         var result = a.permute(IntArray(1, 0))
         assert_true(not result.requires_grad)
 
@@ -541,9 +542,11 @@ def test_perm_gpu_requires_grad_propagates() raises:
     comptime if has_accelerator():
         print("test_perm_gpu_requires_grad_propagates")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2(
-            [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
-        ).to_gpu()
+        var a = (
+            Tensor[dtype]
+            .d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+            .to_gpu()
+        )
         var result = a.permute(IntArray(1, 0))
         assert_true(result.requires_grad)
 
@@ -635,9 +638,7 @@ def test_perm_gpu_backward_gradient_values() raises:
         var loss = (result * weights).sum()
         loss.backward()
         assert_true(
-            a.grad().all_close(
-                Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]])
-            )
+            a.grad().all_close(Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]]))
         )
 
 
@@ -694,9 +695,11 @@ def test_perm_parity_backward_transpose() raises:
         var a_cpu = Tensor[dtype].d2(
             [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
         )
-        var a_gpu = Tensor[dtype].d2(
-            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
-        ).to_gpu()
+        var a_gpu = (
+            Tensor[dtype]
+            .d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+            .to_gpu()
+        )
 
         var loss_cpu = a_cpu.permute(IntArray(1, 0)).sum()
         loss_cpu.backward()
@@ -714,8 +717,8 @@ def test_perm_parity_backward_3d() raises:
         var _tmp0 = Tensor[dtype].arange(24)
         var a_cpu = _tmp0.reshape(Shape(2, 3, 4))
         a_cpu.requires_grad_(True)
-        var _tmp0 = Tensor[dtype].arange(24)
-        var _tmp1 = _tmp0.reshape(Shape(2, 3, 4))
+        var _tmp1 = Tensor[dtype].arange(24)
+        _tmp1 = _tmp1.reshape(Shape(2, 3, 4))
         var a_gpu = _tmp1.to_gpu()
         a_gpu.requires_grad_(True)
 
@@ -735,9 +738,11 @@ def test_perm_parity_backward_chain() raises:
         var a_cpu = Tensor[dtype].d2(
             [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
         )
-        var a_gpu = Tensor[dtype].d2(
-            [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
-        ).to_gpu()
+        var a_gpu = (
+            Tensor[dtype]
+            .d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+            .to_gpu()
+        )
 
         var loss_cpu = (a_cpu.permute(IntArray(1, 0)) * 3.0).sum()
         loss_cpu.backward()
@@ -777,5 +782,3 @@ def test_perm_parity_using_zero_grad() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-
-

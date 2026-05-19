@@ -3,6 +3,7 @@ from .tensor import Tensor
 
 struct MSELoss[dtype: DType = DType.float32]:
     """Mean Squared Error Loss."""
+
     def __init__(out self):
         pass
 

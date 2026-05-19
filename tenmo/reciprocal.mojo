@@ -18,7 +18,9 @@ struct Reciprocal[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
         # out = 1/x
-        var out_ndb = self.buffer.scalar_ops[ReverseDivide](Scalar[Self.dtype](1))
+        var out_ndb = self.buffer.scalar_ops[ReverseDivide](
+            Scalar[Self.dtype](1)
+        )
         var out = Tensor[Self.dtype](out_ndb^, requires_grad=False)
 
         comptime if track_grad:

@@ -15,13 +15,16 @@ struct ExpandBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         parent_shape = ancestor.shape()
         gradbox_contracted = gradbox.sum_over_broadcasted_axes(parent_shape)
 
-        return [(ancestor, gradbox_contracted^, AddTensor)]
+        ancestor.update_grad(gradbox_contracted^, AddTensor, None)
+
+        parent_ids.append(ancestor._id)
 
 
 @fieldwise_init

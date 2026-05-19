@@ -1,5 +1,5 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor, ZeroGrad
+from .mnemonics import AddTensor
 from .intarray import IntArray
 from .backpropagation import BackwardFnArg, BACKWARD_SQUEEZE
 from .gradbox import Gradbox
@@ -13,9 +13,10 @@ struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref ancestor = output.ancestry().get(0)
-        var gradbox = output.gradients()[]
+        ref gradbox = output.gradients()[]
         var ancestor_gradbox: Gradbox[Self.dtype]
         var original_shape = ancestor.shape()
         if gradbox.shape() == Shape():
@@ -27,14 +28,10 @@ struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
         else:
             ancestor_gradbox = gradbox.reshape(original_shape)
-        return [
-            (ancestor, ancestor_gradbox^, AddTensor),
-            (
-                output,
-                gradbox^,
-                ZeroGrad,
-            ),  # Send out a signal to this output of squeeze op to zero out its grad(No accumulation of grad for view)
-        ]
+        if ancestor.requires_grad:
+            ancestor.update_grad(ancestor_gradbox^, AddTensor, None)
+        parent_ids.append(ancestor._id)
+        gradbox.zero_grad()
 
 
 @fieldwise_init

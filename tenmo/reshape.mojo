@@ -1,5 +1,5 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor, ZeroGrad
+from .mnemonics import AddTensor
 from .backpropagation import BackwardFnArg, BACKWARD_RESHAPE
 from .shapes import Shape
 from .validators import Validator
@@ -14,14 +14,15 @@ struct ReshapeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         var reshaped = gradbox.reshape(ancestor.buffer().shape)
-        return [
-            (ancestor^, reshaped^, AddTensor),
-            (output, gradbox, ZeroGrad),
-        ]
+        if ancestor.requires_grad:
+            ancestor.update_grad(reshaped^, AddTensor, None)
+        parent_ids.append(ancestor._id)
+        gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -55,6 +56,7 @@ struct Reshape[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             ndb = tensor.buffer.share(shape, strides, offset=0)
         else:
             ndb = tensor.buffer.contiguous(shape)
+
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         comptime if track_grad:

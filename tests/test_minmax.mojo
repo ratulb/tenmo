@@ -184,9 +184,7 @@ def test_mmrev_cpu_max_3d_axis0_forward() raises:
     # For each (j,k): max over i in {0,1} → second batch wins (values 12..23)
     var _tmp1 = Tensor[dtype].arange(12.0, 24.0)
     var _tmp2 = _tmp1.reshape(Shape(3, 4))
-    assert_true(
-        m.all_close(_tmp2)
-    )
+    assert_true(m.all_close(_tmp2))
 
 
 def test_mmrev_cpu_max_3d_axis0_backward() raises:
@@ -523,6 +521,7 @@ def test_mmrev_gpu_max_2d_axis1_keepdims_forward() raises:
         assert_true(m.shape() == Shape(2, 1))
         assert_true(m.to_cpu().all_close(Tensor[dtype].d2([[5.0], [6.0]])))
 
+
 def test_mmrev_gpu_max_2d_axis0_backward() raises:
     comptime if has_accelerator():
         print("test_mmrev_gpu_max_2d_axis0_backward")
@@ -625,9 +624,7 @@ def test_mmrev_gpu_max_3d_axis0_forward() raises:
         assert_true(m.shape() == Shape(3, 4))
         var _tmp1 = Tensor[dtype].arange(12.0, 24.0)
         var _tmp2 = _tmp1.reshape(Shape(3, 4))
-        assert_true(
-            m.to_cpu().all_close(_tmp2)
-        )
+        assert_true(m.to_cpu().all_close(_tmp2))
 
 
 def test_mmrev_gpu_max_3d_axis0_backward() raises:

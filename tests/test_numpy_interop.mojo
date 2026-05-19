@@ -8,8 +8,6 @@ def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-
-
 def test_scalar_tensor_conversion() raises:
     print("test_scalar_tensor_conversion")
     comptime dtype = DType.float32

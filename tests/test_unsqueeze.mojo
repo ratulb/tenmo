@@ -7,8 +7,6 @@ def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-
-
 def test_unsqueeze_scalar_to_1d() raises:
     print("test_unsqueeze_scalar_to_1d")
     comptime dtype = DType.float32

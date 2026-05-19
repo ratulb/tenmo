@@ -34,7 +34,8 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var bwd_arg = (
             output.ancestry().backward_fn_arg().get[StdBwdArg[Self.dtype]]()
         )
@@ -99,7 +100,8 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # ── Pass 2: multiply by upstream ────────────────────────────────
         gradbox_ancestor = local_grad * gradbox_ancestor
 
-        return [(parent^, gradbox_ancestor^, AddTensor)]
+        parent.update_grad(gradbox_ancestor^, AddTensor, None)
+        parent_ids.append(parent._id)
 
 
 # =============================================================================

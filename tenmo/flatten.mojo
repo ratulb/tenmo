@@ -11,14 +11,15 @@ struct FlattenBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref gradbox = output.gradients()[]
-        ancestor = output.ancestry().get(0)
-        ancestor_shape = ancestor.shape()
+        var ancestor = output.ancestry().get(0)
+        var ancestor_shape = ancestor.shape()
         var reshaped_grad = gradbox.reshape(ancestor_shape)
-        return [
-            (ancestor, reshaped_grad^, AddTensor),
-        ]
+        if ancestor.requires_grad:
+            ancestor.update_grad(reshaped_grad^, AddTensor, None)
+        parent_ids.append(ancestor._id)
 
 
 struct FlattenForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):

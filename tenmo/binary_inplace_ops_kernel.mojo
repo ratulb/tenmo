@@ -611,4 +611,3 @@ struct BinaryInplaceOperations[dtype: DType](
         # Return order matches caller destructuring:
         #   var (threads_per_block, num_blocks) = Self.launch_config(...)
         return threads_per_block, num_blocks
-

@@ -7,6 +7,7 @@ from tenmo.common_utils import s
 
 comptime dtype = DType.float32
 
+
 def test_sgd_basic() raises:
     """Test 1: Basic SGD without momentum."""
     print("\n=== Test 1: Basic SGD ===")
@@ -114,7 +115,9 @@ def test_sgd_value_clipping() raises:
     # p = 1.0 - 0.1*0.5 = 0.95
     assert_true(param == Tensor[dtype].full(Shape(2, 2), 0.95))
 
+
 # ── CPU Tests ─────────────────────────────────────────────────────────────────
+
 
 def test_sgd_cpu_vanilla_single_step() raises:
     print("test_sgd_cpu_vanilla_single_step")
@@ -186,11 +189,13 @@ def test_sgd_cpu_weight_decay() raises:
     sgd.step()
     # g_eff = g + wd*p = 1 + 0.1*p
     # w_new = w - lr * g_eff
-    var expected = Tensor[dtype].d1([
-        1.0 - 0.1 * (1.0 + 0.1 * 1.0),
-        2.0 - 0.1 * (1.0 + 0.1 * 2.0),
-        3.0 - 0.1 * (1.0 + 0.1 * 3.0),
-    ])
+    var expected = Tensor[dtype].d1(
+        [
+            1.0 - 0.1 * (1.0 + 0.1 * 1.0),
+            2.0 - 0.1 * (1.0 + 0.1 * 2.0),
+            3.0 - 0.1 * (1.0 + 0.1 * 3.0),
+        ]
+    )
     assert_true(w.all_close(expected))
     print("passed")
 
@@ -289,7 +294,9 @@ def test_sgd_cpu_set_lr() raises:
     assert_true(w.all_close(Tensor[dtype].d1([0.4, 1.4, 2.4])))
     print("passed")
 
+
 # ── GPU Tests ─────────────────────────────────────────────────────────────────
+
 
 def test_sgd_gpu_vanilla_single_step() raises:
     if not has_accelerator():
@@ -358,11 +365,13 @@ def test_sgd_gpu_weight_decay() raises:
     var sgd = SGD(params, lr=0.1, weight_decay=0.1)
     w_gpu.seed_grad(1.0)
     sgd.step()
-    var expected = Tensor[dtype].d1([
-        1.0 - 0.1 * (1.0 + 0.1 * 1.0),
-        2.0 - 0.1 * (1.0 + 0.1 * 2.0),
-        3.0 - 0.1 * (1.0 + 0.1 * 3.0),
-    ])
+    var expected = Tensor[dtype].d1(
+        [
+            1.0 - 0.1 * (1.0 + 0.1 * 1.0),
+            2.0 - 0.1 * (1.0 + 0.1 * 2.0),
+            3.0 - 0.1 * (1.0 + 0.1 * 3.0),
+        ]
+    )
     assert_true(w_gpu.to_cpu().all_close(expected))
     print("passed")
 
@@ -590,5 +599,3 @@ def test_sgd_gpu_large_tensor() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-
-

@@ -10,7 +10,8 @@ struct SigmoidBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         var ndb = output.buffer().arithmetic_ops[SIGMOID_BACKWARD](
@@ -18,7 +19,9 @@ struct SigmoidBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         )
         var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
 
-        return [(parent, gradbox_ancestor^, AddTensor)]
+        parent.update_grad(gradbox_ancestor^, AddTensor, None)
+
+        parent_ids.append(parent._id)
 
 
 struct Sigmoid[dtype: DType](ImplicitlyCopyable, RegisterPassable):

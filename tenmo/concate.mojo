@@ -18,7 +18,8 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var axis = output.ancestry().backward_fn_arg().get[Integer]().value
         ref grad_output = output.gradients()[]
         var grad_data = grad_output.data_ptr()
@@ -26,9 +27,6 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref grad_strides = grad_output.strides()
 
         var count = len(output.ancestry())
-        var result = List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ]()
 
         # Fast path: axis 0
         if axis == 0:
@@ -44,9 +42,10 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     var grad_input_data = grad_input.data_ptr()
                     for j in range(num_elements):
                         grad_input_data[j] = grad_data[src_offset + j]
-                    result.append((parent^, grad_input^, AddTensor))
+                    parent.update_grad(grad_input^, AddTensor, None)
+                    parent_ids.append(parent._id)
                 src_offset += num_elements
-            return result^
+            return
 
         # General path: any axis
         var offset = 0
@@ -78,9 +77,8 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 elem_idx += 1
 
             offset += tensor.shape()[axis]
-            result.append((parent^, grad_input^, AddTensor))
-
-        return result^
+            parent.update_grad(grad_input^, AddTensor, None)
+            parent_ids.append(parent._id)
 
 
 @fieldwise_init

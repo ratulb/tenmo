@@ -1,6 +1,11 @@
 from .tensor import Tensor
 from .mnemonics import AddTensor, RELU_FORWARD, RELU_BACKWARD
-from .backpropagation import BackwardFnArg, BufferArg, NDBufferArg, BACKWARD_RELU
+from .backpropagation import (
+    BackwardFnArg,
+    BufferArg,
+    NDBufferArg,
+    BACKWARD_RELU,
+)
 from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
 from .buffers import Buffer
@@ -12,7 +17,8 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref arg = output.ancestry().backward_fn_arg()
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
@@ -29,7 +35,9 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
             result_ndb = NDBuffer[Self.dtype](result_buf^, shape)
 
         var ancestor_gbx = Gradbox[Self.dtype](result_ndb^, share=False)
-        return [(ancestor^, ancestor_gbx^, AddTensor)]
+        ancestor.update_grad(ancestor_gbx^, AddTensor, None)
+
+        parent_ids.append(ancestor._id)
 
 
 @fieldwise_init

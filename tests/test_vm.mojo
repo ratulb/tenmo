@@ -4,9 +4,9 @@ from std.testing import assert_true, TestSuite
 from tenmo.strides import Strides
 from tenmo.mnemonics import vm
 
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-
 
 
 # ===== BASIC VECTOR-MATRIX TESTS =====

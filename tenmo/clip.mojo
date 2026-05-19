@@ -11,7 +11,8 @@ struct ClipBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         """Gradient passes where min ≤ x ≤ max, blocked elsewhere."""
         var bwd_arg = (
             output.ancestry().backward_fn_arg().get[ClipArg[Self.dtype]]()
@@ -62,7 +63,8 @@ struct ClipBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 else:
                     parent_gradbox[coord] = Scalar[Self.dtype](0)
 
-        return [(parent^, parent_gradbox^, AddTensor)]
+        parent.update_grad(parent_gradbox^, AddTensor, None)
+        parent_ids.append(parent._id)
 
 
 @fieldwise_init

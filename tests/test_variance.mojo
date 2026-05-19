@@ -514,6 +514,7 @@ def test_std_backward_3d_tensor_vs() raises:
     var expected_grad = Tensor.d3([[[-0.5, 0.5], [-0.5, 0.5]]])
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
+
 def test_std_backward_zero_variance_vs() raises:
     """Test that std backward handles zero variance without NaN."""
     print("test_std_backward_zero_variance_vs")
@@ -523,10 +524,7 @@ def test_std_backward_zero_variance_vs() raises:
     var grad = x.grad()
     grad.print()
     # x - mean = [0,0,0] so grad = 0/(eps*divisor) = 0 — no NaN
-    assert_true(x.grad().all_close[atol=1e-5](
-        Tensor.d1([0.0, 0.0, 0.0])
-    ))
-
+    assert_true(x.grad().all_close[atol=1e-5](Tensor.d1([0.0, 0.0, 0.0])))
 
 
 # ============================================================================

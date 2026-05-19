@@ -237,9 +237,7 @@ def test_countuniq_gpu_count_2d_basic() raises:
     comptime if has_accelerator():
         print("test_countuniq_gpu_count_2d_basic")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2(
-            [[1.0, 2.0, 1.0], [3.0, 1.0, 2.0]]
-        ).to_gpu()
+        var a = Tensor[dtype].d2([[1.0, 2.0, 1.0], [3.0, 1.0, 2.0]]).to_gpu()
         assert_true(a.count(Scalar[dtype](1.0)) == 3)
         assert_true(a.count(Scalar[dtype](2.0)) == 2)
         assert_true(a.count(Scalar[dtype](3.0)) == 1)
@@ -249,9 +247,11 @@ def test_countuniq_gpu_count_3d_basic() raises:
     comptime if has_accelerator():
         print("test_countuniq_gpu_count_3d_basic")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d3(
-            [[[1.0, 2.0], [1.0, 3.0]], [[2.0, 1.0], [4.0, 1.0]]]
-        ).to_gpu()
+        var a = (
+            Tensor[dtype]
+            .d3([[[1.0, 2.0], [1.0, 3.0]], [[2.0, 1.0], [4.0, 1.0]]])
+            .to_gpu()
+        )
         assert_true(a.count(Scalar[dtype](1.0)) == 4)
         assert_true(a.count(Scalar[dtype](2.0)) == 2)
         assert_true(a.count(Scalar[dtype](9.0)) == 0)
@@ -287,9 +287,7 @@ def test_countuniq_gpu_count_noncontiguous() raises:
     comptime if has_accelerator():
         print("test_countuniq_gpu_count_noncontiguous")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2(
-            [[1.0, 2.0], [1.0, 3.0], [2.0, 1.0]]
-        ).to_gpu()
+        var a = Tensor[dtype].d2([[1.0, 2.0], [1.0, 3.0], [2.0, 1.0]]).to_gpu()
         var t = a.transpose()
         assert_true(t.count(Scalar[dtype](1.0)) == 3)
         assert_true(t.count(Scalar[dtype](2.0)) == 2)
@@ -330,9 +328,7 @@ def test_countuniq_gpu_unique_2d_basic() raises:
     comptime if has_accelerator():
         print("test_countuniq_gpu_unique_2d_basic")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2(
-            [[1.0, 2.0], [2.0, 3.0], [1.0, 3.0]]
-        ).to_gpu()
+        var a = Tensor[dtype].d2([[1.0, 2.0], [2.0, 3.0], [1.0, 3.0]]).to_gpu()
         var result = a.unique()
         assert_true(result.is_on_cpu())
         assert_true(result.numels() == 3)
@@ -345,9 +341,11 @@ def test_countuniq_gpu_unique_3d_basic() raises:
     comptime if has_accelerator():
         print("test_countuniq_gpu_unique_3d_basic")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d3(
-            [[[1.0, 2.0], [3.0, 1.0]], [[2.0, 3.0], [4.0, 1.0]]]
-        ).to_gpu()
+        var a = (
+            Tensor[dtype]
+            .d3([[[1.0, 2.0], [3.0, 1.0]], [[2.0, 3.0], [4.0, 1.0]]])
+            .to_gpu()
+        )
         var result = a.unique()
         assert_true(result.is_on_cpu())
         assert_true(result.numels() == 4)
@@ -379,9 +377,7 @@ def test_countuniq_gpu_unique_noncontiguous() raises:
     comptime if has_accelerator():
         print("test_countuniq_gpu_unique_noncontiguous")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2(
-            [[1.0, 2.0], [1.0, 3.0], [2.0, 1.0]]
-        ).to_gpu()
+        var a = Tensor[dtype].d2([[1.0, 2.0], [1.0, 3.0], [2.0, 1.0]]).to_gpu()
         var t = a.transpose()
         var result = t.unique()
         assert_true(result.is_on_cpu())
@@ -410,16 +406,13 @@ def test_countuniq_parity_count_1d() raises:
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 1.0, 3.0, 1.0, 2.0])
         var a_gpu = a_cpu.to_gpu()
         assert_true(
-            a_cpu.count(Scalar[dtype](1.0))
-            == a_gpu.count(Scalar[dtype](1.0))
+            a_cpu.count(Scalar[dtype](1.0)) == a_gpu.count(Scalar[dtype](1.0))
         )
         assert_true(
-            a_cpu.count(Scalar[dtype](2.0))
-            == a_gpu.count(Scalar[dtype](2.0))
+            a_cpu.count(Scalar[dtype](2.0)) == a_gpu.count(Scalar[dtype](2.0))
         )
         assert_true(
-            a_cpu.count(Scalar[dtype](9.0))
-            == a_gpu.count(Scalar[dtype](9.0))
+            a_cpu.count(Scalar[dtype](9.0)) == a_gpu.count(Scalar[dtype](9.0))
         )
 
 
@@ -444,8 +437,7 @@ def test_countuniq_parity_count_large() raises:
         var a_cpu = Tensor[dtype].full(Shape(10000), 7.0)
         var a_gpu = a_cpu.to_gpu()
         assert_true(
-            a_cpu.count(Scalar[dtype](7.0))
-            == a_gpu.count(Scalar[dtype](7.0))
+            a_cpu.count(Scalar[dtype](7.0)) == a_gpu.count(Scalar[dtype](7.0))
         )
 
 
@@ -469,9 +461,7 @@ def test_countuniq_parity_unique_2d() raises:
     comptime if has_accelerator():
         print("test_countuniq_parity_unique_2d")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].d2(
-            [[1.0, 2.0, 3.0], [2.0, 1.0, 4.0]]
-        )
+        var a_cpu = Tensor[dtype].d2([[1.0, 2.0, 3.0], [2.0, 1.0, 4.0]])
         var a_gpu = a_cpu.to_gpu()
         var uniq_cpu = a_cpu.unique()
         var uniq_gpu = a_gpu.unique()
@@ -482,19 +472,14 @@ def test_countuniq_parity_noncontiguous() raises:
     comptime if has_accelerator():
         print("test_countuniq_parity_noncontiguous")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].d2(
-            [[1.0, 2.0], [1.0, 3.0], [2.0, 1.0]]
-        )
+        var a_cpu = Tensor[dtype].d2([[1.0, 2.0], [1.0, 3.0], [2.0, 1.0]])
         var a_gpu = a_cpu.to_gpu()
         var t_cpu = a_cpu.transpose()
         var t_gpu = a_gpu.transpose()
         assert_true(
-            t_cpu.count(Scalar[dtype](1.0))
-            == t_gpu.count(Scalar[dtype](1.0))
+            t_cpu.count(Scalar[dtype](1.0)) == t_gpu.count(Scalar[dtype](1.0))
         )
-        assert_true(
-            t_cpu.unique().numels() == t_gpu.unique().numels()
-        )
+        assert_true(t_cpu.unique().numels() == t_gpu.unique().numels())
 
 
 # ═════════════════════════════════════════════════════════════════════════════

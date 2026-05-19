@@ -798,6 +798,7 @@ struct ProductArg[dtype: DType](ArgumentType):
             0,
         )
 
+
 # =============================================================================
 # SECTION 4 — Welford kernel
 # =============================================================================
@@ -1039,7 +1040,6 @@ struct Reduction[dtype: DType = DType.float32](
         var total_output: Int = output_shape.product()
         var reduced_volume: Int = reduced_shape.product()
 
-
         var (threads_per_block, num_blocks) = Self.launch_config[
             max_block_width
         ](total_output, reduced_volume)
@@ -1076,7 +1076,6 @@ struct Reduction[dtype: DType = DType.float32](
         return NDBuffer[Self.dtype].with_device_state(
             device_state^, output_shape
         )
-
 
     # ── PRODUCT ───────────────────────────────────────────────────────────────
 
@@ -1241,8 +1240,8 @@ struct Reduction[dtype: DType = DType.float32](
         normalized_axes: IntArray,
         keepdims: Bool,
     ) raises -> NDBuffer[Self.dtype]:
-        var shape_A      = A.shape
-        var strides_A    = A.strides
+        var shape_A = A.shape
+        var strides_A = A.strides
         var output_shape = shape_A.compute_output_shape(
             normalized_axes, keepdims, validated=True
         )
@@ -1253,18 +1252,20 @@ struct Reduction[dtype: DType = DType.float32](
                 normalized_axes_copy[i] = i
 
         var reduction_axes: Array = Array(normalized_axes_copy)
-        var in_shape: Array       = shape_A.array()
-        var in_strides: Array     = strides_A.array()
-        var total_output: Int     = output_shape.product()
-        var reduced_volume: Int   = shape_A.reduced_shape(normalized_axes).product()
-        var input_numels: Int     = A.numels()
+        var in_shape: Array = shape_A.array()
+        var in_strides: Array = strides_A.array()
+        var total_output: Int = output_shape.product()
+        var reduced_volume: Int = shape_A.reduced_shape(
+            normalized_axes
+        ).product()
+        var input_numels: Int = A.numels()
 
         var (threads_per_block, num_blocks) = Self.launch_config[512](
             total_output, reduced_volume
         )
 
         ref A_device_state = A.device_state.value()
-        ref gpu            = A_device_state.get_gpu()
+        ref gpu = A_device_state.get_gpu()
         var device_context = gpu[]
 
         var excl_buffer = device_context.enqueue_create_buffer[Self.dtype](

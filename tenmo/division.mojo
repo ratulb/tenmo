@@ -19,7 +19,8 @@ struct TrueDivBackwardScalar[dtype: DType](
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var scalar = (
             output.ancestry()
             .backward_fn_arg()
@@ -30,13 +31,8 @@ struct TrueDivBackwardScalar[dtype: DType](
         ancestor = output.ancestry().get(0)
         # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
         var divided = gradbox / scalar
-        return [
-            (
-                ancestor^,
-                divided^,
-                AddTensor,
-            )
-        ]
+        ancestor.update_grad(divided^, AddTensor, None)
+        parent_ids.append(ancestor._id)
 
 
 @fieldwise_init
@@ -46,7 +42,8 @@ struct RightTrueDivBackwardScalar[dtype: DType](
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var scalar = (
             output.ancestry()
             .backward_fn_arg()
@@ -62,13 +59,8 @@ struct RightTrueDivBackwardScalar[dtype: DType](
             squared_reciprocal^, share=False
         )
 
-        return [
-            (
-                ancestor^,
-                gradbox^,
-                SubtractTensor,
-            )
-        ]
+        ancestor.update_grad(gradbox^, SubtractTensor, None)
+        parent_ids.append(ancestor._id)
 
 
 @fieldwise_init
@@ -76,16 +68,13 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref gradbox = output.gradients()[]
         var ancestor_top = output.ancestry().get(0)
         var ancestor_bottom = output.ancestry().get(1)
         var buffer_top = ancestor_top.buffer()
         var buffer_bottom = ancestor_bottom.buffer()
-
-        var grad_shares = List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ](capacity=2)
 
         if ancestor_top.requires_grad:
             var buffer_bottom_reciprocal = Scalar[Self.dtype](1) / buffer_bottom
@@ -102,7 +91,8 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var ancestor_top_gradbox = Gradbox[Self.dtype](
                 ancestor_top_gradbox_buffer^, share=False
             )
-            grad_shares.append((ancestor_top, ancestor_top_gradbox^, AddTensor))
+            ancestor_top.update_grad(ancestor_top_gradbox^, AddTensor, None)
+            parent_ids.append(ancestor_top._id)
 
         if ancestor_bottom.requires_grad:
             var buffer_bottom_sqrd = buffer_bottom * buffer_bottom
@@ -125,11 +115,10 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var ancestor_bottom_gradbox = Gradbox[Self.dtype](
                 ancestor_bottom_grad_buffer^, share=False
             )
-            grad_shares.append(
-                (ancestor_bottom^, ancestor_bottom_gradbox^, SubtractTensor)
+            ancestor_bottom.update_grad(
+                ancestor_bottom_gradbox^, SubtractTensor, None
             )
-
-        return grad_shares^
+            parent_ids.append(ancestor_bottom._id)
 
 
 @fieldwise_init

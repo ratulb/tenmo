@@ -2,6 +2,7 @@ from .shapes import Shape
 from .broadcasthelper import ShapeBroadcaster
 from .common_utils import panic
 
+
 @fieldwise_init
 struct MatrixShapeValidator(ImplicitlyCopyable, RegisterPassable):
     @always_inline

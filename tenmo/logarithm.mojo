@@ -11,7 +11,8 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var epsilon = (
             output.ancestry()
             .backward_fn_arg()
@@ -25,7 +26,9 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         )
         var parent_gradbox = Gradbox[Self.dtype](result_ndb^, share=False)
 
-        return [(parent^, parent_gradbox^, AddTensor)]
+        parent.update_grad(parent_gradbox^, AddTensor, None)
+
+        parent_ids.append(parent._id)
 
 
 @fieldwise_init

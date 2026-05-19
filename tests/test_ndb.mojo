@@ -102,7 +102,7 @@ def ndb_ops_test_arithmetic_self_noncontiguous_other_contiguous() raises:
     # Create non-contiguous self
     var self_buffer = Buffer[DType.int32](12)
     for i in range(12):
-        self_buffer[i] =Int32( i * 10)
+        self_buffer[i] = Int32(i * 10)
     var a = NDBuffer[DType.int32](
         self_buffer^, Shape(2, 3), Strides(1, 2), offset=0
     )
@@ -177,7 +177,9 @@ def ndb_ops_test_arithmetic_broadcast_row() raises:
     assert_true(result.shape == Shape(3, 4), "Broadcast shape")
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntArray(i, j)] == Int32(10 + j), "Broadcast row add")
+            assert_true(
+                result[IntArray(i, j)] == Int32(10 + j), "Broadcast row add"
+            )
     print("ndb_ops_test_arithmetic_broadcast_row passed")
 
 
@@ -192,7 +194,9 @@ def ndb_ops_test_arithmetic_broadcast_col() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntArray(i, j)] == Int32(10 + i * 100), "Broadcast col")
+            assert_true(
+                result[IntArray(i, j)] == Int32(10 + i * 100), "Broadcast col"
+            )
     print("ndb_ops_test_arithmetic_broadcast_col passed")
 
 
@@ -384,7 +388,9 @@ def ndb_ops_test_inplace_broadcast_row() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(a[IntArray(i, j)] == Int32(10 + j), "Broadcast row inplace")
+            assert_true(
+                a[IntArray(i, j)] == Int32(10 + j), "Broadcast row inplace"
+            )
     print("ndb_ops_test_inplace_broadcast_row passed")
 
 
@@ -1252,7 +1258,8 @@ def test_fill_broadcast_row() raises:
     for i in range(3):
         for j in range(4):
             assert_true(
-                dest[IntArray(i, j)] == Int32(j * 10), "Broadcast row fill mismatch"
+                dest[IntArray(i, j)] == Int32(j * 10),
+                "Broadcast row fill mismatch",
             )
     print("test_fill_broadcast_row passed")
 
@@ -1269,7 +1276,8 @@ def test_fill_broadcast_col() raises:
     for i in range(3):
         for j in range(4):
             assert_true(
-                dest[IntArray(i, j)] == Int32(i * 100), "Broadcast col fill mismatch"
+                dest[IntArray(i, j)] == Int32(i * 100),
+                "Broadcast col fill mismatch",
             )
     print("test_fill_broadcast_col passed")
 
@@ -1539,7 +1547,7 @@ def test_ndbuffer_broadcast_row() raises:
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(1, 4))
     for j in range(4):
-        b[IntArray(0, j)] =Int32( j)
+        b[IntArray(0, j)] = Int32(j)
 
     var result = a + b
     assert_true(result.shape == Shape(3, 4), "Broadcast shape")
@@ -1712,7 +1720,7 @@ def test_ndbuffer_count() raises:
     var ndb = NDBuffer[DType.int32](Shape(3, 4))
     for i in range(3):
         for j in range(4):
-            ndb[IntArray(i, j)] =Int32( (i + j) % 3)
+            ndb[IntArray(i, j)] = Int32((i + j) % 3)
 
     var count_0 = ndb.count(0)
     var count_1 = ndb.count(1)
@@ -1873,8 +1881,6 @@ def run_all_ndbuffer_tests() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-
-
 
 
 def test_buffer_sum() raises:

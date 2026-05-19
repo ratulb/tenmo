@@ -3109,6 +3109,7 @@ struct Tensor[dtype: DType](
             var ready_queue = Deque[UInt](capacity=graph_size)
             ready_queue.append(root._id)
 
+            var parent_ids = List[UInt](capacity=3)
             while len(ready_queue) > 0:
                 var node_id: UInt = 0
                 try:
@@ -3120,25 +3121,10 @@ struct Tensor[dtype: DType](
                 ref node = node_list[node_idx]
 
                 if node.has_ancestry():
-                    for result in Backward[Self.dtype].invoke(node):
-                        ref target_ref = result[0]
-                        ref grad = result[1]
-                        var op_code = result[2]
-                        var target_id = target_ref._id
-
-                        if target_id in id_to_index:
-                            var target_idx = id_to_index[target_id]
-                            ref target = node_list[target_idx]
-
-                            # Extract extra_arg from the output node for ops that need it
-                            var extra_arg: Optional[
-                                BackwardFnArg[Self.dtype]
-                            ] = None
-                            if op_code == ScatterAddTensor:
-                                extra_arg = node.ancestry().backward_fn_arg()
-
-                            target.update_grad(grad, op_code, extra_arg)
-
+                    parent_ids.clear()
+                    Backward[Self.dtype].invoke(node, parent_ids)
+                    for i in range(len(parent_ids)):
+                        var target_id = parent_ids[i]
                         if target_id in fanin:
                             fanin[target_id] -= 1
                             if fanin[target_id] == 0:

@@ -5,7 +5,13 @@ Tests forward pass, backward pass, edge cases, and numerical gradients.
 from tenmo.tensor import Tensor
 from tenmo.cnn import Conv2dFused
 
-from std.testing import assert_almost_equal, assert_equal, assert_true, assert_false, TestSuite
+from std.testing import (
+    assert_almost_equal,
+    assert_equal,
+    assert_true,
+    assert_false,
+    TestSuite,
+)
 from std.math import sqrt
 from tenmo.common_utils import isnan, isinf
 from std.math import sqrt
@@ -445,6 +451,7 @@ def test_numerical_stability() raises:
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
+
 # -------------------------------------------------------------------
 # HELPER FUNCTIONS
 # -------------------------------------------------------------------
@@ -688,9 +695,7 @@ def test_padding_modes() raises:
         img, kernel, padding=Padding((1, 2))
     )
     expect = [1, 1, 8, 10]
-    assert_shape_equal(
-        out_pad_tuple, expect, "Tuple padding (1,2)"
-    )
+    assert_shape_equal(out_pad_tuple, expect, "Tuple padding (1,2)")
 
     # Test 2.5: Asymmetric padding
     var pad_list = List[Tuple[Int, Int]]()
@@ -744,9 +749,7 @@ def test_stride_2() raises:
         img, kernel, stride=2, padding=Padding("same")
     )
     expect = [1, 1, 4, 4]
-    assert_shape_equal(
-        out_s2_pad, expect, "Stride=2 with same padding"
-    )
+    assert_shape_equal(out_s2_pad, expect, "Stride=2 with same padding")
 
     print("\n All stride tests passed!\n")
 
@@ -1209,7 +1212,7 @@ def test_batch_processing() raises:
             if abs(batch_val - individual_val) > 1e-3:
                 raise Error(
                     "Batch processing mismatch at batch "
-                    +String(i)
+                    + String(i)
                     + ", element "
                     + String(j)
                 )
@@ -1227,9 +1230,7 @@ def test_edge_cases_2() raises:
         img_small, kernel_large
     )
     var expect: List[Int] = [1, 1, 1, 1]
-    assert_shape_equal(
-        out_1x1, expect, "Kernel size = image size"
-    )
+    assert_shape_equal(out_1x1, expect, "Kernel size = image size")
 
     # Test 12.2: 1x1 kernel (pointwise convolution)
     var img_pw = Tensor[DType.float32].randn(1, 3, 5, 5)
@@ -1255,10 +1256,8 @@ def test_edge_cases_2() raises:
     var out_many = Conv2dFused[DType.float32].forward[track_grad=False](
         img_many_ch, kernel_many
     )
-    expect= [1, 128, 3, 3]
-    assert_shape_equal(
-        out_many, expect, "Many channels (64128)"
-    )
+    expect = [1, 128, 3, 3]
+    assert_shape_equal(out_many, expect, "Many channels (64128)")
 
     print("\n All edge case tests passed!\n")
 

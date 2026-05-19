@@ -13,7 +13,8 @@ struct ExponentiationBackward[dtype: DType](
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         """
         ∂(x**n)/∂x = n * x**(n-1)
         All ops at NDBuffer level — GPU safe, no LLVM lowering issues.
@@ -38,8 +39,9 @@ struct ExponentiationBackward[dtype: DType](
 
         var parent_gradbox = Gradbox[Self.dtype](grad_result^, share=False)
 
-        return [(ancestor, parent_gradbox^, AddTensor)]
+        ancestor.update_grad(parent_gradbox^, AddTensor, None)
 
+        parent_ids.append(ancestor._id)
 
 
 @fieldwise_init
@@ -69,4 +71,3 @@ struct Exponentiator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^
-

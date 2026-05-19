@@ -58,7 +58,8 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref arg = (
             output.ancestry()
             .backward_fn_arg()
@@ -120,16 +121,17 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         var d_x = rstd.__mul__[track_grad=False](bracket)  # (*, D)
 
-        # ── Wrap into Gradbox and return ────────────────────────────────────
+        # ── Wrap into Gradbox and update parents ────────────────────────────
         var d_input = Gradbox[Self.dtype](d_x.buffer, share=False)
         var d_gamma = Gradbox[Self.dtype](d_gamma_ndb, share=False)
         var d_beta = Gradbox[Self.dtype](d_beta_ndb, share=False)
 
-        return [
-            (input_ancestor^, d_input^, AddTensor),
-            (gamma_ancestor^, d_gamma^, AddTensor),
-            (beta_ancestor^, d_beta^, AddTensor),
-        ]
+        input_ancestor.update_grad(d_input^, AddTensor, None)
+        parent_ids.append(input_ancestor._id)
+        gamma_ancestor.update_grad(d_gamma^, AddTensor, None)
+        parent_ids.append(gamma_ancestor._id)
+        beta_ancestor.update_grad(d_beta^, AddTensor, None)
+        parent_ids.append(beta_ancestor._id)
 
 
 @fieldwise_init

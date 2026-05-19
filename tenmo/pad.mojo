@@ -43,7 +43,8 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         """
         Backward pass: Accumulate gradients based on padding mode.
         """
@@ -55,10 +56,6 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var parent = Tensor[Self.dtype](
             ancestor_ref.buffer(), requires_grad=ancestor_ref.requires_grad
         )
-
-        var results = List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ]()
 
         if parent.requires_grad:
             ref parent_shape = parent.shape()
@@ -85,9 +82,10 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
             elif mode == "reflect":
                 Self._extract_reflect(grad_out, grad_parent, pad, parent_shape)
 
-            results.append((ancestor_ref^, grad_parent^, AddTensor))
+            ancestor_ref.update_grad(grad_parent^, AddTensor, None)
 
-        return results^
+        if parent.requires_grad:
+            parent_ids.append(ancestor_ref._id)
 
     @staticmethod
     def _extract_constant(

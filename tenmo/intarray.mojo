@@ -27,7 +27,6 @@ struct IntArray(
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
     ]: Iterator = IntArrayIterator[iterable_origin, True]
 
-
     @always_inline("nodebug")
     def __init__(out self):
         """Create an empty IntArray instance.
@@ -112,7 +111,6 @@ struct IntArray(
         """
         if self._data.__bool__():
             self._data.free()
-
 
     @staticmethod
     @always_inline("nodebug")
@@ -218,7 +216,6 @@ struct IntArray(
             inverted[perm[i]] = i
         return inverted^
 
-
     @always_inline("nodebug")
     def size(self) -> Int:
         """Get the number of elements in the array.
@@ -255,7 +252,6 @@ struct IntArray(
             True if the array contains no elements, False otherwise.
         """
         return self._size == 0
-
 
     @always_inline("nodebug")
     def __getitem__(ref self, idx: Int) -> ref[self] Int:
@@ -351,7 +347,6 @@ struct IntArray(
                 src_idx += step
 
         return result^
-
 
     @always_inline("nodebug")
     def reserve(mut self, required: Int):
@@ -713,7 +708,6 @@ struct IntArray(
                 return False
         return True
 
-
     @always_inline("nodebug")
     def tolist(self) -> List[Int]:
         """Convert to List[Int]."""
@@ -753,7 +747,6 @@ struct IntArray(
         """
         writer.write(self.__str__())
 
-
     @always_inline("nodebug")
     def product(self) -> Int:
         """Calculate the product of all elements.
@@ -779,7 +772,6 @@ struct IntArray(
         for i in range(self._size):
             s += self._data[i]
         return s
-
 
     @always_inline("nodebug")
     def reverse(mut self):
@@ -968,4 +960,3 @@ struct ZipIterator[
             return min(len(self.src_this[]), len(self.src_that[])) - self.index
         else:
             return self.index
-

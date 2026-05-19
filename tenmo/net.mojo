@@ -42,6 +42,7 @@ from std.random import seed, random_float64
 from std.sys import simd_width_of
 from .device import GPU
 
+
 @fieldwise_init
 struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
     """Fully connected layer: y = xW + b."""
@@ -222,17 +223,16 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
     def to_gpu(
-        deinit self,
-        gpu: Optional[GPU] = None
+        deinit self, gpu: Optional[GPU] = None
     ) raises -> Linear[Self.dtype, Self.mode]:
         """Move this Linear layer to GPU.
         Consumes self — original CPU Linear is destroyed.
         """
         var weight_gpu = self.weight.to_gpu(gpu=gpu, stop_grad=True)
-        var bias_gpu   = self.bias.to_gpu(gpu=gpu, stop_grad=True)
+        var bias_gpu = self.bias.to_gpu(gpu=gpu, stop_grad=True)
         var out = self^
         out.weight = weight_gpu^
-        out.bias   = bias_gpu^
+        out.bias = bias_gpu^
         return out^
 
     def to_cpu(deinit self) raises -> Linear[Self.dtype, Self.mode]:
@@ -240,11 +240,12 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         Consumes self — original GPU Linear is destroyed.
         """
         var weight_cpu = self.weight.to_cpu(stop_grad=True)
-        var bias_cpu   = self.bias.to_cpu(stop_grad=True)
+        var bias_cpu = self.bias.to_cpu(stop_grad=True)
         var out = self^
         out.weight = weight_cpu^
-        out.bias   = bias_cpu^
+        out.bias = bias_cpu^
         return out^
+
 
 @fieldwise_init
 struct Profile(RegisterPassable & ImplicitlyCopyable):
@@ -512,16 +513,20 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
                 return result^
 
-    def to_gpu(self, gpu: Optional[GPU] = None) raises -> Linear[Self.dtype, Self.mode]:
+    def to_gpu(
+        self, gpu: Optional[GPU] = None
+    ) raises -> Linear[Self.dtype, Self.mode]:
         """LinearBLAS does not support GPU.
 
         BLAS operates on CPU memory. Use Linear for GPU models.
         """
         panic(
-         "LinearBLAS does not support GPU — use Linear[dtype] for GPU models"
+            "LinearBLAS does not support GPU — use Linear[dtype] for GPU models"
         )
         # Unreachable — satisfies compiler
-        return Linear[Self.dtype, Self.mode](self.in_features, self.out_features)
+        return Linear[Self.dtype, Self.mode](
+            self.in_features, self.out_features
+        )
 
     def to_cpu(self) raises -> Self:
         panic("LinearBLAS does not support GPU — nothing to transfer back")
@@ -642,6 +647,7 @@ struct ReLU[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         """No-op — no parameters to move."""
         return self
 
+
 struct Sigmoid[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var training: Bool
     comptime TAG = SIGMOID
@@ -684,6 +690,7 @@ struct Sigmoid[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     def to_cpu(self) raises -> Self:
         """No-op — no parameters to move."""
         return self
+
 
 struct Tanh[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var training: Bool
@@ -886,7 +893,9 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
         elif self.tag == LAYER_NORM:
             self.layer[LayerNorm[Self.dtype]].eval()
 
-    def to_gpu(mut self, gpu: Optional[GPU] = None) raises -> Module[Self.dtype]:
+    def to_gpu(
+        mut self, gpu: Optional[GPU] = None
+    ) raises -> Module[Self.dtype]:
         """Move this module to GPU.
 
         Dispatches to the appropriate layer's to_gpu().
@@ -902,20 +911,28 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
         """
         if self.tag == LINEAR:
             var l = self.layer[Linear[Self.dtype, mm]]
-            return Module[Self.dtype](Layer[Self.dtype](l.to_gpu(gpu)), self.tag)
+            return Module[Self.dtype](
+                Layer[Self.dtype](l.to_gpu(gpu)), self.tag
+            )
         elif self.tag == LINEAR_BLAS:
             var l = self.layer[LinearBLAS[Self.dtype, mm]]
             _ = l.to_gpu(gpu)  # panics here
-            return self        # unreachable
+            return self  # unreachable
         elif self.tag == CONV2D:
             var l = self.layer[Conv2D[Self.dtype]]
-            return Module[Self.dtype](Layer[Self.dtype](l.to_gpu(gpu)), self.tag)
+            return Module[Self.dtype](
+                Layer[Self.dtype](l.to_gpu(gpu)), self.tag
+            )
         elif self.tag == LAYER_NORM:
             var l = self.layer[LayerNorm[Self.dtype]]
-            return Module[Self.dtype](Layer[Self.dtype](l.to_gpu(gpu)), self.tag)
+            return Module[Self.dtype](
+                Layer[Self.dtype](l.to_gpu(gpu)), self.tag
+            )
         elif self.tag == EMBEDDING:
             var l = self.layer[Embedding[Self.dtype]]
-            return Module[Self.dtype](Layer[Self.dtype](l.to_gpu(gpu)), self.tag)
+            return Module[Self.dtype](
+                Layer[Self.dtype](l.to_gpu(gpu)), self.tag
+            )
 
         else:
             # RELU, SIGMOID, TANH, DROPOUT, FLATTEN, MAXPOOL2D
@@ -929,7 +946,7 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
         elif self.tag == LINEAR_BLAS:
             var l = self.layer[LinearBLAS[Self.dtype, mm]]
             _ = l.to_cpu()  # panics
-            return self     # unreachable
+            return self  # unreachable
         elif self.tag == CONV2D:
             var l = self.layer[Conv2D[Self.dtype]]
             return Module[Self.dtype](Layer[Self.dtype](l.to_cpu()), self.tag)
@@ -943,6 +960,7 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
         else:
             # RELU, SIGMOID, TANH, DROPOUT, FLATTEN, MAXPOOL2D — no-op
             return self
+
 
 @fieldwise_init
 struct Sequential[dtype: DType](Copyable & Movable):
@@ -993,8 +1011,9 @@ struct Sequential[dtype: DType](Copyable & Movable):
         for i in range(len(self.modules)):
             self.modules[i].eval()
 
-
-    def to_gpu(mut self, gpu: Optional[GPU] = None, stop_grad: Bool=True) raises -> Sequential[Self.dtype]:
+    def to_gpu(
+        mut self, gpu: Optional[GPU] = None, stop_grad: Bool = True
+    ) raises -> Sequential[Self.dtype]:
         """Move all layers in this Sequential model to GPU.
 
         Each layer's to_gpu() is called. Layers with no parameters
@@ -1047,7 +1066,6 @@ struct Sequential[dtype: DType](Copyable & Movable):
         for i in range(len(self.modules)):
             out.modules.append(self.modules[i].to_cpu())
         return out^
-
 
 
 @fieldwise_init
@@ -1510,7 +1528,9 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         """Convert to Module for Sequential."""
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
-    def to_gpu(deinit self, gpu: Optional[GPU] = None) raises -> Conv2D[Self.dtype]:
+    def to_gpu(
+        deinit self, gpu: Optional[GPU] = None
+    ) raises -> Conv2D[Self.dtype]:
         """Move this Conv2D layer to GPU.
 
         Consumes self.
@@ -1525,7 +1545,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
             New Conv2D layer with GPU weights and bias.
         """
         var weight_gpu = self.weight.to_gpu(gpu=gpu, stop_grad=True)
-        var bias_gpu   = self.bias.to_gpu(gpu=gpu, stop_grad=True)
+        var bias_gpu = self.bias.to_gpu(gpu=gpu, stop_grad=True)
 
         var out = self^
         out.weight = weight_gpu^
@@ -1535,11 +1555,12 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
 
     def to_cpu(deinit self) raises -> Conv2D[Self.dtype]:
         var weight_cpu = self.weight.to_cpu(stop_grad=True)
-        var bias_cpu   = self.bias.to_cpu(stop_grad=True)
+        var bias_cpu = self.bias.to_cpu(stop_grad=True)
         var out = self^
         out.weight = weight_cpu^
-        out.bias   = bias_cpu^
+        out.bias = bias_cpu^
         return out^
+
 
 struct Flatten[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     """
@@ -1602,4 +1623,3 @@ struct Flatten[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     def to_cpu(self) raises -> Self:
         """No-op — no parameters to move."""
         return self
-

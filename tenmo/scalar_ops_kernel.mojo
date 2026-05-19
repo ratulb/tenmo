@@ -334,5 +334,3 @@ struct ScalarOperations[dtype: DType = DType.float32](
                 (total_chunks + 255) // 256, 512
             )  # Cap at 512 blocks
         return threads_per_block, num_blocks
-
-

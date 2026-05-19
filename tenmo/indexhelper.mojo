@@ -14,6 +14,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
     in a multi-dimensional tensor. It handles both contiguous and strided tensors
     efficiently, using an odometer-like increment strategy for non-contiguous data.
     """
+
     comptime Element = Int
     comptime IteratorType[
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
@@ -209,7 +210,6 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         for i in range(self.rank):
             self.coords[i] = 0
 
-
     @always_inline("nodebug")
     def peek(self) -> Int:
         """Get current offset without advancing.
@@ -345,5 +345,3 @@ struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
             if strides[i] > 0:
                 max_idx += (shape[i] - 1) * strides[i]
         return max_idx
-
-

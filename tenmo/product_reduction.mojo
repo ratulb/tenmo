@@ -43,7 +43,7 @@
 #
 # =============================================================================
 
-#from .mnemonics import AddTensor, PRODUCT, BACKWARD_PRODUCT
+# from .mnemonics import AddTensor, PRODUCT, BACKWARD_PRODUCT
 from .mnemonics import AddTensor
 from .reduction_kernel import ProductArg
 from .backpropagation import BackwardFnArg, BACKWARD_PRODUCT
@@ -60,8 +60,11 @@ struct ProductBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.ancestry().backward_fn_arg().get[ProductArg[Self.dtype]]()
+        mut parent_ids: List[UInt],
+    ):
+        var bwd_arg = (
+            output.ancestry().backward_fn_arg().get[ProductArg[Self.dtype]]()
+        )
         ref gradbox = output.gradients()[]
         ref gradbox_shape = gradbox.shape()
         var ancestor = output.ancestry().get(0)
@@ -117,13 +120,8 @@ struct ProductBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var grad_input = grad_broadcast.buffer * excl_ndb
 
         var gradbox_ancestor = Gradbox[Self.dtype](grad_input^, share=False)
-        return [
-            (
-                ancestor^,
-                gradbox_ancestor^,
-                AddTensor,
-            )
-        ]
+        ancestor.update_grad(gradbox_ancestor^, AddTensor, None)
+        parent_ids.append(ancestor._id)
 
 
 # =============================================================================
@@ -134,6 +132,7 @@ struct ProductBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 # store_excl_product comptime flag flows from forward into ProductArg —
 # backward reads the same flag's effect via excl_product being Some or None.
 # =============================================================================
+
 
 @fieldwise_init
 struct Product[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -183,8 +182,8 @@ struct Product[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var result = tensor.buffer.product[store_excl_product](
             normalized_axes, keepdims
         )
-        var ndb     = result[0]   # NDBuffer — product output
-        var bwd_arg = result[1]   # ProductArg — for backward
+        var ndb = result[0]  # NDBuffer — product output
+        var bwd_arg = result[1]  # ProductArg — for backward
 
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
@@ -199,4 +198,3 @@ struct Product[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^
-

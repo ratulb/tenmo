@@ -13,7 +13,6 @@ from tenmo.shapes import Shape
 
 def test_dropout_forward_training_mode() raises:
     """Test dropout forward pass in training mode - should zero out some elements."""
-    print("test_dropout_forward_training_mode")
 
     seed(42)
     var dropout = Dropout[DType.float32](p=0.5)
@@ -50,7 +49,6 @@ def test_dropout_forward_training_mode() raises:
 
 def test_dropout_forward_eval_mode() raises:
     """Test dropout forward pass in eval mode - should pass through unchanged."""
-    print("test_dropout_forward_eval_mode")
 
     var dropout = Dropout[DType.float32](p=0.5)
     dropout.eval()
@@ -67,7 +65,6 @@ def test_dropout_forward_eval_mode() raises:
 
 def test_dropout_forward_preserves_shape() raises:
     """Test that dropout preserves tensor shape."""
-    print("test_dropout_forward_preserves_shape")
 
     var dropout = Dropout[DType.float32](p=0.3)
     dropout.train()
@@ -90,7 +87,6 @@ def test_dropout_forward_preserves_shape() raises:
 
 def test_dropout_forward_zero_probability() raises:
     """Test dropout with p=0 (no dropout) - all values kept."""
-    print("test_dropout_forward_zero_probability")
 
     var dropout = Dropout[DType.float32](p=0.0)
     dropout.train()
@@ -107,7 +103,6 @@ def test_dropout_forward_zero_probability() raises:
 
 def test_dropout_forward_high_probability() raises:
     """Test dropout with p=0.9 - most values should be zero."""
-    print("test_dropout_forward_high_probability")
 
     seed(456)
     var dropout = Dropout[DType.float32](p=0.9)
@@ -140,7 +135,6 @@ def test_dropout_forward_high_probability() raises:
 
 def test_dropout_forward_expected_value_preservation() raises:
     """Test that dropout maintains expected values (inverted dropout property)."""
-    print("test_dropout_forward_expected_value_preservation")
 
     seed(123)
     var dropout = Dropout[DType.float32](p=0.5)
@@ -170,7 +164,6 @@ def test_dropout_forward_expected_value_preservation() raises:
 
 def test_dropout_forward_mode_switching() raises:
     """Test switching between training and eval modes."""
-    print("test_dropout_forward_mode_switching")
 
     seed(789)
     var dropout = Dropout[DType.float32](p=0.5)
@@ -210,7 +203,6 @@ def test_dropout_forward_mode_switching() raises:
 # ============================================================================
 def test_dropout_backward_simple() raises:
     """Test dropout backward pass - gradients should flow through non-dropped elements."""
-    print("test_dropout_backward_simple")
 
     seed(100)
     var dropout = Dropout[DType.float32](p=0.5)
@@ -226,7 +218,6 @@ def test_dropout_backward_simple() raises:
     var loss = out.sum()
     loss.backward()
 
-    print()
     # Gradients should be:
     # - 0.0 where elements were dropped
     # - scale (2.0) where elements were kept
@@ -246,7 +237,6 @@ def test_dropout_backward_simple() raises:
 
 def test_dropout_backward_with_upstream_gradient() raises:
     """Test dropout backward pass with non-uniform upstream gradients."""
-    print("test_dropout_backward_with_upstream_gradient")
 
     seed(200)
     var dropout = Dropout[DType.float32](p=0.5)
@@ -294,7 +284,6 @@ def test_dropout_backward_with_upstream_gradient() raises:
 def test_dropout_backward_2d_tensor() raises:
     comptime dtype = DType.float32
     """Test dropout backward pass on 2D tensor."""
-    print("test_dropout_backward_2d_tensor")
 
     seed(300)
     var dropout = Dropout[DType.float32](p=0.3)
@@ -331,7 +320,6 @@ def test_dropout_backward_2d_tensor() raises:
 
 def test_dropout_backward_eval_mode() raises:
     """Test dropout backward in eval mode - gradients should flow unchanged."""
-    print("test_dropout_backward_eval_mode")
 
     var dropout = Dropout[DType.float32](p=0.5)
     dropout.eval()
@@ -357,7 +345,6 @@ def test_dropout_backward_eval_mode() raises:
 
 def test_dropout_backward_chain_rule() raises:
     """Test dropout backward with chain rule (dropout in middle of computation)."""
-    print("test_dropout_backward_chain_rule")
 
     seed(400)
     var dropout = Dropout[DType.float32](p=0.5)
@@ -401,7 +388,6 @@ def test_dropout_backward_chain_rule() raises:
 
 def test_dropout_backward_3d_tensor() raises:
     """Test dropout backward on 3D tensor."""
-    print("test_dropout_backward_3d_tensor")
 
     seed(500)
     var dropout = Dropout[DType.float32](p=0.4)
@@ -436,7 +422,6 @@ def test_dropout_backward_3d_tensor() raises:
 
 def test_dropout_backward_no_grad_input() raises:
     """Test dropout backward when input doesn't require grad."""
-    print("test_dropout_backward_no_grad_input")
 
     var dropout = Dropout[DType.float32](p=0.5)
     dropout.train()
@@ -455,7 +440,6 @@ def test_dropout_backward_no_grad_input() raises:
 
 def test_dropout_backward_multiple_calls() raises:
     """Test dropout backward with multiple forward calls (different masks)."""
-    print("test_dropout_backward_multiple_calls")
 
     seed(600)
     var dropout = Dropout[DType.float32](p=0.5)
@@ -494,7 +478,6 @@ def test_dropout_backward_multiple_calls() raises:
 
 def test_dropout_zero_probability_backward() raises:
     """Test dropout backward with p=0 - all gradients should flow through."""
-    print("test_dropout_zero_probability_backward")
 
     var dropout = Dropout[DType.float32](p=0.0)
     dropout.train()
@@ -517,7 +500,6 @@ def test_dropout_zero_probability_backward() raises:
 
 def test_dropout_large_tensor_backward() raises:
     """Test dropout backward on large tensor - verify gradient statistics."""
-    print("test_dropout_large_tensor_backward")
 
     seed(700)
     var dropout = Dropout[DType.float32](p=0.5)
@@ -598,7 +580,6 @@ def all_nonzero_close[dtype: DType](
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_dropout2_fwd_cpu_eval_is_identity() raises:
-    print("test_dropout2_fwd_cpu_eval_is_identity")
     comptime dtype = DType.float32
     var dropout = Dropout[dtype](p=0.5)
     dropout.eval()
@@ -608,7 +589,6 @@ def test_dropout2_fwd_cpu_eval_is_identity() raises:
 
 
 def test_dropout2_fwd_cpu_p0_is_identity() raises:
-    print("test_dropout2_fwd_cpu_p0_is_identity")
     comptime dtype = DType.float32
     var dropout = Dropout[dtype](p=0.0)
     dropout.train()
@@ -618,7 +598,6 @@ def test_dropout2_fwd_cpu_p0_is_identity() raises:
 
 
 def test_dropout2_fwd_cpu_high_p_many_zeros_1d() raises:
-    print("test_dropout2_fwd_cpu_high_p_many_zeros_1d")
     comptime dtype = DType.float32
     seed(100)
     var dropout = Dropout[dtype](p=0.9)
@@ -630,7 +609,6 @@ def test_dropout2_fwd_cpu_high_p_many_zeros_1d() raises:
 
 
 def test_dropout2_fwd_cpu_scale_correct_1d() raises:
-    print("test_dropout2_fwd_cpu_scale_correct_1d")
     comptime dtype = DType.float32
     seed(200)
     var dropout = Dropout[dtype](p=0.5)
@@ -642,7 +620,6 @@ def test_dropout2_fwd_cpu_scale_correct_1d() raises:
 
 
 def test_dropout2_fwd_cpu_scale_correct_2d() raises:
-    print("test_dropout2_fwd_cpu_scale_correct_2d")
     comptime dtype = DType.float32
     seed(300)
     var dropout = Dropout[dtype](p=0.5)
@@ -653,7 +630,6 @@ def test_dropout2_fwd_cpu_scale_correct_2d() raises:
 
 
 def test_dropout2_fwd_cpu_scale_correct_3d() raises:
-    print("test_dropout2_fwd_cpu_scale_correct_3d")
     comptime dtype = DType.float32
     seed(400)
     var dropout = Dropout[dtype](p=0.5)
@@ -664,7 +640,6 @@ def test_dropout2_fwd_cpu_scale_correct_3d() raises:
 
 
 def test_dropout2_fwd_cpu_different_masks_per_call() raises:
-    print("test_dropout2_fwd_cpu_different_masks_per_call")
     comptime dtype = DType.float32
     seed(500)
     var dropout = Dropout[dtype](p=0.5)
@@ -682,7 +657,6 @@ def test_dropout2_fwd_cpu_different_masks_per_call() raises:
 
 
 def test_dropout2_fwd_cpu_output_shape_preserved_1d() raises:
-    print("test_dropout2_fwd_cpu_output_shape_preserved_1d")
     comptime dtype = DType.float32
     seed(600)
     var dropout = Dropout[dtype](p=0.5)
@@ -693,7 +667,6 @@ def test_dropout2_fwd_cpu_output_shape_preserved_1d() raises:
 
 
 def test_dropout2_fwd_cpu_output_shape_preserved_2d() raises:
-    print("test_dropout2_fwd_cpu_output_shape_preserved_2d")
     comptime dtype = DType.float32
     seed(700)
     var dropout = Dropout[dtype](p=0.5)
@@ -704,7 +677,6 @@ def test_dropout2_fwd_cpu_output_shape_preserved_2d() raises:
 
 
 def test_dropout2_fwd_cpu_output_shape_preserved_3d() raises:
-    print("test_dropout2_fwd_cpu_output_shape_preserved_3d")
     comptime dtype = DType.float32
     seed(800)
     var dropout = Dropout[dtype](p=0.5)
@@ -719,7 +691,6 @@ def test_dropout2_fwd_cpu_output_shape_preserved_3d() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_dropout2_bwd_cpu_grad_zero_where_dropped_1d() raises:
-    print("test_dropout2_bwd_cpu_grad_zero_where_dropped_1d")
     comptime dtype = DType.float32
     seed(1000)
     var dropout = Dropout[dtype](p=0.5)
@@ -737,7 +708,6 @@ def test_dropout2_bwd_cpu_grad_zero_where_dropped_1d() raises:
 
 
 def test_dropout2_bwd_cpu_grad_zero_where_dropped_2d() raises:
-    print("test_dropout2_bwd_cpu_grad_zero_where_dropped_2d")
     comptime dtype = DType.float32
     seed(1100)
     var dropout = Dropout[dtype](p=0.5)
@@ -754,7 +724,6 @@ def test_dropout2_bwd_cpu_grad_zero_where_dropped_2d() raises:
 
 
 def test_dropout2_bwd_cpu_grad_zero_where_dropped_3d() raises:
-    print("test_dropout2_bwd_cpu_grad_zero_where_dropped_3d")
     comptime dtype = DType.float32
     seed(1200)
     var dropout = Dropout[dtype](p=0.5)
@@ -771,7 +740,6 @@ def test_dropout2_bwd_cpu_grad_zero_where_dropped_3d() raises:
 
 
 def test_dropout2_bwd_cpu_no_grad_leaf_unaffected() raises:
-    print("test_dropout2_bwd_cpu_no_grad_leaf_unaffected")
     comptime dtype = DType.float32
     seed(1300)
     var dropout = Dropout[dtype](p=0.5)
@@ -783,7 +751,6 @@ def test_dropout2_bwd_cpu_no_grad_leaf_unaffected() raises:
 
 
 def test_dropout2_bwd_cpu_high_p_grad_flow() raises:
-    print("test_dropout2_bwd_cpu_high_p_grad_flow")
     comptime dtype = DType.float32
     seed(1400)
     var dropout = Dropout[dtype](p=0.9)
@@ -802,7 +769,6 @@ def test_dropout2_bwd_cpu_high_p_grad_flow() raises:
 
 def test_dropout2_bwd_cpu_chained_with_linear_op() raises:
     # dropout -> * 3 -> sum -> backward
-    print("test_dropout2_bwd_cpu_chained_with_linear_op")
     comptime dtype = DType.float32
     seed(1500)
     var dropout = Dropout[dtype](p=0.5)
@@ -820,7 +786,6 @@ def test_dropout2_bwd_cpu_chained_with_linear_op() raises:
 
 def test_dropout2_bwd_cpu_eval_grad_is_ones() raises:
     # In eval mode dropout is identity — grad must be 1
-    print("test_dropout2_bwd_cpu_eval_grad_is_ones")
     comptime dtype = DType.float32
     var dropout = Dropout[dtype](p=0.5)
     dropout.eval()
@@ -832,7 +797,6 @@ def test_dropout2_bwd_cpu_eval_grad_is_ones() raises:
 
 
 def test_dropout2_bwd_cpu_multiple_calls_different_grads() raises:
-    print("test_dropout2_bwd_cpu_multiple_calls_different_grads")
     comptime dtype = DType.float32
     seed(1600)
     var dropout = Dropout[dtype](p=0.5)
@@ -863,7 +827,6 @@ def test_dropout2_bwd_cpu_multiple_calls_different_grads() raises:
 def test_dropout2_gradflow_cpu_mask_consistent_fwd_bwd() raises:
     # The mask used in forward must be the same one used in backward.
     # Verify: wherever out==0, grad==0; wherever out!=0, grad==scale.
-    print("test_dropout2_gradflow_cpu_mask_consistent_fwd_bwd")
     comptime dtype = DType.float32
     seed(1700)
     var dropout = Dropout[dtype](p=0.5)
@@ -883,7 +846,6 @@ def test_dropout2_gradflow_cpu_mask_consistent_fwd_bwd() raises:
 
 
 def test_dropout2_gradflow_cpu_sum_of_grads_matches_nonzero_count() raises:
-    print("test_dropout2_gradflow_cpu_sum_of_grads_matches_nonzero_count")
     comptime dtype = DType.float32
     seed(1800)
     var dropout = Dropout[dtype](p=0.5)
@@ -906,7 +868,6 @@ def test_dropout2_gradflow_cpu_sum_of_grads_matches_nonzero_count() raises:
 
 def test_dropout2_fwd_gpu_eval_is_identity() raises:
     comptime if has_accelerator():
-        print("test_dropout2_fwd_gpu_eval_is_identity")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.eval()
@@ -918,7 +879,6 @@ def test_dropout2_fwd_gpu_eval_is_identity() raises:
 
 def test_dropout2_fwd_gpu_output_shape_preserved_1d() raises:
     comptime if has_accelerator():
-        print("test_dropout2_fwd_gpu_output_shape_preserved_1d")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.train()
@@ -929,7 +889,6 @@ def test_dropout2_fwd_gpu_output_shape_preserved_1d() raises:
 
 def test_dropout2_fwd_gpu_output_shape_preserved_2d() raises:
     comptime if has_accelerator():
-        print("test_dropout2_fwd_gpu_output_shape_preserved_2d")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.train()
@@ -940,7 +899,6 @@ def test_dropout2_fwd_gpu_output_shape_preserved_2d() raises:
 
 def test_dropout2_fwd_gpu_output_shape_preserved_3d() raises:
     comptime if has_accelerator():
-        print("test_dropout2_fwd_gpu_output_shape_preserved_3d")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.train()
@@ -951,7 +909,6 @@ def test_dropout2_fwd_gpu_output_shape_preserved_3d() raises:
 
 def test_dropout2_fwd_gpu_high_p_many_zeros() raises:
     comptime if has_accelerator():
-        print("test_dropout2_fwd_gpu_high_p_many_zeros")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.9)
         dropout.train()
@@ -962,7 +919,6 @@ def test_dropout2_fwd_gpu_high_p_many_zeros() raises:
 
 def test_dropout2_fwd_gpu_scale_correct_1d() raises:
     comptime if has_accelerator():
-        print("test_dropout2_fwd_gpu_scale_correct_1d")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.train()
@@ -973,7 +929,6 @@ def test_dropout2_fwd_gpu_scale_correct_1d() raises:
 
 def test_dropout2_fwd_gpu_scale_correct_2d() raises:
     comptime if has_accelerator():
-        print("test_dropout2_fwd_gpu_scale_correct_2d")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.train()
@@ -984,7 +939,6 @@ def test_dropout2_fwd_gpu_scale_correct_2d() raises:
 
 def test_dropout2_fwd_gpu_scale_correct_3d() raises:
     comptime if has_accelerator():
-        print("test_dropout2_fwd_gpu_scale_correct_3d")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.train()
@@ -995,7 +949,6 @@ def test_dropout2_fwd_gpu_scale_correct_3d() raises:
 
 def test_dropout2_fwd_gpu_different_masks_per_call() raises:
     comptime if has_accelerator():
-        print("test_dropout2_fwd_gpu_different_masks_per_call")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.train()
@@ -1016,7 +969,6 @@ def test_dropout2_fwd_gpu_different_masks_per_call() raises:
 
 def test_dropout2_bwd_gpu_grad_zero_where_dropped_1d() raises:
     comptime if has_accelerator():
-        print("test_dropout2_bwd_gpu_grad_zero_where_dropped_1d")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.train()
@@ -1035,7 +987,6 @@ def test_dropout2_bwd_gpu_grad_zero_where_dropped_1d() raises:
 
 def test_dropout2_bwd_gpu_grad_zero_where_dropped_2d() raises:
     comptime if has_accelerator():
-        print("test_dropout2_bwd_gpu_grad_zero_where_dropped_2d")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.train()
@@ -1054,7 +1005,6 @@ def test_dropout2_bwd_gpu_grad_zero_where_dropped_2d() raises:
 
 def test_dropout2_bwd_gpu_grad_zero_where_dropped_3d() raises:
     comptime if has_accelerator():
-        print("test_dropout2_bwd_gpu_grad_zero_where_dropped_3d")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.train()
@@ -1073,7 +1023,6 @@ def test_dropout2_bwd_gpu_grad_zero_where_dropped_3d() raises:
 
 def test_dropout2_bwd_gpu_no_grad_leaf_unaffected() raises:
     comptime if has_accelerator():
-        print("test_dropout2_bwd_gpu_no_grad_leaf_unaffected")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.train()
@@ -1084,7 +1033,6 @@ def test_dropout2_bwd_gpu_no_grad_leaf_unaffected() raises:
 
 def test_dropout2_bwd_gpu_high_p_grad_flow() raises:
     comptime if has_accelerator():
-        print("test_dropout2_bwd_gpu_high_p_grad_flow")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.9)
         dropout.train()
@@ -1103,7 +1051,6 @@ def test_dropout2_bwd_gpu_high_p_grad_flow() raises:
 
 def test_dropout2_bwd_gpu_chained_with_linear_op() raises:
     comptime if has_accelerator():
-        print("test_dropout2_bwd_gpu_chained_with_linear_op")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.train()
@@ -1120,7 +1067,6 @@ def test_dropout2_bwd_gpu_chained_with_linear_op() raises:
 
 def test_dropout2_bwd_gpu_eval_grad_is_ones() raises:
     comptime if has_accelerator():
-        print("test_dropout2_bwd_gpu_eval_grad_is_ones")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.eval()
@@ -1138,7 +1084,6 @@ def test_dropout2_bwd_gpu_eval_grad_is_ones() raises:
 
 def test_dropout2_gradflow_gpu_mask_consistent_fwd_bwd() raises:
     comptime if has_accelerator():
-        print("test_dropout2_gradflow_gpu_mask_consistent_fwd_bwd")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.train()
@@ -1160,7 +1105,6 @@ def test_dropout2_gradflow_gpu_mask_consistent_fwd_bwd() raises:
 
 def test_dropout2_gradflow_gpu_sum_of_grads_matches_nonzero_count() raises:
     comptime if has_accelerator():
-        print("test_dropout2_gradflow_gpu_sum_of_grads_matches_nonzero_count")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.train()
@@ -1183,7 +1127,6 @@ def test_dropout2_gradflow_gpu_sum_of_grads_matches_nonzero_count() raises:
 
 def test_dropout2_parity_eval_cpu_gpu_match() raises:
     comptime if has_accelerator():
-        print("test_dropout2_parity_eval_cpu_gpu_match")
         comptime dtype = DType.float32
         var dropout = Dropout[dtype](p=0.5)
         dropout.eval()
@@ -1196,7 +1139,6 @@ def test_dropout2_parity_eval_cpu_gpu_match() raises:
 
 def test_dropout2_parity_scale_value_matches() raises:
     comptime if has_accelerator():
-        print("test_dropout2_parity_scale_value_matches")
         comptime dtype = DType.float32
         # Both CPU and GPU non-zero outputs must be exactly input * scale
         var dropout_cpu = Dropout[dtype](p=0.5)
@@ -1213,7 +1155,6 @@ def test_dropout2_parity_scale_value_matches() raises:
 
 def test_dropout2_parity_bwd_grad_scale_matches() raises:
     comptime if has_accelerator():
-        print("test_dropout2_parity_bwd_grad_scale_matches")
         comptime dtype = DType.float32
         var dropout_cpu = Dropout[dtype](p=0.5)
         var dropout_gpu = Dropout[dtype](p=0.5)

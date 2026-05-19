@@ -2,7 +2,7 @@ from .tensor import Tensor
 from .shapes import Shape
 from .strides import Strides
 from .backpropagation import BackwardFnArg, ViewArg, BACKWARD_VIEW
-from .mnemonics import AddTensor, ZeroGrad
+from .mnemonics import AddTensor
 from .validators import Validator
 from .gradbox import Gradbox
 from .intarray import IntArray
@@ -19,16 +19,23 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         comptime if has_accelerator():
             if output.is_on_gpu():
-                return Self.backward_gpu(output)
-        return Self.backward_cpu(output)
+                Self.backward_gpu(output, parent_ids)
+                ref gradbox = output.gradbox[]
+                gradbox.zero_grad()
+                return
+        Self.backward_cpu(output, parent_ids)
+        ref gradbox = output.gradbox[]
+        gradbox.zero_grad()
 
     @staticmethod
     def backward_cpu(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref bwd_arg = output.ancestry().backward_fn_arg().get[ViewArg]()
         var (shape, strides, offset) = (
             bwd_arg.shape,
@@ -114,15 +121,15 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
                         parent_grad_data[parent_addr] += view_data[view_addr]
 
-        return [
-            (parent_ref, parent_gradbox^, AddTensor),
-            (output, gradbox, ZeroGrad),
-        ]
+        if parent_ref.requires_grad:
+            parent_ref.update_grad(parent_gradbox^, AddTensor, None)
+        parent_ids.append(parent_ref._id)
 
     @staticmethod
     def backward_gpu(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref bwd_arg = output.ancestry().backward_fn_arg().get[ViewArg]()
         var (shape, strides, offset) = (
             bwd_arg.shape,
@@ -259,10 +266,9 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             # Parent is CPU — use CPU gradbox directly
             final_gradbox = parent_gradbox^
 
-        return [
-            (parent_ref, final_gradbox^, AddTensor),
-            (output, gradbox, ZeroGrad),
-        ]
+        if parent_ref.requires_grad:
+            parent_ref.update_grad(final_gradbox^, AddTensor, None)
+        parent_ids.append(parent_ref._id)
 
 
 @fieldwise_init

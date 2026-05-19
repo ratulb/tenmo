@@ -2,6 +2,7 @@ from std.testing import assert_true, TestSuite
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from std.sys import has_accelerator
+
 # ============================================================
 # GPU EXPAND TESTS — forward shape, values, and backward grad flow
 # Grad always flows back to the original CPU tensor.
@@ -11,6 +12,7 @@ from std.sys import has_accelerator
 # ------------------------------------------------------------
 # Basic 1D → 2D expansion
 # ------------------------------------------------------------
+
 
 def test_gpu_expand_1d_to_2d_new_batch_dim() raises:
     comptime if has_accelerator():
@@ -48,6 +50,7 @@ def test_gpu_expand_1d_to_3d() raises:
 # 2D → 2D expansions
 # ------------------------------------------------------------
 
+
 def test_gpu_expand_2d_row_vector_to_matrix() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_2d_row_vector_to_matrix")
@@ -74,9 +77,7 @@ def test_gpu_expand_2d_col_vector_to_matrix() raises:
         var e = a_gpu.expand(3, 4)
         assert_true(e.shape() == Shape.of(3, 4))
         var expected = Tensor[dtype].d2(
-            [[1.0, 1.0, 1.0, 1.0],
-             [2.0, 2.0, 2.0, 2.0],
-             [3.0, 3.0, 3.0, 3.0]]
+            [[1.0, 1.0, 1.0, 1.0], [2.0, 2.0, 2.0, 2.0], [3.0, 3.0, 3.0, 3.0]]
         )
         assert_true(e.to_cpu().all_close(expected))
         es = e.sum()
@@ -92,7 +93,9 @@ def test_gpu_expand_2d_both_dims_size1() raises:
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(3, 4)
         assert_true(e.shape() == Shape.of(3, 4))
-        assert_true(e.to_cpu().all_close(Tensor[dtype].full(Shape.of(3, 4), 5.0)))
+        assert_true(
+            e.to_cpu().all_close(Tensor[dtype].full(Shape.of(3, 4), 5.0))
+        )
         es = e.sum()
         es.backward()
         assert_true(a.grad().all_close(Tensor[dtype].d2([[12.0]])))
@@ -116,6 +119,7 @@ def test_gpu_expand_2d_no_op_same_shape() raises:
 # 3D expansions
 # ------------------------------------------------------------
 
+
 def test_gpu_expand_3d_first_dim() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_3d_first_dim")
@@ -128,14 +132,18 @@ def test_gpu_expand_3d_first_dim() raises:
         assert_true(s.all_close(Tensor[dtype].d2([[5.0, 10.0], [15.0, 20.0]])))
         es = e.sum()
         es.backward()
-        assert_true(a.grad().all_close(Tensor[dtype].d3([[[5.0, 5.0], [5.0, 5.0]]])))
+        assert_true(
+            a.grad().all_close(Tensor[dtype].d3([[[5.0, 5.0], [5.0, 5.0]]]))
+        )
 
 
 def test_gpu_expand_3d_last_dim() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_3d_last_dim")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d3([[[1.0], [2.0]], [[3.0], [4.0]]], requires_grad=True)
+        var a = Tensor[dtype].d3(
+            [[[1.0], [2.0]], [[3.0], [4.0]]], requires_grad=True
+        )
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(2, 2, 6)
         assert_true(e.shape() == Shape.of(2, 2, 6))
@@ -143,14 +151,20 @@ def test_gpu_expand_3d_last_dim() raises:
         assert_true(s.all_close(Tensor[dtype].d2([[6.0, 12.0], [18.0, 24.0]])))
         es = e.sum()
         es.backward()
-        assert_true(a.grad().all_close(Tensor[dtype].d3([[[6.0], [6.0]], [[6.0], [6.0]]])))
+        assert_true(
+            a.grad().all_close(
+                Tensor[dtype].d3([[[6.0], [6.0]], [[6.0], [6.0]]])
+            )
+        )
 
 
 def test_gpu_expand_3d_middle_dim() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_3d_middle_dim")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d3([[[1.0, 2.0]], [[3.0, 4.0]]], requires_grad=True)
+        var a = Tensor[dtype].d3(
+            [[[1.0, 2.0]], [[3.0, 4.0]]], requires_grad=True
+        )
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(2, 5, 2)
         assert_true(e.shape() == Shape.of(2, 5, 2))
@@ -158,7 +172,9 @@ def test_gpu_expand_3d_middle_dim() raises:
         assert_true(s.all_close(Tensor[dtype].d2([[5.0, 10.0], [15.0, 20.0]])))
         es = e.sum()
         es.backward()
-        assert_true(a.grad().all_close(Tensor[dtype].d3([[[5.0, 5.0]], [[5.0, 5.0]]])))
+        assert_true(
+            a.grad().all_close(Tensor[dtype].d3([[[5.0, 5.0]], [[5.0, 5.0]]]))
+        )
 
 
 def test_gpu_expand_3d_two_dims_broadcast() raises:
@@ -184,7 +200,9 @@ def test_gpu_expand_3d_all_dims_size1() raises:
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(2, 3, 4)
         assert_true(e.shape() == Shape.of(2, 3, 4))
-        assert_true(e.to_cpu().all_close(Tensor[dtype].full(Shape.of(2, 3, 4), 7.0)))
+        assert_true(
+            e.to_cpu().all_close(Tensor[dtype].full(Shape.of(2, 3, 4), 7.0))
+        )
         es = e.sum()
         es.backward()
         assert_true(a.grad().all_close(Tensor[dtype].d3([[[24.0]]])))
@@ -193,6 +211,7 @@ def test_gpu_expand_3d_all_dims_size1() raises:
 # ------------------------------------------------------------
 # Shape API overload
 # ------------------------------------------------------------
+
 
 def test_gpu_expand_shape_api_overload() raises:
     comptime if has_accelerator():
@@ -213,18 +232,21 @@ def test_gpu_expand_shape_api_overload() raises:
 # Grad correctness: non-uniform values
 # ------------------------------------------------------------
 
+
 def test_gpu_expand_grad_non_uniform_values() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_grad_non_uniform_values")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
-        var a_unsqueezed = a.unsqueeze(0)          # (1,2,2) — no grad
+        var a_unsqueezed = a.unsqueeze(0)  # (1,2,2) — no grad
         var a_gpu = a_unsqueezed.to_gpu()
         var e = a_gpu.expand(3, 2, 2)
         assert_true(e.shape() == Shape.of(3, 2, 2))
         es = e.sum()
         es.backward()
-        assert_true(a.grad().all_close(Tensor[dtype].d2([[3.0, 3.0], [3.0, 3.0]])))
+        assert_true(
+            a.grad().all_close(Tensor[dtype].d2([[3.0, 3.0], [3.0, 3.0]]))
+        )
 
 
 def test_gpu_expand_grad_weighted_loss() raises:
@@ -235,20 +257,22 @@ def test_gpu_expand_grad_weighted_loss() raises:
         var bias_gpu = bias.to_gpu()
         var e = bias_gpu.expand(3, 4, requires_grad=True)
         var weights = Tensor[dtype].d2(
-            [[1.0, 2.0, 1.0, 2.0],
-             [2.0, 1.0, 2.0, 1.0],
-             [1.0, 1.0, 1.0, 1.0]]
+            [[1.0, 2.0, 1.0, 2.0], [2.0, 1.0, 2.0, 1.0], [1.0, 1.0, 1.0, 1.0]]
         )
         var weights_gpu = weights.to_gpu()
         var loss = (e * weights_gpu).sum()
         loss.backward()
         # col0: 1+2+1=4, col1: 2+1+1=4, col2: 1+2+1=4, col3: 2+1+1=4
-        assert_true(bias.grad().all_close(Tensor[dtype].d2([[4.0, 4.0, 4.0, 4.0]])))
+        assert_true(
+            bias.grad().all_close(Tensor[dtype].d2([[4.0, 4.0, 4.0, 4.0]]))
+        )
         print("passed test_gpu_expand_grad_weighted_loss")
+
 
 # ------------------------------------------------------------
 # Expand then reduce — round-trip grad check
 # ------------------------------------------------------------
+
 
 def test_gpu_expand_then_sum_axis_round_trip() raises:
     comptime if has_accelerator():
@@ -282,6 +306,7 @@ def test_gpu_expand_then_mean_grad() raises:
 # ------------------------------------------------------------
 # Common ML patterns
 # ------------------------------------------------------------
+
 
 def test_gpu_expand_bias_broadcast_pattern() raises:
     comptime if has_accelerator():
@@ -319,6 +344,7 @@ def test_gpu_expand_grad_accumulation_two_expands() raises:
 # track_grad=False on GPU
 # ------------------------------------------------------------
 
+
 def test_gpu_expand_no_grad_tracking() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_no_grad_tracking")
@@ -333,6 +359,7 @@ def test_gpu_expand_no_grad_tracking() raises:
 # ------------------------------------------------------------
 # 4D expansions
 # ------------------------------------------------------------
+
 
 def test_gpu_expand_4d_first_two_dims() raises:
     comptime if has_accelerator():
@@ -366,12 +393,15 @@ def test_gpu_expand_4d_last_dim_only() raises:
         assert_true(e.shape() == Shape.of(2, 3, 4, 7))
         es = e.sum()
         es.backward()
-        assert_true(a.grad().all_close(Tensor[dtype].full(Shape.of(2, 3, 4, 1), 7.0)))
+        assert_true(
+            a.grad().all_close(Tensor[dtype].full(Shape.of(2, 3, 4, 1), 7.0))
+        )
 
 
 # ------------------------------------------------------------
 # GPU forward matches CPU forward (cross-validate)
 # ------------------------------------------------------------
+
 
 def test_gpu_expand_matches_cpu_forward() raises:
     comptime if has_accelerator():
@@ -416,6 +446,7 @@ def test_gpu_expand_matches_cpu_forward_3d() raises:
 # Grad lands on CPU, not GPU
 # ------------------------------------------------------------
 
+
 def test_gpu_expand_grad_lands_on_cpu() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_grad_lands_on_cpu")
@@ -447,6 +478,7 @@ def test_gpu_expand_cpu_tensor_data_unchanged() raises:
 # Chained expand ops on GPU
 # ------------------------------------------------------------
 
+
 def test_gpu_expand_chained_two_expands() raises:
     comptime if has_accelerator():
         print("test_gpu_expand_chained_two_expands")
@@ -454,9 +486,9 @@ def test_gpu_expand_chained_two_expands() raises:
         # (1,1,2) → expand to (2,3,2) → sum axis0 → (3,2) → expand to (4,3,2)
         var a = Tensor[dtype].d3([[[1.0, 2.0]]], requires_grad=True)
         var a_gpu = a.to_gpu()
-        var e1 = a_gpu.expand(2, 3, 2)        # (2,3,2)
-        var s = e1.sum(axes=[0], keepdims=True) # (1,3,2)
-        var e2 = s.expand(4, 3, 2)             # (4,3,2)
+        var e1 = a_gpu.expand(2, 3, 2)  # (2,3,2)
+        var s = e1.sum(axes=[0], keepdims=True)  # (1,3,2)
+        var e2 = s.expand(4, 3, 2)  # (4,3,2)
         e2_s = e2.sum()
         e2_s.backward()
         # e1 broadcast factor: 2*3=6 via e1 path, then *4 via e2 = 24 per element
@@ -470,9 +502,9 @@ def test_gpu_expand_then_sum_then_expand() raises:
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
-        var e1 = a_gpu.expand(4, 3)                    # (4,3)
-        var s = e1.sum(axes=[0], keepdims=True)         # (1,3)
-        var e2 = s.expand(2, 3)                         # (2,3)
+        var e1 = a_gpu.expand(4, 3)  # (4,3)
+        var s = e1.sum(axes=[0], keepdims=True)  # (1,3)
+        var e2 = s.expand(2, 3)  # (2,3)
         e2_s = e2.sum()
         e2_s.backward()
         # grad: expand(4) * sum(1) * expand(2) = 4*2 = 8 per element
@@ -482,6 +514,7 @@ def test_gpu_expand_then_sum_then_expand() raises:
 # ------------------------------------------------------------
 # Zero-stride view property on GPU
 # ------------------------------------------------------------
+
 
 def test_gpu_expand_is_zero_stride_view() raises:
     comptime if has_accelerator():
@@ -502,8 +535,6 @@ def test_gpu_expand_is_zero_stride_view() raises:
 # MAIN
 # ============================================================
 
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-
-
-

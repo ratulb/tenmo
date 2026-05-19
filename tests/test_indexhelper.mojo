@@ -533,6 +533,7 @@ def run_all_tests() raises:
 
 # ========== INDEX CALCULATOR TESTS ==========
 
+
 def test_flatten_index_with_intarray() raises:
     """Test flatten_index with IntArray indices."""
     print("test_flatten_index_with_intarray")
@@ -564,7 +565,9 @@ def test_flatten_index_from_list_conversion() raises:
     indices_list.append(2)
     indices_list.append(3)
     # Convert List to IntArray before calling
-    var flat = IndexCalculator.flatten_index(shape, IntArray(indices_list), strides, 0)
+    var flat = IndexCalculator.flatten_index(
+        shape, IntArray(indices_list), strides, 0
+    )
     assert_equal(flat, 11)  # 2*4 + 3*1
 
     print("  ✓ List[Int] to IntArray conversion works")
@@ -576,13 +579,12 @@ def test_flatten_index_from_variadic_conversion() raises:
 
     var shape = Shape(3, 4)
     var strides = Strides(4, 1)
-    
+
     # Convert variadic args to IntArray, then call main function
     var flat = IndexCalculator.flatten_index(shape, IntArray(2, 3), strides, 0)
     assert_equal(flat, 11)  # 2*4 + 3*1
 
     print("  ✓ VariadicList to IntArray conversion works")
-
 
 
 def test_index_to_coord() raises:
@@ -637,13 +639,17 @@ def test_index_calculator_edge_cases() raises:
     # 1D tensor
     var shape1d = Shape(10)
     var strides1d = Strides(1)
-    var idx1d = IndexCalculator.flatten_index(shape1d, IntArray(5), strides1d, 0)
+    var idx1d = IndexCalculator.flatten_index(
+        shape1d, IntArray(5), strides1d, 0
+    )
     assert_equal(idx1d, 5)
 
     # Scalar tensor (0D)
     var shape0d = Shape()
     var strides0d = Strides()
-    var idx0d = IndexCalculator.flatten_index(shape0d, IntArray(), strides0d, 100)
+    var idx0d = IndexCalculator.flatten_index(
+        shape0d, IntArray(), strides0d, 100
+    )
     assert_equal(idx0d, 100)
 
     # Test 2D
@@ -651,7 +657,7 @@ def test_index_calculator_edge_cases() raises:
     var strides2d = Strides(6, 1)
     var indices2d = IntArray(4, 5)
     var idx2d = IndexCalculator.flatten_index(shape2d, indices2d, strides2d, 0)
-    assert_equal(idx2d, 4*6 + 5*1)  # = 29
+    assert_equal(idx2d, 4 * 6 + 5 * 1)  # = 29
 
     print("  ✓ IndexCalculator edge cases work")
 
@@ -881,5 +887,3 @@ def run_all_index_iterator_review_tests() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-
-

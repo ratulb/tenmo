@@ -17,7 +17,8 @@ struct BLASMatmul2dBackward[dtype: DType](
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var bwd_arg = (
             output.ancestry().backward_fn_arg().get[BlasArg[Self.dtype]]()
         )
@@ -36,9 +37,6 @@ struct BLASMatmul2dBackward[dtype: DType](
         var B = Tensor[Self.dtype](
             B_ancestor.buffer(), requires_grad=B_ancestor.requires_grad
         )
-        var result = List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ]()
         if A.requires_grad:
             var grad_A: Gradbox[Self.dtype]
 
@@ -64,7 +62,8 @@ struct BLASMatmul2dBackward[dtype: DType](
                     B, grad_out, transpose_A=True, transpose_B=True
                 )
 
-            result.append((A_ancestor, grad_A^, AddTensor))
+            A_ancestor.update_grad(grad_A^, AddTensor, None)
+            parent_ids.append(A_ancestor._id)
 
         if B.requires_grad:
             var grad_B: Gradbox[Self.dtype]
@@ -91,8 +90,8 @@ struct BLASMatmul2dBackward[dtype: DType](
                     grad_out, A, transpose_A=True, transpose_B=True
                 )
 
-            result.append((B_ancestor^, grad_B^, AddTensor))
-        return result^
+            B_ancestor.update_grad(grad_B^, AddTensor, None)
+            parent_ids.append(B_ancestor._id)
 
 
 comptime BLAS_PATH = get_defined_string[

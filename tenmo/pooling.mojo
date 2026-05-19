@@ -25,7 +25,8 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var bwd_arg = output.ancestry().backward_fn_arg().get[MaxPool2dBwdArg]()
         var (kernel_size, stride, padding, input_shape, argmax_mask) = (
             bwd_arg.kernel_size,
@@ -35,17 +36,10 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
             bwd_arg.argmax_mask,
         )
         ref grad_output = output.gradients()[]
-        var results = List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ]()
 
         var input_tensor_ref = output.ancestry().get(0)
-        var input_tensor = Tensor[Self.dtype](
-            input_tensor_ref.buffer(),
-            requires_grad=input_tensor_ref.requires_grad,
-        )
 
-        if input_tensor.requires_grad:
+        if input_tensor_ref.requires_grad:
             var N = input_shape[0]
             var C = input_shape[1]
             var H_in = input_shape[2]
@@ -105,9 +99,8 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
                             grad_in_ptr[grad_in_nc_base + max_idx] += grad_val
 
             parallelize[scatter_gradients_optimized](N * C)
-            results.append((input_tensor_ref^, grad_input^, AddTensor))
-
-        return results^
+            input_tensor_ref.update_grad(grad_input^, AddTensor, None)
+            parent_ids.append(input_tensor_ref._id)
 
 
 @fieldwise_init

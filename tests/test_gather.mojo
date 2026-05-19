@@ -491,9 +491,12 @@ def test_gather_gpu_2d_axis1_irregular_copy() raises:
 
 # ── CPU / Forward ─────────────────────────────────────────────────────────────
 
+
 def test_mcpy_cpu_2d_single_row_first() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
+    )
     var idx = IntArray()
     idx.append(0)
     var result = a.gather(idx, axis=0)
@@ -502,7 +505,9 @@ def test_mcpy_cpu_2d_single_row_first() raises:
 
 def test_mcpy_cpu_2d_single_row_last() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
+    )
     var idx = IntArray()
     idx.append(2)
     var result = a.gather(idx, axis=0)
@@ -511,7 +516,9 @@ def test_mcpy_cpu_2d_single_row_last() raises:
 
 def test_mcpy_cpu_2d_single_row_middle() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
+    )
     var idx = IntArray()
     idx.append(1)
     var result = a.gather(idx, axis=0)
@@ -526,7 +533,9 @@ def test_mcpy_cpu_2d_multi_row_ordered() raises:
     idx.append(1)
     idx.append(2)
     var result = a.gather(idx, axis=0)
-    assert_true(result.all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])))
+    assert_true(
+        result.all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]))
+    )
 
 
 def test_mcpy_cpu_2d_multi_row_reversed() raises:
@@ -537,7 +546,9 @@ def test_mcpy_cpu_2d_multi_row_reversed() raises:
     idx.append(1)
     idx.append(0)
     var result = a.gather(idx, axis=0)
-    assert_true(result.all_close(Tensor[dtype].d2([[5.0, 6.0], [3.0, 4.0], [1.0, 2.0]])))
+    assert_true(
+        result.all_close(Tensor[dtype].d2([[5.0, 6.0], [3.0, 4.0], [1.0, 2.0]]))
+    )
 
 
 def test_mcpy_cpu_2d_duplicate_indices() raises:
@@ -548,7 +559,9 @@ def test_mcpy_cpu_2d_duplicate_indices() raises:
     idx.append(1)
     idx.append(1)
     var result = a.gather(idx, axis=0)
-    assert_true(result.all_close(Tensor[dtype].d2([[3.0, 4.0], [3.0, 4.0], [3.0, 4.0]])))
+    assert_true(
+        result.all_close(Tensor[dtype].d2([[3.0, 4.0], [3.0, 4.0], [3.0, 4.0]]))
+    )
 
 
 def test_mcpy_cpu_2d_all_rows_identity() raises:
@@ -564,19 +577,27 @@ def test_mcpy_cpu_2d_all_rows_identity() raises:
 
 def test_mcpy_cpu_2d_wide_cols() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([
-        [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
-        [9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0],
-        [17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0],
-    ])
+    var a = Tensor[dtype].d2(
+        [
+            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+            [9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0],
+            [17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0],
+        ]
+    )
     var idx = IntArray()
     idx.append(2)
     idx.append(0)
     var result = a.gather(idx, axis=0)
-    assert_true(result.all_close(Tensor[dtype].d2([
-        [17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0],
-        [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
-    ])))
+    assert_true(
+        result.all_close(
+            Tensor[dtype].d2(
+                [
+                    [17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0],
+                    [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+                ]
+            )
+        )
+    )
 
 
 def test_mcpy_cpu_2d_single_col() raises:
@@ -596,7 +617,9 @@ def test_mcpy_cpu_2d_float64() raises:
     idx.append(1)
     idx.append(0)
     var result = a.gather(idx, axis=0)
-    assert_true(result.all_close(Tensor[dtype].d2([[4.0, 5.0, 6.0], [1.0, 2.0, 3.0]])))
+    assert_true(
+        result.all_close(Tensor[dtype].d2([[4.0, 5.0, 6.0], [1.0, 2.0, 3.0]]))
+    )
 
 
 def test_mcpy_cpu_2d_float16() raises:
@@ -606,7 +629,9 @@ def test_mcpy_cpu_2d_float16() raises:
     idx.append(0)
     idx.append(2)
     var result = a.gather(idx, axis=0)
-    assert_true(result.all_close[atol=1e-2](Tensor[dtype].d2([[1.0, 2.0], [5.0, 6.0]])))
+    assert_true(
+        result.all_close[atol=1e-2](Tensor[dtype].d2([[1.0, 2.0], [5.0, 6.0]]))
+    )
 
 
 def test_mcpy_cpu_2d_more_output_rows_than_input() raises:
@@ -619,12 +644,23 @@ def test_mcpy_cpu_2d_more_output_rows_than_input() raises:
     idx.append(0)
     idx.append(1)
     var result = a.gather(idx, axis=0)
-    assert_true(result.all_close(Tensor[dtype].d2([
-        [10.0, 20.0], [30.0, 40.0], [10.0, 20.0], [10.0, 20.0], [30.0, 40.0]
-    ])))
+    assert_true(
+        result.all_close(
+            Tensor[dtype].d2(
+                [
+                    [10.0, 20.0],
+                    [30.0, 40.0],
+                    [10.0, 20.0],
+                    [10.0, 20.0],
+                    [30.0, 40.0],
+                ]
+            )
+        )
+    )
 
 
 # ── CPU / Grad flow ───────────────────────────────────────────────────────────
+
 
 def test_mcpy_cpu_2d_no_grad_flows_to_source() raises:
     comptime dtype = DType.float32
@@ -674,9 +710,12 @@ def test_mcpy_cpu_2d_grad_through_downstream_op() raises:
 
 # ── CPU / fuse_sum ────────────────────────────────────────────────────────────
 
+
 def test_mcpy_cpu_2d_fuse_sum_basic() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
+    )
     var idx = IntArray()
     idx.append(0)
     idx.append(2)
@@ -734,13 +773,16 @@ def test_mcpy_cpu_2d_fuse_sum_no_grad_flows() raises:
 
 # ── CPU / MEAN forward ──────────────────────────────────────────────────────────
 
+
 def test_mcpy_cpu_2d_fuse_mean_basic() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([
-        [1.0, 2.0, 3.0],
-        [4.0, 5.0, 6.0],
-        [7.0, 8.0, 9.0],
-    ])
+    var a = Tensor[dtype].d2(
+        [
+            [1.0, 2.0, 3.0],
+            [4.0, 5.0, 6.0],
+            [7.0, 8.0, 9.0],
+        ]
+    )
     var idx = IntArray()
     idx.append(0)
     idx.append(1)
@@ -752,10 +794,12 @@ def test_mcpy_cpu_2d_fuse_mean_basic() raises:
 
 def test_mcpy_cpu_2d_fuse_mean_single_index() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([
-        [1.0, 2.0, 3.0],
-        [4.0, 5.0, 6.0],
-    ])
+    var a = Tensor[dtype].d2(
+        [
+            [1.0, 2.0, 3.0],
+            [4.0, 5.0, 6.0],
+        ]
+    )
     var idx = IntArray()
     idx.append(0)
     var result = a.gather(idx, axis=0, reduction=Reduction(0))
@@ -766,10 +810,12 @@ def test_mcpy_cpu_2d_fuse_mean_single_index() raises:
 
 def test_mcpy_cpu_2d_fuse_mean_duplicate_indices() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([
-        [10.0, 20.0],
-        [30.0, 40.0],
-    ])
+    var a = Tensor[dtype].d2(
+        [
+            [10.0, 20.0],
+            [30.0, 40.0],
+        ]
+    )
     var idx = IntArray()
     idx.append(0)
     idx.append(0)
@@ -777,7 +823,7 @@ def test_mcpy_cpu_2d_fuse_mean_duplicate_indices() raises:
     var result = a.gather(idx, axis=0, reduction=Reduction(0))
     # mean of rows 0,0,1: [(10+10+30)/3, (20+20+40)/3] = [50/3, 80/3]
     assert_true(result.shape() == Shape(2))
-    assert_true(result.all_close(Tensor[dtype].d1([50.0/3.0, 80.0/3.0])))
+    assert_true(result.all_close(Tensor[dtype].d1([50.0 / 3.0, 80.0 / 3.0])))
 
 
 def test_mcpy_cpu_2d_fuse_mean_grad() raises:
@@ -800,15 +846,20 @@ def test_mcpy_cpu_2d_fuse_mean_grad() raises:
 
 # ── GPU / Forward ─────────────────────────────────────────────────────────────
 
+
 def test_mcpy_gpu_2d_single_row() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+        var a = Tensor[dtype].d2(
+            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
+        )
         var a_gpu = a.to_gpu()
         var idx = IntArray()
         idx.append(1)
         var result = a_gpu.gather(idx, axis=0)
-        assert_true(result.to_cpu().all_close(Tensor[dtype].d2([[4.0, 5.0, 6.0]])))
+        assert_true(
+            result.to_cpu().all_close(Tensor[dtype].d2([[4.0, 5.0, 6.0]]))
+        )
 
 
 def test_mcpy_gpu_2d_multi_row_reversed() raises:
@@ -821,27 +872,37 @@ def test_mcpy_gpu_2d_multi_row_reversed() raises:
         idx.append(1)
         idx.append(0)
         var result = a_gpu.gather(idx, axis=0)
-        assert_true(result.to_cpu().all_close(
-            Tensor[dtype].d2([[5.0, 6.0], [3.0, 4.0], [1.0, 2.0]])
-        ))
+        assert_true(
+            result.to_cpu().all_close(
+                Tensor[dtype].d2([[5.0, 6.0], [3.0, 4.0], [1.0, 2.0]])
+            )
+        )
 
 
 def test_mcpy_gpu_2d_duplicate_indices() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2([
-            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
-            [9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0],
-        ])
+        var a = Tensor[dtype].d2(
+            [
+                [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+                [9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0],
+            ]
+        )
         var a_gpu = a.to_gpu()
         var idx = IntArray()
         idx.append(1)
         idx.append(0)
         var result = a_gpu.gather(idx, axis=0)
-        assert_true(result.to_cpu().all_close(Tensor[dtype].d2([
-            [9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0],
-            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
-        ])))
+        assert_true(
+            result.to_cpu().all_close(
+                Tensor[dtype].d2(
+                    [
+                        [9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0],
+                        [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+                    ]
+                )
+            )
+        )
 
 
 def test_mcpy_gpu_2d_single_col() raises:
@@ -870,6 +931,7 @@ def test_mcpy_gpu_2d_all_rows_identity() raises:
 
 
 # ── GPU / Grad flow ───────────────────────────────────────────────────────────
+
 
 def test_mcpy_gpu_2d_no_grad_flows_to_source() raises:
     comptime if has_accelerator():
@@ -926,16 +988,21 @@ def test_mcpy_gpu_2d_grad_through_downstream_op() raises:
 
 # ── GPU / fuse_sum ────────────────────────────────────────────────────────────
 
+
 def test_mcpy_gpu_2d_fuse_sum_basic() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+        var a = Tensor[dtype].d2(
+            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
+        )
         var a_gpu = a.to_gpu()
         var idx = IntArray()
         idx.append(0)
         idx.append(2)
         var result = a_gpu.gather(idx, axis=0, reduction=Reduction(1))
-        assert_true(result.to_cpu().all_close(Tensor[dtype].d1([8.0, 10.0, 12.0])))
+        assert_true(
+            result.to_cpu().all_close(Tensor[dtype].d1([8.0, 10.0, 12.0]))
+        )
 
 
 def test_mcpy_gpu_2d_fuse_sum_duplicate_indices() raises:
@@ -972,35 +1039,54 @@ def test_mcpy_gpu_2d_fuse_sum_no_grad_flows() raises:
 
 # ── GPU / MEAN forward ──────────────────────────────────────────────────────────
 
+
 def test_mcpy_gpu_2d_fuse_mean_basic() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2([
-            [1.0, 2.0, 3.0],
-            [4.0, 5.0, 6.0],
-        ]).to_gpu()
+        var a = (
+            Tensor[dtype]
+            .d2(
+                [
+                    [1.0, 2.0, 3.0],
+                    [4.0, 5.0, 6.0],
+                ]
+            )
+            .to_gpu()
+        )
         var idx = IntArray()
         idx.append(0)
         idx.append(1)
         var result = a.gather(idx, axis=0, reduction=Reduction(0))
         assert_true(result.shape() == Shape(3))
-        assert_true(result.to_cpu().all_close(Tensor[dtype].d1([2.5, 3.5, 4.5])))
+        assert_true(
+            result.to_cpu().all_close(Tensor[dtype].d1([2.5, 3.5, 4.5]))
+        )
 
 
 def test_mcpy_gpu_2d_fuse_mean_duplicate_indices() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2([
-            [10.0, 20.0],
-            [30.0, 40.0],
-        ]).to_gpu()
+        var a = (
+            Tensor[dtype]
+            .d2(
+                [
+                    [10.0, 20.0],
+                    [30.0, 40.0],
+                ]
+            )
+            .to_gpu()
+        )
         var idx = IntArray()
         idx.append(0)
         idx.append(0)
         idx.append(1)
         var result = a.gather(idx, axis=0, reduction=Reduction(0))
         assert_true(result.shape() == Shape(2))
-        assert_true(result.to_cpu().all_close(Tensor[dtype].d1([50.0/3.0, 80.0/3.0])))
+        assert_true(
+            result.to_cpu().all_close(
+                Tensor[dtype].d1([50.0 / 3.0, 80.0 / 3.0])
+            )
+        )
 
 
 def test_mcpy_gpu_2d_fuse_mean_grad() raises:
@@ -1024,23 +1110,29 @@ def test_mcpy_gpu_2d_fuse_mean_grad() raises:
 
 # ── CPU / MEAN / CPU–GPU parity ───────────────────────────────────────────────
 
+
 def test_mcpy_cpu_gpu_parity_2d_fuse_mean() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2([
-            [1.0, 2.0, 3.0],
-            [4.0, 5.0, 6.0],
-            [7.0, 8.0, 9.0],
-        ])
+        var a = Tensor[dtype].d2(
+            [
+                [1.0, 2.0, 3.0],
+                [4.0, 5.0, 6.0],
+                [7.0, 8.0, 9.0],
+            ]
+        )
         var idx = IntArray()
         idx.append(0)
         idx.append(2)
         var cpu_result = a.gather(idx, axis=0, reduction=Reduction(0))
-        var gpu_result = a.to_gpu().gather(idx, axis=0, reduction=Reduction(0)).to_cpu()
+        var gpu_result = (
+            a.to_gpu().gather(idx, axis=0, reduction=Reduction(0)).to_cpu()
+        )
         assert_true(cpu_result.all_close[atol=1e-5](gpu_result))
 
 
 # ── CPU / Higher dimensions ───────────────────────────────────────────────────
+
 
 def test_mcpy_cpu_3d_axis0_scalar_path_consistency() raises:
     comptime dtype = DType.float32
@@ -1052,9 +1144,7 @@ def test_mcpy_cpu_3d_axis0_scalar_path_consistency() raises:
     idx.append(2)
     idx.append(0)
     var result = a.gather(idx, axis=0)
-    var _tmp1 = Tensor[dtype].d1(
-        [9.0, 10.0, 11.0, 12.0, 1.0, 2.0, 3.0, 4.0]
-    )
+    var _tmp1 = Tensor[dtype].d1([9.0, 10.0, 11.0, 12.0, 1.0, 2.0, 3.0, 4.0])
     var expected = _tmp1.reshape(2, 2, 2)
     assert_true(result.all_close(expected))
 
@@ -1069,24 +1159,25 @@ def test_mcpy_cpu_3d_axis1_scalar_path_consistency() raises:
     idx.append(0)
     idx.append(2)
     var result = a.gather(idx, axis=1)
-    var _tmp1 = Tensor[dtype].d1(
-        [1.0, 2.0, 5.0, 6.0, 7.0, 8.0, 11.0, 12.0]
-    )
+    var _tmp1 = Tensor[dtype].d1([1.0, 2.0, 5.0, 6.0, 7.0, 8.0, 11.0, 12.0])
     var expected = _tmp1.reshape(2, 2, 2)
     assert_true(result.all_close(expected))
 
 
 # ── CPU / CPU↔GPU value parity ────────────────────────────────────────────────
 
+
 def test_mcpy_cpu_gpu_parity_2d_axis0() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2([
-            [1.0, 2.0, 3.0],
-            [4.0, 5.0, 6.0],
-            [7.0, 8.0, 9.0],
-            [10.0, 11.0, 12.0],
-        ])
+        var a = Tensor[dtype].d2(
+            [
+                [1.0, 2.0, 3.0],
+                [4.0, 5.0, 6.0],
+                [7.0, 8.0, 9.0],
+                [10.0, 11.0, 12.0],
+            ]
+        )
         var idx = IntArray()
         idx.append(3)
         idx.append(1)
@@ -1100,27 +1191,32 @@ def test_mcpy_cpu_gpu_parity_2d_axis0() raises:
 def test_mcpy_cpu_gpu_parity_2d_fuse_sum() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2([
-            [1.0, 2.0, 3.0],
-            [4.0, 5.0, 6.0],
-            [7.0, 8.0, 9.0],
-        ])
+        var a = Tensor[dtype].d2(
+            [
+                [1.0, 2.0, 3.0],
+                [4.0, 5.0, 6.0],
+                [7.0, 8.0, 9.0],
+            ]
+        )
         var idx = IntArray()
         idx.append(0)
         idx.append(1)
         idx.append(2)
         var cpu_result = a.gather(idx, axis=0, reduction=Reduction(1))
-        var gpu_result = a.to_gpu().gather(idx, axis=0, reduction=Reduction(1)).to_cpu()
+        var gpu_result = (
+            a.to_gpu().gather(idx, axis=0, reduction=Reduction(1)).to_cpu()
+        )
         assert_true(cpu_result.all_close[atol=1e-5](gpu_result))
 
 
 # ─── General-case reduction / 3D axis0 SUM forward ────────────
 
+
 def test_mcpy_cpu_3d_axis0_sum_general() raises:
     comptime dtype = DType.float32
-    var _tmp0 = Tensor[dtype].d4([
-        [[[1, 2], [3, 4]], [[5, 6], [7, 8]], [[9, 10], [11, 12]]]
-    ])
+    var _tmp0 = Tensor[dtype].d4(
+        [[[[1, 2], [3, 4]], [[5, 6], [7, 8]], [[9, 10], [11, 12]]]]
+    )
     var a = _tmp0.reshape(3, 2, 2)
     var idx = IntArray()
     idx.append(0)
@@ -1134,6 +1230,7 @@ def test_mcpy_cpu_3d_axis0_sum_general() raises:
 
 
 # ─── General-case reduction / 3D axis0 MEAN forward ───────────
+
 
 def test_mcpy_cpu_3d_axis0_mean_general() raises:
     comptime dtype = DType.float32
@@ -1154,6 +1251,7 @@ def test_mcpy_cpu_3d_axis0_mean_general() raises:
 
 # ─── General-case reduction / 2D axis1 SUM forward ────────────
 
+
 def test_mcpy_cpu_2d_axis1_sum_general() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -1167,6 +1265,7 @@ def test_mcpy_cpu_2d_axis1_sum_general() raises:
 
 
 # ─── General-case reduction / 2D axis1 MEAN forward ───────────
+
 
 def test_mcpy_cpu_2d_axis1_mean_general() raises:
     comptime dtype = DType.float32
@@ -1182,11 +1281,16 @@ def test_mcpy_cpu_2d_axis1_mean_general() raises:
 
 # ─── General-case reduction / 3D axis0 SUM backward ───────────
 
+
 def test_mcpy_cpu_3d_axis0_sum_general_grad() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
-        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]], [[9.0, 10.0], [11.0, 12.0]]],
-        requires_grad=True
+        [
+            [[1.0, 2.0], [3.0, 4.0]],
+            [[5.0, 6.0], [7.0, 8.0]],
+            [[9.0, 10.0], [11.0, 12.0]],
+        ],
+        requires_grad=True,
     )
     var idx = IntArray()
     idx.append(0)
@@ -1206,11 +1310,16 @@ def test_mcpy_cpu_3d_axis0_sum_general_grad() raises:
 
 # ─── General-case reduction / 3D axis0 MEAN backward ──────────
 
+
 def test_mcpy_cpu_3d_axis0_mean_general_grad() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
-        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]], [[9.0, 10.0], [11.0, 12.0]]],
-        requires_grad=True
+        [
+            [[1.0, 2.0], [3.0, 4.0]],
+            [[5.0, 6.0], [7.0, 8.0]],
+            [[9.0, 10.0], [11.0, 12.0]],
+        ],
+        requires_grad=True,
     )
     var idx = IntArray()
     idx.append(0)
@@ -1228,6 +1337,7 @@ def test_mcpy_cpu_3d_axis0_mean_general_grad() raises:
 
 
 # ─── General-case reduction / 2D axis1 SUM backward ───────────
+
 
 def test_mcpy_cpu_2d_axis1_sum_general_grad() raises:
     comptime dtype = DType.float32
@@ -1249,6 +1359,7 @@ def test_mcpy_cpu_2d_axis1_sum_general_grad() raises:
 
 # ─── General-case reduction / 2D axis1 MEAN backward ──────────
 
+
 def test_mcpy_cpu_2d_axis1_mean_general_grad() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
@@ -1267,6 +1378,7 @@ def test_mcpy_cpu_2d_axis1_mean_general_grad() raises:
 
 
 # ─── GPU: General-case reduction SUM forward ──────────────────
+
 
 def test_mcpy_gpu_3d_axis0_sum_general() raises:
     comptime if has_accelerator():
@@ -1288,9 +1400,7 @@ def test_mcpy_gpu_3d_axis0_sum_general() raises:
 def test_mcpy_gpu_2d_axis1_sum_general() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2(
-            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
-        ).to_gpu()
+        var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
         var idx = IntArray()
         idx.append(0)
         idx.append(2)
@@ -1299,6 +1409,7 @@ def test_mcpy_gpu_2d_axis1_sum_general() raises:
 
 
 # ─── GPU: General-case reduction MEAN forward ─────────────────
+
 
 def test_mcpy_gpu_3d_axis0_mean_general() raises:
     comptime if has_accelerator():
@@ -1320,9 +1431,7 @@ def test_mcpy_gpu_3d_axis0_mean_general() raises:
 def test_mcpy_gpu_2d_axis1_mean_general() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2(
-            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
-        ).to_gpu()
+        var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
         var idx = IntArray()
         idx.append(0)
         idx.append(2)
@@ -1332,12 +1441,13 @@ def test_mcpy_gpu_2d_axis1_mean_general() raises:
 
 # ─── GPU: General-case reduction SUM backward ─────────────────
 
+
 def test_mcpy_gpu_3d_axis0_sum_general_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].d1(
             [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0],
-            requires_grad=True
+            requires_grad=True,
         )
         var _tmp1 = _tmp0.reshape(3, 2, 2)
         var a = _tmp1.to_gpu()
@@ -1358,9 +1468,11 @@ def test_mcpy_gpu_3d_axis0_sum_general_grad() raises:
 def test_mcpy_gpu_2d_axis1_sum_general_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2(
-            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
-        ).to_gpu()
+        var a = (
+            Tensor[dtype]
+            .d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+            .to_gpu()
+        )
         var idx = IntArray()
         idx.append(0)
         idx.append(2)
@@ -1368,18 +1480,23 @@ def test_mcpy_gpu_2d_axis1_sum_general_grad() raises:
         var loss = result.sum()
         loss.backward()
         var grad = a.grad().detach(share=True)
-        assert_true(grad[i(0), s()].all_close(Tensor[dtype].d1([1.0, 0.0, 1.0])))
-        assert_true(grad[i(1), s()].all_close(Tensor[dtype].d1([1.0, 0.0, 1.0])))
+        assert_true(
+            grad[i(0), s()].all_close(Tensor[dtype].d1([1.0, 0.0, 1.0]))
+        )
+        assert_true(
+            grad[i(1), s()].all_close(Tensor[dtype].d1([1.0, 0.0, 1.0]))
+        )
 
 
 # ─── GPU: General-case reduction MEAN backward ────────────────
+
 
 def test_mcpy_gpu_3d_axis0_mean_general_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].d1(
             [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0],
-            requires_grad=True
+            requires_grad=True,
         )
         var _tmp1 = _tmp0.reshape(3, 2, 2)
         var a = _tmp1.to_gpu()
@@ -1400,9 +1517,11 @@ def test_mcpy_gpu_3d_axis0_mean_general_grad() raises:
 def test_mcpy_gpu_2d_axis1_mean_general_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2(
-            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
-        ).to_gpu()
+        var a = (
+            Tensor[dtype]
+            .d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+            .to_gpu()
+        )
         var idx = IntArray()
         idx.append(0)
         idx.append(2)
@@ -1410,11 +1529,16 @@ def test_mcpy_gpu_2d_axis1_mean_general_grad() raises:
         var loss = result.sum()
         loss.backward()
         var grad = a.grad().detach(share=True)
-        assert_true(grad[i(0), s()].all_close(Tensor[dtype].d1([0.5, 0.0, 0.5])))
-        assert_true(grad[i(1), s()].all_close(Tensor[dtype].d1([0.5, 0.0, 0.5])))
+        assert_true(
+            grad[i(0), s()].all_close(Tensor[dtype].d1([0.5, 0.0, 0.5]))
+        )
+        assert_true(
+            grad[i(1), s()].all_close(Tensor[dtype].d1([0.5, 0.0, 0.5]))
+        )
 
 
 # ─── CPU–GPU parity: general-case reduction ────────────────────
+
 
 def test_mcpy_cpu_gpu_parity_3d_axis0_sum_general() raises:
     comptime if has_accelerator():
@@ -1427,7 +1551,9 @@ def test_mcpy_cpu_gpu_parity_3d_axis0_sum_general() raises:
         idx.append(0)
         idx.append(2)
         var cpu_result = a.gather(idx, axis=0, reduction=Reduction(1))
-        var gpu_result = a.to_gpu().gather(idx, axis=0, reduction=Reduction(1)).to_cpu()
+        var gpu_result = (
+            a.to_gpu().gather(idx, axis=0, reduction=Reduction(1)).to_cpu()
+        )
         assert_true(cpu_result.all_close[atol=1e-5](gpu_result))
 
 
@@ -1439,7 +1565,9 @@ def test_mcpy_cpu_gpu_parity_2d_axis1_sum_general() raises:
         idx.append(0)
         idx.append(2)
         var cpu_result = a.gather(idx, axis=1, reduction=Reduction(1))
-        var gpu_result = a.to_gpu().gather(idx, axis=1, reduction=Reduction(1)).to_cpu()
+        var gpu_result = (
+            a.to_gpu().gather(idx, axis=1, reduction=Reduction(1)).to_cpu()
+        )
         assert_true(cpu_result.all_close[atol=1e-5](gpu_result))
 
 
@@ -1454,7 +1582,9 @@ def test_mcpy_cpu_gpu_parity_3d_axis0_mean_general() raises:
         idx.append(0)
         idx.append(2)
         var cpu_result = a.gather(idx, axis=0, reduction=Reduction(0))
-        var gpu_result = a.to_gpu().gather(idx, axis=0, reduction=Reduction(0)).to_cpu()
+        var gpu_result = (
+            a.to_gpu().gather(idx, axis=0, reduction=Reduction(0)).to_cpu()
+        )
         assert_true(cpu_result.all_close[atol=1e-5](gpu_result))
 
 
@@ -1466,7 +1596,9 @@ def test_mcpy_cpu_gpu_parity_2d_axis1_mean_general() raises:
         idx.append(0)
         idx.append(2)
         var cpu_result = a.gather(idx, axis=1, reduction=Reduction(0))
-        var gpu_result = a.to_gpu().gather(idx, axis=1, reduction=Reduction(0)).to_cpu()
+        var gpu_result = (
+            a.to_gpu().gather(idx, axis=1, reduction=Reduction(0)).to_cpu()
+        )
         assert_true(cpu_result.all_close[atol=1e-5](gpu_result))
 
 

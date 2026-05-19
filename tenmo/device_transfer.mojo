@@ -46,7 +46,8 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var bwd_arg = (
             output.ancestry().backward_fn_arg().get[DeviceTransferBwdArg]()
         )
@@ -62,46 +63,39 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
         )
 
         if flow == Flow.UnMoved:
-            return [(ancestor_ref^, gradbox, AddTensor)]
-
-        comptime if has_accelerator():
-            if flow == Flow.Cpu2Gpu:
-                # Forward was CPU->GPU, backward transfers grad GPU->CPU
-                try:
-                    return [
-                        (
-                            ancestor_ref^,
-                            Gradbox[Self.dtype](gradbox.buffer.to_cpu()),
-                            AddTensor,
+            ancestor_ref.update_grad(gradbox, AddTensor, None)
+        else:
+            comptime if has_accelerator():
+                if flow == Flow.Cpu2Gpu:
+                    try:
+                        var cpu_grad = Gradbox[Self.dtype](
+                            gradbox.buffer.to_cpu()
                         )
-                    ]
-                except e:
-                    panic(
-                        "DeviceTransferBackward: GPU→CPU transfer failed: "
-                        + String(e)
-                    )
-                    return [(ancestor_ref^, gradbox, AddTensor)]  # unreachable
+                        ancestor_ref.update_grad(cpu_grad, AddTensor, None)
+                    except e:
+                        panic(
+                            "DeviceTransferBackward: GPU→CPU transfer failed: "
+                            + String(e)
+                        )
+                        ancestor_ref.update_grad(gradbox, AddTensor, None)
+                else:
+                    try:
+                        var gpu_grad = Gradbox[Self.dtype](
+                            gradbox.buffer.to_gpu(device.kind[GPU]),
+                            share=False,
+                        )
+                        ancestor_ref.update_grad(gpu_grad, AddTensor, None)
+                    except e:
+                        panic(
+                            "DeviceTransferBackward: CPU->GPU transfer failed: "
+                            + String(e)
+                        )
+                        ancestor_ref.update_grad(gradbox, AddTensor, None)
             else:
-                # Forward was GPU->CPU, backward transfers grad CPU->GPU
-                try:
-                    return [
-                        (
-                            ancestor_ref^,
-                            Gradbox[Self.dtype](
-                                gradbox.buffer.to_gpu(device.kind[GPU]),
-                                share=False,
-                            ),
-                            AddTensor,
-                        )
-                    ]
-                except e:
-                    panic(
-                        "DeviceTransferBackward: CPU->GPU transfer failed: "
-                        + String(e)
-                    )
-                    return [(ancestor_ref^, gradbox, AddTensor)]  # unreachable
+                ancestor_ref.update_grad(gradbox, AddTensor, None)
 
-        return [(ancestor_ref^, gradbox, AddTensor)]
+        parent_ids.append(ancestor_ref._id)
+
 
 @fieldwise_init
 struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -164,8 +158,6 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         This avoids a cross-device grad transfer on every backward pass.
     """
 
-
-
     @staticmethod
     def forward[
         track_grad: Bool = True
@@ -193,7 +185,9 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                             BACKWARD_DEVICE_TRANSFER,
                             DeviceTransferBwdArg(
                                 Flow.Gpu2Cpu,
-                                self.buffer.device_state.value().get_gpu().into(),
+                                self.buffer.device_state.value()
+                                .get_gpu()
+                                .into(),
                             ),
                         )
                     else:

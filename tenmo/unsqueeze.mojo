@@ -1,5 +1,5 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor, ZeroGrad
+from .mnemonics import AddTensor
 from .intarray import IntArray
 from .backpropagation import BackwardFnArg, IntArrayArg, BACKWARD_UNSQUEEZE
 from .squeeze import Squeeze
@@ -12,17 +12,18 @@ struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var axes = output.ancestry().backward_fn_arg().get[IntArrayArg]().array
-        var gradbox = output.gradients()[]
+        ref gradbox = output.gradients()[]
         # Remove the axis we had inserted
         var squeezed_gradbox = gradbox.squeeze(axes)
 
         var ancestor = output.ancestry().get(0)
-        return [
-            (ancestor, squeezed_gradbox^, AddTensor),
-            (output, gradbox^, ZeroGrad),
-        ]
+        if ancestor.requires_grad:
+            ancestor.update_grad(squeezed_gradbox^, AddTensor, None)
+        parent_ids.append(ancestor._id)
+        gradbox.zero_grad()
 
 
 @fieldwise_init

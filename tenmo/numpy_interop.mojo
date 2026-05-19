@@ -47,8 +47,12 @@ def ndarray_ptr[
 def to_ndarray[dtype: DType, //](tensor: Tensor[dtype]) raises -> PythonObject:
     return to_ndarray(tensor.buffer)
 
-def to_ndarray[dtype: DType, //](gradbox: Gradbox[dtype]) raises -> PythonObject:
+
+def to_ndarray[
+    dtype: DType, //
+](gradbox: Gradbox[dtype]) raises -> PythonObject:
     return to_ndarray(gradbox.buffer)
+
 
 def to_ndarray[dtype: DType, //](ndb: NDBuffer[dtype]) raises -> PythonObject:
     np = Python.import_module("numpy")
@@ -65,6 +69,7 @@ def to_ndarray[dtype: DType, //](ndb: NDBuffer[dtype]) raises -> PythonObject:
             flat[idx] = ndb[coord]
             idx += 1
     return ndarray
+
 
 def from_ndarray[
     dtype: DType
@@ -113,21 +118,29 @@ def load[
     return tenmo_tensor^
 
 
-def as_nested_list[dtype: DType, //](self: Tensor[dtype]) raises -> PythonObject:
+def as_nested_list[
+    dtype: DType, //
+](self: Tensor[dtype]) raises -> PythonObject:
     """Convert tensor to a nested Python list retaining shape structure."""
     var ndarray = to_ndarray(self)
     return ndarray.tolist()
 
-def as_nested_list[dtype: DType, //](self: Gradbox[dtype]) raises -> PythonObject:
+
+def as_nested_list[
+    dtype: DType, //
+](self: Gradbox[dtype]) raises -> PythonObject:
     """Convert Gradbox to a nested Python list retaining shape structure."""
     var ndarray = to_ndarray(self)
     return ndarray.tolist()
 
 
-def as_nested_list[dtype: DType, //](self: NDBuffer[dtype]) raises -> PythonObject:
+def as_nested_list[
+    dtype: DType, //
+](self: NDBuffer[dtype]) raises -> PythonObject:
     """Convert NDBuffer to a nested Python list retaining shape structure."""
     var ndarray = to_ndarray(self)
     return ndarray.tolist()
+
 
 def test_to_ndarray() raises:
     comptime dtype = DType.int32

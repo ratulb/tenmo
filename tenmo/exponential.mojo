@@ -10,16 +10,16 @@ struct ExponentialBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[
-        Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-    ] where Self.dtype.is_floating_point():
+        mut parent_ids: List[UInt],
+    ) where Self.dtype.is_floating_point():
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         # Gradient of exp: incoming grad * exp(A) = incoming grad * output
         var exp_grad = Gradbox[Self.dtype](
             gradbox.buffer * output.buffer(), share=False
         )
-        return [(parent, exp_grad, AddTensor)]
+        parent.update_grad(exp_grad, AddTensor, None)
+        parent_ids.append(parent._id)
 
 
 @fieldwise_init
@@ -44,4 +44,3 @@ struct Exponential[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^
-

@@ -16,15 +16,11 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         # This is the gradient flowing *into* this broadcasted op.
         # We need to call copy explicitly because we have not annotated Gradbox with `ImplicitlyCopyable` yet - Intententionally
         ref incoming_grad = output.gradbox[]
-
-        # capacity = 2 because we always have 2 parents(at most)
-        var parent_grad_list = List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ](capacity=2)
 
         # Extract parents (ancestors)
         var left_parent = output.ancestry().get(0)
@@ -39,13 +35,8 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
                 incoming_grad.buffer,
             )
 
-            # Append to return list:
-            #   - which ancestor gets the update
-            #   - the computed gradient box
-            #   - the operation code (AddTensor/SubtractTensor/etc.)
-            parent_grad_list.append(
-                (left_parent, left_parent_grad^, Self.lhs_op)
-            )
+            left_parent.update_grad(left_parent_grad^, Self.lhs_op, None)
+            parent_ids.append(left_parent._id)
 
         # For right parent: compute its gradient if needed
         if right_parent.requires_grad:
@@ -55,11 +46,8 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
                 incoming_grad.buffer,
             )
 
-            parent_grad_list.append(
-                (right_parent^, right_parent_grad^, Self.rhs_op)
-            )
-
-        return parent_grad_list^
+            right_parent.update_grad(right_parent_grad^, Self.rhs_op, None)
+            parent_ids.append(right_parent._id)
 
     @staticmethod
     def upstream_grad_share(
@@ -97,7 +85,8 @@ struct BroadcastToBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var parent = output.ancestry().get(0)
         ref incoming_grad = output.gradbox[]
 
@@ -118,7 +107,8 @@ struct BroadcastToBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             if grad.shape() != parent.shape():
                 grad = grad.reshape(parent.shape())
 
-        return [(parent^, grad^, AddTensor)]
+        parent.update_grad(grad^, AddTensor, None)
+        parent_ids.append(parent._id)
 
 
 @fieldwise_init
@@ -131,7 +121,6 @@ struct Broadcast[dtype: DType](Copyable, RegisterPassable):
         target_shape: Shape,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-
         var broadcasted_buffer = self.buffer.broadcast_to(target_shape)
         var out = Tensor[Self.dtype](broadcasted_buffer^, requires_grad=False)
 

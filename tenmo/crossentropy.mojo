@@ -138,6 +138,7 @@ struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
 # CECommon — Shared utilities for forward and backward
 
+
 @fieldwise_init
 struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
@@ -319,6 +320,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
 # CEClassIndicesBackward
 
+
 @fieldwise_init
 struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
     """
@@ -333,7 +335,8 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref bwd_arg = (
             output.ancestry()
             .backward_fn_arg()
@@ -405,9 +408,7 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         )
         # Step 6: Reshape back to original logits shape
         var _tmp0 = Gradbox[Self.dtype](scaled^, share=False)
-        var grad_final = _tmp0.reshape(
-            logits_shape
-        )
+        var grad_final = _tmp0.reshape(logits_shape)
         # Step 6: Reshape and UNPERMUTE back to original logits shape
         var rank = logits_shape.rank()
         if rank > 2:
@@ -430,7 +431,9 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
             # else:
             # grad_final = grad_final.reshape(self.logits_shape)
 
-        return [(logits, grad_final, AddTensor)]
+        if logits.requires_grad:
+            logits.update_grad(grad_final, AddTensor, None)
+        parent_ids.append(logits._id)
 
 
 # CEClassIndicesForward
@@ -574,6 +577,7 @@ struct CEClassIndicesForward[dtype: DType](
 
 # CEProbabilitiesBackward
 
+
 @fieldwise_init
 struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
     """
@@ -587,7 +591,8 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         ref bwd_arg = (
             output.ancestry()
             .backward_fn_arg()
@@ -629,13 +634,10 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         # Reshape to original logits shape
         var grad_final = scaled.reshape(logits_shape)
 
-        return [
-            (
-                logits,
-                Gradbox[Self.dtype](grad_final, share=False),
-                AddTensor,
-            )
-        ]
+        var gradbox = Gradbox[Self.dtype](grad_final, share=False)
+        if logits.requires_grad:
+            logits.update_grad(gradbox, AddTensor, None)
+        parent_ids.append(logits._id)
 
 
 # CEProbabilitiesForward
@@ -740,7 +742,9 @@ struct CEProbabilitiesForward[dtype: DType](
 
         return out^
 
+
 # CrossEntropyLoss
+
 
 @fieldwise_init
 struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):

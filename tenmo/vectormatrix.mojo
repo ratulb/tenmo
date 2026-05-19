@@ -17,9 +17,7 @@ struct VectorMatmulNdBackward[dtype: DType](
     @staticmethod
     def backward[
         simdwidth: Int = simd_width_of[Self.dtype]()
-    ](output: Ancestor[Self.dtype]) -> List[
-        Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-    ]:
+    ](output: Ancestor[Self.dtype], mut parent_ids: List[UInt]):
         ref grad_out = output.gradients()[]
         ref v_ref = output.ancestry().get(0)
         var v = Tensor[Self.dtype](
@@ -41,10 +39,6 @@ struct VectorMatmulNdBackward[dtype: DType](
         var batch_shape = ShapeBroadcaster.broadcast_shape(
             v_batch_shape, M_batch_shape
         )
-
-        var results = List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ]()
 
         # Gradient for v: dv[k] = grad_out[n] @ M^T[n, k]
         # This is equivalent to: dv[k] = sum_j(grad_out[j] * M[k, j])
@@ -101,7 +95,8 @@ struct VectorMatmulNdBackward[dtype: DType](
                     var grad_v_addr = grad_v_base + i * grad_v_stride
                     grad_v_data[grad_v_addr] += accumulator
 
-            results.append((v_ref, grad_v^, AddTensor))
+            v_ref.update_grad(grad_v^, AddTensor, None)
+            parent_ids.append(v_ref._id)
 
         # Gradient for M: dM[k, n] = v[k] ⊗ grad_out[n] (outer product)
         if M.requires_grad:
@@ -201,9 +196,8 @@ struct VectorMatmulNdBackward[dtype: DType](
                             )
                             grad_M_data[grad_M_addr] += v_val * grad_out_val
 
-            results.append((M_ref, grad_M^, AddTensor))
-
-        return results^
+            M_ref.update_grad(grad_M^, AddTensor, None)
+            parent_ids.append(M_ref._id)
 
 
 @fieldwise_init

@@ -6,6 +6,7 @@ from tenmo.mnemonics import AddTensor
 
 comptime dtype = DType.float32
 
+
 def test_cpu_add_scalar_tensor_result() raises:
     print("test_cpu_add_scalar_tensor_result")
     comptime dtype = DType.float32
@@ -13,9 +14,10 @@ def test_cpu_add_scalar_tensor_result() raises:
     var b = Tensor[dtype].scalar(4.0, requires_grad=True)
     var result = a + b  # Shape()
     result.backward()
-    #a.grad().print()
-    #b.grad().print()
+    # a.grad().print()
+    # b.grad().print()
     print("passed")
+
 
 def test_gpu_scalar_add_backward_only() raises:
     if not has_accelerator():
@@ -28,7 +30,7 @@ def test_gpu_scalar_add_backward_only() raises:
     var b_gpu = b.to_gpu()
     var gpu_result = a_gpu + b_gpu  # Shape() on GPU
     print("gpu_result requires_grad:", gpu_result.requires_grad)
-    #print("gpu_result has_backward_fn:", gpu_result.has_backward_fn())
+    # print("gpu_result has_backward_fn:", gpu_result.has_backward_fn())
     print("gpu_result gradbox is_on_gpu:", gpu_result.gradbox[].is_on_gpu())
     print("gpu_result gradbox numels:", gpu_result.gradbox[].buffer.numels())
     gpu_result.backward()
@@ -37,6 +39,7 @@ def test_gpu_scalar_add_backward_only() raises:
     print("b.grad():")
     b.grad().print()
     print("passed")
+
 
 def test_gpu_scalar_add_forward_only() raises:
     if not has_accelerator():
@@ -55,6 +58,7 @@ def test_gpu_scalar_add_forward_only() raises:
     gpu_result_cpu.print()
     assert_true(gpu_result_cpu.all_close(Tensor[dtype].scalar(7.0)))
     print("passed")
+
 
 def test_gpu_scalar_add_backward_seed_only() raises:
     if not has_accelerator():
@@ -81,6 +85,7 @@ def test_gpu_scalar_add_backward_seed_only() raises:
     gpu_result.grad().print()
     print("passed")
 
+
 def test_gpu_scalar_add_backward_manual_handler() raises:
     if not has_accelerator():
         return
@@ -100,7 +105,7 @@ def test_gpu_scalar_add_backward_manual_handler() raises:
 
     # Manually fire backward handler
     print("firing backward fn")
-    _="""var results = gpu_result.backward_fn()(gpu_result)
+    _ = """var results = gpu_result.backward_fn()(gpu_result)
     print("backward def returned, num results:", len(results))
     for i in range(len(results)):
         print("result", i, "grad:")
@@ -123,7 +128,7 @@ def test_gpu_scalar_add_backward_update_grad() raises:
     var seed_gpu = seed_tensor.to_gpu()
     gpu_result.seed_grad(seed_gpu)
 
-    _="""var results = gpu_result.backward_fn()(gpu_result)
+    _ = """var results = gpu_result.backward_fn()(gpu_result)
     print("backward def returned")
 
     # result[0] targets a_gpu, result[1] targets b_gpu
@@ -152,6 +157,7 @@ def test_gpu_scalar_add_backward_update_grad() raises:
 
     print("passed")
 
+
 def test_gpu_scalar_add_full_backward() raises:
     if not has_accelerator():
         return
@@ -177,7 +183,6 @@ def test_gpu_scalar_add_full_backward() raises:
     assert_true(b.grad().all_close(b_cpu_grad))
     print("passed")
 
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-
-

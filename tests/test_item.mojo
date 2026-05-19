@@ -2,6 +2,7 @@ from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
@@ -54,7 +55,7 @@ def test_item_gpu_gradbox_scalar() raises:
         var c_gpu = a_gpu + b_gpu
         # Manually seed gradbox
         var seed_cpu = Tensor[dtype].full(c_gpu.shape(), Scalar[dtype](1.0))
-        var seed =seed_cpu.to_gpu()
+        var seed = seed_cpu.to_gpu()
         c_gpu.seed_grad(seed)
         # item() on GPU gradbox
         assert_true(c_gpu.gradients()[].item() == 1.0)
@@ -89,5 +90,3 @@ def test_item_gpu_mean_result() raises:
         var a_gpu = a.to_gpu()
         var m = a_gpu.mean()  # Shape() scalar
         assert_true(m.item() == 2.5)
-
-

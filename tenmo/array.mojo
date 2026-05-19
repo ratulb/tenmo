@@ -45,7 +45,6 @@ struct Array(
 
     """
 
-
     comptime device_type: AnyType = Self
 
     @staticmethod
@@ -109,7 +108,6 @@ struct Array(
         self.storage = copy.storage
         self.size = copy.size
 
-
     @staticmethod
     @always_inline("nodebug")
     def filled(size: Int, value: Int) -> Self:
@@ -128,7 +126,6 @@ struct Array(
         """No-op for Array — always has max_rank capacity. Returns empty Array.
         """
         return Self()
-
 
     @always_inline("nodebug")
     def __len__(self) -> Int:
@@ -159,7 +156,6 @@ struct Array(
             "Array -> __setitem__: index out of bounds",
         )
         self.storage[index] = value
-
 
     @always_inline("nodebug")
     def append(mut self, value: Int):
@@ -206,7 +202,6 @@ struct Array(
         """Fill all existing elements with value (does not change size)."""
         for i in range(self.size):
             self.storage[i] = value
-
 
     @always_inline("nodebug")
     def __iadd__(mut self, other: Self):
@@ -271,7 +266,6 @@ struct Array(
             result += self.storage[i] * other[i]
         return result
 
-
     def __contains__(self, value: Int) -> Bool:
         for i in range(self.size):
             if self.storage[i] == value:
@@ -297,7 +291,6 @@ struct Array(
                 return False
         return True
 
-
     @always_inline("nodebug")
     def tolist(self) -> List[Int]:
         var result = List[Int](capacity=self.size)
@@ -308,7 +301,6 @@ struct Array(
     @always_inline("nodebug")
     def copy(self) -> Self:
         return self  # register-passable structs copy by value
-
 
     def product(self) -> Int:
         var result = 1
@@ -322,7 +314,6 @@ struct Array(
             s += self.storage[i]
         return s
 
-
     @always_inline("nodebug")
     def reverse(mut self):
         """Reverse in place."""
@@ -330,7 +321,6 @@ struct Array(
             var tmp = self.storage[i]
             self.storage[i] = self.storage[self.size - 1 - i]
             self.storage[self.size - 1 - i] = tmp
-
 
     comptime IteratorType[
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
@@ -343,7 +333,6 @@ struct Array(
     @always_inline("nodebug")
     def __reversed__(ref self) -> ArrayIterator[origin_of(self), False]:
         return ArrayIterator[forward=False](len(self), Pointer(to=self))
-
 
     @no_inline
     def write_to[W: Writer](self, mut writer: W):

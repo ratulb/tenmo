@@ -17,7 +17,8 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         """
         Split gradient and squeeze the stacked dimension.
 
@@ -35,9 +36,6 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref grad_strides = grad_output.strides()
 
         var count = len(output.ancestry())
-        var result = List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ]()
 
         # Size of stacked dimension should equal num_tensors
         var stack_size = grad_shape[axis]
@@ -86,9 +84,8 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     grad_input_data[elem_idx] = grad_data[src_idx]
                     elem_idx += 1
 
-            result.append((ancestor_ref^, grad_input^, AddTensor))
-
-        return result^
+            ancestor_ref.update_grad(grad_input^, AddTensor, None)
+            parent_ids.append(ancestor_ref._id)
 
 
 @fieldwise_init
@@ -297,4 +294,3 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return Concate.forward[track_grad](
             tensors, axis=1, requires_grad=requires_grad
         )
-

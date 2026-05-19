@@ -1,7 +1,13 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from tenmo.strides import Strides
-from std.testing import assert_true, assert_false, assert_raises, assert_equal, TestSuite
+from std.testing import (
+    assert_true,
+    assert_false,
+    assert_raises,
+    assert_equal,
+    TestSuite,
+)
 from tenmo.common_utils import i, newaxis, s
 
 

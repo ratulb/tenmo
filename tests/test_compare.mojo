@@ -2,7 +2,14 @@ from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 from tenmo.shapes import Shape
-from tenmo.mnemonics import Equal, NotEqual, LessThan, LessThanEqual, GreaterThan, GreaterThanEqual
+from tenmo.mnemonics import (
+    Equal,
+    NotEqual,
+    LessThan,
+    LessThanEqual,
+    GreaterThan,
+    GreaterThanEqual,
+)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -21,10 +28,10 @@ def test_compare_cpu_eq_1d() raises:
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var b = Tensor[dtype].d1([1.0, 0.0, 3.0])
     var result = a == b
-    #assert_true(result[[0]] == True)
-    #assert_true(result[[1]] == False)
+    # assert_true(result[[0]] == True)
+    # assert_true(result[[1]] == False)
     assert_true(result == False)
-    #assert_true(result[[2]] == True)
+    # assert_true(result[[2]] == True)
 
 
 def test_compare_cpu_eq_scalar() raises:
@@ -44,12 +51,11 @@ def test_compare_cpu_eq_2d() raises:
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var b = Tensor[dtype].d2([[1.0, 0.0], [3.0, 0.0]])
     var result = a == b
-    _="""assert_true(result[[0, 0]] == True)
+    _ = """assert_true(result[[0, 0]] == True)
     assert_true(result[[0, 1]] == False)
     assert_true(result[[1, 0]] == True)
     assert_true(result[[1, 1]] == False)"""
     assert_true(result == False)
-
 
 
 # ── CPU NotEqual ──────────────────────────────────────────────────────────────
@@ -61,7 +67,7 @@ def test_compare_cpu_ne_1d() raises:
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var b = Tensor[dtype].d1([1.0, 0.0, 3.0])
     var result = a != b
-    _="""assert_true(result[[0]] == False)
+    _ = """assert_true(result[[0]] == False)
     assert_true(result[[1]] == True)
     assert_true(result[[2]] == False)"""
     assert_true(result == False)
@@ -142,7 +148,7 @@ def test_compare_cpu_gte_1d() raises:
     var b = Tensor[dtype].d1([2.0, 4.0, 3.0])
     var result = a >= b
     assert_true(result[[0]] == False)
-    assert_true(result[[1]] == True)   # equal counts
+    assert_true(result[[1]] == True)  # equal counts
     assert_true(result[[2]] == True)
 
 
@@ -152,7 +158,7 @@ def test_compare_cpu_gte_scalar() raises:
     var a = Tensor[dtype].d1([1.0, 4.0, 5.0])
     var result = a >= Scalar[dtype](4.0)
     assert_true(result[[0]] == False)
-    assert_true(result[[1]] == True)   # equal counts
+    assert_true(result[[1]] == True)  # equal counts
     assert_true(result[[2]] == True)
 
 
@@ -202,7 +208,7 @@ def test_compare_cpu_lte_1d() raises:
     var b = Tensor[dtype].d1([2.0, 4.0, 3.0])
     var result = a <= b
     assert_true(result[[0]] == True)
-    assert_true(result[[1]] == True)   # equal counts
+    assert_true(result[[1]] == True)  # equal counts
     assert_true(result[[2]] == False)
 
 
@@ -212,7 +218,7 @@ def test_compare_cpu_lte_scalar() raises:
     var a = Tensor[dtype].d1([1.0, 4.0, 5.0])
     var result = a <= Scalar[dtype](4.0)
     assert_true(result[[0]] == True)
-    assert_true(result[[1]] == True)   # equal counts
+    assert_true(result[[1]] == True)  # equal counts
     assert_true(result[[2]] == False)
 
 
@@ -393,9 +399,11 @@ def test_compare_gpu_gt_3d() raises:
     comptime if has_accelerator():
         print("test_compare_gpu_gt_3d")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d3(
-            [[[1.0, 5.0], [3.0, 8.0]], [[6.0, 2.0], [4.0, 1.0]]]
-        ).to_gpu()
+        var a = (
+            Tensor[dtype]
+            .d3([[[1.0, 5.0], [3.0, 8.0]], [[6.0, 2.0], [4.0, 1.0]]])
+            .to_gpu()
+        )
         var result = a > Scalar[dtype](4.0)
         assert_true(result.is_on_gpu())
         assert_true(result[[0, 0, 0]] == False)
@@ -592,6 +600,7 @@ def test_compare_gpu_large_mixed() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 # CPU/GPU Parity Tests
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 def test_compare_parity_eq_1d() raises:
     comptime if has_accelerator():

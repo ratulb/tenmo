@@ -80,11 +80,19 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
 
         if init_method == "normal":
             self.weight = Tensor[Self.dtype].randn(
-                shape, mean=0.0, std=1.0, init_seed=init_seed, requires_grad=grad_required
+                shape,
+                mean=0.0,
+                std=1.0,
+                init_seed=init_seed,
+                requires_grad=grad_required,
             )
         elif init_method == "uniform":
             self.weight = Tensor[Self.dtype].rand(
-                shape, min=-1, max=1, init_seed=init_seed, requires_grad=grad_required
+                shape,
+                min=-1,
+                max=1,
+                init_seed=init_seed,
+                requires_grad=grad_required,
             )
         elif init_method == "xavier":
             var limit = Scalar[Self.dtype](
@@ -100,16 +108,29 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
         elif init_method == "kaiming":
             var std = sqrt(2.0 / Float64(embedding_dim))
             self.weight = Tensor[Self.dtype].randn(
-                shape, mean=0.0, std=std, init_seed=init_seed, requires_grad=grad_required
+                shape,
+                mean=0.0,
+                std=std,
+                init_seed=init_seed,
+                requires_grad=grad_required,
             )
         else:  # "zero"
-            self.weight = Tensor[Self.dtype].zeros(shape, requires_grad=grad_required)
+            self.weight = Tensor[Self.dtype].zeros(
+                shape, requires_grad=grad_required
+            )
 
         # Zero out padding row if set
         if padding_idx:
             self._zero_padding_row()
 
     # ── Forward ───────────────────────────────────────────────────────────────
+    def __call__(
+        mut self,
+        xs: Tensor[Self.dtype],
+    ) -> Tensor[Self.dtype]:
+        var xs_casted = xs.to_dtype[DType.int64]()
+        return self.__call__(xs_casted)
+
     def __call__(
         mut self,
         indices: List[Int],

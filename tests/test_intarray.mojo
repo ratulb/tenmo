@@ -565,7 +565,6 @@ def test_ia2_mixed_operations() raises:
     assert_equal(ia3[0], 4)
 
 
-
 # ============================================
 # INTARRAY INSERT/REPLACE TESTS
 # ============================================
@@ -964,5 +963,3 @@ def test_intarray_copyinit() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-
-

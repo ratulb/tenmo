@@ -8,13 +8,20 @@ Broadcasting rules for matmul:
 3. Last 2 dimensions must be compatible for matrix multiplication
 """
 
-from std.testing import assert_almost_equal, assert_equal, assert_true, assert_false, TestSuite
+from std.testing import (
+    assert_almost_equal,
+    assert_equal,
+    assert_true,
+    assert_false,
+    TestSuite,
+)
 from std.math import sqrt
 from std.random import random_float64
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from tenmo.common_utils import isnan, isinf
 from tenmo.gradbox import Gradbox
+
 
 def matmul[
     dtype: DType, //, track_grad: Bool = True
@@ -67,7 +74,6 @@ def test_3d_times_2d() raises:
     print("Test 2: 3D  2D Broadcasting (1,2,4) @ (4,9)")
     print("=" * 80)
 
-
     comptime dtype = DType.float32
     var A = Tensor[dtype].ones(1, 2, 4, requires_grad=True)
     var B = Tensor[dtype].ones(4, 9, requires_grad=True)
@@ -106,7 +112,6 @@ def test_batch_broadcasting() raises:
     print("=" * 80)
     print("Test 3: Batch Broadcasting (3,2,4) @ (1,4,9)")
     print("=" * 80)
-
 
     comptime dtype = DType.float32
     var A = Tensor[DType.float32].ones(3, 2, 4, requires_grad=True)
@@ -255,7 +260,7 @@ def test_gradient_with_numerical_check() raises:
     var grad_output = Tensor[DType.float32].randn(1, 2, 4)
     result.backward(grad_output)
 
-    #var grad_A = A.gradients()[]
+    # var grad_A = A.gradients()[]
     var grad_A = A.grad()
 
     # Numerical gradient check for A[0,0]
@@ -334,12 +339,12 @@ def test_symmetric_broadcasting() raises:
     print("Backward shapes correct with symmetric broadcasting")
     print()
 
+
 def test_complex_broadcasting() raises:
     """Test (2, 1, 3, 1, 4, 5) @ (1, 4, 1, 6, 5, 7) -> (2, 4, 3, 6, 4, 7)."""
     print("=" * 80)
     print("Test 8: Complex Multi-Dimensional Broadcasting")
     print("=" * 80)
-
 
     comptime dtype = DType.float32
     var A = Tensor[DType.float32].ones(2, 1, 3, 1, 4, 5, requires_grad=True)
@@ -374,6 +379,7 @@ def test_complex_broadcasting() raises:
     assert_true(result == Tensor[dtype].full(Shape(2, 4, 3, 6, 4, 7), 5))
     assert_true(grad_A == Gradbox[dtype].full(Shape(2, 1, 3, 1, 4, 5), 168))
     assert_true(grad_B == Gradbox[dtype].full(Shape(1, 4, 1, 6, 5, 7), 24))
+
 
 def test_edge_case_single_batch() raises:
     """Test (1, 2, 3) @ (1, 3, 4) -> (1, 2, 4)."""

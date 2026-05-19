@@ -6,6 +6,7 @@ from std.sys import has_accelerator
 from std.math import log
 from tenmo.shapes import Shape
 
+
 def main() raises:
     print("Example: Basic logarithm with epsilon")
 
@@ -24,15 +25,10 @@ def main() raises:
     loss.backward()
     x.grad().print()
 
-
     TestSuite.discover_tests[__functions_in_module()]().run()
 
-
-
-
-
-
     print("All logarithm tests passed!")
+
 
 # ============================================================================
 # TESTS - Forward Pass
@@ -417,8 +413,6 @@ def run_all_log_tests() raises:
 # ============================================================================
 
 
-
-
 # ── CPU Forward Tests ─────────────────────────────────────────────────────────
 
 
@@ -496,7 +490,7 @@ def test_log_cpu_custom_epsilon() raises:
     print("test_log_cpu_custom_epsilon")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([0.0, 1.0, 2.0])
-    var result = a.log[epsilon = Scalar[dtype](1e-6)]()
+    var result = a.log[epsilon=Scalar[dtype](1e-6)]()
     var expected_clamped = log(Float32(1e-6))
     assert_true(result[[0]] == expected_clamped)
     assert_true(result[[1]] == Float32(0.0))
@@ -619,7 +613,7 @@ def test_log_cpu_backward_custom_epsilon() raises:
     print("test_log_cpu_backward_custom_epsilon")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([0.0, 1.0, 4.0], requires_grad=True)
-    var result = a.log[epsilon = Scalar[dtype](1e-6)]()
+    var result = a.log[epsilon=Scalar[dtype](1e-6)]()
     var loss = result.sum()
     loss.backward()
     assert_true(a.grad()[[0]] == Float32(1.0) / Float32(1e-6))
@@ -827,7 +821,7 @@ def test_log_gpu_backward_custom_epsilon() raises:
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([0.0, 1.0, 4.0], requires_grad=True)
         var a_gpu = a.to_gpu()
-        var result = a_gpu.log[epsilon = Scalar[dtype](1e-6)]()
+        var result = a_gpu.log[epsilon=Scalar[dtype](1e-6)]()
         var loss = result.sum()
         loss.backward()
         assert_true(a.grad()[[0]] == Float32(1.0) / Float32(1e-6))
@@ -924,4 +918,3 @@ def test_log_parity_chain_exp() raises:
         loss_gpu.backward()
 
         assert_true(a_cpu.grad().all_close(2 * a_gpu.grad().to_cpu()))
-

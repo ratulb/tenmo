@@ -8,6 +8,7 @@ from tenmo.shapes import Shape
 # SQRT TESTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_uop_sqrt_forward_1d_cpu() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 4.0, 9.0, 16.0])
@@ -37,9 +38,7 @@ def test_uop_sqrt_backward_1d_cpu() raises:
     var loss = a.sqrt().sum()
     loss.backward()
     assert_true(
-        a.grad().all_close[atol=1e-5](
-            Tensor[dtype].d1([0.25, 0.16667, 0.125])
-        )
+        a.grad().all_close[atol=1e-5](Tensor[dtype].d1([0.25, 0.16667, 0.125]))
     )
 
 
@@ -61,9 +60,7 @@ def test_uop_sqrt_grad_flow_cpu() raises:
     var a = Tensor[dtype].d1([4.0, 9.0], requires_grad=True)
     var loss = (a.sqrt() * 2).sum()
     loss.backward()
-    assert_true(
-        a.grad().all_close[atol=1e-5](Tensor[dtype].d1([0.5, 0.33333]))
-    )
+    assert_true(a.grad().all_close[atol=1e-5](Tensor[dtype].d1([0.5, 0.33333])))
 
 
 def test_uop_sqrt_gpu() raises:
@@ -91,7 +88,9 @@ def test_uop_sqrt_gpu() raises:
 def test_uop_sqrt_gpu_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].full(Shape.of(2, 3, 4), 4.0, requires_grad=True)
+        var a_cpu = Tensor[dtype].full(
+            Shape.of(2, 3, 4), 4.0, requires_grad=True
+        )
         var a_gpu = a_cpu.to_gpu()
         var result = a_gpu.sqrt()
         assert_true(
@@ -111,6 +110,7 @@ def test_uop_sqrt_gpu_3d() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 # NEGATE TESTS
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_uop_negate_forward_1d_cpu() raises:
     comptime dtype = DType.float32
@@ -139,9 +139,7 @@ def test_uop_negate_backward_1d_cpu() raises:
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var loss = (-a).sum()
     loss.backward()
-    assert_true(
-        a.grad().all_close(Tensor[dtype].full(Shape.of(3), -1.0))
-    )
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape.of(3), -1.0)))
 
 
 def test_uop_negate_backward_2d_cpu() raises:
@@ -149,9 +147,7 @@ def test_uop_negate_backward_2d_cpu() raises:
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var loss = (-a).sum()
     loss.backward()
-    assert_true(
-        a.grad().all_close(Tensor[dtype].full(Shape.of(2, 2), -1.0))
-    )
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape.of(2, 2), -1.0)))
 
 
 def test_uop_negate_grad_flow_cpu() raises:
@@ -160,9 +156,7 @@ def test_uop_negate_grad_flow_cpu() raises:
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var loss = (-a + a).sum()
     loss.backward()
-    assert_true(
-        a.grad().all_close(Tensor[dtype].full(Shape.of(3), 0.0))
-    )
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape.of(3), 0.0)))
 
 
 def test_uop_negate_gpu() raises:
@@ -201,15 +195,14 @@ def test_uop_negate_gpu_3d() raises:
         var loss = result.sum()
         loss.backward()
         assert_true(
-            a_cpu.grad().all_close(
-                Tensor[dtype].full(Shape.of(2, 3, 4), -1.0)
-            )
+            a_cpu.grad().all_close(Tensor[dtype].full(Shape.of(2, 3, 4), -1.0))
         )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ABS TESTS
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_uop_abs_forward_1d_cpu() raises:
     comptime dtype = DType.float32
@@ -262,13 +255,12 @@ def test_uop_abs_gpu_3d() raises:
 # RELU TESTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_uop_relu_forward_1d_cpu() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([-2.0, -1.0, 0.0, 1.0, 2.0])
     var result = a.relu()
-    assert_true(
-        result.all_close(Tensor[dtype].d1([0.0, 0.0, 0.0, 1.0, 2.0]))
-    )
+    assert_true(result.all_close(Tensor[dtype].d1([0.0, 0.0, 0.0, 1.0, 2.0])))
 
 
 def test_uop_relu_forward_2d_cpu() raises:
@@ -291,21 +283,15 @@ def test_uop_relu_backward_1d_cpu() raises:
     var a = Tensor[dtype].d1([-1.0, 0.0, 1.0, 2.0], requires_grad=True)
     var loss = a.relu().sum()
     loss.backward()
-    assert_true(
-        a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 1.0, 1.0]))
-    )
+    assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 1.0, 1.0])))
 
 
 def test_uop_relu_backward_2d_cpu() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2(
-        [[-1.0, 2.0], [-3.0, 4.0]], requires_grad=True
-    )
+    var a = Tensor[dtype].d2([[-1.0, 2.0], [-3.0, 4.0]], requires_grad=True)
     var loss = a.relu().sum()
     loss.backward()
-    assert_true(
-        a.grad().all_close(Tensor[dtype].d2([[0.0, 1.0], [0.0, 1.0]]))
-    )
+    assert_true(a.grad().all_close(Tensor[dtype].d2([[0.0, 1.0], [0.0, 1.0]])))
 
 
 def test_uop_relu_grad_flow_cpu() raises:
@@ -315,9 +301,7 @@ def test_uop_relu_grad_flow_cpu() raises:
     var a = Tensor[dtype].d1([-1.0, 2.0, -3.0, 4.0], requires_grad=True)
     var loss = (a.relu() * 2).sum()
     loss.backward()
-    assert_true(
-        a.grad().all_close(Tensor[dtype].d1([0.0, 2.0, 0.0, 2.0]))
-    )
+    assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 2.0, 0.0, 2.0])))
 
 
 def test_uop_relu_gpu() raises:
@@ -336,9 +320,7 @@ def test_uop_relu_gpu() raises:
         var loss = result.sum()
         loss.backward()
         assert_true(
-            a_cpu.grad().all_close(
-                Tensor[dtype].d2([[0.0, 1.0], [0.0, 1.0]])
-            )
+            a_cpu.grad().all_close(Tensor[dtype].d2([[0.0, 1.0], [0.0, 1.0]]))
         )
 
 
@@ -358,9 +340,7 @@ def test_uop_relu_gpu_3d() raises:
         var loss = result.sum()
         loss.backward()
         assert_true(
-            a_cpu.grad().all_close(
-                Tensor[dtype].full(Shape.of(2, 3, 4), 0.0)
-            )
+            a_cpu.grad().all_close(Tensor[dtype].full(Shape.of(2, 3, 4), 0.0))
         )
 
 
@@ -368,29 +348,25 @@ def test_uop_relu_gpu_3d() raises:
 # INVERT TESTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def test_uop_invert_bool_forward_1d_cpu() raises:
     var a = Tensor[DType.bool].d1([True, False, True, True])
     var result = ~a
-    assert_true(
-        result == Tensor[DType.bool].d1([False, True, False, False])
-    )
+    assert_true(result == Tensor[DType.bool].d1([False, True, False, False]))
 
 
 def test_uop_invert_bool_forward_2d_cpu() raises:
     var a = Tensor[DType.bool].d2([[True, False], [False, True]])
     var result = ~a
-    assert_true(
-        result == Tensor[DType.bool].d2([[False, True], [True, False]])
-    )
+    assert_true(result == Tensor[DType.bool].d2([[False, True], [True, False]]))
 
 
 def test_uop_invert_bool_forward_3d_cpu() raises:
     var a = Tensor[DType.bool].full(Shape.of(2, 3, 4), Scalar[DType.bool](True))
     var result = ~a
     assert_true(
-        result == Tensor[DType.bool].full(
-            Shape.of(2, 3, 4), Scalar[DType.bool](False)
-        )
+        result
+        == Tensor[DType.bool].full(Shape.of(2, 3, 4), Scalar[DType.bool](False))
     )
 
 
@@ -424,15 +400,12 @@ def test_uop_invert_int_forward_3d_cpu() raises:
 
 def test_uop_invert_bool_gpu() raises:
     comptime if has_accelerator():
-        var a_cpu = Tensor[DType.bool].d2(
-            [[True, False], [False, True]]
-        )
+        var a_cpu = Tensor[DType.bool].d2([[True, False], [False, True]])
         var a_gpu = a_cpu.to_gpu()
         var result = ~a_gpu
         assert_true(
-            result.to_cpu() == Tensor[DType.bool].d2(
-                [[False, True], [True, False]]
-            )
+            result.to_cpu()
+            == Tensor[DType.bool].d2([[False, True], [True, False]])
         )
 
 
@@ -444,7 +417,8 @@ def test_uop_invert_bool_gpu_3d() raises:
         var a_gpu = a_cpu.to_gpu()
         var result = ~a_gpu
         assert_true(
-            result.to_cpu() == Tensor[DType.bool].full(
+            result.to_cpu()
+            == Tensor[DType.bool].full(
                 Shape.of(2, 3, 4), Scalar[DType.bool](False)
             )
         )
@@ -464,9 +438,7 @@ def test_uop_invert_int_gpu() raises:
         var a_cpu = Tensor[dtype].d2([[1, 2], [3, 4]])
         var a_gpu = a_cpu.to_gpu()
         var result = ~a_gpu
-        assert_true(
-            result.to_cpu() == Tensor[dtype].d2([[-2, -3], [-4, -5]])
-        )
+        assert_true(result.to_cpu() == Tensor[dtype].d2([[-2, -3], [-4, -5]]))
 
 
 def test_uop_invert_int_gpu_3d() raises:
@@ -483,6 +455,7 @@ def test_uop_invert_int_gpu_3d() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 # CROSS OP GRAD FLOW — ensure INVERT did not break other ops
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def test_uop_cross_sqrt_negate_grad_flow_cpu() raises:
     comptime dtype = DType.float32
@@ -503,17 +476,13 @@ def test_uop_cross_relu_negate_grad_flow_cpu() raises:
     var a = Tensor[dtype].d1([-1.0, 2.0, -3.0, 4.0], requires_grad=True)
     var loss = (-a).relu().sum()
     loss.backward()
-    assert_true(
-        a.grad().all_close(Tensor[dtype].d1([-1.0, 0.0, -1.0, 0.0]))
-    )
+    assert_true(a.grad().all_close(Tensor[dtype].d1([-1.0, 0.0, -1.0, 0.0])))
 
 
 def test_uop_cross_sqrt_negate_grad_flow_gpu() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].d1(
-            [4.0, 9.0, 16.0], requires_grad=True
-        )
+        var a_cpu = Tensor[dtype].d1([4.0, 9.0, 16.0], requires_grad=True)
         var a_gpu = a_cpu.to_gpu()
         var loss = (-a_gpu.sqrt()).sum()
         loss.backward()
@@ -527,22 +496,19 @@ def test_uop_cross_sqrt_negate_grad_flow_gpu() raises:
 def test_uop_cross_relu_negate_grad_flow_gpu() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].d1(
-            [-1.0, 2.0, -3.0, 4.0], requires_grad=True
-        )
+        var a_cpu = Tensor[dtype].d1([-1.0, 2.0, -3.0, 4.0], requires_grad=True)
         var a_gpu = a_cpu.to_gpu()
         var loss = (-a_gpu).relu().sum()
         loss.backward()
         assert_true(
-            a_cpu.grad().all_close(
-                Tensor[dtype].d1([-1.0, 0.0, -1.0, 0.0])
-            )
+            a_cpu.grad().all_close(Tensor[dtype].d1([-1.0, 0.0, -1.0, 0.0]))
         )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # RUNNER
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

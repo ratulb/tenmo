@@ -9,9 +9,7 @@ def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-
 def test_matmul_nd_3d_basic_with_grad() raises:
-    print("test_matmul_nd_3d_basic_with_grad")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [
@@ -49,7 +47,6 @@ def test_matmul_nd_3d_basic_with_grad() raises:
 
 
 def test_matmul_nd_3d_broadcast_A_with_grad() raises:
-    print("test_matmul_nd_3d_broadcast_A_with_grad")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True
@@ -71,7 +68,6 @@ def test_matmul_nd_3d_broadcast_A_with_grad() raises:
 
 
 def test_matmul_nd_3d_broadcast_B_with_grad() raises:
-    print("test_matmul_nd_3d_broadcast_B_with_grad")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -96,7 +92,6 @@ def test_matmul_nd_3d_broadcast_B_with_grad() raises:
 
 
 def test_matmul_nd_4d_basic_with_grad() raises:
-    print("test_matmul_nd_4d_basic_with_grad")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d4(
         [
@@ -124,7 +119,6 @@ def test_matmul_nd_4d_basic_with_grad() raises:
 
 
 def test_matmul_nd_4d_complex_broadcast_with_grad() raises:
-    print("test_matmul_nd_4d_complex_broadcast_with_grad")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d4(
         [[[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]],
@@ -147,7 +141,6 @@ def test_matmul_nd_4d_complex_broadcast_with_grad() raises:
 
 
 def test_matmul_nd_with_view_offset_grad() raises:
-    print("test_matmul_nd_with_view_offset_grad")
     comptime dtype = DType.float32
     var base_A = Tensor[dtype].d3(
         [
@@ -183,7 +176,6 @@ def test_matmul_nd_with_view_offset_grad() raises:
 
 
 def test_matmul_nd_with_strided_view_grad() raises:
-    print("test_matmul_nd_with_strided_view_grad")
     comptime dtype = DType.float32
     var base_A = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]],
@@ -213,7 +205,6 @@ def test_matmul_nd_with_strided_view_grad() raises:
 
 
 def test_matmul_nd_single_batch_with_grad() raises:
-    print("test_matmul_nd_single_batch_with_grad")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True)
     var B = Tensor[dtype].d3([[[2.0, 0.0], [0.0, 2.0]]], requires_grad=True)
@@ -227,7 +218,6 @@ def test_matmul_nd_single_batch_with_grad() raises:
 
 
 def test_matmul_nd_large_batch_small_matrices_with_grad() raises:
-    print("test_matmul_nd_large_batch_small_matrices_with_grad")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3([[[2.0]], [[3.0]], [[4.0]]], requires_grad=True)
     var B = Tensor[dtype].d3([[[3.0]], [[4.0]], [[5.0]]], requires_grad=True)
@@ -242,7 +232,6 @@ def test_matmul_nd_large_batch_small_matrices_with_grad() raises:
 
 
 def test_matmul_nd_identity_batch_with_grad() raises:
-    print("test_matmul_nd_identity_batch_with_grad")
     _ = """comptime dtype = DType.float32
     var A = Tensor[dtype].d3([
         [[1.0, 2.0], [3.0, 4.0]],
@@ -263,7 +252,6 @@ def test_matmul_nd_identity_batch_with_grad() raises:
 
 
 def test_matmul_nd_zeros_with_grad() raises:
-    print("test_matmul_nd_zeros_with_grad")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -286,7 +274,6 @@ def test_matmul_nd_zeros_with_grad() raises:
 
 
 def test_matmul_nd_mixed_batch_dims_with_grad() raises:
-    print("test_matmul_nd_mixed_batch_dims_with_grad")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -308,7 +295,6 @@ def test_matmul_nd_mixed_batch_dims_with_grad() raises:
 
 
 def test_matmul_nd_forward_comprehensive() raises:
-    print("Running comprehensive matmul_nd forward tests...")
     test_matmul_nd_3d_basic_with_grad()
     test_matmul_nd_3d_broadcast_A_with_grad()
     test_matmul_nd_3d_broadcast_B_with_grad()
@@ -319,25 +305,19 @@ def test_matmul_nd_forward_comprehensive() raises:
     test_matmul_nd_identity_batch_with_grad()
     test_matmul_nd_zeros_with_grad()
     test_matmul_nd_mixed_batch_dims_with_grad()
-    print("All matmul_nd forward tests passed! ✓")
 
 
 def test_matmul_nd_view_gradients() raises:
-    print("Testing matmul_nd with views and gradients...")
     test_matmul_nd_with_view_offset_grad()
     test_matmul_nd_with_strided_view_grad()
-    print("All matmul_nd view gradient tests passed! ✓")
 
 
 def test_matmul_nd_complete() raises:
-    print("Running complete matmul_nd test suite...")
     test_matmul_nd_forward_comprehensive()
     test_matmul_nd_view_gradients()
-    print("All matmul_nd tests passed! ✓")
 
 
 def test_matmul_nd_3d_basic() raises:
-    print("test_matmul_nd_3d_basic")
     comptime dtype = DType.float32
     # Batch of 2 matrices: 2x(2x3) × 2x(3x2) → 2x(2x2)
     var A = Tensor[dtype].d3(
@@ -361,7 +341,6 @@ def test_matmul_nd_3d_basic() raises:
 
 
 def test_matmul_nd_3d_broadcast_A() raises:
-    print("test_matmul_nd_3d_broadcast_A")
     comptime dtype = DType.float32
     # A: 1x(2x3) broadcast to match B: 2x(3x2)
     var A = Tensor[dtype].d3([[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]])
@@ -379,7 +358,6 @@ def test_matmul_nd_3d_broadcast_A() raises:
 
 
 def test_matmul_nd_3d_broadcast_B() raises:
-    print("test_matmul_nd_3d_broadcast_B")
     comptime dtype = DType.float32
     # B: 1x(3x2) broadcast to match A: 2x(2x3)
     var A = Tensor[dtype].d3(
@@ -400,7 +378,6 @@ def test_matmul_nd_3d_broadcast_B() raises:
 
 
 def test_matmul_nd_4d_basic() raises:
-    print("test_matmul_nd_4d_basic")
     comptime dtype = DType.float32
     # 2x2 batch of 2x3 matrices × 2x2 batch of 3x2 matrices → 2x2 batch of 2x2 matrices
     var A = Tensor[dtype].d4(
@@ -435,7 +412,6 @@ def test_matmul_nd_4d_basic() raises:
 
 
 def test_matmul_nd_4d_complex_broadcast() raises:
-    print("test_matmul_nd_4d_complex_broadcast")
     comptime dtype = DType.float32
     # A: 1x2 batch, B: 2x1 batch → broadcast to 2x2 batch
     var A = Tensor[dtype].d4(
@@ -459,7 +435,6 @@ def test_matmul_nd_4d_complex_broadcast() raises:
 
 
 def test_matmul_nd_single_batch_element() raises:
-    print("test_matmul_nd_single_batch_element")
     comptime dtype = DType.float32
     # Single batch element: 1x(2x3) × 1x(3x2) → 1x(2x2)
     var A = Tensor[dtype].d3([[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]])
@@ -470,7 +445,6 @@ def test_matmul_nd_single_batch_element() raises:
 
 
 def test_matmul_nd_large_batch_small_matrices() raises:
-    print("test_matmul_nd_large_batch_small_matrices")
     comptime dtype = DType.float32
     # Many batches of 1x1 matrices
     var A = Tensor[dtype].d3(
@@ -485,7 +459,6 @@ def test_matmul_nd_large_batch_small_matrices() raises:
 
 
 def test_matmul_nd_identity_batch() raises:
-    print("test_matmul_nd_identity_batch")
     _ = """comptime dtype = DType.float32
     # Batch of identity matrices
     var identity = Tensor[dtype].d2([[1.0, 0.0], [0.0, 1.0]])
@@ -500,7 +473,6 @@ def test_matmul_nd_identity_batch() raises:
 
 
 def test_matmul_nd_zeros_batch() raises:
-    print("test_matmul_nd_zeros_batch")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
@@ -512,7 +484,6 @@ def test_matmul_nd_zeros_batch() raises:
 
 
 def test_matmul_nd_ones_batch() raises:
-    print("test_matmul_nd_ones_batch")
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
@@ -530,7 +501,6 @@ def test_matmul_nd_ones_batch() raises:
 
 
 def test_matmul_nd_mixed_batch_dims() raises:
-    print("test_matmul_nd_mixed_batch_dims")
     comptime dtype = DType.float32
     # A: 3D, B: 4D with broadcasting
     var A = Tensor[dtype].d3(
@@ -549,7 +519,6 @@ def test_matmul_nd_mixed_batch_dims() raises:
 
 
 def test_matmul_nd_comprehensive() raises:
-    print("Running comprehensive matmul_nd tests...")
     test_matmul_batched_non_contiguous_view_case()
     test_matmul_nd_3d_basic()
     test_matmul_nd_3d_broadcast_A()
@@ -571,7 +540,6 @@ def test_matmul_nd_comprehensive() raises:
     test_matmul_batched_3d_input_case()
     test_matmul_batched_result_shape()
     test_matmul_nd_with_higher_dim_batch()
-    print("All matmul_nd forward tests passed! ✓")
 
 
 # ================================================================
@@ -580,7 +548,6 @@ def test_matmul_nd_comprehensive() raises:
 
 
 def test_matmul2d_basic_case() raises:
-    print("test_matmul2d_basic_case")
     var A = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
     var B = Tensor.d2([[5.0, 6.0], [7.0, 8.0]])
     var C = A.matmul(B)
@@ -588,7 +555,6 @@ def test_matmul2d_basic_case() raises:
 
 
 def test_matmul2d_rectangular_case() raises:
-    print("test_matmul2d_rectangular_case")
     var A = Tensor.d2([[1.0, 2.0, 3.0]])
     var B = Tensor.d2([[4.0, 5.0], [6.0, 7.0], [8.0, 9.0]])
     var C = A.matmul(B)
@@ -596,7 +562,6 @@ def test_matmul2d_rectangular_case() raises:
 
 
 def test_matmul2d_non_square_large_case() raises:
-    print("test_matmul2d_non_square_large_case")
     var A = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
     var B = Tensor.d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])
     var C = A.matmul(B)
@@ -610,7 +575,6 @@ def test_matmul2d_non_square_large_case() raises:
 
 
 def test_matmul_batched_basic() raises:
-    print("test_matmul_batched_basic")
     var A = Tensor.d3([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
     var B = Tensor.d3([[[1.0, 0.0], [0.0, 1.0]], [[2.0, 0.0], [0.0, 2.0]]])
     var C = A.matmul(B)
@@ -622,7 +586,6 @@ def test_matmul_batched_basic() raises:
 
 
 def test_matmul_batched_broadcast_B() raises:
-    print("test_matmul_batched_broadcast_B")
     var A = Tensor.d3([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
     var B = Tensor.d2([[2.0, 0.0], [0.0, 2.0]])
     var C = A.matmul(B)
@@ -634,7 +597,6 @@ def test_matmul_batched_broadcast_B() raises:
 
 
 def test_matmul_batched_broadcast_A() raises:
-    print("test_matmul_batched_broadcast_A")
     var A = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
     var B = Tensor.d3([[[1.0, 0.0], [0.0, 1.0]], [[2.0, 0.0], [0.0, 2.0]]])
     var C = A.matmul(B)
@@ -646,7 +608,6 @@ def test_matmul_batched_broadcast_A() raises:
 
 
 def test_matmul_batched_3d_input_case() raises:
-    print("test_matmul_batched_3d_input_case")
     var A = Tensor.d3(
         [
             [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
@@ -670,7 +631,6 @@ def test_matmul_batched_3d_input_case() raises:
 
 
 def test_matmul_batched_non_contiguous_view_case() raises:
-    print("test_matmul_batched_non_contiguous_view_case")
     var A = Tensor.d3([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
     # Make a view skipping the first batch
     var A_view = A.view(
@@ -683,7 +643,6 @@ def test_matmul_batched_non_contiguous_view_case() raises:
 
 
 def test_matmul_batched_result_shape() raises:
-    print("test_matmul_batched_result_shape")
     var A = Tensor.d3([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
     var B = Tensor.d2([[1.0, 0.0], [0.0, 1.0]])
     var C = A.matmul(B)
@@ -691,7 +650,6 @@ def test_matmul_batched_result_shape() raises:
 
 
 def test_matmul_nd_with_higher_dim_batch() raises:
-    print("test_matmul_nd_with_higher_dim_batch")
     var A = Tensor.d4(
         [
             [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
@@ -702,4 +660,3 @@ def test_matmul_nd_with_higher_dim_batch() raises:
     var C = A.matmul(B)
     assert_true(C.shape() == Shape(2, 2, 2, 2))
     assert_true(C.all_close(A))  # Identity matrix case
-

@@ -6,7 +6,6 @@ def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
-
 def test_tensor_linspace_basic() raises:
     print("test_tensor_linspace_basic")
 
@@ -70,4 +69,3 @@ def test_tensor_linspace_with_gradients() raises:
     assert_true(x.grad().all_close(expected_grad))
 
     print("Passed linspace with gradients test")
-

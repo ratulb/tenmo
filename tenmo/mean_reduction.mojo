@@ -13,56 +13,44 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
         ref gradbox = output.gradients()[]
         ref gradbox_shape = gradbox.shape()
         var ancestor = output.ancestry().get(0)
         ref ancestor_shape = ancestor.shape()
+
+        var grad_contrib: Gradbox[Self.dtype]
         if gradbox_shape == Shape():
             scalar_grad = gradbox.item() / Scalar[Self.dtype](
                 ancestor_shape.num_elements()
             )
-            var grad_contrib: Gradbox[Self.dtype]
             grad_contrib = Gradbox[Self.dtype].full(
                 ancestor_shape,
                 scalar_grad,
                 share=False,
                 device=gradbox.device(),
             )
-            return [
-                (
-                    ancestor^,
-                    grad_contrib^,
-                    AddTensor,
-                )
-            ]
-
-        var expanded = gradbox.copy()
-
-        if not bwd_arg.keepdims:
-            expanded = expanded.reshape(
-                Shape(
-                    gradbox_shape.intarray().insert(
-                        bwd_arg.axes,
-                        IntArray.filled(len(bwd_arg.axes), 1),
+        else:
+            var expanded = gradbox.copy()
+            if not bwd_arg.keepdims:
+                expanded = expanded.reshape(
+                    Shape(
+                        gradbox_shape.intarray().insert(
+                            bwd_arg.axes,
+                            IntArray.filled(len(bwd_arg.axes), 1),
+                        )
                     )
                 )
-            )
+            var broadcasted = expanded.broadcast_to(ancestor_shape)
+            var count = ancestor_shape.reduced_shape(bwd_arg.axes).product()
+            count = count if count > 0 else 1
+            grad_contrib = broadcasted / Scalar[Self.dtype](count)
 
-        var broadcasted = expanded.broadcast_to(ancestor_shape)
-        # Compute total count of elements being reduced
-        var count = ancestor_shape.reduced_shape(bwd_arg.axes).product()
-        count = count if count > 0 else 1
-        var average = broadcasted / Scalar[Self.dtype](count)
-
-        return [
-            (
-                ancestor^,
-                average^,
-                AddTensor,
-            )
-        ]
+        if ancestor.requires_grad:
+            ancestor.update_grad(grad_contrib, AddTensor, None)
+        parent_ids.append(ancestor._id)
 
 
 @fieldwise_init
@@ -110,5 +98,3 @@ struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var out = Gradbox[Self.dtype](ndb^, share=False)
 
         return out^
-
-

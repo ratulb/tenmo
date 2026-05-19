@@ -14,7 +14,9 @@ def test_onehot_cpu_1d_basic() raises:
     var result = Tensor[dtype].onehot(indices, 3)
     assert_true(
         result.all_close(
-            Tensor[dtype].d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+            Tensor[dtype].d2(
+                [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+            )
         )
     )
 
@@ -35,7 +37,11 @@ def test_onehot_cpu_1d_first_class() raises:
     assert_true(
         result.all_close(
             Tensor[dtype].d2(
-                [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]]
+                [
+                    [1.0, 0.0, 0.0, 0.0],
+                    [1.0, 0.0, 0.0, 0.0],
+                    [1.0, 0.0, 0.0, 0.0],
+                ]
             )
         )
     )
@@ -49,7 +55,11 @@ def test_onehot_cpu_1d_last_class() raises:
     assert_true(
         result.all_close(
             Tensor[dtype].d2(
-                [[0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0]]
+                [
+                    [0.0, 0.0, 0.0, 1.0],
+                    [0.0, 0.0, 0.0, 1.0],
+                    [0.0, 0.0, 0.0, 1.0],
+                ]
             )
         )
     )
@@ -157,7 +167,9 @@ def test_onehot_cpu_explicit_cpu_device() raises:
     assert_true(result.is_on_cpu())
     assert_true(
         result.all_close(
-            Tensor[dtype].d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+            Tensor[dtype].d2(
+                [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+            )
         )
     )
 
@@ -271,9 +283,9 @@ def test_onehot_gpu_shape() raises:
     comptime if has_accelerator():
         print("test_onehot_gpu_shape")
         comptime dtype = DType.float32
-        var indices = Tensor[dtype].d2(
-            [[0.0, 1.0], [2.0, 0.0], [1.0, 2.0]]
-        ).to_gpu()
+        var indices = (
+            Tensor[dtype].d2([[0.0, 1.0], [2.0, 0.0], [1.0, 2.0]]).to_gpu()
+        )
         var result = Tensor[dtype].onehot(indices, 5)
         assert_true(result.is_on_gpu())
         assert_true(result.shape() == Shape(3, 2, 5))
@@ -373,5 +385,3 @@ def test_onehot_gpu_parity_2d() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-
-

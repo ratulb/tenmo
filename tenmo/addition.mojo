@@ -17,16 +17,19 @@ struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         if not output.parents:
             panic("Addition add scalar backward: parent_refs is None!")
-        ref gradbox = output.gradbox[]
-        var parent = output.ancestry().get(0)
-        ref parent_shape = parent.shape()
-        if parent_shape != gradbox.shape():
-            gradbox = gradbox.reshape(parent_shape)
-        # Gradient of addition is 1 → just pass through incoming grad
-        return [(parent^, gradbox, AddTensor)]
+        ref parent = output.ancestry().get(0)
+        if parent.requires_grad:
+            ref gradbox = output.gradbox[]
+            if parent.shape() != gradbox.shape():
+                var reshaped = gradbox.reshape(parent.shape())
+                parent.update_grad(reshaped, AddTensor, None)
+            else:
+                parent.update_grad(gradbox, AddTensor, None)
+        parent_ids.append(parent._id)
 
 
 comptime AddBroadcastBackward[dtype: DType] = BroadcastBackward[
@@ -109,17 +112,15 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
         output: Ancestor[Self.dtype],
-    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        mut parent_ids: List[UInt],
+    ):
         var gradbox = output.gradbox[]
         count = len(output.ancestry())
 
-        var grad_shares = List[
-            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
-        ](capacity=count)
-
         if count == 1:
             var ancestor = output.ancestry().get(0)
-            grad_shares.append((ancestor^, gradbox^, AddTensor))
+            ancestor.update_grad(gradbox^, AddTensor, None)
+            parent_ids.append(ancestor._id)
         else:
             var ancestor_lhs = output.ancestry().get(0)
             var ancestor_rhs = output.ancestry().get(1)
@@ -127,16 +128,18 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             rhs_requires_grad = ancestor_rhs.requires_grad
 
             if lhs_requires_grad and rhs_requires_grad:
-                grad_shares.append((ancestor_lhs^, gradbox, AddTensor))
-                grad_shares.append((ancestor_rhs^, gradbox^, AddTensor))
+                ancestor_lhs.update_grad(gradbox, AddTensor, None)
+                parent_ids.append(ancestor_lhs._id)
+                ancestor_rhs.update_grad(gradbox, AddTensor, None)
+                parent_ids.append(ancestor_rhs._id)
 
             elif lhs_requires_grad and not rhs_requires_grad:
-                grad_shares.append((ancestor_lhs^, gradbox^, AddTensor))
+                ancestor_lhs.update_grad(gradbox, AddTensor, None)
+                parent_ids.append(ancestor_lhs._id)
 
             elif not lhs_requires_grad and rhs_requires_grad:
-                grad_shares.append((ancestor_rhs^, gradbox^, AddTensor))
+                ancestor_rhs.update_grad(gradbox, AddTensor, None)
+                parent_ids.append(ancestor_rhs._id)
 
             else:
                 pass
-
-        return grad_shares^
