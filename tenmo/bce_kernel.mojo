@@ -300,10 +300,10 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         device_context.synchronize()
 
-        var loss_state = DeviceState[Self.dtype].__init__[True](
+        var loss_state = DeviceState[Self.dtype](
             loss_buffer^, device_state.gpu
         )
-        var sigmoid_state = DeviceState[Self.dtype].__init__[True](
+        var sigmoid_state = DeviceState[Self.dtype](
             sigmoid_buffer^, device_state.gpu
         )
 
@@ -374,10 +374,10 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         device_context.synchronize()
 
-        var loss_state = DeviceState[Self.dtype].__init__[True](
+        var loss_state = DeviceState[Self.dtype](
             loss_buffer^, device_state.gpu
         )
-        var safe_state = DeviceState[Self.dtype].__init__[True](
+        var safe_state = DeviceState[Self.dtype](
             safe_buffer^, device_state.gpu
         )
 
@@ -445,7 +445,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         device_context.synchronize()
 
-        var result_state = DeviceState[Self.dtype].__init__[True](
+        var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu
         )
 
@@ -510,7 +510,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         device_context.synchronize()
 
-        var result_state = DeviceState[Self.dtype].__init__[True](
+        var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu
         )
 
