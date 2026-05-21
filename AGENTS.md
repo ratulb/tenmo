@@ -618,6 +618,10 @@ Two approaches were implemented for word2vec-style negative sampling training on
 
 2. **Embedding integration with `Module`/`Sequential`** — `Embedding` was not included in the `Layer` variant (`net.mojo:740`). `Sequential.parameters()` returned an empty list for Embedding. **FIXED** — added `Embedding[dtype]` to `Layer` variant and dispatch in `Module.parameters()`.
 
+3. **Fused BCE backward CPU-only** — `bce_with_logits_backward` / `bce_backward` in `ndbuffer.mojo` have no GPU kernel yet; GPU path falls through to CPU. Also, the contiguous-fast-path only checks `self.is_contiguous()` (not all operand buffers), so if view-backed (non-contiguous) sigmoid/safe/target/grad_output NDBuffers are passed, the SIMD Buffer path will read from `buffer.load(0)` ignoring strides/offset. The scalar `index_iterator()` fallback is correct for non-contiguous. Same latent bug exists in `bce_with_logits_forward_cpu` / `bce_forward_cpu`.
+
+4. **Large-weight `add_ancestry` deep copy overhead** — `add_ancestry` in `tensor.mojo:1104` deep-copies the parent's data buffer into the ancestry chain (for ops that need it in backward). For large weights (252K×100 Embedding = 100MB), this is ~25ms per forward gather. The copy is unavoidable without making the original tensor's buffer shared, but the user should not have their Tensor's buffer silently converted to shared. **Fix idea:** Layer structs (Embedding, Linear, Conv2d) that "take over" weights from the user at init time can call `self.weight.buffer.buffer.shared()` internally — the user handed off ownership, so sharing is fine. This eliminates the deep copy entirely for those weights, reducing gather cost from ~25ms to ~ns.
+
 ## Running Selective Tests
 
 **`./execute.sh <name>`** — runs a single test alias from the test runner (e.g. `./execute.sh gather`)

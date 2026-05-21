@@ -1104,13 +1104,7 @@ struct Tensor[dtype: DType](
         for parent in parents:
             if not parent.buffer.shared():
                 var parent_copy = parent.copy()
-                var parent_buffer = parent_copy.buffer.copy()
-                parent_buffer = parent_buffer.share(
-                    parent_buffer.shape,
-                    parent_buffer.strides,
-                    parent_buffer.offset,
-                )
-                parent_copy.buffer = parent_buffer^
+                parent_copy.buffer.buffer.shared()
                 ancestors.append(parent_copy^)
 
             else:

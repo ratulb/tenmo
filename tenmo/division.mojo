@@ -6,10 +6,10 @@ from .backpropagation import (
     BACKWARD_DIV_SCALAR,
     BACKWARD_RIGHT_DIV_SCALAR,
 )
-from .mnemonics import AddTensor, SubtractTensor, Divide, ReverseDivide
-from .common_utils import panic
-from .gradbox import Gradbox
-from .ancestry import Ancestor
+from tenmo.mnemonics import AddTensor, SubtractTensor, Divide, ReverseDivide
+from tenmo.common_utils import panic
+from tenmo.gradbox import Gradbox
+from tenmo.ancestry import Ancestor
 
 
 @fieldwise_init
@@ -52,14 +52,12 @@ struct RightTrueDivBackwardScalar[dtype: DType](
         )
         var gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
-        var nd_buffer = ancestor.buffer()
-        squared = nd_buffer * nd_buffer
-        squared_reciprocal = Scalar[Self.dtype](1) / squared
-        gradbox = (gradbox * scalar) * Gradbox[Self.dtype](
-            squared_reciprocal^, share=False
+        # Fused: -s * grad_output / x² in one pass
+        var grad_ndb = gradbox.buffer.rdiv_scalar_backward(
+            ancestor.buffer(), scalar
         )
-
-        ancestor.update_grad(gradbox^, SubtractTensor, None)
+        var grad_parent = Gradbox[Self.dtype](grad_ndb^, share=False)
+        ancestor.update_grad(grad_parent^, SubtractTensor, None)
         parent_ids.append(ancestor._id)
 
 
@@ -76,47 +74,30 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var buffer_top = ancestor_top.buffer()
         var buffer_bottom = ancestor_bottom.buffer()
 
+        # Fused: both gradients in one pass
+        var (grad_num, grad_den) = gradbox.buffer.divide_backward(
+            buffer_top, buffer_bottom
+        )
+
         if ancestor_top.requires_grad:
-            var buffer_bottom_reciprocal = Scalar[Self.dtype](1) / buffer_bottom
-            ref buffer_top_shape = buffer_top.shape
-            var ancestor_top_gradbox_buffer = (
-                buffer_bottom_reciprocal * gradbox.buffer
+            if grad_num.shape != buffer_top.shape:
+                grad_num = grad_num.sum_over_broadcasted_axes(buffer_top.shape)
+            ancestor_top.update_grad(
+                Gradbox[Self.dtype](grad_num^, share=False),
+                AddTensor,
+                None,
             )
-            if ancestor_top_gradbox_buffer.shape != buffer_top_shape:
-                ancestor_top_gradbox_buffer = (
-                    ancestor_top_gradbox_buffer.sum_over_broadcasted_axes(
-                        buffer_top_shape
-                    )
-                )
-            var ancestor_top_gradbox = Gradbox[Self.dtype](
-                ancestor_top_gradbox_buffer^, share=False
-            )
-            ancestor_top.update_grad(ancestor_top_gradbox^, AddTensor, None)
             parent_ids.append(ancestor_top._id)
 
         if ancestor_bottom.requires_grad:
-            var buffer_bottom_sqrd = buffer_bottom * buffer_bottom
-            var buffer_bottom_sqrd_reciprocal = (
-                Scalar[Self.dtype](1) / buffer_bottom_sqrd
-            )
-            var ancestor_bottom_grad_buffer = (
-                buffer_top * buffer_bottom_sqrd_reciprocal
-            )
-
-            ancestor_bottom_grad_buffer = (
-                ancestor_bottom_grad_buffer * gradbox.buffer
-            )
-            if ancestor_bottom_grad_buffer.shape != buffer_bottom.shape:
-                ancestor_bottom_grad_buffer = (
-                    ancestor_bottom_grad_buffer.sum_over_broadcasted_axes(
-                        buffer_bottom.shape
-                    )
+            if grad_den.shape != buffer_bottom.shape:
+                grad_den = grad_den.sum_over_broadcasted_axes(
+                    buffer_bottom.shape
                 )
-            var ancestor_bottom_gradbox = Gradbox[Self.dtype](
-                ancestor_bottom_grad_buffer^, share=False
-            )
             ancestor_bottom.update_grad(
-                ancestor_bottom_gradbox^, SubtractTensor, None
+                Gradbox[Self.dtype](grad_den^, share=False),
+                SubtractTensor,
+                None,
             )
             parent_ids.append(ancestor_bottom._id)
 

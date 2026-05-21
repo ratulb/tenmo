@@ -17,6 +17,7 @@ from .forwards import (
     LayerNorm,
     Embedding,
 )
+from .bceloss import BCEWithLogitsLossFused, BCELossFused
 from .mnemonics import (
     mm,
     mv,
@@ -62,7 +63,6 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         init_seed: Optional[Int] = None,
         init_method: String = "standard",  # "standard", "xavier", "he"
         bias_zero: Bool = True,
-        weight_factor: Scalar[Self.dtype] = Scalar[Self.dtype](1),
     ):
         """
         Initialize Linear layer with configurable weight initialization.
@@ -76,7 +76,6 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 - "xavier": Xavier/Glorot uniform (good for tanh/sigmoid).
                 - "he": He/Kaiming normal (good for ReLU with standardized inputs).
             bias_zero: If True, initialize bias to zeros.
-            weight_factor: Scaling factor for weight initialization.
         """
         self.in_features = in_features
         self.out_features = out_features
@@ -87,15 +86,12 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
             var limit = Scalar[Self.dtype](
                 sqrt(6.0 / Float64(in_features + out_features))
             )
-            self.weight = (
-                Tensor[Self.dtype].rand(
-                    shape=Shape(in_features, out_features),
-                    min=-limit,
-                    max=limit,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
-                * weight_factor
+            self.weight = Tensor[Self.dtype].rand(
+                shape=Shape(in_features, out_features),
+                min=-limit,
+                max=limit,
+                init_seed=init_seed,
+                requires_grad=True,
             )
             if not bias_zero:
                 self.bias = Tensor[Self.dtype].rand(
@@ -113,15 +109,12 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         elif init_method == "he":
             # He/Kaiming normal initialization (for ReLU)
             var std = sqrt(2.0 / Float64(in_features))
-            self.weight = (
-                Tensor[Self.dtype].randn(
-                    shape=Shape(in_features, out_features),
-                    mean=0.0,
-                    std=std,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
-                * weight_factor
+            self.weight = Tensor[Self.dtype].randn(
+                shape=Shape(in_features, out_features),
+                mean=0.0,
+                std=std,
+                init_seed=init_seed,
+                requires_grad=True,
             )
             if not bias_zero:
                 self.bias = Tensor[Self.dtype].randn(
@@ -139,15 +132,12 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         else:  # "standard" or default
             # Simple uniform initialization (good for [0,1] normalized inputs)
             var limit = Scalar[Self.dtype](0.1)
-            self.weight = (
-                Tensor[Self.dtype].rand(
-                    shape=Shape(in_features, out_features),
-                    min=-limit,
-                    max=limit,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
-                * weight_factor
+            self.weight = Tensor[Self.dtype].rand(
+                shape=Shape(in_features, out_features),
+                min=-limit,
+                max=limit,
+                init_seed=init_seed,
+                requires_grad=True,
             )
             if not bias_zero:
                 self.bias = Tensor[Self.dtype].rand(
@@ -161,6 +151,10 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 self.bias = Tensor[Self.dtype].zeros(
                     Shape(out_features), requires_grad=True
                 )
+
+        # Share weight buffer so ancestry copies are a refcount bump, not deep memcpy
+        if self.weight.requires_grad:
+            self.weight.buffer.buffer.shared()
 
     def __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         ref xs_shape = xs.shape()
@@ -289,7 +283,6 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         init_seed: Optional[Int] = None,
         init_method: String = "standard",  # "standard", "xavier", "he"
         bias_zero: Bool = True,
-        weight_factor: Scalar[Self.dtype] = Scalar[Self.dtype](1),
         profile_samples: Int = 10,
     ):
         """
@@ -304,7 +297,6 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 - "xavier": Xavier/Glorot uniform (good for tanh/sigmoid).
                 - "he": He/Kaiming normal (good for ReLU with standardized inputs).
             bias_zero: If True, initialize bias to zeros.
-            weight_factor: Scaling factor for weight initialization.
             profile_samples: Samples per method for profiling:
                 - 0: Skip profiling, always use native
                 - 1-3: Fast profiling (may be noisy)
@@ -330,15 +322,12 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
             var limit = Scalar[Self.dtype](
                 sqrt(6.0 / Float64(in_features + out_features))
             )
-            self.weight = (
-                Tensor[Self.dtype].rand(
-                    shape=Shape(in_features, out_features),
-                    min=-limit,
-                    max=limit,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
-                * weight_factor
+            self.weight = Tensor[Self.dtype].rand(
+                shape=Shape(in_features, out_features),
+                min=-limit,
+                max=limit,
+                init_seed=init_seed,
+                requires_grad=True,
             )
             if not bias_zero:
                 self.bias = Tensor[Self.dtype].rand(
@@ -356,15 +345,12 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         elif init_method == "he":
             # He/Kaiming normal initialization (for ReLU)
             var std = sqrt(2.0 / Float64(in_features))
-            self.weight = (
-                Tensor[Self.dtype].randn(
-                    shape=Shape(in_features, out_features),
-                    mean=0.0,
-                    std=std,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
-                * weight_factor
+            self.weight = Tensor[Self.dtype].randn(
+                shape=Shape(in_features, out_features),
+                mean=0.0,
+                std=std,
+                init_seed=init_seed,
+                requires_grad=True,
             )
             if not bias_zero:
                 self.bias = Tensor[Self.dtype].randn(
@@ -382,15 +368,12 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         else:  # "standard" or default
             # Simple uniform initialization (good for [0,1] normalized inputs)
             var limit = Scalar[Self.dtype](0.1)
-            self.weight = (
-                Tensor[Self.dtype].rand(
-                    shape=Shape(in_features, out_features),
-                    min=-limit,
-                    max=limit,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
-                * weight_factor
+            self.weight = Tensor[Self.dtype].rand(
+                shape=Shape(in_features, out_features),
+                min=-limit,
+                max=limit,
+                init_seed=init_seed,
+                requires_grad=True,
             )
             if not bias_zero:
                 self.bias = Tensor[Self.dtype].rand(
@@ -404,6 +387,10 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 self.bias = Tensor[Self.dtype].zeros(
                     Shape(out_features), requires_grad=True
                 )
+
+        # Share weight buffer so ancestry copies are a refcount bump, not deep memcpy
+        if self.weight.requires_grad:
+            self.weight.buffer.buffer.shared()
 
     def __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         ref xs_shape = xs.shape()
@@ -1184,36 +1171,9 @@ struct BCELoss[dtype: DType = DType.float32](RegisterPassable):
         target: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-        # Clip for numerical stability
-        var pred_safe = Clip[Self.dtype].forward[track_grad](
-            pred, epsilon, 1 - epsilon
+        return BCELossFused[Self.dtype].forward[track_grad](
+            pred, target, epsilon
         )
-
-        # BCE: -[y*log(p) + (1-y)*log(1-p)]
-        var log_pred = pred_safe.log[track_grad]()
-        var term1 = Multiplicator[Self.dtype].forward[track_grad](
-            target, log_pred
-        )
-
-        var one = Tensor[Self.dtype].scalar(1)
-        var one_minus_target = Subtractor[Self.dtype].forward[track_grad](
-            one, target
-        )
-        var one_minus_pred = Subtractor[Self.dtype].forward[track_grad](
-            one, pred_safe
-        )
-        var log_one_minus_pred = one_minus_pred.log[track_grad]()
-        var term2 = Multiplicator[Self.dtype].forward[track_grad](
-            one_minus_target, log_one_minus_pred
-        )
-
-        var sum_terms = Adder[Self.dtype].forward[track_grad](term1, term2)
-        var neg_one = Tensor[Self.dtype].scalar(-1)
-        var loss = Multiplicator[Self.dtype].forward[track_grad](
-            sum_terms, neg_one
-        )
-
-        return loss.mean[track_grad]()
 
     def train(mut self):
         self.training = True
@@ -1251,39 +1211,9 @@ struct BCEWithLogitsLoss[dtype: DType = DType.float32](RegisterPassable):
         target: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9),
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-        # Apply sigmoid to convert logits to probabilities
-        var pred_probs = logits.sigmoid[track_grad]()
-
-        # Clip for numerical stability
-        var probs_safe = Clip[Self.dtype].forward[track_grad](
-            pred_probs, epsilon, 1 - epsilon
+        return BCEWithLogitsLossFused[Self.dtype].forward[track_grad](
+            logits, target, epsilon
         )
-
-        # BCE: -[y*log(p) + (1-y)*log(1-p)]
-        var log_probs = probs_safe.log[track_grad]()
-        var term1 = Multiplicator[Self.dtype].forward[track_grad](
-            target, log_probs
-        )
-
-        var one = Tensor[Self.dtype].scalar(1)
-        var one_minus_target = Subtractor[Self.dtype].forward[track_grad](
-            one, target
-        )
-        var one_minus_probs = Subtractor[Self.dtype].forward[track_grad](
-            one, probs_safe
-        )
-        var log_one_minus = one_minus_probs.log[track_grad]()
-        var term2 = Multiplicator[Self.dtype].forward[track_grad](
-            one_minus_target, log_one_minus
-        )
-
-        var sum_terms = Adder[Self.dtype].forward[track_grad](term1, term2)
-        var neg_one = Tensor[Self.dtype].scalar(-1)
-        var loss = Multiplicator[Self.dtype].forward[track_grad](
-            sum_terms, neg_one
-        )
-
-        return loss.mean[track_grad]()
 
     def train(mut self):
         self.training = True
@@ -1324,7 +1254,6 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         bias: Bool = True,
         init_seed: Optional[Int] = None,
         init_method: String = "he",  # "he" for ReLU, "xavier" for tanh/sigmoid
-        weight_factor: Scalar[Self.dtype] = Scalar[Self.dtype](1),
     ):
         """
         Initialize Conv2D layer.
@@ -1339,7 +1268,6 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
             bias: Whether to include bias term.
             init_seed: Optional seed.
             init_method: Weight initialization ("xavier", "he", "standard").
-            weight_factor: Scaling factor for weight initialization.
         """
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -1360,15 +1288,12 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
             var limit = Scalar[Self.dtype](
                 sqrt(6.0 / Float64(fan_in + fan_out))
             )
-            self.weight = (
-                Tensor[Self.dtype].rand(
-                    shape=weight_shape,
-                    min=-limit,
-                    max=limit,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
-                * weight_factor
+            self.weight = Tensor[Self.dtype].rand(
+                shape=weight_shape,
+                min=-limit,
+                max=limit,
+                init_seed=init_seed,
+                requires_grad=True,
             )
             if bias:
                 self.bias = Tensor[Self.dtype].rand(
@@ -1385,15 +1310,12 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         elif init_method == "he":
             # He/Kaiming normal initialization (for ReLU)
             var std = sqrt(2.0 / Float64(fan_in))
-            self.weight = (
-                Tensor[Self.dtype].randn(
-                    shape=weight_shape,
-                    mean=0.0,
-                    std=std,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
-                * weight_factor
+            self.weight = Tensor[Self.dtype].randn(
+                shape=weight_shape,
+                mean=0.0,
+                std=std,
+                init_seed=init_seed,
+                requires_grad=True,
             )
             if bias:
                 self.bias = Tensor[Self.dtype].randn(
@@ -1410,15 +1332,12 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         else:  # "standard" or default
             # Simple uniform initialization (good for [0,1] normalized inputs)
             var limit = Scalar[Self.dtype](0.1)
-            self.weight = (
-                Tensor[Self.dtype].rand(
-                    shape=weight_shape,
-                    min=-limit,
-                    max=limit,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
-                * weight_factor
+            self.weight = Tensor[Self.dtype].rand(
+                shape=weight_shape,
+                min=-limit,
+                max=limit,
+                init_seed=init_seed,
+                requires_grad=True,
             )
             if bias:
                 self.bias = Tensor[Self.dtype].rand(

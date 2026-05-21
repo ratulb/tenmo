@@ -88,6 +88,8 @@ comptime BACKWARD_PRODUCT = 55
 comptime BACKWARD_LAYER_NORM = 56
 comptime BACKWARD_BROADCAST_TO = 57
 comptime BACKWARD_GATHER = 58
+comptime BACKWARD_BCE_WITH_LOGITS = 59
+comptime BACKWARD_BCE = 60
 
 
 trait ArgumentType(ImplicitlyCopyable & Movable):
@@ -328,6 +330,18 @@ struct StdArg[dtype: DType](ArgumentType):
     var epsilon: Scalar[Self.dtype]
 
 
+@fieldwise_init
+struct BCEWithLogitsBwdArg[dtype: DType](ArgumentType):
+    var sigmoid: NDBuffer[Self.dtype]
+    var target: NDBuffer[Self.dtype]
+
+
+@fieldwise_init
+struct BCELossBwdArg[dtype: DType](ArgumentType):
+    var clipped_pred: NDBuffer[Self.dtype]
+    var target: NDBuffer[Self.dtype]
+
+
 # ============================================================================
 # Backward — Jump Table Dispatcher
 # ============================================================================
@@ -466,3 +480,7 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             ConcatBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_STACK:
             StackBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_BCE_WITH_LOGITS:
+            BCEWithLogitsBackward[Self.dtype].backward(output, parent_ids)
+        elif op_code == BACKWARD_BCE:
+            BCELossBackward[Self.dtype].backward(output, parent_ids)

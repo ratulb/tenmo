@@ -84,6 +84,7 @@ declare -a ALL_TESTS_IN_ORDER=(
     "reshape|tests/test_reshape.mojo"
     "embedding|tests/test_embedding.mojo"
     "dot|tests/test_dot.mojo"
+    "division|tests/test_division.mojo"
     "outer|tests/test_outer.mojo"
     "layer_norm|tests/test_layernorm.mojo"
     "reciprocal|tests/test_reciprocal.mojo"
@@ -112,6 +113,7 @@ declare -a ALL_TESTS_IN_ORDER=(
     "expand|tests/test_expand.mojo"
     "gpu_expand|tests/test_gpu_expand.mojo"
     "sgd|tests/test_sgd.mojo"
+    "sparse_sgd|tests/test_sparse_sgd.mojo"
     "npiop|tests/test_numpy_interop.mojo"
     "fill|tests/test_fill.mojo"
     "chunk|tests/test_chunk.mojo"
@@ -167,6 +169,7 @@ declare -a ALL_TESTS_IN_ORDER=(
 declare -a GPU_TESTS=(
     "reshape|tests/test_reshape.mojo"
     "embedding|tests/test_embedding.mojo"
+    "division|tests/test_division.mojo"
     "dot|tests/test_dot.mojo"
     "outer|tests/test_outer.mojo"
     "layer_norm|tests/test_layernorm.mojo"
@@ -194,6 +197,7 @@ declare -a GPU_TESTS=(
     "inplace|tests/test_inplace.mojo"
     "gpu_expand|tests/test_gpu_expand.mojo"
     "sgd|tests/test_sgd.mojo"
+    "sparse_sgd|tests/test_sparse_sgd.mojo"
     "dropout|tests/test_dropout.mojo"
     "dev_transfer|tests/test_device_transfer_gradflow.mojo"
     "logarithm|tests/test_logarithm.mojo"
@@ -243,10 +247,10 @@ if [ $# -eq 0 ]; then
     echo "  $0 gpu relu tanh              - Run only relu and tanh"
     echo ""
     print_colored "$CYAN" "Available tests:"
-    echo "  reshape, embedding, layer_norm, reciprocal, product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
+    echo "  reshape, dot, division, embedding, layer_norm, reciprocal, product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
     echo "  allany, compare, count_unique, transmute, exp, summean, sigmoid"
     echo "  gpusummean, broadcast, scalar, inplace, expand, gpu_expand, gpu_cpu"
-    echo "  sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout, dev_transfer"
+    echo "  sgd, sparse_sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout, dev_transfer"
     echo "  std_variance, stack, logarithm, concat, variance, variance_and_std, utils, onehot, power"
     echo "  indexhelper, losses, tanh, data, softmax, repeat, mmnd, attn_matmul"
     echo "  intarray, mm2d, vm, mv, slice, tiles, linspace, argminmax"
@@ -307,6 +311,7 @@ run_test_by_name() {
         reshape)        run_test "reshape" "tests/test_reshape.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         embedding)      run_test "embedding" "tests/test_embedding.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         dot)            run_test "dot" "tests/test_dot.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        division)       run_test "division" "tests/test_division.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         outer)          run_test "outer" "tests/test_outer.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         layer_norm)     run_test "layer_norm" "tests/test_layernorm.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         reciprocal)     run_test "reciprocal" "tests/test_reciprocal.mojo" "$DEBUG_MODE"; exit_code=$? ;;
@@ -352,6 +357,7 @@ run_test_by_name() {
         expand)         run_test "expand" "tests/test_expand.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         gpu_expand)     run_test "gpu_expand" "tests/test_gpu_expand.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         sgd)            run_test "sgd" "tests/test_sgd.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        sparse_sgd)     run_test "sparse_sgd" "tests/test_sparse_sgd.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         npiop)          run_test "npiop" "tests/test_numpy_interop.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         fill)           run_test "fill" "tests/test_fill.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         chunk)          run_test "chunk" "tests/test_chunk.mojo" "$DEBUG_MODE"; exit_code=$? ;;

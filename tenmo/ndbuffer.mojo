@@ -6,6 +6,8 @@ from .indexhelper import IndexCalculator, IndexIterator
 from .matrixshapevalidator import MatrixShapeValidator
 from .broadcasthelper import ShapeBroadcaster
 from .common_utils import panic, log_debug, print_buffer, Epsilon, One
+from .bce_kernel import BceKernel
+from .division_kernel import DivisionKernel
 from .validators import Validator
 from std.memory import memcpy, AddressSpace
 from std.gpu.host import DeviceBuffer, DeviceContext
@@ -3382,6 +3384,468 @@ struct NDBuffer[dtype: DType](
             return result_ndb, mask_ndb
         else:
             return result_ndb, NDBuffer[Self.dtype].Empty()
+
+    @staticmethod
+    def sigmoid_fn(
+        x: Scalar[Self.dtype],
+    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
+        return Scalar[Self.dtype](1.0) / (Scalar[Self.dtype](1.0) + exp(-x))
+
+    @staticmethod
+    def clip_fn(
+        x: Scalar[Self.dtype], epsilon: Scalar[Self.dtype]
+    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
+        return x.clamp(epsilon, Scalar[Self.dtype](1.0) - epsilon)
+
+    @staticmethod
+    def bce_with_logits_element(
+        x: Scalar[Self.dtype],
+        y: Scalar[Self.dtype],
+        epsilon: Scalar[Self.dtype],
+    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
+        var s = Self.sigmoid_fn(x)
+        var safe = Self.clip_fn(s, epsilon)
+        return -(
+            y * log(safe)
+            + (Scalar[Self.dtype](1.0) - y)
+            * log(Scalar[Self.dtype](1.0) - safe)
+        )
+
+    @staticmethod
+    def bce_element(
+        p: Scalar[Self.dtype],
+        y: Scalar[Self.dtype],
+        epsilon: Scalar[Self.dtype],
+    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
+        var safe = Self.clip_fn(p, epsilon)
+        return -(
+            y * log(safe)
+            + (Scalar[Self.dtype](1.0) - y)
+            * log(Scalar[Self.dtype](1.0) - safe)
+        )
+
+    @staticmethod
+    def bce_with_logits_backward_element(
+        sigmoid: Scalar[Self.dtype],
+        target: Scalar[Self.dtype],
+        grad: Scalar[Self.dtype],
+    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
+        return (sigmoid - target) * grad
+
+    @staticmethod
+    def bce_backward_element(
+        safe: Scalar[Self.dtype],
+        target: Scalar[Self.dtype],
+        grad: Scalar[Self.dtype],
+    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
+        var one = Scalar[Self.dtype](1.0)
+        var one_minus_target = one - target
+        var one_minus_safe = one - safe
+        return -(target / safe - one_minus_target / one_minus_safe) * grad
+
+    @staticmethod
+    def rdiv_scalar_backward_element(
+        grad_out: Scalar[Self.dtype],
+        x: Scalar[Self.dtype],
+        scalar: Scalar[Self.dtype],
+    ) -> Scalar[Self.dtype]:
+        """Element-wise s / x backward: s * grad_out / x² (positive, caller does SubtractTensor)
+        """
+        return scalar * grad_out / (x * x)
+
+    @staticmethod
+    def divide_backward_x_element(
+        grad_out: Scalar[Self.dtype],
+        y: Scalar[Self.dtype],
+    ) -> Scalar[Self.dtype]:
+        """Element-wise grad_x for x / y backward: grad_out / y"""
+        return grad_out / y
+
+    @staticmethod
+    def divide_backward_y_element(
+        grad_out: Scalar[Self.dtype],
+        x: Scalar[Self.dtype],
+        y: Scalar[Self.dtype],
+    ) -> Scalar[Self.dtype]:
+        """Element-wise grad_y for x / y backward: grad_out * x / y² (positive, caller does SubtractTensor)
+        """
+        return grad_out * x / (y * y)
+
+    @always_inline
+    def bce_with_logits_backward(
+        self: NDBuffer[Self.dtype],
+        target: NDBuffer[Self.dtype],
+        grad_output: NDBuffer[Self.dtype],
+    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+        """Fused BCEWithLogits backward. Returns gradient for logits.
+
+        Device-aware: CPU only for now (GPU backward not yet kernelized).
+        """
+        result: NDBuffer[Self.dtype]
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                # TODO: GPU backward kernel for BCEWithLogits
+                result = self.bce_with_logits_backward_cpu(target, grad_output)
+            else:
+                result = self.bce_with_logits_backward_cpu(target, grad_output)
+        else:
+            result = self.bce_with_logits_backward_cpu(target, grad_output)
+        return result^
+
+    @always_inline
+    def bce_with_logits_backward_cpu(
+        self: NDBuffer[Self.dtype],
+        target: NDBuffer[Self.dtype],
+        grad_output: NDBuffer[Self.dtype],
+    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+        if self.is_contiguous():
+            var buf = self.buffer.bce_with_logits_backward(
+                target.buffer, grad_output.buffer
+            )
+            return NDBuffer[Self.dtype](buf^, self.shape)
+        else:
+            var extent = self.numels()
+            var grad_buf = Buffer[Self.dtype](extent)
+            var idx = 0
+            for coord in self.index_iterator():
+                grad_buf[idx] = Self.bce_with_logits_backward_element(
+                    self.buffer[coord],
+                    target.buffer[coord],
+                    grad_output.buffer[coord],
+                )
+                idx += 1
+            return NDBuffer[Self.dtype](grad_buf^, self.shape)
+
+    @always_inline
+    def bce_backward(
+        self: NDBuffer[Self.dtype],
+        target: NDBuffer[Self.dtype],
+        grad_output: NDBuffer[Self.dtype],
+    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+        """Fused BCELoss backward. Returns gradient for pred.
+
+        Device-aware: CPU only for now (GPU backward not yet kernelized).
+        """
+        result: NDBuffer[Self.dtype]
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                # TODO: GPU backward kernel for BCE
+                result = self.bce_backward_cpu(target, grad_output)
+            else:
+                result = self.bce_backward_cpu(target, grad_output)
+        else:
+            result = self.bce_backward_cpu(target, grad_output)
+        return result^
+
+    @always_inline
+    def bce_backward_cpu(
+        self: NDBuffer[Self.dtype],
+        target: NDBuffer[Self.dtype],
+        grad_output: NDBuffer[Self.dtype],
+    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+        if self.is_contiguous():
+            var buf = self.buffer.bce_backward(
+                target.buffer, grad_output.buffer
+            )
+            return NDBuffer[Self.dtype](buf^, self.shape)
+        else:
+            var extent = self.numels()
+            var grad_buf = Buffer[Self.dtype](extent)
+            var idx = 0
+            for coord in self.index_iterator():
+                grad_buf[idx] = Self.bce_backward_element(
+                    self.buffer[coord],
+                    target.buffer[coord],
+                    grad_output.buffer[coord],
+                )
+                idx += 1
+            return NDBuffer[Self.dtype](grad_buf^, self.shape)
+
+    @always_inline
+    def rdiv_scalar_backward(
+        self: NDBuffer[Self.dtype],
+        divisor: NDBuffer[Self.dtype],
+        scalar: Scalar[Self.dtype],
+    ) -> NDBuffer[Self.dtype]:
+        """Fused backward for s / x. Returns gradient for divisor.
+
+        Device-aware: GPU → DivisionKernel.launch_rdiv_scalar_backward.
+        CPU → _rdiv_scalar_backward_cpu.
+        """
+        result: NDBuffer[Self.dtype]
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    result = DivisionKernel[
+                        Self.dtype
+                    ].launch_rdiv_scalar_backward(self, divisor, scalar)
+                except e:
+                    print(e)
+                    panic(
+                        "NDBuffer rdiv_scalar_backward → GPU operation failed"
+                    )
+                    result = Self.Empty()
+            else:
+                result = self._rdiv_scalar_backward_cpu(divisor, scalar)
+        else:
+            result = self._rdiv_scalar_backward_cpu(divisor, scalar)
+        return result^
+
+    @always_inline
+    def _rdiv_scalar_backward_cpu(
+        self: NDBuffer[Self.dtype],
+        divisor: NDBuffer[Self.dtype],
+        scalar: Scalar[Self.dtype],
+    ) -> NDBuffer[Self.dtype]:
+        if self.is_contiguous() and divisor.is_contiguous():
+            var buf = self.buffer.rdiv_scalar_backward(divisor.buffer, scalar)
+            return NDBuffer[Self.dtype](buf^, self.shape)
+        else:
+            var extent = self.numels()
+            var grad_buf = Buffer[Self.dtype](extent)
+            var idx = 0
+            for coord in self.index_iterator():
+                grad_buf[idx] = Self.rdiv_scalar_backward_element(
+                    self.buffer[coord],
+                    divisor.buffer[coord],
+                    scalar,
+                )
+                idx += 1
+            return NDBuffer[Self.dtype](grad_buf^, self.shape)
+
+    @always_inline
+    def divide_backward(
+        self: NDBuffer[Self.dtype],
+        x: NDBuffer[Self.dtype],
+        y: NDBuffer[Self.dtype],
+    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+        """Fused backward for x / y. Returns (grad_x, grad_y).
+
+        Device-aware: GPU → DivisionKernel.launch_divide_backward.
+        CPU → _divide_backward_cpu.
+        """
+        result_x: NDBuffer[Self.dtype]
+        result_y: NDBuffer[Self.dtype]
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    (result_x, result_y) = DivisionKernel[
+                        Self.dtype
+                    ].launch_divide_backward(self, x, y)
+                except e:
+                    print(e)
+                    panic("NDBuffer divide_backward → GPU operation failed")
+                    result_x = Self.Empty()
+                    result_y = Self.Empty()
+            else:
+                (result_x, result_y) = self._divide_backward_cpu(x, y)
+        else:
+            (result_x, result_y) = self._divide_backward_cpu(x, y)
+        return (result_x^, result_y^)
+
+    @always_inline
+    def _divide_backward_cpu(
+        self: NDBuffer[Self.dtype],
+        x: NDBuffer[Self.dtype],
+        y: NDBuffer[Self.dtype],
+    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+        # Fast path: same-shape contiguous → buffer-level SIMD kernel
+        if (
+            self.is_contiguous()
+            and x.is_contiguous()
+            and y.is_contiguous()
+            and self.shape == x.shape
+            and x.shape == y.shape
+        ):
+            var (buf_x, buf_y) = self.buffer.divide_backward(x.buffer, y.buffer)
+            return (
+                NDBuffer[Self.dtype](buf_x^, self.shape),
+                NDBuffer[Self.dtype](buf_y^, self.shape),
+            )
+        # Fallback: element-wise with broadcast support
+        var out_shape = self.shape
+        var out_rank = out_shape.rank()
+        var x_rank = x.shape.rank()
+        var y_rank = y.shape.rank()
+        var extent = self.numels()
+        var gx_buf = Buffer[Self.dtype](extent)
+        var gy_buf = Buffer[Self.dtype](extent)
+        var idx = 0
+        for flat_idx in self.index_iterator():
+            var g = self.buffer[flat_idx]
+            var out_coord = IndexCalculator.index_to_coord(out_shape, flat_idx)
+            # Map output coord → x coord (handle broadcasting)
+            var xv: Scalar[Self.dtype]
+            if x_rank == out_rank:
+                var x_coord = IntArray.filled(out_rank, 0)
+                for d in range(out_rank):
+                    x_coord[d] = 0 if x.shape[d] == 1 else out_coord[d]
+                xv = x[x_coord]
+            else:
+                var x_skip = out_rank - x_rank
+                var x_coord = IntArray.filled(x_rank, 0)
+                for d in range(x_rank):
+                    x_coord[d] = 0 if x.shape[d] == 1 else out_coord[d + x_skip]
+                xv = x[x_coord]
+            # Map output coord → y coord (handle broadcasting)
+            var yv: Scalar[Self.dtype]
+            if y_rank == out_rank:
+                var y_coord = IntArray.filled(out_rank, 0)
+                for d in range(out_rank):
+                    y_coord[d] = 0 if y.shape[d] == 1 else out_coord[d]
+                yv = y[y_coord]
+            else:
+                var y_skip = out_rank - y_rank
+                var y_coord = IntArray.filled(y_rank, 0)
+                for d in range(y_rank):
+                    y_coord[d] = 0 if y.shape[d] == 1 else out_coord[d + y_skip]
+                yv = y[y_coord]
+            gx_buf[idx] = Self.divide_backward_x_element(g, yv)
+            gy_buf[idx] = Self.divide_backward_y_element(g, xv, yv)
+            idx += 1
+        return (
+            NDBuffer[Self.dtype](gx_buf^, out_shape),
+            NDBuffer[Self.dtype](gy_buf^, out_shape),
+        )
+
+    @always_inline
+    def bce_with_logits_forward(
+        self: NDBuffer[Self.dtype],
+        target: NDBuffer[Self.dtype],
+        epsilon: Scalar[Self.dtype],
+    ) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ] where Self.dtype.is_floating_point():
+        """Fused BCEWithLogits forward. Returns (per_element_loss, sigmoid).
+
+        Device-aware: GPU → BceKernel.launch_forward_with_logits.
+        CPU → buffer.bce_with_logits_forward (contiguous) or scalar fallback.
+        """
+        var loss_ndb: NDBuffer[Self.dtype]
+        var bw_ndb: NDBuffer[Self.dtype]
+
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    var result = BceKernel[
+                        Self.dtype
+                    ].launch_forward_with_logits(self, target, epsilon)
+                    loss_ndb = result[0]
+                    bw_ndb = result[1]
+                except e:
+                    print(e)
+                    panic(
+                        "NDBuffer bce_with_logits_forward → GPU operation"
+                        " failed"
+                    )
+                    loss_ndb = Self.Empty()
+                    bw_ndb = Self.Empty()
+            else:
+                (loss_ndb, bw_ndb) = self.bce_with_logits_forward_cpu(
+                    target, epsilon
+                )
+        else:
+            (loss_ndb, bw_ndb) = self.bce_with_logits_forward_cpu(
+                target, epsilon
+            )
+
+        return (loss_ndb^, bw_ndb^)
+
+    @always_inline
+    def bce_with_logits_forward_cpu(
+        self: NDBuffer[Self.dtype],
+        target: NDBuffer[Self.dtype],
+        epsilon: Scalar[Self.dtype],
+    ) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ] where Self.dtype.is_floating_point():
+        if self.is_contiguous():
+            var result = self.buffer.bce_with_logits_forward(
+                target.buffer, epsilon
+            )
+            var loss_ndb = NDBuffer[Self.dtype](result[0], self.shape)
+            var bw_ndb = NDBuffer[Self.dtype](result[1], self.shape)
+            return (loss_ndb^, bw_ndb^)
+        else:
+            var extent = self.numels()
+            var loss_buf = Buffer[Self.dtype](extent)
+            var sig_buf = Buffer[Self.dtype](extent)
+            var idx = 0
+            for coord in self.index_iterator():
+                loss_buf[idx] = Self.bce_with_logits_element(
+                    self.buffer[coord], target.buffer[coord], epsilon
+                )
+                sig_buf[idx] = Self.sigmoid_fn(self.buffer[coord])
+                idx += 1
+            return (
+                NDBuffer[Self.dtype](loss_buf^, self.shape),
+                NDBuffer[Self.dtype](sig_buf^, self.shape),
+            )
+
+    @always_inline
+    def bce_forward(
+        self: NDBuffer[Self.dtype],
+        target: NDBuffer[Self.dtype],
+        epsilon: Scalar[Self.dtype],
+    ) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ] where Self.dtype.is_floating_point():
+        """Fused BCELoss forward (probabilities). Returns (per_element_loss, clipped_pred).
+
+        Device-aware: GPU → BceKernel.launch_forward.
+        CPU → buffer.bce_forward (contiguous) or scalar fallback.
+        """
+        var loss_ndb: NDBuffer[Self.dtype]
+        var bw_ndb: NDBuffer[Self.dtype]
+
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    var result = BceKernel[Self.dtype].launch_forward(
+                        self, target, epsilon
+                    )
+                    loss_ndb = result[0]
+                    bw_ndb = result[1]
+                except e:
+                    print(e)
+                    panic("NDBuffer bce_forward → GPU operation failed")
+                    loss_ndb = Self.Empty()
+                    bw_ndb = Self.Empty()
+            else:
+                (loss_ndb, bw_ndb) = self.bce_forward_cpu(target, epsilon)
+        else:
+            (loss_ndb, bw_ndb) = self.bce_forward_cpu(target, epsilon)
+
+        return (loss_ndb^, bw_ndb^)
+
+    @always_inline
+    def bce_forward_cpu(
+        self: NDBuffer[Self.dtype],
+        target: NDBuffer[Self.dtype],
+        epsilon: Scalar[Self.dtype],
+    ) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ] where Self.dtype.is_floating_point():
+        if self.is_contiguous():
+            var result = self.buffer.bce_forward(target.buffer, epsilon)
+            var loss_ndb = NDBuffer[Self.dtype](result[0], self.shape)
+            var bw_ndb = NDBuffer[Self.dtype](result[1], self.shape)
+            return (loss_ndb^, bw_ndb^)
+        else:
+            var extent = self.numels()
+            var loss_buf = Buffer[Self.dtype](extent)
+            var safe_buf = Buffer[Self.dtype](extent)
+            var idx = 0
+            for coord in self.index_iterator():
+                loss_buf[idx] = Self.bce_element(
+                    self.buffer[coord], target.buffer[coord], epsilon
+                )
+                safe_buf[idx] = Self.clip_fn(self.buffer[coord], epsilon)
+                idx += 1
+            return (
+                NDBuffer[Self.dtype](loss_buf^, self.shape),
+                NDBuffer[Self.dtype](safe_buf^, self.shape),
+            )
 
     def clamp(
         self: NDBuffer[Self.dtype],

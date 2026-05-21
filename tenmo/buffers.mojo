@@ -2388,6 +2388,301 @@ struct Buffer[dtype: DType = DType.float32](
             out[i] = value if pred(self[i]) else self[i]
         return out^
 
+    def bce_with_logits_forward(
+        self: Buffer[Self.dtype],
+        target: Buffer[Self.dtype],
+        epsilon: Scalar[Self.dtype],
+    ) -> Tuple[
+        Buffer[Self.dtype], Buffer[Self.dtype]
+    ] where Self.dtype.is_floating_point():
+        """Fused BCEWithLogits forward. Computes per-element loss + sigmoid in one pass.
+
+        Args:
+            target: Target buffer (same size as self).
+            epsilon: Clipping epsilon for numerical stability.
+
+        Returns:
+            (loss_per_element, sigmoid) buffers.
+        """
+        var extent = self.size
+        var loss_out = Buffer[Self.dtype](extent)
+        var sig_out = Buffer[Self.dtype](extent)
+
+        comptime simd_width = simd_width_of[Self.dtype]()
+
+        var num_full_chunks = extent // simd_width
+        var remainder = extent % simd_width
+        var one = SIMD[Self.dtype, simd_width](1.0)
+        var eps = SIMD[Self.dtype, simd_width](epsilon)
+
+        for chunk in range(num_full_chunks):
+            var idx = chunk * simd_width
+            var x = self.load[simdwidth=simd_width](idx)
+            var y = target.load[simdwidth=simd_width](idx)
+
+            var s = one / (one + exp(-x))
+            var safe = s.clamp(eps, one - eps)
+            var loss = -(y * log(safe) + (one - y) * log(one - safe))
+
+            loss_out.store[simdwidth=simd_width](idx, loss)
+            sig_out.store[simdwidth=simd_width](idx, s)
+
+        if remainder > 0:
+            var start_idx = num_full_chunks * simd_width
+            var one_s = Scalar[Self.dtype](1.0)
+            for i in range(remainder):
+                var idx = start_idx + i
+                var x = self[idx]
+                var y = target[idx]
+                var s = one_s / (one_s + exp(-x))
+                var safe = s.clamp(epsilon, one_s - epsilon)
+                loss_out[idx] = -(
+                    y * log(safe) + (one_s - y) * log(one_s - safe)
+                )
+                sig_out[idx] = s
+
+        return (loss_out^, sig_out^)
+
+    def bce_forward(
+        self: Buffer[Self.dtype],
+        target: Buffer[Self.dtype],
+        epsilon: Scalar[Self.dtype],
+    ) -> Tuple[
+        Buffer[Self.dtype], Buffer[Self.dtype]
+    ] where Self.dtype.is_floating_point():
+        """Fused BCELoss forward (probabilities input). Computes per-element loss + clipped pred.
+
+        Args:
+            target: Target buffer (same size as self).
+            epsilon: Clipping epsilon for numerical stability.
+
+        Returns:
+            (loss_per_element, clipped_pred) buffers.
+        """
+        var extent = self.size
+        var loss_out = Buffer[Self.dtype](extent)
+        var safe_out = Buffer[Self.dtype](extent)
+
+        comptime simd_width = simd_width_of[Self.dtype]()
+
+        var num_full_chunks = extent // simd_width
+        var remainder = extent % simd_width
+        var one = SIMD[Self.dtype, simd_width](1.0)
+        var eps = SIMD[Self.dtype, simd_width](epsilon)
+
+        for chunk in range(num_full_chunks):
+            var idx = chunk * simd_width
+            var p = self.load[simdwidth=simd_width](idx)
+            var y = target.load[simdwidth=simd_width](idx)
+
+            var safe = p.clamp(eps, one - eps)
+            var loss = -(y * log(safe) + (one - y) * log(one - safe))
+
+            loss_out.store[simdwidth=simd_width](idx, loss)
+            safe_out.store[simdwidth=simd_width](idx, safe)
+
+        if remainder > 0:
+            var start_idx = num_full_chunks * simd_width
+            var one_s = Scalar[Self.dtype](1.0)
+            for i in range(remainder):
+                var idx = start_idx + i
+                var p = self[idx]
+                var y = target[idx]
+                var safe = p.clamp(epsilon, one_s - epsilon)
+                loss_out[idx] = -(
+                    y * log(safe) + (one_s - y) * log(one_s - safe)
+                )
+                safe_out[idx] = safe
+
+        return (loss_out^, safe_out^)
+
+    def bce_with_logits_backward(
+        self: Buffer[Self.dtype],
+        target: Buffer[Self.dtype],
+        grad_output: Buffer[Self.dtype],
+    ) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
+        """Fused BCEWithLogits backward. Computes gradient in one pass.
+
+        grad = (sigmoid - target) * grad_output
+
+        Args:
+            self: Sigmoid buffer.
+            target: Target buffer.
+            grad_output: Upstream gradient buffer.
+
+        Returns:
+            Gradient buffer for the input (logits).
+        """
+        var extent = self.size
+        var grad_out = Buffer[Self.dtype](extent)
+
+        comptime simd_width = simd_width_of[Self.dtype]()
+
+        var num_full_chunks = extent // simd_width
+        var remainder = extent % simd_width
+
+        for chunk in range(num_full_chunks):
+            var idx = chunk * simd_width
+            var s = self.load[simdwidth=simd_width](idx)
+            var y = target.load[simdwidth=simd_width](idx)
+            var g = grad_output.load[simdwidth=simd_width](idx)
+            var grad = (s - y) * g
+            grad_out.store[simdwidth=simd_width](idx, grad)
+
+        if remainder > 0:
+            var start_idx = num_full_chunks * simd_width
+            for i in range(remainder):
+                var idx = start_idx + i
+                var s = self[idx]
+                var y = target[idx]
+                var g = grad_output[idx]
+                grad_out[idx] = (s - y) * g
+
+        return grad_out^
+
+    def bce_backward(
+        self: Buffer[Self.dtype],
+        target: Buffer[Self.dtype],
+        grad_output: Buffer[Self.dtype],
+    ) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
+        """Fused BCELoss backward. Computes gradient in one pass.
+
+        grad = -(target/safe - (1-target)/(1-safe)) * grad_output
+
+        Args:
+            self: Clipped prediction buffer (safe = clip(pred, eps, 1-eps)).
+            target: Target buffer.
+            grad_output: Upstream gradient buffer.
+
+        Returns:
+            Gradient buffer for the input (pred).
+        """
+        var extent = self.size
+        var grad_out = Buffer[Self.dtype](extent)
+
+        comptime simd_width = simd_width_of[Self.dtype]()
+
+        var num_full_chunks = extent // simd_width
+        var remainder = extent % simd_width
+        var one_n = SIMD[Self.dtype, simd_width](1.0)
+
+        for chunk in range(num_full_chunks):
+            var idx = chunk * simd_width
+            var safe = self.load[simdwidth=simd_width](idx)
+            var y = target.load[simdwidth=simd_width](idx)
+            var g = grad_output.load[simdwidth=simd_width](idx)
+            var one_minus_y = one_n - y
+            var one_minus_safe = one_n - safe
+            var grad = -(y / safe - one_minus_y / one_minus_safe) * g
+            grad_out.store[simdwidth=simd_width](idx, grad)
+
+        if remainder > 0:
+            var start_idx = num_full_chunks * simd_width
+            var one_s = Scalar[Self.dtype](1.0)
+            for i in range(remainder):
+                var idx = start_idx + i
+                var safe = self[idx]
+                var y = target[idx]
+                var g = grad_output[idx]
+                var one_minus_y = one_s - y
+                var one_minus_safe_val = one_s - safe
+                grad_out[idx] = (
+                    -(y / safe - one_minus_y / one_minus_safe_val) * g
+                )
+
+        return grad_out^
+
+    def rdiv_scalar_backward(
+        self: Buffer[Self.dtype],
+        divisor: Buffer[Self.dtype],
+        scalar: Scalar[Self.dtype],
+    ) -> Buffer[Self.dtype]:
+        """Fused backward for s / x. Computes s * grad_output / x² in one pass.
+        NOTE: Positive sign because the caller uses SubtractTensor (negation).
+
+        Args:
+            self: Upstream gradient buffer (grad_output).
+            divisor: The tensor buffer x (s / x).
+            scalar: The scalar s.
+
+        Returns:
+            Gradient buffer for the divisor (x).
+        """
+        var extent = self.size
+        var grad_out = Buffer[Self.dtype](extent)
+
+        comptime simd_width = simd_width_of[Self.dtype]()
+
+        var num_full_chunks = extent // simd_width
+        var remainder = extent % simd_width
+        var s_vec = SIMD[Self.dtype, simd_width](scalar)
+
+        for chunk in range(num_full_chunks):
+            var idx = chunk * simd_width
+            var g = self.load[simdwidth=simd_width](idx)
+            var x = divisor.load[simdwidth=simd_width](idx)
+            var x_sq = x * x
+            grad_out.store[simdwidth=simd_width](idx, s_vec * g / x_sq)
+
+        if remainder > 0:
+            var start_idx = num_full_chunks * simd_width
+            var s_s = scalar
+            for i in range(remainder):
+                var idx = start_idx + i
+                var g = self[idx]
+                var x = divisor[idx]
+                grad_out[idx] = s_s * g / (x * x)
+
+        return grad_out^
+
+    def divide_backward(
+        self: Buffer[Self.dtype],
+        x: Buffer[Self.dtype],
+        y: Buffer[Self.dtype],
+    ) -> Tuple[Buffer[Self.dtype], Buffer[Self.dtype]]:
+        """Fused backward for x / y. Computes both gradients in one pass.
+
+        grad_x = grad_output / y
+        grad_y = -grad_output * x / y²
+
+        Args:
+            self: Upstream gradient buffer (grad_output).
+            x: Numerator buffer.
+            y: Denominator buffer.
+
+        Returns:
+            (grad_x, grad_y) buffers, same size as inputs.
+        """
+        var extent = self.size
+        var grad_x_buf = Buffer[Self.dtype](extent)
+        var grad_y_buf = Buffer[Self.dtype](extent)
+
+        comptime simd_width = simd_width_of[Self.dtype]()
+
+        var num_full_chunks = extent // simd_width
+        var remainder = extent % simd_width
+
+        for chunk in range(num_full_chunks):
+            var idx = chunk * simd_width
+            var g = self.load[simdwidth=simd_width](idx)
+            var xv = x.load[simdwidth=simd_width](idx)
+            var yv = y.load[simdwidth=simd_width](idx)
+            var y_sq = yv * yv
+            grad_x_buf.store[simdwidth=simd_width](idx, g / yv)
+            grad_y_buf.store[simdwidth=simd_width](idx, g * xv / y_sq)
+
+        if remainder > 0:
+            var start_idx = num_full_chunks * simd_width
+            for i in range(remainder):
+                var idx = start_idx + i
+                var g = self[idx]
+                var xv = x[idx]
+                var yv = y[idx]
+                grad_x_buf[idx] = g / yv
+                grad_y_buf[idx] = g * xv / (yv * yv)
+
+        return (grad_x_buf^, grad_y_buf^)
+
     def string(self) -> String:
         var result = "Buffer["
 

@@ -123,6 +123,10 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
         if padding_idx:
             self._zero_padding_row()
 
+        # Share weight buffer so ancestry copies are a refcount bump, not 100MB memcpy
+        if self.weight.requires_grad:
+            self.weight.buffer.buffer.shared()
+
     # ── Forward ───────────────────────────────────────────────────────────────
     def __call__(
         mut self,

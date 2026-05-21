@@ -62,3 +62,4 @@ from .product_reduction import ProductBackward
 from .layernorm import LayerNormBackward
 from .broadcast import BroadcastToBackward
 from .gather import GatherBackward
+from .bceloss import BCEWithLogitsBackward, BCELossBackward
