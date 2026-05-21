@@ -8,7 +8,6 @@ from tenmo.shapes import Shape
 
 
 def test_varstd_cpu_variance_in_expression() raises:
-    print("test_varstd_cpu_variance_in_expression")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     # loss = 2 * variance(x)
@@ -23,7 +22,6 @@ def test_varstd_cpu_variance_in_expression() raises:
 
 
 def test_varstd_cpu_std_in_normalization() raises:
-    print("test_varstd_cpu_std_in_normalization")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var s = x.std[track_grad=True](unbiased=False)
@@ -42,7 +40,6 @@ def test_varstd_cpu_std_in_normalization() raises:
 
 
 def test_varstd_cpu_variance_4d_axis2() raises:
-    print("test_varstd_cpu_variance_4d_axis2")
     comptime dtype = DType.float32
     # Shape (2,2,3,2) — variance along axis=2 (size 3)
     var x = Tensor[dtype].d4(
@@ -79,7 +76,6 @@ def test_varstd_cpu_variance_4d_axis2() raises:
 
 def test_varstd_gpu_variance_welford_numerical_stability() raises:
     comptime if has_accelerator():
-        print("test_varstd_gpu_variance_welford_numerical_stability")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d1(
             [1_000_001.0, 1_000_002.0, 1_000_003.0], requires_grad=True
@@ -96,7 +92,6 @@ def test_varstd_gpu_variance_welford_numerical_stability() raises:
 
 
 def test_varstd_cpu_variance_noncontiguous_input() raises:
-    print("test_varstd_cpu_variance_noncontiguous_input")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
@@ -114,7 +109,6 @@ def test_varstd_cpu_variance_noncontiguous_input() raises:
 
 
 def test_varstd_cpu_variance_unbiased_single_element() raises:
-    print("test_varstd_cpu_variance_unbiased_single_element")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([5.0], requires_grad=True)
     # unbiased with n=1 — divisor stays 1, not 0
@@ -126,7 +120,6 @@ def test_varstd_cpu_variance_unbiased_single_element() raises:
 
 
 def test_varstd_cpu_variance_single_element() raises:
-    print("test_varstd_cpu_variance_single_element")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([5.0], requires_grad=True)
     # population variance of single element = 0
@@ -139,7 +132,6 @@ def test_varstd_cpu_variance_single_element() raises:
 
 
 def test_varstd_cpu_variance_welford_numerical_stability() raises:
-    print("test_varstd_cpu_variance_welford_numerical_stability")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1(
         [1_000_001.0, 1_000_002.0, 1_000_003.0], requires_grad=True
@@ -154,7 +146,6 @@ def test_varstd_cpu_variance_welford_numerical_stability() raises:
 
 
 def _varstd_cpu_variance_welford_numerical_stability_ubiased() raises:
-    print("test_varstd_cpu_variance_welford_numerical_stability")
     comptime dtype = DType.float32
     # Large offset — two-pass formula loses precision, Welford stays stable
     # var([1e6+1, 1e6+2, 1e6+3]) = var([1,2,3]) = 1.0 (population)
@@ -162,7 +153,6 @@ def _varstd_cpu_variance_welford_numerical_stability_ubiased() raises:
         [1_000_001.0, 1_000_002.0, 1_000_003.0], requires_grad=True
     )
     var v = x.variance[track_grad=True](unbiased=True)
-    v.print()
     assert_true(v.all_close[atol=1e-1](Tensor[dtype].scalar(1.0)))
     var loss = v.sum()
     loss.backward()
@@ -175,7 +165,6 @@ def _varstd_cpu_variance_welford_numerical_stability_ubiased() raises:
 
 
 def test_varstd_cpu_variance_scalar_global() raises:
-    print("test_varstd_cpu_variance_scalar_global")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1(
         [2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0], requires_grad=True
@@ -193,7 +182,6 @@ def test_varstd_cpu_variance_scalar_global() raises:
 
 
 def test_varstd_cpu_variance_unbiased_global() raises:
-    print("test_varstd_cpu_variance_unbiased_global")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
     var v = x.variance[track_grad=True](unbiased=True)
@@ -207,7 +195,6 @@ def test_varstd_cpu_variance_unbiased_global() raises:
 
 
 def test_varstd_cpu_variance_axis0() raises:
-    print("test_varstd_cpu_variance_axis0")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
@@ -228,7 +215,6 @@ def test_varstd_cpu_variance_axis0() raises:
 
 
 def test_varstd_cpu_variance_axis1() raises:
-    print("test_varstd_cpu_variance_axis1")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 8.0]], requires_grad=True)
     var v = x.variance[track_grad=True](axis=1, keepdims=False, unbiased=False)
@@ -242,7 +228,6 @@ def test_varstd_cpu_variance_axis1() raises:
 
 
 def test_varstd_cpu_variance_axis1_keepdims() raises:
-    print("test_varstd_cpu_variance_axis1_keepdims")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 8.0]], requires_grad=True)
     var v = x.variance[track_grad=True](axis=1, keepdims=True, unbiased=False)
@@ -255,7 +240,6 @@ def test_varstd_cpu_variance_axis1_keepdims() raises:
 
 
 def test_varstd_cpu_variance_3d_axis1() raises:
-    print("test_varstd_cpu_variance_3d_axis1")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -279,7 +263,6 @@ def test_varstd_cpu_variance_3d_axis1() raises:
 
 
 def test_varstd_cpu_variance_no_grad() raises:
-    print("test_varstd_cpu_variance_no_grad")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var v = x.variance[track_grad=False](unbiased=False)
@@ -291,7 +274,6 @@ def test_varstd_cpu_variance_no_grad() raises:
 
 
 def test_varstd_cpu_std_global() raises:
-    print("test_varstd_cpu_std_global")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1(
         [2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0], requires_grad=True
@@ -309,7 +291,6 @@ def test_varstd_cpu_std_global() raises:
 
 
 def test_varstd_cpu_std_axis0() raises:
-    print("test_varstd_cpu_std_axis0")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var s = x.std[track_grad=True](axis=0, keepdims=False, unbiased=False)
@@ -323,7 +304,6 @@ def test_varstd_cpu_std_axis0() raises:
 
 
 def test_varstd_cpu_std_axis1() raises:
-    print("test_varstd_cpu_std_axis1")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 8.0]], requires_grad=True)
     var s = x.std[track_grad=True](axis=1, keepdims=False, unbiased=False)
@@ -337,7 +317,6 @@ def test_varstd_cpu_std_axis1() raises:
 
 
 def test_varstd_cpu_std_axis1_keepdims() raises:
-    print("test_varstd_cpu_std_axis1_keepdims")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 8.0]], requires_grad=True)
     var s = x.std[track_grad=True](axis=1, keepdims=True, unbiased=False)
@@ -350,7 +329,6 @@ def test_varstd_cpu_std_axis1_keepdims() raises:
 
 
 def test_varstd_cpu_std_unbiased() raises:
-    print("test_varstd_cpu_std_unbiased")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
     var s = x.std[track_grad=True](unbiased=True)
@@ -366,7 +344,6 @@ def test_varstd_cpu_std_unbiased() raises:
 
 
 def test_varstd_cpu_std_3d_axis2() raises:
-    print("test_varstd_cpu_std_3d_axis2")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d3(
         [[[1.0, 3.0], [2.0, 4.0]], [[5.0, 7.0], [6.0, 8.0]]], requires_grad=True
@@ -389,7 +366,6 @@ def test_varstd_cpu_std_3d_axis2() raises:
 
 
 def test_varstd_cpu_std_no_grad() raises:
-    print("test_varstd_cpu_std_no_grad")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var s = x.std[track_grad=False](unbiased=False)
@@ -398,7 +374,6 @@ def test_varstd_cpu_std_no_grad() raises:
 
 
 def test_varstd_cpu_variance_grad_accumulation() raises:
-    print("test_varstd_cpu_variance_grad_accumulation")
     comptime dtype = DType.float32
     # x used in two variance ops — grads should accumulate
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -418,7 +393,6 @@ def test_varstd_cpu_variance_grad_accumulation() raises:
 
 
 def test_varstd_cpu_std_vs_variance_consistency() raises:
-    print("test_varstd_cpu_std_vs_variance_consistency")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -435,7 +409,6 @@ def test_varstd_cpu_std_vs_variance_consistency() raises:
 
 def test_varstd_gpu_variance_global() raises:
     comptime if has_accelerator():
-        print("test_varstd_gpu_variance_global")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d1(
             [2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0], requires_grad=True
@@ -453,7 +426,6 @@ def test_varstd_gpu_variance_global() raises:
 
 def test_varstd_gpu_variance_axis0() raises:
     comptime if has_accelerator():
-        print("test_varstd_gpu_variance_axis0")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2(
             [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
@@ -478,7 +450,6 @@ def test_varstd_gpu_variance_axis0() raises:
 
 def test_varstd_gpu_variance_axis1() raises:
     comptime if has_accelerator():
-        print("test_varstd_gpu_variance_axis1")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 8.0]], requires_grad=True)
         var x_gpu = x.to_gpu()
@@ -496,7 +467,6 @@ def test_varstd_gpu_variance_axis1() raises:
 
 def test_varstd_gpu_variance_keepdims() raises:
     comptime if has_accelerator():
-        print("test_varstd_gpu_variance_keepdims")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 8.0]], requires_grad=True)
         var x_gpu = x.to_gpu()
@@ -515,7 +485,6 @@ def test_varstd_gpu_variance_keepdims() raises:
 
 def test_varstd_gpu_std_global() raises:
     comptime if has_accelerator():
-        print("test_varstd_gpu_std_global")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d1(
             [2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0], requires_grad=True
@@ -533,7 +502,6 @@ def test_varstd_gpu_std_global() raises:
 
 def test_varstd_gpu_std_axis1() raises:
     comptime if has_accelerator():
-        print("test_varstd_gpu_std_axis1")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 8.0]], requires_grad=True)
         var x_gpu = x.to_gpu()
@@ -551,7 +519,6 @@ def test_varstd_gpu_std_axis1() raises:
 
 def test_varstd_gpu_std_axis0_keepdims() raises:
     comptime if has_accelerator():
-        print("test_varstd_gpu_std_axis0_keepdims")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var x_gpu = x.to_gpu()
@@ -570,7 +537,6 @@ def test_varstd_gpu_std_axis0_keepdims() raises:
 
 def test_varstd_gpu_std_vs_cpu_consistency() raises:
     comptime if has_accelerator():
-        print("test_varstd_gpu_std_vs_cpu_consistency")
         comptime dtype = DType.float32
         var x_cpu = Tensor[dtype].d2(
             [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -596,7 +562,6 @@ def test_varstd_gpu_std_vs_cpu_consistency() raises:
 
 def test_varstd_gpu_variance_unbiased() raises:
     comptime if has_accelerator():
-        print("test_varstd_gpu_variance_unbiased")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
         var x_gpu = x.to_gpu()
@@ -628,7 +593,6 @@ def main() raises:
 
 
 def test_varstd_var_fwd_cpu_global_1d() raises:
-    print("test_varstd_var_fwd_cpu_global_1d")
     comptime dtype = DType.float32
     # [1,2,3,4,5] — population var = 2.0, sample var = 2.5
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -639,7 +603,6 @@ def test_varstd_var_fwd_cpu_global_1d() raises:
 
 
 def test_varstd_var_fwd_cpu_global_2d() raises:
-    print("test_varstd_var_fwd_cpu_global_2d")
     comptime dtype = DType.float32
     # [[1,2],[3,4]] — global mean=2.5, pop var = (1+0.25+0.25+2.25)/4 = 1.25
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -648,7 +611,6 @@ def test_varstd_var_fwd_cpu_global_2d() raises:
 
 
 def test_varstd_var_fwd_cpu_axis0_2d() raises:
-    print("test_varstd_var_fwd_cpu_axis0_2d")
     comptime dtype = DType.float32
     # [[1,2],[3,4]] — var along axis 0 (over rows):
     # col0: var(1,3)=1.0(pop), col1: var(2,4)=1.0(pop)
@@ -659,7 +621,6 @@ def test_varstd_var_fwd_cpu_axis0_2d() raises:
 
 
 def test_varstd_var_fwd_cpu_axis1_2d() raises:
-    print("test_varstd_var_fwd_cpu_axis1_2d")
     comptime dtype = DType.float32
     # [[1,3],[2,4]] — var along axis 1 (over cols):
     # row0: var(1,3)=1.0, row1: var(2,4)=1.0
@@ -670,7 +631,6 @@ def test_varstd_var_fwd_cpu_axis1_2d() raises:
 
 
 def test_varstd_var_fwd_cpu_axis1_keepdims() raises:
-    print("test_varstd_var_fwd_cpu_axis1_keepdims")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]])
     var v = x.variance[track_grad=False](axis=1, keepdims=True, unbiased=False)
@@ -679,7 +639,6 @@ def test_varstd_var_fwd_cpu_axis1_keepdims() raises:
 
 
 def test_varstd_var_fwd_cpu_constant_is_zero() raises:
-    print("test_varstd_var_fwd_cpu_constant_is_zero")
     comptime dtype = DType.float32
     var x = Tensor[dtype].full(Shape(4), 7.0)
     var v = x.variance[track_grad=False](unbiased=False)
@@ -687,7 +646,6 @@ def test_varstd_var_fwd_cpu_constant_is_zero() raises:
 
 
 def test_varstd_var_fwd_cpu_3d_axis1() raises:
-    print("test_varstd_var_fwd_cpu_3d_axis1")
     comptime dtype = DType.float32
     # shape (2,3,4) — variance along axis 1
     var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
@@ -702,7 +660,6 @@ def test_varstd_var_fwd_cpu_3d_axis1() raises:
 
 
 def test_varstd_var_bwd_cpu_global_1d() raises:
-    print("test_varstd_var_bwd_cpu_global_1d")
     comptime dtype = DType.float32
     # x = [1,2,3,4,5], mean=3, diff=[-2,-1,0,1,2]
     # pop var grad = 2/n * diff = 2/5 * diff = [-0.8,-0.4,0,0.4,0.8]
@@ -718,7 +675,6 @@ def test_varstd_var_bwd_cpu_global_1d() raises:
 
 
 def test_varstd_var_bwd_cpu_global_unbiased() raises:
-    print("test_varstd_var_bwd_cpu_global_unbiased")
     comptime dtype = DType.float32
     # sample var grad = 2/(n-1) * diff = 2/4 * diff = [-1,-0.5,0,0.5,1]
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
@@ -733,7 +689,6 @@ def test_varstd_var_bwd_cpu_global_unbiased() raises:
 
 
 def test_varstd_var_bwd_cpu_axis0_2d() raises:
-    print("test_varstd_var_bwd_cpu_axis0_2d")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var v = x.variance[track_grad=True](axis=0, unbiased=False)
@@ -749,7 +704,6 @@ def test_varstd_var_bwd_cpu_axis0_2d() raises:
 
 
 def test_varstd_var_bwd_cpu_axis1_2d() raises:
-    print("test_varstd_var_bwd_cpu_axis1_2d")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]], requires_grad=True)
     var v = x.variance[track_grad=True](axis=1, unbiased=False)
@@ -765,7 +719,6 @@ def test_varstd_var_bwd_cpu_axis1_2d() raises:
 
 
 def test_varstd_var_bwd_cpu_grad_zero_for_constant() raises:
-    print("test_varstd_var_bwd_cpu_grad_zero_for_constant")
     comptime dtype = DType.float32
     var x = Tensor[dtype].full(Shape(4), 3.0, requires_grad=True)
     var v = x.variance[track_grad=True](unbiased=False)
@@ -775,7 +728,6 @@ def test_varstd_var_bwd_cpu_grad_zero_for_constant() raises:
 
 
 def test_varstd_var_bwd_cpu_3d_axis1() raises:
-    print("test_varstd_var_bwd_cpu_3d_axis1")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
     var x = _tmp0.reshape(2, 3, 4)
@@ -798,7 +750,6 @@ def test_varstd_var_bwd_cpu_3d_axis1() raises:
 
 
 def test_varstd_var_gradflow_cpu_chained_with_sum() raises:
-    print("test_varstd_var_gradflow_cpu_chained_with_sum")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var v = x.variance[track_grad=True](unbiased=False)
@@ -814,7 +765,6 @@ def test_varstd_var_gradflow_cpu_chained_with_sum() raises:
 
 
 def test_varstd_var_gradflow_cpu_no_grad_leaf() raises:
-    print("test_varstd_var_gradflow_cpu_no_grad_leaf")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0])  # no grad
     var v = x.variance[track_grad=True](unbiased=False)
@@ -831,7 +781,6 @@ def test_varstd_var_gradflow_cpu_no_grad_leaf() raises:
 
 
 def test_varstd_std_fwd_cpu_global_1d() raises:
-    print("test_varstd_std_fwd_cpu_global_1d")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
     var s = x.std[track_grad=False](unbiased=False)
@@ -840,7 +789,6 @@ def test_varstd_std_fwd_cpu_global_1d() raises:
 
 
 def test_varstd_std_fwd_cpu_global_unbiased() raises:
-    print("test_varstd_std_fwd_cpu_global_unbiased")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
     var s = x.std[track_grad=False](unbiased=True)
@@ -849,7 +797,6 @@ def test_varstd_std_fwd_cpu_global_unbiased() raises:
 
 
 def test_varstd_std_fwd_cpu_axis0_2d() raises:
-    print("test_varstd_std_fwd_cpu_axis0_2d")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var s = x.std[track_grad=False](axis=0, unbiased=False)
@@ -858,7 +805,6 @@ def test_varstd_std_fwd_cpu_axis0_2d() raises:
 
 
 def test_varstd_std_fwd_cpu_axis1_2d() raises:
-    print("test_varstd_std_fwd_cpu_axis1_2d")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]])
     var s = x.std[track_grad=False](axis=1, unbiased=False)
@@ -867,7 +813,6 @@ def test_varstd_std_fwd_cpu_axis1_2d() raises:
 
 
 def test_varstd_std_fwd_cpu_constant_near_zero() raises:
-    print("test_varstd_std_fwd_cpu_constant_near_zero")
     comptime dtype = DType.float32
     var x = Tensor[dtype].full(Shape(4), 5.0)
     var s = x.std[track_grad=False](unbiased=False)
@@ -876,7 +821,6 @@ def test_varstd_std_fwd_cpu_constant_near_zero() raises:
 
 
 def test_varstd_std_fwd_cpu_keepdims() raises:
-    print("test_varstd_std_fwd_cpu_keepdims")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]])
     var s = x.std[track_grad=False](axis=1, keepdims=True, unbiased=False)
@@ -884,7 +828,6 @@ def test_varstd_std_fwd_cpu_keepdims() raises:
 
 
 def test_varstd_std_fwd_cpu_3d() raises:
-    print("test_varstd_std_fwd_cpu_3d")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
     var x = _tmp0.reshape(2, 3, 4)
@@ -898,7 +841,6 @@ def test_varstd_std_fwd_cpu_3d() raises:
 
 
 def test_varstd_std_bwd_cpu_global_1d() raises:
-    print("test_varstd_std_bwd_cpu_global_1d")
     comptime dtype = DType.float32
     # x=[1,2,3,4,5], std=sqrt(2), grad_std=1
     # dL/dx = diff / (std * n) = [-2,-1,0,1,2] / (sqrt(2)*5)
@@ -920,7 +862,6 @@ def test_varstd_std_bwd_cpu_global_1d() raises:
 
 
 def test_varstd_std_bwd_cpu_axis1_2d() raises:
-    print("test_varstd_std_bwd_cpu_axis1_2d")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]], requires_grad=True)
     var s = x.std[track_grad=True](axis=1, unbiased=False)
@@ -935,7 +876,6 @@ def test_varstd_std_bwd_cpu_axis1_2d() raises:
 
 
 def test_varstd_std_bwd_cpu_grad_zero_for_constant() raises:
-    print("test_varstd_std_bwd_cpu_grad_zero_for_constant")
     comptime dtype = DType.float32
     var x = Tensor[dtype].full(Shape(4), 2.0, requires_grad=True)
     var s = x.std[track_grad=True](unbiased=False)
@@ -946,7 +886,6 @@ def test_varstd_std_bwd_cpu_grad_zero_for_constant() raises:
 
 
 def test_varstd_std_bwd_cpu_3d_axis2() raises:
-    print("test_varstd_std_bwd_cpu_3d_axis2")
     comptime dtype = DType.float32
     var _tmp0 = Tensor[dtype].arange(1.0, 25.0)
     var x = _tmp0.reshape(2, 3, 4)
@@ -964,7 +903,6 @@ def test_varstd_std_bwd_cpu_3d_axis2() raises:
 
 
 def test_varstd_std_gradflow_cpu_chained_with_scalar() raises:
-    print("test_varstd_std_gradflow_cpu_chained_with_scalar")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
     var s = x.std[track_grad=True](unbiased=False)
@@ -977,7 +915,6 @@ def test_varstd_std_gradflow_cpu_chained_with_scalar() raises:
 
 
 def test_varstd_std_gradflow_cpu_no_grad_leaf() raises:
-    print("test_varstd_std_gradflow_cpu_no_grad_leaf")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var s = x.std[track_grad=True](unbiased=False)
@@ -991,7 +928,6 @@ def test_varstd_std_gradflow_cpu_no_grad_leaf() raises:
 
 def test_varstd_var_fwd_gpu_global_1d() raises:
     comptime if has_accelerator():
-        print("test_varstd_var_fwd_gpu_global_1d")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0]).to_gpu()
         var v = x.variance[track_grad=False](unbiased=False)
@@ -1000,7 +936,6 @@ def test_varstd_var_fwd_gpu_global_1d() raises:
 
 def test_varstd_var_fwd_gpu_axis0_2d() raises:
     comptime if has_accelerator():
-        print("test_varstd_var_fwd_gpu_axis0_2d")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
         var v = x.variance[track_grad=False](axis=0, unbiased=False)
@@ -1012,7 +947,6 @@ def test_varstd_var_fwd_gpu_axis0_2d() raises:
 
 def test_varstd_var_fwd_gpu_axis1_2d() raises:
     comptime if has_accelerator():
-        print("test_varstd_var_fwd_gpu_axis1_2d")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]]).to_gpu()
         var v = x.variance[track_grad=False](axis=1, unbiased=False)
@@ -1024,7 +958,6 @@ def test_varstd_var_fwd_gpu_axis1_2d() raises:
 
 def test_varstd_var_fwd_gpu_3d_axis1() raises:
     comptime if has_accelerator():
-        print("test_varstd_var_fwd_gpu_3d_axis1")
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
         var _tmp1 = _tmp0.reshape(2, 3, 4)
@@ -1035,7 +968,6 @@ def test_varstd_var_fwd_gpu_3d_axis1() raises:
 
 def test_varstd_var_bwd_gpu_global_1d() raises:
     comptime if has_accelerator():
-        print("test_varstd_var_bwd_gpu_global_1d")
         comptime dtype = DType.float32
         var x_cpu = Tensor[dtype].d1(
             [1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True
@@ -1053,7 +985,6 @@ def test_varstd_var_bwd_gpu_global_1d() raises:
 
 def test_varstd_var_bwd_gpu_axis1_2d() raises:
     comptime if has_accelerator():
-        print("test_varstd_var_bwd_gpu_axis1_2d")
         comptime dtype = DType.float32
         var x_cpu = Tensor[dtype].d2(
             [[1.0, 3.0], [2.0, 4.0]], requires_grad=True
@@ -1071,7 +1002,6 @@ def test_varstd_var_bwd_gpu_axis1_2d() raises:
 
 def test_varstd_var_bwd_gpu_3d_axis1() raises:
     comptime if has_accelerator():
-        print("test_varstd_var_bwd_gpu_3d_axis1")
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
         var x_cpu = _tmp0.reshape(2, 3, 4)
@@ -1091,7 +1021,6 @@ def test_varstd_var_bwd_gpu_3d_axis1() raises:
 
 def test_varstd_std_fwd_gpu_global_1d() raises:
     comptime if has_accelerator():
-        print("test_varstd_std_fwd_gpu_global_1d")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0]).to_gpu()
         var s = x.std[track_grad=False](unbiased=False)
@@ -1102,7 +1031,6 @@ def test_varstd_std_fwd_gpu_global_1d() raises:
 
 def test_varstd_std_fwd_gpu_axis0_2d() raises:
     comptime if has_accelerator():
-        print("test_varstd_std_fwd_gpu_axis0_2d")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
         var s = x.std[track_grad=False](axis=0, unbiased=False)
@@ -1114,7 +1042,6 @@ def test_varstd_std_fwd_gpu_axis0_2d() raises:
 
 def test_varstd_std_fwd_gpu_axis1_2d() raises:
     comptime if has_accelerator():
-        print("test_varstd_std_fwd_gpu_axis1_2d")
         comptime dtype = DType.float32
         var x = Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]]).to_gpu()
         var s = x.std[track_grad=False](axis=1, unbiased=False)
@@ -1126,7 +1053,6 @@ def test_varstd_std_fwd_gpu_axis1_2d() raises:
 
 def test_varstd_std_fwd_gpu_3d() raises:
     comptime if has_accelerator():
-        print("test_varstd_std_fwd_gpu_3d")
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
         var _tmp1 = _tmp0.reshape(2, 3, 4)
@@ -1137,7 +1063,6 @@ def test_varstd_std_fwd_gpu_3d() raises:
 
 def test_varstd_std_bwd_gpu_global_1d() raises:
     comptime if has_accelerator():
-        print("test_varstd_std_bwd_gpu_global_1d")
         comptime dtype = DType.float32
         var x_cpu = Tensor[dtype].d1(
             [1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True
@@ -1161,7 +1086,6 @@ def test_varstd_std_bwd_gpu_global_1d() raises:
 
 def test_varstd_std_bwd_gpu_axis1_2d() raises:
     comptime if has_accelerator():
-        print("test_varstd_std_bwd_gpu_axis1_2d")
         comptime dtype = DType.float32
         var x_cpu = Tensor[dtype].d2(
             [[1.0, 3.0], [2.0, 4.0]], requires_grad=True
@@ -1179,7 +1103,6 @@ def test_varstd_std_bwd_gpu_axis1_2d() raises:
 
 def test_varstd_std_bwd_gpu_3d_axis2() raises:
     comptime if has_accelerator():
-        print("test_varstd_std_bwd_gpu_3d_axis2")
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(1.0, 25.0)
         var x_cpu = _tmp0.reshape(2, 3, 4)
@@ -1199,7 +1122,6 @@ def test_varstd_std_bwd_gpu_3d_axis2() raises:
 
 def test_varstd_parity_var_fwd_global() raises:
     comptime if has_accelerator():
-        print("test_varstd_parity_var_fwd_global")
         comptime dtype = DType.float32
         var x = Tensor[dtype].arange(1.0, 11.0)
         var cpu_v = x.variance[track_grad=False](unbiased=False)
@@ -1211,7 +1133,6 @@ def test_varstd_parity_var_fwd_global() raises:
 
 def test_varstd_parity_var_fwd_axis1() raises:
     comptime if has_accelerator():
-        print("test_varstd_parity_var_fwd_axis1")
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(1.0, 13.0)
         var x = _tmp0.reshape(3, 4)
@@ -1226,7 +1147,6 @@ def test_varstd_parity_var_fwd_axis1() raises:
 
 def test_varstd_parity_std_fwd_global() raises:
     comptime if has_accelerator():
-        print("test_varstd_parity_std_fwd_global")
         comptime dtype = DType.float32
         var x = Tensor[dtype].arange(1.0, 11.0)
         var cpu_s = x.std[track_grad=False](unbiased=False)
@@ -1236,7 +1156,6 @@ def test_varstd_parity_std_fwd_global() raises:
 
 def test_varstd_parity_std_fwd_axis1() raises:
     comptime if has_accelerator():
-        print("test_varstd_parity_std_fwd_axis1")
         comptime dtype = DType.float32
         var _tmp0 = Tensor[dtype].arange(1.0, 13.0)
         var x = _tmp0.reshape(3, 4)
@@ -1249,7 +1168,6 @@ def test_varstd_parity_std_fwd_axis1() raises:
 
 def test_varstd_parity_var_bwd_global() raises:
     comptime if has_accelerator():
-        print("test_varstd_parity_var_bwd_global")
         comptime dtype = DType.float32
         var x_cpu_leaf = Tensor[dtype].d1(
             [1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True
@@ -1272,7 +1190,6 @@ def test_varstd_parity_var_bwd_global() raises:
 
 def test_varstd_parity_std_bwd_axis1() raises:
     comptime if has_accelerator():
-        print("test_varstd_parity_std_bwd_axis1")
         comptime dtype = DType.float32
         var x_cpu_leaf = Tensor[dtype].d2(
             [[1.0, 3.0], [2.0, 4.0]], requires_grad=True

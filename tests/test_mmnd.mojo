@@ -249,6 +249,7 @@ def test_matmul_nd_identity_batch_with_grad() raises:
         [[1.0, 1.0], [1.0, 1.0]]
     ])
     assert_true(A.grad().all_close(expected_A_grad))"""
+    pass
 
 
 def test_matmul_nd_zeros_with_grad() raises:
@@ -290,31 +291,6 @@ def test_matmul_nd_mixed_batch_dims_with_grad() raises:
     assert_true(A.grad().shape() == Shape(2, 2, 2))
     assert_true(B.grad().shape() == Shape(2, 1, 2, 2))
 
-
-# ===== COMPREHENSIVE TEST FUNCTIONS =====
-
-
-def test_matmul_nd_forward_comprehensive() raises:
-    test_matmul_nd_3d_basic_with_grad()
-    test_matmul_nd_3d_broadcast_A_with_grad()
-    test_matmul_nd_3d_broadcast_B_with_grad()
-    test_matmul_nd_4d_basic_with_grad()
-    test_matmul_nd_4d_complex_broadcast_with_grad()
-    test_matmul_nd_single_batch_with_grad()
-    test_matmul_nd_large_batch_small_matrices_with_grad()
-    test_matmul_nd_identity_batch_with_grad()
-    test_matmul_nd_zeros_with_grad()
-    test_matmul_nd_mixed_batch_dims_with_grad()
-
-
-def test_matmul_nd_view_gradients() raises:
-    test_matmul_nd_with_view_offset_grad()
-    test_matmul_nd_with_strided_view_grad()
-
-
-def test_matmul_nd_complete() raises:
-    test_matmul_nd_forward_comprehensive()
-    test_matmul_nd_view_gradients()
 
 
 def test_matmul_nd_3d_basic() raises:
@@ -470,6 +446,7 @@ def test_matmul_nd_identity_batch() raises:
     var C = A.matmul[track_grad=False](B)
     # A × I should equal A
     assert_true(C.all_close(A))"""
+    pass
 
 
 def test_matmul_nd_zeros_batch() raises:
@@ -514,32 +491,6 @@ def test_matmul_nd_mixed_batch_dims() raises:
     var C = A.matmul[track_grad=False](B)
     assert_true(C.shape() == Shape(2, 2, 2, 2))
 
-
-# ===== CONSOLIDATED TEST FUNCTION =====
-
-
-def test_matmul_nd_comprehensive() raises:
-    test_matmul_batched_non_contiguous_view_case()
-    test_matmul_nd_3d_basic()
-    test_matmul_nd_3d_broadcast_A()
-    test_matmul_nd_3d_broadcast_B()
-    test_matmul_nd_4d_basic()
-    test_matmul_nd_4d_complex_broadcast()
-    test_matmul_nd_single_batch_element()
-    test_matmul_nd_large_batch_small_matrices()
-    test_matmul_nd_identity_batch()
-    test_matmul_nd_zeros_batch()
-    test_matmul_nd_ones_batch()
-    test_matmul_nd_mixed_batch_dims()
-    test_matmul2d_basic_case()
-    test_matmul2d_rectangular_case()
-    test_matmul2d_non_square_large_case()
-    test_matmul_batched_basic()
-    test_matmul_batched_broadcast_B()
-    test_matmul_batched_broadcast_A()
-    test_matmul_batched_3d_input_case()
-    test_matmul_batched_result_shape()
-    test_matmul_nd_with_higher_dim_batch()
 
 
 # ================================================================

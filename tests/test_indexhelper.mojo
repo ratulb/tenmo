@@ -14,9 +14,6 @@ from tenmo.indexhelper import IndexCalculator
 
 def benchmark_contiguous_iteration() raises:
     """Benchmark: IndexIterator vs coordinate iteration (contiguous)."""
-    print("\n" + "=" * 70)
-    print("BENCHMARK 1: Contiguous Iteration")
-    print("=" * 70 + "\n")
 
     var shape = Shape(1000, 1000)  # 1M elements
     var strides = Strides(1000, 1)
@@ -511,25 +508,6 @@ def test_no_allocation_overhead() raises:
     print("  ✓ No allocation overhead detected")
 
 
-def run_all_tests() raises:
-    """Run complete test suite."""
-    print("\n" + "=" * 70)
-    print("INDEX ITERATOR TEST SUITE")
-    print("=" * 70 + "\n")
-
-    test_contiguous_iteration()
-    test_strided_iteration()
-    test_correctness_vs_coordinate_iteration()
-    test_edge_cases()
-    test_start_offset()
-    test_has_next_and_len()
-    test_skip_functionality()
-    test_no_allocation_overhead()
-
-    print("\n" + "=" * 70)
-    print("✅ ALL TESTS PASSED")
-    print("=" * 70 + "\n")
-
 
 # ========== INDEX CALCULATOR TESTS ==========
 
@@ -864,25 +842,6 @@ def test_skip_consistency_idx() raises:
 
     assert_true(offset1 == offset2, "Skip doesn't match repeated __next__")
 
-
-def run_all_index_iterator_review_tests() raises:
-    """Run all tests addressing review comments."""
-    print("\n=== Running IndexIterator Review Tests ===\n")
-
-    test_carry_calculation_correctness_idx()
-    test_no_division_by_zero_idx()
-    test_skip_does_not_overshoot_idx()
-    test_skip_incremental_path_idx()
-    test_skip_direct_path_idx()
-    test_skip_on_3d_tensor_idx()
-    test_skip_boundary_cases_idx()
-    test_carry_with_different_strides_idx()
-    test_divisor_calculation_multidim_idx()
-    test_skip_consistency_idx()
-
-    print("\n=== All Review Tests Passed! ===\n")
-    print("Conclusion: Review comments 1, 2, and 5 are INVALID.")
-    print("Your implementation is CORRECT.")
 
 
 def main() raises:

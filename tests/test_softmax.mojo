@@ -8,7 +8,6 @@ from std.math import log, exp
 
 # Old tests
 def test_tensor_softmax_backward_1d() raises:
-    print("test_tensor_softmax_backward_1d")
     comptime dtype = DType.float64
 
     var t = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -17,11 +16,9 @@ def test_tensor_softmax_backward_1d() raises:
     var loss = s.sum()
     loss.backward()
     assert_true(t.grad().all_close(Tensor[dtype].zeros(Shape(3))))
-    print("Passed 1D softmax backward test")
 
 
 def test_softmax_1d_basic() raises:
-    print("test_softmax_1d_basic")
     comptime dtype = DType.float64
     # Test basic 1D softmax
     var input_data = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -41,7 +38,6 @@ def test_softmax_1d_basic() raises:
 
 
 def test_softmax_1d_with_grad_validation() raises:
-    print("test_softmax_1d_with_grad_validation")
     comptime dtype = DType.float64
     var input_data = Tensor[dtype].d1([0.1, 0.2, 0.3], requires_grad=True)
     var output = input_data.softmax(axes=[0])
@@ -61,7 +57,6 @@ def test_softmax_1d_with_grad_validation() raises:
 
 
 def test_softmax_2d_axis_0() raises:
-    print("test_softmax_2d_axis_0")
     comptime dtype = DType.float64
     var input_data = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
@@ -97,7 +92,6 @@ def test_softmax_2d_axis_0() raises:
 
 
 def test_softmax_2d_axis_1() raises:
-    print("test_softmax_2d_axis_1")
     comptime dtype = DType.float64
     var input_data = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
@@ -133,7 +127,6 @@ def test_softmax_2d_axis_1() raises:
 
 
 def test_softmax_2d_multiple_axes() raises:
-    print("test_softmax_2d_multiple_axes")
     comptime dtype = DType.float64
     var input_data = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
@@ -167,7 +160,6 @@ def test_softmax_2d_multiple_axes() raises:
 
 
 def test_softmax_3d_axis_2() raises:
-    print("test_softmax_3d_axis_2")
     comptime dtype = DType.float64
     var input_data = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -221,7 +213,6 @@ def test_softmax_3d_axis_2() raises:
 
 
 def test_softmax_gradient_validation_1d() raises:
-    print("test_softmax_gradient_validation_1d")
     comptime dtype = DType.float64
     # This test validates gradients against known mathematical properties
     var input_data = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -235,7 +226,6 @@ def test_softmax_gradient_validation_1d() raises:
 
 
 def test_softmax_gradient_validation_2d() raises:
-    print("test_softmax_gradient_validation_2d")
     comptime dtype = DType.float64
     var input_data = Tensor[dtype].d2(
         [[0.5, 1.5], [2.5, 0.5]], requires_grad=True
@@ -261,7 +251,6 @@ def test_softmax_gradient_validation_2d() raises:
 
 
 def test_softmax_numerical_stability() raises:
-    print("test_softmax_numerical_stability")
     comptime dtype = DType.float64
     # Test with large values to ensure numerical stability
     var input_data = Tensor[dtype].d1(
@@ -280,7 +269,6 @@ def test_softmax_numerical_stability() raises:
 
 
 def test_softmax_negative_values() raises:
-    print("test_softmax_negative_values")
     comptime dtype = DType.float64
     var input_data = Tensor[dtype].d1([-2.0, -1.0, 0.0], requires_grad=True)
     var output = input_data.softmax(axes=[0])
@@ -330,7 +318,6 @@ def verify_softmax_properties_2d_axis1(
 
 
 def test_softmax_cpu_1d_basic() raises:
-    print("test_softmax_cpu_1d_basic")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var result = a.softmax()
@@ -343,7 +330,6 @@ def test_softmax_cpu_1d_basic() raises:
 
 
 def test_softmax_cpu_1d_uniform() raises:
-    print("test_softmax_cpu_1d_uniform")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 1.0, 1.0, 1.0])
     var result = a.softmax()
@@ -351,7 +337,6 @@ def test_softmax_cpu_1d_uniform() raises:
 
 
 def test_softmax_cpu_1d_large_values() raises:
-    print("test_softmax_cpu_1d_large_values")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1000.0, 1001.0, 1002.0])
     var result = a.softmax()
@@ -359,7 +344,6 @@ def test_softmax_cpu_1d_large_values() raises:
 
 
 def test_softmax_cpu_1d_negative_values() raises:
-    print("test_softmax_cpu_1d_negative_values")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([-1.0, -2.0, -3.0])
     var result = a.softmax()
@@ -372,7 +356,6 @@ def test_softmax_cpu_1d_negative_values() raises:
 
 
 def test_softmax_cpu_2d_axis0() raises:
-    print("test_softmax_cpu_2d_axis0")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var result = a.softmax(axes=[0])
@@ -382,7 +365,6 @@ def test_softmax_cpu_2d_axis0() raises:
 
 
 def test_softmax_cpu_2d_axis1() raises:
-    print("test_softmax_cpu_2d_axis1")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var result = a.softmax(axes=[1])
@@ -390,7 +372,6 @@ def test_softmax_cpu_2d_axis1() raises:
 
 
 def test_softmax_cpu_2d_default_axis() raises:
-    print("test_softmax_cpu_2d_default_axis")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var result = a.softmax()
@@ -402,7 +383,6 @@ def test_softmax_cpu_2d_default_axis() raises:
 
 
 def test_softmax_cpu_3d_axis2() raises:
-    print("test_softmax_cpu_3d_axis2")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], [[7.0, 8.0, 9.0], [1.0, 2.0, 3.0]]]
@@ -419,7 +399,6 @@ def test_softmax_cpu_3d_axis2() raises:
 
 
 def test_softmax_cpu_no_grad() raises:
-    print("test_softmax_cpu_no_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=False)
     var result = a.softmax()
@@ -427,7 +406,6 @@ def test_softmax_cpu_no_grad() raises:
 
 
 def test_softmax_cpu_requires_grad_propagates() raises:
-    print("test_softmax_cpu_requires_grad_propagates")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var result = a.softmax()
@@ -435,7 +413,6 @@ def test_softmax_cpu_requires_grad_propagates() raises:
 
 
 def test_softmax_cpu_suppress_grad() raises:
-    print("test_softmax_cpu_suppress_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var result = a.softmax(requires_grad=False)
@@ -448,7 +425,6 @@ def test_softmax_cpu_suppress_grad() raises:
 
 
 def test_softmax_cpu_1d_backward_sum_grad() raises:
-    print("test_softmax_cpu_1d_backward_sum_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var result = a.softmax()
@@ -458,7 +434,6 @@ def test_softmax_cpu_1d_backward_sum_grad() raises:
 
 
 def test_softmax_cpu_1d_backward_single_output() raises:
-    print("test_softmax_cpu_1d_backward_single_output")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var s = a.softmax()
@@ -472,7 +447,6 @@ def test_softmax_cpu_1d_backward_single_output() raises:
 
 
 def test_softmax_cpu_2d_backward_axis1() raises:
-    print("test_softmax_cpu_2d_backward_axis1")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -484,7 +458,6 @@ def test_softmax_cpu_2d_backward_axis1() raises:
 
 
 def test_softmax_cpu_backward_chain() raises:
-    print("test_softmax_cpu_backward_chain")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var s = a.softmax()
@@ -494,7 +467,6 @@ def test_softmax_cpu_backward_chain() raises:
 
 
 def test_softmax_cpu_backward_finite_difference() raises:
-    print("test_softmax_cpu_backward_finite_difference")
     comptime dtype = DType.float32
     var eps = Scalar[dtype](1e-3)
     var x_plus = Tensor[dtype].d1([1.0 + eps, 2.0, 3.0])
@@ -514,7 +486,6 @@ def test_softmax_cpu_backward_finite_difference() raises:
 
 
 def test_log_softmax_cpu_1d_basic() raises:
-    print("test_log_softmax_cpu_1d_basic")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var result = a.softmax[log=True]()
@@ -526,7 +497,6 @@ def test_log_softmax_cpu_1d_basic() raises:
 
 
 def test_log_softmax_cpu_1d_uniform() raises:
-    print("test_log_softmax_cpu_1d_uniform")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([0.0, 0.0, 0.0, 0.0])
     var result = a.softmax[log=True]()
@@ -536,7 +506,6 @@ def test_log_softmax_cpu_1d_uniform() raises:
 
 
 def test_log_softmax_cpu_1d_numerical_stability() raises:
-    print("test_log_softmax_cpu_1d_numerical_stability")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1000.0, 1001.0, 1002.0])
     var result = a.softmax[log=True]()
@@ -545,7 +514,6 @@ def test_log_softmax_cpu_1d_numerical_stability() raises:
 
 
 def test_log_softmax_cpu_2d_axis1() raises:
-    print("test_log_softmax_cpu_2d_axis1")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var result = a.softmax[log=True](axes=[1])
@@ -562,7 +530,6 @@ def test_log_softmax_cpu_2d_axis1() raises:
 
 
 def test_log_softmax_cpu_1d_backward_sum() raises:
-    print("test_log_softmax_cpu_1d_backward_sum")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var result = a.softmax[log=True]()
@@ -581,7 +548,6 @@ def test_log_softmax_cpu_1d_backward_sum() raises:
 
 
 def test_log_softmax_cpu_2d_backward_axis1() raises:
-    print("test_log_softmax_cpu_2d_backward_axis1")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -603,7 +569,6 @@ def test_log_softmax_cpu_2d_backward_axis1() raises:
 
 
 def test_log_softmax_cpu_backward_finite_difference() raises:
-    print("test_log_softmax_cpu_backward_finite_difference")
     comptime dtype = DType.float32
     var eps = Scalar[dtype](1e-3)
     var x_plus = Tensor[dtype].d1([1.0 + eps, 2.0, 3.0])
@@ -624,7 +589,6 @@ def test_log_softmax_cpu_backward_finite_difference() raises:
 
 def test_softmax_gpu_1d_basic() raises:
     comptime if has_accelerator():
-        print("test_softmax_gpu_1d_basic")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
         var result = a.softmax()
@@ -638,7 +602,6 @@ def test_softmax_gpu_1d_basic() raises:
 
 def test_softmax_gpu_1d_uniform() raises:
     comptime if has_accelerator():
-        print("test_softmax_gpu_1d_uniform")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 1.0, 1.0, 1.0]).to_gpu()
         var result = a.softmax()
@@ -652,7 +615,6 @@ def test_softmax_gpu_1d_uniform() raises:
 
 def test_softmax_gpu_1d_numerical_stability() raises:
     comptime if has_accelerator():
-        print("test_softmax_gpu_1d_numerical_stability")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1000.0, 1001.0, 1002.0]).to_gpu()
         var result = a.softmax()
@@ -664,7 +626,6 @@ def test_softmax_gpu_1d_numerical_stability() raises:
 
 def test_softmax_gpu_2d_axis1() raises:
     comptime if has_accelerator():
-        print("test_softmax_gpu_2d_axis1")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
         var result = a.softmax(axes=[1])
@@ -674,7 +635,6 @@ def test_softmax_gpu_2d_axis1() raises:
 
 def test_softmax_gpu_3d_axis2() raises:
     comptime if has_accelerator():
-        print("test_softmax_gpu_3d_axis2")
         comptime dtype = DType.float32
         var a = (
             Tensor[dtype]
@@ -706,7 +666,6 @@ def test_softmax_gpu_3d_axis2() raises:
 
 def test_softmax_gpu_1d_backward_sum_grad() raises:
     comptime if has_accelerator():
-        print("test_softmax_gpu_1d_backward_sum_grad")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -720,7 +679,6 @@ def test_softmax_gpu_1d_backward_sum_grad() raises:
 
 def test_softmax_gpu_2d_backward_axis1() raises:
     comptime if has_accelerator():
-        print("test_softmax_gpu_2d_backward_axis1")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
             [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -736,7 +694,6 @@ def test_softmax_gpu_2d_backward_axis1() raises:
 
 def test_softmax_gpu_backward_chain() raises:
     comptime if has_accelerator():
-        print("test_softmax_gpu_backward_chain")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -754,7 +711,6 @@ def test_softmax_gpu_backward_chain() raises:
 
 def test_log_softmax_gpu_1d_basic() raises:
     comptime if has_accelerator():
-        print("test_log_softmax_gpu_1d_basic")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
         var result = a.softmax[log=True]()
@@ -765,7 +721,6 @@ def test_log_softmax_gpu_1d_basic() raises:
 
 def test_log_softmax_gpu_1d_numerical_stability() raises:
     comptime if has_accelerator():
-        print("test_log_softmax_gpu_1d_numerical_stability")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1000.0, 1001.0, 1002.0]).to_gpu()
         var result = a.softmax[log=True]()
@@ -777,7 +732,6 @@ def test_log_softmax_gpu_1d_numerical_stability() raises:
 
 def test_log_softmax_gpu_2d_axis1() raises:
     comptime if has_accelerator():
-        print("test_log_softmax_gpu_2d_axis1")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
         var result = a.softmax[log=True](axes=[1])
@@ -797,7 +751,6 @@ def test_log_softmax_gpu_2d_axis1() raises:
 
 def test_log_softmax_gpu_1d_backward() raises:
     comptime if has_accelerator():
-        print("test_log_softmax_gpu_1d_backward")
         comptime dtype = DType.float32
         var a_gpu = (
             Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True).to_gpu()
@@ -812,7 +765,6 @@ def test_log_softmax_gpu_1d_backward() raises:
 
 def test_log_softmax_gpu_2d_backward_axis1() raises:
     comptime if has_accelerator():
-        print("test_log_softmax_gpu_2d_backward_axis1")
         comptime dtype = DType.float32
         var a_gpu = (
             Tensor[dtype]
@@ -836,7 +788,6 @@ def test_log_softmax_gpu_2d_backward_axis1() raises:
 
 def test_softmax_parity_1d_forward() raises:
     comptime if has_accelerator():
-        print("test_softmax_parity_1d_forward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])
         var a_gpu = a_cpu.to_gpu()
@@ -847,7 +798,6 @@ def test_softmax_parity_1d_forward() raises:
 
 def test_softmax_parity_2d_axis1_forward() raises:
     comptime if has_accelerator():
-        print("test_softmax_parity_2d_axis1_forward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
         var a_gpu = a_cpu.to_gpu()
@@ -860,7 +810,6 @@ def test_softmax_parity_2d_axis1_forward() raises:
 
 def test_softmax_parity_1d_backward() raises:
     comptime if has_accelerator():
-        print("test_softmax_parity_1d_backward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
         var a_gpu = (
@@ -879,7 +828,6 @@ def test_softmax_parity_1d_backward() raises:
 
 def test_softmax_parity_2d_backward() raises:
     comptime if has_accelerator():
-        print("test_softmax_parity_2d_backward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
             [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -898,7 +846,6 @@ def test_softmax_parity_2d_backward() raises:
 
 def test_log_softmax_parity_1d_forward() raises:
     comptime if has_accelerator():
-        print("test_log_softmax_parity_1d_forward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])
         var a_gpu = a_cpu.to_gpu()
@@ -911,7 +858,6 @@ def test_log_softmax_parity_1d_forward() raises:
 
 def test_log_softmax_parity_1d_backward() raises:
     comptime if has_accelerator():
-        print("test_log_softmax_parity_1d_backward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
         var a_gpu = (
@@ -926,7 +872,6 @@ def test_log_softmax_parity_1d_backward() raises:
 
 def test_softmax_parity_using_zero_grad() raises:
     comptime if has_accelerator():
-        print("test_softmax_parity_using_zero_grad")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
         var a_gpu = a_cpu.to_gpu()
@@ -942,7 +887,6 @@ def test_softmax_parity_using_zero_grad() raises:
 
 def test_log_softmax_parity_using_zero_grad() raises:
     comptime if has_accelerator():
-        print("test_log_softmax_parity_using_zero_grad")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
         var a_gpu = a_cpu.to_gpu()
@@ -964,4 +908,3 @@ def test_log_softmax_parity_using_zero_grad() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-    print("\nAll softmax tests passed!")

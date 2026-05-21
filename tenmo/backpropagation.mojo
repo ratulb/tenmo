@@ -25,7 +25,7 @@ from .intarray import IntArray
 from .strides import Strides
 from .shapes import Shape
 from .blashandle import BLASHandleLite
-from .crossentropy import Reduction
+from tenmo.shared import Reduction
 
 # Centralized backward operation tags
 
@@ -334,12 +334,16 @@ struct StdArg[dtype: DType](ArgumentType):
 struct BCEWithLogitsBwdArg[dtype: DType](ArgumentType):
     var sigmoid: NDBuffer[Self.dtype]
     var target: NDBuffer[Self.dtype]
+    var reduction: Reduction
+    var numels: Int
 
 
 @fieldwise_init
 struct BCELossBwdArg[dtype: DType](ArgumentType):
     var clipped_pred: NDBuffer[Self.dtype]
     var target: NDBuffer[Self.dtype]
+    var reduction: Reduction
+    var numels: Int
 
 
 # ============================================================================

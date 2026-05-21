@@ -1,50 +1,50 @@
-from .contiguous import Contiguous
-from .matmul import Matmul
-from .permute import Permute
-from .exponentiator import Exponentiator
-from .argminmax import Argmin, Argmax
-from .views import View
-from .addition import AddScalar, Adder
-from .subtraction import SubtractScalar, SubtractFromScalar, Subtractor
-from .reshape import Reshape
-from .multiplication import MultiplyScalar, Multiplicator
-from .division import DivideByScalar, DivideScalar, Divider
-from .summation import Summer
-from .mean_reduction import Mean
-from .product_reduction import Product
-from .transpose import Transpose
-from .dotproduct import Dot
-from .expand import Expand
-from .flatten import FlattenForward
-from .squeeze import Squeeze
-from .unsqueeze import Unsqueeze
-from .shuffle import Shuffle
-from .relu import ReLU
-from .minmax import MinMax
-from .softmax import Softmax, LogSoftmax
-from .repeat import Repeat
-from .tiles import Tile
-from .crossentropy import CrossEntropyLoss
-from .sigmoid import Sigmoid
-from .tanh import Tanh
-from .logarithm import Logarithm
-from .clip import Clip
-from .net import BCELoss, BCEWithLogitsLoss
-from .squareroot import Sqrt
-from .variance import Variance
-from .std_deviation import StdDev
-from .concate import Concate
-from .stack import Stack
-from .pad import Pad, Padding
-from .cnn import Conv2dFused
-from .filler import Filler
-from .pooling import MaxPool2d
-from .dropout import Dropout
-from .exponential import Exponential
-from .device_transfer import DeviceTransfer
-from .maxmin_scalar import MaxScalar, MinScalar
-from .layernorm import LayerNormForward, LayerNorm
-from .reciprocal import Reciprocal
-from .broadcast import Broadcast
-from .gather import Gather, GatherArg
-from .embedding import Embedding
+from tenmo.contiguous import Contiguous
+from tenmo.matmul import Matmul
+from tenmo.permute import Permute
+from tenmo.exponentiator import Exponentiator
+from tenmo.argminmax import Argmin, Argmax
+from tenmo.views import View
+from tenmo.addition import AddScalar, Adder
+from tenmo.subtraction import SubtractScalar, SubtractFromScalar, Subtractor
+from tenmo.reshape import Reshape
+from tenmo.multiplication import MultiplyScalar, Multiplicator
+from tenmo.division import DivideByScalar, DivideScalar, Divider
+from tenmo.summation import Summer
+from tenmo.mean_reduction import Mean
+from tenmo.product_reduction import Product
+from tenmo.transpose import Transpose
+from tenmo.dotproduct import Dot
+from tenmo.expand import Expand
+from tenmo.flatten import FlattenForward
+from tenmo.squeeze import Squeeze
+from tenmo.unsqueeze import Unsqueeze
+from tenmo.shuffle import Shuffle
+from tenmo.relu import ReLU
+from tenmo.minmax import MinMax
+from tenmo.softmax import Softmax, LogSoftmax
+from tenmo.repeat import Repeat
+from tenmo.tiles import Tile
+from tenmo.crossentropy import CrossEntropyLoss
+from tenmo.sigmoid import Sigmoid
+from tenmo.tanh import Tanh
+from tenmo.logarithm import Logarithm
+from tenmo.clip import Clip
+from tenmo.bceloss import BCELoss, BCEWithLogitsLoss
+from tenmo.squareroot import Sqrt
+from tenmo.variance import Variance
+from tenmo.std_deviation import StdDev
+from tenmo.concate import Concate
+from tenmo.stack import Stack
+from tenmo.pad import Pad, Padding
+from tenmo.cnn import Conv2dFused
+from tenmo.filler import Filler
+from tenmo.pooling import MaxPool2d
+from tenmo.dropout import Dropout
+from tenmo.exponential import Exponential
+from tenmo.device_transfer import DeviceTransfer
+from tenmo.maxmin_scalar import MaxScalar, MinScalar
+from tenmo.layernorm import LayerNormForward, LayerNorm
+from tenmo.reciprocal import Reciprocal
+from tenmo.broadcast import Broadcast
+from tenmo.gather import Gather, GatherArg
+from tenmo.embedding import Embedding

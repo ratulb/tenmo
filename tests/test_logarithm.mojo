@@ -8,26 +8,8 @@ from tenmo.shapes import Shape
 
 
 def main() raises:
-    print("Example: Basic logarithm with epsilon")
-
-    comptime dtype = DType.float64
-
-    # Example 1: Basic usage
-    var x = Tensor[dtype]([1.0, 2.0, 3.0], requires_grad=True)
-    var y = x.log()
-
-    # Example 2: With zero handling
-    # var x_with_zero = Tensor[dtype]([0.0, 1.0, 2.0], requires_grad=True)
-    # var y_with_zero = x_with_zero.log(epsilon=1e-10)
-
-    # Example 3: Gradient computation
-    var loss = y.sum()
-    loss.backward()
-    x.grad().print()
-
     TestSuite.discover_tests[__functions_in_module()]().run()
 
-    print("All logarithm tests passed!")
 
 
 # ============================================================================
@@ -37,7 +19,6 @@ def main() raises:
 
 def test_log_forward_basic() raises:
     """Test basic logarithm computation."""
-    print("test_log_forward_basic")
 
     comptime dtype = DType.float64
     var x = Tensor[dtype]([1.0, 2.0, 3.0, 4.0])
@@ -51,7 +32,6 @@ def test_log_forward_basic() raises:
 
 def test_log_forward_with_epsilon() raises:
     """Test logarithm with very small values (epsilon handling)."""
-    print("test_log_forward_with_epsilon")
 
     comptime dtype = DType.float64
     var x = Tensor[dtype]([1e-15, 1e-13, 1.0, 10.0])
@@ -70,7 +50,6 @@ def test_log_forward_with_epsilon() raises:
 
 def test_log_forward_zero_handling() raises:
     """Test that zero values are handled safely."""
-    print("test_log_forward_zero_handling")
 
     comptime dtype = DType.float64
     var x = Tensor[dtype]([0.0, 1.0, 2.0])
@@ -86,7 +65,6 @@ def test_log_forward_zero_handling() raises:
 
 def test_log_forward_negative_values() raises:
     """Test that negative values are handled (clamped to epsilon)."""
-    print("test_log_forward_negative_values")
 
     comptime dtype = DType.float64
     var x = Tensor[dtype]([-1.0, -0.5, 1.0])
@@ -101,7 +79,6 @@ def test_log_forward_negative_values() raises:
 
 def test_log_forward_2d() raises:
     """Test logarithm on 2D tensor."""
-    print("test_log_forward_2d")
 
     comptime dtype = DType.float64
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -114,7 +91,6 @@ def test_log_forward_2d() raises:
 
 def test_log_forward_e() raises:
     """Test that log(e) = 1."""
-    print("test_log_forward_e")
 
     comptime dtype = DType.float64
     var e = Scalar[dtype](2.718281828459045)
@@ -130,7 +106,6 @@ def test_log_forward_e() raises:
 
 def test_log_backward_basic() raises:
     """Test basic gradient computation: d/dx log(x) = 1/x."""
-    print("test_log_backward_basic")
 
     comptime dtype = DType.float64
     var x = Tensor[dtype]([2.0, 3.0, 4.0], requires_grad=True)
@@ -147,7 +122,6 @@ def test_log_backward_basic() raises:
 
 def test_log_backward_weighted() raises:
     """Test gradient with weighted loss."""
-    print("test_log_backward_weighted")
 
     comptime dtype = DType.float64
     var x = Tensor[dtype]([1.0, 2.0, 4.0], requires_grad=True)
@@ -168,7 +142,6 @@ def test_log_backward_weighted() raises:
 
 def test_log_backward_chain_rule() raises:
     """Test gradient with chain rule: d/dx log(x^2)."""
-    print("test_log_backward_chain_rule")
 
     comptime dtype = DType.float64
     var x = Tensor[dtype]([2.0, 3.0, 4.0], requires_grad=True)
@@ -186,7 +159,6 @@ def test_log_backward_chain_rule() raises:
 
 def test_log_backward_with_epsilon() raises:
     """Test gradient computation with epsilon (small values)."""
-    print("test_log_backward_with_epsilon")
 
     comptime dtype = DType.float64
     comptime epsilon = Scalar[dtype](1e-10)
@@ -206,7 +178,6 @@ def test_log_backward_with_epsilon() raises:
 
 def test_log_backward_zero_input() raises:
     """Test gradient with zero input (should use epsilon)."""
-    print("test_log_backward_zero_input")
 
     comptime dtype = DType.float64
     comptime epsilon = Scalar[dtype](1e-8)
@@ -226,7 +197,6 @@ def test_log_backward_zero_input() raises:
 
 def test_log_backward_2d() raises:
     """Test gradient computation on 2D tensor."""
-    print("test_log_backward_2d")
 
     comptime dtype = DType.float64
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -241,7 +211,6 @@ def test_log_backward_2d() raises:
 
 def test_log_backward_multiple_uses() raises:
     """Test gradient when log output is used multiple times."""
-    print("test_log_backward_multiple_uses")
 
     comptime dtype = DType.float64
     var x = Tensor[dtype]([2.0, 3.0], requires_grad=True)
@@ -266,7 +235,6 @@ def test_log_backward_multiple_uses() raises:
 
 def test_log_numerical_stability_large() raises:
     """Test numerical stability with large values."""
-    print("test_log_numerical_stability_large")
 
     comptime dtype = DType.float64
     var x = Tensor[dtype]([1e10, 1e20, 1e30])
@@ -281,7 +249,6 @@ def test_log_numerical_stability_large() raises:
 
 def test_log_numerical_stability_small() raises:
     """Test numerical stability with very small values."""
-    print("test_log_numerical_stability_small")
 
     comptime dtype = DType.float64
     comptime epsilon = Scalar[dtype](1e-12)
@@ -296,7 +263,6 @@ def test_log_numerical_stability_small() raises:
 
 def test_log_gradient_stability() raises:
     """Test that gradients remain stable near zero."""
-    print("test_log_gradient_stability")
 
     comptime dtype = DType.float64
     comptime epsilon = Scalar[dtype](1e-10)
@@ -317,7 +283,6 @@ def test_log_gradient_stability() raises:
 
 def test_log_single_element() raises:
     """Test logarithm of single element tensor."""
-    print("test_log_single_element")
 
     comptime dtype = DType.float64
     var x = Tensor[dtype]([2.718281828459045], requires_grad=True)  # e
@@ -330,7 +295,6 @@ def test_log_single_element() raises:
 
 def test_log_all_ones() raises:
     """Test logarithm of tensor with all ones."""
-    print("test_log_all_ones")
 
     comptime dtype = DType.float64
     var x = Tensor[dtype].ones(5, requires_grad=True)
@@ -345,7 +309,6 @@ def test_log_all_ones() raises:
 
 def test_log_custom_epsilon_values() raises:
     """Test different epsilon values."""
-    print("test_log_custom_epsilon_values")
 
     comptime dtype = DType.float64
     var x = Tensor[dtype]([0.0, 1.0])
@@ -361,63 +324,11 @@ def test_log_custom_epsilon_values() raises:
     assert_true(abs(y3[0] - log(Scalar[dtype](1e-15))) < 1e-8)
 
 
-# ============================================================================
-# MASTER TEST RUNNER
-# ============================================================================
-
-
-def run_all_log_tests() raises:
-    """Run all logarithm tests."""
-    print("\n" + "=" * 60)
-    print("RUNNING COMPREHENSIVE LOGARITHM TEST SUITE")
-    print("=" * 60 + "\n")
-
-    # Forward pass tests
-    print("--- LOG FORWARD TESTS ---")
-    test_log_forward_basic()
-    test_log_forward_with_epsilon()
-    test_log_forward_zero_handling()
-    test_log_forward_negative_values()
-    test_log_forward_2d()
-    test_log_forward_e()
-
-    # Backward pass tests
-    print("\n--- LOG BACKWARD TESTS ---")
-    test_log_backward_basic()
-    test_log_backward_weighted()
-    test_log_backward_chain_rule()
-    test_log_backward_with_epsilon()
-    test_log_backward_zero_input()
-    test_log_backward_2d()
-    test_log_backward_multiple_uses()
-
-    # Numerical stability tests
-    print("\n--- NUMERICAL STABILITY TESTS ---")
-    test_log_numerical_stability_large()
-    test_log_numerical_stability_small()
-    test_log_gradient_stability()
-
-    # Edge cases
-    print("\n--- EDGE CASE TESTS ---")
-    test_log_single_element()
-    test_log_all_ones()
-    test_log_custom_epsilon_values()
-
-    print("\n" + "=" * 60)
-    print("ALL TESTS PASSED!")
-    print("=" * 60)
-
-
-# ============================================================================
-# USAGE EXAMPLE
-# ============================================================================
-
 
 # ── CPU Forward Tests ─────────────────────────────────────────────────────────
 
 
 def test_log_cpu_1d_basic_forward() raises:
-    print("test_log_cpu_1d_basic_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var result = a.log()
@@ -428,7 +339,6 @@ def test_log_cpu_1d_basic_forward() raises:
 
 
 def test_log_cpu_2d_forward() raises:
-    print("test_log_cpu_2d_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var result = a.log()
@@ -442,7 +352,6 @@ def test_log_cpu_2d_forward() raises:
 
 
 def test_log_cpu_3d_forward() raises:
-    print("test_log_cpu_3d_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
@@ -464,7 +373,6 @@ def test_log_cpu_3d_forward() raises:
 
 
 def test_log_cpu_ones_forward() raises:
-    print("test_log_cpu_ones_forward")
     comptime dtype = DType.float32
     # log(1) = 0
     var a = Tensor[dtype].ones(Shape(4))
@@ -473,7 +381,6 @@ def test_log_cpu_ones_forward() raises:
 
 
 def test_log_cpu_epsilon_clamping() raises:
-    print("test_log_cpu_epsilon_clamping")
     comptime dtype = DType.float32
     # Values <= 0 should be clamped to epsilon before log
     # With default epsilon=1e-12, log(1e-12) ≈ -27.631
@@ -487,7 +394,6 @@ def test_log_cpu_epsilon_clamping() raises:
 
 
 def test_log_cpu_custom_epsilon() raises:
-    print("test_log_cpu_custom_epsilon")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([0.0, 1.0, 2.0])
     var result = a.log[epsilon=Scalar[dtype](1e-6)]()
@@ -498,7 +404,6 @@ def test_log_cpu_custom_epsilon() raises:
 
 
 def test_log_cpu_large_values() raises:
-    print("test_log_cpu_large_values")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([100.0, 1000.0, 10000.0])
     var result = a.log()
@@ -509,7 +414,6 @@ def test_log_cpu_large_values() raises:
 
 
 def test_log_cpu_no_grad() raises:
-    print("test_log_cpu_no_grad")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=False)
     var result = a.log()
@@ -517,7 +421,6 @@ def test_log_cpu_no_grad() raises:
 
 
 def test_log_cpu_requires_grad_propagates() raises:
-    print("test_log_cpu_requires_grad_propagates")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var result = a.log()
@@ -525,7 +428,6 @@ def test_log_cpu_requires_grad_propagates() raises:
 
 
 def test_log_cpu_suppress_grad() raises:
-    print("test_log_cpu_suppress_grad")
     comptime dtype = DType.float32
     # requires_grad=True on input but suppressed via parameter
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -537,7 +439,6 @@ def test_log_cpu_suppress_grad() raises:
 
 
 def test_log_cpu_1d_backward() raises:
-    print("test_log_cpu_1d_backward")
     comptime dtype = DType.float32
     # d/dx log(x) = 1/x
     var a = Tensor[dtype].d1([1.0, 2.0, 4.0], requires_grad=True)
@@ -549,7 +450,6 @@ def test_log_cpu_1d_backward() raises:
 
 
 def test_log_cpu_2d_backward() raises:
-    print("test_log_cpu_2d_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [4.0, 8.0]], requires_grad=True)
     var result = a.log()
@@ -562,7 +462,6 @@ def test_log_cpu_2d_backward() raises:
 
 
 def test_log_cpu_3d_backward() raises:
-    print("test_log_cpu_3d_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0], [4.0, 8.0]], [[1.0, 4.0], [2.0, 8.0]]],
@@ -581,7 +480,6 @@ def test_log_cpu_3d_backward() raises:
 
 
 def test_log_cpu_backward_chain() raises:
-    print("test_log_cpu_backward_chain")
     comptime dtype = DType.float32
     # Chain: log(x) * 2 → sum → backward
     # grad of x = 2/x
@@ -593,7 +491,6 @@ def test_log_cpu_backward_chain() raises:
 
 
 def test_log_cpu_backward_epsilon_clamping() raises:
-    print("test_log_cpu_backward_epsilon_clamping")
     comptime dtype = DType.float32
     # For values <= epsilon, grad = 1/epsilon not 1/x
     # Default epsilon = 1e-12
@@ -610,7 +507,6 @@ def test_log_cpu_backward_epsilon_clamping() raises:
 
 
 def test_log_cpu_backward_custom_epsilon() raises:
-    print("test_log_cpu_backward_custom_epsilon")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([0.0, 1.0, 4.0], requires_grad=True)
     var result = a.log[epsilon=Scalar[dtype](1e-6)]()
@@ -622,7 +518,6 @@ def test_log_cpu_backward_custom_epsilon() raises:
 
 
 def test_log_cpu_backward_chained_with_exp() raises:
-    print("test_log_cpu_backward_chained_with_exp")
     comptime dtype = DType.float32
     # log(exp(x)) = x, so grad should be 1.0 everywhere
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -637,7 +532,6 @@ def test_log_cpu_backward_chained_with_exp() raises:
 
 def test_log_gpu_1d_basic_forward() raises:
     comptime if has_accelerator():
-        print("test_log_gpu_1d_basic_forward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
         var result = a.log()
@@ -650,7 +544,6 @@ def test_log_gpu_1d_basic_forward() raises:
 
 def test_log_gpu_2d_forward() raises:
     comptime if has_accelerator():
-        print("test_log_gpu_2d_forward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
         var result = a.log()
@@ -666,7 +559,6 @@ def test_log_gpu_2d_forward() raises:
 
 def test_log_gpu_3d_forward() raises:
     comptime if has_accelerator():
-        print("test_log_gpu_3d_forward")
         comptime dtype = DType.float32
         var a = (
             Tensor[dtype]
@@ -692,7 +584,6 @@ def test_log_gpu_3d_forward() raises:
 
 def test_log_gpu_ones_forward() raises:
     comptime if has_accelerator():
-        print("test_log_gpu_ones_forward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].ones(Shape(4)).to_gpu()
         var result = a.log()
@@ -702,7 +593,6 @@ def test_log_gpu_ones_forward() raises:
 
 def test_log_gpu_epsilon_clamping() raises:
     comptime if has_accelerator():
-        print("test_log_gpu_epsilon_clamping")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([0.0, -1.0, 1.0]).to_gpu()
         var result = a.log()
@@ -715,7 +605,6 @@ def test_log_gpu_epsilon_clamping() raises:
 
 def test_log_gpu_large_values() raises:
     comptime if has_accelerator():
-        print("test_log_gpu_large_values")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([100.0, 1000.0, 10000.0]).to_gpu()
         var result = a.log()
@@ -728,7 +617,6 @@ def test_log_gpu_large_values() raises:
 # ── GPU Backward Tests ────────────────────────────────────────────────────────
 def test_log_gpu_1d_backward() raises:
     comptime if has_accelerator():
-        print("test_log_gpu_1d_backward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 4.0], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -740,7 +628,6 @@ def test_log_gpu_1d_backward() raises:
 
 def test_log_gpu_2d_backward() raises:
     comptime if has_accelerator():
-        print("test_log_gpu_2d_backward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [4.0, 8.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -754,7 +641,6 @@ def test_log_gpu_2d_backward() raises:
 
 def test_log_gpu_3d_backward() raises:
     comptime if has_accelerator():
-        print("test_log_gpu_3d_backward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
             [[[1.0, 2.0], [4.0, 8.0]], [[1.0, 4.0], [2.0, 8.0]]],
@@ -778,7 +664,6 @@ def test_log_gpu_3d_backward() raises:
 
 def test_log_gpu_backward_chain() raises:
     comptime if has_accelerator():
-        print("test_log_gpu_backward_chain")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 4.0], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -790,7 +675,6 @@ def test_log_gpu_backward_chain() raises:
 
 def test_log_gpu_backward_epsilon_clamping() raises:
     comptime if has_accelerator():
-        print("test_log_gpu_backward_epsilon_clamping")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([0.0, 1.0, 2.0], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -804,7 +688,6 @@ def test_log_gpu_backward_epsilon_clamping() raises:
 
 def test_log_gpu_backward_chained_with_exp() raises:
     comptime if has_accelerator():
-        print("test_log_gpu_backward_chained_with_exp")
         comptime dtype = DType.float32
         # log(exp(x)) = x, grad should be 1.0 everywhere
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -817,7 +700,6 @@ def test_log_gpu_backward_chained_with_exp() raises:
 
 def test_log_gpu_backward_custom_epsilon() raises:
     comptime if has_accelerator():
-        print("test_log_gpu_backward_custom_epsilon")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([0.0, 1.0, 4.0], requires_grad=True)
         var a_gpu = a.to_gpu()
@@ -834,7 +716,6 @@ def test_log_gpu_backward_custom_epsilon() raises:
 
 def test_log_parity_1d_forward() raises:
     comptime if has_accelerator():
-        print("test_log_parity_1d_forward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
         var a_gpu = a_cpu.to_gpu()
@@ -845,7 +726,6 @@ def test_log_parity_1d_forward() raises:
 
 def test_log_parity_2d_forward() raises:
     comptime if has_accelerator():
-        print("test_log_parity_2d_forward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
         var a_gpu = a_cpu.to_gpu()
@@ -856,7 +736,6 @@ def test_log_parity_2d_forward() raises:
 
 def test_log_parity_1d_backward() raises:
     comptime if has_accelerator():
-        print("test_log_parity_1d_backward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 4.0, 8.0], requires_grad=True)
         var a_gpu = a_cpu.to_gpu()
@@ -872,7 +751,6 @@ def test_log_parity_1d_backward() raises:
 
 def test_log_parity_2d_backward() raises:
     comptime if has_accelerator():
-        print("test_log_parity_2d_backward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
             [[1.0, 2.0], [4.0, 8.0]], requires_grad=True
@@ -890,7 +768,6 @@ def test_log_parity_2d_backward() raises:
 
 def test_log_parity_epsilon_clamping() raises:
     comptime if has_accelerator():
-        print("test_log_parity_epsilon_clamping")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([0.0, -1.0, 1.0, 2.0], requires_grad=True)
         var a_gpu = a_cpu.to_gpu()
@@ -906,7 +783,6 @@ def test_log_parity_epsilon_clamping() raises:
 
 def test_log_parity_chain_exp() raises:
     comptime if has_accelerator():
-        print("test_log_parity_chain_exp")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
         var a_gpu = a_cpu.to_gpu()

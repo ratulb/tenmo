@@ -3873,6 +3873,7 @@ struct Tensor[dtype: DType](
         pred: Tensor[Self.dtype],
         target: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9),
+        reduction: Reduction = Reduction("mean"),
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """Binary cross entropy loss.
 
@@ -3880,11 +3881,14 @@ struct Tensor[dtype: DType](
             pred: Predicted probabilities.
             target: Ground truth labels (0 or 1).
             epsilon: Small value for numerical stability.
+            reduction: "mean", "sum", or "none".
 
         Returns:
-            Scalar tensor with the BCE loss.
+            Scalar tensor with the BCE loss (mean/sum) or per-element (none).
         """
-        return BCELoss[Self.dtype].forward[track_grad](pred, target, epsilon)
+        return BCELoss[Self.dtype].forward[track_grad](
+            pred, target, epsilon, reduction
+        )
 
     def binary_cross_entropy_with_logits[
         track_grad: Bool = True
@@ -3892,6 +3896,7 @@ struct Tensor[dtype: DType](
         logits: Tensor[Self.dtype],
         target: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
+        reduction: Reduction = Reduction("mean"),
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """BCE loss with logits (sigmoid applied internally).
 
@@ -3899,12 +3904,13 @@ struct Tensor[dtype: DType](
             logits: Raw unnormalized predictions.
             target: Ground truth labels (0 or 1).
             epsilon: Small value for numerical stability.
+            reduction: "mean", "sum", or "none".
 
         Returns:
-            Scalar tensor with the BCE with logits loss.
+            Scalar tensor with the BCE loss (mean/sum) or per-element (none).
         """
         return BCEWithLogitsLoss[Self.dtype].forward[track_grad](
-            logits, target, epsilon
+            logits, target, epsilon, reduction
         )
 
     def sum_over_broadcasted_axes(

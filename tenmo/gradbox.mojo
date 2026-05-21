@@ -1,21 +1,21 @@
-from .shapes import Shape
-from .mnemonics import *
-from .validators import Validator
-from .tensor import Tensor
-from .intarray import IntArray
-from .ndbuffer import NDBuffer
-from .broadcasthelper import ShapeBroadcaster
-from .strides import Strides
+from tenmo.shapes import Shape
+from tenmo.mnemonics import *
+from tenmo.validators import Validator
+from tenmo.tensor import Tensor
+from tenmo.intarray import IntArray
+from tenmo.ndbuffer import NDBuffer
+from tenmo.broadcasthelper import ShapeBroadcaster
+from tenmo.strides import Strides
 from std.sys import simd_width_of, has_accelerator
-from .matmul import Matmul
+from tenmo.matmul import Matmul
 from std.random import seed, random_float64
-from .buffers import Buffer
-from .forwards import Mean, Sqrt
-from .indexhelper import IndexIterator
-from .filler import Filler
-from .common_utils import Idx, panic, print_buffer
-from .device import Device, CPU, GPU
-from .device_transfer import DeviceTransfer
+from tenmo.buffers import Buffer
+from tenmo.forwards import Mean, Sqrt
+from tenmo.indexhelper import IndexIterator
+from tenmo.filler import Filler
+from tenmo.common_utils import Idx, panic, print_buffer
+from tenmo.device import Device, CPU, GPU
+from tenmo.device_transfer import DeviceTransfer
 from std.os.atomic import Atomic, Consistency, fence
 
 

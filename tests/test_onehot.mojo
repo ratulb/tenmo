@@ -8,7 +8,6 @@ from tenmo.device import CPU, GPU
 
 
 def test_onehot_cpu_1d_basic() raises:
-    print("test_onehot_cpu_1d_basic")
     comptime dtype = DType.float32
     var indices = Tensor[dtype].d1([0.0, 1.0, 2.0])
     var result = Tensor[dtype].onehot(indices, 3)
@@ -22,7 +21,6 @@ def test_onehot_cpu_1d_basic() raises:
 
 
 def test_onehot_cpu_1d_single_class() raises:
-    print("test_onehot_cpu_1d_single_class")
     comptime dtype = DType.float32
     var indices = Tensor[dtype].d1([0.0, 0.0, 0.0])
     var result = Tensor[dtype].onehot(indices, 1)
@@ -30,7 +28,6 @@ def test_onehot_cpu_1d_single_class() raises:
 
 
 def test_onehot_cpu_1d_first_class() raises:
-    print("test_onehot_cpu_1d_first_class")
     comptime dtype = DType.float32
     var indices = Tensor[dtype].d1([0.0, 0.0, 0.0])
     var result = Tensor[dtype].onehot(indices, 4)
@@ -48,7 +45,6 @@ def test_onehot_cpu_1d_first_class() raises:
 
 
 def test_onehot_cpu_1d_last_class() raises:
-    print("test_onehot_cpu_1d_last_class")
     comptime dtype = DType.float32
     var indices = Tensor[dtype].d1([3.0, 3.0, 3.0])
     var result = Tensor[dtype].onehot(indices, 4)
@@ -66,7 +62,6 @@ def test_onehot_cpu_1d_last_class() raises:
 
 
 def test_onehot_cpu_1d_mixed() raises:
-    print("test_onehot_cpu_1d_mixed")
     comptime dtype = DType.float32
     var indices = Tensor[dtype].d1([2.0, 0.0, 1.0, 3.0])
     var result = Tensor[dtype].onehot(indices, 4)
@@ -85,7 +80,6 @@ def test_onehot_cpu_1d_mixed() raises:
 
 
 def test_onehot_cpu_2d_basic() raises:
-    print("test_onehot_cpu_2d_basic")
     comptime dtype = DType.float32
     var indices = Tensor[dtype].d2([[0.0, 2.0], [1.0, 3.0]])
     var result = Tensor[dtype].onehot(indices, 4)
@@ -109,7 +103,6 @@ def test_onehot_cpu_2d_basic() raises:
 
 
 def test_onehot_cpu_2d_single_row() raises:
-    print("test_onehot_cpu_2d_single_row")
     comptime dtype = DType.float32
     var indices = Tensor[dtype].d2([[0.0, 1.0, 2.0]])
     var result = Tensor[dtype].onehot(indices, 3)
@@ -123,7 +116,6 @@ def test_onehot_cpu_2d_single_row() raises:
 
 
 def test_onehot_cpu_1d_large_num_classes() raises:
-    print("test_onehot_cpu_1d_large_num_classes")
     comptime dtype = DType.float32
     var indices = Tensor[dtype].d1([0.0, 4.0, 9.0])
     var result = Tensor[dtype].onehot(indices, 10)
@@ -137,7 +129,6 @@ def test_onehot_cpu_1d_large_num_classes() raises:
 
 
 def test_onehot_cpu_shape() raises:
-    print("test_onehot_cpu_shape")
     comptime dtype = DType.float32
     # Verify output shape is correct
     var indices = Tensor[dtype].d2([[0.0, 1.0], [2.0, 0.0], [1.0, 2.0]])
@@ -147,7 +138,6 @@ def test_onehot_cpu_shape() raises:
 
 
 def test_onehot_cpu_all_zeros_except_one() raises:
-    print("test_onehot_cpu_all_zeros_except_one")
     comptime dtype = DType.float32
     # Each row must sum to exactly 1.0
     var indices = Tensor[dtype].d1([0.0, 1.0, 2.0, 3.0])
@@ -160,7 +150,6 @@ def test_onehot_cpu_all_zeros_except_one() raises:
 
 
 def test_onehot_cpu_explicit_cpu_device() raises:
-    print("test_onehot_cpu_explicit_cpu_device")
     comptime dtype = DType.float32
     var indices = Tensor[dtype].d1([0.0, 1.0, 2.0])
     var result = Tensor[dtype].onehot(indices, 3, CPU().into())
@@ -179,7 +168,6 @@ def test_onehot_cpu_explicit_cpu_device() raises:
 
 def test_onehot_gpu_1d_basic() raises:
     comptime if has_accelerator():
-        print("test_onehot_gpu_1d_basic")
         comptime dtype = DType.float32
         var indices = Tensor[dtype].d1([0.0, 1.0, 2.0]).to_gpu()
         var result = Tensor[dtype].onehot(indices, 3)
@@ -195,7 +183,6 @@ def test_onehot_gpu_1d_basic() raises:
 
 def test_onehot_gpu_1d_mixed() raises:
     comptime if has_accelerator():
-        print("test_onehot_gpu_1d_mixed")
         comptime dtype = DType.float32
         var indices = Tensor[dtype].d1([2.0, 0.0, 1.0, 3.0]).to_gpu()
         var result = Tensor[dtype].onehot(indices, 4)
@@ -216,7 +203,6 @@ def test_onehot_gpu_1d_mixed() raises:
 
 def test_onehot_gpu_2d_basic() raises:
     comptime if has_accelerator():
-        print("test_onehot_gpu_2d_basic")
         comptime dtype = DType.float32
         var indices = Tensor[dtype].d2([[0.0, 2.0], [1.0, 3.0]]).to_gpu()
         var result = Tensor[dtype].onehot(indices, 4)
@@ -241,7 +227,6 @@ def test_onehot_gpu_2d_basic() raises:
 
 def test_onehot_gpu_first_class() raises:
     comptime if has_accelerator():
-        print("test_onehot_gpu_first_class")
         comptime dtype = DType.float32
         var indices = Tensor[dtype].d1([0.0, 0.0, 0.0]).to_gpu()
         var result = Tensor[dtype].onehot(indices, 4)
@@ -261,7 +246,6 @@ def test_onehot_gpu_first_class() raises:
 
 def test_onehot_gpu_last_class() raises:
     comptime if has_accelerator():
-        print("test_onehot_gpu_last_class")
         comptime dtype = DType.float32
         var indices = Tensor[dtype].d1([3.0, 3.0, 3.0]).to_gpu()
         var result = Tensor[dtype].onehot(indices, 4)
@@ -281,7 +265,6 @@ def test_onehot_gpu_last_class() raises:
 
 def test_onehot_gpu_shape() raises:
     comptime if has_accelerator():
-        print("test_onehot_gpu_shape")
         comptime dtype = DType.float32
         var indices = (
             Tensor[dtype].d2([[0.0, 1.0], [2.0, 0.0], [1.0, 2.0]]).to_gpu()
@@ -293,7 +276,6 @@ def test_onehot_gpu_shape() raises:
 
 def test_onehot_gpu_all_zeros_except_one() raises:
     comptime if has_accelerator():
-        print("test_onehot_gpu_all_zeros_except_one")
         comptime dtype = DType.float32
         var indices = Tensor[dtype].d1([0.0, 1.0, 2.0, 3.0]).to_gpu()
         var result = Tensor[dtype].onehot(indices, 4)
@@ -308,7 +290,6 @@ def test_onehot_gpu_all_zeros_except_one() raises:
 
 def test_onehot_gpu_large_num_classes() raises:
     comptime if has_accelerator():
-        print("test_onehot_gpu_large_num_classes")
         comptime dtype = DType.float32
         var indices = Tensor[dtype].d1([0.0, 4.0, 9.0]).to_gpu()
         var result = Tensor[dtype].onehot(indices, 10)
@@ -323,7 +304,6 @@ def test_onehot_gpu_large_num_classes() raises:
 
 def test_onehot_gpu_explicit_device() raises:
     comptime if has_accelerator():
-        print("test_onehot_gpu_explicit_device")
         comptime dtype = DType.float32
         # CPU indices but explicit GPU device
         var indices = Tensor[dtype].d1([0.0, 1.0, 2.0])
@@ -340,7 +320,6 @@ def test_onehot_gpu_explicit_device() raises:
 
 def test_onehot_gpu_override_to_cpu() raises:
     comptime if has_accelerator():
-        print("test_onehot_gpu_override_to_cpu")
         comptime dtype = DType.float32
         # GPU indices but force CPU result
         var indices = Tensor[dtype].d1([0.0, 1.0, 2.0]).to_gpu()
@@ -360,7 +339,6 @@ def test_onehot_gpu_override_to_cpu() raises:
 
 def test_onehot_gpu_parity_1d() raises:
     comptime if has_accelerator():
-        print("test_onehot_gpu_parity_1d")
         comptime dtype = DType.float32
         var indices_cpu = Tensor[dtype].d1([0.0, 2.0, 1.0, 3.0])
         var indices_gpu = indices_cpu.to_gpu()
@@ -371,7 +349,6 @@ def test_onehot_gpu_parity_1d() raises:
 
 def test_onehot_gpu_parity_2d() raises:
     comptime if has_accelerator():
-        print("test_onehot_gpu_parity_2d")
         comptime dtype = DType.float32
         var indices_cpu = Tensor[dtype].d2([[0.0, 2.0], [1.0, 3.0]])
         var indices_gpu = indices_cpu.to_gpu()

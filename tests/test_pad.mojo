@@ -15,7 +15,6 @@ from tenmo.forwards import Conv2dFused, Padding
 
 def test_pad_constant_2d_symmetric() raises:
     """Test symmetric constant padding on 2D tensor."""
-    print("test_pad_constant_2d_symmetric")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])  # (2, 2)
@@ -49,7 +48,6 @@ def test_pad_constant_2d_symmetric() raises:
 
 def test_pad_constant_2d_asymmetric() raises:
     """Test asymmetric constant padding on 2D tensor."""
-    print("test_pad_constant_2d_asymmetric")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])  # (2, 3)
@@ -81,7 +79,6 @@ def test_pad_constant_2d_asymmetric() raises:
 
 def test_pad_constant_1d() raises:
     """Test constant padding on 1D tensor."""
-    print("test_pad_constant_1d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -102,7 +99,6 @@ def test_pad_constant_1d() raises:
 
 def test_pad_constant_3d() raises:
     """Test constant padding on 3D tensor."""
-    print("test_pad_constant_3d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d3([[[1.0, 2.0]]])  # (1, 1, 2)
@@ -122,7 +118,6 @@ def test_pad_constant_3d() raises:
 
 def test_pad_constant_4d_conv_style() raises:
     """Test constant padding on 4D tensor (typical for conv layers)."""
-    print("test_pad_constant_4d_conv_style")
 
     comptime dtype = DType.float32
     # Create 4D tensor: (batch=1, channels=1, H=2, W=2)
@@ -149,7 +144,6 @@ def test_pad_constant_4d_conv_style() raises:
 
 def test_pad_constant_nonzero_value() raises:
     """Test constant padding with non-zero pad value."""
-    print("test_pad_constant_nonzero_value")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0]])
@@ -177,7 +171,6 @@ def test_pad_constant_nonzero_value() raises:
 
 def test_pad_zero_padding() raises:
     """Test padding with zero on all sides (no-op)."""
-    print("test_pad_zero_padding")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -199,7 +192,6 @@ def test_pad_zero_padding() raises:
 
 def test_pad_backward_symmetric() raises:
     """Test gradient flow through symmetric padding."""
-    print("test_pad_backward_symmetric")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -221,7 +213,6 @@ def test_pad_backward_symmetric() raises:
 
 def test_pad_backward_asymmetric() raises:
     """Test gradient flow through asymmetric padding."""
-    print("test_pad_backward_asymmetric")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -241,7 +232,6 @@ def test_pad_backward_asymmetric() raises:
 
 def test_pad_backward_weighted() raises:
     """Test gradient flow with weighted loss."""
-    print("test_pad_backward_weighted")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -265,7 +255,6 @@ def test_pad_backward_weighted() raises:
 
 def test_pad_backward_1d() raises:
     """Test gradient flow for 1D padding."""
-    print("test_pad_backward_1d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -284,7 +273,6 @@ def test_pad_backward_1d() raises:
 
 def test_pad_backward_3d() raises:
     """Test gradient flow for 3D padding."""
-    print("test_pad_backward_3d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d3(
@@ -307,7 +295,6 @@ def test_pad_backward_3d() raises:
 
 def test_pad_backward_chain() raises:
     """Test gradient flow through chained operations."""
-    print("test_pad_backward_chain")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -328,7 +315,6 @@ def test_pad_backward_chain() raises:
 
 def test_pad_backward_4d_conv_style() raises:
     """Test gradient flow for 4D tensor (conv layer style)."""
-    print("test_pad_backward_4d_conv_style")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(Shape(1, 2, 2, 2), requires_grad=True)
@@ -358,7 +344,6 @@ def test_pad_backward_4d_conv_style() raises:
 
 def test_pad_replicate_2d() raises:
     """Test replicate padding mode."""
-    print("test_pad_replicate_2d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -388,7 +373,6 @@ def test_pad_replicate_2d() raises:
 
 def test_pad_reflect_2d() raises:
     """Test reflect padding mode."""
-    print("test_pad_reflect_2d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -417,7 +401,6 @@ def test_pad_reflect_2d() raises:
 
 def test_pad_for_convolution() raises:
     """Test padding for CNN convolution layer."""
-    print("test_pad_for_convolution")
 
     comptime dtype = DType.float32
     # Typical conv input: (batch=2, channels=3, H=28, W=28)
@@ -448,7 +431,6 @@ def test_pad_for_convolution() raises:
 
 def test_pad_selective_dimensions() raises:
     """Test padding only specific dimensions."""
-    print("test_pad_selective_dimensions")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype](2, 3, 4, 5)
@@ -471,7 +453,6 @@ def test_pad_selective_dimensions() raises:
 
 def test_pad_requires_grad_propagation() raises:
     """Test requires_grad propagation."""
-    print("test_pad_requires_grad_propagation")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -497,7 +478,6 @@ def main() raises:
 
 def test_pad_circular_1d_asymmetric() raises:
     """Test asymmetric circular padding on 1D tensor."""
-    print("test_pad_circular_1d_asymmetric")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -518,7 +498,6 @@ def test_pad_circular_1d_asymmetric() raises:
 
 def test_pad_circular_2d_symmetric() raises:
     """Test symmetric circular padding on 2D tensor."""
-    print("test_pad_circular_2d_symmetric")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])  # (2, 3)
@@ -556,7 +535,6 @@ def test_pad_circular_2d_symmetric() raises:
 
 def test_pad_circular_2d_asymmetric() raises:
     """Test asymmetric circular padding on 2D tensor."""
-    print("test_pad_circular_2d_asymmetric")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])  # (2, 2)
@@ -599,7 +577,6 @@ def test_pad_circular_2d_asymmetric() raises:
 
 def test_pad_circular_2d_one_dimension() raises:
     """Test circular padding on only one dimension."""
-    print("test_pad_circular_2d_one_dimension")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -627,7 +604,6 @@ def test_pad_circular_2d_one_dimension() raises:
 
 def test_pad_circular_large_padding() raises:
     """Test circular padding with padding larger than input size."""
-    print("test_pad_circular_large_padding")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -677,7 +653,6 @@ def test_pad_circular_large_padding() raises:
 
 def test_pad_circular_3d() raises:
     """Test circular padding on 3D tensor."""
-    print("test_pad_circular_3d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2, 2)
@@ -697,7 +672,6 @@ def test_pad_circular_3d() raises:
 
 def test_pad_circular_single_element() raises:
     """Test circular padding on single element tensor."""
-    print("test_pad_circular_single_element")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([5.0])
@@ -706,7 +680,6 @@ def test_pad_circular_single_element() raises:
     pad.append((3, 3))
 
     var result = Tensor[dtype].pad(x, pad, mode="circular")
-    result.print()
 
     # Expected: all elements should be 5.0
     # [5, 5, 5, 5, 5, 5, 5]
@@ -722,7 +695,6 @@ def test_pad_circular_single_element() raises:
 
 def test_pad_circular_backward_1d() raises:
     """Test gradient flow through circular padding 1D."""
-    print("test_pad_circular_backward_1d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -756,7 +728,6 @@ def test_pad_circular_backward_1d() raises:
 
 def test_pad_circular_backward_2d() raises:
     """Test gradient flow through circular padding 2D."""
-    print("test_pad_circular_backward_2d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -815,7 +786,6 @@ def test_pad_circular_backward_2d() raises:
 
 def test_pad_circular_backward_weighted() raises:
     """Test gradient flow with weighted loss through circular padding."""
-    print("test_pad_circular_backward_weighted")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -848,7 +818,6 @@ def test_pad_circular_backward_weighted() raises:
 
 def test_pad_circular_backward_chain() raises:
     """Test gradient flow through chained operations with circular padding."""
-    print("test_pad_circular_backward_chain")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -880,7 +849,6 @@ def test_pad_circular_backward_chain() raises:
 
 def test_circular_vs_replicate_difference() raises:
     """Show difference between circular and replicate padding."""
-    print("test_circular_vs_replicate_difference")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -904,7 +872,6 @@ def test_circular_vs_replicate_difference() raises:
 
 def test_circular_periodic_signal() raises:
     """Test circular padding preserves periodicity."""
-    print("test_circular_periodic_signal")
 
     comptime dtype = DType.float32
     # Periodic signal: one period
@@ -937,9 +904,6 @@ def test_circular_periodic_signal() raises:
 
 def test_pad_symmetric_padding_forward() raises:
     """Test symmetric padding forward pass."""
-    print("\n" + "=" * 80)
-    print("TEST: Symmetric Padding Forward")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].zeros(1, 1, 3, 3, requires_grad=True)
@@ -976,14 +940,10 @@ def test_pad_symmetric_padding_forward() raises:
         output[0, 0, 1, 1], 12.0, atol=1e-5, msg="Center value incorrect"
     )
 
-    print("✓ Symmetric padding forward pass correct")
 
 
 def test_pad_symmetric_padding_backward() raises:
     """Test symmetric padding backward pass."""
-    print("\n" + "=" * 80)
-    print("TEST: Symmetric Padding Backward")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].zeros(1, 1, 3, 3, requires_grad=True)
@@ -1017,14 +977,10 @@ def test_pad_symmetric_padding_backward() raises:
         grad_image[0, 0, 2, 2], 4.0, atol=1e-5, msg="Bottom-right grad"
     )
 
-    print("✓ Symmetric padding backward pass correct")
 
 
 def test_pad_asymmetric_padding_forward() raises:
     """Test asymmetric padding forward pass."""
-    print("\n" + "=" * 80)
-    print("TEST: Asymmetric Padding Forward")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].zeros(1, 1, 3, 3, requires_grad=True)
@@ -1069,14 +1025,10 @@ def test_pad_asymmetric_padding_forward() raises:
         output[0, 0, 2, 2], 24.0, atol=1e-5, msg="Center asymmetric"
     )
 
-    print("✓ Asymmetric padding forward pass correct")
 
 
 def test_pad_asymmetric_padding_backward() raises:
     """Test asymmetric padding backward pass."""
-    print("\n" + "=" * 80)
-    print("TEST: Asymmetric Padding Backward")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].zeros(1, 1, 3, 3, requires_grad=True)
@@ -1115,14 +1067,10 @@ def test_pad_asymmetric_padding_backward() raises:
                 msg="Gradient at " + String(i) + "," + String(j),
             )
 
-    print("✓ Asymmetric padding backward pass correct")
 
 
 def test_pad_no_padding() raises:
     """Test valid padding (no padding)."""
-    print("\n" + "=" * 80)
-    print("TEST: No Padding (Valid)")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].zeros(1, 1, 5, 5, requires_grad=True)
@@ -1171,14 +1119,10 @@ def test_pad_no_padding() raises:
         grad_image[0, 0, 2, 2], 9.0, atol=1e-5, msg="Center grad no pad"
     )
 
-    print("✓ No padding test correct")
 
 
 def test_pad_same_padding() raises:
     """Test 'same' padding mode."""
-    print("\n" + "=" * 80)
-    print("TEST: Same Padding")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].randn(1, 1, 7, 7, requires_grad=True)
@@ -1200,14 +1144,10 @@ def test_pad_same_padding() raises:
         grad_image.shape() == Shape(1, 1, 7, 7), "Same padding grad shape"
     )
 
-    print("✓ Same padding test correct")
 
 
 def test_pad_multi_channel() raises:
     """Test padding with multiple channels."""
-    print("\n" + "=" * 80)
-    print("TEST: Multi-Channel Padding")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].randn(2, 3, 8, 8, requires_grad=True)
@@ -1236,14 +1176,10 @@ def test_pad_multi_channel() raises:
         "Multi-channel grad kernel shape",
     )
 
-    print("✓ Multi-channel padding test correct")
 
 
 def test_pad_with_stride() raises:
     """Test padding with stride > 1."""
-    print("\n" + "=" * 80)
-    print("TEST: Padding with Stride")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].randn(1, 1, 8, 8, requires_grad=True)
@@ -1265,14 +1201,10 @@ def test_pad_with_stride() raises:
 
     # With stride=2, not all pixels contribute equally
     # Pixels on stride grid contribute more
-    print("✓ Stride with padding test correct")
 
 
 def test_pad_with_dilation() raises:
     """Test padding with dilation."""
-    print("\n" + "=" * 80)
-    print("TEST: Padding with Dilation")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].randn(1, 1, 10, 10, requires_grad=True)
@@ -1295,14 +1227,10 @@ def test_pad_with_dilation() raises:
         grad_image.shape() == Shape(1, 1, 10, 10), "Dilation grad shape"
     )
 
-    print("✓ Dilation with padding test correct")
 
 
 def test_pad_tuple_padding() raises:
     """Test tuple padding specification."""
-    print("\n" + "=" * 80)
-    print("TEST: Tuple Padding")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].randn(1, 1, 8, 8, requires_grad=True)
@@ -1326,14 +1254,10 @@ def test_pad_tuple_padding() raises:
         grad_image.shape() == Shape(1, 1, 8, 8), "Tuple padding grad shape"
     )
 
-    print("✓ Tuple padding test correct")
 
 
 def test_pad_numerical_gradient_check() raises:
     """Numerical gradient verification for padding."""
-    print("\n" + "=" * 80)
-    print("TEST: Numerical Gradient Check")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].randn(1, 1, 4, 4, requires_grad=True)
@@ -1383,19 +1307,12 @@ def test_pad_numerical_gradient_check() raises:
         abs(grad_numerical) + 1e-8
     )
 
-    print("Analytical gradient: ", grad_analytical)
-    print("Numerical gradient: ", grad_numerical)
-    print("Relative error:", rel_error)
 
     assert_true(rel_error < 0.01, "Numerical gradient mismatch")
-    print("✓ Numerical gradient check passed")
 
 
 def test_pad_kernel_gradient() raises:
     """Test kernel gradients with padding."""
-    print("\n" + "=" * 80)
-    print("TEST: Kernel Gradient with Padding")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].zeros(1, 1, 3, 3, requires_grad=False)
@@ -1432,14 +1349,10 @@ def test_pad_kernel_gradient() raises:
                 "Kernel grad :" + String(i) + "," + String(j) + "positive",
             )
 
-    print("✓ Kernel gradient test correct")
 
 
 def test_pad_bias_gradient() raises:
     """Test bias gradients with padding."""
-    print("\n" + "=" * 80)
-    print("TEST: Bias Gradient with Padding")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].randn(2, 3, 8, 8, requires_grad=False)
@@ -1465,14 +1378,10 @@ def test_pad_bias_gradient() raises:
             grad_bias[i], expected, atol=1e-4, msg="Bias grad " + String(i)
         )
 
-    print("✓ Bias gradient test correct")
 
 
 def test_pad_large_asymmetric() raises:
     """Test large asymmetric padding values."""
-    print("\n" + "=" * 80)
-    print("TEST: Large Asymmetric Padding")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].randn(1, 2, 5, 5, requires_grad=True)
@@ -1520,14 +1429,10 @@ def test_pad_large_asymmetric() raises:
                     + String(j),
                 )
 
-    print("✓ Large asymmetric padding test correct")
 
 
 def test_pad_zero_padding_one_side() raises:
     """Test zero padding on one side, non-zero on other."""
-    print("\n" + "=" * 80)
-    print("TEST: Zero Padding One Side")
-    print("=" * 80)
 
     comptime dtype = DType.float32
     var image = Tensor[dtype].randn(1, 1, 6, 6, requires_grad=True)
@@ -1554,26 +1459,3 @@ def test_pad_zero_padding_one_side() raises:
     assert_true(
         grad_image.shape() == Shape(1, 1, 6, 6), "Zero one side grad shape"
     )
-
-    print("✓ Zero padding one side test correct")
-
-
-def run_all_padding_tests() raises:
-    """Run all padding tests."""
-
-    test_pad_symmetric_padding_forward()
-    test_pad_symmetric_padding_backward()
-    test_pad_asymmetric_padding_forward()
-    test_pad_asymmetric_padding_backward()
-    test_pad_no_padding()
-    test_pad_same_padding()
-    test_pad_multi_channel()
-    test_pad_with_stride()
-    test_pad_with_dilation()
-    test_pad_tuple_padding()
-    test_pad_numerical_gradient_check()
-    test_pad_kernel_gradient()
-    test_pad_bias_gradient()
-    test_pad_large_asymmetric()
-    test_pad_zero_padding_one_side()
-    test_pad_backward_asymmetric()

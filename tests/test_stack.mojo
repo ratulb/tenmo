@@ -9,7 +9,6 @@ from tenmo.shapes import Shape
 
 def test_stack_axis0_2d() raises:
     """Test stack along axis 0 for 2D tensors."""
-    print("test_stack_axis0_2d")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -41,7 +40,6 @@ def test_stack_axis0_2d() raises:
 
 def test_stack_axis1_2d() raises:
     """Test stack along axis 1 for 2D tensors."""
-    print("test_stack_axis1_2d")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -73,7 +71,6 @@ def test_stack_axis1_2d() raises:
 
 def test_stack_axis2_2d() raises:
     """Test stack along axis 2 for 2D tensors."""
-    print("test_stack_axis2_2d")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -105,7 +102,6 @@ def test_stack_axis2_2d() raises:
 
 def test_stack_axis_negative() raises:
     """Test stack with negative axis."""
-    print("test_stack_axis_negative")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -124,7 +120,6 @@ def test_stack_axis_negative() raises:
 
 def test_stack_1d_tensors() raises:
     """Test stack of 1D tensors."""
-    print("test_stack_1d_tensors")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -151,7 +146,6 @@ def test_stack_1d_tensors() raises:
 
 def test_stack_1d_axis1() raises:
     """Test stack of 1D tensors along axis 1."""
-    print("test_stack_1d_axis1")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -174,7 +168,6 @@ def test_stack_1d_axis1() raises:
 
 def test_stack_3d_tensors() raises:
     """Test stack of 3D tensors."""
-    print("test_stack_3d_tensors")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2, 2)
@@ -195,7 +188,6 @@ def test_stack_3d_tensors() raises:
 
 def test_stack_many_tensors() raises:
     """Test stack of many tensors."""
-    print("test_stack_many_tensors")
 
     comptime dtype = DType.float32
     var tensors = List[Tensor[dtype]]()
@@ -215,7 +207,6 @@ def test_stack_many_tensors() raises:
 
 def test_stack_single_tensor() raises:
     """Test stack of single tensor (edge case)."""
-    print("test_stack_single_tensor")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -236,7 +227,6 @@ def test_stack_single_tensor() raises:
 # ============================================================================
 def test_vstack_2d() raises:
     """Test vstack with 2D tensors."""
-    print("test_vstack_2d")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])  # (3,)
@@ -258,7 +248,6 @@ def test_vstack_2d() raises:
 
 def test_vstack_1d() raises:
     """Test vstack with 1D tensors."""
-    print("test_vstack_1d")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -285,7 +274,6 @@ def test_vstack_1d() raises:
 
 def test_vstack_mixed_rows() raises:
     """Test vstack with different number of rows."""
-    print("test_vstack_mixed_rows")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])  # (2, 2)
@@ -323,7 +311,6 @@ def test_vstack_mixed_rows() raises:
 
 def test_hstack_2d() raises:
     """Test hstack with 2D tensors."""
-    print("test_hstack_2d")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0], [2.0], [3.0]])  # (3, 1)
@@ -346,7 +333,6 @@ def test_hstack_2d() raises:
 
 def test_hstack_1d() raises:
     """Test hstack with 1D tensors."""
-    print("test_hstack_1d")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -372,7 +358,6 @@ def test_hstack_1d() raises:
 
 def test_hstack_mixed_cols() raises:
     """Test hstack with different number of columns."""
-    print("test_hstack_mixed_cols")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])  # (2, 2)
@@ -404,7 +389,6 @@ def test_hstack_mixed_cols() raises:
 
 def test_stack_backward_axis0() raises:
     """Test gradient flow through stack along axis 0."""
-    print("test_stack_backward_axis0")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -427,7 +411,6 @@ def test_stack_backward_axis0() raises:
 
 def test_stack_backward_axis1() raises:
     """Test gradient flow through stack along axis 1."""
-    print("test_stack_backward_axis1")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -450,7 +433,6 @@ def test_stack_backward_axis1() raises:
 
 def test_stack_backward_weighted() raises:
     """Test gradient flow with weighted loss."""
-    print("test_stack_backward_weighted")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -476,7 +458,6 @@ def test_stack_backward_weighted() raises:
 
 def test_stack_backward_three_tensors() raises:
     """Test gradient flow through stack of three tensors."""
-    print("test_stack_backward_three_tensors")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -501,7 +482,6 @@ def test_stack_backward_three_tensors() raises:
 
 def test_stack_backward_chain() raises:
     """Test gradient flow through chained operations."""
-    print("test_stack_backward_chain")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -531,7 +511,6 @@ def test_stack_backward_chain() raises:
 
 def test_vstack_backward() raises:
     """Test gradient flow through vstack."""
-    print("test_vstack_backward")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)  # (1, 2)
@@ -556,7 +535,6 @@ def test_vstack_backward() raises:
 
 def test_vstack_backward_1d() raises:
     """Test gradient flow through vstack with 1D tensors."""
-    print("test_vstack_backward_1d")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -578,7 +556,6 @@ def test_vstack_backward_1d() raises:
 
 def test_vstack_backward_weighted() raises:
     """Test gradient flow through vstack with weighted loss."""
-    print("test_vstack_backward_weighted")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -614,7 +591,6 @@ def test_vstack_backward_weighted() raises:
 
 def test_hstack_backward() raises:
     """Test gradient flow through hstack."""
-    print("test_hstack_backward")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0], [2.0]], requires_grad=True)  # (2, 1)
@@ -639,7 +615,6 @@ def test_hstack_backward() raises:
 
 def test_hstack_backward_1d() raises:
     """Test gradient flow through hstack with 1D tensors."""
-    print("test_hstack_backward_1d")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -676,7 +651,6 @@ def main() raises:
 
 def test_stk_basic_2_tensors_axis0() raises:
     """Test stacking 2 tensors along axis 0."""
-    print("test_stk_basic_2_tensors_axis0")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -694,7 +668,6 @@ def test_stk_basic_2_tensors_axis0() raises:
 
 def test_stk_basic_3_tensors_axis0() raises:
     """Test stacking 3 tensors along axis 0."""
-    print("test_stk_basic_3_tensors_axis0")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0])
@@ -714,7 +687,6 @@ def test_stk_basic_3_tensors_axis0() raises:
 
 def test_stk_axis1_2d() raises:
     """Test stacking along axis 1 for 2D tensors."""
-    print("test_stk_axis1_2d")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])  # (2, 2)
@@ -736,7 +708,6 @@ def test_stk_axis1_2d() raises:
 
 def test_stk_axis_negative() raises:
     """Test stacking with negative axis."""
-    print("test_stk_axis_negative")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -755,7 +726,6 @@ def test_stk_axis_negative() raises:
 
 def test_stk_single_element_tensors() raises:
     """Test stacking single-element tensors."""
-    print("test_stk_single_element_tensors")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0])
@@ -775,7 +745,6 @@ def test_stk_single_element_tensors() raises:
 
 def test_stk_3d_tensors() raises:
     """Test stacking 3D tensors."""
-    print("test_stk_3d_tensors")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].zeros(2, 3, 4)
@@ -800,7 +769,6 @@ def test_stk_3d_tensors() raises:
 
 def test_stk_backward_simple_axis0() raises:
     """Test gradient flow through stack with axis=0."""
-    print("test_stk_backward_simple_axis0")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -822,7 +790,6 @@ def test_stk_backward_simple_axis0() raises:
 
 def test_stk_backward_weighted() raises:
     """Test gradient flow with weighted loss."""
-    print("test_stk_backward_weighted")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -850,7 +817,6 @@ def test_stk_backward_weighted() raises:
 
 def test_stk_backward_axis1() raises:
     """Test gradient flow through stack with axis=1."""
-    print("test_stk_backward_axis1")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -872,7 +838,6 @@ def test_stk_backward_axis1() raises:
 
 def test_stk_backward_three_tensors() raises:
     """Test gradient flow with three input tensors."""
-    print("test_stk_backward_three_tensors")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -903,7 +868,6 @@ def test_stk_backward_three_tensors() raises:
 
 def test_stk_backward_selective_grad() raises:
     """Test gradient flow when only some tensors require grad."""
-    print("test_stk_backward_selective_grad")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -933,7 +897,6 @@ def test_stk_backward_selective_grad() raises:
 
 def test_stk_vstack_1d_tensors() raises:
     """Test vstack with 1D tensors."""
-    print("test_stk_vstack_1d_tensors")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -951,7 +914,6 @@ def test_stk_vstack_1d_tensors() raises:
 
 def test_stk_vstack_2d_tensors() raises:
     """Test vstack with 2D tensors."""
-    print("test_stk_vstack_2d_tensors")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])  # (2, 2)
@@ -971,7 +933,6 @@ def test_stk_vstack_2d_tensors() raises:
 
 def test_stk_vstack_different_rows() raises:
     """Test vstack with tensors having different number of rows."""
-    print("test_stk_vstack_different_rows")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0]])  # (1, 3)
@@ -991,7 +952,6 @@ def test_stk_vstack_different_rows() raises:
 
 def test_stk_vstack_backward() raises:
     """Test gradient flow through vstack."""
-    print("test_stk_vstack_backward")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -1023,7 +983,6 @@ def test_stk_vstack_backward() raises:
 
 def test_stk_hstack_1d_tensors() raises:
     """Test hstack with 1D tensors."""
-    print("test_stk_hstack_1d_tensors")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -1041,7 +1000,6 @@ def test_stk_hstack_1d_tensors() raises:
 
 def test_stk_hstack_2d_tensors() raises:
     """Test hstack with 2D tensors."""
-    print("test_stk_hstack_2d_tensors")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])  # (2, 2)
@@ -1061,7 +1019,6 @@ def test_stk_hstack_2d_tensors() raises:
 
 def test_stk_hstack_different_columns() raises:
     """Test hstack with tensors having different number of columns."""
-    print("test_stk_hstack_different_columns")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0], [2.0]])  # (2, 1)
@@ -1081,7 +1038,6 @@ def test_stk_hstack_different_columns() raises:
 
 def test_stk_hstack_backward() raises:
     """Test gradient flow through hstack."""
-    print("test_stk_hstack_backward")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -1108,7 +1064,6 @@ def test_stk_hstack_backward() raises:
 
 def test_stk_hstack_2d_backward() raises:
     """Test gradient flow through hstack with 2D tensors."""
-    print("test_stk_hstack_2d_backward")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -1140,7 +1095,6 @@ def test_stk_hstack_2d_backward() raises:
 
 def test_stk_large_number_tensors() raises:
     """Test stacking a large number of tensors."""
-    print("test_stk_large_number_tensors")
 
     comptime dtype = DType.float32
     var tensors = List[Tensor[dtype]]()
@@ -1158,7 +1112,6 @@ def test_stk_large_number_tensors() raises:
 
 def test_stk_zeros_and_ones() raises:
     """Test stacking tensors with zeros and ones."""
-    print("test_stk_zeros_and_ones")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].zeros(3, 4)
@@ -1183,7 +1136,6 @@ def test_stk_zeros_and_ones() raises:
 
 def test_stk_chain_operations() raises:
     """Test stacking followed by other operations."""
-    print("test_stk_chain_operations")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -1206,7 +1158,6 @@ def test_stk_chain_operations() raises:
 
 def test_stk_mixed_operations() raises:
     """Test mixing stack, vstack, and hstack."""
-    print("test_stk_mixed_operations")
 
     comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0])
@@ -1239,12 +1190,7 @@ def test_stk_mixed_operations() raises:
 
 def run_all_stack_tests() raises:
     """Run all stack operation tests."""
-    print("\n" + "=" * 60)
-    print("RUNNING COMPREHENSIVE STACK OPERATIONS TEST SUITE")
-    print("=" * 60 + "\n")
-
     # Forward pass tests
-    print("--- STACK FORWARD TESTS ---")
     test_stk_basic_2_tensors_axis0()
     test_stk_basic_3_tensors_axis0()
     test_stk_axis1_2d()
@@ -1253,7 +1199,6 @@ def run_all_stack_tests() raises:
     test_stk_3d_tensors()
 
     # Backward pass tests
-    print("\n--- STACK BACKWARD TESTS ---")
     test_stk_backward_simple_axis0()
     test_stk_backward_weighted()
     test_stk_backward_axis1()
@@ -1261,14 +1206,12 @@ def run_all_stack_tests() raises:
     test_stk_backward_selective_grad()
 
     # VStack tests
-    print("\n--- VSTACK TESTS ---")
     test_stk_vstack_1d_tensors()
     test_stk_vstack_2d_tensors()
     test_stk_vstack_different_rows()
     test_stk_vstack_backward()
 
     # HStack tests
-    print("\n--- HSTACK TESTS ---")
     test_stk_hstack_1d_tensors()
     test_stk_hstack_2d_tensors()
     test_stk_hstack_different_columns()
@@ -1283,9 +1226,6 @@ def run_all_stack_tests() raises:
 def test_stack_operations() raises:
     comptime dtype = DType.float32
 
-    print("=" * 70)
-    print("TEST 1: Basic stack along axis 0")
-    print("=" * 70)
 
     var A = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -1300,38 +1240,22 @@ def test_stack_operations() raises:
 
     var result = Tensor[dtype].stack(tensors, axis=0, requires_grad=True)
 
-    print("A (2x3):")
-    A.print()
-    print("\nB (2x3):")
-    B.print()
-    print("\nstack([A, B], axis=0) - Shape:", result.shape())
-    result.print()
     # Expected: (2, 2, 3)
     # [[[1, 2, 3],
     #   [4, 5, 6]],
     #  [[7, 8, 9],
     #   [10, 11, 12]]]
 
-    print("\n" + "=" * 70)
-    print("TEST 2: Stack along axis 1")
-    print("=" * 70)
 
     var result2 = Tensor[dtype].stack(tensors, axis=1, requires_grad=True)
-    print("stack([A, B], axis=1) - Shape:", result2.shape())
-    result2.print()
     # Expected: (2, 2, 3)
     # [[[1, 2, 3],
     #   [7, 8, 9]],
     #  [[4, 5, 6],
     #   [10, 11, 12]]]
 
-    print("\n" + "=" * 70)
-    print("TEST 3: Stack along axis 2")
-    print("=" * 70)
 
     var result3 = Tensor[dtype].stack(tensors, axis=2, requires_grad=True)
-    print("stack([A, B], axis=2) - Shape:", result3.shape())
-    result3.print()
     # Expected: (2, 3, 2)
     # [[[1, 7],
     #   [2, 8],
@@ -1340,24 +1264,14 @@ def test_stack_operations() raises:
     #   [5, 11],
     #   [6, 12]]]
 
-    print("\n" + "=" * 70)
-    print("TEST 4: Gradient flow")
-    print("=" * 70)
 
     var loss = result.sum()
     loss.backward()
 
-    print("Grad A:")
-    A.grad().print()
     # Expected: all ones (2x3)
 
-    print("\nGrad B:")
-    B.grad().print()
     # Expected: all ones (2x3)
 
-    print("\n" + "=" * 70)
-    print("TEST 5: vstack")
-    print("=" * 70)
 
     var C = Tensor[dtype].ones(1, 3, requires_grad=True)
     var D = Tensor[dtype].ones(1, 3, requires_grad=True) * 2.0
@@ -1367,15 +1281,10 @@ def test_stack_operations() raises:
     vstack_list.append(D)
 
     var vstacked = Tensor[dtype].vstack(vstack_list, requires_grad=True)
-    print("vstack([C(1x3), D(1x3)]) - Shape:", vstacked.shape())
-    vstacked.print()
     # Expected: (2, 3)
     # [[1, 1, 1],
     #  [2, 2, 2]]
 
-    print("\n" + "=" * 70)
-    print("TEST 6: hstack")
-    print("=" * 70)
 
     var E = Tensor[dtype].ones(2, 1, requires_grad=True)
     var F = Tensor[dtype].ones(2, 2, requires_grad=True) * 3.0
@@ -1385,15 +1294,10 @@ def test_stack_operations() raises:
     hstack_list.append(F)
 
     var hstacked = Tensor[dtype].hstack(hstack_list, requires_grad=True)
-    print("hstack([E(2x1), F(2x2)]) - Shape:", hstacked.shape())
-    hstacked.print()
     # Expected: (2, 3)
     # [[1, 3, 3],
     #  [1, 3, 3]]
 
-    print("\n" + "=" * 70)
-    print("TEST 7: 1D vstack")
-    print("=" * 70)
 
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var b = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
@@ -1403,23 +1307,15 @@ def test_stack_operations() raises:
     vstack_1d.append(b)
 
     var vstacked_1d = Tensor[dtype].vstack(vstack_1d, requires_grad=True)
-    print("vstack([a(3,), b(3,)]) - Shape:", vstacked_1d.shape())
-    vstacked_1d.print()
     # Expected: (2, 3)
     # [[1, 2, 3],
     #  [4, 5, 6]]
 
-    print("\n" + "=" * 70)
-    print("TEST 8: 1D hstack")
-    print("=" * 70)
 
     var hstacked_1d = Tensor[dtype].hstack(vstack_1d, requires_grad=True)
-    print("hstack([a(3,), b(3,)]) - Shape:", hstacked_1d.shape())
-    hstacked_1d.print()
     # Expected: (6,)
     # [1, 2, 3, 4, 5, 6]
 
-    print("\n✅ All stack tests passed!")
 
 
 # ```

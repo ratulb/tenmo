@@ -17,7 +17,6 @@ comptime tol = Float32(1e-4)
 
 
 def test_tanh_forward_values() raises:
-    print("test_tanh_forward_values")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([0.0, 1.0, -1.0, 2.0, -2.0], requires_grad=False)
     var y = x.tanh[track_grad=False]()
@@ -32,7 +31,6 @@ def test_tanh_forward_values() raises:
 
 
 def test_tanh_moderate_range() raises:
-    print("test_tanh_moderate_range")
     comptime dtype = DType.float32
     # For |x| < 5, tanh should be strictly within (-1, 1)
     var x = Tensor[dtype].d1(
@@ -48,7 +46,6 @@ def test_tanh_moderate_range() raises:
 
 
 def test_tanh_range_bounded() raises:
-    print("test_tanh_range_bounded")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([-10.0, -5.0, 0.0, 5.0, 10.0], requires_grad=False)
     var y = x.tanh[track_grad=False]()
@@ -89,7 +86,6 @@ def test_tanh_range_bounded() raises:
 
 
 def test_tanh_saturation() raises:
-    print("test_tanh_saturation")
     comptime dtype = DType.float32
     # For large |x|, tanh saturates to ±1.0 due to float32 precision
     var x = Tensor[dtype].d1([-10.0, -20.0, 10.0, 20.0], requires_grad=False)
@@ -109,7 +105,6 @@ def test_tanh_saturation() raises:
 
 
 def test_tanh_no_overflow() raises:
-    print("test_tanh_no_overflow")
     comptime dtype = DType.float32
     # Test that extreme values don't cause NaN or Inf
     var x = Tensor[dtype].d1([-100.0, -50.0, 50.0, 100.0], requires_grad=False)
@@ -123,7 +118,6 @@ def test_tanh_no_overflow() raises:
 
 
 def test_tanh_gradient_at_zero() raises:
-    print("test_tanh_gradient_at_zero")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([0.0], requires_grad=True)
     var y = x.tanh[track_grad=True]()
@@ -140,7 +134,6 @@ def test_tanh_gradient_at_zero() raises:
 
 
 def test_tanh_gradient_positive() raises:
-    print("test_tanh_gradient_positive")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0], requires_grad=True)
@@ -157,7 +150,6 @@ def test_tanh_gradient_positive() raises:
 
 
 def test_tanh_gradient_negative() raises:
-    print("test_tanh_gradient_negative")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([-1.0], requires_grad=True)
     var y = x.tanh[track_grad=True]()
@@ -172,7 +164,6 @@ def test_tanh_gradient_negative() raises:
 
 
 def test_tanh_gradient_saturation() raises:
-    print("test_tanh_gradient_saturation")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([5.0, -5.0], requires_grad=True)
     var y = x.tanh[track_grad=True]()
@@ -188,7 +179,6 @@ def test_tanh_gradient_saturation() raises:
 
 
 def test_tanh_gradient_batch() raises:
-    print("test_tanh_gradient_batch")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[0.0, 1.0], [-1.0, 2.0]], requires_grad=True)
     var y = x.tanh[track_grad=True]()
@@ -207,7 +197,6 @@ def test_tanh_gradient_batch() raises:
 
 
 def test_tanh_chain_rule() raises:
-    print("test_tanh_chain_rule")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([0.5], requires_grad=True)
     var y = x.tanh[track_grad=True]()
@@ -223,7 +212,6 @@ def test_tanh_chain_rule() raises:
 
 
 def test_tanh_no_grad_mode() raises:
-    print("test_tanh_no_grad_mode")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var y = x.tanh[track_grad=False]()
@@ -233,7 +221,6 @@ def test_tanh_no_grad_mode() raises:
 
 
 def test_tanh_layer_train_mode() raises:
-    print("test_tanh_layer_train_mode")
     comptime dtype = DType.float32
     var activation = Tanh[dtype]()
     activation.train()
@@ -247,7 +234,6 @@ def test_tanh_layer_train_mode() raises:
 
 
 def test_tanh_layer_eval_mode() raises:
-    print("test_tanh_layer_eval_mode")
     comptime dtype = DType.float32
     var activation = Tanh[dtype]()
     activation.eval()
@@ -259,7 +245,6 @@ def test_tanh_layer_eval_mode() raises:
 
 
 def test_tanh_numerical_stability_positive() raises:
-    print("test_tanh_numerical_stability_positive")
     comptime dtype = DType.float32
     # Test large positive values
     var x = Tensor[dtype].d1([10.0, 20.0, 50.0], requires_grad=False)
@@ -274,7 +259,6 @@ def test_tanh_numerical_stability_positive() raises:
 
 
 def test_tanh_numerical_stability_negative() raises:
-    print("test_tanh_numerical_stability_negative")
     comptime dtype = DType.float32
     # Test large negative values
     var x = Tensor[dtype].d1([-10.0, -20.0, -50.0], requires_grad=False)
@@ -289,7 +273,6 @@ def test_tanh_numerical_stability_negative() raises:
 
 
 def test_tanh_contiguous_vs_non_contiguous() raises:
-    print("test_tanh_contiguous_vs_non_contiguous")
 
     comptime dtype = DType.float32
     var x_contig = Tensor[dtype].d1([0.0, 1.0, -1.0], requires_grad=True)
@@ -311,7 +294,6 @@ def test_tanh_contiguous_vs_non_contiguous() raises:
 
 
 def test_tanh_with_linear_layer() raises:
-    print("test_tanh_with_linear_layer")
     comptime dtype = DType.float32
     var layer = Linear[dtype](2, 3, init_method="xavier")
     var activation = Tanh[dtype]()
@@ -334,7 +316,6 @@ def test_tanh_with_linear_layer() raises:
 
 
 def test_tanh_zero_tensor() raises:
-    print("test_tanh_zero_tensor")
     comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(Shape(3, 3), requires_grad=True)
     var y = x.tanh[track_grad=True]()
@@ -351,7 +332,6 @@ def test_tanh_zero_tensor() raises:
 
 
 def test_tanh_symmetry() raises:
-    print("test_tanh_symmetry")
     comptime dtype = DType.float32
     var x_pos = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=False)
     var x_neg = Tensor[dtype].d1([-1.0, -2.0, -3.0], requires_grad=False)
@@ -365,55 +345,6 @@ def test_tanh_symmetry() raises:
         var neg_val = y_neg[IntArray(i)]
         assert_true(abs(pos_val + neg_val) < 1e-5, "tanh should be symmetric")
 
-
-# ============================================================================
-# Master Test Runner
-# ============================================================================
-
-
-def run_all_tanh_tests() raises:
-    print("\n" + "=" * 80)
-    print("RUNNING COMPREHENSIVE TANH ACTIVATION TESTS")
-    print("=" * 80 + "\n")
-
-    # Forward pass tests
-    print("\n--- Forward Pass Tests ---")
-    test_tanh_forward_values()
-    test_tanh_range_bounded()
-    test_tanh_moderate_range()
-    test_tanh_saturation()  # New
-    test_tanh_no_overflow()  # New
-    test_tanh_numerical_stability_positive()
-    test_tanh_numerical_stability_negative()
-    test_tanh_symmetry()
-
-    # Gradient tests
-    print("\n--- Gradient Tests ---")
-    test_tanh_gradient_at_zero()
-    test_tanh_gradient_positive()
-    test_tanh_gradient_negative()
-    test_tanh_gradient_saturation()
-    test_tanh_gradient_batch()
-    test_tanh_chain_rule()
-
-    # Mode tests
-    print("\n--- Train/Eval Mode Tests ---")
-    test_tanh_no_grad_mode()
-    test_tanh_layer_train_mode()
-    test_tanh_layer_eval_mode()
-
-    # Integration tests
-    print("\n--- Integration Tests ---")
-    test_tanh_with_linear_layer()
-    test_tanh_contiguous_vs_non_contiguous()
-
-    # Edge cases
-    print("\n--- Edge Case Tests ---")
-    test_tanh_zero_tensor()
-
-    print("\n" + "=" * 80)
-    print("ALL TANH ACTIVATION TESTS PASSED! ✓")
-    print("=" * 80 + "\n")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -457,60 +388,47 @@ def tanh_grad_expected_1d() -> Tensor[dtype]:
 
 
 def test_tanh_cpu_fwd_scalar_zero() raises:
-    print("test_tanh_cpu_fwd_scalar_zero")
     var t = Tensor[dtype].scalar(0.0)
     var out = t.tanh()
     assert_true(tanh_close(out, Tensor[dtype].scalar(0.0)))
-    print("passed")
 
 
 def test_tanh_cpu_fwd_scalar_one() raises:
-    print("test_tanh_cpu_fwd_scalar_one")
     var t = Tensor[dtype].scalar(1.0)
     var out = t.tanh()
     assert_true(
         tanh_close(out, Tensor[dtype].scalar(scalar_tanh(Float32(1.0))))
     )
-    print("passed")
 
 
 def test_tanh_cpu_fwd_scalar_neg() raises:
-    print("test_tanh_cpu_fwd_scalar_neg")
     var t = Tensor[dtype].scalar(-1.0)
     var out = t.tanh()
     assert_true(
         tanh_close(out, Tensor[dtype].scalar(scalar_tanh(Float32(-1.0))))
     )
-    print("passed")
 
 
 def test_tanh_cpu_fwd_1d_known() raises:
-    print("test_tanh_cpu_fwd_1d_known")
     var t = Tensor[dtype].d1([0.0, 0.5, -0.5, 1.0, -1.0])
     var out = t.tanh()
     assert_true(tanh_close(out, tanh_expected_1d()))
-    print("passed")
 
 
 def test_tanh_cpu_fwd_1d_zeros() raises:
-    print("test_tanh_cpu_fwd_1d_zeros")
     var t = Tensor[dtype].zeros(Shape(8))
     var out = t.tanh()
     assert_true(tanh_close(out, Tensor[dtype].zeros(Shape(8))))
-    print("passed")
 
 
 def test_tanh_cpu_fwd_2d_zeros() raises:
-    print("test_tanh_cpu_fwd_2d_zeros")
     var t = Tensor[dtype].zeros(Shape(3, 4))
     var out = t.tanh()
     assert_true(out.shape() == Shape(3, 4))
     assert_true(tanh_close(out, Tensor[dtype].zeros(Shape(3, 4))))
-    print("passed")
 
 
 def test_tanh_cpu_fwd_2d_known() raises:
-    print("test_tanh_cpu_fwd_2d_known")
     var t = Tensor[dtype].d2([[0.0, 1.0], [-1.0, 0.5]])
     var out = t.tanh()
     var expected = Tensor[dtype].d2(
@@ -520,29 +438,23 @@ def test_tanh_cpu_fwd_2d_known() raises:
         ]
     )
     assert_true(tanh_close(out, expected))
-    print("passed")
 
 
 def test_tanh_cpu_fwd_3d() raises:
-    print("test_tanh_cpu_fwd_3d")
     var t = Tensor[dtype].zeros(Shape(2, 3, 4))
     var out = t.tanh()
     assert_true(out.shape() == Shape(2, 3, 4))
     assert_true(tanh_close(out, Tensor[dtype].zeros(Shape(2, 3, 4))))
-    print("passed")
 
 
 def test_tanh_cpu_fwd_4d() raises:
-    print("test_tanh_cpu_fwd_4d")
     var t = Tensor[dtype].zeros(Shape(2, 3, 4, 5))
     var out = t.tanh()
     assert_true(out.shape() == Shape(2, 3, 4, 5))
     assert_true(tanh_close(out, Tensor[dtype].zeros(Shape(2, 3, 4, 5))))
-    print("passed")
 
 
 def test_tanh_cpu_fwd_range_clamping() raises:
-    print("test_tanh_cpu_fwd_range_clamping")
 
     # tanh output must be in (-1, 1)
     var t = Tensor[dtype].d1([-10.0, -1.0, 0.0, 1.0, 10.0])
@@ -550,20 +462,16 @@ def test_tanh_cpu_fwd_range_clamping() raises:
     var data = out.data_ptr()
     for i in range(5):
         assert_true(data[i] >= Float32(-1.0) and data[i] <= Float32(1.0))
-    print("passed")
 
 
 def test_tanh_cpu_fwd_large() raises:
-    print("test_tanh_cpu_fwd_large")
     var t = Tensor[dtype].zeros(Shape(64, 128))
     var out = t.tanh()
     assert_true(out.shape() == Shape(64, 128))
     assert_true(tanh_close(out, Tensor[dtype].zeros(Shape(64, 128))))
-    print("passed")
 
 
 def test_tanh_cpu_fwd_non_contiguous() raises:
-    print("test_tanh_cpu_fwd_non_contiguous")
     var t = Tensor[dtype].d2([[0.0, 1.0], [-1.0, 0.5]])
     var t_T = t.transpose()
     var out = t_T.tanh()
@@ -574,35 +482,28 @@ def test_tanh_cpu_fwd_non_contiguous() raises:
         ]
     )
     assert_true(tanh_close(out, expected))
-    print("passed")
 
 
 def test_tanh_cpu_fwd_no_requires_grad() raises:
-    print("test_tanh_cpu_fwd_no_requires_grad")
     var t = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var out = t.tanh[track_grad=False]()
     assert_true(not out.requires_grad)
     assert_true(not out.has_ancestry())
-    print("passed")
 
 
 def test_tanh_cpu_fwd_requires_grad_propagates() raises:
-    print("test_tanh_cpu_fwd_requires_grad_propagates")
     var t = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var out = t.tanh()
     assert_true(out.requires_grad)
     assert_true(out.has_ancestry())
     assert_true(out.has_ancestry())
-    print("passed")
 
 
 def test_tanh_cpu_fwd_no_ancestry_without_grad() raises:
-    print("test_tanh_cpu_fwd_no_ancestry_without_grad")
     var t = Tensor[dtype].d1([1.0, 2.0], requires_grad=False)
     var out = t.tanh()
     assert_true(not out.requires_grad)
     assert_true(not out.has_ancestry())
-    print("passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -611,18 +512,15 @@ def test_tanh_cpu_fwd_no_ancestry_without_grad() raises:
 
 
 def test_tanh_cpu_bwd_scalar_zero() raises:
-    print("test_tanh_cpu_bwd_scalar_zero")
     var t = Tensor[dtype].scalar(0.0, requires_grad=True)
     var out = t.tanh()
     var loss = out.sum()
     loss.backward()
     # grad = 1 - tanh(0)^2 = 1
     assert_true(tanh_close(t.grad().as_tensor(), Tensor[dtype].scalar(1.0)))
-    print("passed")
 
 
 def test_tanh_cpu_bwd_scalar_one() raises:
-    print("test_tanh_cpu_bwd_scalar_one")
     var t = Tensor[dtype].scalar(1.0, requires_grad=True)
     var out = t.tanh()
     var loss = out.sum()
@@ -631,32 +529,26 @@ def test_tanh_cpu_bwd_scalar_one() raises:
         Float32(1) - scalar_tanh(Float32(1.0)) ** 2
     )
     assert_true(tanh_close(t.grad().as_tensor(), expected))
-    print("passed")
 
 
 def test_tanh_cpu_bwd_1d_zeros() raises:
-    print("test_tanh_cpu_bwd_1d_zeros")
     var t = Tensor[dtype].zeros(Shape(4), requires_grad=True)
     var out = t.tanh()
     var loss = out.sum()
     loss.backward()
     # grad = 1 - tanh(0)^2 = 1 everywhere
     assert_true(tanh_close(t.grad().as_tensor(), Tensor[dtype].ones(Shape(4))))
-    print("passed")
 
 
 def test_tanh_cpu_bwd_1d_known() raises:
-    print("test_tanh_cpu_bwd_1d_known")
     var t = Tensor[dtype].d1([0.0, 0.5, -0.5, 1.0, -1.0], requires_grad=True)
     var out = t.tanh()
     var loss = out.sum()
     loss.backward()
     assert_true(tanh_close(t.grad().as_tensor(), tanh_grad_expected_1d()))
-    print("passed")
 
 
 def test_tanh_cpu_bwd_2d_zeros() raises:
-    print("test_tanh_cpu_bwd_2d_zeros")
     var t = Tensor[dtype].zeros(Shape(3, 4), requires_grad=True)
     var out = t.tanh()
     var loss = out.sum()
@@ -664,11 +556,9 @@ def test_tanh_cpu_bwd_2d_zeros() raises:
     assert_true(
         tanh_close(t.grad().as_tensor(), Tensor[dtype].ones(Shape(3, 4)))
     )
-    print("passed")
 
 
 def test_tanh_cpu_bwd_3d() raises:
-    print("test_tanh_cpu_bwd_3d")
     var t = Tensor[dtype].zeros(Shape(2, 3, 4), requires_grad=True)
     var out = t.tanh()
     var loss = out.sum()
@@ -676,11 +566,9 @@ def test_tanh_cpu_bwd_3d() raises:
     assert_true(
         tanh_close(t.grad().as_tensor(), Tensor[dtype].ones(Shape(2, 3, 4)))
     )
-    print("passed")
 
 
 def test_tanh_cpu_bwd_4d() raises:
-    print("test_tanh_cpu_bwd_4d")
     var t = Tensor[dtype].zeros(Shape(2, 3, 4, 5), requires_grad=True)
     var out = t.tanh()
     var loss = out.sum()
@@ -688,11 +576,9 @@ def test_tanh_cpu_bwd_4d() raises:
     assert_true(
         tanh_close(t.grad().as_tensor(), Tensor[dtype].ones(Shape(2, 3, 4, 5)))
     )
-    print("passed")
 
 
 def test_tanh_cpu_bwd_chain_mul() raises:
-    print("test_tanh_cpu_bwd_chain_mul")
     # y = tanh(2*x), dy/dx = 2 * (1 - tanh(2x)^2)
     var t = Tensor[dtype].d1([0.0, 1.0], requires_grad=True)
     var t2 = t * Scalar[dtype](2)
@@ -706,11 +592,9 @@ def test_tanh_cpu_bwd_chain_mul() raises:
         ]
     )
     assert_true(tanh_close(t.grad().as_tensor(), expected))
-    print("passed")
 
 
 def test_tanh_cpu_bwd_chain_add() raises:
-    print("test_tanh_cpu_bwd_chain_add")
     # y = tanh(x + 1), dy/dx = 1 - tanh(x+1)^2
     var t = Tensor[dtype].d1([0.0, 1.0], requires_grad=True)
     var t2 = t + Scalar[dtype](1)
@@ -724,11 +608,9 @@ def test_tanh_cpu_bwd_chain_add() raises:
         ]
     )
     assert_true(tanh_close(t.grad().as_tensor(), expected))
-    print("passed")
 
 
 def test_tanh_cpu_bwd_double_tanh() raises:
-    print("test_tanh_cpu_bwd_double_tanh")
     # y = tanh(tanh(x)), at x=0: tanh(0)=0, tanh(tanh(0))=0
     # dy/dx = (1-tanh(0)^2) * (1-tanh(tanh(0))^2) = 1*1 = 1
     var t = Tensor[dtype].scalar(0.0, requires_grad=True)
@@ -736,11 +618,9 @@ def test_tanh_cpu_bwd_double_tanh() raises:
     var loss = out.sum()
     loss.backward()
     assert_true(tanh_close(t.grad().as_tensor(), Tensor[dtype].scalar(1.0)))
-    print("passed")
 
 
 def test_tanh_cpu_bwd_large() raises:
-    print("test_tanh_cpu_bwd_large")
     var t = Tensor[dtype].zeros(Shape(32, 32), requires_grad=True)
     var out = t.tanh()
     var loss = out.sum()
@@ -748,11 +628,9 @@ def test_tanh_cpu_bwd_large() raises:
     assert_true(
         tanh_close(t.grad().as_tensor(), Tensor[dtype].ones(Shape(32, 32)))
     )
-    print("passed")
 
 
 def test_tanh_cpu_bwd_grad_flow_two_paths() raises:
-    print("test_tanh_cpu_bwd_grad_flow_two_paths")
     # loss = tanh(x).sum() + tanh(x).sum() → grad = 2*(1-tanh(x)^2)
     var t = Tensor[dtype].zeros(Shape(3), requires_grad=True)
     var a = t.tanh()
@@ -767,11 +645,9 @@ def test_tanh_cpu_bwd_grad_flow_two_paths() raises:
             t.grad().as_tensor(), Tensor[dtype].full(Shape(3), Float32(2.0))
         )
     )
-    print("passed")
 
 
 def test_tanh_cpu_bwd_non_contiguous() raises:
-    print("test_tanh_cpu_bwd_non_contiguous")
     var t = Tensor[dtype].zeros(Shape(2, 3), requires_grad=True)
     var t_T = t.transpose()
     var out = t_T.tanh()
@@ -781,11 +657,9 @@ def test_tanh_cpu_bwd_non_contiguous() raises:
     assert_true(
         tanh_close(t.grad().as_tensor(), Tensor[dtype].ones(Shape(2, 3)))
     )
-    print("passed")
 
 
 def test_tanh_cpu_bwd_with_matmul() raises:
-    print("test_tanh_cpu_bwd_with_matmul")
     # loss = sum(tanh(A @ B))
     var A = Tensor[dtype].zeros(Shape(2, 3), requires_grad=True)
     var B = Tensor[dtype].rand(Shape(3, 4))
@@ -797,7 +671,6 @@ def test_tanh_cpu_bwd_with_matmul() raises:
     # grad_A = ones(2,4) @ B.T
     var grad_expected = Tensor[dtype].ones(Shape(2, 4)).matmul(B.transpose())
     assert_true(tanh_close(A.grad().as_tensor(), grad_expected))
-    print("passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -807,116 +680,94 @@ def test_tanh_cpu_bwd_with_matmul() raises:
 
 def test_tanh_gpu_fwd_scalar_zero() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_fwd_scalar_zero")
         var t = Tensor[dtype].scalar(0.0).to_gpu()
         var out = t.tanh()
         assert_true(out.is_on_gpu())
         assert_true(tanh_close(out.to_cpu(), Tensor[dtype].scalar(0.0)))
-        print("passed")
 
 
 def test_tanh_gpu_fwd_1d_zeros() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_fwd_1d_zeros")
         var t = Tensor[dtype].zeros(Shape(8)).to_gpu()
         var out = t.tanh()
         assert_true(out.is_on_gpu())
         assert_true(tanh_close(out.to_cpu(), Tensor[dtype].zeros(Shape(8))))
-        print("passed")
 
 
 def test_tanh_gpu_fwd_1d_known() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_fwd_1d_known")
         var t_cpu = Tensor[dtype].d1([0.0, 0.5, -0.5, 1.0, -1.0])
         var out_gpu = t_cpu.to_gpu().tanh()
         assert_true(out_gpu.is_on_gpu())
         assert_true(tanh_close(out_gpu.to_cpu(), tanh_expected_1d()))
-        print("passed")
 
 
 def test_tanh_gpu_fwd_2d_known() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_fwd_2d_known")
         var t_cpu = Tensor[dtype].d2([[0.0, 1.0], [-1.0, 0.5]])
         var out_cpu = t_cpu.tanh()
         var out_gpu = t_cpu.to_gpu().tanh()
         assert_true(out_gpu.is_on_gpu())
         assert_true(tanh_close(out_gpu.to_cpu(), out_cpu))
-        print("passed")
 
 
 def test_tanh_gpu_fwd_3d() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_fwd_3d")
         var t_cpu = Tensor[dtype].rand(Shape(2, 3, 4))
         var out_cpu = t_cpu.tanh()
         var out_gpu = t_cpu.to_gpu().tanh()
         assert_true(out_gpu.is_on_gpu())
         assert_true(tanh_close(out_gpu.to_cpu(), out_cpu))
-        print("passed")
 
 
 def test_tanh_gpu_fwd_4d() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_fwd_4d")
         var t_cpu = Tensor[dtype].rand(Shape(2, 3, 4, 5))
         var out_cpu = t_cpu.tanh()
         var out_gpu = t_cpu.to_gpu().tanh()
         assert_true(out_gpu.is_on_gpu())
         assert_true(tanh_close(out_gpu.to_cpu(), out_cpu))
-        print("passed")
 
 
 def test_tanh_gpu_fwd_large() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_fwd_large")
         var t_cpu = Tensor[dtype].rand(Shape(64, 128))
         var out_cpu = t_cpu.tanh()
         var out_gpu = t_cpu.to_gpu().tanh()
         assert_true(out_gpu.is_on_gpu())
         assert_true(tanh_close(out_gpu.to_cpu(), out_cpu))
-        print("passed")
 
 
 def test_tanh_gpu_fwd_matches_cpu() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_fwd_matches_cpu")
         var t_cpu = Tensor[dtype].rand(Shape(9, 20))
         assert_true(tanh_close(t_cpu.to_gpu().tanh().to_cpu(), t_cpu.tanh()))
-        print("passed")
 
 
 def test_tanh_gpu_fwd_no_requires_grad() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_fwd_no_requires_grad")
         var t = Tensor[dtype].d1([1.0, 2.0]).to_gpu()
         var out = t.tanh[track_grad=False]()
         assert_true(not out.requires_grad)
         assert_true(not out.has_ancestry())
-        print("passed")
 
 
 def test_tanh_gpu_fwd_requires_grad_propagates() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_fwd_requires_grad_propagates")
         var t = Tensor[dtype].d1([1.0, 2.0], requires_grad=True).to_gpu()
         var out = t.tanh()
         assert_true(out.is_on_gpu())
         assert_true(out.requires_grad)
         assert_true(out.has_ancestry())
-        print("passed")
 
 
 def test_tanh_gpu_fwd_range_clamping() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_fwd_range_clamping")
         var t = Tensor[dtype].d1([-10.0, -1.0, 0.0, 1.0, 10.0]).to_gpu()
         var out = t.tanh().to_cpu()
         var data = out.data_ptr()
         for i in range(5):
             assert_true(data[i] >= Float32(-1.0) and data[i] <= Float32(1.0))
-        print("passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -926,7 +777,6 @@ def test_tanh_gpu_fwd_range_clamping() raises:
 
 def test_tanh_gpu_bwd_zeros_1d() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_bwd_zeros_1d")
         var t = Tensor[dtype].zeros(Shape(4), requires_grad=True)
         var t_gpu = t.to_gpu()
         var out = t_gpu.tanh()
@@ -935,24 +785,20 @@ def test_tanh_gpu_bwd_zeros_1d() raises:
         assert_true(
             tanh_close(t.grad().as_tensor(), Tensor[dtype].ones(Shape(4)))
         )
-        print("passed")
 
 
 def test_tanh_gpu_bwd_scalar_zero() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_bwd_scalar_zero")
         var t = Tensor[dtype].scalar(0.0, requires_grad=True)
         var t_gpu = t.to_gpu()
         var out = t_gpu.tanh()
         var loss = out.sum()
         loss.backward()
         assert_true(tanh_close(t.grad().as_tensor(), Tensor[dtype].scalar(1.0)))
-        print("passed")
 
 
 def test_tanh_gpu_bwd_1d_known() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_bwd_1d_known")
         var t = Tensor[dtype].d1(
             [0.0, 0.5, -0.5, 1.0, -1.0], requires_grad=True
         )
@@ -961,12 +807,10 @@ def test_tanh_gpu_bwd_1d_known() raises:
         var loss = out.sum()
         loss.backward()
         assert_true(tanh_close(t.grad().as_tensor(), tanh_grad_expected_1d()))
-        print("passed")
 
 
 def test_tanh_gpu_bwd_matches_cpu() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_bwd_matches_cpu")
         var t = Tensor[dtype].rand(Shape(4, 5), requires_grad=True)
 
         # CPU backward
@@ -983,12 +827,10 @@ def test_tanh_gpu_bwd_matches_cpu() raises:
         loss_gpu.backward()
 
         assert_true(tanh_close(t.grad().as_tensor(), grad_cpu))
-        print("passed")
 
 
 def test_tanh_gpu_bwd_2d() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_bwd_2d")
         var t = Tensor[dtype].zeros(Shape(3, 4), requires_grad=True)
         var t_gpu = t.to_gpu()
         var out = t_gpu.tanh()
@@ -997,12 +839,10 @@ def test_tanh_gpu_bwd_2d() raises:
         assert_true(
             tanh_close(t.grad().as_tensor(), Tensor[dtype].ones(Shape(3, 4)))
         )
-        print("passed")
 
 
 def test_tanh_gpu_bwd_3d() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_bwd_3d")
         var t = Tensor[dtype].zeros(Shape(2, 3, 4), requires_grad=True)
         var t_gpu = t.to_gpu()
         var out = t_gpu.tanh()
@@ -1011,12 +851,10 @@ def test_tanh_gpu_bwd_3d() raises:
         assert_true(
             tanh_close(t.grad().as_tensor(), Tensor[dtype].ones(Shape(2, 3, 4)))
         )
-        print("passed")
 
 
 def test_tanh_gpu_bwd_4d() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_bwd_4d")
         var t = Tensor[dtype].zeros(Shape(2, 3, 4, 5), requires_grad=True)
         var t_gpu = t.to_gpu()
         var out = t_gpu.tanh()
@@ -1027,12 +865,10 @@ def test_tanh_gpu_bwd_4d() raises:
                 t.grad().as_tensor(), Tensor[dtype].ones(Shape(2, 3, 4, 5))
             )
         )
-        print("passed")
 
 
 def test_tanh_gpu_bwd_chain_mul() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_bwd_chain_mul")
         # y = tanh(2*x), dy/dx = 2*(1-tanh(2x)^2)
         var t = Tensor[dtype].d1([0.0, 1.0], requires_grad=True)
         var t_gpu = t.to_gpu()
@@ -1047,12 +883,10 @@ def test_tanh_gpu_bwd_chain_mul() raises:
             ]
         )
         assert_true(tanh_close(t.grad().as_tensor(), expected))
-        print("passed")
 
 
 def test_tanh_gpu_bwd_double_tanh() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_bwd_double_tanh")
         # y = tanh(tanh(x)), x=0 → grad=1
         var t = Tensor[dtype].scalar(0.0, requires_grad=True)
         var t_gpu = t.to_gpu()
@@ -1060,12 +894,10 @@ def test_tanh_gpu_bwd_double_tanh() raises:
         var loss = out.sum()
         loss.backward()
         assert_true(tanh_close(t.grad().as_tensor(), Tensor[dtype].scalar(1.0)))
-        print("passed")
 
 
 def test_tanh_gpu_bwd_large() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_bwd_large")
         var t = Tensor[dtype].zeros(Shape(32, 32), requires_grad=True)
         var t_gpu = t.to_gpu()
         var out = t_gpu.tanh()
@@ -1074,12 +906,10 @@ def test_tanh_gpu_bwd_large() raises:
         assert_true(
             tanh_close(t.grad().as_tensor(), Tensor[dtype].ones(Shape(32, 32)))
         )
-        print("passed")
 
 
 def test_tanh_gpu_bwd_chain_add() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_bwd_chain_add")
         # y = tanh(x + 1), dy/dx = 1 - tanh(x+1)^2
         var t = Tensor[dtype].d1([0.0, 1.0], requires_grad=True)
         var t_gpu = t.to_gpu()
@@ -1094,12 +924,10 @@ def test_tanh_gpu_bwd_chain_add() raises:
             ]
         )
         assert_true(tanh_close(t.grad().as_tensor(), expected))
-        print("passed")
 
 
 def test_tanh_gpu_bwd_grad_flow_two_paths() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_bwd_grad_flow_two_paths")
         # loss = tanh(x).sum() + tanh(x).sum() → grad = 2*(1-tanh(x)^2)
         var t = Tensor[dtype].zeros(Shape(3), requires_grad=True)
         var t_gpu = t.to_gpu()
@@ -1114,12 +942,10 @@ def test_tanh_gpu_bwd_grad_flow_two_paths() raises:
                 t.grad().as_tensor(), Tensor[dtype].full(Shape(3), Float32(2.0))
             )
         )
-        print("passed")
 
 
 def test_tanh_gpu_bwd_scalar_one() raises:
     comptime if has_accelerator():
-        print("test_tanh_gpu_bwd_scalar_one")
         var t = Tensor[dtype].scalar(1.0, requires_grad=True)
         var t_gpu = t.to_gpu()
         var out = t_gpu.tanh()
@@ -1129,7 +955,6 @@ def test_tanh_gpu_bwd_scalar_one() raises:
             Float32(1) - scalar_tanh(Float32(1.0)) ** 2
         )
         assert_true(tanh_close(t.grad().as_tensor(), expected))
-        print("passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1139,4 +964,3 @@ def test_tanh_gpu_bwd_scalar_one() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-    print("\nAll tanh tests passed!")

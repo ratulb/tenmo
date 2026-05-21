@@ -17,7 +17,8 @@ from .forwards import (
     LayerNorm,
     Embedding,
 )
-from .bceloss import BCEWithLogitsLossFused, BCELossFused
+from tenmo.shared import Reduction
+from .bceloss import BCEWithLogitsLoss, BCELoss
 from .mnemonics import (
     mm,
     mv,
@@ -1140,87 +1141,6 @@ struct MSELoss[dtype: DType = DType.float32](RegisterPassable):
 
     def eval(mut self):
         self.training = False
-
-
-@fieldwise_init
-struct BCELoss[dtype: DType = DType.float32](RegisterPassable):
-    var training: Bool
-    var epsilon: Scalar[Self.dtype]
-
-    def __init__(
-        out self, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
-    ):
-        self.training = True
-        self.epsilon = epsilon
-
-    # Instance method - respects training mode
-    def __call__(
-        self, pred: Tensor[Self.dtype], target: Tensor[Self.dtype]
-    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-        if self.training:
-            return Self.forward[track_grad=True](pred, target, self.epsilon)
-        else:
-            return Self.forward[track_grad=False](pred, target, self.epsilon)
-
-    # Static method - can be called directly or via instance
-    @staticmethod
-    def forward[
-        track_grad: Bool = True
-    ](
-        pred: Tensor[Self.dtype],
-        target: Tensor[Self.dtype],
-        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
-    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-        return BCELossFused[Self.dtype].forward[track_grad](
-            pred, target, epsilon
-        )
-
-    def train(mut self):
-        self.training = True
-
-    def eval(mut self):
-        self.training = False
-
-
-@fieldwise_init
-struct BCEWithLogitsLoss[dtype: DType = DType.float32](RegisterPassable):
-    var training: Bool
-    var epsilon: Scalar[Self.dtype]
-
-    def __init__(
-        out self, epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9)
-    ):
-        self.training = True
-        self.epsilon = epsilon
-
-    # Instance method - respects training mode
-    def __call__(
-        self, logits: Tensor[Self.dtype], target: Tensor[Self.dtype]
-    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-        if self.training:
-            return Self.forward[track_grad=True](logits, target, self.epsilon)
-        else:
-            return Self.forward[track_grad=False](logits, target, self.epsilon)
-
-    # Static method - can be called directly or via instance
-    @staticmethod
-    def forward[
-        track_grad: Bool = True
-    ](
-        logits: Tensor[Self.dtype],
-        target: Tensor[Self.dtype],
-        epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9),
-    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-        return BCEWithLogitsLossFused[Self.dtype].forward[track_grad](
-            logits, target, epsilon
-        )
-
-    def train(mut self):
-        self.training = True
-
-    def eval(mut self):
-        self.training = False
-
 
 @fieldwise_init
 struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):

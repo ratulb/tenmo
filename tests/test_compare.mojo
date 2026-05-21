@@ -23,7 +23,6 @@ from tenmo.mnemonics import (
 
 
 def test_compare_cpu_eq_1d() raises:
-    print("test_compare_cpu_eq_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var b = Tensor[dtype].d1([1.0, 0.0, 3.0])
@@ -35,7 +34,6 @@ def test_compare_cpu_eq_1d() raises:
 
 
 def test_compare_cpu_eq_scalar() raises:
-    print("test_compare_cpu_eq_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 2.0, 3.0])
     var result = a == Scalar[dtype](2.0)
@@ -46,7 +44,6 @@ def test_compare_cpu_eq_scalar() raises:
 
 
 def test_compare_cpu_eq_2d() raises:
-    print("test_compare_cpu_eq_2d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var b = Tensor[dtype].d2([[1.0, 0.0], [3.0, 0.0]])
@@ -62,7 +59,6 @@ def test_compare_cpu_eq_2d() raises:
 
 
 def test_compare_cpu_ne_1d() raises:
-    print("test_compare_cpu_ne_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var b = Tensor[dtype].d1([1.0, 0.0, 3.0])
@@ -74,7 +70,6 @@ def test_compare_cpu_ne_1d() raises:
 
 
 def test_compare_cpu_ne_scalar() raises:
-    print("test_compare_cpu_ne_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 2.0, 3.0])
     var result = a != Scalar[dtype](2.0)
@@ -88,7 +83,6 @@ def test_compare_cpu_ne_scalar() raises:
 
 
 def test_compare_cpu_gt_1d() raises:
-    print("test_compare_cpu_gt_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 5.0, 3.0])
     var b = Tensor[dtype].d1([2.0, 3.0, 3.0])
@@ -99,7 +93,6 @@ def test_compare_cpu_gt_1d() raises:
 
 
 def test_compare_cpu_gt_scalar() raises:
-    print("test_compare_cpu_gt_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 4.0, 5.0, 4.0])
     var result = a > Scalar[dtype](4.0)
@@ -110,7 +103,6 @@ def test_compare_cpu_gt_scalar() raises:
 
 
 def test_compare_cpu_gt_2d() raises:
-    print("test_compare_cpu_gt_2d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 5.0], [3.0, 2.0]])
     var b = Tensor[dtype].d2([[2.0, 3.0], [3.0, 4.0]])
@@ -122,7 +114,6 @@ def test_compare_cpu_gt_2d() raises:
 
 
 def test_compare_cpu_gt_3d() raises:
-    print("test_compare_cpu_gt_3d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 5.0], [3.0, 8.0]], [[6.0, 2.0], [4.0, 1.0]]]
@@ -142,7 +133,6 @@ def test_compare_cpu_gt_3d() raises:
 
 
 def test_compare_cpu_gte_1d() raises:
-    print("test_compare_cpu_gte_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 4.0, 5.0])
     var b = Tensor[dtype].d1([2.0, 4.0, 3.0])
@@ -153,7 +143,6 @@ def test_compare_cpu_gte_1d() raises:
 
 
 def test_compare_cpu_gte_scalar() raises:
-    print("test_compare_cpu_gte_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 4.0, 5.0])
     var result = a >= Scalar[dtype](4.0)
@@ -166,7 +155,6 @@ def test_compare_cpu_gte_scalar() raises:
 
 
 def test_compare_cpu_lt_1d() raises:
-    print("test_compare_cpu_lt_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 4.0, 5.0])
     var b = Tensor[dtype].d1([2.0, 4.0, 3.0])
@@ -177,7 +165,6 @@ def test_compare_cpu_lt_1d() raises:
 
 
 def test_compare_cpu_lt_scalar() raises:
-    print("test_compare_cpu_lt_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 4.0, 5.0])
     var result = a < Scalar[dtype](4.0)
@@ -187,7 +174,6 @@ def test_compare_cpu_lt_scalar() raises:
 
 
 def test_compare_cpu_lt_2d() raises:
-    print("test_compare_cpu_lt_2d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 5.0], [3.0, 2.0]])
     var b = Tensor[dtype].d2([[2.0, 3.0], [3.0, 4.0]])
@@ -202,7 +188,6 @@ def test_compare_cpu_lt_2d() raises:
 
 
 def test_compare_cpu_lte_1d() raises:
-    print("test_compare_cpu_lte_1d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 4.0, 5.0])
     var b = Tensor[dtype].d1([2.0, 4.0, 3.0])
@@ -213,7 +198,6 @@ def test_compare_cpu_lte_1d() raises:
 
 
 def test_compare_cpu_lte_scalar() raises:
-    print("test_compare_cpu_lte_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 4.0, 5.0])
     var result = a <= Scalar[dtype](4.0)
@@ -226,28 +210,24 @@ def test_compare_cpu_lte_scalar() raises:
 
 
 def test_compare_cpu_all_true_from_gt() raises:
-    print("test_compare_cpu_all_true_from_gt")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([5.0, 6.0, 7.0])
     assert_true((a > Scalar[dtype](4.0)).all_true())
 
 
 def test_compare_cpu_all_true_fails() raises:
-    print("test_compare_cpu_all_true_fails")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([3.0, 6.0, 7.0])
     assert_true(not (a > Scalar[dtype](4.0)).all_true())
 
 
 def test_compare_cpu_any_true_from_gt() raises:
-    print("test_compare_cpu_any_true_from_gt")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 5.0])
     assert_true((a > Scalar[dtype](4.0)).any_true())
 
 
 def test_compare_cpu_any_true_fails() raises:
-    print("test_compare_cpu_any_true_fails")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
     assert_true(not (a > Scalar[dtype](4.0)).any_true())
@@ -257,7 +237,6 @@ def test_compare_cpu_any_true_fails() raises:
 
 
 def test_compare_cpu_large_gt_scalar() raises:
-    print("test_compare_cpu_large_gt_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].full(Shape(10000), 5.0)
     var result = a > Scalar[dtype](4.0)
@@ -265,7 +244,6 @@ def test_compare_cpu_large_gt_scalar() raises:
 
 
 def test_compare_cpu_large_lt_scalar() raises:
-    print("test_compare_cpu_large_lt_scalar")
     comptime dtype = DType.float32
     var a = Tensor[dtype].full(Shape(10000), 3.0)
     var result = a < Scalar[dtype](4.0)
@@ -283,7 +261,6 @@ def test_compare_cpu_large_lt_scalar() raises:
 
 def test_compare_gpu_eq_1d() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_eq_1d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
         var b = Tensor[dtype].d1([1.0, 0.0, 3.0]).to_gpu()
@@ -297,7 +274,6 @@ def test_compare_gpu_eq_1d() raises:
 
 def test_compare_gpu_eq_scalar() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_eq_scalar")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 2.0, 3.0]).to_gpu()
         var result = a == Scalar[dtype](2.0)
@@ -310,7 +286,6 @@ def test_compare_gpu_eq_scalar() raises:
 
 def test_compare_gpu_eq_2d() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_eq_2d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
         var b = Tensor[dtype].d2([[1.0, 0.0], [3.0, 0.0]]).to_gpu()
@@ -328,7 +303,6 @@ def test_compare_gpu_eq_2d() raises:
 
 def test_compare_gpu_ne_1d() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_ne_1d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
         var b = Tensor[dtype].d1([1.0, 0.0, 3.0]).to_gpu()
@@ -341,7 +315,6 @@ def test_compare_gpu_ne_1d() raises:
 
 def test_compare_gpu_ne_scalar() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_ne_scalar")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 2.0, 3.0]).to_gpu()
         var result = a != Scalar[dtype](2.0)
@@ -357,7 +330,6 @@ def test_compare_gpu_ne_scalar() raises:
 
 def test_compare_gpu_gt_1d() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_gt_1d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 5.0, 3.0]).to_gpu()
         var b = Tensor[dtype].d1([2.0, 3.0, 3.0]).to_gpu()
@@ -370,7 +342,6 @@ def test_compare_gpu_gt_1d() raises:
 
 def test_compare_gpu_gt_scalar() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_gt_scalar")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 4.0, 5.0, 4.0]).to_gpu()
         var result = a > Scalar[dtype](4.0)
@@ -383,7 +354,6 @@ def test_compare_gpu_gt_scalar() raises:
 
 def test_compare_gpu_gt_2d() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_gt_2d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 5.0], [3.0, 2.0]]).to_gpu()
         var b = Tensor[dtype].d2([[2.0, 3.0], [3.0, 4.0]]).to_gpu()
@@ -397,7 +367,6 @@ def test_compare_gpu_gt_2d() raises:
 
 def test_compare_gpu_gt_3d() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_gt_3d")
         comptime dtype = DType.float32
         var a = (
             Tensor[dtype]
@@ -421,7 +390,6 @@ def test_compare_gpu_gt_3d() raises:
 
 def test_compare_gpu_gte_1d() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_gte_1d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 4.0, 5.0]).to_gpu()
         var b = Tensor[dtype].d1([2.0, 4.0, 3.0]).to_gpu()
@@ -434,7 +402,6 @@ def test_compare_gpu_gte_1d() raises:
 
 def test_compare_gpu_gte_scalar() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_gte_scalar")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 4.0, 5.0]).to_gpu()
         var result = a >= Scalar[dtype](4.0)
@@ -449,7 +416,6 @@ def test_compare_gpu_gte_scalar() raises:
 
 def test_compare_gpu_lt_1d() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_lt_1d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 4.0, 5.0]).to_gpu()
         var b = Tensor[dtype].d1([2.0, 4.0, 3.0]).to_gpu()
@@ -462,7 +428,6 @@ def test_compare_gpu_lt_1d() raises:
 
 def test_compare_gpu_lt_scalar() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_lt_scalar")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 4.0, 5.0]).to_gpu()
         var result = a < Scalar[dtype](4.0)
@@ -474,7 +439,6 @@ def test_compare_gpu_lt_scalar() raises:
 
 def test_compare_gpu_lt_2d() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_lt_2d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 5.0], [3.0, 2.0]]).to_gpu()
         var b = Tensor[dtype].d2([[2.0, 3.0], [3.0, 4.0]]).to_gpu()
@@ -491,7 +455,6 @@ def test_compare_gpu_lt_2d() raises:
 
 def test_compare_gpu_lte_1d() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_lte_1d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 4.0, 5.0]).to_gpu()
         var b = Tensor[dtype].d1([2.0, 4.0, 3.0]).to_gpu()
@@ -504,7 +467,6 @@ def test_compare_gpu_lte_1d() raises:
 
 def test_compare_gpu_lte_scalar() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_lte_scalar")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 4.0, 5.0]).to_gpu()
         var result = a <= Scalar[dtype](4.0)
@@ -519,7 +481,6 @@ def test_compare_gpu_lte_scalar() raises:
 
 def test_compare_gpu_all_true_from_gt() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_all_true_from_gt")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([5.0, 6.0, 7.0]).to_gpu()
         var result = a > Scalar[dtype](4.0)
@@ -529,7 +490,6 @@ def test_compare_gpu_all_true_from_gt() raises:
 
 def test_compare_gpu_all_true_fails() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_all_true_fails")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([3.0, 6.0, 7.0]).to_gpu()
         var result = a > Scalar[dtype](4.0)
@@ -539,7 +499,6 @@ def test_compare_gpu_all_true_fails() raises:
 
 def test_compare_gpu_any_true_from_gt() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_any_true_from_gt")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 5.0]).to_gpu()
         var result = a > Scalar[dtype](4.0)
@@ -549,7 +508,6 @@ def test_compare_gpu_any_true_from_gt() raises:
 
 def test_compare_gpu_any_true_fails() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_any_true_fails")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
         var result = a > Scalar[dtype](4.0)
@@ -562,7 +520,6 @@ def test_compare_gpu_any_true_fails() raises:
 
 def test_compare_gpu_large_gt_scalar() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_large_gt_scalar")
         comptime dtype = DType.float32
         var a = Tensor[dtype].full(Shape(10000), 5.0).to_gpu()
         var result = a > Scalar[dtype](4.0)
@@ -572,7 +529,6 @@ def test_compare_gpu_large_gt_scalar() raises:
 
 def test_compare_gpu_large_lt_scalar() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_large_lt_scalar")
         comptime dtype = DType.float32
         var a = Tensor[dtype].full(Shape(10000), 3.0).to_gpu()
         var result = a < Scalar[dtype](4.0)
@@ -582,7 +538,6 @@ def test_compare_gpu_large_lt_scalar() raises:
 
 def test_compare_gpu_large_mixed() raises:
     comptime if has_accelerator():
-        print("test_compare_gpu_large_mixed")
         comptime dtype = DType.float32
         # Half above, half below
         var a_cpu = Tensor[dtype].zeros(Shape(10000))
@@ -604,7 +559,6 @@ def test_compare_gpu_large_mixed() raises:
 
 def test_compare_parity_eq_1d() raises:
     comptime if has_accelerator():
-        print("test_compare_parity_eq_1d")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0, 2.0])
         var b_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0, 2.0])
@@ -620,7 +574,6 @@ def test_compare_parity_eq_1d() raises:
 
 def test_compare_parity_gt_scalar() raises:
     comptime if has_accelerator():
-        print("test_compare_parity_gt_scalar")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 4.0, 5.0, 3.0, 6.0])
         var a_gpu = a_cpu.to_gpu()
@@ -632,7 +585,6 @@ def test_compare_parity_gt_scalar() raises:
 
 def test_compare_parity_lt_scalar() raises:
     comptime if has_accelerator():
-        print("test_compare_parity_lt_scalar")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 4.0, 5.0, 3.0, 6.0])
         var a_gpu = a_cpu.to_gpu()
@@ -644,7 +596,6 @@ def test_compare_parity_lt_scalar() raises:
 
 def test_compare_parity_gte_scalar() raises:
     comptime if has_accelerator():
-        print("test_compare_parity_gte_scalar")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 4.0, 5.0])
         var a_gpu = a_cpu.to_gpu()
@@ -656,7 +607,6 @@ def test_compare_parity_gte_scalar() raises:
 
 def test_compare_parity_lte_scalar() raises:
     comptime if has_accelerator():
-        print("test_compare_parity_lte_scalar")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 4.0, 5.0])
         var a_gpu = a_cpu.to_gpu()
@@ -668,7 +618,6 @@ def test_compare_parity_lte_scalar() raises:
 
 def test_compare_parity_ne_scalar() raises:
     comptime if has_accelerator():
-        print("test_compare_parity_ne_scalar")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 4.0, 5.0, 4.0])
         var a_gpu = a_cpu.to_gpu()
@@ -680,7 +629,6 @@ def test_compare_parity_ne_scalar() raises:
 
 def test_compare_parity_2d_gt() raises:
     comptime if has_accelerator():
-        print("test_compare_parity_2d_gt")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[1.0, 5.0], [3.0, 8.0]])
         var b_cpu = Tensor[dtype].d2([[2.0, 3.0], [3.0, 4.0]])
@@ -695,7 +643,6 @@ def test_compare_parity_2d_gt() raises:
 
 def test_compare_parity_all_true() raises:
     comptime if has_accelerator():
-        print("test_compare_parity_all_true")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([5.0, 6.0, 7.0])
         var a_gpu = a_cpu.to_gpu()
@@ -707,7 +654,6 @@ def test_compare_parity_all_true() raises:
 
 def test_compare_parity_any_true() raises:
     comptime if has_accelerator():
-        print("test_compare_parity_any_true")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 5.0])
         var a_gpu = a_cpu.to_gpu()
@@ -719,7 +665,6 @@ def test_compare_parity_any_true() raises:
 
 def test_compare_parity_large() raises:
     comptime if has_accelerator():
-        print("test_compare_parity_large")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].full(Shape(10000), 5.0)
         var a_gpu = a_cpu.to_gpu()
@@ -734,100 +679,4 @@ def test_compare_parity_large() raises:
 
 
 def main() raises:
-    _ = """
-    # CPU Equal
-    test_compare_cpu_eq_1d()
-    test_compare_cpu_eq_scalar()
-    test_compare_cpu_eq_2d()
-
-    # CPU NotEqual
-    test_compare_cpu_ne_1d()
-    test_compare_cpu_ne_scalar()
-
-    # CPU GreaterThan
-    test_compare_cpu_gt_1d()
-    test_compare_cpu_gt_scalar()
-    test_compare_cpu_gt_2d()
-    test_compare_cpu_gt_3d()
-
-    # CPU GreaterThanEqual
-    test_compare_cpu_gte_1d()
-    test_compare_cpu_gte_scalar()
-
-    # CPU LessThan
-    test_compare_cpu_lt_1d()
-    test_compare_cpu_lt_scalar()
-    test_compare_cpu_lt_2d()
-
-    # CPU LessThanEqual
-    test_compare_cpu_lte_1d()
-    test_compare_cpu_lte_scalar()
-
-    # CPU all_true/any_true
-    test_compare_cpu_all_true_from_gt()
-    test_compare_cpu_all_true_fails()
-    test_compare_cpu_any_true_from_gt()
-    test_compare_cpu_any_true_fails()
-
-    # CPU large
-    test_compare_cpu_large_gt_scalar()
-    test_compare_cpu_large_lt_scalar()
-    print("CPU compare tests passed!")
-
-    # GPU Equal
-    test_compare_gpu_eq_1d()
-    test_compare_gpu_eq_scalar()
-    test_compare_gpu_eq_2d()
-
-    # GPU NotEqual
-    test_compare_gpu_ne_1d()
-    test_compare_gpu_ne_scalar()
-
-    # GPU GreaterThan
-    test_compare_gpu_gt_1d()
-    test_compare_gpu_gt_scalar()
-    test_compare_gpu_gt_2d()
-    test_compare_gpu_gt_3d()
-
-    # GPU GreaterThanEqual
-    test_compare_gpu_gte_1d()
-    test_compare_gpu_gte_scalar()
-
-    # GPU LessThan
-    test_compare_gpu_lt_1d()
-    test_compare_gpu_lt_scalar()
-    test_compare_gpu_lt_2d()
-
-    # GPU LessThanEqual
-    test_compare_gpu_lte_1d()
-    test_compare_gpu_lte_scalar()
-
-    # GPU all_true/any_true
-    test_compare_gpu_all_true_from_gt()
-    test_compare_gpu_all_true_fails()
-    test_compare_gpu_any_true_from_gt()
-    test_compare_gpu_any_true_fails()
-
-    # GPU large
-    test_compare_gpu_large_gt_scalar()
-    test_compare_gpu_large_lt_scalar()
-    test_compare_gpu_large_mixed()
-    comptime if has_accelerator():
-        print("GPU compare tests passed!")
-
-    # Parity
-    test_compare_parity_eq_1d()
-    test_compare_parity_gt_scalar()
-    test_compare_parity_lt_scalar()
-    test_compare_parity_gte_scalar()
-    test_compare_parity_lte_scalar()
-    test_compare_parity_ne_scalar()
-    test_compare_parity_2d_gt()
-    test_compare_parity_all_true()
-    test_compare_parity_any_true()
-    test_compare_parity_large()
-    print("Parity compare tests passed!")
-
-    print("All compare tests passed!")
-    """
     TestSuite.discover_tests[__functions_in_module()]().run()

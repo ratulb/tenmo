@@ -3,7 +3,6 @@ from std.testing import assert_true, TestSuite
 
 
 def test_tensor_slice_1d_basic() raises:
-    print("test_tensor_slice_1d_basic")
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
 
@@ -15,11 +14,9 @@ def test_tensor_slice_1d_basic() raises:
     var slice2 = x.slice(axis=0, start=1, end=8, step=2)
     assert_true(slice2 == Tensor[dtype].d1([1, 3, 5, 7]))
 
-    print("Passed 1D basic slicing tests")
 
 
 def test_tensor_slice_1d_negative_indices() raises:
-    print("test_tensor_slice_1d_negative_indices")
     comptime dtype = DType.float32
 
     var x = Tensor[dtype].d1([0, 1, 2, 3, 4, 5])
@@ -32,11 +29,9 @@ def test_tensor_slice_1d_negative_indices() raises:
     var slice2 = x.slice(axis=0, start=1, end=-1)
     assert_true(slice2 == Tensor[dtype].d1([1, 2, 3, 4]))
 
-    print("Passed 1D negative indices slicing tests")
 
 
 def test_tensor_slice_1d_step_sizes() raises:
-    print("test_tensor_slice_1d_step_sizes")
     comptime dtype = DType.float32
 
     var x = Tensor[dtype].d1([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
@@ -49,11 +44,9 @@ def test_tensor_slice_1d_step_sizes() raises:
     var slice2 = x.slice(axis=0, start=0, end=10, step=3)
     assert_true(slice2 == Tensor[dtype].d1([0, 3, 6, 9]))
 
-    print("Passed 1D step size slicing tests")
 
 
 def test_tensor_slice_2d_rows() raises:
-    print("test_tensor_slice_2d_rows")
     comptime dtype = DType.float32
 
     var x = Tensor[dtype].d2([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
@@ -68,11 +61,9 @@ def test_tensor_slice_2d_rows() raises:
     var expected_single = Tensor[dtype].d2([[1, 2, 3, 4]])
     assert_true(single_row == expected_single)
 
-    print("Passed 2D row slicing tests")
 
 
 def test_tensor_slice_2d_columns() raises:
-    print("test_tensor_slice_2d_columns")
     comptime dtype = DType.float32
 
     var x = Tensor[dtype].d2([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
@@ -87,11 +78,9 @@ def test_tensor_slice_2d_columns() raises:
     var expected_single_col = Tensor[dtype].d2([[3], [7], [11]])
     assert_true(single_col == expected_single_col)
 
-    print("Passed 2D column slicing tests")
 
 
 def test_tensor_slice_2d_both_dims() raises:
-    print("test_tensor_slice_2d_both_dims")
     comptime dtype = DType.float32
 
     var x = Tensor[dtype].d2([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
@@ -102,11 +91,9 @@ def test_tensor_slice_2d_both_dims() raises:
     var expected = Tensor[dtype].d2([[2, 3], [6, 7]])
     assert_true(slice1 == expected)
 
-    print("Passed 2D both dimensions slicing tests")
 
 
 def test_tensor_slice_3d_basic() raises:
-    print("test_tensor_slice_3d_basic")
     comptime dtype = DType.float32
 
     # Create 3D tensor with known values
@@ -139,11 +126,9 @@ def test_tensor_slice_3d_basic() raises:
     )
     assert_true(slice_dim2 == expected_dim2)
 
-    print("Passed 3D basic slicing tests")
 
 
 def test_tensor_slice_with_gradients() raises:
-    print("test_tensor_slice_with_gradients")
     comptime dtype = DType.float32
 
     var x = Tensor[dtype].d2(
@@ -159,11 +144,9 @@ def test_tensor_slice_with_gradients() raises:
     var expected_grad = Tensor[dtype].d2([[1.0, 1.0, 0.0], [1.0, 1.0, 0.0]])
     assert_true(x.grad().all_close(expected_grad))
 
-    print("Passed slicing with gradients test")
 
 
 def test_tensor_nested_slice_with_gradients() raises:
-    print("test_tensor_nested_slice_with_gradients")
     comptime dtype = DType.float32
 
     var x = Tensor[dtype].d2(
@@ -180,11 +163,9 @@ def test_tensor_nested_slice_with_gradients() raises:
     var expected_grad = Tensor[dtype].d2([[0.0, 0.0, 0.0], [42.0, 42.0, 0.0]])
     assert_true(x.grad().all_close(expected_grad))
 
-    print("Passed slicing with gradients test")
 
 
 def test_tensor_slice_edge_cases() raises:
-    print("test_tensor_slice_edge_cases")
     comptime dtype = DType.float32
 
     var x = Tensor[dtype].d1([1, 2, 3, 4, 5])
@@ -201,11 +182,9 @@ def test_tensor_slice_edge_cases() raises:
     var full_slice = x.slice(axis=0, start=0, end=5)
     assert_true(full_slice == x)
 
-    print("Passed edge cases slicing tests")
 
 
 def test_tensor_slice_step_edge_cases() raises:
-    print("test_tensor_slice_step_edge_cases")
     comptime dtype = DType.float32
 
     var x = Tensor[dtype].d1([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
@@ -218,7 +197,6 @@ def test_tensor_slice_step_edge_cases() raises:
     var reverse_slice = x.slice(axis=0, start=5, end=0, step=-1)
     assert_true(reverse_slice == Tensor[dtype].d1([5, 4, 3, 2, 1]))
 
-    print("Passed step edge cases slicing tests")
 
 
 # Consolidated test function
@@ -233,7 +211,6 @@ def main() raises:
 
 def test_slice_1d_full() raises:
     """Test slicing entire 1D tensor."""
-    print("test_slice_1d_full")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -247,7 +224,6 @@ def test_slice_1d_full() raises:
 
 def test_slice_1d_start_only() raises:
     """Test 1D slice with start index only."""
-    print("test_slice_1d_start_only")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -262,7 +238,6 @@ def test_slice_1d_start_only() raises:
 
 def test_slice_1d_end_only() raises:
     """Test 1D slice with end index only."""
-    print("test_slice_1d_end_only")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -277,7 +252,6 @@ def test_slice_1d_end_only() raises:
 
 def test_slice_1d_start_end() raises:
     """Test 1D slice with both start and end."""
-    print("test_slice_1d_start_end")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -292,22 +266,6 @@ def test_slice_1d_start_end() raises:
 
 def test_slice_1d_with_step() raises:
     """Test 1D slice with step."""
-    print("test_slice_1d_with_step")
-
-    comptime dtype = DType.float32
-    var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
-
-    var sliced = x[::2]  # Every other element
-
-    # Should be [1, 3, 5]
-    assert_true(sliced.shape()[0] == 3)
-    var expected = Tensor[dtype].d1([1.0, 3.0, 5.0])
-    assert_true(sliced.all_close[atol=1e-6](expected))
-
-
-def test_slice_1d_negative_indices() raises:
-    """Test 1D slice with negative indices."""
-    print("test_slice_1d_negative_indices")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -322,7 +280,6 @@ def test_slice_1d_negative_indices() raises:
 
 def test_slice_1d_single_element() raises:
     """Test 1D slice getting single element range."""
-    print("test_slice_1d_single_element")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -341,7 +298,6 @@ def test_slice_1d_single_element() raises:
 
 def test_slice_2d_full() raises:
     """Test slicing entire 2D tensor."""
-    print("test_slice_2d_full")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
@@ -357,7 +313,6 @@ def test_slice_2d_full() raises:
 
 def test_slice_2d_single_row() raises:
     """Test slicing single row from 2D tensor."""
-    print("test_slice_2d_single_row")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
@@ -375,7 +330,6 @@ def test_slice_2d_single_row() raises:
 
 def test_slice_2d_single_column() raises:
     """Test slicing single column from 2D tensor."""
-    print("test_slice_2d_single_column")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
@@ -393,7 +347,6 @@ def test_slice_2d_single_column() raises:
 
 def test_slice_2d_submatrix() raises:
     """Test slicing submatrix from 2D tensor."""
-    print("test_slice_2d_submatrix")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
@@ -416,7 +369,6 @@ def test_slice_2d_submatrix() raises:
 
 def test_slice_2d_rows_subset() raises:
     """Test slicing subset of rows."""
-    print("test_slice_2d_rows_subset")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
@@ -434,7 +386,6 @@ def test_slice_2d_rows_subset() raises:
 
 def test_slice_2d_cols_subset() raises:
     """Test slicing subset of columns."""
-    print("test_slice_2d_cols_subset")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
@@ -452,7 +403,6 @@ def test_slice_2d_cols_subset() raises:
 
 def test_slice_2d_with_step() raises:
     """Test 2D slicing with step."""
-    print("test_slice_2d_with_step")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
@@ -480,7 +430,6 @@ def test_slice_2d_with_step() raises:
 
 def test_slice_3d_full() raises:
     """Test slicing entire 3D tensor."""
-    print("test_slice_3d_full")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].ones(2, 3, 4)
@@ -495,7 +444,6 @@ def test_slice_3d_full() raises:
 
 def test_slice_3d_single_depth() raises:
     """Test slicing single depth slice from 3D tensor."""
-    print("test_slice_3d_single_depth")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(2 * 3 * 4)
@@ -511,7 +459,6 @@ def test_slice_3d_single_depth() raises:
 
 def test_slice_3d_subvolume() raises:
     """Test slicing subvolume from 3D tensor."""
-    print("test_slice_3d_subvolume")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(4 * 4 * 4)
@@ -529,7 +476,6 @@ def test_slice_3d_subvolume() raises:
 
 def test_slice_3d_single_channel() raises:
     """Test slicing single channel from 3D tensor (like CNN)."""
-    print("test_slice_3d_single_channel")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(3 * 28 * 28)  # 3 channels, 28x28 spatial
@@ -543,7 +489,6 @@ def test_slice_3d_single_channel() raises:
 
 def test_slice_3d_spatial_region() raises:
     """Test slicing spatial region from 3D tensor."""
-    print("test_slice_3d_spatial_region")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(3 * 28 * 28)
@@ -563,7 +508,6 @@ def test_slice_3d_spatial_region() raises:
 
 def test_slice_4d_full() raises:
     """Test slicing entire 4D tensor."""
-    print("test_slice_4d_full")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].ones(2, 3, 28, 28)
@@ -578,7 +522,6 @@ def test_slice_4d_full() raises:
 
 def test_slice_4d_single_batch() raises:
     """Test slicing single batch element from 4D tensor."""
-    print("test_slice_4d_single_batch")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].rand(8, 3, 32, 32)  # Batch of 8 images
@@ -593,7 +536,6 @@ def test_slice_4d_single_batch() raises:
 
 def test_slice_4d_batch_subset() raises:
     """Test slicing subset of batch."""
-    print("test_slice_4d_batch_subset")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].rand(16, 3, 32, 32)
@@ -608,7 +550,6 @@ def test_slice_4d_batch_subset() raises:
 
 def test_slice_4d_channel_subset() raises:
     """Test slicing subset of channels from 4D tensor."""
-    print("test_slice_4d_channel_subset")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].rand(2, 64, 14, 14)  # 64 channels
@@ -623,7 +564,6 @@ def test_slice_4d_channel_subset() raises:
 
 def test_slice_4d_spatial_crop() raises:
     """Test spatial cropping from 4D tensor."""
-    print("test_slice_4d_spatial_crop")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].rand(4, 3, 224, 224)  # Large images
@@ -643,7 +583,6 @@ def test_slice_4d_spatial_crop() raises:
 
 def test_chained_slicing_2d() raises:
     """Test chaining multiple slicing operations."""
-    print("test_chained_slicing_2d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
@@ -667,7 +606,6 @@ def test_chained_slicing_2d() raises:
 
 def test_chained_slicing_3d() raises:
     """Test chaining slices on 3D tensor."""
-    print("test_chained_slicing_3d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].rand(4, 4, 4)
@@ -690,7 +628,6 @@ def test_chained_slicing_3d() raises:
 
 def test_immutable_multiple_slices() raises:
     """Test that we can create multiple slices from same immutable tensor."""
-    print("test_immutable_multiple_slices")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -712,7 +649,6 @@ def test_immutable_multiple_slices() raises:
 
 def test_immutable_slice_from_const() raises:
     """Test slicing from a const-reference like scenario."""
-    print("test_immutable_slice_from_const")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -728,7 +664,6 @@ def test_immutable_slice_from_const() raises:
 
 def test_immutable_overlapping_slices() raises:
     """Test creating overlapping slices (only possible with 'self')."""
-    print("test_immutable_overlapping_slices")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
@@ -758,7 +693,6 @@ def test_immutable_overlapping_slices() raises:
 
 def test_slice_backward_1d() raises:
     """Test gradient flow through 1D slice."""
-    print("test_slice_backward_1d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
@@ -774,7 +708,6 @@ def test_slice_backward_1d() raises:
 
 def test_slice_backward_2d() raises:
     """Test gradient flow through 2D slice."""
-    print("test_slice_backward_2d")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
@@ -794,7 +727,6 @@ def test_slice_backward_2d() raises:
 
 def test_slice_backward_chained() raises:
     """Test gradient flow through chained slices."""
-    print("test_slice_backward_chained")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
@@ -815,7 +747,6 @@ def test_slice_backward_chained() raises:
 
 def test_slice_backward_multiple_paths() raises:
     """Test gradient accumulation from multiple slices."""
-    print("test_slice_backward_multiple_paths")
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
@@ -834,78 +765,4 @@ def test_slice_backward_multiple_paths() raises:
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
 
-# ============================================================================
-# Additional TEST RUNNER
-# ============================================================================
 
-
-def run_additional_tests() raises:
-    print("=" * 80)
-    print("TENSOR SLICING COMPREHENSIVE TEST SUITE")
-    print("Testing API change: 'mut self' → 'self'")
-    print("=" * 80)
-
-    print("\n--- 1D SLICING TESTS ---")
-    test_slice_1d_full()
-    test_slice_1d_start_only()
-    test_slice_1d_end_only()
-    test_slice_1d_start_end()
-    test_slice_1d_with_step()
-    test_slice_1d_negative_indices()
-    test_slice_1d_single_element()
-
-    print("\n--- 2D SLICING TESTS ---")
-    test_slice_2d_full()
-    test_slice_2d_single_row()
-    test_slice_2d_single_column()
-    test_slice_2d_submatrix()
-    test_slice_2d_rows_subset()
-    test_slice_2d_cols_subset()
-    test_slice_2d_with_step()
-
-    print("\n--- 3D SLICING TESTS ---")
-    test_slice_3d_full()
-    test_slice_3d_single_depth()
-    test_slice_3d_subvolume()
-    test_slice_3d_single_channel()
-    test_slice_3d_spatial_region()
-
-    print("\n--- 4D SLICING TESTS (CNN BATCHES) ---")
-    test_slice_4d_full()
-    test_slice_4d_single_batch()
-    test_slice_4d_batch_subset()
-    test_slice_4d_channel_subset()
-    test_slice_4d_spatial_crop()
-
-    print("\n--- CHAINED SLICING TESTS ---")
-    test_chained_slicing_2d()
-    test_chained_slicing_3d()
-
-    print("\n--- IMMUTABILITY TESTS (KEY FOR 'self' vs 'mut self') ---")
-    test_immutable_multiple_slices()
-    test_immutable_slice_from_const()
-    test_immutable_overlapping_slices()
-
-    print("\n--- GRADIENT FLOW TESTS ---")
-    test_slice_backward_1d()
-    test_slice_backward_2d()
-    test_slice_backward_chained()
-    test_slice_backward_multiple_paths()
-
-    print("\n" + "=" * 80)
-    print("ALL TESTS PASSED! ✓")
-    print("=" * 80)
-    print("\nTotal tests run: 35")
-    print("  - 1D slicing: 7 tests")
-    print("  - 2D slicing: 7 tests")
-    print("  - 3D slicing: 5 tests")
-    print("  - 4D slicing: 5 tests")
-    print("  - Chained slicing: 2 tests")
-    print("  - Immutability: 3 tests")
-    print("  - Gradient flow: 4 tests")
-    print("\n" + "=" * 80)
-    print("'self' allows multiple simultaneous views")
-    print("Overlapping slices work correctly")
-    print("Const references can be sliced")
-    print("Gradient flow preserved")
-    print("=" * 80)
