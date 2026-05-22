@@ -92,6 +92,7 @@ declare -a ALL_TESTS_IN_ORDER=(
     "unary|tests/test_unary_ops.mojo"
     "sqrt|tests/test_sqrt.mojo"
     "attn_matmul|tests/test_attn_matmul.mojo"
+    "bce|tests/test_bce.mojo"
     "tensors|tests/test_tensors.mojo"
     "gpu_cpu|tests/test_gpu.mojo"
     "item|tests/test_item.mojo"
@@ -178,6 +179,7 @@ declare -a GPU_TESTS=(
     "unary|tests/test_unary_ops.mojo"
     "sqrt|tests/test_sqrt.mojo"
     "attn_matmul|tests/test_attn_matmul.mojo"
+    "bce|tests/test_bce.mojo"
     "gpu_cpu|tests/test_gpu.mojo"
     "item|tests/test_item.mojo"
     "contiguous|tests/test_contiguous.mojo"
@@ -253,7 +255,7 @@ if [ $# -eq 0 ]; then
     echo "  sgd, sparse_sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout, dev_transfer"
     echo "  std_variance, stack, logarithm, concat, variance, variance_and_std, utils, onehot, power"
     echo "  indexhelper, losses, tanh, data, softmax, repeat, mmnd, attn_matmul"
-    echo "  intarray, mm2d, vm, mv, slice, tiles, linspace, argminmax"
+    echo "  attn_matmul, bce, intarray, mm2d, vm, mv, slice, tiles, linspace, argminmax"
     echo "  minmax, relu, shuffle, permute, flatten, gather, squeeze, unsqueeze"
     echo "  gradbox, ndb, transpose, buffers, views, shapes, strides"
     echo "  shapebroadcast, validators, ce, synth_mnist"
@@ -319,6 +321,7 @@ run_test_by_name() {
         unary)          run_test "unary" "tests/test_unary_ops.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         sqrt)           run_test "sqrt" "tests/test_sqrt.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         attn_matmul)    run_test "attn_matmul" "tests/test_attn_matmul.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        bce)            run_test "bce" "tests/test_bce.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         tensors)        run_test "tensors" "tests/test_tensors.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         gpu)
             print_colored "$BLUE" "Running all GPU-guarded tests..."
