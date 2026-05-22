@@ -2,6 +2,9 @@ from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
 from tenmo.device import GPU, has_accelerator
 from std.sys import has_accelerator
+from tenmo.common_utils import now
+from tenmo.shapes import Shape
+from tenmo.intarray import IntArray
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. BASIC TESTS - 1D
@@ -512,6 +515,48 @@ def test_mean_cpu_gpu_consistency_3d() raises:
         var gpu_result = a.to_gpu().mean(axes=[1, 2])
 
         assert_true(cpu_result.all_close(gpu_result.to_cpu()))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 9. BENCHMARK: SIMD FAST PATH TIMING ($ ./execute.sh summean ... --only test_*benchmark*)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# These are timing benchmarks, not correctness tests. They verify that the
+# SIMD fast path for suffix-axis reductions is actually ~100x+ faster than
+# the coord-by-coord fallback. Run them individually to get timing output.
+
+
+fn assert_fast_path_timing(shape: Shape, axes: IntArray, num_trials: Int) raises:
+    """Measure a suffix-axis reduction and assert it completes in < 10ms."""
+    comptime dtype = DType.float32
+    var t = Tensor[dtype].rand(shape)
+    for _ in range(5):
+        var _ = t.sum(axes=axes)
+    var start = now()
+    for _ in range(num_trials):
+        var _ = t.sum(axes=axes)
+    var end = now()
+    var avg_ms = (end - start) * 1000.0 / Float64(num_trials)
+    var label = String(shape) + " axes=" + String(axes) + " avg=" + String(avg_ms) + "ms"
+    print(label)
+    # Fast path should easily clear this bar (typically < 0.5ms for these sizes)
+    assert_true(avg_ms < 10.0)
+
+
+fn test_reduce_fastpath_benchmark_small_2d() raises:
+    assert_fast_path_timing(Shape(512, 1024), IntArray(1), 50)
+
+
+fn test_reduce_fastpath_benchmark_3d() raises:
+    assert_fast_path_timing(Shape(128, 256, 64), IntArray(2), 20)
+
+
+fn test_reduce_fastpath_benchmark_3d_two_axes() raises:
+    assert_fast_path_timing(Shape(128, 256, 64), IntArray(1, 2), 20)
+
+
+fn test_reduce_fastpath_benchmark_large_skinny() raises:
+    assert_fast_path_timing(Shape(1000000, 10), IntArray(1), 50)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

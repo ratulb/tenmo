@@ -1290,6 +1290,31 @@ struct NDBuffer[dtype: DType](
                 out[IntArray()] = self.sum_all()
         else:
             var reduction_axes_shape = self.shape.reduced_shape(normalized_axes)
+            # Fast path: contiguous input with suffix-axis reduction —
+            # each output element maps to a contiguous block of reduced_volume
+            # elements in memory, so we can call Buffer.sum() with SIMD.
+            if self.is_contiguous():
+                var rank = self.shape.ndim()
+                var num_axes = normalized_axes.size()
+                var is_suffix = num_axes > 0 and normalized_axes[num_axes - 1] == rank - 1
+                var idx = 0
+                while is_suffix and idx < num_axes - 1:
+                    if normalized_axes[idx] != rank - num_axes + idx:
+                        is_suffix = False
+                        break
+                    idx += 1
+                if is_suffix:
+                    var reduced_numels = reduction_axes_shape.product()
+                    var num_out = out.numels()
+                    for oi in range(num_out):
+                        var base = self.offset + oi * reduced_numels
+                        comptime if op_code == MEAN:
+                            out.buffer[oi] = self.buffer.sum(base, base + reduced_numels) / reduced_volume
+                        else:
+                            out.buffer[oi] = self.buffer.sum(base, base + reduced_numels)
+                    return out^
+
+            # Fallback: coord-by-coord (works for any layout / any axes)
             for out_coord in out_shape:
                 var accum = Scalar[Self.dtype](0)
                 for red_coord in reduction_axes_shape:

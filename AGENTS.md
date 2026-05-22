@@ -612,6 +612,12 @@ Two approaches were implemented for word2vec-style negative sampling training on
 
 **Current Tenmo limitation:** No sparse optimizer exists. `SGD.step()` always touches every parameter, even if only a few rows have non-zero gradients.
 
+## Performance Analysis
+
+See [`PERFORMANCE_BOTTLENECKS.md`](PERFORMANCE_BOTTLENECKS.md) for a ranked
+list of all performance bottlenecks across GPU kernels, autograd, memory
+management, and SIMD paths — with root causes and fix suggestions for each.
+
 ## What to Improve in Tenmo
 
 1. **Sparse optimizer support** — Add a sparse gradient mode to `SGD` (or a separate `SparseSGD`) that only touches rows with non-zero gradients. This would make `Embedding` + autograd practical for word2vec-style tasks.
