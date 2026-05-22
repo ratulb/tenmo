@@ -95,7 +95,7 @@ trait Dataset(Sized & Copyable & Movable):
 
 @fieldwise_init
 struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
-    ImplicitlyCopyable & Movable & Sized
+    ImplicitlyCopyable & Movable & Sized & Iterator
 ):
     """Zero-copy batched data loading that preserves tensor shapes."""
 
@@ -236,18 +236,32 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
             self._last_batch_size = 0
             self._last_batch = None
 
-    def __iter__(mut self) -> ref[self] Self:
+    def __iter__(mut self) -> ref[self] Self.IteratorType[origin_of(self)]:
         self._current_idx = 0
         if self.shuffle_data:
             reshuffle(self._indices)
         return self
 
+    comptime Element = Batch[
+        Self.DatasetSource._feature_dtype, Self.DatasetSource._label_dtype
+    ]
+    comptime IteratorType[
+        iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
+    ]: Iterator = Self
+
+    @always_inline
+    def bounds(self) -> Tuple[Int, Optional[Int]]:
+        var iter_len = len(self)
+        return (iter_len, {iter_len})
+
     def __next__(
         mut self,
-    ) -> ref[self._batch, self._last_batch.value()] Batch[
-        Self.DatasetSource._feature_dtype, Self.DatasetSource._label_dtype
-    ]:
+    ) raises StopIteration -> ref[
+        self._batch, self._last_batch.value()
+    ] Self.Element:
         """Get next batch with proper shape preservation."""
+        if not self.__has_next__():
+            raise StopIteration()
         var start_idx = self._current_idx
         var end_idx = min(start_idx + self.batch_size, len(self._indices))
         var actual_batch_size = end_idx - start_idx
