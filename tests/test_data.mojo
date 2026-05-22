@@ -2,6 +2,8 @@ from tenmo.tensor import Tensor
 from tenmo.common_utils import panic, now
 from std.testing import assert_true, assert_equal, assert_false, TestSuite
 from tenmo.dataloader import *
+from tenmo.nlp import LLMDataset
+from bpe import BasicTokenizer, Tokenizer
 from std.python import Python, PythonObject
 
 # Comprehensive tests for TensorDataset, Batch, and DataLoader
@@ -483,6 +485,100 @@ def test_dataloader_shuffle_quality() raises:
 # ============================================================================
 # Main Test Runner
 # ============================================================================
+
+
+def test_gpt_dataset_not_enough_tokens() raises:
+    """Verify no crash when text has fewer tokens than max_length."""
+
+    var text = "Hello world"
+    var tokenizer = BasicTokenizer()
+    tokenizer.train(text, vocab_size=32)
+
+    var max_length = 256
+    var stride = 128
+
+    var ds = LLMDataset(text, tokenizer, max_length, stride)
+    assert_equal(len(ds), 0, "Expected 0 samples when n < max_length")
+
+    # DataLoader with drop_last=True — no batches
+    var dl = ds.into_loader(batch_size=4, shuffle=False, drop_last=True)
+    assert_equal(len(dl), 0, "Expected 0 batches (drop_last=True)")
+    var count = 0
+    for _ in dl:
+        count += 1
+    assert_equal(count, 0, "Iteration should produce 0 batches (drop_last=True)")
+
+    # DataLoader with drop_last=False — also 0 batches (0 samples)
+    var dl2 = ds.into_loader(batch_size=4, shuffle=False, drop_last=False)
+    assert_equal(len(dl2), 0, "Expected 0 batches (drop_last=False)")
+    count = 0
+    for _ in dl2:
+        count += 1
+    assert_equal(count, 0, "Iteration should produce 0 batches (drop_last=False)")
+
+    print("  No crash with", len(ds), "samples across both drop_last modes")
+
+
+def test_gpt_dataset_partial_batch_target_stride() raises:
+    """Verify partial batch (drop_last=False) is correctly strided:
+    target[i] == input[i+1] for every sample."""
+
+    var text = "the cat sat on the mat and the dog ran"
+    var tokenizer = BasicTokenizer()
+    tokenizer.train(text, vocab_size=64)
+
+    var ids = tokenizer.encode(text)
+    var max_length = 4
+    var stride = 2
+
+    var ds = LLMDataset(text, tokenizer, max_length, stride)
+    assert_true(len(ds) > 0, "Expected at least 1 sample")
+
+    # Use batch_size that doesn't divide evenly to force a partial batch
+    var batch_size = 3
+    var dl = ds.into_loader(
+        batch_size=batch_size, shuffle=False, drop_last=False
+    )
+    var num_batches = len(dl)
+
+    # Iterate all batches
+    var batch_idx = 0
+    for batch in dl:
+        var x = batch.features  # (batch_size or remainder, max_length)
+        var y = batch.labels
+
+        # Verify shapes
+        var expected_batch_size = x.shape()[0]
+        assert_equal(x.shape()[1], max_length, "Feature dim should be max_length")
+        assert_equal(
+            y.shape(), x.shape(), "Labels should match features shape"
+        )
+
+        # Verify target stride: y[sample, j] == x[sample, j+1]
+        for sample in range(expected_batch_size):
+            for j in range(max_length - 1):
+                assert_equal(
+                    y[sample, j],
+                    x[sample, j + 1],
+                    "target[i] != input[i+1] — stride violation at batch "
+                    + String(batch_idx) + " sample " + String(sample)
+                    + " pos " + String(j),
+                )
+
+        batch_idx += 1
+
+    assert_true(
+        batch_idx == num_batches,
+        "Iterated all batches including the partial one",
+    )
+    print(
+        "  Partial batch verified:",
+        num_batches,
+        "batches, last batch has",
+        batch_size if num_batches * batch_size <= len(ds)
+        else (len(ds) - (num_batches - 1) * batch_size),
+        "samples",
+    )
 
 
 def main() raises:

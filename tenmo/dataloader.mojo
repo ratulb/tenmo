@@ -194,6 +194,10 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
             Shape(batch_label_dims)
         )
 
+        # Share batch buffers so copies stay cheap (refcount bump, not deep alloc)
+        batch_features.buffer.buffer.shared()
+        batch_labels.buffer.buffer.shared()
+
         self._batch = Batch[
             Self.DatasetSource._feature_dtype, Self.DatasetSource._label_dtype
         ](batch_features^, batch_labels^)
@@ -224,6 +228,10 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
                 var last_labels = Tensor[Self.DatasetSource._label_dtype].zeros(
                     Shape(last_label_dims)
                 )
+
+                # Share last batch buffers too
+                last_features.buffer.buffer.shared()
+                last_labels.buffer.buffer.shared()
 
                 self._last_batch = Batch[
                     Self.DatasetSource._feature_dtype,
