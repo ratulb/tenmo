@@ -750,11 +750,142 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         return out^
 
     @staticmethod
+    def forward[
+        track_grad: Bool = True
+    ](
+        self: Tensor[Self.dtype],
+        indices: Tensor[DType.int64],
+        axis: Int = 0,
+        reduction: Reduction = Reduction(2),
+        padding_idx: Optional[Int] = None,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        """Gather with multi-dimensional indices.
+        Output shape: (*indices.shape(), *self.shape()[1:]) for axis=0.
+
+        Backward uses the flat indices (same as IntArray overload) —
+        GatherBackward's ScatterAddTensor is shape-agnostic.
+
+        GPU: GPU kernel doesn't support multi-dimensional indices yet,
+        so we route through the IntArray forward + tracked reshape
+        (reshape is zero-cost view on GPU too).
+        """
+        var rank = self.shape().rank()
+        var ax = axis if axis >= 0 else axis + rank
+        if ax < 0 or ax >= rank:
+            panic(
+                "gather: axis ",
+                String(axis),
+                " out of bounds for rank ",
+                String(rank),
+            )
+
+        if indices.numels() == 0:
+            panic("gather: indices tensor cannot be empty")
+
+        # ── Validate and normalize indices ────────────────────────────────────
+        var ax_dim = self.shape()[ax]
+        var n = indices.numels()
+        var normalized = IntArray.with_capacity(n)
+        for k in range(n):
+            var idx = Int(indices.get(k))
+            if idx < 0:
+                idx += ax_dim
+            if idx < 0 or idx >= ax_dim:
+                panic(
+                    "gather: index ",
+                    String(Int(indices.get(k))),
+                    " out of bounds for axis ",
+                    String(ax),
+                    " with size ",
+                    String(ax_dim),
+                )
+            normalized.append(idx)
+
+        # ── Build output shape: (*indices.shape(), *self.shape()[ax+1:]) ──────
+        var out_dims = IntArray()
+        var idx_rank = indices.shape().rank()
+        for d in range(idx_rank):
+            out_dims.append(indices.shape()[d])
+        var self_shape = self.shape()
+        for d in range(ax + 1, rank):
+            out_dims.append(self_shape[d])
+
+        # ── GPU: route through IntArray forward + tracked reshape ─────────────
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                var flat = Self.forward[track_grad](
+                    self, normalized, axis=ax, reduction=reduction,
+                    padding_idx=padding_idx, requires_grad=requires_grad,
+                )
+                return flat.reshape[track_grad](Shape(out_dims))
+
+        # ── CPU: multi-dimensional _gather_copy ───────────────────────────────
+        var indices_shape_arr = IntArray()
+        for d in range(indices.shape().rank()):
+            indices_shape_arr.append(indices.shape()[d])
+
+        var is_fast_path = (
+            (reduction.is_sum() or reduction.is_mean())
+            and ax == 0
+            and rank == 2
+        )
+
+        var out: Tensor[Self.dtype]
+        comptime if track_grad:
+            var grad_required = requires_grad.or_else(self.requires_grad)
+            if (
+                grad_required
+                and not is_fast_path
+                and (reduction.is_sum() or reduction.is_mean())
+            ):
+                out = Self._gather_copy(
+                    self, ax=ax, normalized=normalized, reduction=Reduction(2),
+                    indices_shape=indices_shape_arr,
+                )
+                out.requires_grad_(True)
+                var bfa = BackwardFnArg[Self.dtype](
+                    BACKWARD_GATHER,
+                    GatherArg(ax, normalized, padding_idx, Reduction(2)),
+                )
+                out.add_ancestry(bfa^, self)
+                if reduction.is_sum():
+                    out = out.sum[track_grad=True](IntArray(ax))
+                elif reduction.is_mean():
+                    out = out.mean[track_grad=True](IntArray(ax))
+            else:
+                out = Self._gather_copy(
+                    self, ax=ax, normalized=normalized, reduction=reduction,
+                    indices_shape=indices_shape_arr,
+                )
+                if grad_required:
+                    out.requires_grad_(True)
+                    var bfa = BackwardFnArg[Self.dtype](
+                        BACKWARD_GATHER,
+                        GatherArg(ax, normalized, padding_idx, reduction),
+                    )
+                    out.add_ancestry(bfa^, self)
+        else:
+            out = Self._gather_copy(
+                self, ax=ax, normalized=normalized,
+                reduction=reduction if is_fast_path else Reduction(2),
+                indices_shape=indices_shape_arr,
+            )
+            if not is_fast_path:
+                if reduction.is_sum():
+                    out = out.sum[track_grad=False](IntArray(ax))
+                elif reduction.is_mean():
+                    out = out.mean[track_grad=False](IntArray(ax))
+
+        return out^
+
+    @staticmethod
     def _gather_copy(
         self: Tensor[Self.dtype],
         ax: Int,
         normalized: IntArray,
         reduction: Reduction,
+        indices_shape: IntArray = IntArray(),
     ) -> Tensor[Self.dtype]:
         """Gather + optional reduce, single dispatch.
 
@@ -764,16 +895,22 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         wired separately by Gather.forward).
 
         Args:
-            self:       Tensor.
-            ax:         Normalized axis to gather along.
-            normalized: Validated, normalized indices.
-            reduction:  How to reduce gathered rows (NONE/SUM/MEAN).
+            self:            Tensor.
+            ax:              Normalized axis to gather along.
+            normalized:      Validated, normalized indices.
+            reduction:       How to reduce gathered rows (NONE/SUM/MEAN).
+            indices_shape:   Optional multi-dimensional index shape.
+                             Empty (default) → 1D behavior, output dim `ax` = len(normalized).
+                             Non-empty → output gains `len(indices_shape)-1` extra dims
+                             inserted at `ax`.
 
         Returns:
             Fresh contiguous tensor on the same device as self.
         """
         ref shape = self.shape()
         var rank = shape.rank()
+        var use_nd = len(indices_shape) > 0
+        var indices_rank: Int = len(indices_shape) if use_nd else 1
 
         # ── Fast path: rank==2, ax==0, SUM or MEAN ────────────────────────────
         if (
@@ -808,8 +945,10 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
             return result^
 
         # ── General case: standard gather (CPU or GPU) ─────────────────────────
+        # GPU kernel doesn't support multi-dimensional index shapes yet;
+        # fall through to CPU general case when use_nd.
         comptime if has_accelerator():
-            if self.is_on_gpu():
+            if self.is_on_gpu() and not use_nd:
                 try:
                     var ndb = gather_gpu[Self.dtype](
                         self.buffer, ax, normalized, Reduction(2)
@@ -824,9 +963,20 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
                     panic("gather_gpu failed: ", String(e))
                     return Tensor[Self.dtype].scalar(0)
 
-        var out_shape_arr = IntArray.with_capacity(rank)
-        for d in range(rank):
-            out_shape_arr.append(len(normalized) if d == ax else shape[d])
+        # Compute output shape:
+        #   1D indices: replace dim `ax` with len(normalized) → rank stays the same
+        #   ND indices: replace dim `ax` with indices_shape → rank += len(indices_shape) - 1
+        var out_rank = rank if not use_nd else rank + len(indices_shape) - 1
+        var out_shape_arr = IntArray.with_capacity(out_rank)
+        for d in range(ax):
+            out_shape_arr.append(shape[d])
+        if not use_nd:
+            out_shape_arr.append(len(normalized))
+        else:
+            for d in range(len(indices_shape)):
+                out_shape_arr.append(indices_shape[d])
+        for d in range(ax + 1, rank):
+            out_shape_arr.append(shape[d])
 
         var gathered = Tensor[Self.dtype].zeros(
             Shape(out_shape_arr), requires_grad=False, device=self.device()
@@ -834,18 +984,31 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         var total = gathered.shape().num_elements()
 
         for flat in range(total):
-            var coords = IntArray.with_capacity(rank)
+            var coords = IntArray.with_capacity(out_rank)
             var rem = flat
-            for d in range(rank - 1, -1, -1):
+            for d in range(out_rank - 1, -1, -1):
                 coords.prepend(rem % gathered.shape()[d])
                 rem //= gathered.shape()[d]
 
-            var src_idx = normalized[coords[ax]]
+            # Compute flat index into `normalized` from multi-dimensional coords
+            var flat_idx: Int
+            if not use_nd:
+                flat_idx = coords[ax]
+            else:
+                flat_idx = 0
+                var mul = 1
+                for r in range(len(indices_shape) - 1, -1, -1):
+                    flat_idx += coords[ax + r] * mul
+                    mul *= indices_shape[r]
+            var src_idx = normalized[flat_idx]
+
+            # Map output coords to weight offset
             var src_offset = self.offset()
-            for d in range(rank):
-                src_offset += (
-                    src_idx if d == ax else coords[d]
-                ) * self.strides()[d]
+            for d in range(ax):
+                src_offset += coords[d] * self.strides()[d]
+            src_offset += src_idx * self.strides()[ax]
+            for k in range(rank - ax - 1):
+                src_offset += coords[ax + indices_rank + k] * self.strides()[ax + 1 + k]
 
             gathered.set(flat, self.get(src_offset))
 

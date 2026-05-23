@@ -263,7 +263,27 @@ shape/strides/offset as kernel arguments.
 
 ## 🟡 Medium (specific scenarios, notable impact)
 
-### 13. Broadcast arithmetic always scalar — no SIMD
+### 13. No multi-dimensional GPU gather kernel
+
+**File:** `tenmo/gather.mojo`
+
+**Problem:** `Gather._gather_copy` supports multi-dimensional index shapes on
+CPU natively (`indices_shape` parameter), but on GPU it falls back to flat
+gather + tracked reshape. The reshape is zero-cost (view), but the tracked
+graph node adds unnecessary complexity.
+
+**Root cause:** The `gather_gpu` kernel only accepts flat 1D `IntArray`
+indices and produces `(n, cols)` output. When the input indices are a
+multi-dimensional tensor (e.g. `(B, T)` from batched Embedding), the caller
+must flatten, gather, then reshape.
+
+**Fix:** Write a GPU gather kernel that accepts an `indices_shape` parameter
+(like the CPU path) and produces `(*indices_shape, *src.shape[ax+1:])` output
+directly, avoiding the extra reshape node in the autograd graph.
+
+---
+
+### 14. Broadcast arithmetic always scalar — no SIMD
 
 **Files:** `tenmo/ndbuffer.mojo:2680-2730` (`broadcast_nd_buffer`,
 `broadcast_scalar_buffer`)
@@ -277,7 +297,7 @@ expand the smaller operand into contiguous form and SIMD.
 
 ---
 
-### 14. Ancestor recursive deep copy
+### 15. Ancestor recursive deep copy
 
 **File:** `tenmo/ancestry.mojo:48`
 
@@ -290,7 +310,7 @@ deep-copying every ancestor.
 
 ---
 
-### 15. `float_unary_ops` parallelization capped at 2 cores
+### 16. `float_unary_ops` parallelization capped at 2 cores
 
 **File:** `tenmo/buffers.mojo:1470`
 
@@ -301,7 +321,7 @@ deep-copying every ancestor.
 
 ---
 
-### 16. BCE backward always allocates full-size gradient buffer
+### 17. BCE backward always allocates full-size gradient buffer
 
 **Files:** `tenmo/bceloss.mojo:186,195,216,223`
 
@@ -315,7 +335,7 @@ computation.
 
 ---
 
-### 17. `product_reduce` uses float64 log-space for ALL dtypes
+### 18. `product_reduce` uses float64 log-space for ALL dtypes
 
 **File:** `tenmo/reduction_kernel.mojo:298`
 
@@ -328,7 +348,7 @@ float64 log-space for floating-point types).
 
 ---
 
-### 18. `__getitem__` bounds check per element on every NDBuffer access
+### 19. `__getitem__` bounds check per element on every NDBuffer access
 
 **File:** `tenmo/indexhelper.mojo:286`
 
@@ -343,7 +363,7 @@ with comptime-gated bounds checking).
 
 ## 🔵 Low (minor or rare)
 
-### 19. `except` with `panic()` in hot inner loops for iterator mismatch
+### 20. `except` with `panic()` in hot inner loops for iterator mismatch
 
 **Files:** `tenmo/ndbuffer.mojo:2237-2253` (`copy_from_alike`),
 `tenmo/ndbuffer.mojo:2412-2421` (`inplace_ops_cpu`),
@@ -360,7 +380,7 @@ iterators, avoiding the exception mechanism entirely.
 
 ---
 
-### 20. GPU dropout reuses same 4 random values across SIMD lanes
+### 21. GPU dropout reuses same 4 random values across SIMD lanes
 
 **File:** `tenmo/dropout_kernel.mojo:83-88`
 
@@ -373,7 +393,7 @@ use a different subsequence per group.
 
 ---
 
-### 21. `atomic_and` implemented as CAS loop instead of native instruction
+### 22. `atomic_and` implemented as CAS loop instead of native instruction
 
 **File:** `tenmo/compare_kernel.mojo:30-36`
 
@@ -385,7 +405,7 @@ intrinsics).
 
 ---
 
-### 22. `excl_product_kernel` does 2 full passes over data
+### 23. `excl_product_kernel` does 2 full passes over data
 
 **File:** `tenmo/reduction_kernel.mojo:453-608`
 
@@ -398,7 +418,7 @@ prefix/suffix.
 
 ---
 
-### 23. Dead SIMD strided load code
+### 24. Dead SIMD strided load code
 
 **File:** `tenmo/buffers.mojo:279-302`
 
@@ -411,7 +431,7 @@ with proper stride computation).
 
 ---
 
-### 24. Duplicated 4-case contiguity dispatch code
+### 25. Duplicated 4-case contiguity dispatch code
 
 **Files:** `tenmo/ndbuffer.mojo` — `arithmetic_ops_cpu`, `inplace_ops_cpu`,
 `copy_from_alike`
@@ -423,7 +443,7 @@ B strided, both strided) is ~120 lines duplicated across 3 functions.
 
 ---
 
-## Top 3 Highest-ROI Fixes
+## Top 4 Highest-ROI Fixes
 
 1. **Layer structs proactively share buffers** → eliminates `add_ancestry`
    deep copy (biggest win for training throughput, especially with large

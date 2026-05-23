@@ -186,12 +186,21 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
         """Lookup embeddings for indices given as an int64 Tensor.
         Enables batched transformer-style usage:
             embedding(token_ids_tensor)
+        Preserves input shape: e.g. (B, T) → (B, T, embed_dim).
         """
-        var idx = IntArray()
-        var n = indices.numels()
-        for k in range(n):
-            idx.append(Int(indices.get(k)))
-        return self.__call__(idx)
+        var result: Tensor[Self.dtype]
+        if self.training:
+            result = Gather[Self.dtype].forward[track_grad=True](
+                self.weight, indices, axis=0, reduction=self.reduction,
+                padding_idx=self.padding_idx,
+            )
+        else:
+            result = Gather[Self.dtype].forward[track_grad=False](
+                self.weight, indices, axis=0, reduction=self.reduction,
+            )
+        if self.max_norm:
+            self._apply_max_norm(result)
+        return result^
 
     # ── Utilities ─────────────────────────────────────────────────────────────
 

@@ -149,7 +149,6 @@ from .subtraction import *
 from .summation import *
 from .tanh import *
 
-# from  .tensor import *
 from .tiles import *
 from .transpose import *
 from .unary_ops_kernel import *

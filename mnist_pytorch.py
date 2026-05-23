@@ -5,7 +5,6 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import time
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 import numpy as np
 
