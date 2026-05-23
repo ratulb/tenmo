@@ -1457,30 +1457,29 @@ def test_ndbuffer_share() raises:
         ndb[IntArray(0, 0)] = 99
         assert_true(view[IntArray(0, 0)] == 99, "View sees modification")
     except e:
-        print("test_ndbuffer_simd_load_store")
-        var ndb = NDBuffer[DType.float32](Shape(4, 8))
-
-        # Fill with pattern
-        for i in range(4):
-            for j in range(8):
-                ndb[IntArray(i, j)] = Scalar[DType.float32](i * 10 + j)
-
-        # SIMD load row 1, starting at col 0, width 4
-        var vec = ndb.load[4](1, 0)
-        assert_true(vec[0] == 10.0, "SIMD load [0]")
-        assert_true(vec[1] == 11.0, "SIMD load [1]")
-        assert_true(vec[2] == 12.0, "SIMD load [2]")
-        assert_true(vec[3] == 13.0, "SIMD load [3]")
-
-        # SIMD store
-        var new_vec = SIMD[DType.float32, 4](100.0, 101.0, 102.0, 103.0)
-        ndb.store[4](2, 0, new_vec)
-        assert_true(ndb[IntArray(2, 0)] == 100.0, "SIMD store [0]")
-        assert_true(ndb[IntArray(2, 3)] == 103.0, "SIMD store [3]")
-    except e:
         print(e)
         raise e^
 
+def test_ndbuffer_simd_load_store() raises:
+    var ndb = NDBuffer[DType.float32](Shape(4, 8))
+
+    # Fill with pattern
+    for i in range(4):
+        for j in range(8):
+            ndb[IntArray(i, j)] = Scalar[DType.float32](i * 10 + j)
+
+    # SIMD load row 1, starting at col 0, width 4
+    var vec = ndb.load[4](1, 0)
+    assert_true(vec[0] == 10.0, "SIMD load [0]")
+    assert_true(vec[1] == 11.0, "SIMD load [1]")
+    assert_true(vec[2] == 12.0, "SIMD load [2]")
+    assert_true(vec[3] == 13.0, "SIMD load [3]")
+
+    # SIMD store
+    var new_vec = SIMD[DType.float32, 4](100.0, 101.0, 102.0, 103.0)
+    ndb.store[4](2, 0, new_vec)
+    assert_true(ndb[IntArray(2, 0)] == 100.0, "SIMD store [0]")
+    assert_true(ndb[IntArray(2, 3)] == 103.0, "SIMD store [3]")
 
 
 def main() raises:
@@ -2258,8 +2257,8 @@ def ndb_minmax_3d_with_offset() raises:
     assert_true(ndb.max_index() == 12, "3d_with_offset: max_index should be 12")
     # shape=[2,2,2,2], strides=[8,4,2,1], offset=0
     # min = 0, max = 0 + 1*8 + 1*4 + 1*2 + 1*1 = 15
-    var buf = Buffer[DType.float32](16)
-    var ndb = NDBuffer[DType.float32](
+    buf = Buffer[DType.float32](16)
+    ndb = NDBuffer[DType.float32](
         buf^, Shape(2, 2, 2, 2), Strides(8, 4, 2, 1), offset=0
     )
     assert_true(ndb.min_index() == 0, "4d_contiguous: min_index should be 0")
