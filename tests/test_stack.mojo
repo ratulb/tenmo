@@ -1183,49 +1183,8 @@ def test_stk_mixed_operations() raises:
     assert_true(hstacked.all_close[atol=1e-6](expected))
 
 
-# ============================================================================
-# MASTER TEST RUNNER
-# ============================================================================
-
-
-def run_all_stack_tests() raises:
-    """Run all stack operation tests."""
-    # Forward pass tests
-    test_stk_basic_2_tensors_axis0()
-    test_stk_basic_3_tensors_axis0()
-    test_stk_axis1_2d()
-    test_stk_axis_negative()
-    test_stk_single_element_tensors()
-    test_stk_3d_tensors()
-
-    # Backward pass tests
-    test_stk_backward_simple_axis0()
-    test_stk_backward_weighted()
-    test_stk_backward_axis1()
-    test_stk_backward_three_tensors()
-    test_stk_backward_selective_grad()
-
-    # VStack tests
-    test_stk_vstack_1d_tensors()
-    test_stk_vstack_2d_tensors()
-    test_stk_vstack_different_rows()
-    test_stk_vstack_backward()
-
-    # HStack tests
-    test_stk_hstack_1d_tensors()
-    test_stk_hstack_2d_tensors()
-    test_stk_hstack_different_columns()
-    test_stk_hstack_backward()
-    test_stk_hstack_2d_backward()
-    test_stk_large_number_tensors()
-    test_stk_zeros_and_ones()
-    test_stk_chain_operations()
-    test_stk_mixed_operations()
-
-
 def test_stack_operations() raises:
     comptime dtype = DType.float32
-
 
     var A = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -1239,6 +1198,7 @@ def test_stack_operations() raises:
     tensors.append(B)
 
     var result = Tensor[dtype].stack(tensors, axis=0, requires_grad=True)
+    _ = """assert_true(result == Tensor[dtype].d3([[[1, 2, 3],[4, 5, 6]],[[7, 8, 9],[10, 11, 12]]])
 
     # Expected: (2, 2, 3)
     # [[[1, 2, 3],
@@ -1262,8 +1222,26 @@ def test_stack_operations() raises:
     #   [3, 9]],
     #  [[4, 10],
     #   [5, 11],
-    #   [6, 12]]]
+    #   [6, 12]]]"""
 
+    assert_true(
+        result
+        == Tensor[dtype].d3([[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]])
+    )
+
+    var result2 = Tensor[dtype].stack(tensors, axis=1, requires_grad=True)
+    assert_true(
+        result2
+        == Tensor[dtype].d3([[[1, 2, 3], [7, 8, 9]], [[4, 5, 6], [10, 11, 12]]])
+    )
+
+    var result3 = Tensor[dtype].stack(tensors, axis=2, requires_grad=True)
+    assert_true(
+        result3
+        == Tensor[dtype].d3(
+            [[[1, 7], [2, 8], [3, 9]], [[4, 10], [5, 11], [6, 12]]]
+        )
+    )
 
     var loss = result.sum()
     loss.backward()
@@ -1271,7 +1249,6 @@ def test_stack_operations() raises:
     # Expected: all ones (2x3)
 
     # Expected: all ones (2x3)
-
 
     var C = Tensor[dtype].ones(1, 3, requires_grad=True)
     var D = Tensor[dtype].ones(1, 3, requires_grad=True) * 2.0
@@ -1284,7 +1261,7 @@ def test_stack_operations() raises:
     # Expected: (2, 3)
     # [[1, 1, 1],
     #  [2, 2, 2]]
-
+    assert_true(vstacked == Tensor[dtype].d2([[1, 1, 1], [2, 2, 2]]))
 
     var E = Tensor[dtype].ones(2, 1, requires_grad=True)
     var F = Tensor[dtype].ones(2, 2, requires_grad=True) * 3.0
@@ -1298,6 +1275,7 @@ def test_stack_operations() raises:
     # [[1, 3, 3],
     #  [1, 3, 3]]
 
+    assert_true(hstacked == Tensor[dtype].d2([[1, 3, 3], [1, 3, 3]]))
 
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var b = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
@@ -1311,11 +1289,12 @@ def test_stack_operations() raises:
     # [[1, 2, 3],
     #  [4, 5, 6]]
 
-
+    assert_true(vstacked_1d == Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]]))
     var hstacked_1d = Tensor[dtype].hstack(vstack_1d, requires_grad=True)
     # Expected: (6,)
     # [1, 2, 3, 4, 5, 6]
 
+    assert_true(hstacked_1d == Tensor[dtype].d1([1, 2, 3, 4, 5, 6]))
 
 
 # ```

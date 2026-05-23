@@ -468,7 +468,7 @@ def test_std_backward_zero_variance_vs() raises:
     s.backward()
     var grad = x.grad()
     # x - mean = [0,0,0] so grad = 0/(eps*divisor) = 0 — no NaN
-    assert_true(x.grad().all_close[atol=1e-5](Tensor.d1([0.0, 0.0, 0.0])))
+    assert_true(grad.all_close[atol=1e-5](Tensor.d1([0.0, 0.0, 0.0])))
 
 
 # ============================================================================

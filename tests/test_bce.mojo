@@ -25,7 +25,6 @@ import std.math
 
 
 def test_bce_cpu_1d_mean_forward() raises:
-    print("bce_cpu_1d_mean_forward")
     comptime dtype = DType.float32
     # p = sigmoid([2.0, -1.0, 0.5]) ≈ [0.8808, 0.2689, 0.6225]
     var logits = Tensor[dtype].d1([2.0, -1.0, 0.5])
@@ -40,7 +39,6 @@ def test_bce_cpu_1d_mean_forward() raises:
 
 
 def test_bce_cpu_1d_sum_forward() raises:
-    print("bce_cpu_1d_sum_forward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d1([2.0, -1.0, 0.5])
     var pred = logits.sigmoid()
@@ -55,7 +53,6 @@ def test_bce_cpu_1d_sum_forward() raises:
 
 
 def test_bce_cpu_1d_none_forward() raises:
-    print("bce_cpu_1d_none_forward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d1([2.0, -1.0, 0.5])
     var pred = logits.sigmoid()
@@ -69,7 +66,6 @@ def test_bce_cpu_1d_none_forward() raises:
 
 
 def test_bce_cpu_2d_mean_forward() raises:
-    print("bce_cpu_2d_mean_forward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[1.0, -1.0], [2.0, -2.0]])
     var pred = logits.sigmoid()
@@ -83,7 +79,6 @@ def test_bce_cpu_2d_mean_forward() raises:
 
 
 def test_bce_cpu_2d_sum_forward() raises:
-    print("bce_cpu_2d_sum_forward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[1.0, -1.0], [2.0, -2.0]])
     var pred = logits.sigmoid()
@@ -98,7 +93,6 @@ def test_bce_cpu_2d_sum_forward() raises:
 
 
 def test_bce_cpu_2d_none_forward() raises:
-    print("bce_cpu_2d_none_forward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[1.0, -1.0], [2.0, -2.0]])
     var pred = logits.sigmoid()
@@ -114,7 +108,6 @@ def test_bce_cpu_2d_none_forward() raises:
 
 
 def test_bce_cpu_3d_mean_forward() raises:
-    print("bce_cpu_3d_mean_forward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d3(
         [[[1.0, -1.0], [2.0, -2.0]], [[0.5, -0.5], [1.5, -1.5]]]
@@ -137,7 +130,6 @@ def test_bce_cpu_3d_mean_forward() raises:
 
 
 def test_bce_cpu_1d_mean_backward() raises:
-    print("bce_cpu_1d_mean_backward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d1([2.0, -1.0, 0.5])
     var pred = logits.sigmoid()
@@ -154,7 +146,6 @@ def test_bce_cpu_1d_mean_backward() raises:
 
 
 def test_bce_cpu_1d_sum_backward() raises:
-    print("bce_cpu_1d_sum_backward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d1([2.0, -1.0, 0.5])
     var pred = logits.sigmoid()
@@ -174,7 +165,6 @@ def test_bce_cpu_1d_sum_backward() raises:
 
 
 def test_bce_cpu_1d_none_backward() raises:
-    print("bce_cpu_1d_none_backward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d1([2.0, -1.0, 0.5])
     var pred = logits.sigmoid()
@@ -194,7 +184,6 @@ def test_bce_cpu_1d_none_backward() raises:
 
 
 def test_bce_cpu_2d_mean_backward() raises:
-    print("bce_cpu_2d_mean_backward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[1.0, -1.0], [2.0, -2.0]])
     var pred = logits.sigmoid()
@@ -213,7 +202,6 @@ def test_bce_cpu_2d_mean_backward() raises:
 
 
 def test_bce_cpu_2d_sum_backward() raises:
-    print("bce_cpu_2d_sum_backward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[1.0, -1.0], [2.0, -2.0]])
     var pred = logits.sigmoid()
@@ -232,7 +220,6 @@ def test_bce_cpu_2d_sum_backward() raises:
 
 
 def test_bce_cpu_2d_none_backward() raises:
-    print("bce_cpu_2d_none_backward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[1.0, -1.0], [2.0, -2.0]])
     var pred = logits.sigmoid()
@@ -251,7 +238,6 @@ def test_bce_cpu_2d_none_backward() raises:
 
 
 def test_bce_cpu_3d_mean_backward() raises:
-    print("bce_cpu_3d_mean_backward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d3(
         [[[1.0, -1.0], [2.0, -2.0]], [[0.5, -0.5], [1.5, -1.5]]]
@@ -286,7 +272,6 @@ def test_bce_cpu_3d_mean_backward() raises:
 
 
 def test_bce_cpu_all_ones_target_forward() raises:
-    print("bce_cpu_all_ones_target_forward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var pred = logits.sigmoid()
@@ -300,7 +285,6 @@ def test_bce_cpu_all_ones_target_forward() raises:
 
 
 def test_bce_cpu_all_zeros_target_forward() raises:
-    print("bce_cpu_all_zeros_target_forward")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var pred = logits.sigmoid()
@@ -319,7 +303,6 @@ def test_bce_cpu_all_zeros_target_forward() raises:
 
 
 def test_bce_cpu_custom_epsilon_forward() raises:
-    print("bce_cpu_custom_epsilon_forward")
     comptime dtype = DType.float32
     # use extreme logits so sigmoid values near 0/1 are affected by epsilon
     var logits = Tensor[dtype].d1([10.0, -10.0])
@@ -338,7 +321,6 @@ def test_bce_cpu_custom_epsilon_forward() raises:
 
 
 def test_bce_cpu_float64_mean_forward_backward() raises:
-    print("bce_cpu_float64_mean_forward_backward")
     comptime dtype = DType.float64
     var logits = Tensor[dtype].d1([2.0, -1.0, 0.5])
     var pred = logits.sigmoid()
@@ -365,7 +347,6 @@ def test_bce_cpu_float64_mean_forward_backward() raises:
 def test_bce_cpu_view_forward_matches_contiguous() raises:
     """BCELoss forward on non-contiguous (transposed) input matches contiguous.
     Exercises scalar fallback in bce_forward_reduce_cpu."""
-    print("bce_cpu_view_forward_matches_contiguous")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, -1.0, 0.5], [1.0, -2.0, -0.5]])
     var pred = logits.sigmoid()
@@ -382,7 +363,6 @@ def test_bce_cpu_view_forward_matches_contiguous() raises:
 def test_bce_cpu_view_backward_runs() raises:
     """BCELoss backward on non-contiguous (transposed) prediction runs and produces grad.
     """
-    print("bce_cpu_view_backward_runs")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, -1.0, 0.5], [1.0, -2.0, -0.5]])
     var pred = logits.sigmoid()
@@ -406,7 +386,6 @@ def test_bce_cpu_view_backward_runs() raises:
 def test_bwl_cpu_view_backward_runs() raises:
     """BCEWithLogits backward on non-contiguous (transposed) logits runs and produces grad.
     """
-    print("bwl_cpu_view_backward_runs")
     comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0, -1.0, 0.5], [1.0, -2.0, -0.5]])
     var target = Tensor[dtype].d2([[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]])
@@ -428,7 +407,6 @@ def test_bwl_cpu_view_backward_runs() raises:
 
 def test_bce_gpu_1d_mean_forward_grad_to_cpu() raises:
     comptime if has_accelerator():
-        print("bce_gpu_1d_mean_forward_grad_to_cpu")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d1([2.0, -1.0, 0.5])
         var pred = logits.sigmoid()
@@ -454,7 +432,6 @@ def test_bce_gpu_1d_mean_forward_grad_to_cpu() raises:
 
 def test_bce_gpu_1d_sum_forward_grad_to_cpu() raises:
     comptime if has_accelerator():
-        print("bce_gpu_1d_sum_forward_grad_to_cpu")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d1([2.0, -1.0, 0.5])
         var pred = logits.sigmoid()
@@ -476,7 +453,6 @@ def test_bce_gpu_1d_sum_forward_grad_to_cpu() raises:
 
 def test_bce_gpu_1d_none_forward_grad_to_cpu() raises:
     comptime if has_accelerator():
-        print("bce_gpu_1d_none_forward_grad_to_cpu")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d1([2.0, -1.0, 0.5])
         var pred = logits.sigmoid()
@@ -498,7 +474,6 @@ def test_bce_gpu_1d_none_forward_grad_to_cpu() raises:
 
 def test_bce_gpu_2d_mean_forward_grad_to_cpu() raises:
     comptime if has_accelerator():
-        print("bce_gpu_2d_mean_forward_grad_to_cpu")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d2([[1.0, -1.0], [2.0, -2.0]])
         var pred = logits.sigmoid()
@@ -518,7 +493,6 @@ def test_bce_gpu_2d_mean_forward_grad_to_cpu() raises:
 
 def test_bce_gpu_3d_mean_forward_grad_to_cpu() raises:
     comptime if has_accelerator():
-        print("bce_gpu_3d_mean_forward_grad_to_cpu")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d3(
             [[[1.0, -1.0], [2.0, -2.0]], [[0.5, -0.5], [1.5, -1.5]]]
@@ -552,7 +526,6 @@ def test_bce_gpu_3d_mean_forward_grad_to_cpu() raises:
 
 def test_bce_gpu_1d_mean_stop_grad() raises:
     comptime if has_accelerator():
-        print("bce_gpu_1d_mean_stop_grad")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d1([2.0, -1.0, 0.5])
         var pred = logits.sigmoid()
@@ -570,7 +543,6 @@ def test_bce_gpu_1d_mean_stop_grad() raises:
 
 def test_bce_gpu_2d_mean_stop_grad() raises:
     comptime if has_accelerator():
-        print("bce_gpu_2d_mean_stop_grad")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d2([[1.0, -1.0], [2.0, -2.0]])
         var pred = logits.sigmoid()
@@ -591,7 +563,6 @@ def test_bce_gpu_2d_mean_stop_grad() raises:
 
 def test_bwl_gpu_1d_mean_forward_grad_to_cpu() raises:
     comptime if has_accelerator():
-        print("bwl_gpu_1d_mean_forward_grad_to_cpu")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d1([2.0, -1.0, 0.5], requires_grad=True)
         var target = Tensor[dtype].d1([1.0, 0.0, 1.0])
@@ -615,7 +586,6 @@ def test_bwl_gpu_1d_mean_forward_grad_to_cpu() raises:
 
 def test_bwl_gpu_1d_sum_forward_grad_to_cpu() raises:
     comptime if has_accelerator():
-        print("bwl_gpu_1d_sum_forward_grad_to_cpu")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d1([2.0, -1.0, 0.5], requires_grad=True)
         var target = Tensor[dtype].d1([1.0, 0.0, 1.0])
@@ -634,7 +604,6 @@ def test_bwl_gpu_1d_sum_forward_grad_to_cpu() raises:
 
 def test_bwl_gpu_1d_none_forward_grad_to_cpu() raises:
     comptime if has_accelerator():
-        print("bwl_gpu_1d_none_forward_grad_to_cpu")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d1([2.0, -1.0, 0.5], requires_grad=True)
         var target = Tensor[dtype].d1([1.0, 0.0, 1.0])
@@ -653,7 +622,6 @@ def test_bwl_gpu_1d_none_forward_grad_to_cpu() raises:
 
 def test_bwl_gpu_2d_mean_forward_grad_to_cpu() raises:
     comptime if has_accelerator():
-        print("bwl_gpu_2d_mean_forward_grad_to_cpu")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d2(
             [[1.0, -1.0], [2.0, -2.0]], requires_grad=True
@@ -674,7 +642,6 @@ def test_bwl_gpu_2d_mean_forward_grad_to_cpu() raises:
 
 def test_bwl_gpu_2d_sum_forward_grad_to_cpu() raises:
     comptime if has_accelerator():
-        print("bwl_gpu_2d_sum_forward_grad_to_cpu")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d2(
             [[1.0, -1.0], [2.0, -2.0]], requires_grad=True
@@ -695,7 +662,6 @@ def test_bwl_gpu_2d_sum_forward_grad_to_cpu() raises:
 
 def test_bwl_gpu_2d_none_forward_grad_to_cpu() raises:
     comptime if has_accelerator():
-        print("bwl_gpu_2d_none_forward_grad_to_cpu")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d2(
             [[1.0, -1.0], [2.0, -2.0]], requires_grad=True
@@ -716,7 +682,6 @@ def test_bwl_gpu_2d_none_forward_grad_to_cpu() raises:
 
 def test_bwl_gpu_3d_mean_forward_grad_to_cpu() raises:
     comptime if has_accelerator():
-        print("bwl_gpu_3d_mean_forward_grad_to_cpu")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d3(
             [[[1.0, -1.0], [2.0, -2.0]], [[0.5, -0.5], [1.5, -1.5]]],
@@ -750,7 +715,6 @@ def test_bwl_gpu_3d_mean_forward_grad_to_cpu() raises:
 
 def test_bwl_gpu_1d_mean_stop_grad() raises:
     comptime if has_accelerator():
-        print("bwl_gpu_1d_mean_stop_grad")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d1([2.0, -1.0, 0.5], requires_grad=True)
         var target = Tensor[dtype].d1([1.0, 0.0, 1.0])
@@ -765,7 +729,6 @@ def test_bwl_gpu_1d_mean_stop_grad() raises:
 
 def test_bwl_gpu_1d_sum_stop_grad() raises:
     comptime if has_accelerator():
-        print("bwl_gpu_1d_sum_stop_grad")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d1([2.0, -1.0, 0.5], requires_grad=True)
         var target = Tensor[dtype].d1([1.0, 0.0, 1.0])
@@ -780,7 +743,6 @@ def test_bwl_gpu_1d_sum_stop_grad() raises:
 
 def test_bwl_gpu_1d_none_stop_grad() raises:
     comptime if has_accelerator():
-        print("bwl_gpu_1d_none_stop_grad")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d1([2.0, -1.0, 0.5], requires_grad=True)
         var target = Tensor[dtype].d1([1.0, 0.0, 1.0])
@@ -795,7 +757,6 @@ def test_bwl_gpu_1d_none_stop_grad() raises:
 
 def test_bwl_gpu_2d_mean_stop_grad() raises:
     comptime if has_accelerator():
-        print("bwl_gpu_2d_mean_stop_grad")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d2(
             [[1.0, -1.0], [2.0, -2.0]], requires_grad=True
@@ -812,7 +773,6 @@ def test_bwl_gpu_2d_mean_stop_grad() raises:
 
 def test_bwl_gpu_3d_mean_stop_grad() raises:
     comptime if has_accelerator():
-        print("bwl_gpu_3d_mean_stop_grad")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d3(
             [[[1.0, -1.0], [2.0, -2.0]], [[0.5, -0.5], [1.5, -1.5]]],
@@ -837,7 +797,6 @@ def test_bwl_gpu_3d_mean_stop_grad() raises:
 
 def test_bwl_gpu_large_logits_stable() raises:
     comptime if has_accelerator():
-        print("bwl_gpu_large_logits_stable")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d1([50.0, 100.0], requires_grad=True)
         var target = Tensor[dtype].d1([1.0, 1.0])
@@ -855,7 +814,6 @@ def test_bwl_gpu_large_logits_stable() raises:
 
 def test_bwl_gpu_bce_matches_bwl() raises:
     comptime if has_accelerator():
-        print("bwl_gpu_bce_matches_bwl")
         comptime dtype = DType.float32
         var logits_raw = Tensor[dtype].d1([2.0, -1.0, 0.5])
         var sigmoided = logits_raw.sigmoid()
