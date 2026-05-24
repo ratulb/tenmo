@@ -168,36 +168,51 @@ loss.backward()     # Initiates reverse-mode differentiation
 From `tenmo/backpropagation.mojo`:
 
 ```mojo
-struct Backward[dtype: DType](RegisterPassable):
+struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     @staticmethod
-    fn invoke(output: Ancestor) -> List[(Ancestor, Gradbox, Int)]:
+    def invoke(
+        output: Ancestor[Self.dtype],
+        mut parent_ids: List[UInt],
+    ):
+        if not output.has_ancestry():
+            return
         ref arg = output.ancestry().backward_fn_arg()
         var op_code = arg.op_code
 
         # Direct jump table — no variant extraction!
         if op_code == BACKWARD_ADD_SCALAR:
-            return AddBackwardScalar.backward(output)
+            AddBackwardScalar[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_ADD:
-            return AddBackward.backward(output)
+            AddBackward[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_MULTIPLY_SCALAR:
-            return MultiplyBackwardScalar.backward(output)
+            MultiplyBackwardScalar[Self.dtype].backward(output, parent_ids)
         elif op_code == BACKWARD_MULTIPLY:
-            return MultiplyBackward.backward(output)
+            MultiplyBackward[Self.dtype].backward(output, parent_ids)
         # ... and so on for 50+ operations
 ```
+
+Each handler receives a `mut parent_ids: List[UInt]` that it fills with the IDs of
+parents that received gradient updates. The caller uses this list to decrement
+fan-in counters. Handlers call `parent.update_grad()` internally — no return value.
 
 ### Example: Backward for `a * 42`
 
 From `tenmo/multiplication.mojo`:
 
 ```mojo
-struct MultiplyBackwardScalar:
+struct MultiplyBackwardScalar[dtype: DType](
+    ImplicitlyCopyable, RegisterPassable
+):
     @staticmethod
-    fn backward(output: Ancestor) -> List[(Ancestor, Gradbox, Int)]:
+    def backward(
+        output: Ancestor[Self.dtype],
+        mut parent_ids: List[UInt],
+    ):
         # Retrieve the scalar factor from the type-erased argument
         var factor = output.ancestry()
             .backward_fn_arg()
-            .get[ScalarArg].value  # = 42
+            .get[ScalarArg[Self.dtype]]()
+            .value  # = 42
 
         # Get incoming gradient from downstream
         ref gradbox = output.gradients()  # ∂loss/∂c
@@ -205,8 +220,9 @@ struct MultiplyBackwardScalar:
         # Scale gradient: ∂loss/∂a = ∂loss/∂c * ∂c/∂a = grad * 42
         var scaled_gradbox = gradbox * factor
 
-        # Add to parent's gradient accumulator
-        return [(parent, scaled_gradbox, AddTensor)]
+        # Accumulate into parent's gradbox and register for fan-in
+        ancestor.update_grad(scaled_gradbox^, AddTensor, None)
+        parent_ids.append(ancestor._id)
 ```
 
 ### Example: Backward for `a + b`
@@ -214,28 +230,29 @@ struct MultiplyBackwardScalar:
 From `tenmo/addition.mojo`:
 
 ```mojo
-struct AddBackward:
+struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(output: Ancestor) -> List[(Ancestor, Gradbox, Int)]:
-        ref gradbox = output.gradients()  # ∂loss/∂(a+b)
-
-        var grad_shares = List[(Ancestor, Gradbox, Int)]()
-
+    def backward(
+        output: Ancestor[Self.dtype],
+        mut parent_ids: List[UInt],
+    ):
+        var gradbox = output.gradbox[]
         count = len(output.ancestry())
 
         if count == 1:  # Only one parent needed grad
             var ancestor = output.ancestry().get(0)
-            grad_shares.append((ancestor^, gradbox^, AddTensor))
+            ancestor.update_grad(gradbox^, AddTensor, None)
+            parent_ids.append(ancestor._id)
         else:  # Both parents might need grad
-            var lhs = output.ancestry().get(0)  # a
-            var rhs = output.ancestry().get(1)  # b
+            var ancestor_lhs = output.ancestry().get(0)  # a
+            var ancestor_rhs = output.ancestry().get(1)  # b
 
-            if lhs.requires_grad:
-                grad_shares.append((lhs^, gradbox, AddTensor))  # ∂loss/∂a = ∂loss/∂c * 1
-            if rhs.requires_grad:
-                grad_shares.append((rhs^, gradbox^, AddTensor))  # ∂loss/∂b = ∂loss/∂c * 1
-
-        return grad_shares^
+            if ancestor_lhs.requires_grad:
+                ancestor_lhs.update_grad(gradbox, AddTensor, None)
+                parent_ids.append(ancestor_lhs._id)
+            if ancestor_rhs.requires_grad:
+                ancestor_rhs.update_grad(gradbox, AddTensor, None)
+                parent_ids.append(ancestor_rhs._id)
 ```
 
 **Key insight**: For addition, ∂(a+b)/∂a = ∂(a+b)/∂b = 1, so the gradient passes through unchanged.
@@ -264,14 +281,35 @@ d = c + b
 ```
 loss = d.sum() = 258
 loss.backward()
-  → invokes BACKWARD_ADD backward on d
-     grad_d = [1,1,1]
-     propagates to c: grad_c = grad_d * 1 = [1,1,1]
-     propagates to b: grad_b = grad_d * 1 = [1,1,1]
-  → invokes BACKWARD_MULTIPLY_SCALAR backward on c
-     grad_c = [1,1,1]
-     factor = 42
-     grad_a = grad_c * 42 = [42,84,126]
+  → Phase 1: seed gradbox of d (loss) with [1]
+
+  → Phase 2: DFS from d → ancestors of c, b → ancestors of a
+             fanin: {d:0, c:1, b:1, a:1}  (c depends on d, b depends on d ...)
+
+  → Phase 3: ready_queue = [d]
+     pop d → Backward.invoke(d, parent_ids)
+        op_code = BACKWARD_ADD
+        grad_d = [1,1,1]
+        propagates to c: c.update_grad(grad_d, AddTensor)  → c.grad = [1,1,1]
+        propagates to b: b.update_grad(grad_d, AddTensor)  → b.grad = [1,1,1]
+        parent_ids = [c._id, b._id]
+        fanin: {c:0, b:0, a:1}  → enqueue c, b
+
+     pop c → Backward.invoke(c, parent_ids)
+        op_code = BACKWARD_MULTIPLY_SCALAR
+        grad_c = [1,1,1], factor = 42
+        a.update_grad(grad_c * 42, AddTensor)              → a.grad = [42,84,126]
+        parent_ids = [a._id]
+        fanin: {a:0, b:0}  → enqueue a
+
+     pop b → Backward.invoke(b, parent_ids)
+        op_code = BACKWARD_ADD_SCALAR
+        b has no ancestry → returns, parent_ids empty
+        fanin: {a:0}  → nothing to enqueue
+
+     pop a → Backward.invoke(a, parent_ids)
+        a has no ancestry (leaf) → returns, parent_ids empty
+        fanin: {}  → done
 ```
 
 **Final gradients:**

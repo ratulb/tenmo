@@ -431,36 +431,46 @@ fn backward[graph_size: Int = 50](mut output, seed_tensor: Tensor)
 - Record reverse topological order in `topo_ids`
 
 **Phase 3: Reverse topological execution**
-- `ready_queue` starts with output node
+- `ready_queue` starts with output node, `parent_ids: List[UInt]` reused per node
 - For each node popped from queue:
-  1. Call `Backward.invoke(node)` — jump table dispatch on `op_code`
-  2. Backward handler returns `List[Tuple[Ancestor, Gradbox, Int]]` (target, gradient, op_code)
-  3. For each result:
-     - Extract `extra_arg` from output's `backward_fn_arg()` if `op_code == ScatterAddTensor`
-     - `target.update_grad(grad, op_code, extra_arg)` — accumulates into parent's gradbox
+  1. `parent_ids.clear()`
+  2. Call `Backward.invoke(node, parent_ids)` — jump table dispatch on `op_code`. Each backward handler:
+     - Reads gradient from `output.gradbox[]`
+     - Computes parent gradient contributions
+     - Calls `parent.update_grad(grad, op_code, extra_arg)` to accumulate into parent's gradbox
+     - Appends parent `_id` to `parent_ids`
+  3. For each `target_id` in `parent_ids`:
      - Decrement `fanin[target_id]`; when it hits 0 and target has ancestry, add to `ready_queue`
 
-### `Backward.invoke()` (`backpropagation.mojo:337`)
+### `Backward.invoke()` (`backpropagation.mojo:357`)
 
 Jump table dispatcher with 58 operation codes:
 
 ```mojo
-fn invoke(output: Ancestor[dtype]) -> List[Tuple[Ancestor, Gradbox, Int]]:
+def invoke(
+    output: Ancestor[Self.dtype],
+    mut parent_ids: List[UInt],
+):
+    if not output.has_ancestry():
+        return
     ref arg = output.ancestry().backward_fn_arg()
     var op_code = arg.op_code
     if op_code == BACKWARD_SUM:
-        return SumBackward[dtype].backward(output)
+        SumBackward[Self.dtype].backward(output, parent_ids)
     # ... 57 more branches
 ```
 
-- Guards: returns empty list if `!output.has_ancestry()`
-- Each backward struct implements `static fn backward(output: Ancestor) -> List[Tuple[Ancestor, Gradbox, Int]]`
+- Guards: returns early if `!output.has_ancestry()`
+- Each backward struct implements `def backward(output: Ancestor[Self.dtype], mut parent_ids: List[UInt])` — handlers call `parent.update_grad()` internally and append to `parent_ids`
 - All backward handlers are in separate modules, imported via `walkback.mojo`
 
 ### Example: `SumBackward` (`tenmo/summation.mojo`)
 
 ```mojo
-fn backward(output: Ancestor) -> List[Tuple[Ancestor, Gradbox, Int]]:
+def backward(
+    output: Ancestor[Self.dtype],
+    mut parent_ids: List[UInt],
+):
     # 1. Extract reduction parameters from BackwardFnArg
     ref bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
     var (axes, keepdims) = bwd_arg.axes, bwd_arg.keepdims
@@ -481,8 +491,10 @@ fn backward(output: Ancestor) -> List[Tuple[Ancestor, Gradbox, Int]]:
     else:
         grad_contrib = gradbox.broadcast_to(shape, share=False)
 
-    # 4. Return (parent, gradient, accumulate_op)
-    return [(ancestor^, grad_contrib^, AddTensor)]
+    # 4. Accumulate into parent's gradbox and register parent for fanin
+    if ancestor.requires_grad:
+        ancestor.update_grad(grad_contrib^, AddTensor, None)
+    parent_ids.append(ancestor._id)
 ```
 
 ### `seed_grad()` (`tensor.mojo:1226`)
