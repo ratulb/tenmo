@@ -103,7 +103,7 @@ struct Buffer[dtype: DType = DType.float32](
     def __init__(
         out self,
         size: Int,
-        #data: UnsafePointer[Scalar[Self.dtype], MutExternalOrigin],
+        # data: UnsafePointer[Scalar[Self.dtype], MutExternalOrigin],
         data: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
         copy: Bool = False,
     ):
@@ -324,7 +324,6 @@ struct Buffer[dtype: DType = DType.float32](
             self.size,
             index,
         )
-        # self.data.store[width=1](index, scalar)
         (self.data + index)[] = scalar
 
     @always_inline
@@ -333,7 +332,7 @@ struct Buffer[dtype: DType = DType.float32](
     ](self, offset: Int) -> SIMD[Self.dtype, simdwidth]:
         debug_assert(
             offset >= 0 and offset + simdwidth <= self.size,
-            "Buffer -> load : offset out of bounds",
+            "Buffer -> load: offset out of bounds",
             self.size,
             offset,
             simdwidth,
@@ -346,13 +345,31 @@ struct Buffer[dtype: DType = DType.float32](
     ](self, offset: Int, values: SIMD[Self.dtype, simdwidth]):
         debug_assert(
             offset >= 0 and offset + simdwidth <= self.size,
-            "Buffer -> store : offset out of bounds",
+            "Buffer -> store: offset out of bounds",
             self.size,
             offset,
             simdwidth,
         )
 
         self.data.store[width=simdwidth](offset, values)
+
+    def copied(
+        self, start_index: Int = 0, end_index: Optional[Int] = None
+    ) -> Buffer[Self.dtype]:
+        if self.size == 0:
+            return Buffer[Self.dtype]()
+        var actual_end = end_index.or_else(self.size)
+        var extent = actual_end - start_index
+        if extent <= 0:
+            panic(
+                "Buffer -> copied: invalid range, start_index",
+                String(start_index),
+                "and actual end",
+                String(actual_end),
+            )
+        var out = Buffer[Self.dtype](extent)
+        memcpy(dest=out.data, src=self.data + start_index, count=extent)
+        return out^
 
     @always_inline
     def __add__(

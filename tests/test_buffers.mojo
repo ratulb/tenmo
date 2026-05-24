@@ -4162,5 +4162,99 @@ def test_relu_backward_multiplication() raises:
     )
 
 
+# ============================================
+# Buffer.copied Tests
+# ============================================
+
+
+def test_copied_empty() raises:
+    var buf = Buffer[DType.float32]()
+    var copy = buf.copied()
+    assert_true(copy.size == 0, "copied: empty buffer size mismatch")
+
+
+def test_copied_full() raises:
+    comptime dtype = DType.float32
+    var buf = Buffer[dtype](10)
+    for i in range(10):
+        buf[i] = Float32(i)
+    var copy = buf.copied()
+    assert_true(copy.size == 10, "copied: full copy size mismatch")
+    for i in range(10):
+        assert_true(
+            copy[i] == Float32(i),
+            "copied: full copy value mismatch at " + String(i),
+        )
+
+
+def test_copied_independent() raises:
+    comptime dtype = DType.float32
+    var buf = Buffer[dtype](5)
+    for i in range(5):
+        buf[i] = Float32(i)
+    var copy = buf.copied()
+    buf[0] = Float32(99)
+    copy[1] = Float32(88)
+    assert_true(
+        buf[0] == Float32(99),
+        "copied: modifying original should not affect copy",
+    )
+    assert_true(buf[1] == Float32(1), "copied: original unchanged at index 1")
+    assert_true(copy[0] == Float32(0), "copied: copy unchanged at index 0")
+    assert_true(
+        copy[1] == Float32(88),
+        "copied: modifying copy should not affect original",
+    )
+
+
+def test_copied_start_index() raises:
+    comptime dtype = DType.float32
+    var buf = Buffer[dtype](10)
+    for i in range(10):
+        buf[i] = Float32(i)
+    var copy = buf.copied(start_index=3)
+    assert_true(copy.size == 7, "copied: start_index size mismatch")
+    for i in range(7):
+        assert_true(
+            copy[i] == Float32(i + 3),
+            "copied: start_index value mismatch at " + String(i),
+        )
+
+
+def test_copied_start_end() raises:
+    comptime dtype = DType.float32
+    var buf = Buffer[dtype](10)
+    for i in range(10):
+        buf[i] = Float32(i)
+    var copy = buf.copied(start_index=3, end_index=7)
+    assert_true(copy.size == 4, "copied: start_end size mismatch")
+    for i in range(4):
+        assert_true(
+            copy[i] == Float32(i + 3),
+            "copied: start_end value mismatch at " + String(i),
+        )
+
+
+def test_copied_shared_independent() raises:
+    comptime dtype = DType.float32
+    var buf = Buffer[dtype](5)
+    for i in range(5):
+        buf[i] = Float32(i)
+    buf.shared()  # convert to shared in-place
+    var copy = buf.copied()
+    buf[0] = Float32(99)
+    copy[0] = Float32(88)
+    assert_true(
+        buf[0] == Float32(99),
+        "copied: modifying original should not affect copy",
+    )
+    assert_true(buf[1] == Float32(1), "copied: original unchanged at index 1")
+    assert_true(
+        copy[0] == Float32(88),
+        "copied: modifying copy should not affect original",
+    )
+    assert_true(copy[1] == Float32(1), "copied: copy unchanged at index 1")
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
