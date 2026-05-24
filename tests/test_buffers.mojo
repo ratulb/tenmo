@@ -3,6 +3,8 @@ from tenmo.mnemonics import *
 from std.sys import simd_width_of
 from std.time import perf_counter_ns
 from std.testing import assert_almost_equal, TestSuite
+from std.testing import assert_true, assert_false
+
 
 # ============================================
 # Test Constants
@@ -17,23 +19,18 @@ comptime SMALL_SIZE_NEW = 17  # Prime number to test tail loop
 # Constructor Tests
 # ============================================
 def test_constructor_empty() raises:
-    print("test_constructor_empty")
     var buffer = Buffer[DType.int32]()
     assert_true(buffer.size == 0, "Empty buffer size should be 0")
     assert_true(len(buffer) == 0, "Empty buffer len should be 0")
-    print("test_constructor_empty passed")
 
 
 def test_constructor_size() raises:
-    print("test_constructor_size")
     var buffer = Buffer[DType.float32](MEDIUM_SIZE)
     assert_true(buffer.size == MEDIUM_SIZE, "Buffer size mismatch")
     assert_true(len(buffer) == MEDIUM_SIZE, "Buffer len mismatch")
-    print("test_constructor_size passed")
 
 
 def test_constructor_from_list() raises:
-    print("test_constructor_from_list")
     var ll = List[Scalar[DType.int32]](capacity=5)
     for i in range(5):
         ll.append(Scalar[DType.int32](i * 10))
@@ -45,61 +42,49 @@ def test_constructor_from_list() raises:
             buffer[i] == Int32(i * 10),
             "Buffer value from list mismatch at " + String(i),
         )
-    print("test_constructor_from_list passed")
 
 
 # ============================================
 # Static Factory Tests
 # ============================================
 def test_full() raises:
-    print("test_full")
     var buffer = Buffer[DType.int32].full(42, MEDIUM_SIZE)
     assert_true(buffer.size == MEDIUM_SIZE, "full: size mismatch")
     for i in range(MEDIUM_SIZE):
         assert_true(buffer[i] == 42, "full: value mismatch at " + String(i))
-    print("test_full passed")
 
 
 def test_zeros() raises:
-    print("test_zeros")
     var buffer = Buffer[DType.float32].zeros(MEDIUM_SIZE)
     assert_true(buffer.size == MEDIUM_SIZE, "zeros: size mismatch")
     for i in range(MEDIUM_SIZE):
         assert_true(buffer[i] == 0.0, "zeros: value mismatch at " + String(i))
-    print("test_zeros passed")
 
 
 def test_arange_single_arg() raises:
-    print("test_arange_single_arg")
     var buffer = Buffer[DType.int32].arange(10)
     assert_true(buffer.size == 10, "arange: size mismatch")
     for i in range(10):
         assert_true(
             buffer[i] == Int32(i), "arange: value mismatch at " + String(i)
         )
-    print("test_arange_single_arg passed")
 
 
 def test_arange_two_args() raises:
-    print("test_arange_two_args")
     var buffer = Buffer[DType.int32].arange(5, 10)
     assert_true(buffer.size == 5, "arange: size mismatch")
     for i in range(5):
         assert_true(buffer[i] == Int32(i + 5), "arange: value mismatch")
-    print("test_arange_two_args passed")
 
 
 def test_arange_three_args() raises:
-    print("test_arange_three_args")
     var buffer = Buffer[DType.int32].arange(0, 10, 2)
     assert_true(buffer.size == 5, "arange step 2: size mismatch")
     for i in range(5):
         assert_true(buffer[i] == Int32(i * 2), "arange step 2: value mismatch")
-    print("test_arange_three_args passed")
 
 
 def test_linspace() raises:
-    print("test_linspace")
     var buffer = Buffer[DType.float32].linspace(0.0, 10.0, 11)
     assert_true(buffer.size == 11, "linspace: size mismatch")
     for i in range(11):
@@ -107,25 +92,21 @@ def test_linspace() raises:
             abs(buffer[i] - Scalar[DType.float32](i)) < 0.001,
             "linspace: value mismatch at " + String(i),
         )
-    print("test_linspace passed")
 
 
 # ============================================
 # Indexing and Slicing Tests
 # ============================================
 def test_getitem_setitem() raises:
-    print("test_getitem_setitem")
     var buffer = Buffer[DType.int32](10)
     for i in range(10):
         buffer[i] = Int32(i) * 5
 
     for i in range(10):
         assert_true(buffer[i] == Int32(i * 5), "getitem/setitem mismatch")
-    print("test_getitem_setitem passed")
 
 
 def test_slice_contiguous() raises:
-    print("test_slice_contiguous")
     var buffer = Buffer[DType.int32](10)
     for i in range(10):
         buffer[i] = Int32(i)
@@ -134,11 +115,9 @@ def test_slice_contiguous() raises:
     assert_true(sliced.size == 5, "slice: size mismatch")
     for i in range(5):
         assert_true(sliced[i] == Int32(i) + 2, "slice: value mismatch")
-    print("test_slice_contiguous passed")
 
 
 def test_slice_with_step() raises:
-    print("test_slice_with_step")
     var buffer = Buffer[DType.int32](10)
     for i in range(10):
         buffer[i] = Int32(i)
@@ -147,176 +126,144 @@ def test_slice_with_step() raises:
     assert_true(sliced.size == 5, "slice step: size mismatch")
     for i in range(5):
         assert_true(sliced[i] == Int32(i * 2), "slice step: value mismatch")
-    print("test_slice_with_step passed")
 
 
 def test_slice_empty() raises:
-    print("test_slice_empty")
     var buffer = Buffer[DType.int32](10)
     var sliced = buffer[5:5]
     assert_true(sliced.size == 0, "empty slice: size should be 0")
-    print("test_slice_empty passed")
 
 
 # ============================================
 # Arithmetic Operations (Buffer + Buffer)
 # ============================================
 def test_add_buffers() raises:
-    print("test_add_buffers")
     var a = Buffer[DType.int32].full(10, MEDIUM_SIZE)
     var b = Buffer[DType.int32].full(5, MEDIUM_SIZE)
     var result = a + b
 
     for i in range(MEDIUM_SIZE):
         assert_true(result[i] == 15, "add buffers: value mismatch")
-    print("test_add_buffers passed")
 
 
 def test_sub_buffers() raises:
-    print("test_sub_buffers")
     var a = Buffer[DType.int32].full(10, MEDIUM_SIZE)
     var b = Buffer[DType.int32].full(3, MEDIUM_SIZE)
     var result = a - b
 
     for i in range(MEDIUM_SIZE):
         assert_true(result[i] == 7, "sub buffers: value mismatch")
-    print("test_sub_buffers passed")
 
 
 def test_mul_buffers() raises:
-    print("test_mul_buffers")
     var a = Buffer[DType.int32].full(4, MEDIUM_SIZE)
     var b = Buffer[DType.int32].full(3, MEDIUM_SIZE)
     var result = a * b
 
     for i in range(MEDIUM_SIZE):
         assert_true(result[i] == 12, "mul buffers: value mismatch")
-    print("test_mul_buffers passed")
 
 
 def test_div_buffers() raises:
-    print("test_div_buffers")
     var a = Buffer[DType.float32].full(10.0, MEDIUM_SIZE)
     var b = Buffer[DType.float32].full(2.0, MEDIUM_SIZE)
     var result = a / b
 
     for i in range(MEDIUM_SIZE):
         assert_true(abs(result[i] - 5.0) < 0.001, "div buffers: value mismatch")
-    print("test_div_buffers passed")
 
 
 # ============================================
 # In-place Arithmetic (Buffer += Buffer)
 # ============================================
 def test_iadd_buffers() raises:
-    print("test_iadd_buffers")
     var a = Buffer[DType.int32].full(10, MEDIUM_SIZE)
     var b = Buffer[DType.int32].full(5, MEDIUM_SIZE)
     a += b
 
     for i in range(MEDIUM_SIZE):
         assert_true(a[i] == 15, "iadd buffers: value mismatch")
-    print("test_iadd_buffers passed")
 
 
 def test_isub_buffers() raises:
-    print("test_isub_buffers")
     var a = Buffer[DType.int32].full(10, MEDIUM_SIZE)
     var b = Buffer[DType.int32].full(3, MEDIUM_SIZE)
     a -= b
 
     for i in range(MEDIUM_SIZE):
         assert_true(a[i] == 7, "isub buffers: value mismatch")
-    print("test_isub_buffers passed")
 
 
 def test_imul_buffers() raises:
-    print("test_imul_buffers")
     var a = Buffer[DType.int32].full(4, MEDIUM_SIZE)
     var b = Buffer[DType.int32].full(3, MEDIUM_SIZE)
     a *= b
 
     for i in range(MEDIUM_SIZE):
         assert_true(a[i] == 12, "imul buffers: value mismatch")
-    print("test_imul_buffers passed")
 
 
 def test_itruediv_buffers() raises:
-    print("test_itruediv_buffers")
     var a = Buffer[DType.float32].full(10.0, MEDIUM_SIZE)
     var b = Buffer[DType.float32].full(2.0, MEDIUM_SIZE)
     a /= b
 
     for i in range(MEDIUM_SIZE):
         assert_true(abs(a[i] - 5.0) < 0.001, "itruediv buffers: value mismatch")
-    print("test_itruediv_buffers passed")
 
 
 # ============================================
 # Arithmetic Operations (Buffer + Scalar)
 # ============================================
 def test_add_scalar() raises:
-    print("test_add_scalar")
     var buffer = Buffer[DType.int32].full(10, MEDIUM_SIZE)
     var result = buffer + 5
 
     for i in range(MEDIUM_SIZE):
         assert_true(result[i] == 15, "add scalar: value mismatch")
-    print("test_add_scalar passed")
 
 
 def test_radd_scalar() raises:
-    print("test_radd_scalar")
     var buffer = Buffer[DType.int32].full(10, MEDIUM_SIZE)
     var result = 5 + buffer
 
     for i in range(MEDIUM_SIZE):
         assert_true(result[i] == 15, "radd scalar: value mismatch")
-    print("test_radd_scalar passed")
 
 
 def test_sub_scalar() raises:
-    print("test_sub_scalar")
     var buffer = Buffer[DType.int32].full(10, MEDIUM_SIZE)
     var result = buffer - 3
 
     for i in range(MEDIUM_SIZE):
         assert_true(result[i] == 7, "sub scalar: value mismatch")
-    print("test_sub_scalar passed")
 
 
 def test_rsub_scalar() raises:
-    print("test_rsub_scalar")
     var buffer = Buffer[DType.int32].full(3, MEDIUM_SIZE)
     var result = 10 - buffer
 
     for i in range(MEDIUM_SIZE):
         assert_true(result[i] == 7, "rsub scalar: value mismatch")
-    print("test_rsub_scalar passed")
 
 
 def test_mul_scalar() raises:
-    print("test_mul_scalar")
     var buffer = Buffer[DType.int32].full(4, MEDIUM_SIZE)
     var result = buffer * 3
 
     for i in range(MEDIUM_SIZE):
         assert_true(result[i] == 12, "mul scalar: value mismatch")
-    print("test_mul_scalar passed")
 
 
 def test_rmul_scalar() raises:
-    print("test_rmul_scalar")
     var buffer = Buffer[DType.int32].full(4, MEDIUM_SIZE)
     var result = 3 * buffer
 
     for i in range(MEDIUM_SIZE):
         assert_true(result[i] == 12, "rmul scalar: value mismatch")
-    print("test_rmul_scalar passed")
 
 
 def test_truediv_scalar() raises:
-    print("test_truediv_scalar")
     var buffer = Buffer[DType.float32].full(10.0, MEDIUM_SIZE)
     var result = buffer / 2.0
 
@@ -324,11 +271,9 @@ def test_truediv_scalar() raises:
         assert_true(
             abs(result[i] - 5.0) < 0.001, "truediv scalar: value mismatch"
         )
-    print("test_truediv_scalar passed")
 
 
 def test_rtruediv_scalar() raises:
-    print("test_rtruediv_scalar")
     var buffer = Buffer[DType.float32].full(2.0, MEDIUM_SIZE)
     var result = 10.0 / buffer
 
@@ -336,44 +281,36 @@ def test_rtruediv_scalar() raises:
         assert_true(
             abs(result[i] - 5.0) < 0.001, "rtruediv scalar: value mismatch"
         )
-    print("test_rtruediv_scalar passed")
 
 
 # ============================================
 # In-place Scalar Operations
 # ============================================
 def test_iadd_scalar() raises:
-    print("test_iadd_scalar")
     var buffer = Buffer[DType.int32].full(10, MEDIUM_SIZE)
     buffer += 5
 
     for i in range(MEDIUM_SIZE):
         assert_true(buffer[i] == 15, "iadd scalar: value mismatch")
-    print("test_iadd_scalar passed")
 
 
 def test_isub_scalar() raises:
-    print("test_isub_scalar")
     var buffer = Buffer[DType.int32].full(10, MEDIUM_SIZE)
     buffer -= 3
 
     for i in range(MEDIUM_SIZE):
         assert_true(buffer[i] == 7, "isub scalar: value mismatch")
-    print("test_isub_scalar passed")
 
 
 def test_imul_scalar() raises:
-    print("test_imul_scalar")
     var buffer = Buffer[DType.int32].full(4, MEDIUM_SIZE)
     buffer *= 3
 
     for i in range(MEDIUM_SIZE):
         assert_true(buffer[i] == 12, "imul scalar: value mismatch")
-    print("test_imul_scalar passed")
 
 
 def test_itruediv_scalar() raises:
-    print("test_itruediv_scalar")
     var buffer = Buffer[DType.float32].full(10.0, MEDIUM_SIZE)
     buffer /= 2.0
 
@@ -381,24 +318,20 @@ def test_itruediv_scalar() raises:
         assert_true(
             abs(buffer[i] - 5.0) < 0.001, "itruediv scalar: value mismatch"
         )
-    print("test_itruediv_scalar passed")
 
 
 # ============================================
 # Unary Operations
 # ============================================
 def test_neg() raises:
-    print("test_neg")
     var buffer = Buffer[DType.int32].full(5, MEDIUM_SIZE)
     var result = -buffer
 
     for i in range(MEDIUM_SIZE):
         assert_true(result[i] == -5, "neg: value mismatch")
-    print("test_neg passed")
 
 
 def test_abs() raises:
-    print("test_abs")
     var buffer = Buffer[DType.int32](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
         buffer[i] = Int32(i - 30)  # Mix of negative and positive
@@ -407,41 +340,33 @@ def test_abs() raises:
     for i in range(MEDIUM_SIZE):
         assert_true(result[i] >= 0, "abs: should be non-negative")
         assert_true(result[i] == abs(Int32(i) - 30), "abs: value mismatch")
-    print("test_abs passed")
 
 
 def test_pow() raises:
-    print("test_pow")
     var buffer = Buffer[DType.float32].full(2.0, MEDIUM_SIZE)
     var result = buffer**3.0
 
     for i in range(MEDIUM_SIZE):
         assert_true(abs(result[i] - 8.0) < 0.001, "pow: value mismatch")
-    print("test_pow passed")
 
 
 def test_exp() raises:
-    print("test_exp")
     var buffer = Buffer[DType.float32].full(0.0, 10)
     var result = buffer.exp()
 
     for i in range(10):
         assert_true(abs(result[i] - 1.0) < 0.001, "exp(0) should be 1")
-    print("test_exp passed")
 
 
 def test_log() raises:
-    print("test_log")
     var buffer = Buffer[DType.float32].full(1.0, 10)
     var result = buffer.log()
 
     for i in range(10):
         assert_true(abs(result[i] - 0.0) < 0.001, "log(1) should be 0")
-    print("test_log passed")
 
 
 def test_log_buffer() raises:
-    print("test_log_buffer")
     comptime dtype = DType.float32
     var a = Buffer[dtype].arange(3, MEDIUM_SIZE)
     var result = a.log(10, 50)
@@ -450,7 +375,6 @@ def test_log_buffer() raises:
 
 
 def test_invert_bool() raises:
-    print("test_invert_bool")
     var buffer = Buffer[DType.bool](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
         buffer[i] = Scalar[DType.bool](i % 2 == 0)  # Alternating True/False
@@ -461,36 +385,30 @@ def test_invert_bool() raises:
         assert_true(
             result[i] == expected, "invert: value mismatch at " + String(i)
         )
-    print("test_invert_bool passed")
 
 
 # ============================================
 # Reduction Operations
 # ============================================
 def test_sum() raises:
-    print("test_sum")
     var buffer = Buffer[DType.int32](10)
     for i in range(10):
         buffer[i] = Int32(i + 1)  # 1 to 10
 
     var result = buffer.sum()
     assert_true(result == 55, "sum: expected 55, got " + String(result))
-    print("test_sum passed")
 
 
 def test_sum_with_range() raises:
-    print("test_sum_with_range")
     var buffer = Buffer[DType.int32](10)
     for i in range(10):
         buffer[i] = Int32(i + 1)  # 1 to 10
 
     var result = buffer.sum(2, 5)  # Sum indices 2,3,4 -> 3+4+5 = 12
     assert_true(result == 12, "sum range: expected 12, got " + String(result))
-    print("test_sum_with_range passed")
 
 
 def test_product() raises:
-    print("test_product")
     var buffer = Buffer[DType.int32](5)
     for i in range(5):
         buffer[i] = Int32(i + 1)  # 1 to 5
@@ -499,22 +417,18 @@ def test_product() raises:
     assert_true(
         result == 120, "product: expected 120 (5!), got " + String(result)
     )
-    print("test_product passed")
 
 
 def test_product_with_range() raises:
-    print("test_product_with_range")
     var buffer = Buffer[DType.int32](10)
     for i in range(10):
         buffer[i] = Int32(i + 1)
 
     var result = buffer.product(0, 3)  # 1*2*3 = 6
     assert_true(result == 6, "product range: expected 6, got " + String(result))
-    print("test_product_with_range passed")
 
 
 def test_dot() raises:
-    print("test_dot")
     var a = Buffer[DType.int32].full(2, 5)
     var b = Buffer[DType.int32].full(3, 5)
 
@@ -528,71 +442,56 @@ def test_dot() raises:
         scalar == 168, "dot: expected 168 (2*2*42), got " + String(scalar)
     )
 
-    print("test_dot passed")
-
 
 # ============================================
 # Comparison Operations (Scalar)
 # ============================================
 def test_eq_scalar_all_equal() raises:
-    print("test_eq_scalar_all_equal")
     var buffer = Buffer[DType.int32].full(42, MEDIUM_SIZE)
 
     assert_true(buffer == 42, "eq scalar: all equal should be True")
     assert_true(not (buffer == 0), "eq scalar: none equal should be False")
-    print("test_eq_scalar_all_equal passed")
 
 
 def test_ne_scalar() raises:
-    print("test_ne_scalar")
     var buffer = Buffer[DType.int32].full(42, MEDIUM_SIZE)
 
     assert_true(buffer != 0, "ne scalar: all != should be True")
     assert_true(not (buffer != 42), "ne scalar: none != should be False")
-    print("test_ne_scalar passed")
 
 
 def test_gt_scalar() raises:
-    print("test_gt_scalar")
     var buffer = Buffer[DType.int32].full(100, MEDIUM_SIZE)
 
     assert_true(buffer > 99, "gt scalar: all > 99")
     assert_true(not (buffer > 100), "gt scalar: none > 100")
-    print("test_gt_scalar passed")
 
 
 def test_ge_scalar() raises:
-    print("test_ge_scalar")
     var buffer = Buffer[DType.int32].full(100, MEDIUM_SIZE)
 
     assert_true(buffer >= 100, "ge scalar: all >= 100")
     assert_true(not (buffer >= 101), "ge scalar: none >= 101")
-    print("test_ge_scalar passed")
 
 
 def test_lt_scalar() raises:
-    print("test_lt_scalar")
     var buffer = Buffer[DType.int32].full(50, MEDIUM_SIZE)
 
     assert_true(buffer < 51, "lt scalar: all < 51")
     assert_true(not (buffer < 50), "lt scalar: none < 50")
-    print("test_lt_scalar passed")
 
 
 def test_le_scalar() raises:
-    print("test_le_scalar")
     var buffer = Buffer[DType.int32].full(50, MEDIUM_SIZE)
 
     assert_true(buffer <= 50, "le scalar: all <= 50")
     assert_true(not (buffer <= 49), "le scalar: none <= 49")
-    print("test_le_scalar passed")
 
 
 # ============================================
 # Element-wise Comparison (Scalar) -> Buffer[bool]
 # ============================================
 def test_eq_full_scalar() raises:
-    print("test_eq_full_scalar")
     var buffer = Buffer[DType.int32](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
         buffer[i] = Int32(i % 10)
@@ -601,11 +500,9 @@ def test_eq_full_scalar() raises:
     for i in range(MEDIUM_SIZE):
         expected = (i % 10) == 5
         assert_true(result[i] == expected, "eq full: mismatch at " + String(i))
-    print("test_eq_full_scalar passed")
 
 
 def test_ne_full_scalar() raises:
-    print("test_ne_full_scalar")
     var buffer = Buffer[DType.int32](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
         buffer[i] = Int32(i % 10)
@@ -614,11 +511,9 @@ def test_ne_full_scalar() raises:
     for i in range(MEDIUM_SIZE):
         expected = (i % 10) != 5
         assert_true(result[i] == expected, "ne full: mismatch at " + String(i))
-    print("test_ne_full_scalar passed")
 
 
 def test_lt_full_scalar() raises:
-    print("test_lt_full_scalar")
     var buffer = Buffer[DType.int32](20)
     for i in range(20):
         buffer[i] = Int32(i)
@@ -627,11 +522,9 @@ def test_lt_full_scalar() raises:
     for i in range(20):
         expected = i < 10
         assert_true(result[i] == expected, "lt full: mismatch at " + String(i))
-    print("test_lt_full_scalar passed")
 
 
 def test_gt_full_scalar() raises:
-    print("test_gt_full_scalar")
     var buffer = Buffer[DType.int32](20)
     for i in range(20):
         buffer[i] = Int32(i)
@@ -640,14 +533,12 @@ def test_gt_full_scalar() raises:
     for i in range(20):
         expected = i > 10
         assert_true(result[i] == expected, "gt full: mismatch at " + String(i))
-    print("test_gt_full_scalar passed")
 
 
 # ============================================
 # Comparison Operations (Buffer)
 # ============================================
 def test_eq_buffers() raises:
-    print("test_eq_buffers")
     var a = Buffer[DType.int32].full(42, MEDIUM_SIZE)
     var b = Buffer[DType.int32].full(42, MEDIUM_SIZE)
 
@@ -655,11 +546,9 @@ def test_eq_buffers() raises:
 
     b[0] = 0
     assert_true(not (a == b), "eq buffers: one different should be False")
-    print("test_eq_buffers passed")
 
 
 def test_ne_buffers() raises:
-    print("test_ne_buffers")
     var a = Buffer[DType.int32](MEDIUM_SIZE)
     var b = Buffer[DType.int32](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
@@ -670,11 +559,9 @@ def test_ne_buffers() raises:
 
     a[0] = b[0]
     assert_true(not (a != b), "ne buffers: one equal should be False")
-    print("test_ne_buffers passed")
 
 
 def test_lt_buffers() raises:
-    print("test_lt_buffers")
     var a = Buffer[DType.int32].full(5, MEDIUM_SIZE)
     var b = Buffer[DType.int32].full(10, MEDIUM_SIZE)
 
@@ -682,14 +569,12 @@ def test_lt_buffers() raises:
 
     a[0] = 10
     assert_true(not (a < b), "lt buffers: one not < should be False")
-    print("test_lt_buffers passed")
 
 
 # ============================================
 # Element-wise Comparison (Buffer) -> Buffer[bool]
 # ============================================
 def test_eq_full_buffers() raises:
-    print("test_eq_full_buffers")
     var a = Buffer[DType.int32](MEDIUM_SIZE)
     var b = Buffer[DType.int32](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
@@ -702,11 +587,9 @@ def test_eq_full_buffers() raises:
         assert_true(
             result[i] == expected, "eq full buffers: mismatch at " + String(i)
         )
-    print("test_eq_full_buffers passed")
 
 
 def test_lt_full_buffers() raises:
-    print("test_lt_full_buffers")
     var a = Buffer[DType.int32](MEDIUM_SIZE)
     var b = Buffer[DType.int32](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
@@ -719,14 +602,12 @@ def test_lt_full_buffers() raises:
         assert_true(
             result[i] == expected, "lt full buffers: mismatch at " + String(i)
         )
-    print("test_lt_full_buffers passed")
 
 
 # ============================================
 # Utility Methods
 # ============================================
 def test_fill() raises:
-    print("test_fill")
     var buffer = Buffer[DType.int32].zeros(MEDIUM_SIZE)
     buffer.fill(99, 10, 20)
 
@@ -735,21 +616,17 @@ def test_fill() raises:
             assert_true(buffer[i] == 99, "fill: should be 99 in range")
         else:
             assert_true(buffer[i] == 0, "fill: should be 0 outside range")
-    print("test_fill passed")
 
 
 def test_zero() raises:
-    print("test_zero")
     var buffer = Buffer[DType.int32].full(42, MEDIUM_SIZE)
     buffer.zero()
 
     for i in range(MEDIUM_SIZE):
         assert_true(buffer[i] == 0, "zero: all should be 0")
-    print("test_zero passed")
 
 
 def test_overwrite() raises:
-    print("test_overwrite")
     var buffer = Buffer[DType.int32].zeros(MEDIUM_SIZE)
     var source = Buffer[DType.int32].full(99, 10)
     buffer.overwrite(source, 10, 20)
@@ -759,11 +636,9 @@ def test_overwrite() raises:
             assert_true(buffer[i] == 99, "overwrite: should be 99 in range")
         else:
             assert_true(buffer[i] == 0, "overwrite: should be 0 outside range")
-    print("test_overwrite passed")
 
 
 def test_count() raises:
-    print("test_count")
     var buffer = Buffer[DType.int32](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
         buffer[i] = Int32(i % 10)
@@ -775,11 +650,9 @@ def test_count() raises:
     var count_0 = buffer.count(0)
     # i % 10 == 0 at indices: 0, 10, 20, 30, 40, 50, 60 = 7 occurrences
     assert_true(count_0 == 7, "count: expected 7 zeros, got " + String(count_0))
-    print("test_count passed")
 
 
 def test_count_with_range() raises:
-    print("test_count_with_range")
     var buffer = Buffer[DType.int32].full(5, MEDIUM_SIZE)
     buffer[10] = 99
     buffer[20] = 99
@@ -790,14 +663,12 @@ def test_count_with_range() raises:
 
     var count_range = buffer.count(99, 15, 35)
     assert_true(count_range == 2, "count range: expected 2 (at 20 and 30)")
-    print("test_count_with_range passed")
 
 
 # ============================================
 # Type Conversion Tests
 # ============================================
 def test_to_dtype_int_to_float() raises:
-    print("test_to_dtype_int_to_float")
     var buffer = Buffer[DType.int32](10)
     for i in range(10):
         buffer[i] = Int32(i * 10)
@@ -808,11 +679,9 @@ def test_to_dtype_int_to_float() raises:
             abs(result[i] - Scalar[DType.float32](i * 10)) < 0.001,
             "to_dtype int->float: mismatch at " + String(i),
         )
-    print("test_to_dtype_int_to_float passed")
 
 
 def test_to_dtype_float_to_int() raises:
-    print("test_to_dtype_float_to_int")
     var buffer = Buffer[DType.float32](10)
     for i in range(10):
         buffer[i] = Scalar[DType.float32](i) + 0.7
@@ -824,11 +693,9 @@ def test_to_dtype_float_to_int() raises:
             result[i] == Int32(i),
             "to_dtype float->int: mismatch at " + String(i),
         )
-    print("test_to_dtype_float_to_int passed")
 
 
 def test_to_dtype_to_bool() raises:
-    print("test_to_dtype_to_bool")
     var buffer = Buffer[DType.int32](10)
     for i in range(10):
         buffer[i] = Int32(i)  # 0, 1, 2, ...
@@ -839,11 +706,9 @@ def test_to_dtype_to_bool() raises:
         assert_true(
             result[i] == True, "to_dtype to bool: non-zero should be True"
         )
-    print("test_to_dtype_to_bool passed")
 
 
 def test_to_dtype_from_bool() raises:
-    print("test_to_dtype_from_bool")
     var buffer = Buffer[DType.bool](10)
     for i in range(10):
         buffer[i] = i % 2 == 0  # Alternating
@@ -855,25 +720,20 @@ def test_to_dtype_from_bool() raises:
             result[i] == Int32(expected),
             "to_dtype from bool: mismatch at " + String(i),
         )
-    print("test_to_dtype_from_bool passed")
 
 
 def test_float_convenience() raises:
-    print("test_float_convenience")
     var buffer = Buffer[DType.int32].full(42, 10)
     var result = buffer.float()
 
     assert_true(result[0] == 42.0, "float() convenience: value mismatch")
-    print("test_float_convenience passed")
 
 
 def test_float64_convenience() raises:
-    print("test_float64_convenience")
     var buffer = Buffer[DType.int32].full(42, 10)
     var result = buffer.float64()
 
     assert_true(result[0] == 42.0, "float64() convenience: value mismatch")
-    print("test_float64_convenience passed")
 
 
 # ============================================
@@ -882,7 +742,6 @@ def test_float64_convenience() raises:
 
 
 def test_imul_bool_scalar() raises:
-    print("test_imul_bool_scalar")
     var buffer = Buffer[DType.bool](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
         buffer[i] = True
@@ -890,14 +749,12 @@ def test_imul_bool_scalar() raises:
     buffer *= False
     for i in range(MEDIUM_SIZE):
         assert_true(buffer[i] == False, "imul bool scalar: all should be False")
-    print("test_imul_bool_scalar passed")
 
 
 # ============================================
 # Edge Cases and SIMD Boundary Tests
 # ============================================
 def test_simd_boundary_sizes() raises:
-    print("test_simd_boundary_sizes")
     comptime sizes: List[Int] = [1, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65]
 
     comptime for idx in range(len(sizes)):
@@ -916,11 +773,8 @@ def test_simd_boundary_sizes() raises:
                 mul_result[i] == 50, "SIMD boundary mul: size " + String(size)
             )
 
-    print("test_simd_boundary_sizes passed")
-
 
 def test_arithmetic_ops_with_range() raises:
-    print("test_arithmetic_ops_with_range")
     var a = Buffer[DType.int32].full(10, 20)
     var b = Buffer[DType.int32].full(3, 10)
 
@@ -929,11 +783,9 @@ def test_arithmetic_ops_with_range() raises:
     assert_true(result.size == 10, "arithmetic_ops range: size mismatch")
     for i in range(10):
         assert_true(result[i] == 13, "arithmetic_ops range: value mismatch")
-    print("test_arithmetic_ops_with_range passed")
 
 
 def test_inplace_ops_with_range() raises:
-    print("test_inplace_ops_with_range")
     var a = Buffer[DType.int32].full(10, 20)
     var b = Buffer[DType.int32].full(5, 10)
 
@@ -948,11 +800,9 @@ def test_inplace_ops_with_range() raises:
             assert_true(
                 a[i] == 10, "inplace_ops range: unmodified region should be 10"
             )
-    print("test_inplace_ops_with_range passed")
 
 
 def test_inplace_ops_scalar_with_range() raises:
-    print("test_inplace_ops_scalar_with_range")
     var buffer = Buffer[DType.int32].full(10, 20)
 
     buffer.inplace_ops_scalar[Multiply](2, 5, 15)
@@ -968,14 +818,12 @@ def test_inplace_ops_scalar_with_range() raises:
                 buffer[i] == 10,
                 "inplace_ops_scalar range: unmodified should be 10",
             )
-    print("test_inplace_ops_scalar_with_range passed")
 
 
 # ============================================
 # Different DType Tests
 # ============================================
 def test_operations_uint8() raises:
-    print("test_operations_uint8")
     var a = Buffer[DType.uint8].full(100, MEDIUM_SIZE)
     var b = Buffer[DType.uint8].full(50, MEDIUM_SIZE)
 
@@ -984,21 +832,17 @@ def test_operations_uint8() raises:
 
     assert_true(sum_result[0] == 150, "uint8 add")
     # Note: 100 * 50 = 5000, but uint8 max is 255, so overflow
-    print("test_operations_uint8 passed")
 
 
 def test_operations_int16() raises:
-    print("test_operations_int16")
     var a = Buffer[DType.int16].full(1000, MEDIUM_SIZE)
     var b = Buffer[DType.int16].full(500, MEDIUM_SIZE)
 
     var sum_result = a + b
     assert_true(sum_result[0] == 1500, "int16 add")
-    print("test_operations_int16 passed")
 
 
 def test_operations_float64() raises:
-    print("test_operations_float64")
     var a = Buffer[DType.float64].full(1.5, MEDIUM_SIZE)
     var b = Buffer[DType.float64].full(2.5, MEDIUM_SIZE)
 
@@ -1007,152 +851,19 @@ def test_operations_float64() raises:
 
     assert_true(abs(sum_result[0] - 4.0) < 0.001, "float64 add")
     assert_true(abs(mul_result[0] - 3.75) < 0.001, "float64 mul")
-    print("test_operations_float64 passed")
-
-
-# ============================================
-# Consolidated Test Runner
-# ============================================
-def run_all_buffer_tests() raises:
-    print("=" * 60)
-    print("Running all Buffer tests")
-    print("=" * 60)
-
-    # Constructors
-    test_constructor_empty()
-    test_constructor_size()
-    test_constructor_from_list()
-
-    # Static factories
-    test_full()
-    test_zeros()
-    test_arange_single_arg()
-    test_arange_two_args()
-    test_arange_three_args()
-    test_linspace()
-
-    # Indexing
-    test_getitem_setitem()
-    test_slice_contiguous()
-    test_slice_with_step()
-    test_slice_empty()
-
-    # Buffer arithmetic
-    test_add_buffers()
-    test_sub_buffers()
-    test_mul_buffers()
-    test_div_buffers()
-
-    # In-place buffer arithmetic
-    test_iadd_buffers()
-    test_isub_buffers()
-    test_imul_buffers()
-    test_itruediv_buffers()
-
-    # Scalar arithmetic
-    test_add_scalar()
-    test_radd_scalar()
-    test_sub_scalar()
-    test_rsub_scalar()
-    test_mul_scalar()
-    test_rmul_scalar()
-    test_truediv_scalar()
-    test_rtruediv_scalar()
-
-    # In-place scalar arithmetic
-    test_iadd_scalar()
-    test_isub_scalar()
-    test_imul_scalar()
-    test_itruediv_scalar()
-
-    # Unary ops
-    test_neg()
-    test_abs()
-    test_pow()
-    test_exp()
-    test_log_orig()
-    test_invert_bool()
-
-    # Reductions
-    test_sum()
-    test_sum_with_range()
-    test_product()
-    test_product_with_range()
-    test_dot()
-
-    # Scalar comparisons
-    test_eq_scalar_all_equal()
-    test_ne_scalar()
-    test_gt_scalar()
-    test_ge_scalar()
-    test_lt_scalar()
-    test_le_scalar()
-
-    # Element-wise scalar comparisons
-    test_eq_full_scalar()
-    test_ne_full_scalar()
-    test_lt_full_scalar()
-    test_gt_full_scalar()
-
-    # Buffer comparisons
-    test_eq_buffers()
-    test_ne_buffers()
-    test_lt_buffers()
-
-    # Element-wise buffer comparisons
-    test_eq_full_buffers()
-    test_lt_full_buffers()
-
-    # Utility methods
-    test_fill()
-    test_zero()
-    test_overwrite()
-    test_count()
-    test_count_with_range()
-
-    # Type conversion
-    test_to_dtype_int_to_float()
-    test_to_dtype_float_to_int()
-    test_to_dtype_to_bool()
-    test_to_dtype_from_bool()
-    test_float_convenience()
-    test_float64_convenience()
-
-    # Boolean operations
-    # test_mul_bool_buffers()
-    test_imul_bool_scalar()
-
-    # Edge cases
-    test_simd_boundary_sizes()
-    test_arithmetic_ops_with_range()
-    test_inplace_ops_with_range()
-    test_inplace_ops_scalar_with_range()
-
-    # Different DTypes
-    test_operations_uint8()
-    test_operations_int16()
-    test_operations_float64()
-
-    print("=" * 60)
-    print("All Buffer tests passed!")
-    print("=" * 60)
 
 
 # ============================================
 # __eq__ Tests - new tests above
 # ============================================
 def test_dunder_eq_all_equal_int32() raises:
-    print("test_dunder_eq_all_equal_int32")
     var buffer = Buffer[DType.int32].full(42, MEDIUM_SIZE)
 
     assert_true(buffer == 42, "All elements are 42, should return True")
     assert_true(not (buffer == 0), "No elements are 0, should return False")
-    print("test_dunder_eq_all_equal_int32 passed")
 
 
 def test_dunder_eq_one_different() raises:
-    print("test_dunder_eq_one_different")
-
     var buffer = Buffer[DType.int64].full(100, MEDIUM_SIZE)
     buffer[0] = 99
     assert_true(
@@ -1170,33 +881,27 @@ def test_dunder_eq_one_different() raises:
     assert_true(
         not (buffer == 100), "Middle element differs, should return False"
     )
-    print("test_dunder_eq_one_different passed")
 
 
 def test_dunder_eq_small_buffer() raises:
-    print("test_dunder_eq_small_buffer")
     var buffer = Buffer[DType.int32].full(5, SMALL_SIZE)
     assert_true(buffer == 5, "Small buffer: all equal")
 
     buffer[SMALL_SIZE - 1] = 6
     assert_true(not (buffer == 5), "Small buffer: one different")
-    print("test_dunder_eq_small_buffer passed")
 
 
 # ============================================
 # __ne__ Tests
 # ============================================
 def test_dunder_ne_all_different() raises:
-    print("test_dunder_ne_all_different")
     var buffer = Buffer[DType.int32].full(42, MEDIUM_SIZE)
 
     assert_true(buffer != 0, "All != 0, should return True")
     assert_true(not (buffer != 42), "None != 42, should return False")
-    print("test_dunder_ne_all_different passed")
 
 
 def test_dunder_ne_one_equal() raises:
-    print("test_dunder_ne_one_equal")
     var buffer = Buffer[DType.int64].full(100, MEDIUM_SIZE)
     buffer[MEDIUM_SIZE // 2] = 50
 
@@ -1206,124 +911,102 @@ def test_dunder_ne_one_equal() raises:
     assert_true(
         not (buffer != 100), "Most elements equal 100, should return False"
     )
-    print("test_dunder_ne_one_equal passed")
 
 
 # ============================================
 # __gt__ Tests
 # ============================================
 def test_dunder_gt_all_greater() raises:
-    print("test_dunder_gt_all_greater")
     var buffer = Buffer[DType.int32].full(100, MEDIUM_SIZE)
 
     assert_true(buffer > 99, "All > 99")
     assert_true(not (buffer > 100), "None > 100 (equal)")
     assert_true(not (buffer > 101), "None > 101")
-    print("test_dunder_gt_all_greater passed")
 
 
 def test_dunder_gt_one_not_greater() raises:
-    print("test_dunder_gt_one_not_greater")
     var buffer = Buffer[DType.int64].full(100, MEDIUM_SIZE)
     buffer[0] = 50
 
     assert_true(not (buffer > 99), "First element 50 not > 99")
-    print("test_dunder_gt_one_not_greater passed")
 
 
 def test_dunder_gt_negative() raises:
-    print("test_dunder_gt_negative")
     var buffer = Buffer[DType.int32](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
         buffer[i] = Int32(i) - 30
 
     assert_true(buffer > -31, "All > -31")
     assert_true(not (buffer > -30), "First element is -30, not > -30")
-    print("test_dunder_gt_negative passed")
 
 
 # ============================================
 # __ge__ Tests
 # ============================================
 def test_dunder_ge_all_greater_equal() raises:
-    print("test_dunder_ge_all_greater_equal")
     var buffer = Buffer[DType.int32].full(100, MEDIUM_SIZE)
 
     assert_true(buffer >= 100, "All >= 100 (equal)")
     assert_true(buffer >= 50, "All >= 50")
     assert_true(not (buffer >= 101), "None >= 101")
-    print("test_dunder_ge_all_greater_equal passed")
 
 
 def test_dunder_ge_one_less() raises:
-    print("test_dunder_ge_one_less")
     var buffer = Buffer[DType.int64].full(100, MEDIUM_SIZE)
     buffer[MEDIUM_SIZE - 1] = 99
 
     assert_true(not (buffer >= 100), "Last element 99 not >= 100")
-    print("test_dunder_ge_one_less passed")
 
 
 # ============================================
 # __lt__ Tests
 # ============================================
 def test_dunder_lt_all_less() raises:
-    print("test_dunder_lt_all_less")
     var buffer = Buffer[DType.int32].full(50, MEDIUM_SIZE)
 
     assert_true(buffer < 51, "All < 51")
     assert_true(not (buffer < 50), "None < 50 (equal)")
     assert_true(not (buffer < 49), "None < 49")
-    print("test_dunder_lt_all_less passed")
 
 
 def test_dunder_lt_one_not_less() raises:
-    print("test_dunder_lt_one_not_less")
     var buffer = Buffer[DType.int64].full(50, MEDIUM_SIZE)
     buffer[0] = 100
 
     assert_true(not (buffer < 51), "First element 100 not < 51")
-    print("test_dunder_lt_one_not_less passed")
 
 
 def test_dunder_lt_float32() raises:
-    print("test_dunder_lt_float32")
     var buffer = Buffer[DType.float32](20)
     for i in range(20):
         buffer[i] = Scalar[DType.float32](i)
 
     assert_true(buffer < 20.0, "All < 20.0")
     assert_true(not (buffer < 19.0), "Last element 19.0 not < 19.0")
-    print("test_dunder_lt_float32 passed")
 
 
 # ============================================
 # __le__ Tests
 # ============================================
 def test_dunder_le_all_less_equal() raises:
-    print("test_dunder_le_all_less_equal")
     var buffer = Buffer[DType.int32].full(50, MEDIUM_SIZE)
 
     assert_true(buffer <= 50, "All <= 50 (equal)")
     assert_true(buffer <= 100, "All <= 100")
     assert_true(not (buffer <= 49), "None <= 49")
-    print("test_dunder_le_all_less_equal passed")
 
 
 def test_dunder_le_one_greater() raises:
-    print("test_dunder_le_one_greater")
     var buffer = Buffer[DType.int64].full(50, MEDIUM_SIZE)
     buffer[0] = 51
 
     assert_true(not (buffer <= 50), "First element 51 not <= 50")
-    print("test_dunder_le_one_greater passed")
 
 
 # ============================================
 # Edge Cases
 # ============================================
 def test_dunder_compare_single_element() raises:
-    print("test_dunder_compare_single_element")
     var buffer = Buffer[DType.int32](1)
     buffer[0] = 42
 
@@ -1333,11 +1016,9 @@ def test_dunder_compare_single_element() raises:
     assert_true(buffer >= 42, "Single: >= 42")
     assert_true(buffer < 43, "Single: < 43")
     assert_true(buffer <= 42, "Single: <= 42")
-    print("test_dunder_compare_single_element passed")
 
 
 def test_dunder_compare_empty() raises:
-    print("test_dunder_compare_empty")
     var buffer = Buffer[DType.int32]()
 
     assert_true(not (buffer == 0), "Empty: == returns False")
@@ -1346,11 +1027,9 @@ def test_dunder_compare_empty() raises:
     assert_true(not (buffer >= 0), "Empty: >= returns False")
     assert_true(not (buffer < 0), "Empty: < returns False")
     assert_true(not (buffer <= 0), "Empty: <= returns False")
-    print("test_dunder_compare_empty passed")
 
 
 def test_dunder_compare_simd_boundary() raises:
-    print("test_dunder_compare_simd_boundary")
     # Test sizes around SIMD width (8 for int32)
     comptime sizes: List[Int] = [1, 7, 8, 9, 15, 16, 17, 31, 32, 33]
 
@@ -1371,11 +1050,8 @@ def test_dunder_compare_simd_boundary() raises:
             "Size " + String(size) + ": not <= after change",
         )
 
-    print("test_dunder_compare_simd_boundary passed")
-
 
 def test_dunder_compare_position_sensitivity() raises:
-    print("test_dunder_compare_position_sensitivity")
     comptime positions: List[Int] = [0, 7, 8, 9, 16, 33, 64, 67]
 
     comptime for idx in range(len(positions)):
@@ -1391,69 +1067,27 @@ def test_dunder_compare_position_sensitivity() raises:
                 not (buffer == 100), "Position " + String(pos) + ": == fails"
             )
 
-    print("test_dunder_compare_position_sensitivity passed")
-
 
 def test_dunder_compare_uint8() raises:
-    print("test_dunder_compare_uint8")
     var buffer = Buffer[DType.uint8].full(100, MEDIUM_SIZE)
 
     assert_true(buffer == 100, "uint8: ==")
     assert_true(buffer > 99, "uint8: >")
     assert_true(buffer < 101, "uint8: <")
-    print("test_dunder_compare_uint8 passed")
 
 
 def test_dunder_compare_float64() raises:
-    print("test_dunder_compare_float64")
     var buffer = Buffer[DType.float64].full(3.14159, MEDIUM_SIZE)
 
     assert_true(buffer == 3.14159, "float64: ==")
     assert_true(buffer > 3.14, "float64: >")
     assert_true(buffer < 3.15, "float64: <")
-    print("test_dunder_compare_float64 passed")
-
-
-# ============================================
-# Test Runner
-# ============================================
-def run_all_dunder_comparison_tests() raises:
-    print("=" * 60)
-    print("Running dunder comparison tests")
-    print("=" * 60)
-
-    test_dunder_eq_all_equal_int32()
-    test_dunder_eq_one_different()
-    test_dunder_eq_small_buffer()
-    test_dunder_ne_all_different()
-    test_dunder_ne_one_equal()
-    test_dunder_gt_all_greater()
-    test_dunder_gt_one_not_greater()
-    test_dunder_gt_negative()
-    test_dunder_ge_all_greater_equal()
-    test_dunder_ge_one_less()
-    test_dunder_lt_all_less()
-    test_dunder_lt_one_not_less()
-    test_dunder_lt_float32()
-    test_dunder_le_all_less_equal()
-    test_dunder_le_one_greater()
-    test_dunder_compare_single_element()
-    test_dunder_compare_empty()
-    test_dunder_compare_simd_boundary()
-    test_dunder_compare_position_sensitivity()
-    test_dunder_compare_uint8()
-    test_dunder_compare_float64()
-
-    print("=" * 60)
-    print("All dunder comparison tests passed!")
-    print("=" * 60)
 
 
 # ============================================
 # EQ Tests
 # ============================================
 def test_eq_int32() raises:
-    print("test_eq_int32")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32](size)
     for i in range(size):
@@ -1471,11 +1105,9 @@ def test_eq_int32() raises:
             + " expected "
             + String(expected),
         )
-    print("test_eq_int32 passed")
 
 
 def test_eq_float64() raises:
-    print("test_eq_float64")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.float64](size)
     for i in range(size):
@@ -1489,11 +1121,9 @@ def test_eq_float64() raises:
             result[i] == expected,
             "test_eq_float64: index " + String(i) + " failed",
         )
-    print("test_eq_float64 passed")
 
 
 def test_eq_all_same() raises:
-    print("test_eq_all_same")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.int64].full(42, size)
 
@@ -1507,11 +1137,9 @@ def test_eq_all_same() raises:
         assert_true(
             result_false[i] == False, "test_eq_all_same: all should be False"
         )
-    print("test_eq_all_same passed")
 
 
 def test_eq_small_buffer() raises:
-    print("test_eq_small_buffer")
     size = SMALL_SIZE
     var buffer = Buffer[DType.int32](size)
     for i in range(size):
@@ -1525,14 +1153,12 @@ def test_eq_small_buffer() raises:
             result[i] == expected,
             "test_eq_small_buffer: index " + String(i) + " failed",
         )
-    print("test_eq_small_buffer passed")
 
 
 # ============================================
 # NE Tests
 # ============================================
 def test_ne_int32() raises:
-    print("test_ne_int32")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32](size)
     for i in range(size):
@@ -1546,11 +1172,9 @@ def test_ne_int32() raises:
             result[i] == expected,
             "test_ne_int32: index " + String(i) + " failed",
         )
-    print("test_ne_int32 passed")
 
 
 def test_ne_float32() raises:
-    print("test_ne_float32")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.float32](size)
     for i in range(size):
@@ -1564,11 +1188,9 @@ def test_ne_float32() raises:
             result[i] == expected,
             "test_ne_float32: index " + String(i) + " failed",
         )
-    print("test_ne_float32 passed")
 
 
 def test_ne_all_different() raises:
-    print("test_ne_all_different")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.int64].full(100, size)
 
@@ -1578,14 +1200,12 @@ def test_ne_all_different() raises:
         assert_true(
             result[i] == True, "test_ne_all_different: all should be True"
         )
-    print("test_ne_all_different passed")
 
 
 # ============================================
 # GT Tests
 # ============================================
 def test_gt_int64() raises:
-    print("test_gt_int64")
     size = MEDIUM_SIZE
     var ll = List[Scalar[DType.int64]](capacity=size)
     for i in range(size):
@@ -1600,11 +1220,9 @@ def test_gt_int64() raises:
             result[i] == expected,
             "test_gt_int64: index " + String(i) + " failed",
         )
-    print("test_gt_int64 passed")
 
 
 def test_gt_float32() raises:
-    print("test_gt_float32")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.float32](size)
     for i in range(size):
@@ -1618,11 +1236,9 @@ def test_gt_float32() raises:
             result[i] == expected,
             "test_gt_float32: index " + String(i) + " failed",
         )
-    print("test_gt_float32 passed")
 
 
 def test_gt_negative_values() raises:
-    print("test_gt_negative_values")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32](size)
     for i in range(size):
@@ -1636,11 +1252,9 @@ def test_gt_negative_values() raises:
             result[i] == expected,
             "test_gt_negative_values: index " + String(i) + " failed",
         )
-    print("test_gt_negative_values passed")
 
 
 def test_gt_boundary() raises:
-    print("test_gt_boundary")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32](size)
     for i in range(size):
@@ -1662,14 +1276,12 @@ def test_gt_boundary() raises:
             result[i] == False,
             "test_gt_boundary: middle elements should not be > 10",
         )
-    print("test_gt_boundary passed")
 
 
 # ============================================
 # GE Tests
 # ============================================
 def test_ge_int32() raises:
-    print("test_ge_int32")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32](size)
     for i in range(size):
@@ -1683,11 +1295,9 @@ def test_ge_int32() raises:
             result[i] == expected,
             "test_ge_int32: index " + String(i) + " failed",
         )
-    print("test_ge_int32 passed")
 
 
 def test_ge_float64() raises:
-    print("test_ge_float64")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.float64](size)
     for i in range(size):
@@ -1701,11 +1311,9 @@ def test_ge_float64() raises:
             result[i] == expected,
             "test_ge_float64: index " + String(i) + " failed",
         )
-    print("test_ge_float64 passed")
 
 
 def test_ge_equal_value() raises:
-    print("test_ge_equal_value")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.int64].full(100, size)
 
@@ -1715,14 +1323,12 @@ def test_ge_equal_value() raises:
         assert_true(
             result[i] == True, "test_ge_equal_value: all should be >= 100"
         )
-    print("test_ge_equal_value passed")
 
 
 # ============================================
 # LT Tests
 # ============================================
 def test_lt_int64() raises:
-    print("test_lt_int64")
     size = MEDIUM_SIZE
     var ll = List[Scalar[DType.int64]](capacity=size)
     for _ in range(size):
@@ -1737,11 +1343,9 @@ def test_lt_int64() raises:
     assert_true(result[1] == True, "test_lt_int64: 2 < 5")
     assert_true(result[65] == False, "test_lt_int64: 42 is not < 5")
     assert_true(result[67] == True, "test_lt_int64: 2 < 5")
-    print("test_lt_int64 passed")
 
 
 def test_lt_float32() raises:
-    print("test_lt_float32")
     size = 20
     var ll = List[Scalar[DType.float32]](capacity=size)
     for i in range(size):
@@ -1756,11 +1360,9 @@ def test_lt_float32() raises:
             result[i] == expected,
             "test_lt_float32: index " + String(i) + " failed",
         )
-    print("test_lt_float32 passed")
 
 
 def test_lt_all_less() raises:
-    print("test_lt_all_less")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32].full(0, size)
 
@@ -1768,11 +1370,9 @@ def test_lt_all_less() raises:
 
     for i in range(size):
         assert_true(result[i] == True, "test_lt_all_less: all should be < 100")
-    print("test_lt_all_less passed")
 
 
 def test_lt_none_less() raises:
-    print("test_lt_none_less")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32].full(100, size)
 
@@ -1782,14 +1382,12 @@ def test_lt_none_less() raises:
         assert_true(
             result[i] == False, "test_lt_none_less: none should be < 50"
         )
-    print("test_lt_none_less passed")
 
 
 # ============================================
 # LE Tests
 # ============================================
 def test_le_int32() raises:
-    print("test_le_int32")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32](size)
     for i in range(size):
@@ -1803,11 +1401,9 @@ def test_le_int32() raises:
             result[i] == expected,
             "test_le_int32: index " + String(i) + " failed",
         )
-    print("test_le_int32 passed")
 
 
 def test_le_float64() raises:
-    print("test_le_float64")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.float64](size)
     for i in range(size):
@@ -1821,11 +1417,9 @@ def test_le_float64() raises:
             result[i] == expected,
             "test_le_float64: index " + String(i) + " failed",
         )
-    print("test_le_float64 passed")
 
 
 def test_le_equal_value() raises:
-    print("test_le_equal_value")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.int64].full(100, size)
 
@@ -1835,14 +1429,12 @@ def test_le_equal_value() raises:
         assert_true(
             result[i] == True, "test_le_equal_value: all should be <= 100"
         )
-    print("test_le_equal_value passed")
 
 
 # ============================================
 # Edge Case Tests
 # ============================================
 def test_compare_single_element() raises:
-    print("test_compare_single_element")
     var buffer = Buffer[DType.int32](1)
     buffer[0] = 5
 
@@ -1852,11 +1444,9 @@ def test_compare_single_element() raises:
     assert_true(buffer.ge(5)[0] == True, "Single element ge failed")
     assert_true(buffer.lt(6)[0] == True, "Single element lt failed")
     assert_true(buffer.le(5)[0] == True, "Single element le failed")
-    print("test_compare_single_element passed")
 
 
 def test_compare_simd_boundary() raises:
-    print("test_compare_simd_boundary")
     # Test sizes around typical SIMD widths
     comptime sizes: List[Int] = [
         1,
@@ -1895,11 +1485,8 @@ def test_compare_simd_boundary() raises:
                 + " failed",
             )
 
-    print("test_compare_simd_boundary passed")
-
 
 def test_compare_large_buffer() raises:
-    print("test_compare_large_buffer")
     size = LARGE_SIZE
     var buffer = Buffer[DType.float32](size)
     for i in range(size):
@@ -1913,11 +1500,9 @@ def test_compare_large_buffer() raises:
             result[i] == expected,
             "test_compare_large_buffer: index " + String(i) + " failed",
         )
-    print("test_compare_large_buffer passed")
 
 
 def test_compare_uint8() raises:
-    print("test_compare_uint8")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.uint8](size)
     for i in range(size):
@@ -1931,11 +1516,9 @@ def test_compare_uint8() raises:
             result[i] == expected,
             "test_compare_uint8: index " + String(i) + " failed",
         )
-    print("test_compare_uint8 passed")
 
 
 def test_compare_int8() raises:
-    print("test_compare_int8")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.int8](size)
     for i in range(size):
@@ -1949,11 +1532,9 @@ def test_compare_int8() raises:
             result[i] == expected,
             "test_compare_int8: index " + String(i) + " failed",
         )
-    print("test_compare_int8 passed")
 
 
 def test_compare_int16() raises:
-    print("test_compare_int16")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.int16](size)
     for i in range(size):
@@ -1967,11 +1548,9 @@ def test_compare_int16() raises:
             result[i] == expected,
             "test_compare_int16: index " + String(i) + " failed",
         )
-    print("test_compare_int16 passed")
 
 
 def test_compare_uint64() raises:
-    print("test_compare_uint64")
     size = MEDIUM_SIZE
     var buffer = Buffer[DType.uint64](size)
     for i in range(size):
@@ -1985,69 +1564,10 @@ def test_compare_uint64() raises:
             result[i] == expected,
             "test_compare_uint64: index " + String(i) + " failed",
         )
-    print("test_compare_uint64 passed")
-
-
-# ============================================
-# Consolidated Test Runner
-# ============================================
-def run_all_comparison_tests() raises:
-    print("=" * 60)
-    print("Running all comparison tests")
-    print("=" * 60)
-
-    # EQ tests
-    test_eq_int32()
-    test_eq_float64()
-    test_eq_all_same()
-    test_eq_small_buffer()
-
-    # NE tests
-    test_ne_int32()
-    test_ne_float32()
-    test_ne_all_different()
-
-    # GT tests
-    test_gt_int64()
-    test_gt_float32()
-    test_gt_negative_values()
-    test_gt_boundary()
-
-    # GE tests
-    test_ge_int32()
-    test_ge_float64()
-    test_ge_equal_value()
-
-    # LT tests
-    test_lt_int64()
-    test_lt_float32()
-    test_lt_all_less()
-    test_lt_none_less()
-
-    # LE tests
-    test_le_int32()
-    test_le_float64()
-    test_le_equal_value()
-
-    # Edge cases
-    test_compare_single_element()
-    test_compare_simd_boundary()
-    test_compare_large_buffer()
-
-    # Different DTypes
-    test_compare_uint8()
-    test_compare_int8()
-    test_compare_int16()
-    test_compare_uint64()
-
-    print("=" * 60)
-    print("All comparison tests passed!")
-    print("=" * 60)
 
 
 # ====================================="
 def test_lt() raises:
-    print("test_lt")
     size = 68
     ll = List[Scalar[DType.int64]](capacity=size)
     for _ in range(size):
@@ -2073,11 +1593,9 @@ def test_lt() raises:
     assert_true(
         cmp_result[67] == True, "buffer.lt: index 67 should be True (2 < 5)"
     )
-    print("test_lt passed")
 
 
 def test_lt_breaks_original() raises:
-    print("test_lt_breaks_original")
     size = 20
     ll = List[Scalar[DType.float32]](capacity=size)
 
@@ -2095,28 +1613,22 @@ def test_lt_breaks_original() raises:
     assert_true(cmp_result[10] == False, "buffer.lt: 10 < 10 should be False")
     assert_true(cmp_result[15] == False, "buffer.lt: 15 < 10 should be False")
     assert_true(cmp_result[19] == False, "buffer.lt: 19 < 10 should be False")
-    print("test_lt_breaks_original passed")
 
 
 def test_simd_indexing() raises:
-    print("test_simd_indexing")
     comptime simd_width = 8
 
     # Create a SIMD vector with distinct values
     var vec = SIMD[DType.int32, simd_width](0, 1, 2, 3, 4, 5, 6, 7)
 
-    print("Direct indexing:")
     for i in range(simd_width):
         assert_true(vec[i] == Int32(i), "SIMD vector indexing failed")
 
-    print("\nAttempting out of bounds indexing (expecting crash):")
     # This will segfault - commenting out for safety
     # var should_crash = vec[8]
-    print("test_simd_indexing passed (in-bounds checks only)")
 
 
 def test_what_values() raises:
-    print("test_what_values")
     comptime simd_width = 8
 
     var buffer = Buffer[DType.float32](16)
@@ -2152,11 +1664,8 @@ def test_what_values() raises:
                     + ") should be >= 10",
                 )
 
-    print("test_what_values passed")
-
 
 def test_to_dtype_same_type() raises:
-    print("test_to_dtype_same_type")
     var buffer = Buffer[DType.int32](5)
     for i in range(5):
         buffer[i] = Int32(i * 10)
@@ -2169,11 +1678,8 @@ def test_to_dtype_same_type() raises:
             "Same type conversion should preserve values",
         )
 
-    print("test_to_dtype_same_type passed")
-
 
 def test_to_dtype_non_bool() raises:
-    print("test_to_dtype_non_bool")
     var buffer = Buffer[DType.int32](5)
     for i in range(5):
         buffer[i] = Int32(i * 10)
@@ -2186,11 +1692,8 @@ def test_to_dtype_non_bool() raises:
             "int32 to float32 conversion failed",
         )
 
-    print("test_to_dtype_non_bool passed")
-
 
 def test_to_dtype_to_bool_orig() raises:
-    print("test_to_dtype_to_bool")
     var buffer = Buffer[DType.int32](5)
     buffer[0] = 0
     buffer[1] = 1
@@ -2206,11 +1709,8 @@ def test_to_dtype_to_bool_orig() raises:
     assert_true(result[3] == False, "0 should cast to False")
     assert_true(result[4] == True, "-5 should cast to True")
 
-    print("test_to_dtype_to_bool passed")
-
 
 def test_to_dtype_from_bool_orig() raises:
-    print("test_to_dtype_from_bool")
     var buffer = Buffer[DType.bool](5)
     buffer[0] = False
     buffer[1] = True
@@ -2226,11 +1726,8 @@ def test_to_dtype_from_bool_orig() raises:
     assert_true(result[3] == 0, "False should cast to 0")
     assert_true(result[4] == 1, "True should cast to 1")
 
-    print("test_to_dtype_from_bool passed")
-
 
 def test_to_dtype_large_buffer() raises:
-    print("test_to_dtype_large_buffer")
     size = 100
     var buffer = Buffer[DType.float64](size)
     for i in range(size):
@@ -2245,77 +1742,8 @@ def test_to_dtype_large_buffer() raises:
             "Large buffer conversion failed at index " + String(i),
         )
 
-    print("test_to_dtype_large_buffer passed")
-
-
-def run_all_tests() raises:
-    print("=" * 50)
-    print("Running all buffer tests")
-    print("=" * 50)
-
-    test_lt()
-    test_lt_breaks_original()
-    test_simd_indexing()
-    test_what_values()
-    test_to_dtype_same_type()
-    test_to_dtype_non_bool()
-    test_to_dtype_to_bool_orig()
-    test_to_dtype_from_bool_orig()
-    test_to_dtype_large_buffer()
-
-    print("=" * 50)
-    print("All tests passed!")
-    print("=" * 50)
-
-
-def main() raises:
-    _ = """
-    print("Running buffer tests")
-    run_all_dunder_comparison_tests()
-    run_all_comparison_tests()
-    test_overwrite_orig()
-    test_fill_segment()
-    test_buffer_iter()
-    test_buffer_slice()
-    test_buffer_buffer_add()
-    # test_buffer_buffer_mul()
-    test_buffer_scalar_float_greater_than()
-    test_buffer_scalar_float_less_than_eq()
-    test_buffer_scalar_float_greater_than_eq()
-    test_buffer_scalar_float_less_than()
-    test_buffer_scalar_float_equality()
-    test_buffer_scalar_float_inequality()
-    test_buffer_float_equality()
-    test_buffer_dot()
-    test_buffer_prod()
-    test_buffer_sum()
-    test_buffer_float_greater_than_eq()
-    test_buffer_float_greater_than()
-    test_buffer_float_less_than()
-    test_buffer_float_inequality()
-    test_buffer_float_less_eq_than()
-    test_count_orig()
-    test_log()
-    test_log_buffer()
-    run_all_tests()
-    run_all_buffer_tests()
-    run_all_count_tests()
-    run_all_inplace_scalar_tests()
-    run_all_arithmetic_ops_tests()
-    run_all_manual_vectorization_tests()
-    run_all_buffer_ops_tests()
-    run_all_manual_vectorization_tests_2()
-    run_relu_optimization_tests()
-    print("Done running buffer tests")
-    """
-    TestSuite.discover_tests[__functions_in_module()]().run()
-
-
-from std.testing import assert_true, assert_false
-
 
 def test_count_orig() raises:
-    print("test_count_orig")
     size = 135
     ll = List[Scalar[DType.int64]](capacity=size)
     for _ in range(size):
@@ -2370,7 +1798,6 @@ def test_count_orig() raises:
 
 
 def test_log_orig() raises:
-    print("test_log")
     ll = List[Scalar[DType.float32]](capacity=100)
     for i in range(1, 100):
         ll.insert(0, Scalar[DType.float32](i))
@@ -2384,7 +1811,6 @@ def test_log_orig() raises:
 
 
 def test_buffer_iter() raises:
-    print("test_buffer_iter")
     comptime dtype = DType.float32
     buff = Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     sliced = buff[4:1:-1]
@@ -2395,7 +1821,6 @@ def test_buffer_iter() raises:
 
 
 def test_buffer_slice() raises:
-    print("test_buffer_slice")
     comptime dtype = DType.float32
     buff = Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     sliced = buff[4:1:-2]
@@ -2406,7 +1831,6 @@ def test_buffer_slice() raises:
 
 
 def _buffer_buffer_mul() raises:
-    print("test_buffer_buffer_mul")
     x = Buffer[DType.bool](129)
     x.fill(Scalar[DType.bool](True))
     y = Buffer[DType.bool](129)
@@ -2430,7 +1854,6 @@ def _buffer_buffer_mul() raises:
 
 
 def test_buffer_buffer_add() raises:
-    print("test_buffer_buffer_add")
     comptime dtype = DType.float32
     a = Buffer[dtype](72)
     a.fill(43.0)
@@ -2447,7 +1870,6 @@ def test_buffer_buffer_add() raises:
 
 
 def test_buffer_scalar_float_greater_than_eq() raises:
-    print("test_buffer_scalar_float_greater_than_eq")
     comptime dtype = DType.float32
     a = Buffer[dtype](72)
     a.fill(43.0)
@@ -2461,7 +1883,6 @@ def test_buffer_scalar_float_greater_than_eq() raises:
 
 
 def test_buffer_scalar_float_less_than_eq() raises:
-    print("test_buffer_scalar_float_less_than_eq")
     comptime dtype = DType.float32
     a = Buffer[dtype](72)
     a.fill(42.0)
@@ -2474,7 +1895,6 @@ def test_buffer_scalar_float_less_than_eq() raises:
 
 
 def test_buffer_scalar_float_greater_than() raises:
-    print("test_buffer_scalar_float_greater_than")
     comptime dtype = DType.float32
     a = Buffer[dtype](72)
     a.fill(42.0)
@@ -2483,7 +1903,6 @@ def test_buffer_scalar_float_greater_than() raises:
 
 
 def test_buffer_scalar_float_less_than() raises:
-    print("test_buffer_scalar_float_less_than")
     comptime dtype = DType.float32
     a = Buffer[dtype](72)
     a.fill(42.0)
@@ -2492,7 +1911,6 @@ def test_buffer_scalar_float_less_than() raises:
 
 
 def test_buffer_scalar_float_inequality() raises:
-    print("test_buffer_scalar_float_inequality")
     comptime dtype = DType.float32
     a = Buffer[dtype](72)
     a.fill(42.0)
@@ -2501,7 +1919,6 @@ def test_buffer_scalar_float_inequality() raises:
 
 
 def test_buffer_scalar_float_equality() raises:
-    print("test_buffer_scalar_float_equality")
     comptime dtype = DType.float32
     a = Buffer[dtype](72)
     a.fill(42.0)
@@ -2510,7 +1927,6 @@ def test_buffer_scalar_float_equality() raises:
 
 
 def test_buffer_dot() raises:
-    print("test_buffer_dot")
     comptime dtype = DType.float32
     a = Buffer[dtype](33)
     a.fill(42.0)
@@ -2522,7 +1938,6 @@ def test_buffer_dot() raises:
 
 
 def test_buffer_prod() raises:
-    print("test_buffer_prod")
     comptime dtype = DType.float32
     a = Buffer[dtype](2)
     a.fill(42.0)
@@ -2531,7 +1946,6 @@ def test_buffer_prod() raises:
 
 
 def test_buffer_sum() raises:
-    print("test_buffer_sum")
     comptime dtype = DType.float32
     a = Buffer[dtype](72)
     a.fill(42.0)
@@ -2540,7 +1954,6 @@ def test_buffer_sum() raises:
 
 
 def test_buffer_float_greater_than_eq() raises:
-    print("test_buffer_float_greater_than_eq")
     comptime dtype = DType.float32
     a = Buffer[dtype](72)
     a.fill(42.0)
@@ -2558,7 +1971,6 @@ def test_buffer_float_greater_than_eq() raises:
 
 
 def test_buffer_float_greater_than() raises:
-    print("test_buffer_float_greater_than")
     comptime dtype = DType.float32
     a = Buffer[dtype](72)
     a.fill(42.0)
@@ -2569,7 +1981,6 @@ def test_buffer_float_greater_than() raises:
 
 
 def test_buffer_float_less_eq_than() raises:
-    print("test_buffer_float_less_eq_than")
     comptime dtype = DType.float32
     a = Buffer[dtype](72)
     a.fill(42.0)
@@ -2587,7 +1998,6 @@ def test_buffer_float_less_eq_than() raises:
 
 
 def test_buffer_float_less_than() raises:
-    print("test_buffer_float_less_than")
     comptime dtype = DType.float32
     a = Buffer[dtype](72)
     a.fill(42.0)
@@ -2598,7 +2008,6 @@ def test_buffer_float_less_than() raises:
 
 
 def test_buffer_float_equality() raises:
-    print("test_buffer_float_equality")
     comptime dtype = DType.float32
     a = Buffer[dtype](72)
     a.fill(42.0)
@@ -2623,7 +2032,6 @@ def test_buffer_float_equality() raises:
 
 
 def test_buffer_float_inequality() raises:
-    print("test_buffer_float_inequality")
     comptime dtype = DType.float32
     a = Buffer[dtype](72)
     a.fill(42.0)
@@ -2648,7 +2056,6 @@ def test_buffer_float_inequality() raises:
 
 
 def test_fill_segment() raises:
-    print("test_fill_segment")
     comptime dtype = DType.int32
     size = 21
     l = List[Scalar[dtype]](capacity=Int(size))
@@ -2699,7 +2106,6 @@ def test_fill_segment() raises:
 
 
 def test_overwrite_orig() raises:
-    print("test_overwrite")
     comptime dtype = DType.int32
     size = 21
     l = List[Scalar[dtype]](capacity=Int(size))
@@ -2740,49 +2146,6 @@ def test_overwrite_orig() raises:
     )
 
 
-def run_all_count_tests() raises:
-    """Run all buffer count tests."""
-    print("\n=== Running Buffer Count Test Suite ===\n")
-
-    # Basic tests
-    test_count_basic_cnt()
-    test_count_with_range_cnt()
-    test_count_empty_buffer_cnt()
-    test_count_single_element_cnt()
-    test_count_all_match_cnt()
-    test_count_none_match_cnt()
-
-    # Pattern tests
-    test_count_alternating_pattern_cnt()
-    test_count_simd_boundary_cnt()
-    test_count_range_partial_simd_cnt()
-
-    # Dtype-specific tests
-    test_count_float32_cnt()
-    test_count_float64_cnt()
-    test_count_int8_cnt()
-    test_count_int64_cnt()
-    test_count_uint8_cnt()
-
-    # Boolean tests
-    test_count_bool_true_cnt()
-    test_count_bool_false_cnt()
-    test_count_bool_all_true_cnt()
-    test_count_bool_all_false_cnt()
-    test_count_bool_range_cnt()
-
-    # Edge case tests
-    test_count_large_buffer_cnt()
-    test_count_negative_values_cnt()
-    test_count_zero_cnt()
-    test_count_start_equals_end_cnt()
-    test_count_invalid_range_cnt()
-    test_count_large_buffer_cnt_777_with_default()
-    test_count_large_buffer_cnt_777()
-
-    print("\n=== All Buffer Count Tests Passed! ===\n")
-
-
 # ============================================================================
 # Buffer Count Tests
 # ============================================================================
@@ -2790,7 +2153,6 @@ def run_all_count_tests() raises:
 
 def test_count_basic_cnt() raises:
     """Test basic counting functionality."""
-    print("test_count_basic_cnt")
     var buffer = Buffer[DType.int32](68)
     for i in range(68):
         buffer[i] = Int32(i % 10)
@@ -2810,7 +2172,6 @@ def test_count_basic_cnt() raises:
 
 def test_count_with_range_cnt() raises:
     """Test counting within a specified range."""
-    print("test_count_with_range_cnt")
     var buffer = Buffer[DType.int32].full(5, 68)
     buffer[10] = 99
     buffer[20] = 99
@@ -2828,7 +2189,6 @@ def test_count_with_range_cnt() raises:
 
 def test_count_empty_buffer_cnt() raises:
     """Test counting on empty buffer."""
-    print("test_count_empty_buffer_cnt")
     var buffer = Buffer[DType.int32](0)
     var count = buffer.count(42)
     assert_true(count == 0)
@@ -2836,7 +2196,6 @@ def test_count_empty_buffer_cnt() raises:
 
 def test_count_single_element_cnt() raises:
     """Test counting in single-element buffer."""
-    print("test_count_single_element_cnt")
     var buffer = Buffer[DType.int32](1)
     buffer[0] = 42
 
@@ -2849,7 +2208,6 @@ def test_count_single_element_cnt() raises:
 
 def test_count_all_match_cnt() raises:
     """Test counting when all elements match."""
-    print("test_count_all_match_cnt")
     var buffer = Buffer[DType.int32].full(7, 100)
     var count = buffer.count(7)
     assert_true(count == 100)
@@ -2857,7 +2215,6 @@ def test_count_all_match_cnt() raises:
 
 def test_count_none_match_cnt() raises:
     """Test counting when no elements match."""
-    print("test_count_none_match_cnt")
     var buffer = Buffer[DType.int32].full(5, 100)
     var count = buffer.count(999)
     assert_true(count == 0)
@@ -2865,7 +2222,6 @@ def test_count_none_match_cnt() raises:
 
 def test_count_alternating_pattern_cnt() raises:
     """Test counting with alternating pattern."""
-    print("test_count_alternating_pattern_cnt")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(1 if i % 2 == 0 else 0)
@@ -2879,7 +2235,6 @@ def test_count_alternating_pattern_cnt() raises:
 
 def test_count_simd_boundary_cnt() raises:
     """Test counting across SIMD boundaries."""
-    print("test_count_simd_boundary_cnt")
     comptime simd_w = simd_width_of[DType.int32]()
     var size = simd_w * 3 + 5  # Not aligned to SIMD width
     var buffer = Buffer[DType.int32](size)
@@ -2899,7 +2254,6 @@ def test_count_simd_boundary_cnt() raises:
 
 def test_count_range_partial_simd_cnt() raises:
     """Test counting with range that doesn't align to SIMD width."""
-    print("test_count_range_partial_simd_cnt")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i)
@@ -2917,7 +2271,6 @@ def test_count_range_partial_simd_cnt() raises:
 
 def test_count_float32_cnt() raises:
     """Test counting with float32 dtype."""
-    print("test_count_float32_cnt")
     var buffer = Buffer[DType.float64](50)
     for i in range(50):
         buffer[i] = 3.14 if i % 5 == 0 else 2.71
@@ -2931,7 +2284,6 @@ def test_count_float32_cnt() raises:
 
 def test_count_float64_cnt() raises:
     """Test counting with float64 dtype."""
-    print("test_count_float64_cnt")
     var buffer = Buffer[DType.float64](64)
     for i in range(64):
         buffer[i] = 1.5 if i < 32 else 2.5
@@ -2945,7 +2297,6 @@ def test_count_float64_cnt() raises:
 
 def test_count_int8_cnt() raises:
     """Test counting with int8 dtype."""
-    print("test_count_int8_cnt")
     var buffer = Buffer[DType.int8](100)
     for i in range(100):
         buffer[i] = Int8(i % 128)
@@ -2959,7 +2310,6 @@ def test_count_int8_cnt() raises:
 
 def test_count_int64_cnt() raises:
     """Test counting with int64 dtype."""
-    print("test_count_int64_cnt")
     var buffer = Buffer[DType.int64](80)
     for i in range(80):
         buffer[i] = Int64(1000000 if i % 10 == 0 else i)
@@ -2970,7 +2320,6 @@ def test_count_int64_cnt() raises:
 
 def test_count_bool_true_cnt() raises:
     """Test counting True in boolean buffer."""
-    print("test_count_bool_true_cnt")
     var buffer = Buffer[DType.bool](100)
     for i in range(100):
         buffer[i] = True if i % 3 == 0 else False
@@ -2986,7 +2335,6 @@ def test_count_bool_true_cnt() raises:
 
 def test_count_bool_false_cnt() raises:
     """Test counting False in boolean buffer."""
-    print("test_count_bool_false_cnt")
     var buffer = Buffer[DType.bool](100)
     for i in range(100):
         buffer[i] = i % 2 == 0
@@ -2997,7 +2345,6 @@ def test_count_bool_false_cnt() raises:
 
 def test_count_bool_all_true_cnt() raises:
     """Test counting in all-True boolean buffer."""
-    print("test_count_bool_all_true_cnt")
     var buffer = Buffer[DType.bool].full(True, 100)
     var count = buffer.count(True)
     assert_true(count == 100)
@@ -3008,7 +2355,6 @@ def test_count_bool_all_true_cnt() raises:
 
 def test_count_bool_all_false_cnt() raises:
     """Test counting in all-False boolean buffer."""
-    print("test_count_bool_all_false_cnt")
     var buffer = Buffer[DType.bool].full(False, 100)
     var count = buffer.count(False)
     assert_true(count == 100)
@@ -3019,7 +2365,6 @@ def test_count_bool_all_false_cnt() raises:
 
 def test_count_bool_range_cnt() raises:
     """Test counting with range on boolean buffer."""
-    print("test_count_bool_range_cnt")
     var buffer = Buffer[DType.bool](50)
     for i in range(50):
         buffer[i] = i < 25
@@ -3033,7 +2378,6 @@ def test_count_bool_range_cnt() raises:
 
 def test_count_large_buffer_cnt_777_with_default() raises:
     """Test counting in large buffer."""
-    print("test_count_large_buffer_cnt")
     var buffer = Buffer[DType.int32](10000)
     for i in range(10000):
         buffer[i] = Int32(777 if i % 100 == 0 else -1)  # Use -1 as default
@@ -3044,7 +2388,6 @@ def test_count_large_buffer_cnt_777_with_default() raises:
 
 def test_count_large_buffer_cnt_777() raises:
     """Test counting in large buffer."""
-    print("test_count_large_buffer_cnt")
     var buffer = Buffer[DType.int32](10000)
     for i in range(10000):
         buffer[i] = Int32(777 if i % 100 == 0 else i)
@@ -3055,7 +2398,6 @@ def test_count_large_buffer_cnt_777() raises:
 
 def test_count_large_buffer_cnt() raises:
     """Test counting in large buffer."""
-    print("test_count_large_buffer_cnt")
     var buffer = Buffer[DType.int32](10000)
     for i in range(10000):
         buffer[i] = 99999 if i % 100 == 0 else Int32(
@@ -3068,7 +2410,6 @@ def test_count_large_buffer_cnt() raises:
 
 def test_count_negative_values_cnt() raises:
     """Test counting negative values."""
-    print("test_count_negative_values_cnt")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = -5 if i % 10 == 0 else Int32(i)
@@ -3079,7 +2420,6 @@ def test_count_negative_values_cnt() raises:
 
 def test_count_zero_cnt() raises:
     """Test counting zeros."""
-    print("test_count_zero_cnt")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(0 if i % 7 == 0 else 1)
@@ -3095,7 +2435,6 @@ def test_count_zero_cnt() raises:
 
 def test_count_start_equals_end_cnt() raises:
     """Test counting with start_index == end_index."""
-    print("test_count_start_equals_end_cnt")
     var buffer = Buffer[DType.int32].full(42, 100)
     var count = buffer.count(42, 50, 50)
     assert_true(count == 0)
@@ -3103,7 +2442,6 @@ def test_count_start_equals_end_cnt() raises:
 
 def test_count_invalid_range_cnt() raises:
     """Test counting with start > end."""
-    print("test_count_invalid_range_cnt")
     var buffer = Buffer[DType.int32].full(42, 100)
     var count = buffer.count(42, 60, 50)
     assert_true(count == 0)
@@ -3111,7 +2449,6 @@ def test_count_invalid_range_cnt() raises:
 
 def test_count_uint8_cnt() raises:
     """Test counting with uint8 dtype."""
-    print("test_count_uint8_cnt")
     var buffer = Buffer[DType.uint8](256)
     for i in range(256):
         buffer[i] = UInt8(i)
@@ -3130,7 +2467,6 @@ def test_count_uint8_cnt() raises:
 
 def test_inplace_multiply_scalar_ips() raises:
     """Test inplace multiplication by scalar."""
-    print("test_inplace_multiply_scalar_ips")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i)
@@ -3143,7 +2479,6 @@ def test_inplace_multiply_scalar_ips() raises:
 
 def test_inplace_add_scalar_ips() raises:
     """Test inplace addition of scalar."""
-    print("test_inplace_add_scalar_ips")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i)
@@ -3156,7 +2491,6 @@ def test_inplace_add_scalar_ips() raises:
 
 def test_inplace_subtract_scalar_ips() raises:
     """Test inplace subtraction of scalar."""
-    print("test_inplace_subtract_scalar_ips")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i + 50)
@@ -3169,7 +2503,6 @@ def test_inplace_subtract_scalar_ips() raises:
 
 def test_inplace_divide_scalar_ips() raises:
     """Test inplace division by scalar."""
-    print("test_inplace_divide_scalar_ips")
     var buffer = Buffer[DType.float32](100)
     for i in range(100):
         buffer[i] = Float32(i * 4)
@@ -3182,7 +2515,6 @@ def test_inplace_divide_scalar_ips() raises:
 
 def test_inplace_multiply_with_range_ips() raises:
     """Test inplace multiplication with range."""
-    print("test_inplace_multiply_with_range_ips")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i)
@@ -3198,7 +2530,6 @@ def test_inplace_multiply_with_range_ips() raises:
 
 def test_inplace_add_with_range_ips() raises:
     """Test inplace addition with range."""
-    print("test_inplace_add_with_range_ips")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i)
@@ -3214,7 +2545,6 @@ def test_inplace_add_with_range_ips() raises:
 
 def test_inplace_empty_buffer_ips() raises:
     """Test inplace operations on empty buffer."""
-    print("test_inplace_empty_buffer_ips")
     var buffer = Buffer[DType.int32](0)
     buffer.inplace_ops_scalar[Multiply](5)
     # Should not crash
@@ -3223,7 +2553,6 @@ def test_inplace_empty_buffer_ips() raises:
 
 def test_inplace_multiply_by_zero_ips() raises:
     """Test inplace multiplication by zero."""
-    print("test_inplace_multiply_by_zero_ips")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
         buffer[i] = Int32(i + 1)
@@ -3236,7 +2565,6 @@ def test_inplace_multiply_by_zero_ips() raises:
 
 def test_inplace_multiply_by_one_ips() raises:
     """Test inplace multiplication by one (identity)."""
-    print("test_inplace_multiply_by_one_ips")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
         buffer[i] = Int32(i)
@@ -3249,7 +2577,6 @@ def test_inplace_multiply_by_one_ips() raises:
 
 def test_inplace_add_zero_ips() raises:
     """Test inplace addition of zero (identity)."""
-    print("test_inplace_add_zero_ips")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
         buffer[i] = Int32(i)
@@ -3262,7 +2589,6 @@ def test_inplace_add_zero_ips() raises:
 
 def test_inplace_subtract_zero_ips() raises:
     """Test inplace subtraction of zero (identity)."""
-    print("test_inplace_subtract_zero_ips")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
         buffer[i] = Int32(i)
@@ -3275,7 +2601,6 @@ def test_inplace_subtract_zero_ips() raises:
 
 def test_inplace_divide_by_one_ips() raises:
     """Test inplace division by one (identity)."""
-    print("test_inplace_divide_by_one_ips")
     var buffer = Buffer[DType.float32](50)
     for i in range(50):
         buffer[i] = Float32(i)
@@ -3288,7 +2613,6 @@ def test_inplace_divide_by_one_ips() raises:
 
 def test_inplace_multiply_negative_ips() raises:
     """Test inplace multiplication by negative scalar."""
-    print("test_inplace_multiply_negative_ips")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
         buffer[i] = Int32(i)
@@ -3301,7 +2625,6 @@ def test_inplace_multiply_negative_ips() raises:
 
 def test_inplace_add_negative_ips() raises:
     """Test inplace addition of negative scalar."""
-    print("test_inplace_add_negative_ips")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
         buffer[i] = Int32(i + 100)
@@ -3314,7 +2637,6 @@ def test_inplace_add_negative_ips() raises:
 
 def test_inplace_float32_precision_ips() raises:
     """Test inplace operations on float32 with precision check."""
-    print("test_inplace_float32_precision_ips")
     var buffer = Buffer[DType.float32](100)
     for i in range(100):
         buffer[i] = Float32(i) * 0.1
@@ -3327,7 +2649,6 @@ def test_inplace_float32_precision_ips() raises:
 
 def test_inplace_float64_precision_ips() raises:
     """Test inplace operations on float64 with precision check."""
-    print("test_inplace_float64_precision_ips")
     var buffer = Buffer[DType.float64](100)
     for i in range(100):
         buffer[i] = Float64(i) * 0.1
@@ -3340,7 +2661,6 @@ def test_inplace_float64_precision_ips() raises:
 
 def test_inplace_simd_boundary_ips() raises:
     """Test inplace operations across SIMD boundaries."""
-    print("test_inplace_simd_boundary_ips")
     comptime simd_w = simd_width_of[DType.int32]()
     var size = simd_w * 5 + 7  # Not aligned to SIMD width
     var buffer = Buffer[DType.int32](size)
@@ -3356,7 +2676,6 @@ def test_inplace_simd_boundary_ips() raises:
 
 def test_inplace_range_partial_simd_ips() raises:
     """Test inplace operations with range not aligned to SIMD."""
-    print("test_inplace_range_partial_simd_ips")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i)
@@ -3372,7 +2691,6 @@ def test_inplace_range_partial_simd_ips() raises:
 
 def test_inplace_single_element_ips() raises:
     """Test inplace operations on single element."""
-    print("test_inplace_single_element_ips")
     var buffer = Buffer[DType.int32](1)
     buffer[0] = 42
 
@@ -3382,7 +2700,6 @@ def test_inplace_single_element_ips() raises:
 
 def test_inplace_bool_multiply_ips() raises:
     """Test inplace multiplication on boolean buffer."""
-    print("test_inplace_bool_multiply_ips")
     var buffer = Buffer[DType.bool](100)
     for i in range(100):
         buffer[i] = True if i % 2 == 0 else False
@@ -3396,7 +2713,6 @@ def test_inplace_bool_multiply_ips() raises:
 
 def test_inplace_int8_ips() raises:
     """Test inplace operations on int8."""
-    print("test_inplace_int8_ips")
     var buffer = Buffer[DType.int8](128)
     for i in range(128):
         buffer[i] = Int8(i)
@@ -3410,7 +2726,6 @@ def test_inplace_int8_ips() raises:
 
 def test_inplace_int64_ips() raises:
     """Test inplace operations on int64."""
-    print("test_inplace_int64_ips")
     var buffer = Buffer[DType.int64](100)
     for i in range(100):
         buffer[i] = Int64(i) * 1000000
@@ -3423,7 +2738,6 @@ def test_inplace_int64_ips() raises:
 
 def test_inplace_uint8_ips() raises:
     """Test inplace operations on uint8."""
-    print("test_inplace_uint8_ips")
     var buffer = Buffer[DType.uint8](100)
     for i in range(100):
         buffer[i] = UInt8(i)
@@ -3437,7 +2751,6 @@ def test_inplace_uint8_ips() raises:
 
 def test_inplace_chained_operations_ips() raises:
     """Test chaining multiple inplace operations."""
-    print("test_inplace_chained_operations_ips")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
         buffer[i] = Int32(i)
@@ -3452,7 +2765,6 @@ def test_inplace_chained_operations_ips() raises:
 
 def test_inplace_large_buffer_ips() raises:
     """Test inplace operations on large buffer."""
-    print("test_inplace_large_buffer_ips")
     var buffer = Buffer[DType.int32](10000)
     for i in range(10000):
         buffer[i] = Int32(i)
@@ -3468,7 +2780,6 @@ def test_inplace_large_buffer_ips() raises:
 
 def test_inplace_start_equals_end_ips() raises:
     """Test inplace operation with start == end (no-op)."""
-    print("test_inplace_start_equals_end_ips")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i)
@@ -3482,7 +2793,6 @@ def test_inplace_start_equals_end_ips() raises:
 
 def test_inplace_invalid_range_ips() raises:
     """Test inplace operation with start > end (no-op)."""
-    print("test_inplace_invalid_range_ips")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i)
@@ -3496,7 +2806,6 @@ def test_inplace_invalid_range_ips() raises:
 
 def test_inplace_full_range_explicit_ips() raises:
     """Test inplace operation with explicit full range."""
-    print("test_inplace_full_range_explicit_ips")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i)
@@ -3508,71 +2817,12 @@ def test_inplace_full_range_explicit_ips() raises:
 
 
 # ============================================================================
-# Consolidated Test Runner
-# ============================================================================
-
-
-def run_all_inplace_scalar_tests() raises:
-    """Run all buffer inplace scalar operation tests."""
-    print("\n=== Running Buffer Inplace Scalar Operations Test Suite ===\n")
-
-    # Basic operation tests
-    test_inplace_multiply_scalar_ips()
-    test_inplace_add_scalar_ips()
-    test_inplace_subtract_scalar_ips()
-    test_inplace_divide_scalar_ips()
-
-    # Range tests
-    test_inplace_multiply_with_range_ips()
-    test_inplace_add_with_range_ips()
-    test_inplace_range_partial_simd_ips()
-
-    # Edge case tests
-    test_inplace_empty_buffer_ips()
-    test_inplace_single_element_ips()
-    test_inplace_start_equals_end_ips()
-    test_inplace_invalid_range_ips()
-    test_inplace_full_range_explicit_ips()
-
-    # Identity operation tests
-    test_inplace_multiply_by_zero_ips()
-    test_inplace_multiply_by_one_ips()
-    test_inplace_add_zero_ips()
-    test_inplace_subtract_zero_ips()
-    test_inplace_divide_by_one_ips()
-
-    # Negative values tests
-    test_inplace_multiply_negative_ips()
-    test_inplace_add_negative_ips()
-
-    # Precision tests
-    test_inplace_float32_precision_ips()
-    test_inplace_float64_precision_ips()
-
-    # SIMD boundary tests
-    test_inplace_simd_boundary_ips()
-
-    # Dtype-specific tests
-    test_inplace_bool_multiply_ips()
-    test_inplace_int8_ips()
-    test_inplace_int64_ips()
-    test_inplace_uint8_ips()
-
-    # Complex scenarios
-    test_inplace_chained_operations_ips()
-    test_inplace_large_buffer_ips()
-
-    print("\n=== All Buffer Inplace Scalar Operations Tests Passed! ===\n")
-
-
-# ============================================================================
 # Buffer Arithmetic Operations (Buffer-Buffer) Tests
 # ============================================================================
 
 
 def test_arithmetic_multiply_buffers_arith() raises:
     """Test element-wise multiplication of two buffers."""
-    print("test_arithmetic_multiply_buffers_arith")
     var buf1 = Buffer[DType.int32](100)
     var buf2 = Buffer[DType.int32](100)
 
@@ -3589,7 +2839,6 @@ def test_arithmetic_multiply_buffers_arith() raises:
 
 def test_arithmetic_add_buffers_arith() raises:
     """Test element-wise addition of two buffers."""
-    print("test_arithmetic_add_buffers_arith")
     var buf1 = Buffer[DType.int32](100)
     var buf2 = Buffer[DType.int32](100)
 
@@ -3606,7 +2855,6 @@ def test_arithmetic_add_buffers_arith() raises:
 
 def test_arithmetic_subtract_buffers_arith() raises:
     """Test element-wise subtraction of two buffers."""
-    print("test_arithmetic_subtract_buffers_arith")
     var buf1 = Buffer[DType.int32](100)
     var buf2 = Buffer[DType.int32](100)
 
@@ -3623,7 +2871,6 @@ def test_arithmetic_subtract_buffers_arith() raises:
 
 def test_arithmetic_divide_buffers_arith() raises:
     """Test element-wise division of two buffers."""
-    print("test_arithmetic_divide_buffers_arith")
     var buf1 = Buffer[DType.float32](100)
     var buf2 = Buffer[DType.float32](100)
 
@@ -3640,7 +2887,6 @@ def test_arithmetic_divide_buffers_arith() raises:
 
 def test_arithmetic_with_ranges_arith() raises:
     """Test arithmetic operations with specified ranges."""
-    print("test_arithmetic_with_ranges_arith")
     var buf1 = Buffer[DType.int32](100)
     var buf2 = Buffer[DType.int32](100)
 
@@ -3659,7 +2905,6 @@ def test_arithmetic_with_ranges_arith() raises:
 
 def test_arithmetic_float32_precision_arith() raises:
     """Test arithmetic on float32 with precision."""
-    print("test_arithmetic_float32_precision_arith")
     var buf1 = Buffer[DType.float32](100)
     var buf2 = Buffer[DType.float32](100)
 
@@ -3676,7 +2921,6 @@ def test_arithmetic_float32_precision_arith() raises:
 
 def test_arithmetic_simd_boundary_arith() raises:
     """Test arithmetic across SIMD boundaries."""
-    print("test_arithmetic_simd_boundary_arith")
     comptime simd_w = simd_width_of[DType.int32]()
     var size = simd_w * 4 + 7
 
@@ -3695,7 +2939,6 @@ def test_arithmetic_simd_boundary_arith() raises:
 
 def test_arithmetic_int64_arith() raises:
     """Test arithmetic on int64 buffers."""
-    print("test_arithmetic_int64_arith")
     var buf1 = Buffer[DType.int64](100)
     var buf2 = Buffer[DType.int64](100)
 
@@ -3716,7 +2959,6 @@ def test_arithmetic_int64_arith() raises:
 
 def test_arithmetic_scalar_multiply_arith() raises:
     """Test multiplication by scalar."""
-    print("test_arithmetic_scalar_multiply_arith")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i)
@@ -3730,7 +2972,6 @@ def test_arithmetic_scalar_multiply_arith() raises:
 
 def test_arithmetic_scalar_add_arith() raises:
     """Test addition with scalar."""
-    print("test_arithmetic_scalar_add_arith")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i)
@@ -3743,7 +2984,6 @@ def test_arithmetic_scalar_add_arith() raises:
 
 def test_arithmetic_scalar_subtract_arith() raises:
     """Test subtraction with scalar."""
-    print("test_arithmetic_scalar_subtract_arith")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i + 50)
@@ -3756,7 +2996,6 @@ def test_arithmetic_scalar_subtract_arith() raises:
 
 def test_arithmetic_scalar_reverse_subtract_arith() raises:
     """Test reverse subtraction (scalar - buffer)."""
-    print("test_arithmetic_scalar_reverse_subtract_arith")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i)
@@ -3769,7 +3008,6 @@ def test_arithmetic_scalar_reverse_subtract_arith() raises:
 
 def test_arithmetic_scalar_divide_arith() raises:
     """Test division by scalar."""
-    print("test_arithmetic_scalar_divide_arith")
     var buffer = Buffer[DType.float32](100)
     for i in range(100):
         buffer[i] = Float32(i * 4)
@@ -3782,7 +3020,6 @@ def test_arithmetic_scalar_divide_arith() raises:
 
 def test_arithmetic_scalar_reverse_divide_arith() raises:
     """Test reverse division (scalar / buffer)."""
-    print("test_arithmetic_scalar_reverse_divide_arith")
     var buffer = Buffer[DType.float32](100)
     for i in range(1, 101):  # Start from 1 to avoid division by zero
         buffer[i - 1] = Float32(i)
@@ -3796,7 +3033,6 @@ def test_arithmetic_scalar_reverse_divide_arith() raises:
 
 def test_arithmetic_scalar_with_range_arith() raises:
     """Test scalar arithmetic with range."""
-    print("test_arithmetic_scalar_with_range_arith")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i)
@@ -3810,7 +3046,6 @@ def test_arithmetic_scalar_with_range_arith() raises:
 
 def test_arithmetic_scalar_float64_arith() raises:
     """Test scalar arithmetic on float64."""
-    print("test_arithmetic_scalar_float64_arith")
     var buffer = Buffer[DType.float64](100)
     for i in range(100):
         buffer[i] = Float64(i) * 0.1
@@ -3823,7 +3058,6 @@ def test_arithmetic_scalar_float64_arith() raises:
 
 def test_arithmetic_scalar_simd_boundary_arith() raises:
     """Test scalar arithmetic across SIMD boundaries."""
-    print("test_arithmetic_scalar_simd_boundary_arith")
     comptime simd_w = simd_width_of[DType.int32]()
     var size = simd_w * 3 + 5
 
@@ -3839,7 +3073,6 @@ def test_arithmetic_scalar_simd_boundary_arith() raises:
 
 def test_arithmetic_scalar_bool_arith() raises:
     """Test scalar arithmetic on boolean buffer."""
-    print("test_arithmetic_scalar_bool_arith")
     var buffer = Buffer[DType.bool](100)
     for i in range(100):
         buffer[i] = i % 2 == 0
@@ -3852,7 +3085,6 @@ def test_arithmetic_scalar_bool_arith() raises:
 
 def test_arithmetic_scalar_negative_arith() raises:
     """Test scalar arithmetic with negative values."""
-    print("test_arithmetic_scalar_negative_arith")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
         buffer[i] = Int32(i)
@@ -3865,7 +3097,6 @@ def test_arithmetic_scalar_negative_arith() raises:
 
 def test_arithmetic_scalar_int8_arith() raises:
     """Test scalar arithmetic on int8."""
-    print("test_arithmetic_scalar_int8_arith")
     var buffer = Buffer[DType.int8](128)
     for i in range(128):
         buffer[i] = Int8(i)
@@ -3879,7 +3110,6 @@ def test_arithmetic_scalar_int8_arith() raises:
 
 def test_arithmetic_ops_preserve_original_arith() raises:
     """Test that arithmetic ops don't modify original buffers."""
-    print("test_arithmetic_ops_preserve_original_arith")
     var buf1 = Buffer[DType.int32](50)
     var buf2 = Buffer[DType.int32](50)
 
@@ -3897,7 +3127,6 @@ def test_arithmetic_ops_preserve_original_arith() raises:
 
 def test_arithmetic_scalar_preserve_original_arith() raises:
     """Test that scalar ops don't modify original buffer."""
-    print("test_arithmetic_scalar_preserve_original_arith")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
         buffer[i] = Int32(i)
@@ -3911,7 +3140,6 @@ def test_arithmetic_scalar_preserve_original_arith() raises:
 
 def test_arithmetic_chained_operations_arith() raises:
     """Test chaining multiple arithmetic operations."""
-    print("test_arithmetic_chained_operations_arith")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
         buffer[i] = Int32(i)
@@ -3926,7 +3154,6 @@ def test_arithmetic_chained_operations_arith() raises:
 
 def test_arithmetic_large_buffers_arith() raises:
     """Test arithmetic on large buffers."""
-    print("test_arithmetic_large_buffers_arith")
     var buf1 = Buffer[DType.int32](10000)
     var buf2 = Buffer[DType.int32](10000)
 
@@ -3945,7 +3172,6 @@ def test_arithmetic_large_buffers_arith() raises:
 
 def test_arithmetic_uint8_arith() raises:
     """Test arithmetic on uint8 buffers."""
-    print("test_arithmetic_uint8_arith")
     var buf1 = Buffer[DType.uint8](100)
     var buf2 = Buffer[DType.uint8](100)
 
@@ -3960,54 +3186,11 @@ def test_arithmetic_uint8_arith() raises:
         assert_true(result[i] == expected)
 
 
-# ============================================================================
-# Consolidated Test Runner
-# ============================================================================
-
-
-def run_all_arithmetic_ops_tests() raises:
-    """Run all buffer arithmetic operation tests."""
-    print("\n=== Running Buffer Arithmetic Operations Test Suite ===\n")
-
-    print("--- Buffer-Buffer Operations ---")
-    test_arithmetic_multiply_buffers_arith()
-    test_arithmetic_add_buffers_arith()
-    test_arithmetic_subtract_buffers_arith()
-    test_arithmetic_divide_buffers_arith()
-    test_arithmetic_with_ranges_arith()
-    test_arithmetic_float32_precision_arith()
-    test_arithmetic_simd_boundary_arith()
-    # test_arithmetic_bool_buffers_arith()
-    test_arithmetic_int64_arith()
-    test_arithmetic_ops_preserve_original_arith()
-    test_arithmetic_large_buffers_arith()
-    test_arithmetic_uint8_arith()
-
-    print("\n--- Buffer-Scalar Operations ---")
-    test_arithmetic_scalar_multiply_arith()
-    test_arithmetic_scalar_add_arith()
-    test_arithmetic_scalar_subtract_arith()
-    test_arithmetic_scalar_reverse_subtract_arith()
-    test_arithmetic_scalar_divide_arith()
-    test_arithmetic_scalar_reverse_divide_arith()
-    test_arithmetic_scalar_with_range_arith()
-    test_arithmetic_scalar_float64_arith()
-    test_arithmetic_scalar_simd_boundary_arith()
-    test_arithmetic_scalar_bool_arith()
-    test_arithmetic_scalar_negative_arith()
-    test_arithmetic_scalar_int8_arith()
-    test_arithmetic_scalar_preserve_original_arith()
-    test_arithmetic_chained_operations_arith()
-
-    print("\n=== All Buffer Arithmetic Operations Tests Passed! ===\n")
-
-
 # ========== Add Operation Tests ==========
 
 
 def test_mv_inplace_add_basic() raises:
     """Test basic in-place addition."""
-    print("test_mv_inplace_add_basic")
     var buffer1 = Buffer[DType.float32](SMALL_SIZE_NEW)
     var buffer2 = Buffer[DType.float32](SMALL_SIZE_NEW)
 
@@ -4029,12 +3212,9 @@ def test_mv_inplace_add_basic() raises:
             + String(expected),
         )
 
-    print("test_mv_inplace_add_basic passed")
-
 
 def test_mv_inplace_add_range() raises:
     """Test in-place addition with range."""
-    print("test_mv_inplace_add_range")
     var buffer1 = Buffer[DType.float32].full(10.0, MEDIUM_SIZE)
     var buffer2 = Buffer[DType.float32].full(5.0, MEDIUM_SIZE)
 
@@ -4053,15 +3233,12 @@ def test_mv_inplace_add_range() raises:
     for i in range(50, MEDIUM_SIZE):
         assert_true(buffer1[i] == 10.0, "After range changed")
 
-    print("test_mv_inplace_add_range passed")
-
 
 # ========== Multiply Operation Tests ==========
 
 
 def test_mv_inplace_multiply_basic() raises:
     """Test basic in-place multiplication."""
-    print("test_mv_inplace_multiply_basic")
     var buffer1 = Buffer[DType.int32](SMALL_SIZE_NEW)
     var buffer2 = Buffer[DType.int32](SMALL_SIZE_NEW)
 
@@ -4077,12 +3254,9 @@ def test_mv_inplace_multiply_basic() raises:
             buffer1[i] == Int32(expected), "Multiply failed at " + String(i)
         )
 
-    print("test_mv_inplace_multiply_basic passed")
-
 
 def test_mv_inplace_multiply_large() raises:
     """Test vectorization efficiency on large buffer."""
-    print("test_mv_inplace_multiply_large")
     var buffer1 = Buffer[DType.float64](LARGE_SIZE)
     var buffer2 = Buffer[DType.float64](LARGE_SIZE)
 
@@ -4096,15 +3270,12 @@ def test_mv_inplace_multiply_large() raises:
         var expected = Float64(i) * 1.5
         assert_true(abs(buffer1[i] - expected) < 1e-10, "Large multiply failed")
 
-    print("test_mv_inplace_multiply_large passed")
-
 
 # ========== Subtract Operation Tests ==========
 
 
 def test_mv_inplace_subtract_basic() raises:
     """Test basic in-place subtraction."""
-    print("test_mv_inplace_subtract_basic")
     var buffer1 = Buffer[DType.int32](MEDIUM_SIZE)
     var buffer2 = Buffer[DType.int32](MEDIUM_SIZE)
 
@@ -4118,12 +3289,9 @@ def test_mv_inplace_subtract_basic() raises:
         var expected = Int32(100 - i)
         assert_true(buffer1[i] == expected, "Subtract failed")
 
-    print("test_mv_inplace_subtract_basic passed")
-
 
 def test_mv_inplace_subtract_negative() raises:
     """Test subtraction resulting in negatives."""
-    print("test_mv_inplace_subtract_negative")
     var buffer1 = Buffer[DType.float32](SMALL_SIZE_NEW)
     var buffer2 = Buffer[DType.float32](SMALL_SIZE_NEW)
 
@@ -4136,15 +3304,12 @@ def test_mv_inplace_subtract_negative() raises:
     for i in range(SMALL_SIZE_NEW):
         assert_true(buffer1[i] == -10.0, "Negative result incorrect")
 
-    print("test_mv_inplace_subtract_negative passed")
-
 
 # ========== Divide Operation Tests ==========
 
 
 def test_mv_inplace_divide_basic() raises:
     """Test basic in-place division."""
-    print("test_mv_inplace_divide_basic")
     var buffer1 = Buffer[DType.float32](SMALL_SIZE_NEW)
     var buffer2 = Buffer[DType.float32](SMALL_SIZE_NEW)
 
@@ -4157,12 +3322,9 @@ def test_mv_inplace_divide_basic() raises:
     for i in range(SMALL_SIZE_NEW):
         assert_true(buffer1[i] == 25.0, "Divide failed")
 
-    print("test_mv_inplace_divide_basic passed")
-
 
 def test_mv_inplace_divide_fractional() raises:
     """Test division with fractional results."""
-    print("test_mv_inplace_divide_fractional")
     var buffer1 = Buffer[DType.float64](MEDIUM_SIZE)
     var buffer2 = Buffer[DType.float64](MEDIUM_SIZE)
 
@@ -4178,15 +3340,12 @@ def test_mv_inplace_divide_fractional() raises:
             abs(buffer1[i] - expected) < 1e-10, "Fractional divide failed"
         )
 
-    print("test_mv_inplace_divide_fractional passed")
-
 
 # ========== Overwrite Operation Tests ==========
 
 
 def test_mv_inplace_overwrite_basic() raises:
     """Test basic overwrite operation."""
-    print("test_mv_inplace_overwrite_basic")
     var buffer1 = Buffer[DType.int32](SMALL_SIZE_NEW)
     var buffer2 = Buffer[DType.int32](SMALL_SIZE_NEW)
 
@@ -4201,12 +3360,9 @@ def test_mv_inplace_overwrite_basic() raises:
             buffer1[i] == Int32(i * 10), "Overwrite failed at " + String(i)
         )
 
-    print("test_mv_inplace_overwrite_basic passed")
-
 
 def test_mv_inplace_overwrite_partial() raises:
     """Test partial overwrite with range."""
-    print("test_mv_inplace_overwrite_partial")
     var buffer1 = Buffer[DType.float32].full(1.0, MEDIUM_SIZE)
     var buffer2 = Buffer[DType.float32].full(5.0, MEDIUM_SIZE)
 
@@ -4225,12 +3381,9 @@ def test_mv_inplace_overwrite_partial() raises:
     for i in range(30, MEDIUM_SIZE):
         assert_true(buffer1[i] == 1.0, "Tail should be unchanged")
 
-    print("test_mv_inplace_overwrite_partial passed")
-
 
 def test_mv_inplace_bool_overwrite() raises:
     """Test boolean overwrite."""
-    print("test_mv_inplace_bool_overwrite")
     var buffer1 = Buffer[DType.bool](SMALL_SIZE_NEW)
     var buffer2 = Buffer[DType.bool](SMALL_SIZE_NEW)
 
@@ -4243,15 +3396,12 @@ def test_mv_inplace_bool_overwrite() raises:
     for i in range(SMALL_SIZE_NEW):
         assert_true(buffer1[i] == ((i % 2) == 0), "Bool overwrite failed")
 
-    print("test_mv_inplace_bool_overwrite passed")
-
 
 # ========== Edge Cases ==========
 
 
 def test_mv_inplace_single_element() raises:
     """Test with single element buffer."""
-    print("test_mv_inplace_single_element")
     var buffer1 = Buffer[DType.int32](1)
     var buffer2 = Buffer[DType.int32](1)
 
@@ -4264,12 +3414,9 @@ def test_mv_inplace_single_element() raises:
     buffer1.inplace_ops[Multiply](buffer2)
     assert_true(buffer1[0] == 75, "Single element multiply failed")
 
-    print("test_mv_inplace_single_element passed")
-
 
 def test_mv_inplace_tail_alignment() raises:
     """Test SIMD tail loop handling."""
-    print("test_mv_inplace_tail_alignment")
 
     # Size that's not SIMD-aligned (e.g., 13 for 16-byte SIMD)
     comptime SIZE = 13
@@ -4287,12 +3434,9 @@ def test_mv_inplace_tail_alignment() raises:
         var expected = Float32(i + 1)
         assert_true(buffer1[i] == expected, "Tail element failed")
 
-    print("test_mv_inplace_tail_alignment passed")
-
 
 def test_mv_inplace_mismatched_ranges() raises:
     """Test validation catches mismatched ranges."""
-    print("test_mv_inplace_mismatched_ranges")
     var buffer1 = Buffer[DType.int32](100)
     var buffer2 = Buffer[DType.int32](100)
 
@@ -4307,15 +3451,12 @@ def test_mv_inplace_mismatched_ranges() raises:
     for i in range(100):
         assert_true(buffer1[i] == Int32(i), "Validation bypass failed")
 
-    print("test_mv_inplace_mismatched_ranges passed")
-
 
 # ========== Performance Comparison Test ==========
 
 
 def test_mv_performance_comparison() raises:
     """Compare performance: small vs large buffers."""
-    print("test_mv_performance_comparison")
 
     comptime PERF_SIZE = 10000
     var buffer1 = Buffer[DType.float64](PERF_SIZE)
@@ -4346,54 +3487,6 @@ def test_mv_performance_comparison() raises:
             "Performance test: result incorrect",
         )
 
-    print("test_mv_performance_comparison passed")
-
-
-# ========== Test Runner ==========
-
-
-def run_all_manual_vectorization_tests() raises:
-    """Run all manual vectorization tests."""
-    print("\n" + "=" * 60)
-    print("Manual Vectorization In-place Ops Tests")
-    print("=" * 60 + "\n")
-
-    # Add tests
-    test_mv_inplace_add_basic()
-    test_mv_inplace_add_range()
-
-    # Multiply tests
-    test_mv_inplace_multiply_basic()
-    test_mv_inplace_multiply_large()
-
-    # Subtract tests
-    test_mv_inplace_subtract_basic()
-    test_mv_inplace_subtract_negative()
-
-    # Divide tests
-    test_mv_inplace_divide_basic()
-    test_mv_inplace_divide_fractional()
-
-    # Overwrite tests
-    test_mv_inplace_overwrite_basic()
-    test_mv_inplace_overwrite_partial()
-
-    # Bool tests (bit-packed)
-    # test_mv_inplace_bool_multiply()
-    test_mv_inplace_bool_overwrite()
-
-    # Edge cases
-    test_mv_inplace_single_element()
-    test_mv_inplace_tail_alignment()
-    test_mv_inplace_mismatched_ranges()
-
-    # Performance
-    test_mv_performance_comparison()
-
-    print("\n" + "=" * 60)
-    print("All Manual Vectorization Tests Passed!")
-    print("=" * 60)
-
 
 comptime TEST_SMALL = 17
 comptime TEST_MEDIUM = 68
@@ -4404,7 +3497,6 @@ comptime TEST_LARGE = 1024
 
 def test_bufops_sum_basic() raises:
     """Test basic sum operation."""
-    print("test_bufops_sum_basic")
     var buffer = Buffer[DType.int32](TEST_SMALL)
 
     for i in range(TEST_SMALL):
@@ -4418,12 +3510,9 @@ def test_bufops_sum_basic() raises:
         "Sum failed: got " + String(result) + ", expected " + String(expected),
     )
 
-    print("test_bufops_sum_basic passed")
-
 
 def test_bufops_sum_range() raises:
     """Test sum with start/end indices."""
-    print("test_bufops_sum_range")
     var buffer = Buffer[DType.float32](TEST_MEDIUM)
 
     for i in range(TEST_MEDIUM):
@@ -4433,12 +3522,9 @@ def test_bufops_sum_range() raises:
     var result = buffer.sum(10, 30)
     assert_true(result == 20.0, "Sum range failed")
 
-    print("test_bufops_sum_range passed")
-
 
 def test_bufops_sum_negative() raises:
     """Test sum with negative numbers."""
-    print("test_bufops_sum_negative")
     var buffer = Buffer[DType.int32](10)
 
     for i in range(10):
@@ -4449,12 +3535,9 @@ def test_bufops_sum_negative() raises:
 
     assert_true(result == Int32(expected), "Sum with negatives failed")
 
-    print("test_bufops_sum_negative passed")
-
 
 def test_bufops_sum_large() raises:
     """Test sum on large buffer (vectorization efficiency)."""
-    print("test_bufops_sum_large")
     var buffer = Buffer[DType.float64](TEST_LARGE)
 
     for i in range(TEST_LARGE):
@@ -4463,18 +3546,13 @@ def test_bufops_sum_large() raises:
     var result = buffer.sum()
     assert_true(result == Float64(TEST_LARGE), "Large sum failed")
 
-    print("test_bufops_sum_large passed")
-
 
 def test_bufops_sum_empty_range() raises:
     """Test sum with empty range."""
-    print("test_bufops_sum_empty_range")
     var buffer = Buffer[DType.int32](100)
 
     var result = buffer.sum(50, 50)  # Empty range
     assert_true(result == 0, "Empty sum should be 0")
-
-    print("test_bufops_sum_empty_range passed")
 
 
 # ========== PRODUCT TESTS ==========
@@ -4482,7 +3560,6 @@ def test_bufops_sum_empty_range() raises:
 
 def test_bufops_product_basic() raises:
     """Test basic product operation."""
-    print("test_bufops_product_basic")
     var buffer = Buffer[DType.int32](5)
 
     for i in range(5):
@@ -4491,12 +3568,9 @@ def test_bufops_product_basic() raises:
     var result = buffer.product()
     assert_true(result == 120, "Product failed: expected 120")
 
-    print("test_bufops_product_basic passed")
-
 
 def test_bufops_product_range() raises:
     """Test product with range."""
-    print("test_bufops_product_range")
     var buffer = Buffer[DType.float32](20)
 
     for i in range(20):
@@ -4506,12 +3580,9 @@ def test_bufops_product_range() raises:
     var result = buffer.product(5, 10)
     assert_true(result == 32.0, "Product range failed")
 
-    print("test_bufops_product_range passed")
-
 
 def test_bufops_product_with_zero() raises:
     """Test product with zero element."""
-    print("test_bufops_product_with_zero")
     var buffer = Buffer[DType.int32](10)
 
     for i in range(10):
@@ -4520,12 +3591,9 @@ def test_bufops_product_with_zero() raises:
     var result = buffer.product()
     assert_true(result == 0, "Product with zero should be 0")
 
-    print("test_bufops_product_with_zero passed")
-
 
 def test_bufops_product_fractional() raises:
     """Test product with fractional values."""
-    print("test_bufops_product_fractional")
     var buffer = Buffer[DType.float64](4)
 
     buffer[0] = 0.5
@@ -4536,18 +3604,13 @@ def test_bufops_product_fractional() raises:
     var result = buffer.product()
     assert_true(result == 1.0, "Fractional product failed")
 
-    print("test_bufops_product_fractional passed")
-
 
 def test_bufops_product_empty() raises:
     """Test product of empty range (should be 1)."""
-    print("test_bufops_product_empty")
     var buffer = Buffer[DType.int32](100)
 
     var result = buffer.product(10, 10)  # Empty range
     assert_true(result == 1, "Empty product should be 1")
-
-    print("test_bufops_product_empty passed")
 
 
 # ========== POWER TESTS ==========
@@ -4555,7 +3618,6 @@ def test_bufops_product_empty() raises:
 
 def test_bufops_pow_basic() raises:
     """Test basic power operation."""
-    print("test_bufops_pow_basic")
     var buffer = Buffer[DType.float32](TEST_SMALL)
 
     for i in range(TEST_SMALL):
@@ -4567,12 +3629,9 @@ def test_bufops_pow_basic() raises:
         var expected = Float32(i * i)
         assert_true(result[i] == expected, "Pow failed at " + String(i))
 
-    print("test_bufops_pow_basic passed")
-
 
 def test_bufops_pow_fractional() raises:
     """Test power with fractional exponent."""
-    print("test_bufops_pow_fractional")
     var buffer = Buffer[DType.float64](10)
 
     for i in range(10):
@@ -4584,12 +3643,9 @@ def test_bufops_pow_fractional() raises:
         var expected = Float64(i + 1)
         assert_true(abs(result[i] - expected) < 1e-8, "Fractional pow failed")
 
-    print("test_bufops_pow_fractional passed")
-
 
 def test_bufops_pow_zero_exponent() raises:
     """Test power with exponent 0 (should be all 1s)."""
-    print("test_bufops_pow_zero_exponent")
     var buffer = Buffer[DType.int32](TEST_MEDIUM)
 
     for i in range(TEST_MEDIUM):
@@ -4600,12 +3656,9 @@ def test_bufops_pow_zero_exponent() raises:
     for i in range(TEST_MEDIUM):
         assert_true(result[i] == 1, "Pow 0 should be 1")
 
-    print("test_bufops_pow_zero_exponent passed")
-
 
 def test_bufops_pow_negative_base() raises:
     """Test power with negative base values."""
-    print("test_bufops_pow_negative_base")
     var buffer = Buffer[DType.float32](5)
 
     buffer[0] = -2.0
@@ -4622,15 +3675,12 @@ def test_bufops_pow_negative_base() raises:
     assert_true(result[3] == 1.0, "Positive pow failed")
     assert_true(result[4] == 8.0, "Positive pow failed")
 
-    print("test_bufops_pow_negative_base passed")
-
 
 # ========== ABSOLUTE VALUE TESTS ==========
 
 
 def test_bufops_abs_basic() raises:
     """Test basic absolute value."""
-    print("test_bufops_abs_basic")
     var buffer = Buffer[DType.int32](TEST_SMALL)
 
     for i in range(TEST_SMALL):
@@ -4642,12 +3692,9 @@ def test_bufops_abs_basic() raises:
         var expected = abs(Int32(i) - 8)
         assert_true(result[i] == expected, "Abs failed")
 
-    print("test_bufops_abs_basic passed")
-
 
 def test_bufops_abs_all_negative() raises:
     """Test abs with all negative values."""
-    print("test_bufops_abs_all_negative")
     var buffer = Buffer[DType.float32](TEST_MEDIUM)
 
     for i in range(TEST_MEDIUM):
@@ -4658,12 +3705,9 @@ def test_bufops_abs_all_negative() raises:
     for i in range(TEST_MEDIUM):
         assert_true(result[i] == Float32(i + 1), "Abs negative failed")
 
-    print("test_bufops_abs_all_negative passed")
-
 
 def test_bufops_abs_all_positive() raises:
     """Test abs with all positive values (should be unchanged)."""
-    print("test_bufops_abs_all_positive")
     var buffer = Buffer[DType.int32](20)
 
     for i in range(20):
@@ -4674,12 +3718,9 @@ def test_bufops_abs_all_positive() raises:
     for i in range(20):
         assert_true(result[i] == Int32(i) * 5, "Abs positive changed value")
 
-    print("test_bufops_abs_all_positive passed")
-
 
 def test_bufops_abs_mixed() raises:
     """Test abs with mixed positive/negative."""
-    print("test_bufops_abs_mixed")
     var buffer = Buffer[DType.float64](10)
 
     buffer[0] = -100.0
@@ -4699,15 +3740,12 @@ def test_bufops_abs_mixed() raises:
     assert_true(result[3] == 0.0, "Abs zero failed")
     assert_true(result[7] == 50.0, "Abs mixed failed")
 
-    print("test_bufops_abs_mixed passed")
-
 
 # ========== FILL TESTS ==========
 
 
 def test_bufops_fill_basic() raises:
     """Test basic fill operation."""
-    print("test_bufops_fill_basic")
     var buffer = Buffer[DType.int32](TEST_SMALL)
 
     buffer.fill(42)
@@ -4715,12 +3753,9 @@ def test_bufops_fill_basic() raises:
     for i in range(TEST_SMALL):
         assert_true(buffer[i] == 42, "Fill failed")
 
-    print("test_bufops_fill_basic passed")
-
 
 def test_bufops_fill_range() raises:
     """Test fill with range."""
-    print("test_bufops_fill_range")
     var buffer = Buffer[DType.float32](TEST_MEDIUM)
 
     # Initialize with 1.0
@@ -4741,12 +3776,9 @@ def test_bufops_fill_range() raises:
     for i in range(40, TEST_MEDIUM):
         assert_true(buffer[i] == 1.0, "Fill tail changed")
 
-    print("test_bufops_fill_range passed")
-
 
 def test_bufops_fill_bool() raises:
     """Test fill with boolean type."""
-    print("test_bufops_fill_bool")
     var buffer = Buffer[DType.bool](TEST_SMALL)
 
     buffer.fill(True)
@@ -4759,12 +3791,9 @@ def test_bufops_fill_bool() raises:
     for i in range(5, 10):
         assert_true(buffer[i] == False, "Bool fill range failed")
 
-    print("test_bufops_fill_bool passed")
-
 
 def test_bufops_fill_zero() raises:
     """Test fill with zero."""
-    print("test_bufops_fill_zero")
     var buffer = Buffer[DType.float64](TEST_MEDIUM)
 
     # Set to non-zero
@@ -4777,12 +3806,9 @@ def test_bufops_fill_zero() raises:
     for i in range(TEST_MEDIUM):
         assert_true(buffer[i] == 0.0, "Fill zero failed")
 
-    print("test_bufops_fill_zero passed")
-
 
 def test_bufops_fill_negative() raises:
     """Test fill with negative value."""
-    print("test_bufops_fill_negative")
     var buffer = Buffer[DType.int32](30)
 
     buffer.fill(-999)
@@ -4790,15 +3816,12 @@ def test_bufops_fill_negative() raises:
     for i in range(30):
         assert_true(buffer[i] == -999, "Fill negative failed")
 
-    print("test_bufops_fill_negative passed")
-
 
 # ========== NEGATION TESTS ==========
 
 
 def test_bufops_neg_basic() raises:
     """Test basic negation."""
-    print("test_bufops_neg_basic")
     var buffer = Buffer[DType.int32](TEST_SMALL)
 
     for i in range(TEST_SMALL):
@@ -4809,12 +3832,9 @@ def test_bufops_neg_basic() raises:
     for i in range(TEST_SMALL):
         assert_true(result[i] == -Int32(i + 1), "Neg failed")
 
-    print("test_bufops_neg_basic passed")
-
 
 def test_bufops_neg_mixed() raises:
     """Test negation with mixed signs."""
-    print("test_bufops_neg_mixed")
     var buffer = Buffer[DType.float32](10)
 
     for i in range(10):
@@ -4826,12 +3846,9 @@ def test_bufops_neg_mixed() raises:
         var expected = Float32(5 - i)
         assert_true(result[i] == expected, "Neg mixed failed")
 
-    print("test_bufops_neg_mixed passed")
-
 
 def test_bufops_neg_zero() raises:
     """Test negation with zeros."""
-    print("test_bufops_neg_zero")
     var buffer = Buffer[DType.float64](TEST_MEDIUM)
 
     buffer.fill(0.0)
@@ -4841,12 +3858,9 @@ def test_bufops_neg_zero() raises:
     for i in range(TEST_MEDIUM):
         assert_true(result[i] == 0.0, "Neg zero failed")
 
-    print("test_bufops_neg_zero passed")
-
 
 def test_bufops_neg_double_negation() raises:
     """Test double negation (should restore original)."""
-    print("test_bufops_neg_double_negation")
     var buffer = Buffer[DType.int32](20)
 
     for i in range(20):
@@ -4858,15 +3872,12 @@ def test_bufops_neg_double_negation() raises:
     for i in range(20):
         assert_true(neg2[i] == buffer[i], "Double neg failed")
 
-    print("test_bufops_neg_double_negation passed")
-
 
 # ========== EDGE CASE TESTS ==========
 
 
 def test_bufops_single_element() raises:
     """Test all operations on single element buffer."""
-    print("test_bufops_single_element")
 
     var buffer = Buffer[DType.float32](1)
     buffer[0] = 5.0
@@ -4883,12 +3894,9 @@ def test_bufops_single_element() raises:
     var neg_result = buffer.__neg__()
     assert_true(neg_result[0] == -5.0, "Single neg failed")
 
-    print("test_bufops_single_element passed")
-
 
 def test_bufops_tail_alignment() raises:
     """Test tail loop handling for non-SIMD-aligned sizes."""
-    print("test_bufops_tail_alignment")
 
     comptime SIZE = 13  # Likely not SIMD-aligned
     var buffer = Buffer[DType.float64](SIZE)
@@ -4906,12 +3914,9 @@ def test_bufops_tail_alignment() raises:
     for i in range(SIZE):
         assert_true(buffer[i] == 7.0, "Tail fill failed at " + String(i))
 
-    print("test_bufops_tail_alignment passed")
-
 
 def test_bufops_performance_comparison() raises:
     """Compare performance across operations."""
-    print("test_bufops_performance_comparison")
 
     comptime PERF_SIZE = 10000
     var buffer = Buffer[DType.float64](PERF_SIZE)
@@ -4953,69 +3958,8 @@ def test_bufops_performance_comparison() raises:
         + " ms"
     )
 
-    print("test_bufops_performance_comparison passed")
-
-
-# ========== TEST RUNNER ==========
-
-
-def run_all_buffer_ops_tests() raises:
-    """Run all buffer operations tests."""
-    print("\n" + "=" * 70)
-    print("Manual Vectorization Buffer Operations Tests")
-    print("=" * 70 + "\n")
-
-    # Sum tests (5)
-    test_bufops_sum_basic()
-    test_bufops_sum_range()
-    test_bufops_sum_negative()
-    test_bufops_sum_large()
-    test_bufops_sum_empty_range()
-
-    # Product tests (5)
-    test_bufops_product_basic()
-    test_bufops_product_range()
-    test_bufops_product_with_zero()
-    test_bufops_product_fractional()
-    test_bufops_product_empty()
-
-    # Power tests (4)
-    test_bufops_pow_basic()
-    test_bufops_pow_fractional()
-    test_bufops_pow_zero_exponent()
-    test_bufops_pow_negative_base()
-
-    # Absolute value tests (4)
-    test_bufops_abs_basic()
-    test_bufops_abs_all_negative()
-    test_bufops_abs_all_positive()
-    test_bufops_abs_mixed()
-
-    # Fill tests (5)
-    test_bufops_fill_basic()
-    test_bufops_fill_range()
-    test_bufops_fill_bool()
-    test_bufops_fill_zero()
-    test_bufops_fill_negative()
-
-    # Negation tests (4)
-    test_bufops_neg_basic()
-    test_bufops_neg_mixed()
-    test_bufops_neg_zero()
-    test_bufops_neg_double_negation()
-
-    # Edge cases (3)
-    test_bufops_single_element()
-    test_bufops_tail_alignment()
-    test_bufops_performance_comparison()
-
-    print("\n" + "=" * 70)
-    print("All 30 Buffer Operations Tests Passed!")
-    print("=" * 70)
-
 
 def test_compare_buffer_manual() raises:
-    print("test_compare_buffer_manual")
     var buf1 = Buffer[DType.int32](MEDIUM_SIZE)
     var buf2 = Buffer[DType.int32](MEDIUM_SIZE)
 
@@ -5035,11 +3979,9 @@ def test_compare_buffer_manual() raises:
         equal_count == 30,
         "compare_buffer_manual: expected 30 equal, got " + String(equal_count),
     )
-    print("test_compare_buffer_manual passed")
 
 
 def test_compare_scalar_manual() raises:
-    print("test_compare_scalar_manual")
     var buffer = Buffer[DType.int32](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
         buffer[i] = Int32(i % 10)
@@ -5057,11 +3999,9 @@ def test_compare_scalar_manual() raises:
         count == 7,
         "compare_scalar_manual: expected 7 fives, got " + String(count),
     )
-    print("test_compare_scalar_manual passed")
 
 
 def test_unary_ops_manual_relu() raises:
-    print("test_unary_ops_manual_relu")
     var buffer = Buffer[DType.float32](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
         buffer[i] = Float32(i - 30)  # Values from -30 to 37
@@ -5077,11 +4017,9 @@ def test_unary_ops_manual_relu() raises:
             break
 
     assert_true(all_correct, "unary_ops_manual_relu: ReLU forward failed")
-    print("test_unary_ops_manual_relu passed")
 
 
 def test_select_manual_relu_backward() raises:
-    print("test_select_manual_relu_backward")
     var input_buf = Buffer[DType.float32](MEDIUM_SIZE)
     var grad_buf = Buffer[DType.float32](MEDIUM_SIZE)
 
@@ -5100,11 +4038,9 @@ def test_select_manual_relu_backward() raises:
             break
 
     assert_true(all_correct, "select_manual_relu_backward: failed")
-    print("test_select_manual_relu_backward passed")
 
 
 def test_compare_buffer_manual_gt() raises:
-    print("test_compare_buffer_manual_gt")
     var buf1 = Buffer[DType.int32](MEDIUM_SIZE)
     var buf2 = Buffer[DType.int32](MEDIUM_SIZE)
 
@@ -5125,11 +4061,9 @@ def test_compare_buffer_manual_gt() raises:
         count == 37,
         "compare_buffer_manual_gt: expected 37, got " + String(count),
     )
-    print("test_compare_buffer_manual_gt passed")
 
 
 def test_unary_ops_manual_sigmoid() raises:
-    print("test_unary_ops_manual_sigmoid")
     var buffer = Buffer[DType.float32](10)
     for i in range(10):
         buffer[i] = Float32(i - 5)  # Values from -5 to 4
@@ -5144,23 +4078,9 @@ def test_unary_ops_manual_sigmoid() raises:
             break
 
     assert_true(all_in_range, "unary_ops_manual_sigmoid: values out of range")
-    print("test_unary_ops_manual_sigmoid passed")
-
-
-# Consolidated test runner
-def run_all_manual_vectorization_tests_2() raises:
-    print("\n========== Running Manual Vectorization Tests ==========\n")
-    test_compare_buffer_manual()
-    test_compare_scalar_manual()
-    test_unary_ops_manual_relu()
-    test_select_manual_relu_backward()
-    test_compare_buffer_manual_gt()
-    test_unary_ops_manual_sigmoid()
-    print("\n========== All Manual Vectorization Tests Passed ==========\n")
 
 
 def test_relu_forward_with_mask() raises:
-    print("test_relu_forward_with_mask")
     var buffer = Buffer[DType.float32](10)
     for i in range(10):
         buffer[i] = Float32(i - 5)  # Values from -5 to 4
@@ -5187,11 +4107,9 @@ def test_relu_forward_with_mask() raises:
 
     assert_true(output_correct, "relu_forward_with_mask: output incorrect")
     assert_true(mask_correct, "relu_forward_with_mask: mask incorrect")
-    print("test_relu_forward_with_mask passed")
 
 
 def test_buffer_multiply() raises:
-    print("test_buffer_multiply")
     var buf1 = Buffer[DType.float32](MEDIUM_SIZE)
     var buf2 = Buffer[DType.float32](MEDIUM_SIZE)
 
@@ -5210,12 +4128,9 @@ def test_buffer_multiply() raises:
             break
 
     assert_true(all_correct, "buffer_multiply: incorrect results")
-    print("test_buffer_multiply passed")
 
 
 def test_relu_backward_multiplication() raises:
-    print("test_relu_backward_multiplication")
-
     # Simulate: input had values [-2, -1, 0, 1, 2]
     # Mask should be [0, 0, 0, 1, 1]
     var mask = Buffer[DType.float32](5)
@@ -5245,12 +4160,7 @@ def test_relu_backward_multiplication() raises:
     assert_true(
         correct, "relu_backward_multiplication: incorrect gradient masking"
     )
-    print("test_relu_backward_multiplication passed")
 
 
-def run_relu_optimization_tests() raises:
-    print("\n========== Running ReLU Optimization Tests ==========\n")
-    test_relu_forward_with_mask()
-    test_buffer_multiply()
-    test_relu_backward_multiplication()
-    print("\n========== All ReLU Optimization Tests Passed ==========\n")
+def main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
