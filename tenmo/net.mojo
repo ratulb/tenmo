@@ -390,8 +390,9 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 )
 
         # Share weight buffer so ancestry copies are a refcount bump, not deep memcpy
-        if self.weight.requires_grad:
-            self.weight.buffer.buffer.shared()
+	#if self.weight.requires_grad:
+        self.weight.buffer.buffer.shared()
+        self.bias.buffer.buffer.shared()
 
     def __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         ref xs_shape = xs.shape()

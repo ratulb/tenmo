@@ -2703,8 +2703,9 @@ struct NDBuffer[dtype: DType](
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
         Self.dtype
     ]:
-        # if self.shape.rank() == 0 or other.shape.rank() == 0:
-        if self.numels() == 1 or other.numels() == 1:
+        if (self.shape.rank() <= 1 and self.numels() == 1) or (
+            other.shape.rank() <= 1 and other.numels() == 1
+        ):
             return self.broadcast_scalar_buffer[op_code](other)
         else:
             return self.broadcast_nd_buffer[op_code](other)
@@ -2761,22 +2762,22 @@ struct NDBuffer[dtype: DType](
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
         Self.dtype
     ]:
-        result_shape = ShapeBroadcaster.broadcast_shape(self.shape, other.shape)
+        var result_shape = ShapeBroadcaster.broadcast_shape(self.shape, other.shape)
 
-        mask1 = ShapeBroadcaster.broadcast_mask(self.shape, result_shape)
-        mask2 = ShapeBroadcaster.broadcast_mask(other.shape, result_shape)
+        var mask1 = ShapeBroadcaster.broadcast_mask(self.shape, result_shape)
+        var mask2 = ShapeBroadcaster.broadcast_mask(other.shape, result_shape)
 
         var buffer = Buffer[Self.dtype](result_shape.num_elements())
-        strides = Strides.default(result_shape)
+        var strides = Strides.default(result_shape)
 
         for coord in result_shape:
-            self_coord = ShapeBroadcaster.translate_index(
+            var self_coord = ShapeBroadcaster.translate_index(
                 self.shape, coord, mask1, result_shape
             )
-            other_coord = ShapeBroadcaster.translate_index(
+            var other_coord = ShapeBroadcaster.translate_index(
                 other.shape, coord, mask2, result_shape
             )
-            index = IndexCalculator.flatten_index(
+            var index = IndexCalculator.flatten_index(
                 result_shape, coord, strides, 0
             )
 
