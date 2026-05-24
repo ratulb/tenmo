@@ -1,4 +1,5 @@
-from std.math import exp, floor, log, cos, sin, sqrt, pi
+# from std.math import exp, floor, log, cos, sin, sqrt, pi
+from std.math import exp, log, sqrt
 from std.random import seed, random_float64
 from std.sys import simd_width_of
 from std.utils.numerics import min_finite
@@ -1466,7 +1467,7 @@ struct Tensor[dtype: DType](
         Returns:
             A tensor of given shape with normally distributed values.
         """
-        if init_seed:
+        _ = """if init_seed:
             seed(init_seed.value())
         else:
             seed()
@@ -1489,9 +1490,9 @@ struct Tensor[dtype: DType](
             buffer[i] = z0.cast[Self.dtype]()
             if i + 1 < numels:
                 buffer[i + 1] = z1.cast[Self.dtype]()
-            i += 2
+            i += 2"""
 
-        var nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
+        var nd_buffer = NDBuffer[Self.dtype].randn(shape, mean, std, init_seed)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
     @staticmethod

@@ -328,6 +328,38 @@ struct NDBuffer[dtype: DType](
                     print("NDBuffer device state synchronization failed")
 
     @staticmethod
+    def randn(
+        shape: Shape,
+        mean: Float64 = 0.0,
+        std: Float64 = 1.0,
+        init_seed: Optional[Int] = None,
+    ) -> NDBuffer[Self.dtype]:
+        if init_seed:
+            seed(init_seed.value())
+        else:
+            seed()
+        var numels = shape.num_elements()
+        var buffer = Buffer[Self.dtype](numels)
+        var i = 0
+        while i < numels:
+            # Polar method — sample uniformly from unit disk
+            var u: Float64 = 0.0
+            var v: Float64 = 0.0
+            var s: Float64 = 2.0  # anything >= 1 to enter loop
+            while s >= 1.0 or s == 0.0:
+                u = random_float64(-1.0, 1.0)
+                v = random_float64(-1.0, 1.0)
+                s = u * u + v * v
+            var multiplier = sqrt(-2.0 * log(s) / s) * std
+            var z0 = u * multiplier + mean
+            var z1 = v * multiplier + mean
+            buffer[i] = z0.cast[Self.dtype]()
+            if i + 1 < numels:
+                buffer[i + 1] = z1.cast[Self.dtype]()
+            i += 2
+        return NDBuffer[Self.dtype](buffer^, shape)
+
+    @staticmethod
     @always_inline
     def zeros(
         shape: Shape, device: Device = CPU().into()
@@ -2703,21 +2735,31 @@ struct NDBuffer[dtype: DType](
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
         Self.dtype
     ]:
-        if (self.shape.rank() <= 1 and self.numels() == 1) or (
-            other.shape.rank() <= 1 and other.numels() == 1
-        ):
-            return self.broadcast_scalar_buffer[op_code](other)
+        var self_is_scalar = self.shape.rank() == 0
+        if self_is_scalar or other.shape.rank() == 0:
+            if self_is_scalar:
+                comptime if op_code == Subtract or op_code == Divide:
+                    if op_code == Subtract:
+                        return self.broadcast_scalar_buffer[ReverseSubtract](
+                            other, self_is_scalar
+                        )
+                    else:
+                        return self.broadcast_scalar_buffer[ReverseDivide](
+                            other, self_is_scalar
+                        )
+
+            return self.broadcast_scalar_buffer[op_code](other, self_is_scalar)
         else:
             return self.broadcast_nd_buffer[op_code](other)
 
     @always_inline
     def broadcast_scalar_buffer[
         op_code: Int
-    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
-        Self.dtype
-    ]:
-        # var self_is_scalar = self.shape.rank() == 0
-        var self_is_scalar = self.numels() == 1
+    ](
+        self: NDBuffer[Self.dtype],
+        other: NDBuffer[Self.dtype],
+        self_is_scalar: Bool,
+    ) -> NDBuffer[Self.dtype]:
         var result_shape = other.shape if self_is_scalar else self.shape
         var is_contiguous = (
             other.is_contiguous() if self_is_scalar else self.is_contiguous()
@@ -2728,14 +2770,12 @@ struct NDBuffer[dtype: DType](
             var offset = other.offset if self_is_scalar else self.offset
             var numels = other.numels() if self_is_scalar else self.numels()
             buffer = (
-                other.buffer.copied(offset, offset + numels)
-                .arithmetic_ops_scalar[op_code](
-                    item
+                other.buffer.copied(
+                    offset, offset + numels
                 ) if self_is_scalar else self.buffer.copied(
                     offset, offset + numels
                 )
-                .arithmetic_ops_scalar[op_code](item)
-            )
+            ).arithmetic_ops_scalar[op_code](item)
 
         else:
             buffer = Buffer[Self.dtype](result_shape.num_elements())
@@ -2744,7 +2784,7 @@ struct NDBuffer[dtype: DType](
             if self_is_scalar:
                 for idx in other.index_iterator():
                     buffer[index] = Self.scalar_fn[op_code](
-                        other.buffer[idx], item
+                        item, other.buffer[idx]
                     )
                     index += 1
             else:
@@ -2762,7 +2802,9 @@ struct NDBuffer[dtype: DType](
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
         Self.dtype
     ]:
-        var result_shape = ShapeBroadcaster.broadcast_shape(self.shape, other.shape)
+        var result_shape = ShapeBroadcaster.broadcast_shape(
+            self.shape, other.shape
+        )
 
         var mask1 = ShapeBroadcaster.broadcast_mask(self.shape, result_shape)
         var mask2 = ShapeBroadcaster.broadcast_mask(other.shape, result_shape)
