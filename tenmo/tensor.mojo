@@ -512,6 +512,7 @@ struct Tensor[dtype: DType](
             self.strides(),
             slices,
         )
+        offset += self.offset()
         return View[Self.dtype].forward[track_grad=track_grad](
             self,
             shape=shape,
@@ -1633,6 +1634,14 @@ struct Tensor[dtype: DType](
             requires_grad=requires_grad.or_else(self.requires_grad),
             device=target_device,
         )
+
+    @staticmethod
+    def empty(
+        shape: Shape,
+        requires_grad: Bool = False,
+        device: Optional[Device] = None,
+    ) -> Tensor[Self.dtype]:
+        return Self.zeros(shape, requires_grad, device)
 
     @staticmethod
     def zeros(
@@ -3385,6 +3394,7 @@ struct Tensor[dtype: DType](
                 self.shape(), self.strides(), axis, start, end, step
             )
         )
+        offset += self.buffer.offset
 
         return View[Self.dtype].forward[track_grad](
             self,
@@ -3429,6 +3439,7 @@ struct Tensor[dtype: DType](
                 step_sizes,
             )
         )
+        offset += self.buffer.offset
 
         return View[Self.dtype].forward[track_grad](
             self,
@@ -4163,6 +4174,9 @@ struct Tensor[dtype: DType](
             x, pad_spec, "constant", 0.0, requires_grad
         )
 
+    def slices(ref self) -> SliceIterator[Self.dtype, origin_of(self)]:
+        return SliceIterator(Pointer(to=self))
+
 
 @fieldwise_init
 struct ElemIterator[dtype: DType, origin: ImmutOrigin](
@@ -4230,3 +4244,63 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
             Tuple of (remaining length, Optional of the same length).
         """
         return self.index_itr.bounds()
+
+
+@fieldwise_init
+struct SliceIterator[dtype: DType, origin: ImmutOrigin](
+    RegisterPassable & ImplicitlyCopyable & Iterable & Iterator & Sized
+):
+    """Iterates over first dimension slices.
+
+    matrix (4,3)   → yields 4 tensors of shape (3,)
+    tensor (4,3,2) → yields 4 tensors of shape (3,2)
+    """
+
+    comptime Element = Tensor[Self.dtype]
+    comptime IteratorType[
+        iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
+    ]: Iterator = Self
+
+    var src: Pointer[Tensor[Self.dtype], Self.origin]
+    var current: Int
+    var first_dim_size: Int
+    var first_dim_stride: Int
+    var slice_shape: Shape
+    var slice_strides: Strides
+
+    def __init__(out self, src: Pointer[Tensor[Self.dtype], Self.origin]):
+        self.src = src
+        self.current = 0
+        self.first_dim_size = src[].shape()[0]
+        self.first_dim_stride = src[].strides()[0]
+        self.slice_shape = src[].shape()[1::]
+        self.slice_strides = src[].strides()[1::]
+
+    def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+        return self
+
+    def __next__(mut self) raises StopIteration -> Self.Element:
+        if not self.__has_next__():
+            raise StopIteration()
+        var idx = self.current
+        self.current += 1
+        var source = self.src[]
+        var offset = source.offset() + idx * self.first_dim_stride
+        return View[Self.dtype].forward[track_grad=False](
+            source,
+            self.slice_shape,
+            self.slice_strides,
+            offset,
+            requires_grad=False,
+            validated=True,
+        )
+
+    def __len__(self) -> Int:
+        return self.first_dim_size - self.current
+
+    def __has_next__(self) -> Bool:
+        return self.current < self.first_dim_size
+
+    def bounds(self) -> Tuple[Int, Optional[Int]]:
+        var remaining = self.__len__()
+        return remaining, Optional(remaining)

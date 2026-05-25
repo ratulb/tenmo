@@ -19,16 +19,16 @@ struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref gradbox = output.gradients()[]
         var ancestor_gradbox: Gradbox[Self.dtype]
         var original_shape = ancestor.shape()
-        if gradbox.shape() == Shape():
-            ancestor_gradbox = Gradbox[Self.dtype].full(
-                original_shape,
-                gradbox.item(),
-                share=False,
-                device=gradbox.device(),
-            )
-        else:
-            ancestor_gradbox = gradbox.reshape(original_shape)
         if ancestor.requires_grad:
+            if gradbox.shape() == Shape():
+                ancestor_gradbox = Gradbox[Self.dtype].full(
+                    original_shape,
+                    gradbox.item(),
+                    share=False,
+                    device=gradbox.device(),
+                )
+            else:
+                ancestor_gradbox = gradbox.reshape(original_shape)
             ancestor.update_grad(ancestor_gradbox^, AddTensor, None)
         parent_ids.append(ancestor._id)
         gradbox.zero_grad()

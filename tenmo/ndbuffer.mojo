@@ -683,7 +683,7 @@ struct NDBuffer[dtype: DType](
                 " buffer/singleton, got shape: "
                 + String(self.shape)
             )
-        return self.get(0)
+        return self.get(self.offset)
 
     def get(self, index: Int) -> Scalar[Self.dtype]:
         idx = index + self.max_index() if index < 0 else index
@@ -2735,8 +2735,9 @@ struct NDBuffer[dtype: DType](
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
         Self.dtype
     ]:
-        var self_is_scalar = self.shape.rank() == 0
-        if self_is_scalar or other.shape.rank() == 0:
+        var self_is_scalar = self.shape.rank() <= 1 and self.numels() == 1
+        var other_is_scalar = other.shape.rank() <= 1 and other.numels() == 1
+        if self_is_scalar or other_is_scalar:
             if self_is_scalar:
                 comptime if op_code == Subtract or op_code == Divide:
                     if op_code == Subtract:
@@ -2760,7 +2761,9 @@ struct NDBuffer[dtype: DType](
         other: NDBuffer[Self.dtype],
         self_is_scalar: Bool,
     ) -> NDBuffer[Self.dtype]:
-        var result_shape = other.shape if self_is_scalar else self.shape
+        var result_shape = ShapeBroadcaster.broadcast_shape(
+            self.shape, other.shape
+        )
         var is_contiguous = (
             other.is_contiguous() if self_is_scalar else self.is_contiguous()
         )
@@ -2783,9 +2786,14 @@ struct NDBuffer[dtype: DType](
 
             if self_is_scalar:
                 for idx in other.index_iterator():
-                    buffer[index] = Self.scalar_fn[op_code](
-                        item, other.buffer[idx]
-                    )
+                    comptime if op_code == ReverseSubtract or op_code == ReverseDivide:
+                        buffer[index] = Self.scalar_fn[op_code](
+                            other.buffer[idx], item
+                        )
+                    else:
+                        buffer[index] = Self.scalar_fn[op_code](
+                            item, other.buffer[idx]
+                        )
                     index += 1
             else:
                 for idx in self.index_iterator():

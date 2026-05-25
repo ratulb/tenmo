@@ -597,10 +597,9 @@ def test_chained_slicing_2d() raises:
     # Chain: first get rows 1-3, then get cols 1-3
     var sliced1 = x[1:3, :]
     var sliced2 = sliced1[:, 1:3]
-    # Should be [[2, 3], [6, 7]] - offsets are always w.r.t. storage buffer!
     assert_true(sliced2.shape()[0] == 2)
     assert_true(sliced2.shape()[1] == 2)
-    var expected = Tensor[dtype].d2([[2.0, 3.0], [6.0, 7.0]])
+    var expected = Tensor[dtype].d2([[6.0, 7.0], [10.0, 11.0]])
     assert_true(sliced2.all_close[atol=1e-6](expected))
 
 
@@ -738,9 +737,9 @@ def test_slice_backward_chained() raises:
     var sliced2 = sliced1[1:2, :]  # Get row 1 from that
     var loss = sliced2.sum()  # Sum of [6, 7]
     loss.backward()
-    # Only element at [1, 1] and [1, 2] should have gradient
+    # Elements at [1, 1] and [1, 2] should have gradient
     var expected_grad = Tensor[dtype].d2(
-        [[0.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
+        [[0.0, 0.0, 0.0, 0.0], [0.0, 1.0, 1.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
     )
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 

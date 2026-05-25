@@ -255,7 +255,7 @@ if [ $# -eq 0 ]; then
     echo "  sgd, sparse_sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout, dev_transfer"
     echo "  std_variance, stack, logarithm, concat, variance, variance_and_std, utils, onehot, power"
     echo "  indexhelper, losses, tanh, data, softmax, repeat, mmnd, attn_matmul"
-    echo "  attn_matmul, bce, intarray, mm2d, vm, mv, slice, tiles, linspace, argminmax"
+    echo "  attn_matmul, bce, intarray, mm2d, vm, mv, slice, view_slice, tiles, linspace, argminmax"
     echo "  minmax, relu, shuffle, permute, flatten, gather, squeeze, unsqueeze"
     echo "  gradbox, ndb, transpose, buffers, views, shapes, strides"
     echo "  shapebroadcast, validators, ce, synth_mnist"
@@ -389,6 +389,7 @@ run_test_by_name() {
         vm)             run_test "vm" "tests/test_vm.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         mv)             run_test "mv" "tests/test_mv.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         slice)          run_test "slice" "tests/test_slice.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        view_slice)     run_test "view_slice" "tests/test_view_slice.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         tiles)          run_test "tiles" "tests/test_tiles.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         linspace)       run_test "linspace" "tests/test_linspace.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         argminmax)      run_test "argminmax" "tests/test_argminmax.mojo" "$DEBUG_MODE"; exit_code=$? ;;

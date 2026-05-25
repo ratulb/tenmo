@@ -1118,6 +1118,386 @@ def test_bcast_gpu_bwd_chained_add() raises:
         assert_true(a.grad().all_close(Tensor[dtype].d1([3.0, 3.0, 3.0])))
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers — Scalar broadcast tests
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _scalar(v: Float32, rg: Bool = False) -> Tensor[dtype]:
+    return Tensor[dtype].scalar(v, requires_grad=rg)
+
+
+def _scalar1(v: Float32, rg: Bool = False) -> Tensor[dtype]:
+    return Tensor[dtype].d1([v], requires_grad=rg)
+
+
+def _mat(rows: List[List[Float32]], rg: Bool = False) -> Tensor[dtype]:
+    return Tensor[dtype].d2(rows, requires_grad=rg)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A — Shape equivalence: () and (1,) behave identically in all 4 ops
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_A1_shape_eq_add() raises:
+    var a = _scalar(5.0)
+    var b = _scalar1(5.0)
+    var c = _scalar(7.0)
+    var d = _scalar1(7.0)
+
+    assert_true((a + c).all_close(Tensor[dtype].scalar(12.0)))
+    assert_true((b + c).all_close(Tensor[dtype].d1([12.0])))
+    assert_true((a + d).all_close(Tensor[dtype].d1([12.0])))
+    assert_true((b + d).all_close(Tensor[dtype].d1([12.0])))
+    assert_true((b + d).all_close(c + b))
+    print("  A1 add: ✓")
+
+
+def test_A2_shape_eq_sub() raises:
+    var a = _scalar(5.0)
+    var b = _scalar1(5.0)
+    var c = _scalar(7.0)
+    var d = _scalar1(7.0)
+
+    assert_true((a - c).all_close(Tensor[dtype].scalar(-2.0)))
+    assert_true((b - c).all_close(Tensor[dtype].d1([-2.0])))
+    assert_true((a - d).all_close(Tensor[dtype].d1([-2.0])))
+    assert_true((b - d).all_close(Tensor[dtype].d1([-2.0])))
+    print("  A2 sub: ✓")
+
+
+def test_A3_shape_eq_mul() raises:
+    var a = _scalar(5.0)
+    var b = _scalar1(5.0)
+    var c = _scalar(7.0)
+    var d = _scalar1(7.0)
+
+    assert_true((a * c).all_close(Tensor[dtype].scalar(35.0)))
+    assert_true((b * c).all_close(Tensor[dtype].d1([35.0])))
+    assert_true((a * d).all_close(Tensor[dtype].d1([35.0])))
+    assert_true((b * d).all_close(Tensor[dtype].d1([35.0])))
+    assert_true((b * d).all_close(c * b))
+    print("  A3 mul: ✓")
+
+
+def test_A4_shape_eq_div() raises:
+    var a = _scalar(10.0)
+    var b = _scalar1(10.0)
+    var c = _scalar(2.0)
+    var d = _scalar1(2.0)
+
+    assert_true((a / c).all_close(Tensor[dtype].scalar(5.0)))
+    assert_true((b / c).all_close(Tensor[dtype].d1([5.0])))
+    assert_true((a / d).all_close(Tensor[dtype].d1([5.0])))
+    assert_true((b / d).all_close(Tensor[dtype].d1([5.0])))
+    print("  A4 div: ✓")
+
+
+def test_A5_scalar_vs_vector() raises:
+    var s_ = _scalar(2.0)
+    var s1 = _scalar1(2.0)
+    var v = Tensor[dtype].d1([1.0, 2.0, 3.0])
+
+    assert_true((s_ * v).all_close(Tensor[dtype].d1([2.0, 4.0, 6.0])))
+    assert_true((s1 * v).all_close(Tensor[dtype].d1([2.0, 4.0, 6.0])))
+    assert_true((v * s_).all_close(Tensor[dtype].d1([2.0, 4.0, 6.0])))
+    assert_true((v * s1).all_close(Tensor[dtype].d1([2.0, 4.0, 6.0])))
+    print("  A5 vec: ✓")
+
+
+def test_A6_not_scalar() raises:
+    var m = Tensor[dtype].full(Shape(1, 1), 5.0)
+    var s_ = _scalar(7.0)
+    var r = m * s_
+    assert_true(r.shape() == Shape(1, 1))
+    assert_true(r.all_close(Tensor[dtype].full(Shape(1, 1), 35.0)))
+    print("  A6 (1,1) not scalar: ✓")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# B — Op-code flip: Subtract→ReverseSubtract, Divide→ReverseDivide
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_B1_flip_sub_scalar_left() raises:
+    assert_true(
+        (_scalar(5.0) - Tensor[dtype].d1([10.0, 20.0])).all_close(
+            Tensor[dtype].d1([-5.0, -15.0])
+        )
+    )
+    print("  B1 flip sub ()-vec: ✓")
+
+
+def test_B2_flip_sub_scalar1_left() raises:
+    assert_true(
+        (_scalar1(5.0) - Tensor[dtype].d1([10.0, 20.0])).all_close(
+            Tensor[dtype].d1([-5.0, -15.0])
+        )
+    )
+    print("  B2 flip sub (1,)-vec: ✓")
+
+
+def test_B3_no_flip_sub_right() raises:
+    assert_true(
+        (Tensor[dtype].d1([10.0, 20.0]) - _scalar(5.0)).all_close(
+            Tensor[dtype].d1([5.0, 15.0])
+        )
+    )
+    print("  B3 no-flip sub: ✓")
+
+
+def test_B4_no_flip_sub_scalar1_right() raises:
+    assert_true(
+        (Tensor[dtype].d1([10.0, 20.0]) - _scalar1(5.0)).all_close(
+            Tensor[dtype].d1([5.0, 15.0])
+        )
+    )
+    print("  B4 no-flip sub scalar1: ✓")
+
+
+def test_B5_flip_div_scalar_left() raises:
+    assert_true(
+        (_scalar(10.0) / Tensor[dtype].d1([2.0, 4.0])).all_close(
+            Tensor[dtype].d1([5.0, 2.5])
+        )
+    )
+    print("  B5 flip div ()-vec: ✓")
+
+
+def test_B6_flip_div_scalar1_left() raises:
+    assert_true(
+        (_scalar1(10.0) / Tensor[dtype].d1([2.0, 4.0])).all_close(
+            Tensor[dtype].d1([5.0, 2.5])
+        )
+    )
+    print("  B6 flip div (1,)-vec: ✓")
+
+
+def test_B7_no_flip_div_right() raises:
+    assert_true(
+        (Tensor[dtype].d1([10.0, 20.0]) / _scalar(2.0)).all_close(
+            Tensor[dtype].d1([5.0, 10.0])
+        )
+    )
+    print("  B7 no-flip div: ✓")
+
+
+def test_B8_no_flip_div_scalar1_right() raises:
+    assert_true(
+        (Tensor[dtype].d1([10.0, 20.0]) / _scalar1(2.0)).all_close(
+            Tensor[dtype].d1([5.0, 10.0])
+        )
+    )
+    print("  B8 no-flip div scalar1: ✓")
+
+
+def test_B9_commutative_same() raises:
+    var s_ = _scalar(3.0)
+    var s1 = _scalar1(3.0)
+    var v = Tensor[dtype].d1([1.0, 2.0, 4.0])
+
+    assert_true((s_ + v).all_close(s1 + v))
+    assert_true((v + s_).all_close(v + s1))
+    assert_true((s_ * v).all_close(s1 * v))
+    assert_true((v * s_).all_close(v * s1))
+    assert_true((s_ * v).all_close(s1 * v))
+    assert_true((v * s_).all_close(v * s1))
+    print("  B9 commutative: ✓")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C — Non-contiguous path (index_iterator + item order)
+# ─────────────────────────────────────────────────────────────────────────────
+# Transposing a (3,2) tensor gives a (2,3) view with non-default strides.
+# This forces broadcast_scalar_buffer to the index_iterator path (non-SIMD).
+
+
+def test_C1_noncontig_scalar_left_add() raises:
+    var A = _mat([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+    var T = A.transpose()
+    var s = _scalar(10.0)
+    var R = s + T
+    var expected = _mat([[11.0, 13.0, 15.0], [12.0, 14.0, 16.0]])
+    assert_true(R.all_close(expected))
+    print("  C1 noncontig ()+transpose: ✓")
+
+
+def test_C2_noncontig_scalar1_left_mul() raises:
+    var A = _mat([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+    var T = A.transpose()
+    var s1 = _scalar1(3.0)
+    var R = s1 * T
+    var expected = _mat([[3.0, 9.0, 15.0], [6.0, 12.0, 18.0]])
+    assert_true(R.all_close(expected))
+    print("  C2 noncontig (1,)*transpose: ✓")
+
+
+def test_C3_noncontig_scalar_right_sub() raises:
+    var A = _mat([[10.0, 20.0], [30.0, 40.0], [50.0, 60.0]])
+    var T = A.transpose()
+    var s = _scalar(5.0)
+    var R = T - s
+    var expected = _mat([[5.0, 25.0, 45.0], [15.0, 35.0, 55.0]])
+    assert_true(R.all_close(expected))
+    print("  C3 noncontig transpose-(): ✓")
+
+
+def test_C4_noncontig_scalar1_right_div() raises:
+    var A = _mat([[2.0, 4.0], [8.0, 10.0], [14.0, 16.0]])
+    var T = A.transpose()
+    var s1 = _scalar1(2.0)
+    var R = T / s1
+    var expected = _mat([[1.0, 4.0, 7.0], [2.0, 5.0, 8.0]])
+    assert_true(R.all_close(expected))
+    print("  C4 noncontig transpose/(1,): ✓")
+
+
+def test_C5_noncontig_scalar_left_sub_flip() raises:
+    """() - transpose: scalar left SUBTRACT → ReverseSubtract, index_iterator path.
+    """
+    var A = _mat([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+    var T = A.transpose()
+    var s = _scalar(100.0)
+    var R = s - T
+    var expected = _mat([[99.0, 97.0, 95.0], [98.0, 96.0, 94.0]])
+    assert_true(R.all_close(expected))
+    print("  C5 noncontig ()-transpose flip: ✓")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# D — Backward pass (gradient through broadcast)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_D1_backward_scalar_left() raises:
+    var a = _scalar(2.0, rg=True)
+    var b = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var c = a * b
+    c.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].scalar(6.0)))
+    var gb = b.grad().detach(share=True)
+    assert_true(gb.all_close(Tensor[dtype].d1([2.0, 2.0, 2.0])))
+    print("  D1 backward scalar-left: ✓")
+
+
+def test_D2_backward_scalar_right() raises:
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var b = _scalar(2.0, rg=True)
+    var c = a * b
+    c.backward()
+    var ga = a.grad().detach(share=True)
+    assert_true(ga.all_close(Tensor[dtype].d1([2.0, 2.0, 2.0])))
+    assert_true(b.grad().all_close(Tensor[dtype].scalar(6.0)))
+    print("  D2 backward scalar-right: ✓")
+
+
+def test_D3_backward_sub_scalar_left() raises:
+    var a = _scalar(10.0, rg=True)
+    var b = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var c = a - b
+    c.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].scalar(3.0)))
+    var gb = b.grad().detach(share=True)
+    assert_true(gb.all_close(Tensor[dtype].d1([-1.0, -1.0, -1.0])))
+    print("  D3 backward sub scalar-left: ✓")
+
+
+def test_D4_backward_div_scalar_left() raises:
+    var a = _scalar(12.0, rg=True)
+    var b = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
+    var c = a / b
+    c.backward()
+    var exp_ga = (
+        Float32(1.0) / Float32(2.0)
+        + Float32(1.0) / Float32(3.0)
+        + Float32(1.0) / Float32(4.0)
+    )
+    assert_true(a.grad().all_close(Tensor[dtype].scalar(exp_ga)))
+    var gb = b.grad().detach(share=True)
+    assert_true(
+        gb.all_close(
+            Tensor[dtype].d1(
+                [
+                    Float32(-12.0 / 4.0),
+                    Float32(-12.0 / 9.0),
+                    Float32(-12.0 / 16.0),
+                ]
+            ),
+        )
+    )
+    print("  D4 backward div scalar-left: ✓")
+
+
+def test_D5_backward_scalar1_left() raises:
+    var a = _scalar1(2.0, rg=True)
+    var b = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var c = a * b
+    c.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d1([6.0])))
+    var gb = b.grad().detach(share=True)
+    assert_true(gb.all_close(Tensor[dtype].d1([2.0, 2.0, 2.0])))
+    print("  D5 backward scalar1-left: ✓")
+
+
+def test_D6_backward_through_reshape() raises:
+    var a = _scalar(42.0, rg=True)
+    var b = a.reshape(Shape.of(1))
+    var c = _scalar(2.0, rg=True)
+    var d = b * c
+    d.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].scalar(2.0)))
+    print("  D6 backward through reshape: ✓")
+
+
+def test_D7_backward_2d_broadcast() raises:
+    var a = _scalar(5.0, rg=True)
+    var b = _mat([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], rg=True)
+    var c = a * b
+    c.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].scalar(21.0)))
+    var gb = b.grad().detach(share=True)
+    assert_true(gb.all_close(Tensor[dtype].full(Shape(2, 3), 5.0)))
+    print("  D7 backward 2d broadcast: ✓")
+
+
+def test_D8_backward_scalar1_2d() raises:
+    var a = _scalar1(5.0, rg=True)
+    var b = _mat([[1.0, 2.0], [3.0, 4.0]], rg=True)
+    var c = a + b
+    c.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d1([4.0])))
+    var gb = b.grad().detach(share=True)
+    assert_true(gb.all_close(Tensor[dtype].full(Shape(2, 2), 1.0)))
+    print("  D8 backward scalar1+2d: ✓")
+
+
+def test_D9_backward_noncontig() raises:
+    var a = _scalar(2.0, rg=True)
+    var A = _mat([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], rg=True)
+    var T = A.transpose()
+    var c = a * T
+    var loss = c.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].scalar(21.0)))
+    var ga = A.grad().detach(share=True)
+    assert_true(ga.all_close(Tensor[dtype].full(Shape(3, 2), 2.0)))
+    print("  D9 backward noncontig: ✓")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# E — Boundary cases
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_E1_same_shape_scalar1_ok() raises:
+    var a = _scalar1(5.0)
+    var b = _scalar1(7.0)
+    var r = a + b
+    assert_true(r.all_close(Tensor[dtype].d1([12.0])))
+    print("  E1 (1,)+(1,) OK: ✓")
+
+
 # =============================================================================
 # Main
 # =============================================================================
