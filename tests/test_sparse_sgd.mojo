@@ -4,6 +4,7 @@ from std.testing import assert_true, TestSuite
 from tenmo.sgd import SGD
 from tenmo.intarray import IntArray
 from tenmo.filler import Filler
+from std.sys import has_accelerator
 
 
 comptime dtype = DType.float32
@@ -365,6 +366,53 @@ fn test_sparse_sgd_duplicate_indices() raises:
         [[9.8, 9.8], [20.0, 20.0]],
     )
     assert_true(w.all_close(expected))
+
+
+fn test_gpu_sparse_sgd_step_only_updates_specified_rows() raises:
+    """Sparse step on GPU: only rows at specified indices change."""
+    comptime if not has_accelerator():
+        print("No GPU available — skipping test_gpu_sparse_sgd_step_only_updates_specified_rows")
+        return
+    var w_cpu = Tensor[dtype].d2(
+        [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0]],
+        requires_grad=True,
+    )
+    var w = w_cpu.to_gpu()
+    var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
+    params.append(UnsafePointer(to=w))
+    var sgd = SGD(params, lr=0.1)
+    w.seed_grad(1.0)
+    sgd.step(IntArray([0, 2]))
+    var result = w.to_cpu()
+    var expected = Tensor[dtype].d2(
+        [[0.9, 0.9], [2.0, 2.0], [2.9, 2.9], [4.0, 4.0]],
+    )
+    assert_true(result.all_close(expected))
+
+
+fn test_gpu_sparse_sgd_with_momentum() raises:
+    """Sparse momentum step on GPU: only specified rows updated."""
+    comptime if not has_accelerator():
+        print("No GPU available — skipping test_gpu_sparse_sgd_with_momentum")
+        return
+    var w_cpu = Tensor[dtype].d2(
+        [[10.0, 10.0], [20.0, 20.0], [30.0, 30.0]],
+        requires_grad=True,
+    )
+    var w = w_cpu.to_gpu()
+    var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
+    params.append(UnsafePointer(to=w))
+    var sgd = SGD(params, lr=0.1, momentum=0.9)
+    var idx = IntArray([1])
+    w.seed_grad(1.0)
+    sgd.step(idx)
+    var result = w.to_cpu()
+    # Row 1: v = 0.9*0 + 1 = 1, w = 20 - 0.1*1 = 19.9
+    # Rows 0 and 2 unchanged
+    var expected = Tensor[dtype].d2(
+        [[10.0, 10.0], [19.9, 19.9], [30.0, 30.0]],
+    )
+    assert_true(result.all_close(expected))
 
 
 fn main() raises:
