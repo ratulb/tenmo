@@ -2,6 +2,7 @@ from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
 from tenmo.shapes import Shape
 from tenmo.mnemonics import AddTensor
+from std.sys import has_accelerator
 
 comptime dtype = DType.float32
 
