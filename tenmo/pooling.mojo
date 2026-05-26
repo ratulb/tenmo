@@ -7,6 +7,7 @@ from .ndbuffer import NDBuffer
 from std.utils.numerics import neg_inf
 from .common_utils import panic
 from std.algorithm import parallelize
+from .named_parameter import NamedParameter
 from .net import Module, Layer, MAXPOOL2D
 from .ancestry import Ancestor
 
@@ -530,6 +531,11 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
+
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        return List[NamedParameter[Self.dtype]]()
 
     def num_parameters(self) -> Int:
         return 0

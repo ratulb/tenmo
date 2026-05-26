@@ -164,6 +164,7 @@ declare -a ALL_TESTS_IN_ORDER=(
     "shapebroadcast|tests/test_broadcaster.mojo"
     "validators|tests/test_validators.mojo"
     "ce|tests/test_cross_entropy.mojo"
+    "checkpoint|tests/test_checkpoint.mojo"
 #    "synth_mnist|tests/test_synthetic_mnist.mojo"
 )
 
@@ -258,7 +259,7 @@ if [ $# -eq 0 ]; then
     echo "  attn_matmul, bce, intarray, mm2d, vm, mv, slice, view_slice, tiles, linspace, argminmax"
     echo "  minmax, relu, shuffle, permute, flatten, gather, squeeze, unsqueeze"
     echo "  gpu_all          Run all GPU tests from a single file"
-    echo "  shapebroadcast, validators, ce, synth_mnist"
+    echo "  checkpoint, shapebroadcast, validators, ce, synth_mnist"
     echo ""
     print_colored "$GREEN" "  all              Run all tests"
     print_colored "$GREEN" "  gpu              Run all GPU-guarded tests"
@@ -411,6 +412,7 @@ run_test_by_name() {
         shapebroadcast) run_test "shapebroadcast" "tests/test_broadcaster.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         validators)     run_test "validators" "tests/test_validators.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         ce)             run_test "ce" "tests/test_cross_entropy.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        checkpoint)     run_test "checkpoint" "tests/test_checkpoint.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         synth_mnist)    run_test "synth_mnist" "tests/test_synthetic_mnist.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         gpu_all)
             print_colored "$BLUE" "Running all GPU tests from single file..."

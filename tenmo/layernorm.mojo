@@ -36,6 +36,7 @@ from .mnemonics import LAYER_NORM, AddTensor
 from .device import GPU
 from .common_utils import panic
 from tenmo.intarray import IntArray
+from .named_parameter import NamedParameter
 
 # =============================================================================
 # Backward argument — saved from forward, zero recomputation in backward
@@ -246,6 +247,16 @@ struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
             UnsafePointer(to=self.beta).unsafe_mut_cast[True]().as_any_origin()
         )
         return params^
+
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        var result = List[NamedParameter[Self.dtype]]()
+        var g = UnsafePointer(to=self.gamma).unsafe_mut_cast[True]()
+        result.append(NamedParameter(prefix + "gamma", g.as_any_origin()))
+        var b = UnsafePointer(to=self.beta).unsafe_mut_cast[True]()
+        result.append(NamedParameter(prefix + "beta", b.as_any_origin()))
+        return result^
 
     def num_parameters(self) -> Int:
         return self.gamma.numels() + self.beta.numels()

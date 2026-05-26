@@ -5,6 +5,8 @@ from .shapes import Shape
 from .buffers import Buffer
 from .ndbuffer import NDBuffer
 from .gradbox import Gradbox
+from .net import Sequential
+from .named_parameter import NamedParameter
 
 
 def numpy_dtype(dtype: DType) raises -> PythonObject:
@@ -140,6 +142,39 @@ def as_nested_list[
     """Convert NDBuffer to a nested Python list retaining shape structure."""
     var ndarray = to_ndarray(self)
     return ndarray.tolist()
+
+
+def save_checkpoint[dtype: DType, //](
+    model: Sequential[dtype], path: String
+) raises:
+    np = Python.import_module("numpy")
+    var state_dict: PythonObject = {}
+    var params = model.named_parameters("")
+    for p in params:
+        var tensor_ptr = p.tensor_ptr
+        var nd = to_ndarray(tensor_ptr[])
+        state_dict[p.name] = nd
+    np.save(path, state_dict)
+
+
+def load_checkpoint[dtype: DType, //](
+    mut model: Sequential[dtype], path: String
+) raises:
+    np = Python.import_module("numpy")
+    var state_dict = np.load(path, allow_pickle=True).item()
+    var params = model.named_parameters("")
+    for p in params:
+        var key = p.name
+        if state_dict.__contains__(key):
+            var nd = state_dict[key]
+            var src_ptr = ndarray_ptr[dtype](nd)
+            var tensor_ptr = p.tensor_ptr
+            ref t = tensor_ptr[]
+            memcpy(
+                dest=t.data_ptr().unsafe_mut_cast[True](),
+                src=src_ptr,
+                count=t.numels(),
+            )
 
 
 def test_to_ndarray() raises:

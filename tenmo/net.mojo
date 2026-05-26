@@ -43,6 +43,7 @@ from .ndbuffer import NDBuffer
 from std.random import seed, random_float64
 from std.sys import simd_width_of
 from .device import GPU
+from .named_parameter import NamedParameter
 
 
 @fieldwise_init
@@ -202,6 +203,16 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         )
 
         return params^
+
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        var result = List[NamedParameter[Self.dtype]]()
+        var w = UnsafePointer(to=self.weight).unsafe_mut_cast[True]()
+        result.append(NamedParameter(prefix + "weight", w.as_any_origin()))
+        var b = UnsafePointer(to=self.bias).unsafe_mut_cast[True]()
+        result.append(NamedParameter(prefix + "bias", b.as_any_origin()))
+        return result^
 
     def num_parameters(self) -> Int:
         return self.weight.numels() + self.bias.numels()
@@ -580,6 +591,16 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
         return params^
 
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        var result = List[NamedParameter[Self.dtype]]()
+        var w = UnsafePointer(to=self.weight).unsafe_mut_cast[True]()
+        result.append(NamedParameter(prefix + "weight", w.as_any_origin()))
+        var b = UnsafePointer(to=self.bias).unsafe_mut_cast[True]()
+        result.append(NamedParameter(prefix + "bias", b.as_any_origin()))
+        return result^
+
     def num_parameters(self) -> Int:
         return self.weight.numels() + self.bias.numels()
 
@@ -615,6 +636,11 @@ struct ReLU[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
+
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        return List[NamedParameter[Self.dtype]]()
 
     def num_parameters(self) -> Int:
         return 0
@@ -660,6 +686,11 @@ struct Sigmoid[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        return List[NamedParameter[Self.dtype]]()
+
     def num_parameters(self) -> Int:
         return 0
 
@@ -703,6 +734,11 @@ struct Tanh[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
+
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        return List[NamedParameter[Self.dtype]]()
 
     def num_parameters(self) -> Int:
         return 0
@@ -799,6 +835,20 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
 
         else:
             return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
+
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        if self.tag == LINEAR:
+            return self.layer[Linear[Self.dtype]].named_parameters(prefix)
+        elif self.tag == LINEAR_BLAS:
+            return self.layer[LinearBLAS[Self.dtype]].named_parameters(prefix)
+        elif self.tag == CONV2D:
+            return self.layer[Conv2D[Self.dtype]].named_parameters(prefix)
+        elif self.tag == LAYER_NORM:
+            return self.layer[LayerNorm[Self.dtype]].named_parameters(prefix)
+        else:
+            return List[NamedParameter[Self.dtype]]()
 
     def num_parameters(self) -> Int:
         if self.tag == LINEAR:
@@ -984,6 +1034,15 @@ struct Sequential[dtype: DType](Copyable & Movable):
             params.extend(module.parameters())
         return params^
 
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        var result = List[NamedParameter[Self.dtype]]()
+        for i in range(len(self.modules)):
+            var module_prefix = prefix + String(i) + "."
+            result.extend(self.modules[i].named_parameters(module_prefix))
+        return result^
+
     def num_parameters(self) -> Int:
         var total: Int = 0
         for parameter in self.parameters():
@@ -1101,6 +1160,15 @@ struct SequentialBLAS[dtype: DType](Copyable & Movable):
         for module in self.modules:
             params.extend(module.parameters())
         return params^
+
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        var result = List[NamedParameter[Self.dtype]]()
+        for i in range(len(self.modules)):
+            var module_prefix = prefix + String(i) + "."
+            result.extend(self.modules[i].named_parameters(module_prefix))
+        return result^
 
     def num_parameters(self) -> Int:
         var total: Int = 0
@@ -1349,6 +1417,17 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
 
         return params^
 
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        var result = List[NamedParameter[Self.dtype]]()
+        var w = UnsafePointer(to=self.weight).unsafe_mut_cast[True]()
+        result.append(NamedParameter(prefix + "weight", w.as_any_origin()))
+        if self.bias.shape().rank() > 0:
+            var b = UnsafePointer(to=self.bias).unsafe_mut_cast[True]()
+            result.append(NamedParameter(prefix + "bias", b.as_any_origin()))
+        return result^
+
     def num_parameters(self) -> Int:
         """Count total parameters."""
         var count = self.weight.numels()
@@ -1443,6 +1522,11 @@ struct Flatten[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
+
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        return List[NamedParameter[Self.dtype]]()
 
     def num_parameters(self) -> Int:
         return 0

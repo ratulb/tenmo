@@ -9,6 +9,7 @@ from .gradbox import Gradbox
 from .common_utils import panic
 from .ndbuffer import NDBuffer
 from .buffers import Buffer
+from .named_parameter import NamedParameter
 from .net import Module, Layer
 from .dropout_kernel import DropoutKernel
 from .ancestry import Ancestor
@@ -227,6 +228,11 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
+
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        return List[NamedParameter[Self.dtype]]()
 
     def num_parameters(self) -> Int:
         return 0

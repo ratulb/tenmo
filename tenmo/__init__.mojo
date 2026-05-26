@@ -120,6 +120,7 @@ from .minmax import *
 from .minmax_kernel import *
 from .minmax_reducer import *
 from .mnemonics import *
+from .named_parameter import NamedParameter
 from .mse import *
 from .multiplication import *
 from .ndbuffer import *
