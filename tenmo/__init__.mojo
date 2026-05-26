@@ -83,7 +83,6 @@ from .blashandle import *
 from .broadcast import *
 from .broadcasthelper import *
 
-# from  .buffers import *
 from .clip import *
 from .cnn import *
 from .common_utils import *
@@ -104,10 +103,8 @@ from .filler import *
 from .flatten import *
 from .forwards import *
 
-# from  .gradbox import *
 from .indexhelper import *
 
-# from  .intarray import *
 from .logarithm import *
 from .matmul import *
 from .matmul_kernel import *
@@ -137,7 +134,6 @@ from .scalar_inplace_ops_kernel import *
 from .scalar_ops_kernel import *
 from .sgd import *
 
-# from  .shapes import *
 from .shuffle import *
 from .sigmoid import *
 from .softmax import *
