@@ -23,10 +23,13 @@ pixi install              # install deps
 
 - Tests are compiled with `mojo -I .` — the repo root must be on the include path
 - Logs go to `logs/<test_name>.log`
+- GPU access: launch a Kaggle GPU notebook, then SSH into it (no local GPU)
 - Test names in `execute.sh` do **not** match filenames 1:1 (e.g. `ce` → `test_cross_entropy.mojo`, `npiop` → `test_numpy_interop.mojo`, `shapebroadcast` → `test_broadcaster.mojo`)
 - Use the test **name** (not filename) as the argument to `execute.sh`
 - `synth_mnist` is commented out in the test list
 - The `gpu` test suite is a defined subset of tests that have GPU guards — not all tests run on GPU
+- The `gpu_all` test alias in `execute.sh` runs the consolidated file `tests/test_gpu_all.mojo` (1138 tests from 49 files, single compile ~3.5 min)
+- `--only` flag for filtering individual tests is **not supported** in Mojo's TestSuite — run individual test files via `./execute.sh <name>` instead
 
 ## CI (`.github/workflows/test.yml`)
 

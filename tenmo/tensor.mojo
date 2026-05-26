@@ -1584,6 +1584,15 @@ struct Tensor[dtype: DType](
         return out^
 
     @staticmethod
+    def empty(
+        *axes_spans: Int,
+        requires_grad: Bool = False,
+        device: Optional[Device] = None,
+    ) -> Tensor[Self.dtype]:
+        var shape = Shape(axes_spans)
+        return Self.zeros(shape^, requires_grad, device)
+
+    @staticmethod
     def zeros(
         *axes_spans: Int,
         requires_grad: Bool = False,
@@ -1599,8 +1608,8 @@ struct Tensor[dtype: DType](
         Returns:
             A tensor of given shape filled with zeros.
         """
-        shape = Shape(axes_spans)
-        return Self.zeros(shape, requires_grad=requires_grad, device=device)
+        var shape = Shape(axes_spans)
+        return Self.zeros(shape^, requires_grad=requires_grad, device=device)
 
     @staticmethod
     def zeros_like(

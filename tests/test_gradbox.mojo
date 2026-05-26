@@ -1,5 +1,7 @@
 from tenmo.buffers import Buffer
 from std.testing import assert_true, TestSuite
+from std.sys import has_accelerator
+from tenmo.common_utils import i, s
 from tenmo.ndbuffer import NDBuffer
 from tenmo.shapes import Shape
 from tenmo.gradbox import Gradbox
@@ -273,6 +275,96 @@ def test_gradbox_squeeze_chain_of_ops() raises:
     # grad should be 3.0 in the original shape (1,1,2)
     assert_true(a.grad().all_close(Tensor[dtype].d3([[[3.0, 3.0]]])))
 
+
+# ── __getitem__ [Idx] tests (the broken GPU path) ──────────────────────
+
+def test_gradbox_getitem_shared_cpu() raises:
+    """CPU: basic slice on a Gradbox created via shared constructor."""
+    comptime dtype = DType.float32
+    var ndb = NDBuffer[dtype].arange(12).reshape(Shape(3, 4))
+    var g = Gradbox[dtype](ndb^, share=True)  # explicitly shared
+    var row = g[i(1), s()]          # shape (4,), returns unshared (share=False)
+    assert_true(row.shape() == Shape(4))
+    # Use List[Int] accessor to read values (no shared check)
+    assert_true(row[[0]] == 4.0 and row[[3]] == 7.0)
+    # Integer index → rank-0 scalar
+    var elem = g[i(1), i(2)]
+    assert_true(elem.item() == 6.0)
+
+
+def test_gradbox_getitem_multi_axis_cpu() raises:
+    """CPU: multi-axis slice with mixed int/slice indices."""
+    comptime dtype = DType.float32
+    var ndb = NDBuffer[dtype].arange(24).reshape(Shape(2, 3, 4))
+    var g = Gradbox[dtype](ndb^, share=True)
+    var slice1 = g[i(0), s(), i(1)]
+    assert_true(slice1.shape() == Shape(3))
+    assert_true(slice1[[0]] == 1.0 and slice1[[2]] == 9.0)
+    var elem = g[i(0), i(1), s()]
+    assert_true(elem.shape() == Shape(4))
+    assert_true(elem[[0]] == 4.0 and elem[[3]] == 7.0)
+
+
+def test_gradbox_getitem_detach_share_true_cpu() raises:
+    """CPU: detach(share=True) then slice."""
+    comptime dtype = DType.float32
+    var ndb = NDBuffer[dtype].full(Shape(3, 4), Scalar[dtype](7.0))
+    var g = Gradbox[dtype](ndb^, share=True)
+    var detached = g.detach(share=True)
+    var sliced = detached[i(1), s()]
+    assert_true(sliced.shape() == Shape(4))
+    assert_true(sliced[[0]] == 7.0 and sliced[[3]] == 7.0)
+
+
+# ── GPU __getitem__ tests (guarded) ────────────────────────────────────
+
+def test_gpu_gradbox_getitem_device_state_propagation() raises:
+    """GPU: slice propagates device_state so to_cpu reads correct data."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        # Fill CPU Gradbox → GPU
+        var g = Gradbox[dtype].full(Shape(3, 4), 42.0)
+        g = g.to_gpu()
+        # Slice via __getitem__ (the broken path)
+        var sliced = g[i(1), s()]
+        # Bring back and verify
+        sliced = sliced.to_cpu()
+        assert_true(sliced.shape() == Shape(4))
+        assert_true(sliced[i(0)].item() == 42.0)
+        assert_true(sliced[i(1)].item() == 42.0)
+        assert_true(sliced[i(2)].item() == 42.0)
+        assert_true(sliced[i(3)].item() == 42.0)
+
+
+def test_gpu_gradbox_getitem_after_detach() raises:
+    """GPU: detach(share=False) → slice (matching embedding test pattern)."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var g = Gradbox[dtype].full(Shape(3, 4), 42.0, share=False)
+        g = g.to_gpu()
+        # detach(share=False) returns unshared at Gradbox level,
+        # but NDBuffer.shared() returns True on GPU (DeviceBuffer always ref-counted)
+        var detached = g.detach(share=False)
+        var sliced = detached[i(1), s()]
+        sliced = sliced.to_cpu()
+        assert_true(sliced[i(0)].item() == 42.0)
+
+
+def test_gpu_gradbox_getitem_chained() raises:
+    """GPU: chained slices on GPU."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var g = Gradbox[dtype].arange(24).reshape(Shape(2, 3, 4))
+        g = g.to_gpu()
+        # First slice: grab batch 0, all rows, all cols
+        var s1 = g[i(0), s(), s()]
+        s1 = s1.to_cpu()
+        assert_true(s1.shape() == Shape(3, 4))
+        assert_true(s1[i(0), i(0)].item() == 0.0)   # g[0,0,0]
+        assert_true(s1[i(2), i(3)].item() == 11.0)  # g[0,2,3]
+
+
+# ── original tests follow ──────────────────────────────────────────────
 
 def test_gradbox_reverse_division() raises:
     comptime dtype = DType.float32

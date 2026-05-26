@@ -505,6 +505,12 @@ struct Gradbox[dtype: DType](
         ndb = NDBuffer[Self.dtype](
             shared_buffer^, shape=shape^, strides=strides^, offset=abs_offset
         )
+        # ── Propagate device_state for GPU gradboxes ──────────────────────────
+        # On GPU the CPU Buffer is empty — the actual data lives in DeviceState.
+        # The sliced view must share the same DeviceState so get/set and to_cpu
+        # route correctly to GPU memory using abs_offset and slice_strides.
+        comptime if has_accelerator():
+            ndb.device_state = self.buffer.device_state.copy()
 
         return Gradbox[Self.dtype](ndb^, share=False)
 

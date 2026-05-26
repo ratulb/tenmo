@@ -3,6 +3,7 @@ from tenmo.nlp import LLMDataset
 from tenmo.dataloader import DataLoader
 from tenmo import Embedding, Tensor, IntArray
 from std.random import seed
+from tenmo.common_utils import i, s
 
 comptime dtype = DType.float32
 
@@ -58,6 +59,26 @@ def main() raises:
 
     var input_embeddings = token_embeddings + pos_embeddings
     print("input_embeddings shape: ", input_embeddings.shape())
+
+    var inputs_x = Tensor[dtype].d2(
+        [[0.43, 0.15, 0.89],
+        [0.55, 0.87, 0.66],
+        [0.57, 0.85, 0.64],
+        [0.22, 0.58, 0.33],
+        [0.77, 0.25, 0.10],
+        [0.05, 0.80, 0.55]]
+    )
+    inputs_x.print()
+    var query = inputs_x[i(1), s()]
+    query.print()
+
+    for i, t in enumerate(inputs_x.slices()):
+        print("i: ", i)
+        t.print()
+        #for ss in t.slices():
+        for ss in t:
+            print(ss[1])
+
 
 def main_1() raises:
     var tokenizer = GPT4Tokenizer()

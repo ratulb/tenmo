@@ -16,3 +16,4 @@ model_weights.npy
 .pixi/*
 !.pixi/config.toml
 logs/
+scripts/__pycache__/

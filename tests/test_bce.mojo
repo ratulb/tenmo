@@ -537,8 +537,10 @@ def test_bce_gpu_1d_mean_stop_grad() raises:
         var target_gpu = target.to_gpu()
         var loss = Tensor[dtype].binary_cross_entropy(pred_gpu, target_gpu)
         loss.backward()
-        # pred2 on CPU must NOT have received any grad
-        assert_true(not pred2.has_grad())
+        # pred2 on CPU must NOT have received any grad (grad values stay zero)
+        assert_true(
+            pred2.grad().all_close(Tensor[dtype].zeros(pred2.shape()))
+        )
 
 
 def test_bce_gpu_2d_mean_stop_grad() raises:
@@ -553,7 +555,9 @@ def test_bce_gpu_2d_mean_stop_grad() raises:
         var target_gpu = target.to_gpu()
         var loss = Tensor[dtype].binary_cross_entropy(pred_gpu, target_gpu)
         loss.backward()
-        assert_true(not pred2.has_grad())
+        assert_true(
+            pred2.grad().all_close(Tensor[dtype].zeros(pred2.shape()))
+        )
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -724,7 +728,9 @@ def test_bwl_gpu_1d_mean_stop_grad() raises:
             logits_gpu, target_gpu
         )
         loss.backward()
-        assert_true(not logits.has_grad())
+        assert_true(
+            logits.grad().all_close(Tensor[dtype].zeros(logits.shape()))
+        )
 
 
 def test_bwl_gpu_1d_sum_stop_grad() raises:
@@ -738,7 +744,9 @@ def test_bwl_gpu_1d_sum_stop_grad() raises:
             logits_gpu, target_gpu, reduction=Reduction("sum")
         )
         loss.backward()
-        assert_true(not logits.has_grad())
+        assert_true(
+            logits.grad().all_close(Tensor[dtype].zeros(logits.shape()))
+        )
 
 
 def test_bwl_gpu_1d_none_stop_grad() raises:
@@ -752,7 +760,9 @@ def test_bwl_gpu_1d_none_stop_grad() raises:
             logits_gpu, target_gpu, reduction=Reduction("none")
         )
         loss.backward()
-        assert_true(not logits.has_grad())
+        assert_true(
+            logits.grad().all_close(Tensor[dtype].zeros(logits.shape()))
+        )
 
 
 def test_bwl_gpu_2d_mean_stop_grad() raises:
@@ -768,7 +778,9 @@ def test_bwl_gpu_2d_mean_stop_grad() raises:
             logits_gpu, target_gpu
         )
         loss.backward()
-        assert_true(not logits.has_grad())
+        assert_true(
+            logits.grad().all_close(Tensor[dtype].zeros(logits.shape()))
+        )
 
 
 def test_bwl_gpu_3d_mean_stop_grad() raises:
@@ -787,7 +799,9 @@ def test_bwl_gpu_3d_mean_stop_grad() raises:
             logits_gpu, target_gpu
         )
         loss.backward()
-        assert_true(not logits.has_grad())
+        assert_true(
+            logits.grad().all_close(Tensor[dtype].zeros(logits.shape()))
+        )
 
 
 # ─────────────────────────────────────────────

@@ -257,7 +257,7 @@ if [ $# -eq 0 ]; then
     echo "  indexhelper, losses, tanh, data, softmax, repeat, mmnd, attn_matmul"
     echo "  attn_matmul, bce, intarray, mm2d, vm, mv, slice, view_slice, tiles, linspace, argminmax"
     echo "  minmax, relu, shuffle, permute, flatten, gather, squeeze, unsqueeze"
-    echo "  gradbox, ndb, transpose, buffers, views, shapes, strides"
+    echo "  gpu_all          Run all GPU tests from a single file"
     echo "  shapebroadcast, validators, ce, synth_mnist"
     echo ""
     print_colored "$GREEN" "  all              Run all tests"
@@ -412,6 +412,9 @@ run_test_by_name() {
         validators)     run_test "validators" "tests/test_validators.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         ce)             run_test "ce" "tests/test_cross_entropy.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         synth_mnist)    run_test "synth_mnist" "tests/test_synthetic_mnist.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        gpu_all)
+            print_colored "$BLUE" "Running all GPU tests from single file..."
+            run_test "gpu_all" "tests/test_gpu_all.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         quick)
             print_colored "$BLUE" "Running quick sanity tests..."
             run_test "tensors" "tests/test_tensors.mojo" "$DEBUG_MODE"; exit_code=$?

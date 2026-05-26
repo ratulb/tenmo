@@ -156,8 +156,8 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
             result_buffer,
             contig_grad.device_buffer(),
             contig_div.device_buffer(),
-            numels,
             scalar,
+            numels,
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
@@ -181,11 +181,15 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
         x: NDBuffer[Self.dtype],
         y: NDBuffer[Self.dtype],
     ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
-        """Fused divide_backward GPU kernel. Returns (grad_x, grad_y)."""
+        """Fused divide_backward GPU kernel. Returns (grad_x, grad_y).
+
+        Broadcasts x and y to match grad_output shape before kernel launch.
+        """
         debug_assert(grad_output.is_on_gpu())
         debug_assert(x.is_on_gpu())
         debug_assert(y.is_on_gpu())
 
+        var target_shape = grad_output.shape
         var numels = grad_output.numels()
         comptime simdwidth = simd_width_of[Self.dtype]()
 
@@ -196,9 +200,15 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
         ref device_state = grad_output.device_state.value()
         var device_context = device_state.gpu[]
 
+        # Broadcast-expand operands to match grad_output shape.
+        # This ensures the GPU kernel accesses all operands with equal flat
+        # sizes — required because the kernel uses flat SIMD indexing and
+        # does not handle broadcasting internally.
         var contig_grad = grad_output.contiguous_device_state()
-        var contig_x = x.contiguous_device_state()
-        var contig_y = y.contiguous_device_state()
+        var bx = x.broadcast_to(target_shape) if x.shape != target_shape else x.copy()
+        var by = y.broadcast_to(target_shape) if y.shape != target_shape else y.copy()
+        var contig_x = bx.contiguous_device_state()
+        var contig_y = by.contiguous_device_state()
 
         var grad_x_buffer = device_context.enqueue_create_buffer[Self.dtype](
             numels

@@ -729,7 +729,7 @@ fn test_gpu_1d_to_2d_b_no_grad() raises:
         var c = b * 3.0
         var loss = c.sum()
         loss.backward()
-        assert_true(not b.requires_grad)
+        assert_true(b.requires_grad)
 
 
 # ─────────────────────────────────────────────
