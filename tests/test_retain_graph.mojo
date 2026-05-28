@@ -1,4 +1,5 @@
 from std.testing import assert_true, TestSuite
+from std.sys import has_accelerator
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 
@@ -777,6 +778,158 @@ def test_retain_graph_multiple_backward() raises:
         a.grad().all_close(Tensor[dtype].full(Shape(4), 8.0)),
         "Multiple backward: second call a grad=2*2*2=8",
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GPU retain_graph tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def test_retain_graph_gpu_add() raises:
+    comptime dtype = DType.float32
+    comptime if has_accelerator():
+        var a = Tensor[dtype].full(Shape(4), 2.0, requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var mid_gpu = a_gpu + a_gpu
+        var out_gpu = mid_gpu.sum()
+        out_gpu.backward(retain_graph=False)
+        assert_true(
+            mid_gpu.grad().to_cpu().all_close(Tensor[dtype].zeros(Shape(4))),
+            "GPU Add: retain_graph=False should zero intermediate grad",
+        )
+        assert_true(
+            a.grad().all_close(Tensor[dtype].full(Shape(4), 2.0)),
+            "GPU Add: leaf grad correct with retain_graph=False",
+        )
+
+        var a2 = Tensor[dtype].full(Shape(4), 2.0, requires_grad=True)
+        var a2_gpu = a2.to_gpu()
+        var mid2_gpu = a2_gpu + a2_gpu
+        var out2_gpu = mid2_gpu.sum()
+        out2_gpu.backward(retain_graph=True)
+        assert_true(
+            mid2_gpu.grad().to_cpu().all_close(Tensor[dtype].full(Shape(4), 1.0)),
+            "GPU Add: retain_graph=True should preserve intermediate grad",
+        )
+        assert_true(
+            a2.grad().all_close(Tensor[dtype].full(Shape(4), 2.0)),
+            "GPU Add: leaf grad correct with retain_graph=True",
+        )
+
+
+def test_retain_graph_gpu_matmul() raises:
+    comptime dtype = DType.float32
+    comptime if has_accelerator():
+        var a = Tensor[dtype].full(Shape(2, 3), 1.0, requires_grad=True)
+        var b = Tensor[dtype].full(Shape(3, 2), 2.0, requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var b_gpu = b.to_gpu()
+        var mid_gpu = a_gpu.matmul(b_gpu)
+        var out_gpu = mid_gpu.sum()
+        out_gpu.backward(retain_graph=False)
+        assert_true(
+            mid_gpu.grad().to_cpu().all_close(Tensor[dtype].zeros(Shape(2, 2))),
+            "GPU Matmul: retain_graph=False should zero intermediate grad",
+        )
+
+        var a2 = Tensor[dtype].full(Shape(2, 3), 1.0, requires_grad=True)
+        var b2 = Tensor[dtype].full(Shape(3, 2), 2.0, requires_grad=True)
+        var a2_gpu = a2.to_gpu()
+        var b2_gpu = b2.to_gpu()
+        var mid2_gpu = a2_gpu.matmul(b2_gpu)
+        var out2_gpu = mid2_gpu.sum()
+        out2_gpu.backward(retain_graph=True)
+        assert_true(
+            mid2_gpu.grad().to_cpu().all_close(Tensor[dtype].full(Shape(2, 2), 1.0)),
+            "GPU Matmul: retain_graph=True should preserve intermediate grad",
+        )
+
+
+def test_retain_graph_gpu_sum() raises:
+    comptime dtype = DType.float32
+    comptime if has_accelerator():
+        var a = Tensor[dtype].full(Shape(2, 3), 1.0, requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var mid_gpu = a_gpu.sum(axes=[0])
+        var out_gpu = mid_gpu.sum()
+        out_gpu.backward(retain_graph=False)
+        assert_true(
+            mid_gpu.grad().to_cpu().all_close(Tensor[dtype].zeros(Shape(3))),
+            "GPU Sum: retain_graph=False should zero intermediate grad",
+        )
+
+        var a2 = Tensor[dtype].full(Shape(2, 3), 1.0, requires_grad=True)
+        var a2_gpu = a2.to_gpu()
+        var mid2_gpu = a2_gpu.sum(axes=[0])
+        var out2_gpu = mid2_gpu.sum()
+        out2_gpu.backward(retain_graph=True)
+        assert_true(
+            mid2_gpu.grad().to_cpu().all_close(Tensor[dtype].full(Shape(3), 1.0)),
+            "GPU Sum: retain_graph=True should preserve intermediate grad",
+        )
+
+
+def test_retain_graph_gpu_view_zero_grad_always() raises:
+    comptime dtype = DType.float32
+    comptime if has_accelerator():
+        var a = Tensor[dtype].full(Shape(2, 3), 1.0, requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var mid_gpu = a_gpu.into_view()
+        var out_gpu = mid_gpu.sum()
+        out_gpu.backward(retain_graph=False)
+        assert_true(
+            mid_gpu.grad().to_cpu().all_close(Tensor[dtype].zeros(Shape(2, 3))),
+            "GPU View: retain_graph=False should zero intermediate grad (view)",
+        )
+
+        var a2 = Tensor[dtype].full(Shape(2, 3), 1.0, requires_grad=True)
+        var a2_gpu = a2.to_gpu()
+        var mid2_gpu = a2_gpu.into_view()
+        var out2_gpu = mid2_gpu.sum()
+        out2_gpu.backward(retain_graph=True)
+        assert_true(
+            mid2_gpu.grad().to_cpu().all_close(Tensor[dtype].zeros(Shape(2, 3))),
+            "GPU View: retain_graph=True should ALSO zero intermediate grad (view)",
+        )
+        assert_true(
+            a2.grad().all_close(Tensor[dtype].full(Shape(2, 3), 1.0)),
+            "GPU View: leaf grad correct",
+        )
+
+
+def test_retain_graph_gpu_complex_graph() raises:
+    comptime dtype = DType.float32
+    comptime if has_accelerator():
+        var a = Tensor[dtype].full(Shape(4), 2.0, requires_grad=True)
+        var b = Tensor[dtype].full(Shape(4), 3.0, requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var b_gpu = b.to_gpu()
+        var c_gpu = a_gpu + b_gpu
+        var d_gpu = a_gpu * b_gpu
+        var mid_gpu = c_gpu + d_gpu
+        var out_gpu = mid_gpu.sum()
+        out_gpu.backward(retain_graph=True)
+
+        assert_true(
+            c_gpu.grad().to_cpu().all_close(Tensor[dtype].full(Shape(4), 1.0)),
+            "GPU Complex: c grad preserved with retain_graph=True",
+        )
+        assert_true(
+            d_gpu.grad().to_cpu().all_close(Tensor[dtype].full(Shape(4), 1.0)),
+            "GPU Complex: d grad preserved with retain_graph=True",
+        )
+        assert_true(
+            mid_gpu.grad().to_cpu().all_close(Tensor[dtype].full(Shape(4), 1.0)),
+            "GPU Complex: mid grad preserved with retain_graph=True",
+        )
+        assert_true(
+            a.grad().all_close(Tensor[dtype].full(Shape(4), 4.0)),
+            "GPU Complex: a leaf grad correct",
+        )
+        assert_true(
+            b.grad().all_close(Tensor[dtype].full(Shape(4), 3.0)),
+            "GPU Complex: b leaf grad correct",
+        )
 
 
 def main() raises:

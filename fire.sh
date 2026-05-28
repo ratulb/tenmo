@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Default file
-DEFAULT_FILE="scratchpad.mojo"
+DEFAULT_FILE="debug.mojo"
 
 # Use provided argument or default
 TARGET_FILE="${1:-$DEFAULT_FILE}"

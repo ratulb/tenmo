@@ -1,13 +1,18 @@
 from tenmo import Tensor
 from std.testing import assert_true
 from tenmo.common_utils import s, i
+from std.sys.defines import get_defined_string
 
 comptime dtype = DType.float32
 
 def main() raises:
     #test_slice_every_second_row_column1()
     #test_permute_backward()
-    test_add_backward()
+    #test_add_backward()
+    comptime BLAS_PATH = get_defined_string[
+        "BLAS_PATH", "/lib/x86_64-linux-gnu/libopenblas.so.0"
+    ]()
+    print("BLAS_PATH: ", BLAS_PATH)
 
 def test_slice_every_second_row_column1() raises:
     print("test_slice_every_second_row_column1")
