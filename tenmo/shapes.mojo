@@ -113,7 +113,7 @@ struct Shape(
         self._numels = self._compute_numels()
 
     @always_inline("nodebug")
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         """Create a copy of another Shape instance.
 
         Args:
@@ -261,7 +261,7 @@ struct Shape(
             String in the format "(d0, d1, ..., dn)"
         """
         var s = self.dims.__str__()
-        return "(" + s[byte = 1 : len(s) - 1] + ")"
+        return "(" + s[byte = 1 : s.byte_length() - 1] + ")"
 
     @no_inline
     def __repr__(self) -> String:
@@ -632,7 +632,7 @@ struct ShapeIndexIterator[origin: ImmutOrigin](
         self.current = IntArray.filled(shape[].rank(), 0)
         self.index = 0
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         """Create a copy of the iterator."""
         self.shape = copy.shape
         self.current = copy.current

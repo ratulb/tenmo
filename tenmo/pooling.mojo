@@ -27,6 +27,7 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var bwd_arg = output.ancestry().backward_fn_arg().get[MaxPool2dBwdArg]()
         var (kernel_size, stride, padding, input_shape, argmax_mask) = (
@@ -102,6 +103,9 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
             parallelize[scatter_gradients_optimized](N * C)
             input_tensor_ref.update_grad(grad_input^, AddTensor, None)
             parent_ids.append(input_tensor_ref._id)
+
+        if not retain_graph:
+            grad_output.zero_grad()
 
 
 @fieldwise_init

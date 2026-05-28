@@ -72,7 +72,7 @@ struct Strides(
         self.data = IntArray(values)
 
     @always_inline("nodebug")
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         """Create a copy of another strides instance.
 
         Args:
@@ -154,7 +154,7 @@ struct Strides(
             String representation in the format '(s0, s1, ..., sn)'
         """
         var s = self.data.__str__()
-        return "(" + s[byte = 1 : len(s) - 1] + ")"
+        return "(" + s[byte = 1 : s.byte_length() - 1] + ")"
 
     def __repr__(self) -> String:
         """Get official string representation of the strides.

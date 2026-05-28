@@ -44,6 +44,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         """
         Backward pass: Accumulate gradients based on padding mode.
@@ -86,6 +87,9 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         if parent.requires_grad:
             parent_ids.append(ancestor_ref._id)
+
+        if not retain_graph:
+            grad_out.zero_grad()
 
     @staticmethod
     def _extract_constant(

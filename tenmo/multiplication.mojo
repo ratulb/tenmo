@@ -11,7 +11,7 @@ from .common_utils import panic, id
 from .gradbox import Gradbox
 from .broadcast import BroadcastBackward
 from .ancestry import Ancestor
-from std.os.atomic import Atomic, Consistency, fence
+from std.atomic import Atomic, Ordering, fence
 
 
 @fieldwise_init
@@ -22,6 +22,7 @@ struct MultiplyBackwardScalar[dtype: DType](
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var factor = (
             output.ancestry()
@@ -34,6 +35,8 @@ struct MultiplyBackwardScalar[dtype: DType](
         scaled_gradbox = gradbox * factor
         ancestor.update_grad(scaled_gradbox^, AddTensor, None)
         parent_ids.append(ancestor._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -42,6 +45,7 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref gradbox = output.gradients()[]
         count = len(output.ancestry())
@@ -55,6 +59,8 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             gradbox_prod = gradbox_prod * Scalar[Self.dtype](2)
             ancestor_lhs.update_grad(gradbox_prod^, AddTensor, None)
             parent_ids.append(ancestor_lhs._id)
+            if not retain_graph:
+                gradbox.zero_grad()
             return
 
         var ancestor_rhs = output.ancestry().get(1)
@@ -72,6 +78,8 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
             ancestor_rhs.update_grad(gradbox_prod^, AddTensor, None)
             parent_ids.append(ancestor_rhs._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 comptime MultiplyBroadcastBackward[dtype: DType] = BroadcastBackward[

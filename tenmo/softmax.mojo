@@ -24,6 +24,7 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var bwd_arg = (
             output.ancestry().backward_fn_arg().get[SoftmaxArg[Self.dtype]]()
@@ -48,6 +49,8 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
         var local_grad = Gradbox[Self.dtype](local_grad_ndb^, share=False)
         ancestor.update_grad(local_grad^, AddTensor, None)
         parent_ids.append(ancestor._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init

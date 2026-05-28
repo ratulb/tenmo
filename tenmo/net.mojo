@@ -401,7 +401,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 )
 
         # Share weight buffer so ancestry copies are a refcount bump, not deep memcpy
-	#if self.weight.requires_grad:
+        # if self.weight.requires_grad:
         self.weight.buffer.buffer.shared()
         self.bias.buffer.buffer.shared()
 
@@ -623,7 +623,7 @@ struct ReLU[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     def __init__(out self):
         self.training = True
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.training = copy.training
 
     def __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
@@ -670,7 +670,7 @@ struct Sigmoid[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     def __init__(out self):
         self.training = True
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.training = copy.training
 
     def __call__(
@@ -719,7 +719,7 @@ struct Tanh[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     def __init__(out self):
         self.training = True
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.training = copy.training
 
     def __call__(
@@ -1211,6 +1211,7 @@ struct MSELoss[dtype: DType = DType.float32](RegisterPassable):
     def eval(mut self):
         self.training = False
 
+
 @fieldwise_init
 struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
     """
@@ -1492,7 +1493,7 @@ struct Flatten[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     def __init__(out self):
         self.training = True
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.training = copy.training
 
     def __call__(self, mut x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:

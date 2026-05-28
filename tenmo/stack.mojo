@@ -18,6 +18,7 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         """
         Split gradient and squeeze the stacked dimension.
@@ -86,6 +87,9 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             ancestor_ref.update_grad(grad_input^, AddTensor, None)
             parent_ids.append(ancestor_ref._id)
+
+        if not retain_graph:
+            grad_output.zero_grad()
 
 
 @fieldwise_init

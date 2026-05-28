@@ -1,6 +1,7 @@
 from tenmo.shapes import Shape
 from tenmo.strides import Strides
 from tenmo.buffers import Buffer
+from tenmo.shared import ScalarPredicate
 from tenmo.intarray import IntArray
 from tenmo.indexhelper import IndexCalculator, IndexIterator
 from tenmo.matrixshapevalidator import MatrixShapeValidator
@@ -92,17 +93,17 @@ struct Layout(ImplicitlyCopyable & Movable & Equatable):
         self.offset = offset
         self._contiguous = strides.is_contiguous(shape)
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.shape = copy.shape.copy()
         self.strides = copy.strides.copy()
         self.offset = copy.offset
         self._contiguous = copy._contiguous
 
-    def __moveinit__(out self, deinit take: Self):
-        self.shape = take.shape^
-        self.strides = take.strides^
-        self.offset = take.offset
-        self._contiguous = take._contiguous
+    def __init__(out self, deinit existing: Self):
+        self.shape = existing.shape^
+        self.strides = existing.strides^
+        self.offset = existing.offset
+        self._contiguous = existing._contiguous
 
     def __eq__(self, other: Self) -> Bool:
         return (
@@ -173,13 +174,13 @@ struct Storage[dtype: DType](ImplicitlyCopyable & Movable):
         self.buffer = Buffer[Self.dtype]()
         self.device_state = Optional(device_state^)
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.buffer = copy.buffer.copy()  # Buffer refcount bump if shared
         self.device_state = copy.device_state.copy()  # Ref count bump for GPU
 
-    def __moveinit__(out self, deinit take: Self):
-        self.buffer = take.buffer^
-        self.device_state = take.device_state^
+    def __init__(out self, deinit existing: Self):
+        self.buffer = existing.buffer^
+        self.device_state = existing.device_state^
 
     @always_inline
     def is_on_gpu(self) -> Bool:
@@ -278,15 +279,15 @@ struct NDBuffer[dtype: DType](
         self.device_state = None
         self._contiguous = self.is_contiguous()
 
-    def __moveinit__(out self, deinit take: Self):
-        self.buffer = take.buffer^
-        self.shape = take.shape^
-        self.strides = take.strides^
-        self.offset = take.offset
-        self._contiguous = take._contiguous
-        self.device_state = take.device_state^
+    def __init__(out self, deinit existing: Self):
+        self.buffer = existing.buffer^
+        self.shape = existing.shape^
+        self.strides = existing.strides^
+        self.offset = existing.offset
+        self._contiguous = existing._contiguous
+        self.device_state = existing.device_state^
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         """Copy NDBuffer - Buffer handles ref counting automatically."""
         self.buffer = copy.buffer.copy()  # Buffer copy handles shared/unshared!
         self.shape = copy.shape.copy()
@@ -1099,17 +1100,8 @@ struct NDBuffer[dtype: DType](
         return False
 
     @always_inline
-    def data_ptr[
-        origin: Origin, address_space: AddressSpace, //
-    ](ref[origin, address_space] self) -> UnsafePointer[
-        Scalar[Self.dtype], origin, address_space=address_space
-    ]:
-        return (
-            self.buffer.unsafe_ptr()
-            .unsafe_mut_cast[origin.mut]()
-            .unsafe_origin_cast[origin]()
-            .address_space_cast[address_space]()
-        )
+    def data_ptr(ref self) -> UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]:
+        return self.buffer.unsafe_ptr()
 
     @always_inline
     def zero(self):
@@ -1208,9 +1200,9 @@ struct NDBuffer[dtype: DType](
             out = NDBuffer[Self.dtype].Empty()
         return out^
 
-    def map_where(
-        self, pred: fn(Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
-    ) -> NDBuffer[Self.dtype]:
+    def map_where[
+        Pred: ScalarPredicate
+    ](self, pred: Pred, value: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
@@ -1229,9 +1221,9 @@ struct NDBuffer[dtype: DType](
         return self.map_where_cpu(pred, value)
 
     @always_inline
-    def map_where_cpu(
-        self, pred: fn(Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
-    ) -> NDBuffer[Self.dtype]:
+    def map_where_cpu[
+        Pred: ScalarPredicate
+    ](self, pred: Pred, value: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         var buffer = Buffer[Self.dtype](len(self))
         var index = 0
         for next in self.index_iterator():
@@ -4520,32 +4512,34 @@ struct NDBuffer[dtype: DType](
 
         return result
 
-    def map_to_bool(
-        self,
-        pred: fn(Scalar[Self.dtype]) -> Bool,
-    ) -> NDBuffer[DType.bool]:
+    def map_to_bool[
+        Pred: ScalarPredicate
+    ](self, pred: Pred,) -> NDBuffer[DType.bool]:
         """Apply predicate to each element, returning a boolean NDBuffer.
         GPU path: transfers to CPU, applies pred, transfers back if needed.
-        CPU path: delegates to Buffer.map_to_bool via contiguous buffer.
-        Note: pred is a CPU function — GPU path materialises through CPU.
+        CPU path: iterates through elements, applying pred.
         """
 
         comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
-                    # Materialise to CPU — pred is a CPU fn
                     var cpu_ndb = self.to_cpu()
-                    var bool_buffer = cpu_ndb.contiguous_buffer().map_to_bool(
-                        pred
-                    )
-                    return NDBuffer[DType.bool](bool_buffer^, self.shape)
+                    var buf = Buffer[DType.bool](len(self))
+                    var idx = 0
+                    for next in cpu_ndb.index_iterator():
+                        buf[idx] = pred(cpu_ndb.get(next))
+                        idx += 1
+                    return NDBuffer[DType.bool](buf^, self.shape)
                 except e:
                     panic("NDBuffer map_to_bool: GPU→CPU failed: " + String(e))
-                    return NDBuffer[DType.bool].Empty()  # unreachable
+                    return NDBuffer[DType.bool].Empty()
 
-        # CPU path
-        var bool_buffer = self.contiguous_buffer().map_to_bool(pred)
-        return NDBuffer[DType.bool](bool_buffer^, self.shape)
+        var buf = Buffer[DType.bool](len(self))
+        var idx = 0
+        for next in self.index_iterator():
+            buf[idx] = pred(self.get(next))
+            idx += 1
+        return NDBuffer[DType.bool](buf^, self.shape)
 
     def all_true(self: NDBuffer[DType.bool]) -> Bool:
         """

@@ -23,6 +23,7 @@ from tenmo.mnemonics import AddTensor
 from tenmo.common_utils import Epsilon
 from tenmo.shared import Reduction
 
+
 @fieldwise_init
 struct BCEWithLogitsLoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
     var training: Bool
@@ -124,9 +125,7 @@ struct BCELoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
         var safe_ndb: NDBuffer[Self.dtype]
 
         if reduction.is_none():
-            var (loss_ndb, bw) = pred.buffer.bce_forward(
-                target.buffer, epsilon
-            )
+            var (loss_ndb, bw) = pred.buffer.bce_forward(target.buffer, epsilon)
             out = Tensor[Self.dtype](loss_ndb^, requires_grad=False)
             safe_ndb = bw^
         else:
@@ -168,6 +167,7 @@ struct BCEWithLogitsBackward[dtype: DType](ImplicitlyCopyable & Movable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ) where Self.dtype.is_floating_point():
         var bwd_arg = (
             output.ancestry()
@@ -195,6 +195,8 @@ struct BCEWithLogitsBackward[dtype: DType](ImplicitlyCopyable & Movable):
             var grad_parent = Gradbox[Self.dtype](grad_ndb^, share=False)
             parent.update_grad(grad_parent^, AddTensor, None)
         parent_ids.append(parent._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -203,6 +205,7 @@ struct BCELossBackward[dtype: DType](ImplicitlyCopyable & Movable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ) where Self.dtype.is_floating_point():
         var bwd_arg = (
             output.ancestry().backward_fn_arg().get[BCELossBwdArg[Self.dtype]]()
@@ -224,3 +227,5 @@ struct BCELossBackward[dtype: DType](ImplicitlyCopyable & Movable):
             var grad_parent = Gradbox[Self.dtype](grad_ndb^, share=False)
             parent.update_grad(grad_parent^, AddTensor, None)
         parent_ids.append(parent._id)
+        if not retain_graph:
+            gradbox.zero_grad()

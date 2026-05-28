@@ -961,5 +961,252 @@ def test_intarray_copyinit() raises:
     assert_true(arr2[0] == 999, "copy should be modified")
 
 
+# ========== Optional / Null-Safety Tests ==========
+
+
+def test_empty_operations_no_crash() raises:
+    """All operations on empty IntArray must not segfault."""
+    var a = IntArray()
+    a.fill(0)
+    assert_true(a.is_empty())
+    assert_false(42 in a)
+    assert_equal(a.tolist().__len__(), 0)
+    assert_equal(a.__str__(), "[]")
+    assert_true(a == IntArray())
+    a.reverse()
+    assert_true(a.is_empty())
+    assert_equal(a.sum(), 0)
+    assert_equal(a.product(), 1)
+
+
+def test_empty_append_after_clear() raises:
+    """Append after clear — exercises reserve() Optional reinit path."""
+    var a = IntArray()
+    for i in range(5):
+        a.append(i)
+    assert_equal(len(a), 5)
+    a.clear()
+    assert_true(a.is_empty())
+    a.append(99)
+    assert_equal(len(a), 1)
+    assert_equal(a[0], 99)
+
+
+def test_repeated_growth() raises:
+    """Repeated reserve growth — exercises Optional reassign in reserve()."""
+    var a = IntArray()
+    for i in range(1000):
+        a.append(i)
+    assert_equal(len(a), 1000)
+    for i in range(1000):
+        assert_equal(a[i], i)
+
+
+def test_reserve_preserves_data() raises:
+    """reserve() must preserve existing data through multiple growth phases."""
+    var a = IntArray.with_capacity(2)
+    a.append(10)
+    a.append(20)
+    a.reserve(100)
+    assert_equal(a[0], 10)
+    assert_equal(a[1], 20)
+    assert_equal(len(a), 2)
+    for i in range(200):
+        a.append(i)
+    assert_equal(a[0], 10)
+    assert_equal(a[1], 20)
+    assert_equal(a[201], 199)
+
+
+def test_copy_constructor_empty() raises:
+    """Copy of empty IntArray must create valid empty array."""
+    var a = IntArray()
+    var b = a
+    assert_true(b.is_empty())
+    assert_equal(b.capacity(), 0)
+    b.append(7)
+    assert_equal(b[0], 7)
+
+
+def test_slice_of_empty() raises:
+    """Slicing empty array must return empty array."""
+    var a = IntArray()
+    var s = a[:]
+    assert_true(s.is_empty())
+    s = a[0:0]
+    assert_true(s.is_empty())
+
+
+def test_concat_empty() raises:
+    """Concatenation with empty arrays must not dereference null."""
+    var a = IntArray()
+    var b = IntArray(1, 2)
+    var c = a + b
+    assert_equal(len(c), 2)
+    assert_equal(c[0], 1)
+
+    var d = b + a
+    assert_equal(len(d), 2)
+    assert_equal(d[0], 1)
+
+    var e = a + a
+    assert_true(e.is_empty())
+
+
+def test_pop_until_empty() raises:
+    """Pop all elements — exercises left-shift through Optional pointer."""
+    var a = IntArray(10, 20, 30)
+    assert_equal(a.pop(), 30)
+    assert_equal(a.pop(), 20)
+    assert_equal(a.pop(), 10)
+    assert_true(a.is_empty())
+
+
+def test_setitem_on_constructed() raises:
+    """Write through Optional pointer after capacity growth."""
+    var a = IntArray(0, 0, 0)
+    a[0] = 100
+    a[-1] = 300
+    assert_equal(a[0], 100)
+    assert_equal(a[2], 300)
+
+
+def test_data_integrity_after_multiple_ops() raises:
+    """Sequence of operations through Optional pointer must preserve data."""
+    var a = IntArray()
+    for i in range(50):
+        a.append(i * 2)
+    a.reverse()
+    for i in range(50):
+        assert_equal(a[i], (49 - i) * 2)
+    a.sort()
+    for i in range(50):
+        assert_equal(a[i], i * 2)
+
+
+# ========== Memmove / Bulk Tests ==========
+
+
+def test_prepend_large() raises:
+    """Prepend 10000 elements — triggers SIMD memmove."""
+    var a = IntArray()
+    for i in range(10000):
+        a.prepend(i)
+    assert_equal(len(a), 10000)
+    assert_equal(a[0], 9999)
+    assert_equal(a[9999], 0)
+
+
+def test_prepend_to_existing() raises:
+    """Prepend to non-empty array — memmove with partial shift."""
+    var a = IntArray(10, 20, 30)
+    a.prepend(0)
+    assert_equal(a[0], 0)
+    assert_equal(a[1], 10)
+    assert_equal(a[2], 20)
+    assert_equal(a[3], 30)
+
+    a.prepend(-10)
+    assert_equal(a[0], -10)
+    assert_equal(a[1], 0)
+    assert_equal(a[2], 10)
+    assert_equal(len(a), 5)
+
+
+def test_prepend_after_append() raises:
+    """Mix of append and prepend — exercises both growth paths."""
+    var a = IntArray()
+    for i in range(100):
+        a.append(i)
+    for i in range(100):
+        a.prepend(-i - 1)
+    assert_equal(len(a), 200)
+    assert_equal(a[0], -100)
+    assert_equal(a[99], -1)
+    assert_equal(a[100], 0)
+    assert_equal(a[199], 99)
+
+
+def test_pop_front() raises:
+    """Pop from front — triggers full memmove of remaining elements."""
+    var a = IntArray(10, 20, 30, 40, 50)
+    var v = a.pop(0)
+    assert_equal(v, 10)
+    assert_equal(len(a), 4)
+    assert_equal(a[0], 20)
+    assert_equal(a[3], 50)
+    var v2 = a.pop(0)
+    assert_equal(v2, 20)
+    assert_equal(a[0], 30)
+
+
+def test_pop_back() raises:
+    """Pop from back — no memmove, pure size decrement."""
+    var a = IntArray(1, 2, 3, 4, 5)
+    for i in range(5):
+        var v = a.pop()
+        assert_equal(v, 5 - i)
+    assert_true(a.is_empty())
+
+
+def test_pop_middle_large() raises:
+    """Pop from middle of large array — triggers SIMD memmove."""
+    var a = IntArray()
+    for i in range(5000):
+        a.append(i)
+    var v = a.pop(2500)
+    assert_equal(v, 2500)
+    assert_equal(len(a), 4999)
+    assert_equal(a[2500], 2501)
+    for i in range(2500):
+        assert_equal(a[i], i)
+    for i in range(2500, 4999):
+        assert_equal(a[i], i + 1)
+
+
+def test_insert_single_memcpy() raises:
+    """Insert single element — exercises memcpy-based insert."""
+    var a = IntArray(10, 20, 40, 50)
+    var r = a.insert(2, 30)
+    assert_equal(len(r), 5)
+    assert_equal(r[0], 10)
+    assert_equal(r[1], 20)
+    assert_equal(r[2], 30)
+    assert_equal(r[3], 40)
+    assert_equal(r[4], 50)
+
+
+def test_insert_beginning() raises:
+    """Insert at position 0 — full right-shift memcpy."""
+    var a = IntArray(1, 2, 3)
+    var r = a.insert(0, 0)
+    assert_equal(len(r), 4)
+    assert_equal(r[0], 0)
+    assert_equal(r[1], 1)
+    assert_equal(r[3], 3)
+
+
+def test_insert_end() raises:
+    """Insert at last position — single element memcpy after."""
+    var a = IntArray(1, 2, 3)
+    var r = a.insert(3, 4)
+    assert_equal(len(r), 4)
+    assert_equal(r[0], 1)
+    assert_equal(r[3], 4)
+
+
+def test_insert_large_middle() raises:
+    """Insert in middle of large array — triggers SIMD memcpy."""
+    var a = IntArray()
+    for i in range(10000):
+        a.append(i)
+    var r = a.insert(5000, 9999)
+    assert_equal(len(r), 10001)
+    assert_equal(r[0], 0)
+    assert_equal(r[5000], 9999)
+    assert_equal(r[5001], 5000)
+    assert_equal(r[10000], 9999)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

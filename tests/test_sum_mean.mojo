@@ -526,7 +526,9 @@ def test_mean_cpu_gpu_consistency_3d() raises:
 # the coord-by-coord fallback. Run them individually to get timing output.
 
 
-fn assert_fast_path_timing(shape: Shape, axes: IntArray, num_trials: Int) raises:
+def assert_fast_path_timing(
+    shape: Shape, axes: IntArray, num_trials: Int
+) raises:
     """Measure a suffix-axis reduction and assert it completes in < 10ms."""
     comptime dtype = DType.float32
     var t = Tensor[dtype].rand(shape)
@@ -537,25 +539,32 @@ fn assert_fast_path_timing(shape: Shape, axes: IntArray, num_trials: Int) raises
         var _ = t.sum(axes=axes)
     var end = now()
     var avg_ms = (end - start) * 1000.0 / Float64(num_trials)
-    var label = String(shape) + " axes=" + String(axes) + " avg=" + String(avg_ms) + "ms"
+    var label = (
+        String(shape)
+        + " axes="
+        + String(axes)
+        + " avg="
+        + String(avg_ms)
+        + "ms"
+    )
     print(label)
     # Fast path should easily clear this bar (typically < 0.5ms for these sizes)
     assert_true(avg_ms < 10.0)
 
 
-fn test_reduce_fastpath_benchmark_small_2d() raises:
+def test_reduce_fastpath_benchmark_small_2d() raises:
     assert_fast_path_timing(Shape(512, 1024), IntArray(1), 50)
 
 
-fn test_reduce_fastpath_benchmark_3d() raises:
+def test_reduce_fastpath_benchmark_3d() raises:
     assert_fast_path_timing(Shape(128, 256, 64), IntArray(2), 20)
 
 
-fn test_reduce_fastpath_benchmark_3d_two_axes() raises:
+def test_reduce_fastpath_benchmark_3d_two_axes() raises:
     assert_fast_path_timing(Shape(128, 256, 64), IntArray(1, 2), 20)
 
 
-fn test_reduce_fastpath_benchmark_large_skinny() raises:
+def test_reduce_fastpath_benchmark_large_skinny() raises:
     assert_fast_path_timing(Shape(1000000, 10), IntArray(1), 50)
 
 

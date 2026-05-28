@@ -60,6 +60,7 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref arg = (
             output.ancestry()
@@ -80,14 +81,14 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # ── dL/dβ = sum(upstream) over all non-D dims ──────────────────────
         # Reduce over all axes 0..rank-2 sequentially, leaving shape (D,)
         # e.g. upstream (B, T, D) -> sum axis=0 -> (T, D) -> sum axis=0 -> (D,)
-        var d_beta_t = upstream
+        var d_beta_t = upstream.copy()
         for _ax in range(upstream.rank() - 1):
             d_beta_t = d_beta_t.sum[track_grad=False](axes=[0], keepdims=False)
         var d_beta_ndb = d_beta_t.buffer
 
         # ── dL/dγ = sum(upstream * x_hat) over all non-D dims ──────────────
         var ux = upstream.__mul__[track_grad=False](x_hat)  # (*, D)
-        var d_gamma_t = ux
+        var d_gamma_t = ux.copy()
         for _ax in range(ux.rank() - 1):
             d_gamma_t = d_gamma_t.sum[track_grad=False](
                 axes=[0], keepdims=False
@@ -111,8 +112,8 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         )  # (*, 1)
 
         # dx = rstd * (d_x_hat - mean_d_x_hat - x_hat * mean_d_x_hat_x_hat)
-        var term1 = d_x_hat
-        var term2 = mean_d_x_hat  # (*, 1) broadcasts
+        var term1 = d_x_hat.copy()
+        var term2 = mean_d_x_hat.copy()  # (*, 1) broadcasts
         var term3 = x_hat.__mul__[track_grad=False](
             mean_d_x_hat_x_hat  # (*, 1) broadcasts
         )
@@ -133,6 +134,9 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         parent_ids.append(gamma_ancestor._id)
         beta_ancestor.update_grad(d_beta^, AddTensor, None)
         parent_ids.append(beta_ancestor._id)
+
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init

@@ -6,6 +6,7 @@ from std.utils import Variant
 from .ndbuffer import NDBuffer
 from .shapes import Shape
 from .buffers import Buffer
+from .shared import ScalarPredicate
 from std.sys.defines import get_defined_int
 
 comptime DeviceType = Variant[CPU, GPU]
@@ -84,15 +85,15 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable, Writable):
         self.id = Int64(device_id)
         self._id = IDGen.generate_id()
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.device_context = copy.device_context.copy()
         self.id = copy.id
         self._id = copy._id
 
-    def __moveinit__(out self, deinit take: Self):
-        self.device_context = take.device_context^
-        self.id = take.id
-        self._id = take._id
+    def __init__(out self, deinit existing: Self):
+        self.device_context = existing.device_context^
+        self.id = existing.id
+        self._id = existing._id
 
     def write_to[W: Writer](self, mut writer: W):
         # Not printing _id
@@ -165,13 +166,13 @@ struct DeviceState[dtype: DType](
         self.buffer = buffer.create_sub_buffer[Self.datatype](0, len(buffer))
         self.gpu = gpu
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.gpu = copy.gpu.copy()
         self.buffer = copy.buffer.copy()
 
-    def __moveinit__(out self, deinit take: Self):
-        self.buffer = take.buffer^
-        self.gpu = take.gpu^
+    def __init__(out self, deinit existing: Self):
+        self.buffer = existing.buffer^
+        self.gpu = existing.gpu^
 
     def __eq__(self, other: Self) -> Bool:
         return self.gpu == other.gpu
@@ -208,9 +209,11 @@ struct DeviceState[dtype: DType](
         return device_state
 
     @staticmethod
-    def map_where(
+    def map_where[
+        Pred: ScalarPredicate
+    ](
         ref ndb: NDBuffer[Self.dtype],
-        pred: fn(Scalar[Self.dtype]) -> Bool,
+        pred: Pred,
         value: Scalar[Self.dtype],
         sync: Bool = True,
     ) raises -> DeviceState[Self.dtype]:

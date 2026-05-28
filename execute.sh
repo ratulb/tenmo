@@ -37,9 +37,9 @@ run_test() {
     local start_time=$(date +%s%N)
 
     if [ -n "$debug_mode" ]; then
-        mojo -I . $debug_mode "$test_file" 2>&1 | tee "$log_file"
+        pixi run mojo -I . $debug_mode "$test_file" 2>&1 | tee "$log_file"
     else
-        mojo -I . "$test_file" 2>&1 | tee "$log_file"
+        pixi run mojo -I . "$test_file" 2>&1 | tee "$log_file"
     fi
 
     local exit_code=${PIPESTATUS[0]}
@@ -165,7 +165,7 @@ declare -a ALL_TESTS_IN_ORDER=(
     "validators|tests/test_validators.mojo"
     "ce|tests/test_cross_entropy.mojo"
     "checkpoint|tests/test_checkpoint.mojo"
-#    "synth_mnist|tests/test_synthetic_mnist.mojo"
+    "retain_graph|tests/test_retain_graph.mojo"
 )
 
 declare -a GPU_TESTS=(
@@ -259,6 +259,7 @@ if [ $# -eq 0 ]; then
     echo "  attn_matmul, bce, intarray, mm2d, vm, mv, slice, view_slice, tiles, linspace, argminmax"
     echo "  minmax, relu, shuffle, permute, flatten, gather, squeeze, unsqueeze"
     echo "  gpu_all          Run all GPU tests from a single file"
+    echo "  retain_graph   Test retain_graph=True/False for all backward handlers"
     echo "  checkpoint, shapebroadcast, validators, ce, synth_mnist"
     echo ""
     print_colored "$GREEN" "  all              Run all tests"
@@ -398,6 +399,7 @@ run_test_by_name() {
         relu)           run_test "relu" "tests/test_relu.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         shuffle)        run_test "shuffle" "tests/test_shuffle.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         permute)        run_test "permute" "tests/test_permute.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        retain_graph)   run_test "retain_graph" "tests/test_retain_graph.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         flatten)        run_test "flatten" "tests/test_flatten.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         gather)        run_test "gather" "tests/test_gather.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         squeeze)        run_test "squeeze" "tests/test_squeeze.mojo" "$DEBUG_MODE"; exit_code=$? ;;

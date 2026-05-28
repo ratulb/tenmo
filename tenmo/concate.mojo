@@ -19,6 +19,7 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var axis = output.ancestry().backward_fn_arg().get[Integer]().value
         ref grad_output = output.gradients()[]
@@ -45,6 +46,8 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     parent.update_grad(grad_input^, AddTensor, None)
                     parent_ids.append(parent._id)
                 src_offset += num_elements
+            if not retain_graph:
+                grad_output.zero_grad()
             return
 
         # General path: any axis
@@ -79,6 +82,9 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             offset += tensor.shape()[axis]
             parent.update_grad(grad_input^, AddTensor, None)
             parent_ids.append(parent._id)
+
+        if not retain_graph:
+            grad_output.zero_grad()
 
 
 @fieldwise_init

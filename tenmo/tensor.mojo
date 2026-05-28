@@ -7,7 +7,7 @@ from std.memory import memcpy, memset, memset_zero, AddressSpace
 from .shapes import Shape, ShapeIndexIterator
 from .ancestry import Ancestors, Ancestor
 from .strides import Strides
-from std.os.atomic import Atomic, Consistency, fence
+from std.atomic import Atomic, Ordering, fence
 from .common_utils import (
     IDGen,
     log_warning,
@@ -33,18 +33,17 @@ from .broadcasthelper import ShapeBroadcaster
 from .ndbuffer import NDBuffer
 from std.gpu.host import DeviceBuffer, DeviceContext
 from .device import Device, CPU, GPU
-from tenmo.shared import Reduction
+from tenmo.shared import Reduction, ScalarPredicate
 from std.sys.info import has_accelerator
 
 
 struct Tensor[dtype: DType](
-    Copyable
+    ImplicitlyCopyable
     & Movable
     & Sized
     & Writable
     & Absable
     & Equatable
-    & ImplicitlyCopyable
     & Iterable
 ):
 
@@ -72,7 +71,7 @@ struct Tensor[dtype: DType](
     var _id: UInt
     var buffer: NDBuffer[Self.dtype]
     var requires_grad: Bool
-    var gradbox: UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]
+    var gradbox: Optional[UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]]
     var ancestors: Optional[Ancestors[Self.dtype]]
 
     def __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
@@ -86,7 +85,7 @@ struct Tensor[dtype: DType](
         self._id = IDGen.generate_id()
         self.buffer = NDBuffer[Self.dtype](shape)
         self.requires_grad = requires_grad
-        self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
+        self.gradbox = {}
         self.ancestors = None
         self.init_gradbox()
 
@@ -94,7 +93,7 @@ struct Tensor[dtype: DType](
         self._id = 0
         self.buffer = NDBuffer[Self.dtype].Empty()
         self.requires_grad = False
-        self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
+        self.gradbox = {}
         self.ancestors = None
 
     def __init__(
@@ -117,7 +116,7 @@ struct Tensor[dtype: DType](
             buffer^, shape, strides, offset_adjusted
         )
         self.requires_grad = requires_grad
-        self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
+        self.gradbox = {}
         self.ancestors = None
         self.init_gradbox()
 
@@ -129,7 +128,7 @@ struct Tensor[dtype: DType](
         self._id = IDGen.generate_id()
         self.buffer = buffer^
         self.requires_grad = requires_grad
-        self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
+        self.gradbox = {}
         self.ancestors = None
         self.init_gradbox()
 
@@ -197,14 +196,14 @@ struct Tensor[dtype: DType](
         memcpy(dest=tensor_data.unsafe_ptr(), src=self.data_ptr(), count=count)
         return tensor_data^
 
-    def __moveinit__(out self, deinit take: Self):
+    def __init__(out self, *, deinit take: Self):
         self._id = take._id
         self.buffer = take.buffer^
         self.requires_grad = take.requires_grad
         self.gradbox = take.gradbox
         self.ancestors = take.ancestors^
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self._id = copy._id
         self.buffer = copy.buffer.copy()
         self.requires_grad = copy.requires_grad
@@ -212,9 +211,9 @@ struct Tensor[dtype: DType](
         self.ancestors = copy.ancestors.copy()
         if self.gradbox:
             _ = (
-                self.gradbox[]
+                self.gradbox.unsafe_value()[]
                 ._refcount[]
-                .fetch_add[ordering=Consistency.MONOTONIC](1)
+                .fetch_add[ordering=Ordering.RELAXED](1)
             )
 
     def shallow_copy(self) -> Tensor[Self.dtype]:
@@ -242,11 +241,7 @@ struct Tensor[dtype: DType](
 
         Allocates GPU memory for gradients if the tensor is on GPU.
         """
-        if (
-            self.requires_grad
-            and self.gradbox
-            == UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
-        ):
+        if self.requires_grad and not self.gradbox:
             var gradbox: Gradbox[Self.dtype]
 
             comptime if has_accelerator():
@@ -274,8 +269,9 @@ struct Tensor[dtype: DType](
             else:
                 gradbox = Gradbox[Self.dtype](self.shape())
                 gradbox.zero_grad()
-            self.gradbox = alloc[Gradbox[Self.dtype]](1)
-            self.gradbox.init_pointee_move(gradbox^)
+            var gb_ptr = alloc[Gradbox[Self.dtype]](1)
+            gb_ptr.init_pointee_move(gradbox^)
+            self.gradbox = gb_ptr
 
     @always_inline
     def is_contiguous(self) -> Bool:
@@ -305,7 +301,7 @@ struct Tensor[dtype: DType](
         Returns:
             True if this is a leaf tensor, False otherwise.
         """
-        return self.requires_grad and not self.ancestors is None
+        return self.requires_grad and self.ancestors is None
 
     @always_inline
     def __len__(self) -> Int:
@@ -909,9 +905,7 @@ struct Tensor[dtype: DType](
         Returns:
             True if a gradient buffer exists for this tensor, False otherwise.
         """
-        return (
-            self.gradbox != UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
-        )
+        return self.gradbox != None
 
     @always_inline
     def zero_grad(self):
@@ -921,8 +915,7 @@ struct Tensor[dtype: DType](
         Only affects tensors that require and have gradients.
         """
         if self.requires_grad and self.has_grad():
-            ref gradbox = self.gradbox[]
-            gradbox.zero_grad()
+            self.gradbox.unsafe_value()[].zero_grad()
 
     @always_inline
     def gradients(self) -> UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]:
@@ -939,7 +932,7 @@ struct Tensor[dtype: DType](
                 "Tensor → gradients(self): called on a tensor that does not"
                 " require grad or grad not initialized"
             )
-        return self.gradbox
+        return self.gradbox.unsafe_value()
 
     @always_inline
     def grad(self) -> Gradbox[Self.dtype]:
@@ -956,7 +949,7 @@ struct Tensor[dtype: DType](
                 "Tensor → grad(self): called on a tensor that does not require"
                 " grad or grad not initialized"
             )
-        return self.gradbox[].detach()
+        return self.gradbox.unsafe_value()[].detach()
 
     def rows(self) -> Int:
         if not self.rank() == 2:
@@ -1175,13 +1168,13 @@ struct Tensor[dtype: DType](
         """
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
-    def all(self, pred: fn(Scalar[Self.dtype]) -> Bool) -> Bool:
+    def all[Pred: ScalarPredicate](self, pred: Pred) -> Bool:
         """Returns True if pred holds for all elements.
         Uses NDBuffer.map_to_bool — handles GPU via CPU materialisation.
         """
         return self.buffer.map_to_bool(pred).all_true()
 
-    def any(self, pred: fn(Scalar[Self.dtype]) -> Bool) -> Bool:
+    def any[Pred: ScalarPredicate](self, pred: Pred) -> Bool:
         """Returns True if pred holds for any element.
         Uses NDBuffer.map_to_bool — handles GPU via CPU materialisation.
         """
@@ -1202,29 +1195,11 @@ struct Tensor[dtype: DType](
         """
         return self.buffer.any_true()
 
-    def unsafe_ptr[
-        origin: Origin, address_space: AddressSpace, //
-    ](ref[origin, address_space] self) -> UnsafePointer[
-        Tensor[Self.dtype], origin, address_space=address_space
-    ]:
-        return (
-            UnsafePointer(to=self)
-            .unsafe_mut_cast[origin.mut]()
-            .unsafe_origin_cast[origin]()
-            .address_space_cast[address_space]()
-        )
+    def unsafe_ptr(ref self) -> UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]:
+        return UnsafePointer(to=self)
 
-    def data_ptr[
-        origin: Origin, address_space: AddressSpace, //
-    ](ref[origin, address_space] self) -> UnsafePointer[
-        Scalar[Self.dtype], origin, address_space=address_space
-    ]:
-        return (
-            self.buffer.data_ptr()
-            .unsafe_mut_cast[origin.mut]()
-            .unsafe_origin_cast[origin]()
-            .address_space_cast[address_space]()
-        )
+    def data_ptr(ref self) -> UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]:
+        return self.buffer.data_ptr()
 
     def seed_grad(mut self, with_tensor: Tensor[Self.dtype]):
         """Seed gradient accumulation with a specific tensor.
@@ -1236,7 +1211,7 @@ struct Tensor[dtype: DType](
             return
         if not self.has_grad():
             self.requires_grad_()
-        self.gradbox[].seed_grad(with_tensor)
+        self.gradbox.unsafe_value()[].seed_grad(with_tensor)
 
     def seed_grad(mut self, value: Scalar[Self.dtype]):
         """Seed gradient accumulation with a scalar value.
@@ -1256,9 +1231,11 @@ struct Tensor[dtype: DType](
         """
         self.buffer.fill(value)
 
-    def map_where(
+    def map_where[
+        Pred: ScalarPredicate
+    ](
         self,
-        pred: fn(Scalar[Self.dtype]) -> Bool,
+        pred: Pred,
         value: Scalar[Self.dtype],
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
@@ -3015,14 +2992,15 @@ struct Tensor[dtype: DType](
     def __del__(deinit self):
         if self.gradbox:
             if (
-                self.gradbox[]
+                self.gradbox.unsafe_value()[]
                 ._refcount[]
-                .fetch_sub[ordering=Consistency.RELEASE](1)
-                == 1
+                .fetch_sub[ordering=Ordering.RELEASE](1)
+                != 1
             ):
-                fence[ordering=Consistency.ACQUIRE]()
-                self.gradbox.destroy_pointee()
-                self.gradbox.free()
+                return  # other owners exist
+            fence[ordering=Ordering.ACQUIRE]()
+            self.gradbox.unsafe_value().destroy_pointee()
+            self.gradbox.unsafe_value().free()
 
     def mse[
         track_grad: Bool = True
@@ -3052,31 +3030,36 @@ struct Tensor[dtype: DType](
     def backward[
         graph_size: Int = 50
     ](
-        mut output: Tensor[Self.dtype], start_grad: Scalar[Self.dtype] = 1.0
+        mut output: Tensor[Self.dtype],
+        start_grad: Scalar[Self.dtype] = 1.0,
+        retain_graph: Bool = False,
     ) where Self.dtype.is_floating_point():
         """Run backward pass to compute gradients.
 
         Args:
             start_grad: Initial gradient value (default: 1.0).
             graph_size: Maximum graph size for traversal.
+            retain_graph: If True, intermediate gradients are preserved.
         """
         if not output.requires_grad:
             return
         var shape = output.shape()
         var seed_tensor = Tensor[Self.dtype].full(shape, start_grad)
-        output.backward[graph_size](seed_tensor)
+        output.backward[graph_size](seed_tensor, retain_graph)
 
     def backward[
         graph_size: Int = 50,
     ](
         mut output: Tensor[Self.dtype],
         seed_tensor: Tensor[Self.dtype],
+        retain_graph: Bool = False,
     ) where Self.dtype.is_floating_point():
         """Run backward pass with a specific seed tensor.
 
         Args:
             seed_tensor: Tensor containing initial gradients.
             graph_size: Maximum graph size for traversal.
+            retain_graph: If True, intermediate gradients are preserved.
         """
         if not output.requires_grad:
             return
@@ -3093,7 +3076,7 @@ struct Tensor[dtype: DType](
 
             var root = Ancestor[Self.dtype].from_tensor(output)
             dfs_stack.append(root._id)
-            node_list.append(root)
+            node_list.append(root.copy())
             id_to_index[root._id] = 0
 
             while len(dfs_stack) > 0:
@@ -3115,7 +3098,7 @@ struct Tensor[dtype: DType](
 
                         if parent_id not in id_to_index:
                             var new_idx = len(node_list)
-                            node_list.append(parent)
+                            node_list.append(parent.copy())
                             id_to_index[parent_id] = new_idx
                             dfs_stack.append(parent_id)
 
@@ -3135,7 +3118,7 @@ struct Tensor[dtype: DType](
 
                 if node.has_ancestry():
                     parent_ids.clear()
-                    Backward[Self.dtype].invoke(node, parent_ids)
+                    Backward[Self.dtype].invoke(node, parent_ids, retain_graph)
                     for i in range(len(parent_ids)):
                         var target_id = parent_ids[i]
                         if target_id in fanin:
@@ -3152,7 +3135,7 @@ struct Tensor[dtype: DType](
         if not self.requires_grad:
             print("Tensor update_grad -> does not require grad")
             return
-        ref gradbox = self.gradbox[]
+        ref gradbox = self.gradbox.unsafe_value()[]
         if opcode == MulTensor:
             gradbox *= incoming
         elif opcode == AddTensor:

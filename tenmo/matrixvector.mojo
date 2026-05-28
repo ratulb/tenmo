@@ -19,6 +19,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         comptime simdwidth = simd_width_of[Self.dtype]()
 
@@ -196,6 +197,8 @@ struct MatrixVectorMulNdBackward[dtype: DType](
 
             v_ref.update_grad(grad_v^, AddTensor, None)
             parent_ids.append(v_ref._id)
+        if not retain_graph:
+            grad_out.zero_grad()
 
 
 @fieldwise_init

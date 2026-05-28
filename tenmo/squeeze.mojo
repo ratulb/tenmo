@@ -14,6 +14,7 @@ struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref ancestor = output.ancestry().get(0)
         ref gradbox = output.gradients()[]

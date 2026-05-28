@@ -61,6 +61,7 @@ struct ProductBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var bwd_arg = (
             output.ancestry().backward_fn_arg().get[ProductArg[Self.dtype]]()
@@ -122,6 +123,8 @@ struct ProductBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var gradbox_ancestor = Gradbox[Self.dtype](grad_input^, share=False)
         ancestor.update_grad(gradbox_ancestor^, AddTensor, None)
         parent_ids.append(ancestor._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 # =============================================================================

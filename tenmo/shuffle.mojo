@@ -207,6 +207,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref bwd_fn_arg = output.ancestry().backward_fn_arg().get[ShuffleArg]()
         var axis = bwd_fn_arg.axis
@@ -248,6 +249,8 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         parent.update_grad(gradbox_parent^, AddTensor, None)
         parent_ids.append(parent._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init

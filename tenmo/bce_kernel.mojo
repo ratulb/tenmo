@@ -11,7 +11,7 @@ Gradient formulas (after mean reduction with N elements):
 from std.gpu import thread_idx, block_dim, grid_dim, block_idx, barrier
 from std.sys import simd_width_of
 from std.math import exp, log
-from std.os.atomic import Atomic, Consistency
+from std.atomic import Atomic, Ordering
 from std.memory import stack_allocation, AddressSpace
 
 from tenmo.ndbuffer import NDBuffer
@@ -41,8 +41,8 @@ def bce_with_logits_forward_kernel[
     size: Int,
     epsilon: Scalar[dtype],
 ) where dtype.is_floating_point():
-    var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = thread_idx.x + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
@@ -110,8 +110,8 @@ def bce_with_logits_forward_reduce_kernel[
     epsilon: Scalar[dtype],
 ) where dtype.is_floating_point():
     var cache_index = thread_idx.x
-    var gtid = Int(cache_index + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = cache_index + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
 
     var partial_sum = Scalar[dtype](0)
@@ -167,7 +167,7 @@ def bce_with_logits_forward_reduce_kernel[
     block_shared[cache_index] = partial_sum
     barrier()
 
-    var sm_stride = UInt(block_dim.x // 2)
+    var sm_stride = block_dim.x // 2
     while sm_stride > 0:
         if cache_index < sm_stride:
             block_shared[cache_index] += block_shared[cache_index + sm_stride]
@@ -196,8 +196,8 @@ def bce_forward_kernel[
     size: Int,
     epsilon: Scalar[dtype],
 ) where dtype.is_floating_point():
-    var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = thread_idx.x + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
@@ -257,8 +257,8 @@ def bce_forward_reduce_kernel[
     epsilon: Scalar[dtype],
 ) where dtype.is_floating_point():
     var cache_index = thread_idx.x
-    var gtid = Int(cache_index + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = cache_index + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
 
     var partial_sum = Scalar[dtype](0)
@@ -310,7 +310,8 @@ def bce_forward_reduce_kernel[
     block_shared[cache_index] = partial_sum
     barrier()
 
-    var sm_stride = UInt(block_dim.x // 2)
+    # var sm_stride = UInt(block_dim.x // 2)
+    var sm_stride = block_dim.x // 2
     while sm_stride > 0:
         if cache_index < sm_stride:
             block_shared[cache_index] += block_shared[cache_index + sm_stride]
@@ -337,8 +338,8 @@ def bce_with_logits_backward_kernel[
     grad_output: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     size: Int,
 ):
-    var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = thread_idx.x + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
@@ -377,8 +378,8 @@ def bce_with_logits_backward_scaled_kernel[
     size: Int,
     scalar_grad: Scalar[dtype],
 ):
-    var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = thread_idx.x + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
     var s_grad = SIMD[dtype, simd_width](scalar_grad)
@@ -418,8 +419,8 @@ def bce_backward_kernel[
     grad_output: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     size: Int,
 ):
-    var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = thread_idx.x + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
@@ -467,8 +468,8 @@ def bce_backward_scaled_kernel[
     size: Int,
     scalar_grad: Scalar[dtype],
 ):
-    var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = thread_idx.x + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
     var one_simd = SIMD[dtype, simd_width](1.0)

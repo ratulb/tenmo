@@ -42,11 +42,11 @@ struct Tokenizer(Sized & ImplicitlyCopyable & Movable):
         self.int_to_str = {item.value: item.key for item in vocab.items()}
         self.str_to_int = vocab^
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, copy: Self):
         self.int_to_str = copy.int_to_str.copy()
         self.str_to_int = copy.str_to_int.copy()
 
-    def __moveinit__(out self, deinit take: Self):
+    def __init__(out self, take: Self):
         self.int_to_str = take.int_to_str^
         self.str_to_int = take.str_to_int^
 
@@ -199,7 +199,7 @@ struct NegativeSampler:
                     print("BAD ID:", word_id, "for vocab size: ", vocab_size)
                     break_out = True
                     break
-        #shuffle(self.input_dataset)
+        # shuffle(self.input_dataset)
 
         return tokenizer
 
@@ -318,7 +318,9 @@ def main() raises:
             ref review = input_dataset[rev_i]
             for target_i in range(len(review)):
                 var left = slice(max(0, target_i - window), target_i)
-                var right = slice(target_i + 1, min(len(review), target_i + window))
+                var right = slice(
+                    target_i + 1, min(len(review), target_i + window)
+                )
                 if left.start == left.end and right.start == right.end:
                     continue
                 var context_indices = review[left].copy()
@@ -332,23 +334,25 @@ def main() raises:
                 )
 
                 # ── Forward ───────────────────────────────────────────────────
-                var context_embed = weights_0_1.gather[
-                    track_grad=False
-                ](context_indices, reduction=Reduction(1))
+                var context_embed = weights_0_1.gather[track_grad=False](
+                    context_indices, reduction=Reduction(1)
+                )
                 var layer_1 = context_embed / Float32(context_len)
 
                 var target_embed = weights_1_2.gather[track_grad=False](
                     target_samples
                 )
-                var layer_2 = target_embed.matmul[
-                    mode=mv, track_grad=False
-                ](layer_1).sigmoid()
+                var layer_2 = target_embed.matmul[mode=mv, track_grad=False](
+                    layer_1
+                ).sigmoid()
 
                 # ── Backward (manual) ─────────────────────────────────────────
                 var layer_2_delta = layer_2 - layer_2_target  # (n+1,)
                 var layer_1_delta = target_embed.transpose().matmul[
                     mode=mv, track_grad=False
-                ](layer_2_delta)  # (h,)
+                ](
+                    layer_2_delta
+                )  # (h,)
 
                 # ── Update weights_0_1: context word rows ─────────────────────
                 # All context words get the same delta (layer_1_delta * lr).
@@ -356,9 +360,9 @@ def main() raises:
                 # once — avoids per-index scatter_add calls.
                 var delta_01_raw = -layer_1_delta * Float32(LEARNING_RATE)
                 var unsqueezed = delta_01_raw.unsqueeze(0)
-                var delta_01 = unsqueezed.repeat[
-                    track_grad=False
-                ](context_len, 1)
+                var delta_01 = unsqueezed.repeat[track_grad=False](
+                    context_len, 1
+                )
                 var ctx_arr = IntArray(context_indices)
                 Filler[dtype].scatter_add(
                     weights_0_1.buffer, delta_01.buffer, ctx_arr
@@ -367,7 +371,8 @@ def main() raises:
                 # ── Update weights_1_2: target sample rows ────────────────────
                 # outer(-layer_2_delta * lr, layer_1) → (n+1, hidden)
                 var delta_12_raw = (
-                    -layer_2_delta.unsqueeze(1) * layer_1.unsqueeze(0)
+                    -layer_2_delta.unsqueeze(1)
+                    * layer_1.unsqueeze(0)
                     * Float32(LEARNING_RATE)
                 )
                 var tgt_arr = IntArray(target_samples)
@@ -377,9 +382,7 @@ def main() raises:
 
             # Progress
             if (rev_i + 1) % 25 == 0:
-                var pct = (
-                    Float32(rev_i + 1) / Float32(num_reviews) * 100.0
-                )
+                var pct = Float32(rev_i + 1) / Float32(num_reviews) * 100.0
                 sys.stdout.write(
                     "\rIter:"
                     + String(iteration)
@@ -400,9 +403,7 @@ def main() raises:
             _similar_embeddings = weights_0_1.to_cpu()
         else:
             _similar_embeddings = weights_0_1
-        var neighbours = similar(
-            tokenizer, _similar_embeddings, "terrible"
-        )
+        var neighbours = similar(tokenizer, _similar_embeddings, "terrible")
         print("Words similar to 'terrible':")
         for item in neighbours:
             print("  ", item[0], item[1])
@@ -421,9 +422,11 @@ def similar(
             IntArray(0), keepdims=True
         )
     var diff = embeddings - target_vec
-    var distances = (diff * diff).sum[track_grad=False](
-        IntArray(1)
-    ).sqrt[track_grad=False]()
+    var distances = (
+        (diff * diff)
+        .sum[track_grad=False](IntArray(1))
+        .sqrt[track_grad=False]()
+    )
     var result = List[Tuple[String, Float32]](capacity=len(tokenizer))
     for ref pair in tokenizer.str_to_int.items():
         var word = pair.key

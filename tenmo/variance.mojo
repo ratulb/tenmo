@@ -27,6 +27,7 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var bwd_arg = (
             output.ancestry()
@@ -37,7 +38,7 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var unbiased = bwd_arg.unbiased
         var keepdims = bwd_arg.keepdims
         var n = bwd_arg.n
-        var gradbox = output.gradients()[]
+        ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         # x_ndb preserves original strides — may be non-contiguous
         var x_ndb = parent.buffer()  # (*, D) — strided if view
@@ -78,11 +79,14 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     device=gradbox.device(),
                 )
         else:
-            gradbox_ancestor = gradbox^
+            gradbox_ancestor = gradbox
 
         gradbox_ancestor = local_grad * gradbox_ancestor
         parent.update_grad(gradbox_ancestor^, AddTensor, None)
         parent_ids.append(parent._id)
+
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 # =============================================================================

@@ -12,6 +12,7 @@ struct ContiguousBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
@@ -37,6 +38,8 @@ struct ContiguousBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         parent.update_grad(parent_gradbox^, AddTensor, None)
 
         parent_ids.append(parent._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 struct Contiguous[dtype: DType](ImplicitlyCopyable, RegisterPassable):

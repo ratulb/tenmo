@@ -3,13 +3,13 @@ from tenmo.shapes import Shape
 from std.testing import assert_true, TestSuite
 from tenmo.sgd import SGD
 from tenmo.common_utils import s
+from std.sys import has_accelerator
 
 comptime dtype = DType.float32
 
 
 def test_sgd_basic() raises:
     """Test 1: Basic SGD without momentum."""
-    print("\n=== Test 1: Basic SGD ===")
     comptime dtype = DType.float32
 
     var param = Tensor[dtype].ones(Shape([2, 2]), requires_grad=True)
@@ -30,7 +30,6 @@ def test_sgd_basic() raises:
 
 def test_sgd_momentum() raises:
     """Test 2: SGD with momentum."""
-    print("\n=== Test 2: SGD with Momentum ===")
     comptime dtype = DType.float32
 
     var param = Tensor[dtype].ones(Shape([2, 2]), requires_grad=True)
@@ -58,7 +57,6 @@ def test_sgd_momentum() raises:
 
 def test_sgd_weight_decay() raises:
     """Test 3: SGD with weight decay."""
-    print("\n=== Test 3: Weight Decay ===")
     comptime dtype = DType.float32
 
     var param = Tensor[dtype].ones(Shape([2, 2]), requires_grad=True)
@@ -77,7 +75,6 @@ def test_sgd_weight_decay() raises:
 
 def test_sgd_grad_norm_clipping() raises:
     """Test 4: Gradient norm clipping."""
-    print("\n=== Test 4: Gradient norm Clipping ===")
     comptime dtype = DType.float32
 
     var param = Tensor[dtype].ones(Shape([2, 2]), requires_grad=True)
@@ -99,7 +96,6 @@ def test_sgd_grad_norm_clipping() raises:
 
 def test_sgd_value_clipping() raises:
     """Test 5: Gradient value clipping."""
-    print("\n=== Test 5: Value Clipping ===")
     comptime dtype = DType.float32
 
     var param = Tensor[dtype].ones(Shape([2, 2]), requires_grad=True)
@@ -119,26 +115,19 @@ def test_sgd_value_clipping() raises:
 
 
 def test_sgd_cpu_vanilla_single_step() raises:
-    print("test_sgd_cpu_vanilla_single_step")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
     var sgd = SGD(params, lr=0.1)
     # Manually set grad
     w.seed_grad(1.0)
-    print("w shape:", w.shape().__str__())
-    print("w grad shape:", w.gradients()[].shape().__str__())
-    print("w grad num_elements:", w.gradients()[].num_elements())
-    w.gradients()[].print()
 
     sgd.step()
     # w = w - lr * grad = [1,2,3] - 0.1*[1,1,1] = [0.9, 1.9, 2.9]
     assert_true(w.all_close(Tensor[dtype].d1([0.9, 1.9, 2.9])))
-    print("passed")
 
 
 def test_sgd_cpu_vanilla_multiple_steps() raises:
-    print("test_sgd_cpu_vanilla_multiple_steps")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
@@ -148,11 +137,9 @@ def test_sgd_cpu_vanilla_multiple_steps() raises:
         sgd.step()
     # After 3 steps: [1,2,3] - 3*0.1 = [0.7, 1.7, 2.7]
     assert_true(w.all_close(Tensor[dtype].d1([0.7, 1.7, 2.7])))
-    print("passed")
 
 
 def test_sgd_cpu_vanilla_2d() raises:
-    print("test_sgd_cpu_vanilla_2d")
     var w = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
@@ -161,11 +148,9 @@ def test_sgd_cpu_vanilla_2d() raises:
     sgd.step()
     # w = w - 0.1 * 2 = w - 0.2
     assert_true(w.all_close(Tensor[dtype].d2([[0.8, 1.8], [2.8, 3.8]])))
-    print("passed")
 
 
 def test_sgd_cpu_zero_grad() raises:
-    print("test_sgd_cpu_zero_grad")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
@@ -175,11 +160,9 @@ def test_sgd_cpu_zero_grad() raises:
     sgd.zero_grad()
     # grad should be zero
     assert_true(w.gradients()[].all_close(Tensor[dtype].zeros(w.shape())))
-    print("passed")
 
 
 def test_sgd_cpu_weight_decay() raises:
-    print("test_sgd_cpu_weight_decay")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
@@ -196,11 +179,9 @@ def test_sgd_cpu_weight_decay() raises:
         ]
     )
     assert_true(w.all_close(expected))
-    print("passed")
 
 
 def test_sgd_cpu_momentum_single_step() raises:
-    print("test_sgd_cpu_momentum_single_step")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
@@ -209,11 +190,9 @@ def test_sgd_cpu_momentum_single_step() raises:
     sgd.step()
     # v = 0.9*0 + 1 = 1, w = w - 0.1*1 = [0.9, 1.9, 2.9]
     assert_true(w.all_close(Tensor[dtype].d1([0.9, 1.9, 2.9])))
-    print("passed")
 
 
 def test_sgd_cpu_momentum_multiple_steps() raises:
-    print("test_sgd_cpu_momentum_multiple_steps")
     var w = Tensor[dtype].d1([1.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
@@ -228,11 +207,9 @@ def test_sgd_cpu_momentum_multiple_steps() raises:
     w.seed_grad(1.0)
     sgd.step()
     assert_true(w.all_close(Tensor[dtype].d1([0.439])))
-    print("passed")
 
 
 def test_sgd_cpu_clip_value() raises:
-    print("test_sgd_cpu_clip_value")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
@@ -241,11 +218,9 @@ def test_sgd_cpu_clip_value() raises:
     sgd.step()
     # clipped grad = 0.5, w = w - 0.1*0.5 = w - 0.05
     assert_true(w.all_close(Tensor[dtype].d1([0.95, 1.95, 2.95])))
-    print("passed")
 
 
 def test_sgd_cpu_multiple_parameters() raises:
-    print("test_sgd_cpu_multiple_parameters")
     var w1 = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var w2 = Tensor[dtype].d1([3.0, 4.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -257,11 +232,9 @@ def test_sgd_cpu_multiple_parameters() raises:
     sgd.step()
     assert_true(w1.all_close(Tensor[dtype].d1([0.9, 1.9])))
     assert_true(w2.all_close(Tensor[dtype].d1([2.8, 3.8])))
-    print("passed")
 
 
 def test_sgd_cpu_backward_integration() raises:
-    print("test_sgd_cpu_backward_integration")
     # Simple linear: loss = sum(w * x)
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var x = Tensor[dtype].d1([1.0, 1.0, 1.0])
@@ -273,11 +246,9 @@ def test_sgd_cpu_backward_integration() raises:
     # grad_w = x = [1,1,1]
     sgd.step()
     assert_true(w.all_close(Tensor[dtype].d1([0.9, 1.9, 2.9])))
-    print("passed")
 
 
 def test_sgd_cpu_set_lr() raises:
-    print("test_sgd_cpu_set_lr")
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
@@ -291,7 +262,6 @@ def test_sgd_cpu_set_lr() raises:
     # After first step: [0.9, 1.9, 2.9]
     # After second step with lr=0.5: [0.4, 1.4, 2.4]
     assert_true(w.all_close(Tensor[dtype].d1([0.4, 1.4, 2.4])))
-    print("passed")
 
 
 # ── GPU Tests ─────────────────────────────────────────────────────────────────
@@ -308,7 +278,6 @@ def test_sgd_gpu_vanilla_single_step() raises:
         sgd.step()
         var result = w_gpu.to_cpu()
         assert_true(result.all_close(Tensor[dtype].d1([0.9, 1.9, 2.9])))
-        print("passed")
 
 
 def test_sgd_gpu_vanilla_matches_cpu() raises:
@@ -329,7 +298,6 @@ def test_sgd_gpu_vanilla_matches_cpu() raises:
         sgd_cpu.step()
         sgd_gpu.step()
         assert_true(w.all_close(w_gpu.to_cpu()))
-        print("passed")
 
 
 def test_sgd_gpu_vanilla_multiple_steps() raises:
@@ -344,7 +312,6 @@ def test_sgd_gpu_vanilla_multiple_steps() raises:
             sgd.step()
         var result = w_gpu.to_cpu()
         assert_true(result.all_close(Tensor[dtype].d1([0.7, 1.7, 2.7])))
-        print("passed")
 
 
 def test_sgd_gpu_weight_decay() raises:
@@ -364,7 +331,6 @@ def test_sgd_gpu_weight_decay() raises:
             ]
         )
         assert_true(w_gpu.to_cpu().all_close(expected))
-        print("passed")
 
 
 def test_sgd_gpu_momentum_single_step() raises:
@@ -377,7 +343,6 @@ def test_sgd_gpu_momentum_single_step() raises:
         w_gpu.seed_grad(1.0)
         sgd.step()
         assert_true(w_gpu.to_cpu().all_close(Tensor[dtype].d1([0.9, 1.9, 2.9])))
-        print("passed")
 
 
 def test_sgd_gpu_momentum_multiple_steps() raises:
@@ -391,7 +356,6 @@ def test_sgd_gpu_momentum_multiple_steps() raises:
             w_gpu.seed_grad(1.0)
             sgd.step()
         assert_true(w_gpu.to_cpu().all_close(Tensor[dtype].d1([0.439])))
-        print("passed")
 
 
 def test_sgd_gpu_momentum_matches_cpu() raises:
@@ -412,7 +376,6 @@ def test_sgd_gpu_momentum_matches_cpu() raises:
             sgd_cpu.step()
             sgd_gpu.step()
         assert_true(w.all_close(w_gpu.to_cpu()))
-        print("passed")
 
 
 def test_sgd_gpu_clip_value() raises:
@@ -424,8 +387,9 @@ def test_sgd_gpu_clip_value() raises:
         var sgd = SGD(params, lr=0.1, clip_value=0.5)
         w_gpu.seed_grad(2.0)
         sgd.step()
-        assert_true(w_gpu.to_cpu().all_close(Tensor[dtype].d1([0.95, 1.95, 2.95])))
-        print("passed")
+        assert_true(
+            w_gpu.to_cpu().all_close(Tensor[dtype].d1([0.95, 1.95, 2.95]))
+        )
 
 
 def test_sgd_gpu_clip_value_matches_cpu() raises:
@@ -445,7 +409,6 @@ def test_sgd_gpu_clip_value_matches_cpu() raises:
         sgd_cpu.step()
         sgd_gpu.step()
         assert_true(w.all_close(w_gpu.to_cpu()))
-        print("passed")
 
 
 def test_sgd_gpu_clip_norm_matches_cpu() raises:
@@ -465,7 +428,6 @@ def test_sgd_gpu_clip_norm_matches_cpu() raises:
         sgd_cpu.step()
         sgd_gpu.step()
         assert_true(w.all_close(w_gpu.to_cpu()))
-        print("passed")
 
 
 def test_sgd_gpu_multiple_parameters() raises:
@@ -483,7 +445,6 @@ def test_sgd_gpu_multiple_parameters() raises:
         sgd.step()
         assert_true(w1_gpu.to_cpu().all_close(Tensor[dtype].d1([0.9, 1.9])))
         assert_true(w2_gpu.to_cpu().all_close(Tensor[dtype].d1([2.8, 3.8])))
-        print("passed")
 
 
 def test_sgd_gpu_zero_grad() raises:
@@ -498,7 +459,6 @@ def test_sgd_gpu_zero_grad() raises:
         sgd.zero_grad()
         var grad_after = w_gpu.grad().to_cpu()
         assert_true(grad_after.all_close(Tensor[dtype].zeros(w_gpu.shape())))
-        print("passed")
 
 
 def test_sgd_gpu_backward_integration() raises:
@@ -517,7 +477,6 @@ def test_sgd_gpu_backward_integration() raises:
         assert_true(w_gpu.to_cpu().all_close(Tensor[dtype].d1([0.9, 1.9, 2.9])))
         # grad flows back to CPU w
         assert_true(w.grad().all_close(Tensor[dtype].d1([1.0, 1.0, 1.0])))
-        print("passed")
 
 
 def test_sgd_gpu_backward_integration_matches_cpu() raises:
@@ -543,7 +502,6 @@ def test_sgd_gpu_backward_integration_matches_cpu() raises:
         loss_gpu.backward()
         sgd_gpu.step()
         assert_true(w_cpu_result.all_close(w_gpu.to_cpu()))
-        print("passed")
 
 
 def test_sgd_gpu_large_tensor() raises:
@@ -563,7 +521,6 @@ def test_sgd_gpu_large_tensor() raises:
         sgd_cpu.step()
         sgd_gpu.step()
         assert_true(w.all_close(w_gpu.to_cpu()))
-        print("passed")
 
 
 def main() raises:

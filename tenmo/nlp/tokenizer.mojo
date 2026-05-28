@@ -40,48 +40,48 @@ struct SimpleTokenizer[
         self.max_n = max_n
         self.regex_parser = Python.import_module("re")
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.int_to_str = copy.int_to_str.copy()
         self.str_to_int = copy.str_to_int.copy()
         self.text_cleaner = copy.text_cleaner
         self.max_n = copy.max_n
         self.regex_parser = copy.regex_parser.copy()
 
-    def __moveinit__(out self, deinit take: Self):
-        self.int_to_str = take.int_to_str^
-        self.str_to_int = take.str_to_int^
-        self.text_cleaner = take.text_cleaner
-        self.max_n = take.max_n
-        self.regex_parser = take.regex_parser^
+    def __init__(out self, deinit existing: Self):
+        self.int_to_str = existing.int_to_str^
+        self.str_to_int = existing.str_to_int^
+        self.text_cleaner = existing.text_cleaner
+        self.max_n = existing.max_n
+        self.regex_parser = existing.regex_parser^
 
     @staticmethod
     def ngramify(
-        words:   PythonObject,
-        max_n:   Int,
+        words: PythonObject,
+        max_n: Int,
         cleaner: IMDBTextCleaner,
     ) raises -> PythonObject:
-        var py     = Python.import_module("builtins")
-        var n      = len(words)
-        var result = py.list(words)   # unigrams — full word list, no stopword filter
+        var py = Python.import_module("builtins")
+        var n = len(words)
+        var result = py.list(
+            words
+        )  # unigrams — full word list, no stopword filter
 
         if max_n >= 2:
             # n-grams use content words only — stopwords filtered here
-            var cw      = cleaner.content_words(words)
-            var nc      = len(cw)
+            var cw = cleaner.content_words(words)
+            var nc = len(cw)
             var bigrams = py.list()
             for k in range(nc - 1):
-                bigrams.append(cw[k] + py.str('_') + cw[k + 1])
+                bigrams.append(cw[k] + py.str("_") + cw[k + 1])
             result.extend(bigrams)
 
         if max_n >= 3:
-            var cw       = cleaner.content_words(words)
-            var nc       = len(cw)
+            var cw = cleaner.content_words(words)
+            var nc = len(cw)
             var trigrams = py.list()
             for k in range(nc - 2):
                 trigrams.append(
-                    cw[k]     + py.str('_')
-                    + cw[k+1] + py.str('_')
-                    + cw[k+2]
+                    cw[k] + py.str("_") + cw[k + 1] + py.str("_") + cw[k + 2]
                 )
             result.extend(trigrams)
 
@@ -145,9 +145,7 @@ struct SimpleTokenizer[
             var lines = List[String]()
             for line in content.splitlines():
                 lines.append(String(line))
-            return Self.from_text_lines(
-                lines^, text_cleaner, min_freq, max_n
-            )
+            return Self.from_text_lines(lines^, text_cleaner, min_freq, max_n)
         except e:
             print(e)
             raise e^
@@ -166,9 +164,7 @@ struct SimpleTokenizer[
             var lines = List[String]()
             for line in content.splitlines():
                 lines.append(String(line))
-            return Self.from_text_lines(
-                lines^, text_cleaner, min_freq, max_n
-            )
+            return Self.from_text_lines(lines^, text_cleaner, min_freq, max_n)
         except e:
             print(e)
             raise e^

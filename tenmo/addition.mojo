@@ -18,18 +18,21 @@ struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         if not output.parents:
             panic("Addition add scalar backward: parent_refs is None!")
         ref parent = output.ancestry().get(0)
         if parent.requires_grad:
-            ref gradbox = output.gradbox[]
+            ref gradbox = output.gradbox.unsafe_value()[]
             if parent.shape() != gradbox.shape():
                 var reshaped = gradbox.reshape(parent.shape())
                 parent.update_grad(reshaped, AddTensor, None)
             else:
                 parent.update_grad(gradbox, AddTensor, None)
         parent_ids.append(parent._id)
+        if not retain_graph:
+            output.gradbox.unsafe_value()[].zero_grad()
 
 
 comptime AddBroadcastBackward[dtype: DType] = BroadcastBackward[
@@ -113,8 +116,9 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
-        var gradbox = output.gradbox[]
+        var gradbox = output.gradbox.unsafe_value()[]
         count = len(output.ancestry())
 
         if count == 1:
@@ -143,3 +147,5 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             else:
                 pass
+        if not retain_graph:
+            gradbox.zero_grad()

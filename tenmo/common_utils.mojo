@@ -194,8 +194,8 @@ def copy[
 
 def is_null[
     type: AnyType, //
-](ptr: UnsafePointer[type, ImmutAnyOrigin]) -> Bool:
-    return ptr.__bool__() == False
+](ptr: Optional[UnsafePointer[type, ImmutAnyOrigin]]) -> Bool:
+    return ptr.is_none()
 
 
 struct IDGen(RegisterPassable):
@@ -354,7 +354,7 @@ def assert_grad[
 
 
 @fieldwise_init
-struct NewAxis(Copyable & Movable):  # Empty struct as a sentinel
+struct NewAxis(ImplicitlyCopyable & Movable):  # Empty struct as a sentinel
     pass
 
 

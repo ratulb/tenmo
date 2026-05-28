@@ -15,6 +15,7 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var bwd_arg = output.ancestry().backward_fn_arg().get[TilesArg]()
         var (repeat, orig_shape) = bwd_arg.repeat, bwd_arg.orig_shape
@@ -32,6 +33,8 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
             parent.update_grad(gradbox_parent^, AddTensor, None)
             parent_ids.append(parent._id)
+            if not retain_graph:
+                grad_out.zero_grad()
             return
 
         var effective_rank = max(parent_rank, repeat_rank)
@@ -61,6 +64,8 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         parent.update_grad(gradbox_parent^, AddTensor, None)
         parent_ids.append(parent._id)
+        if not retain_graph:
+            grad_out.zero_grad()
 
 
 @fieldwise_init

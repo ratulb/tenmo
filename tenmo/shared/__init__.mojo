@@ -1,6 +1,11 @@
 from tenmo.common_utils import panic
 
 
+trait ScalarPredicate:
+    def __call__[dtype: DType](self, x: Scalar[dtype]) -> Bool:
+        ...
+
+
 struct Reduction(ImplicitlyCopyable, RegisterPassable):
     var reduction: Int
 
@@ -27,7 +32,7 @@ struct Reduction(ImplicitlyCopyable, RegisterPassable):
                 + "'"
             )
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.reduction = copy.reduction
 
     def is_mean(self) -> Bool:

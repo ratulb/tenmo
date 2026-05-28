@@ -104,7 +104,7 @@ struct Array(
             self.storage[i] = intarray[i]
 
     @always_inline("nodebug")
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.storage = copy.storage
         self.size = copy.size
 

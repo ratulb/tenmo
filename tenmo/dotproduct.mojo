@@ -6,7 +6,7 @@ from .gradbox import Gradbox
 from .shapes import Shape
 from std.memory import stack_allocation, AddressSpace
 from std.gpu import thread_idx, block_dim, grid_dim, block_idx, barrier
-from std.os.atomic import Atomic, Consistency
+from std.atomic import Atomic, Ordering
 from std.sys import has_accelerator
 from std.gpu.primitives.id import lane_id, warp_id
 from std.gpu.primitives.warp import shuffle_down
@@ -24,6 +24,7 @@ struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref gradbox = output.gradients()[]
         var scalar_grad_value = gradbox.item()  # Scalar
@@ -41,7 +42,7 @@ struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_tensor = tensor_rhs.__mul__[track_grad=False](
                 scalar_grad_value
             )
-            var gradbox_lhs = grad_tensor.as_gradbox(
+            var gradbox_lhs = grad_tensor^.as_gradbox(
                 share=False, contiguous=False
             )
             tensor_lhs_ref.update_grad(gradbox_lhs^, AddTensor, None)
@@ -51,11 +52,13 @@ struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_tensor = tensor_lhs.__mul__[track_grad=False](
                 scalar_grad_value
             )
-            var gradbox_rhs = grad_tensor.as_gradbox(
+            var gradbox_rhs = grad_tensor^.as_gradbox(
                 share=False, contiguous=False
             )
             tensor_rhs_ref.update_grad(gradbox_rhs^, AddTensor, None)
             parent_ids.append(tensor_rhs_ref._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -67,8 +70,8 @@ struct Dot[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # ── Broadcast scalar → vector if needed ──────────────────────────────
         # A scalar tensor (rank=0 or numels=1) is broadcast to match the other.
         # broadcast_to wires grad correctly so chain rule is preserved.
-        var actual_lhs = lhs
-        var actual_rhs = rhs
+        var actual_lhs = lhs.copy()
+        var actual_rhs = rhs.copy()
 
         if lhs.numels() == 1 and rhs.numels() > 1:
             actual_lhs = Broadcast[Self.dtype].forward[track_grad](
@@ -155,8 +158,8 @@ def dot_product_32[
     ]()
 
     # Thread and block identification
-    var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
+    var tid = Int(thread_idx.x)
+    var gtid = tid + Int(block_dim.x * block_idx.x)
 
     # =================================================================
     # Phase 1: Grid-Stride Accumulation
@@ -164,9 +167,9 @@ def dot_product_32[
     # =================================================================
     var accum = Scalar[dtype](0)
     var i = gtid
-    while i < size:
+    while i < Int(size):
         accum += a[i] * b[i]
-        i += block_dim.x * grid_dim.x
+        i += Int(block_dim.x * grid_dim.x)
 
     # =================================================================
     # Phase 2: Warp-Level Reduction (Shuffle)
@@ -198,7 +201,7 @@ def dot_product_32[
     # =================================================================
     if warp == 0:
         # Each thread in first warp loads one warp sum
-        accum = warp_sums[lane] if lane < UInt(NUM_WARPS) else Scalar[dtype](0)
+        accum = warp_sums[lane] if lane < NUM_WARPS else Scalar[dtype](0)
 
         # Shuffle reduction
         offset = UInt32(NUM_WARPS // 2)
@@ -224,17 +227,17 @@ def dot_product_64[
     var block_shared_memory = stack_allocation[
         BLOCK_SIZE, Scalar[dtype], address_space=AddressSpace.SHARED
     ]()
-    var cache_index = thread_idx.x
-    var gtid = cache_index + block_dim.x * block_idx.x
+    var cache_index = Int(thread_idx.x)
+    var gtid = cache_index + Int(block_dim.x * block_idx.x)
     var accum: Scalar[dtype] = 0
     # Grid-stride loop
-    for i in range(gtid, size, block_dim.x * grid_dim.x):
+    for i in range(gtid, Int(size), Int(block_dim.x * grid_dim.x)):
         accum += a[i] * b[i]
 
     block_shared_memory[cache_index] = accum
     barrier()
 
-    var stride = UInt(block_dim.x // 2)
+    var stride = Int(block_dim.x // 2)
 
     while stride > 0:
         if cache_index < stride:

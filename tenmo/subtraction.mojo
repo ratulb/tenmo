@@ -21,6 +21,7 @@ struct SubBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var signs = output.ancestry().backward_fn_arg().get[IntArrayArg]().array
         ref gradbox = output.gradients()[]
@@ -30,6 +31,8 @@ struct SubBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var op_code = AddTensor if signs[i] == 0 else SubtractTensor
             ancestor.update_grad(gradbox, op_code, None)
             parent_ids.append(ancestor._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -40,6 +43,7 @@ struct SubLeftRightBackwardScalar[dtype: DType](
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var negate = output.ancestry().backward_fn_arg().get[Boolean]().is_true
         ref gradbox = output.gradients()[]
@@ -47,6 +51,8 @@ struct SubLeftRightBackwardScalar[dtype: DType](
         var op_code = SubtractTensor if negate else AddTensor
         ancestor.update_grad(gradbox, op_code, None)
         parent_ids.append(ancestor._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 comptime SubtractBroadcastBackward[dtype: DType] = BroadcastBackward[

@@ -20,6 +20,7 @@ struct TrueDivBackwardScalar[dtype: DType](
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var scalar = (
             output.ancestry()
@@ -33,6 +34,8 @@ struct TrueDivBackwardScalar[dtype: DType](
         var divided = gradbox / scalar
         ancestor.update_grad(divided^, AddTensor, None)
         parent_ids.append(ancestor._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -43,6 +46,7 @@ struct RightTrueDivBackwardScalar[dtype: DType](
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var scalar = (
             output.ancestry()
@@ -59,6 +63,8 @@ struct RightTrueDivBackwardScalar[dtype: DType](
         var grad_parent = Gradbox[Self.dtype](grad_ndb^, share=False)
         ancestor.update_grad(grad_parent^, SubtractTensor, None)
         parent_ids.append(ancestor._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -67,6 +73,7 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref gradbox = output.gradients()[]
         var ancestor_top = output.ancestry().get(0)
@@ -100,6 +107,8 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 None,
             )
             parent_ids.append(ancestor_bottom._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init

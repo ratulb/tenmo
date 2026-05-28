@@ -16,7 +16,7 @@ from tenmo.filler import Filler
 from tenmo.common_utils import Idx, panic, print_buffer
 from tenmo.device import Device, CPU, GPU
 from tenmo.device_transfer import DeviceTransfer
-from std.os.atomic import Atomic, Consistency, fence
+from std.atomic import Atomic, Ordering, fence
 
 
 struct Gradbox[dtype: DType](
@@ -36,7 +36,7 @@ struct Gradbox[dtype: DType](
     """
 
     var buffer: NDBuffer[Self.dtype]
-    var _refcount: UnsafePointer[Atomic[DType.uint64], MutExternalOrigin]
+    var _refcount: UnsafePointer[Atomic[DType.uint64], MutAnyOrigin]
     comptime Empty = Gradbox[Self.dtype].zeros(Shape())
 
     def __init__(out self, shape: Shape, share: Bool = True):
@@ -68,28 +68,22 @@ struct Gradbox[dtype: DType](
         self._refcount[] = Atomic[DType.uint64](1)
         self.buffer = buffer.share() if share else buffer^
 
-    def __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, *, deinit take: Self):
         """Move constructor — transfer ownership without copying."""
         self._refcount = take._refcount
         self.buffer = take.buffer^
 
-    def __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, *, copy: Self):
         """Copy constructor — increments reference count."""
         self.buffer = copy.buffer.copy()
         self._refcount = copy._refcount
-        _ = self._refcount[].fetch_add[ordering=Consistency.MONOTONIC](1)
+        _ = self._refcount[].fetch_add[ordering=Ordering.RELAXED](1)
 
     def __del__(deinit self):
-        """Destructor — decrements refcount and frees if last owner."""
-        if not self._refcount:
-            return
-        if self._refcount[].fetch_sub[ordering=Consistency.RELEASE](1) != 1:
-            return  # other owners exist — do nothing
-        fence[ordering=Consistency.ACQUIRE]()
-        # Last owner — free refcount allocation
-        # buffer.__del__ handles its own cleanup via NDBuffer/Buffer refcount
-        self._refcount.destroy_pointee()
-        self._refcount.free()
+        # _refcount lifecycle is owned by Tensor/Ancestor.__del__
+        # They call destroy_pointee(gradbox) which triggers this __del__
+        # By that point _refcount is already freed — do NOT touch it!
+        pass
 
     def ref_count(self) -> UInt64:
         """Get the current reference count.
@@ -97,7 +91,7 @@ struct Gradbox[dtype: DType](
         Returns:
             Number of references to this Gradbox.
         """
-        return self._refcount[].load[ordering=Consistency.MONOTONIC]()
+        return self._refcount[].load[ordering=Ordering.RELAXED]()
 
     def is_shared(self) -> Bool:
         """Check if this Gradbox is shared (ref_count > 1).
@@ -1500,19 +1494,10 @@ struct Gradbox[dtype: DType](
             num_last=num_last,
         )
 
-    def data_ptr[
-        origin: Origin, address_space: AddressSpace, //
-    ](ref[origin, address_space] self) -> UnsafePointer[
-        Scalar[Self.dtype], origin, address_space=address_space
-    ]:
+    def data_ptr(ref self) -> UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]:
         """Get a pointer to the data.
 
         Returns:
             Pointer to the underlying data.
         """
-        return (
-            self.buffer.data_ptr()
-            .unsafe_mut_cast[origin.mut]()
-            .unsafe_origin_cast[origin]()
-            .address_space_cast[address_space]()
-        )
+        return self.buffer.data_ptr()

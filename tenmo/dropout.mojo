@@ -40,6 +40,7 @@ struct DropoutBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref arg_dropout = (
             output.ancestry().backward_fn_arg().get[ArgDropout[Self.dtype]]()
@@ -64,6 +65,9 @@ struct DropoutBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if ancestor.requires_grad:
             ancestor.update_grad(gradbox_ancestor^, AddTensor, None)
         parent_ids.append(ancestor._id)
+
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -99,7 +103,7 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self.seed = 42
         self.fixed_seed = False
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.training = copy.training
         self.p = copy.p
         self.scale = copy.scale

@@ -16,6 +16,7 @@ struct ExpandBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
@@ -25,6 +26,7 @@ struct ExpandBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ancestor.update_grad(gradbox_contracted^, AddTensor, None)
 
         parent_ids.append(ancestor._id)
+        gradbox.zero_grad()
 
 
 @fieldwise_init

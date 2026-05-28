@@ -11,6 +11,7 @@ struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref gradbox = output.gradients()[]
         ref parent = output.ancestry().get(0)
@@ -20,6 +21,8 @@ struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         parent.update_grad(gradbox_ancestor^, AddTensor, None)
 
         parent_ids.append(parent._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init

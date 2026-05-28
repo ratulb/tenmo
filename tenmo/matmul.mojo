@@ -24,6 +24,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
@@ -49,6 +50,8 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             B.update_grad(grad_B^, AddTensor, None)
             parent_ids.append(B._id)
+        if not retain_graph:
+            grad_out.zero_grad()
 
 
 @fieldwise_init
@@ -97,6 +100,7 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
@@ -128,6 +132,8 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             B.update_grad(final_grad_B^, AddTensor, None)
             parent_ids.append(B._id)
+        if not retain_graph:
+            grad_out.zero_grad()
 
 
 @fieldwise_init

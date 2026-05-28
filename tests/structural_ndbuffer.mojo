@@ -90,19 +90,19 @@ struct Layout(ImplicitlyCopyable & Movable & Equatable):
         self.offset = offset
         self._contiguous = strides.is_contiguous(shape)
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         """Copy Layout with deep copy of shape and strides."""
         self.shape = copy.shape.copy()
         self.strides = copy.strides.copy()
         self.offset = copy.offset
         self._contiguous = copy._contiguous
 
-    def __moveinit__(out self, deinit take: Self):
+    def __init__(out self, deinit existing: Self):
         """Move Layout by transferring ownership of shape and strides."""
-        self.shape = take.shape^
-        self.strides = take.strides^
-        self.offset = take.offset
-        self._contiguous = take._contiguous
+        self.shape = existing.shape^
+        self.strides = existing.strides^
+        self.offset = existing.offset
+        self._contiguous = existing._contiguous
 
     def __eq__(self, other: Self) -> Bool:
         """Check if two Layouts are equal."""
@@ -190,15 +190,15 @@ struct Storage[dtype: DType](ImplicitlyCopyable & Movable):
         self.buffer = Buffer[Self.dtype]()
         self.device_state = Optional(device_state^)
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         """Copy Storage with refcount bump for buffer and device_state."""
         self.buffer = copy.buffer.copy()
         self.device_state = copy.device_state.copy()
 
-    def __moveinit__(out self, deinit take: Self):
+    def __init__(out self, deinit existing: Self):
         """Move Storage by transferring ownership of buffer and device_state."""
-        self.buffer = take.buffer^
-        self.device_state = take.device_state^
+        self.buffer = existing.buffer^
+        self.device_state = existing.device_state^
 
     @always_inline
     def is_on_gpu(self) -> Bool:
@@ -393,12 +393,12 @@ struct NDBuffer[dtype: DType](
         self.layout = Layout(shape, Strides.default(shape), 0)
         self.storage = Storage[Self.dtype](buffer^)
 
-    def __moveinit__(out self, deinit take: Self):
+    def __init__(out self, deinit existing: Self):
         """Move NDBuffer by transferring layout an.storage ownership."""
-        self.layout = take.layout^
-        self.storage = take.storage^
+        self.layout = existing.layout^
+        self.storage = existing.storage^
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         """Copy NDBuffer with deep copy of layout and refcount bump fo.storage.
         """
         self.layout = copy.layout.copy()
@@ -3330,7 +3330,7 @@ struct NDBuffer[dtype: DType](
     # =================================================================
 
     def map_where(
-        self, pred: fn(Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
+        self, pred: def(Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
     ) -> NDBuffer[Self.dtype]:
         """Replace elements where predicate is true with given value."""
         comptime if has_accelerator():
@@ -3352,7 +3352,7 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     def map_where_cpu(
-        self, pred: fn(Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
+        self, pred: def(Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
     ) -> NDBuffer[Self.dtype]:
         """Replace elements where predicate is true with given value on CPU."""
         var buffer = Buffer[Self.dtype](len(self))
@@ -3363,8 +3363,8 @@ struct NDBuffer[dtype: DType](
         return NDBuffer[Self.dtype](buffer^, self.layout.shape)
 
     def map[
-        map_buffer: fn(Buffer[Self.dtype]) -> Buffer[Self.dtype],
-        map_element: fn(Scalar[Self.dtype]) -> Scalar[Self.dtype],
+        map_buffer: def(Buffer[Self.dtype]) -> Buffer[Self.dtype],
+        map_element: def(Scalar[Self.dtype]) -> Scalar[Self.dtype],
     ](self) -> Buffer[Self.dtype]:
         """Apply a mapping function to each element."""
         if self.is_contiguous():
@@ -3381,7 +3381,7 @@ struct NDBuffer[dtype: DType](
 
     def map_to_bool(
         self,
-        pred: fn(Scalar[Self.dtype]) -> Bool,
+        pred: def(Scalar[Self.dtype]) -> Bool,
     ) -> NDBuffer[DType.bool]:
         """Apply predicate to each element, returning a boolean NDBuffer."""
         comptime if has_accelerator():

@@ -1,9 +1,11 @@
 from tenmo.buffers import Buffer
 from tenmo.mnemonics import *
+from tenmo.numpy_interop import ndarray_ptr
 from std.sys import simd_width_of
 from std.time import perf_counter_ns
 from std.testing import assert_almost_equal, TestSuite
 from std.testing import assert_true, assert_false
+from std.python import Python
 
 
 # ============================================
@@ -42,6 +44,40 @@ def test_constructor_from_list() raises:
             buffer[i] == Int32(i * 10),
             "Buffer value from list mismatch at " + String(i),
         )
+
+
+def test_constructor_external_ptr() raises:
+    """Buffer wrapping an external pointer (copy=False — the old 'rebind' path).
+    """
+    var n = 5
+    var ptr = alloc[Scalar[DType.float32]](n)
+    for i in range(n):
+        ptr[i] = Float32(Float32(i) * 1.5)
+    var buffer = Buffer[DType.float32](n, ptr, copy=False)
+    assert_true(buffer.size == n)
+    assert_true(buffer.external)
+    for i in range(n):
+        assert_true(buffer[i] == Float32(Float32(i) * 1.5))
+    ptr.free()
+
+
+def test_constructor_external_ptr_copy() raises:
+    """Buffer deep-copying from an external pointer (copy=True)."""
+    var n = 4
+    var ptr = alloc[Scalar[DType.int64]](n)
+    for i in range(n):
+        ptr[i] = Int64(i * 100)
+    var buffer = Buffer[DType.int64](n, ptr, copy=True)
+    assert_true(buffer.size == n)
+    assert_false(buffer.external)
+    for i in range(n):
+        assert_true(buffer[i] == Int64(i * 100))
+    # Mutate original — buffer must be unaffected
+    ptr[0] = Int64(-999)
+    assert_true(
+        buffer[0] == Int64(0), "Buffer must not share memory with external ptr"
+    )
+    ptr.free()
 
 
 # ============================================
@@ -4254,6 +4290,32 @@ def test_copied_shared_independent() raises:
         "copied: modifying copy should not affect original",
     )
     assert_true(copy[1] == Float32(1), "copied: copy unchanged at index 1")
+
+
+def test_buffer_numpy_noncopy_roundtrip() raises:
+    """Buffer wrapping a numpy ndarray without copying (the non-copy / 'rebind' path).
+    """
+    var np = Python.import_module("numpy")
+    var py_list = Python.list(
+        Float32(1.0), Float32(2.0), Float32(3.0), Float32(4.0)
+    )
+    var arr = np.array(py_list, dtype=np.float32)
+    var ptr = ndarray_ptr[DType.float32](arr)
+    var buf = Buffer[DType.float32](4, ptr, copy=False)
+    assert_true(buf.size == 4)
+    assert_true(buf.external, "non-copy Buffer should be marked external")
+    assert_true(buf[0] == 1.0)
+    assert_true(buf[1] == 2.0)
+    assert_true(buf[2] == 3.0)
+    assert_true(buf[3] == 4.0)
+    # Modify numpy array in-place — Buffer must reflect changes (shared memory)
+    arr[0] = 99.0
+    arr[2] = -77.0
+    assert_true(buf[0] == 99.0, "Buffer must see numpy modifications (no copy)")
+    assert_true(
+        buf[2] == -77.0, "Buffer must see numpy modifications (no copy)"
+    )
+    # Buffer destructor will NOT free numpy's memory (external=True)
 
 
 def main() raises:

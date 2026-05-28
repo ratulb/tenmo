@@ -1,5 +1,4 @@
-"""
-Comprehensive test suite for Conv2D implementation.
+"""Comprehensive test suite for Conv2D implementation.
 Tests forward pass, backward pass, edge cases, and numerical gradients.
 """
 from tenmo.tensor import Tensor
@@ -369,9 +368,9 @@ def test_gradient_flow() raises:
     out2.backward(grad_output)
 
     # Check that all gradients exist
-    assert_true(image.gradients())
-    assert_true(kernel1.gradients())
-    assert_true(kernel2.gradients())
+    assert_true(image.has_grad())
+    assert_true(kernel1.has_grad())
+    assert_true(kernel2.has_grad())
 
     print("Gradient flow correct")
 

@@ -26,7 +26,7 @@ struct Flow(RegisterPassable & Equatable, ImplicitlyCopyable):
                 " or '-1 → UnMoved'"
             )
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.direction = copy.direction
 
     def __eq__(self, other: Self) -> Bool:
@@ -47,6 +47,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var bwd_arg = (
             output.ancestry().backward_fn_arg().get[DeviceTransferBwdArg]()
@@ -95,6 +96,9 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
                 ancestor_ref.update_grad(gradbox, AddTensor, None)
 
         parent_ids.append(ancestor_ref._id)
+
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -170,7 +174,7 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var (code, ndb) = self.buffer.to_device(device)
         # Either CPU->CPU or GPU->GPU on same device — no transfer needed
         if code == -1:
-            return self
+            return self.copy()
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         comptime if track_grad:

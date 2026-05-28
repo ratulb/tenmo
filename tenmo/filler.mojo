@@ -10,7 +10,7 @@ from tenmo.intarray import IntArray
 from tenmo.strides import Strides
 from std.memory import memcpy, AddressSpace, stack_allocation
 from std.gpu import thread_idx, block_dim, grid_dim, block_idx, barrier
-from std.os.atomic import Atomic
+from std.atomic import Atomic
 from std.sys import has_accelerator, simd_width_of
 
 

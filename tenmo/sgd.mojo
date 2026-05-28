@@ -67,7 +67,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                         )
                     )
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.parameters = copy.parameters.copy()
         self.lr = copy.lr
         self.momentum = copy.momentum
@@ -77,15 +77,15 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         self.use_momentum = copy.use_momentum
         self.velocities = copy.velocities.copy()
 
-    def __moveinit__(out self, deinit take: Self):
-        self.parameters = take.parameters^
-        self.lr = take.lr
-        self.momentum = take.momentum
-        self.weight_decay = take.weight_decay
-        self.clip_norm = take.clip_norm
-        self.clip_value = take.clip_value
-        self.use_momentum = take.use_momentum
-        self.velocities = take.velocities^
+    def __init__(out self, deinit existing: Self):
+        self.parameters = existing.parameters^
+        self.lr = existing.lr
+        self.momentum = existing.momentum
+        self.weight_decay = existing.weight_decay
+        self.clip_norm = existing.clip_norm
+        self.clip_value = existing.clip_value
+        self.use_momentum = existing.use_momentum
+        self.velocities = existing.velocities^
 
     @always_inline
     def _step_no_momentum[

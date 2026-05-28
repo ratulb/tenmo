@@ -17,7 +17,11 @@ struct VectorMatmulNdBackward[dtype: DType](
     @staticmethod
     def backward[
         simdwidth: Int = simd_width_of[Self.dtype]()
-    ](output: Ancestor[Self.dtype], mut parent_ids: List[UInt]):
+    ](
+        output: Ancestor[Self.dtype],
+        mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
+    ):
         ref grad_out = output.gradients()[]
         ref v_ref = output.ancestry().get(0)
         var v = Tensor[Self.dtype](
@@ -198,6 +202,8 @@ struct VectorMatmulNdBackward[dtype: DType](
 
             M_ref.update_grad(grad_M^, AddTensor, None)
             parent_ids.append(M_ref._id)
+        if not retain_graph:
+            grad_out.zero_grad()
 
 
 @fieldwise_init

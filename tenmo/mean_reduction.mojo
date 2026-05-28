@@ -14,6 +14,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
         ref gradbox = output.gradients()[]
@@ -51,6 +52,8 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if ancestor.requires_grad:
             ancestor.update_grad(grad_contrib, AddTensor, None)
         parent_ids.append(ancestor._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init

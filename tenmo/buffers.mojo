@@ -5,7 +5,7 @@ from std.memory import memset_zero, memcpy, AddressSpace
 from std.math import exp, log, ceil, tanh, sqrt
 from .common_utils import log_debug, panic, Epsilon, One
 from std.utils.numerics import max_finite
-from std.os.atomic import Atomic, Consistency, fence
+from std.atomic import Atomic, Ordering, fence
 from .mnemonics import (
     Multiply,
     Add,
@@ -35,6 +35,7 @@ from .mnemonics import (
     GreaterThan,
     GreaterThanEqual,
 )
+from .shared import ScalarPredicate
 
 
 struct Buffer[dtype: DType = DType.float32](
@@ -49,9 +50,9 @@ struct Buffer[dtype: DType = DType.float32](
     """
 
     var size: Int
-    var data: UnsafePointer[Scalar[Self.dtype], MutExternalOrigin]
-    var _refcount: UnsafePointer[
-        Atomic[DType.uint64], MutExternalOrigin
+    var data: Optional[UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]]
+    var _refcount: Optional[
+        UnsafePointer[Atomic[DType.uint64], MutAnyOrigin]
     ]  # Null if not shared!
     var external: Bool
 
@@ -61,7 +62,7 @@ struct Buffer[dtype: DType = DType.float32](
 
     def __init__(out self):
         self.size = 0
-        self.data = UnsafePointer[Scalar[Self.dtype], MutExternalOrigin]()
+        self.data = {}
         self._refcount = {}
         self.external = False
 
@@ -92,7 +93,7 @@ struct Buffer[dtype: DType = DType.float32](
         self.external = False
         self._refcount = {}
         for i in range(len(self)):
-            self.data[i] = elems[i]
+            self.data.unsafe_value()[i] = elems[i]
 
     def __init__[
         size: Int, datatype: DType, //
@@ -103,7 +104,7 @@ struct Buffer[dtype: DType = DType.float32](
     def __init__(
         out self,
         size: Int,
-        # data: UnsafePointer[Scalar[Self.dtype], MutExternalOrigin],
+        # data: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
         data: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
         copy: Bool = False,
     ):
@@ -114,7 +115,7 @@ struct Buffer[dtype: DType = DType.float32](
             memcpy(dest=self.data, src=data, count=size)
             self.external = False
         else:
-            self.data = rebind[type_of(self.data)](data)
+            self.data = data
             self.external = True
 
     # Shared state management
@@ -123,7 +124,7 @@ struct Buffer[dtype: DType = DType.float32](
         """Check if this buffer has ref counting enabled."""
         return (
             self._refcount
-            != UnsafePointer[Atomic[DType.uint64], MutExternalOrigin]()
+            != None  # UnsafePointer[Atomic[DType.uint64], MutAnyOrigin]()
         )
 
     # def shared(mut self) -> Self:
@@ -160,7 +161,8 @@ struct Buffer[dtype: DType = DType.float32](
 
         # Free old allocation
 
-        self.data.free()
+        self.data.unsafe_value().free()
+        self.data = {}
         log_debug("Buffer__del__ → freed unshared data pointer")
 
         # Update pointers
@@ -173,13 +175,13 @@ struct Buffer[dtype: DType = DType.float32](
         Returns:
             The current amount of references to the pointee.
         """
-        return self._refcount[].load[ordering=Consistency.MONOTONIC]()
+        return self._refcount.unsafe_value()[].load[ordering=Ordering.RELAXED]()
 
     # ========================================
     # Copy/Move semantics
     # ========================================
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         """Copy buffer - increment refcount if shared."""
         self.size = copy.size
         self.data = copy.data
@@ -188,14 +190,16 @@ struct Buffer[dtype: DType = DType.float32](
 
         if self.is_shared():
             # Atomic increment (only for shared buffers)
-            _ = self._refcount[].fetch_add[ordering=Consistency.MONOTONIC](1)
+            _ = self._refcount.unsafe_value()[].fetch_add[
+                ordering=Ordering.RELAXED
+            ](1)
         else:
             # Not shared - deep copy data
             if self.size > 0 and not self.external:
                 self.data = alloc[Scalar[Self.dtype]](self.size)
                 memcpy(dest=self.data, src=copy.data, count=self.size)
 
-    def __moveinit__(out self, deinit take: Self):
+    def __init__(out self, *, deinit take: Self):
         """Move buffer - no refcount change."""
         self.size = take.size
         self.data = take.data
@@ -204,7 +208,7 @@ struct Buffer[dtype: DType = DType.float32](
 
     def __del__(deinit self):
         """Destroy buffer - handle both shared and unshared cases."""
-        if self.size == 0 or not self.data.__bool__():
+        if self.size == 0 or self.data == None:
             return
 
         if self.external:
@@ -212,40 +216,31 @@ struct Buffer[dtype: DType = DType.float32](
 
         if self._refcount and self.is_shared():
             # Shared buffer - atomic decrement
-            if self._refcount[].fetch_sub[ordering=Consistency.RELEASE](1) != 1:
+            if (
+                self._refcount.unsafe_value()[].fetch_sub[
+                    ordering=Ordering.RELEASE
+                ](1)
+                != 1
+            ):
                 return  # Other references exist
 
             # Last reference - free everything
-            fence[ordering=Consistency.ACQUIRE]()
+            fence[ordering=Ordering.ACQUIRE]()
 
             # Free allocation (starts at refcount, not data)
-            var alloc_start = self._refcount.bitcast[UInt8]()
+            var alloc_start = self._refcount.unsafe_value().bitcast[UInt8]()
             alloc_start.free()
+            _ = self._refcount = {}
+            _ = self.data = {}
 
         else:
             # Unshared buffer - direct free
-            self.data.free()
+            self.data.unsafe_value().free()
+            _ = self.data = {}
             log_debug("Buffer__del__ → freed unshared buffer")
 
-    def unsafe_ptr[
-        origin: Origin, address_space: AddressSpace, //
-    ](ref[origin, address_space] self) -> UnsafePointer[
-        Scalar[Self.dtype], origin, address_space=address_space
-    ]:
-        """Retrieves a pointer to the underlying memory.
-
-        Parameters:
-            origin: The origin of the `Buffer`.
-            address_space: The `AddressSpace` of the `Buffer`.
-
-        Returns:
-            The pointer to the underlying memory.
-        """
-        return (
-            self.data.unsafe_mut_cast[origin.mut]()
-            .unsafe_origin_cast[origin]()
-            .address_space_cast[address_space]()
-        )
+    def unsafe_ptr(ref self) -> UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]:
+        return self.data.unsafe_value()
 
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return {0, Pointer(to=self)}
@@ -267,7 +262,11 @@ struct Buffer[dtype: DType = DType.float32](
 
         # Fast path: contiguous (step == 1)
         if step == 1:
-            memcpy(dest=result.data, src=self.data + start, count=result_size)
+            memcpy(
+                dest=result.data.unsafe_value(),
+                src=self.data.unsafe_value() + start,
+                count=result_size,
+            )
             return result^
 
         # Strided path: use SIMD if beneficial
@@ -275,34 +274,10 @@ struct Buffer[dtype: DType = DType.float32](
             Self.dtype
         ]()
 
-        # Only use SIMD if we have enough elements
-        _ = """if result_size >= simd_width:
-            var num_chunks = result_size // simd_width
-            var remainder = result_size % simd_width
-
-            # SIMD strided loads
-            for chunk in range(num_chunks):
-                var src_idx = start + chunk * simd_width * step
-                var dst_idx = chunk * simd_width
-
-                # Strided load from source
-                var values = (self.data + src_idx).strided_load[
-                    width=simd_width
-                ](stride=step)
-
-                # Contiguous store to result
-                result.data.store[width=simd_width](dst_idx, values)
-
-            # Handle remainder scalars
-            var start_remainder = num_chunks * simd_width
-            for i in range(remainder):
-                result.data[start_remainder + i] = self.data[
-                    start + (start_remainder + i) * step
-                ]
-        else:"""
-        # Too small for SIMD - just use scalar loop
         for i in range(result_size):
-            result.data[i] = self.data[start + i * step]
+            result.data.unsafe_value()[i] = self.data.unsafe_value()[
+                start + i * step
+            ]
 
         return result^
 
@@ -314,7 +289,7 @@ struct Buffer[dtype: DType = DType.float32](
             self.size,
             index,
         )
-        return (self.data + index)[]
+        return (self.data.unsafe_value() + index)[]
 
     @always_inline
     def __setitem__(self, index: Int, scalar: Scalar[Self.dtype]):
@@ -324,7 +299,7 @@ struct Buffer[dtype: DType = DType.float32](
             self.size,
             index,
         )
-        (self.data + index)[] = scalar
+        (self.data.unsafe_value() + index)[] = scalar
 
     @always_inline
     def load[
@@ -337,7 +312,7 @@ struct Buffer[dtype: DType = DType.float32](
             offset,
             simdwidth,
         )
-        return self.data.load[width=simdwidth](offset)
+        return self.data.unsafe_value().load[width=simdwidth](offset)
 
     @always_inline
     def store[
@@ -351,7 +326,7 @@ struct Buffer[dtype: DType = DType.float32](
             simdwidth,
         )
 
-        self.data.store[width=simdwidth](offset, values)
+        self.data.unsafe_value().store[width=simdwidth](offset, values)
 
     def copied(
         self, start_index: Int = 0, end_index: Optional[Int] = None
@@ -368,7 +343,11 @@ struct Buffer[dtype: DType = DType.float32](
                 String(actual_end),
             )
         var out = Buffer[Self.dtype](extent)
-        memcpy(dest=out.data, src=self.data + start_index, count=extent)
+        memcpy(
+            dest=out.data.unsafe_value(),
+            src=self.data.unsafe_value() + start_index,
+            count=extent,
+        )
         return out^
 
     @always_inline
@@ -1435,111 +1414,49 @@ struct Buffer[dtype: DType = DType.float32](
         self,
         start_index: Int = 0,
         end_index: Optional[Int] = None,
-        *,
-        threshold: Int = 100000,
-    ) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
+    ) -> Buffer[
+        Self.dtype
+    ] where Self.dtype.is_floating_point():
         var actual_end = end_index.or_else(self.size)
         var extent = actual_end - start_index
         var out = Buffer[Self.dtype](extent)
 
         comptime simd_width = simd_width_of[Self.dtype]()
 
-        # For small arrays, don't parallelize
-        if extent < threshold:
-            var vectorized_end = (extent // simd_width) * simd_width
+        var vectorized_end = (extent // simd_width) * simd_width
 
-            # SIMD loop
-            for out_idx in range(0, vectorized_end, simd_width):
-                var src_idx = start_index + out_idx
-                var chunk = self.load[simdwidth=simd_width](src_idx)
-                comptime if op_code == EXP:
-                    out.store[simdwidth=simd_width](out_idx, exp(chunk))
-                elif op_code == LOG:
-                    out.store[simdwidth=simd_width](
-                        out_idx, log(max(chunk, epsilon))
-                    )
-                elif op_code == TANH_FORWARD:
-                    out.store[simdwidth=simd_width](out_idx, tanh(chunk))
-                else:  # Sigmoid
-                    out.store[simdwidth=simd_width](
-                        out_idx,
-                        One[Self.dtype].value()
-                        / (One[Self.dtype].value() + exp(-chunk)),
-                    )
+        # SIMD loop
+        for out_idx in range(0, vectorized_end, simd_width):
+            var src_idx = start_index + out_idx
+            var chunk = self.load[simdwidth=simd_width](src_idx)
+            comptime if op_code == EXP:
+                out.store[simdwidth=simd_width](out_idx, exp(chunk))
+            elif op_code == LOG:
+                out.store[simdwidth=simd_width](
+                    out_idx, log(max(chunk, epsilon))
+                )
+            elif op_code == TANH_FORWARD:
+                out.store[simdwidth=simd_width](out_idx, tanh(chunk))
+            else:  # Sigmoid
+                out.store[simdwidth=simd_width](
+                    out_idx,
+                    One[Self.dtype].value()
+                    / (One[Self.dtype].value() + exp(-chunk)),
+                )
 
-            # Tail loop
-            for out_idx in range(vectorized_end, extent):
-                var src_idx = start_index + out_idx
-                comptime if op_code == EXP:
-                    out[out_idx] = exp(self[src_idx])
-                elif op_code == LOG:
-                    out[out_idx] = log(max(self[src_idx], epsilon))
-                elif op_code == TANH_FORWARD:
-                    out[out_idx] = tanh(self[src_idx])
-                else:  # Sigmoid
-                    out[out_idx] = One[Self.dtype].value() / (
-                        One[Self.dtype].value() + exp(-self[src_idx])
-                    )
-
-            return out^
-
-        # For large arrays, parallelize
-        var num_cores = min(num_physical_cores(), 2)
-        var chunk_size = (extent + num_cores - 1) // num_cores
-
-        var src_data = self.data
-        var dst_data = out.data
-
-        @parameter
-        def process_chunk(chunk_idx: Int):
-            var out_start = chunk_idx * chunk_size
-            var out_end = min(out_start + chunk_size, extent)
-
-            var src_start = start_index + out_start
-
-            var chunk_extent = out_end - out_start
-            var chunk_vectorized_end = (chunk_extent // simd_width) * simd_width
-
-            # SIMD loop
-            var i = 0
-            while i < chunk_vectorized_end:
-                var src_idx = src_start + i
-                var out_idx = out_start + i
-                var vec = src_data.load[width=simd_width](src_idx)
-                comptime if op_code == EXP:
-                    dst_data.store[width=simd_width](out_idx, exp(vec))
-                elif op_code == LOG:
-                    dst_data.store[width=simd_width](
-                        out_idx, log(max(vec, epsilon))
-                    )
-                elif op_code == TANH_FORWARD:
-                    dst_data.store[width=simd_width](out_idx, tanh(vec))
-
-                else:  # Sigmoid
-                    dst_data.store[width=simd_width](
-                        out_idx,
-                        One[Self.dtype].value()
-                        / (One[Self.dtype].value() + exp(-vec)),
-                    )
-                i += simd_width
-
-            # Tail loop
-            while i < chunk_extent:
-                var src_idx = src_start + i
-                var out_idx = out_start + i
-                comptime if op_code == EXP:
-                    dst_data[out_idx] = exp(src_data[src_idx])
-                elif op_code == LOG:
-                    dst_data[out_idx] = log(max(src_data[src_idx], epsilon))
-                elif op_code == TANH_FORWARD:
-                    dst_data[out_idx] = tanh(src_data[src_idx])
-                else:  # Sigmoid
-                    dst_data[out_idx] = One[Self.dtype].value() / (
-                        One[Self.dtype].value() + exp(-src_data[src_idx])
-                    )
-                i += 1
-
-        parallelize[process_chunk](num_cores)
+        # Tail loop
+        for out_idx in range(vectorized_end, extent):
+            var src_idx = start_index + out_idx
+            comptime if op_code == EXP:
+                out[out_idx] = exp(self[src_idx])
+            elif op_code == LOG:
+                out[out_idx] = log(max(self[src_idx], epsilon))
+            elif op_code == TANH_FORWARD:
+                out[out_idx] = tanh(self[src_idx])
+            else:  # Sigmoid
+                out[out_idx] = One[Self.dtype].value() / (
+                    One[Self.dtype].value() + exp(-self[src_idx])
+                )
 
         return out^
 
@@ -1644,8 +1561,8 @@ struct Buffer[dtype: DType = DType.float32](
     @staticmethod
     @always_inline
     def zeros(size: Int) -> Buffer[Self.dtype]:
-        buffer = Buffer[Self.dtype](size)
-        memset_zero(buffer.data, size)
+        var buffer = Buffer[Self.dtype](size)
+        memset_zero(buffer.data.unsafe_value(), size)
         return buffer^
 
     @staticmethod
@@ -1676,7 +1593,7 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     def zero(self: Buffer[Self.dtype]):
-        memset_zero(self.data, self.size)
+        memset_zero(self.data.unsafe_value(), self.size)
 
     @always_inline
     def sum(
@@ -2341,10 +2258,9 @@ struct Buffer[dtype: DType = DType.float32](
         return True
 
     @always_inline
-    def any(
-        self: Buffer[Self.dtype],
-        pred: fn(Scalar[Self.dtype]) -> Bool,
-    ) -> Bool:
+    def any[
+        Pred: ScalarPredicate
+    ](self: Buffer[Self.dtype], pred: Pred,) -> Bool:
         """Check if any element satisfies the predicate."""
         for i in range(self.size):
             if pred(self[i]):
@@ -2352,10 +2268,9 @@ struct Buffer[dtype: DType = DType.float32](
         return False
 
     @always_inline
-    def all(
-        self: Buffer[Self.dtype],
-        pred: fn(Scalar[Self.dtype]) -> Bool,
-    ) -> Bool:
+    def all[
+        Pred: ScalarPredicate
+    ](self: Buffer[Self.dtype], pred: Pred,) -> Bool:
         """Check if all elements satisfy the predicate."""
         for i in range(self.size):
             if not pred(self[i]):
@@ -2363,10 +2278,9 @@ struct Buffer[dtype: DType = DType.float32](
         return True
 
     @always_inline
-    def map_to_bool(
-        self: Buffer[Self.dtype],
-        pred: fn(Scalar[Self.dtype]) -> Bool,
-    ) -> Buffer[DType.bool]:
+    def map_to_bool[
+        Pred: ScalarPredicate
+    ](self: Buffer[Self.dtype], pred: Pred,) -> Buffer[DType.bool]:
         """Apply predicate to each element, returning a boolean buffer."""
         var out = Buffer[DType.bool](self.size)
         for i in range(self.size):
@@ -2393,9 +2307,11 @@ struct Buffer[dtype: DType = DType.float32](
         return False
 
     @always_inline
-    def map_where(
+    def map_where[
+        Pred: ScalarPredicate
+    ](
         self: Buffer[Self.dtype],
-        pred: fn(Scalar[Self.dtype]) -> Bool,
+        pred: Pred,
         value: Scalar[Self.dtype],
     ) -> Buffer[Self.dtype]:
         """Apply predicate to each element, setting value where predicate holds,

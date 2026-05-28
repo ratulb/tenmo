@@ -11,6 +11,7 @@ struct SigmoidBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
@@ -22,6 +23,8 @@ struct SigmoidBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         parent.update_grad(gradbox_ancestor^, AddTensor, None)
 
         parent_ids.append(parent._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 struct Sigmoid[dtype: DType](ImplicitlyCopyable, RegisterPassable):

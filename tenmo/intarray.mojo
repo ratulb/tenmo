@@ -1,5 +1,5 @@
 from .common_utils import panic
-from std.memory import memcpy
+from std.memory import memcpy, memmove
 
 
 struct IntArray(
@@ -19,7 +19,7 @@ struct IntArray(
     It provides dynamic array functionality with efficient memory management.
     """
 
-    var _data: UnsafePointer[Int, MutExternalOrigin]
+    var _data: Optional[UnsafePointer[Int, MutAnyOrigin]]
     var _size: Int  # Current number of elements
     var _capacity: Int  # Allocated capacity
 
@@ -34,7 +34,7 @@ struct IntArray(
         Initializes an array with zero size and zero capacity.
         Memory will be allocated as elements are appended.
         """
-        self._data = UnsafePointer[Int, MutExternalOrigin]()
+        self._data = {}
         self._size = 0
         self._capacity = 0
 
@@ -52,8 +52,9 @@ struct IntArray(
         self._data = alloc[Int](n)
         self._size = n
         self._capacity = n
+        var data = self._data.unsafe_value()
         for i in range(n):
-            self._data[i] = values[i]
+            data[i] = values[i]
 
     @always_inline("nodebug")
     def __init__(out self, values: VariadicList[Int, _]):
@@ -66,8 +67,9 @@ struct IntArray(
         self._data = alloc[Int](n)
         self._size = n
         self._capacity = n
+        var data = self._data.unsafe_value()
         for i in range(n):
-            self._data[i] = values[i]
+            data[i] = values[i]
 
     @always_inline("nodebug")
     def __init__(out self, values: List[Int]):
@@ -83,10 +85,10 @@ struct IntArray(
         self._data = alloc[Int](n)
         self._size = n
         self._capacity = n
-        memcpy(dest=self._data, src=values._data, count=n)
+        memcpy(dest=self._data.unsafe_value(), src=values._data, count=n)
 
     @always_inline("nodebug")
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         """Create a deep copy of another IntArray instance.
 
         Args:
@@ -99,9 +101,13 @@ struct IntArray(
         self._capacity = copy._capacity
         if copy._capacity > 0:
             self._data = alloc[Int](copy._capacity)
-            memcpy(dest=self._data, src=copy._data, count=copy._size)
+            memcpy(
+                dest=self._data.unsafe_value(),
+                src=copy._data.unsafe_value(),
+                count=copy._size,
+            )
         else:
-            self._data = UnsafePointer[Int, MutExternalOrigin]()
+            self._data = {}
 
     @always_inline("nodebug")
     def __del__(deinit self):
@@ -109,8 +115,8 @@ struct IntArray(
 
         Releases any allocated memory back to the system.
         """
-        if self._data.__bool__():
-            self._data.free()
+        if self._capacity > 0 and self._data:
+            self._data.unsafe_value().free()
 
     @staticmethod
     @always_inline("nodebug")
@@ -269,7 +275,7 @@ struct IntArray(
         var index = idx if idx >= 0 else idx + self._size
         if index < 0 or index >= self._size:
             panic("IntArray: index out of bounds")
-        return (self._data + index)[]
+        return (self._data.unsafe_value() + index)[]
 
     @always_inline("nodebug")
     def __setitem__(mut self, idx: Int, value: Int):
@@ -285,8 +291,7 @@ struct IntArray(
         var index = idx if idx >= 0 else idx + self._size
         if index < 0 or index >= self._size:
             panic("IntArray: index out of bounds")
-        # self._data[index] = value
-        (self._data + index)[] = value
+        (self._data.unsafe_value() + index)[] = value
 
     @always_inline("nodebug")
     def __getitem__(self, slice: Slice) -> Self:
@@ -334,16 +339,17 @@ struct IntArray(
 
         var result = IntArray.with_capacity(size)
         var src_idx = start
+        var data = self._data.unsafe_value()
 
         if step > 0:
             while src_idx < stop and src_idx < self._size:
                 if src_idx >= 0:
-                    result.append(self._data[src_idx])
+                    result.append(data[src_idx])
                 src_idx += step
         else:
             while src_idx > stop and src_idx >= 0:
                 if src_idx < self._size:
-                    result.append(self._data[src_idx])
+                    result.append(data[src_idx])
                 src_idx += step
 
         return result^
@@ -367,10 +373,13 @@ struct IntArray(
 
         # Copy existing
         if self._size > 0:
-            memcpy(dest=new_data, src=self._data, count=self._size)
+            memcpy(
+                dest=new_data, src=self._data.unsafe_value(), count=self._size
+            )
 
         if self._data:
-            self._data.free()
+            self._data.unsafe_value().free()
+            self._data = {}
         self._data = new_data
         self._capacity = new_cap
 
@@ -385,8 +394,9 @@ struct IntArray(
             Automatically reserves additional capacity if needed using exponential growth strategy.
         """
         self.reserve(self._size + len(values))
+        var data = self._data.unsafe_value()
         for i in range(len(values)):
-            self._data[self._size + i] = values[i]
+            data[self._size + i] = values[i]
         self._size += len(values)
 
     @always_inline
@@ -397,14 +407,13 @@ struct IntArray(
             value: Integer value to prepend
 
         Note:
-            This operation shifts all existing elements to the right by one position
-            and has O(n) time complexity due to the shifting required.
+            Uses memmove for O(n) block shift.
         """
         self.reserve(self._size + 1)
-        # Shift right
-        for i in range(self._size, 0, -1):
-            self._data[i] = self._data[i - 1]
-        self._data[0] = value
+        var data = self._data.unsafe_value()
+        if self._size > 0:
+            memmove(dest=data + 1, src=data, count=self._size)
+        data[0] = value
         self._size += 1
 
     @always_inline("nodebug")
@@ -474,8 +483,13 @@ struct IntArray(
             Does not modify the original array (immutable operation).
         """
         var result = IntArray.with_capacity(self._size + 1)
-        memcpy(dest=result._data, src=self._data, count=self._size)
-        result._data[self._size] = value
+        if self._size > 0:
+            memcpy(
+                dest=result._data.unsafe_value(),
+                src=self._data.unsafe_value(),
+                count=self._size,
+            )
+        result._data.unsafe_value()[self._size] = value
         result._size = self._size + 1
         return result^
 
@@ -493,10 +507,18 @@ struct IntArray(
             Does not modify either original array (immutable operation).
         """
         var result = Self.with_capacity(self._size + other._size)
-        memcpy(dest=result._data, src=self._data, count=self._size)
-        memcpy(
-            dest=result._data + self._size, src=other._data, count=other._size
-        )
+        if self._size > 0:
+            memcpy(
+                dest=result._data.unsafe_value(),
+                src=self._data.unsafe_value(),
+                count=self._size,
+            )
+        if other._size > 0:
+            memcpy(
+                dest=result._data.unsafe_value() + self._size,
+                src=other._data.unsafe_value(),
+                count=other._size,
+            )
         result._size = self._size + other._size
         return result^
 
@@ -546,10 +568,11 @@ struct IntArray(
         if i < 0 or i >= self._size:
             panic("IntArray: pop index out of bounds")
 
-        var val = self._data[i]
-        # Shift left
-        for j in range(i, self._size - 1):
-            self._data[j] = self._data[j + 1]
+        var data = self._data.unsafe_value()
+        var val = data[i]
+        var shift_count = self._size - i - 1
+        if shift_count > 0:
+            memmove(dest=data + i, src=data + i + 1, count=shift_count)
         self._size -= 1
         return val
 
@@ -598,12 +621,16 @@ struct IntArray(
         if at < 0 or at > len(self):
             panic("IntArray -> insert - index out of bounds: " + String(at))
 
-        var result = IntArray.with_capacity(len(self) + 1)
-        for i in range(len(self) + 1):
-            if i == at:
-                result.append(value)
-            if i < len(self):
-                result.append(self[i])
+        var n = len(self)
+        var result = Self.with_capacity(n + 1)
+        var res_data = result._data.unsafe_value()
+        var src_data = self._data.unsafe_value()
+        if at > 0:
+            memcpy(dest=res_data, src=src_data, count=at)
+        res_data[at] = value
+        if n > at:
+            memcpy(dest=res_data + at + 1, src=src_data + at, count=n - at)
+        result._size = n + 1
         return result^
 
     @always_inline("nodebug")
@@ -679,14 +706,16 @@ struct IntArray(
     @always_inline("nodebug")
     def fill(mut self, value: Int):
         """Fill with value."""
+        var data = self._data.unsafe_value()
         for i in range(self._size):
-            self._data[i] = value
+            data[i] = value
 
     @always_inline
     def __contains__(self, value: Int) -> Bool:
         """Check if contains value."""
+        var data = self._data.unsafe_value()
         for i in range(self._size):
-            if self._data[i] == value:
+            if data[i] == value:
                 return True
         return False
 
@@ -694,8 +723,10 @@ struct IntArray(
         """Check equality."""
         if self._size != other._size:
             return False
+        var data = self._data.unsafe_value()
+        var other_data = other._data.unsafe_value()
         for i in range(self._size):
-            if self._data[i] != other._data[i]:
+            if data[i] != other_data[i]:
                 return False
         return True
 
@@ -703,8 +734,9 @@ struct IntArray(
         """Check equality with List."""
         if self._size != len(other):
             return False
+        var data = self._data.unsafe_value()
         for i in range(self._size):
-            if self._data[i] != other[i]:
+            if data[i] != other[i]:
                 return False
         return True
 
@@ -712,8 +744,9 @@ struct IntArray(
     def tolist(self) -> List[Int]:
         """Convert to List[Int]."""
         var result = List[Int](capacity=Int(self._size))
+        var data = self._data.unsafe_value()
         for i in range(self._size):
-            result.append(self._data[i])
+            result.append(data[i])
         return result^
 
     @no_inline
@@ -722,10 +755,11 @@ struct IntArray(
         if self._size == 0:
             return "[]"
         var result = String("[")
+        var data = self._data.unsafe_value()
         for i in range(self._size):
             if i > 0:
                 result += ", "
-            result += String(self._data[i])
+            result += String(data[i])
         result += "]"
         return result
 
@@ -757,8 +791,9 @@ struct IntArray(
         if self._size == 0:
             return 1
         var prod = 1
+        var data = self._data.unsafe_value()
         for i in range(self._size):
-            prod *= self._data[i]
+            prod *= data[i]
         return prod
 
     @always_inline("nodebug")
@@ -769,8 +804,9 @@ struct IntArray(
             Sum of all elements. Returns 0 for empty arrays.
         """
         var s = 0
+        var data = self._data.unsafe_value()
         for i in range(self._size):
-            s += self._data[i]
+            s += data[i]
         return s
 
     @always_inline("nodebug")
@@ -781,10 +817,11 @@ struct IntArray(
             Modifies the array in place, reversing the order of elements.
             Time complexity is O(n).
         """
+        var data = self._data.unsafe_value()
         for i in range(self._size // 2):
-            var temp = self._data[i]
-            self._data[i] = self._data[self._size - 1 - i]
-            self._data[self._size - 1 - i] = temp
+            var temp = data[i]
+            data[i] = data[self._size - 1 - i]
+            data[self._size - 1 - i] = temp
 
     @always_inline("nodebug")
     def reversed(self) -> Self:
@@ -797,8 +834,9 @@ struct IntArray(
             Does not modify the original array (immutable operation).
         """
         var result = IntArray.with_capacity(self._size)
+        var data = self._data.unsafe_value()
         for i in range(self._size - 1, -1, -1):
-            result.append(self._data[i])
+            result.append(data[i])
         return result^
 
     @always_inline("nodebug")

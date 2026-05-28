@@ -5,6 +5,7 @@ from tenmo.shapes import Shape
 from tenmo.common_utils import *
 from std.utils.numerics import min_finite
 from tenmo.mnemonics import AddTensor
+from tenmo.shared import ScalarPredicate
 from tenmo.strides import Strides
 
 
@@ -123,7 +124,7 @@ def test_square_and_identity_path() raises:
     var a = Tensor[dtype].d1([3.0], requires_grad=True)
 
     var sq = a * a  # ∂sq/∂a = 2a = 6
-    var id = a  # ∂id/∂a = 1
+    var id = a.copy()  # ∂id/∂a = 1
 
     var out = sq + id  # ∂out/∂a = 6 + 1 = 7
     out.backward()
@@ -1479,7 +1480,7 @@ def test_reshape_scalar_to_tensor() raises:
     assert_true(b[0] == Scalar[dtype](42.0))
     c = b * 3
     c.backward()
-    assert_true(b.grad().item() == 0 and a.gradbox[].item() == 3)
+    assert_true(b.grad().item() == 0 and a.grad().item() == 3)
 
 
 def test_miscellaneous() raises:
@@ -1822,22 +1823,28 @@ def test_arange() raises:
     assert_true(is_true, "arange negative step assertion failed")
 
 
+@fieldwise_init
+struct PredAll(ScalarPredicate):
+    def __call__[dtype: DType](self, e: Scalar[dtype]) -> Bool:
+        return e >= 0 and e < 1
+
+
+@fieldwise_init
+struct PredAll2(ScalarPredicate):
+    def __call__[dtype: DType](self, e: Scalar[dtype]) -> Bool:
+        return e >= -2 and e < 2
+
+
 def test_random() raises:
     comptime dtype = DType.float32
     rand_tensor = Tensor[dtype].rand([10])
 
-    def each(e: Scalar[DType.float32]) -> Bool:
-        return e >= 0 and e < 1
-
-    holds_true = rand_tensor.all(each)
+    holds_true = rand_tensor.all(PredAll())
     assert_true(holds_true, "rand min and max range assertion failed")
 
     rand_tensor2 = Tensor[dtype].rand([10, 20], low=-2, high=2)
 
-    def each2(e: Scalar[DType.float32]) -> Bool:
-        return e >= -2 and e < 2
-
-    holds_true = rand_tensor2.all(each2)
+    holds_true = rand_tensor2.all(PredAll2())
     assert_true(holds_true, "rand min(-2) and max(2) range assertion failed")
 
 
@@ -2913,11 +2920,11 @@ def test_add_backward() raises:
     ev = e.into_view()
     ev.backward()
     assert_true(
-        (a.gradients()[] == Tensor[dtype].d2([[158, 158, 158]])),
+        (a.gradients()[] == Tensor[dtype].d2([[54, 54, 54]])),
         "2D + 1D grad assertion 3 failed",
     )
     assert_true(
-        (b.gradients()[] == Tensor[dtype].d1([158, 158, 158])),
+        (b.gradients()[] == Tensor[dtype].d1([54, 54, 54])),
         "2D + 1D grad assertion 4 failed",
     )
 

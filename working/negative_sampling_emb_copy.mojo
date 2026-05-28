@@ -45,11 +45,11 @@ struct Tokenizer(Sized & ImplicitlyCopyable & Movable):
         self.int_to_str = {item.value: item.key for item in vocab.items()}
         self.str_to_int = vocab^
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, copy: Self):
         self.int_to_str = copy.int_to_str.copy()
         self.str_to_int = copy.str_to_int.copy()
 
-    def __moveinit__(out self, deinit take: Self):
+    def __init__(out self, take: Self):
         self.int_to_str = take.int_to_str^
         self.str_to_int = take.str_to_int^
 
@@ -259,13 +259,15 @@ def main() raises:
     # Input embeddings: kaiming init (~N(0, 0.14)) — close to original U(-0.1, 0.1)
     # Output embeddings: zero init — matches original
     var emb_input = Embedding[dtype](
-        vocab_size, HIDDEN_SIZE,
+        vocab_size,
+        HIDDEN_SIZE,
         init_method="kaiming",
         init_seed=RANDOM_SEED_W01,
         reduction=Reduction(1),
     )
     var emb_output = Embedding[dtype](
-        vocab_size, HIDDEN_SIZE,
+        vocab_size,
+        HIDDEN_SIZE,
         init_method="zero",
     )
     var layer_2_target = Tensor[dtype].zeros(negative + 1)
@@ -307,7 +309,9 @@ def main() raises:
             var loss: Tensor[dtype] = Tensor[dtype].scalar(0)
             for target_i in range(len(review)):
                 var left = slice(max(0, target_i - window), target_i)
-                var right = slice(target_i + 1, min(len(review), target_i + window))
+                var right = slice(
+                    target_i + 1, min(len(review), target_i + window)
+                )
                 if left.start == left.end and right.start == right.end:
                     continue
                 var context_indices = review[left].copy()
@@ -330,9 +334,7 @@ def main() raises:
                 if rev_i == 0 and target_i == 0:
                     print("target_embed shape: ", target_embed.shape())
 
-                var logits = target_embed.matmul[
-                    mode=mv
-                ](layer_1)
+                var logits = target_embed.matmul[mode=mv](layer_1)
                 if rev_i == 0 and target_i == 0:
                     print("logits shape: ", logits.shape())
 
@@ -352,9 +354,7 @@ def main() raises:
 
             # Progress
             if (rev_i + 1) % 25 == 0:
-                var pct = (
-                    Float32(rev_i + 1) / Float32(num_reviews) * 100.0
-                )
+                var pct = Float32(rev_i + 1) / Float32(num_reviews) * 100.0
                 sys.stdout.write(
                     "\rIter:"
                     + String(iteration)
@@ -367,17 +367,27 @@ def main() raises:
 
         var final_sum_in = emb_input.weight.sum[track_grad=False]().item()
         var final_sum_out = emb_output.weight.sum[track_grad=False]().item()
-        print("Final emb_input.weight sum:", final_sum_in, "(delta:", final_sum_in - init_sum_in, ")")
-        print("Final emb_output.weight sum:", final_sum_out, "(delta:", final_sum_out - init_sum_out, ")")
+        print(
+            "Final emb_input.weight sum:",
+            final_sum_in,
+            "(delta:",
+            final_sum_in - init_sum_in,
+            ")",
+        )
+        print(
+            "Final emb_output.weight sum:",
+            final_sum_out,
+            "(delta:",
+            final_sum_out - init_sum_out,
+            ")",
+        )
 
         print()
         comptime if has_accelerator():
             _similar_embeddings = emb_input.weight.to_cpu()
         else:
             _similar_embeddings = emb_input.weight
-        var neighbours = similar(
-            tokenizer, _similar_embeddings, "terrible"
-        )
+        var neighbours = similar(tokenizer, _similar_embeddings, "terrible")
         print("Words similar to 'terrible':")
         for item in neighbours:
             print("  ", item[0], item[1])
@@ -396,9 +406,11 @@ def similar(
             IntArray(0), keepdims=True
         )
     var diff = embeddings - target_vec
-    var distances = (diff * diff).sum[track_grad=False](
-        IntArray(1)
-    ).sqrt[track_grad=False]()
+    var distances = (
+        (diff * diff)
+        .sum[track_grad=False](IntArray(1))
+        .sqrt[track_grad=False]()
+    )
     var result = List[Tuple[String, Float32]](capacity=len(tokenizer))
     for ref pair in tokenizer.str_to_int.items():
         var word = pair.key

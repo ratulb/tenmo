@@ -5,7 +5,7 @@ from .backpropagation import BackwardFnArg
 from .ndbuffer import NDBuffer, Layout, Storage
 from .common_utils import panic, i, s
 from .shapes import Shape
-from std.os.atomic import Consistency, fence
+from std.atomic import Ordering, fence
 
 
 struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
@@ -26,7 +26,7 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
 
     var _id: UInt
     var requires_grad: Bool
-    var gradbox: UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]
+    var gradbox: Optional[UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]]
     var layout: Layout
     var storage: Storage[Self.dtype]
     var parents: Optional[Ancestors[Self.dtype]]
@@ -34,12 +34,12 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
     def __init__(out self):
         self._id = 0
         self.requires_grad = False
-        self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
+        self.gradbox = {}
         self.layout = Layout()
         self.storage = Storage[Self.dtype]()
         self.parents = None
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self._id = copy._id
         self.requires_grad = copy.requires_grad
         self.gradbox = copy.gradbox
@@ -48,12 +48,12 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         self.parents = copy.parents.copy()
         if self.gradbox:
             _ = (
-                self.gradbox[]
+                self.gradbox.unsafe_value()[]
                 ._refcount[]
-                .fetch_add[ordering=Consistency.MONOTONIC](1)
+                .fetch_add[ordering=Ordering.RELAXED](1)
             )
 
-    def __moveinit__(out self, deinit take: Self):
+    def __init__(out self, *, deinit take: Self):
         self._id = take._id
         self.requires_grad = take.requires_grad
         self.gradbox = take.gradbox
@@ -79,7 +79,7 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         return ndb^
 
     def gradients(self) -> UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]:
-        return self.gradbox
+        return self.gradbox.unsafe_value()
 
     def ancestry(
         ref self,
@@ -103,9 +103,9 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         # Only bump and store if gradbox exists!
         if tensor.gradbox:
             _ = (
-                tensor.gradbox[]
+                tensor.gradbox.unsafe_value()[]
                 ._refcount[]
-                .fetch_add[ordering=Consistency.MONOTONIC](1)
+                .fetch_add[ordering=Ordering.RELAXED](1)
             )
             out.gradbox = tensor.gradbox
 
@@ -132,41 +132,42 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
             return
 
         if op_code == AddTensor:
-            self.gradbox[] += incoming
+            self.gradbox.unsafe_value()[] += incoming
 
         elif op_code == SubtractTensor:
-            self.gradbox[] -= incoming
+            self.gradbox.unsafe_value()[] -= incoming
 
         elif op_code == ZeroGrad:
-            self.gradbox[].zero_grad()
+            self.gradbox.unsafe_value()[].zero_grad()
 
         elif op_code == ScatterAddTensor:
             ref arg = extra_arg.value().get[GatherArg]()
             Filler[Self.dtype].scatter_add(
-                self.gradbox[].buffer,
+                self.gradbox.unsafe_value()[].buffer,
                 incoming.buffer,
                 arg.indices,
                 arg.axis,
             )
             # Zero padding row grad if set
             if arg.padding_idx:
-                self.gradbox[].fill(0.0, i(arg.padding_idx.value()), s())
+                self.gradbox.unsafe_value()[].fill(
+                    0.0, i(arg.padding_idx.value()), s()
+                )
         else:
             print("Ancestor → update_grad: unknown op_code", String(op_code))
 
     def __del__(deinit self):
-        if not self.gradbox:
-            return
-        if (
-            self.gradbox[]
-            ._refcount[]
-            .fetch_sub[ordering=Consistency.RELEASE](1)
-            != 1
-        ):
-            return
-        fence[ordering=Consistency.ACQUIRE]()
-        self.gradbox.destroy_pointee()
-        self.gradbox.free()
+        if self.gradbox:
+            if (
+                self.gradbox.unsafe_value()[]
+                ._refcount[]
+                .fetch_sub[ordering=Ordering.RELEASE](1)
+                != 1
+            ):
+                return
+            fence[ordering=Ordering.ACQUIRE]()
+            self.gradbox.unsafe_value().destroy_pointee()
+            self.gradbox.unsafe_value().free()
 
 
 # ========================================
@@ -183,11 +184,11 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         self.origins = {}
         self.backwardFnArg = backwardFnArg^
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.origins = copy.origins.copy()
         self.backwardFnArg = copy.backwardFnArg.copy()
 
-    def __moveinit__(out self, deinit take: Self):
+    def __init__(out self, *, deinit take: Self):
         self.origins = take.origins^
         self.backwardFnArg = take.backwardFnArg^
 
@@ -262,7 +263,7 @@ struct AncestorIterator[dtype: DType, origin: ImmutOrigin](
 
     def __next__(mut self) -> Ancestor[Self.dtype]:
         self.index += 1
-        return self.src[].get(self.index - 1)
+        return self.src[].get(self.index - 1).copy()
 
     def __has_next__(self) -> Bool:
         return self.__len__() > 0

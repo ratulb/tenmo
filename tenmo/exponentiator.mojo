@@ -14,6 +14,7 @@ struct ExponentiationBackward[dtype: DType](
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         """
         ∂(x**n)/∂x = n * x**(n-1)
@@ -42,6 +43,8 @@ struct ExponentiationBackward[dtype: DType](
         ancestor.update_grad(parent_gradbox^, AddTensor, None)
 
         parent_ids.append(ancestor._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init

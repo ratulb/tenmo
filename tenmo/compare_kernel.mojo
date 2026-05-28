@@ -1,6 +1,6 @@
 from std.sys import simd_width_of
 from std.gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
-from std.os.atomic import Atomic, Consistency
+from std.atomic import Atomic, Ordering
 from std.memory import AddressSpace, stack_allocation
 from std.utils.numerics import isnan, isinf
 
@@ -19,7 +19,7 @@ from .ndbuffer import NDBuffer
 def atomic_and[
     address_space: AddressSpace,
     //,
-    ordering: Consistency = Consistency.SEQUENTIAL,
+    ordering: Ordering = Ordering.SEQUENTIAL,
 ](
     ptr: UnsafePointer[
         Scalar[DType.uint8], MutAnyOrigin, address_space=address_space

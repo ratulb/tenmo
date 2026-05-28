@@ -18,6 +18,7 @@ struct BLASMatmul2dBackward[dtype: DType](
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var bwd_arg = (
             output.ancestry().backward_fn_arg().get[BlasArg[Self.dtype]]()
@@ -93,6 +94,9 @@ struct BLASMatmul2dBackward[dtype: DType](
             B_ancestor.update_grad(grad_B^, AddTensor, None)
             parent_ids.append(B_ancestor._id)
 
+        if not retain_graph:
+            grad_out.zero_grad()
+
 
 comptime BLAS_PATH = get_defined_string[
     "BLAS_PATH", "/lib/x86_64-linux-gnu/libopenblas.so.0"
@@ -122,7 +126,7 @@ comptime CblasNoTrans = Int32(111)
 comptime CblasTrans = Int32(112)
 
 # Function type aliases
-comptime CBLAS_SGEMM_FN = fn(
+comptime CBLAS_SGEMM_FN = def(
     Int32,  # order
     Int32,  # transA
     Int32,  # transB
@@ -137,9 +141,9 @@ comptime CBLAS_SGEMM_FN = fn(
     Float32,  # beta
     UnsafePointer[Float32, MutAnyOrigin],  # C
     Int32,  # ldc
-) -> None
+) thin -> None
 
-comptime CBLAS_DGEMM_FN = fn(
+comptime CBLAS_DGEMM_FN = def(
     Int32,
     Int32,
     Int32,
@@ -154,7 +158,7 @@ comptime CBLAS_DGEMM_FN = fn(
     Float64,
     UnsafePointer[Float64, MutAnyOrigin],
     Int32,
-) -> None
+) thin -> None
 
 
 @fieldwise_init
@@ -162,7 +166,7 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
     var _handle_ptr: Optional[ArcPointer[OwnedDLHandle]]
     var _error_msg: String
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self._handle_ptr = copy._handle_ptr.copy()
         self._error_msg = copy._error_msg
 
@@ -179,9 +183,9 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
             self._error_msg = "Failed to load BLAS library: " + String(e)
             self._handle_ptr = None
 
-    def __moveinit__(out self, deinit take: Self):
-        self._handle_ptr = take._handle_ptr^
-        self._error_msg = take._error_msg
+    def __init__(out self, deinit existing: Self):
+        self._handle_ptr = existing._handle_ptr^
+        self._error_msg = existing._error_msg
 
     def lite_handle(self) -> BLASHandleLite[Self.dtype]:
         return BLASHandleLite[Self.dtype](self._handle_ptr.value()[].borrow())
@@ -616,7 +620,7 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
 struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var _handle: _DLHandle
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self._handle = copy._handle.copy()
 
     # ========== REQUIRED PARAMS BEFORE OPTIONAL ==========

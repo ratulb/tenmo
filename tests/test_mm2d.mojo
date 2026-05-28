@@ -6,7 +6,7 @@ from std.testing import assert_true, TestSuite
 from tenmo.strides import Strides
 
 
-fn matmul_naive[
+def matmul_naive[
     dtype: DType, //
 ](A: Tensor[dtype], B: Tensor[dtype]) raises -> Tensor[dtype]:
     """Naive matrix multiplication for verification purposes.
@@ -36,7 +36,7 @@ fn matmul_naive[
     return C^
 
 
-fn validate_matmul_2d_grads[
+def validate_matmul_2d_grads[
     dtype: DType, //
 ](mut A: Tensor[dtype], mut B: Tensor[dtype], C: Tensor[dtype]) raises:
     print("validate_matmul_2d_grads")
@@ -100,14 +100,14 @@ fn validate_matmul_2d_grads[
     print("Matmul_2d gradient validation passed for all applicable tensors")
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 
 
 # ===== LARGE MATRICES FOR SIMD PATH TESTING =====
 
 
-fn test_matmul_2d_large_contiguous_simd_path() raises:
+def test_matmul_2d_large_contiguous_simd_path() raises:
     # Create matrices larger than SIMD width to ensure vectorization
     comptime dtype = DType.float32
     var m: Int = 8
@@ -131,7 +131,7 @@ fn test_matmul_2d_large_contiguous_simd_path() raises:
     # Just verify computation completes with correct shape
 
 
-fn test_matmul_2d_very_large_matrices() raises:
+def test_matmul_2d_very_large_matrices() raises:
     comptime dtype = DType.float32
     var m: Int = 32
     var n: Int = 64  # Large multiple of SIMD width
@@ -151,7 +151,7 @@ fn test_matmul_2d_very_large_matrices() raises:
     validate_matmul_2d_grads(A, B, C)
 
 
-fn test_matmul_2d_very_very_large_matrices() raises:
+def test_matmul_2d_very_very_large_matrices() raises:
     comptime dtype = DType.float32
     var m: Int = 512
     var n: Int = 128  # Large multiple of SIMD width
@@ -171,7 +171,7 @@ fn test_matmul_2d_very_very_large_matrices() raises:
     validate_matmul_2d_grads(A, B, C)
 
 
-fn test_matmul_2d_simd_width_boundary() raises:
+def test_matmul_2d_simd_width_boundary() raises:
     # Test right at SIMD width boundary
 
     comptime dtype = DType.float32
@@ -191,7 +191,7 @@ fn test_matmul_2d_simd_width_boundary() raises:
     )
 
 
-fn test_matmul_2d_non_multiple_simd_width() raises:
+def test_matmul_2d_non_multiple_simd_width() raises:
     comptime dtype = DType.float32
     # Test with dimensions not multiples of SIMD width
     # This tests the vectorize[] function's handling of remainder
@@ -211,7 +211,7 @@ fn test_matmul_2d_non_multiple_simd_width() raises:
     validate_matmul_2d_grads(A, B, C)
 
 
-fn test_matmul_2d_large_views_simd_path() raises:
+def test_matmul_2d_large_views_simd_path() raises:
     comptime dtype = DType.float32
     # Create large base tensors and take contiguous views from them
     var A_base = Tensor[dtype].rand(Shape(16, 24))
@@ -233,7 +233,7 @@ fn test_matmul_2d_large_views_simd_path() raises:
     )
 
 
-fn test_matmul_2d_large_transposed_slow_path() raises:
+def test_matmul_2d_large_transposed_slow_path() raises:
     comptime dtype = DType.float32
     # Large matrices but B is transposed (non-contiguous -> slow path)
     var m: Int = 8
@@ -256,7 +256,7 @@ fn test_matmul_2d_large_transposed_slow_path() raises:
     )
 
 
-fn test_matmul_2d_basic() raises:
+def test_matmul_2d_basic() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).float()
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]]).float()
@@ -266,7 +266,7 @@ fn test_matmul_2d_basic() raises:
     validate_matmul_2d_grads(A, B, C)
 
 
-fn test_matmul_2d_rectangular() raises:
+def test_matmul_2d_rectangular() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).float()
     var B = Tensor[dtype].d2([[7.0, 8.0], [9.0, 10.0], [11.0, 12.0]]).float()
@@ -276,7 +276,7 @@ fn test_matmul_2d_rectangular() raises:
     validate_matmul_2d_grads(A, B, C)
 
 
-fn test_matmul_2d_non_contiguous_A_view() raises:
+def test_matmul_2d_non_contiguous_A_view() raises:
     # fn main() raises:
     comptime dtype = DType.float32
     var A_base = (
@@ -301,7 +301,7 @@ fn test_matmul_2d_non_contiguous_A_view() raises:
     validate_matmul_2d_grads(A1, B, C)
 
 
-fn test_matmul_2d_identity() raises:
+def test_matmul_2d_identity() raises:
     comptime dtype = DType.float32
     var I = Tensor[dtype].d2([[1.0, 0.0], [0.0, 1.0]]).float()
     var A = Tensor[dtype].d2([[3.0, 4.0], [5.0, 6.0]]).float()
@@ -311,7 +311,7 @@ fn test_matmul_2d_identity() raises:
     validate_matmul_2d_grads(A, I, C)
 
 
-fn test_matmul_2d_non_contiguous_B_view() raises:
+def test_matmul_2d_non_contiguous_B_view() raises:
     comptime dtype = DType.float32
     var BB_base = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).float()
     # Permute shape (3×2), stride (1, 3)
@@ -327,7 +327,7 @@ fn test_matmul_2d_non_contiguous_B_view() raises:
     validate_matmul_2d_grads(AA, BB, C)
 
 
-fn test_matmul_2d_non_contiguous_both_views() raises:
+def test_matmul_2d_non_contiguous_both_views() raises:
     comptime dtype = DType.float32
     var base = Tensor[dtype].d2(
         [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
@@ -345,7 +345,7 @@ fn test_matmul_2d_non_contiguous_both_views() raises:
     validate_matmul_2d_grads(AA, BB, C)
 
 
-fn test_matmul_2d_single_row_col() raises:
+def test_matmul_2d_single_row_col() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0]]).float()  # 1×3
     var B = Tensor[dtype].d2([[4.0], [5.0], [6.0]]).float()  # 3×1
@@ -356,7 +356,7 @@ fn test_matmul_2d_single_row_col() raises:
     validate_matmul_2d_grads(A, B, C)
 
 
-fn test_matmul_2d_high_values() raises:
+def test_matmul_2d_high_values() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1000.0, 2000.0], [3000.0, 4000.0]]).float()
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]]).float()
@@ -373,7 +373,7 @@ fn test_matmul_2d_high_values() raises:
     validate_matmul_2d_grads(A, B, C)
 
 
-fn test_matmul_2d_mixed_stride_views() raises:
+def test_matmul_2d_mixed_stride_views() raises:
     comptime dtype = DType.float32
     var A_base = Tensor[dtype].d2([[1, 2, 3, 4], [5, 6, 7, 8]])
     var A = A_base.view(
@@ -393,7 +393,7 @@ fn test_matmul_2d_mixed_stride_views() raises:
 # ===== BASIC MATRIX MULTIPLICATION =====
 
 
-fn test_matmul_2d_1x1_identity() raises:
+def test_matmul_2d_1x1_identity() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[2.0]])
     var b = Tensor[dtype].d2([[1.0]])
@@ -403,7 +403,7 @@ fn test_matmul_2d_1x1_identity() raises:
     validate_matmul_2d_grads(a, b, c)
 
 
-fn test_matmul_2d_1x1_scalar_multiplication() raises:
+def test_matmul_2d_1x1_scalar_multiplication() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[3.0]])
     var b = Tensor[dtype].d2([[4.0]])
@@ -413,7 +413,7 @@ fn test_matmul_2d_1x1_scalar_multiplication() raises:
     validate_matmul_2d_grads(a, b, c)
 
 
-fn test_matmul_2d_2x2_square_matrices() raises:
+def test_matmul_2d_2x2_square_matrices() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var b = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])
@@ -423,7 +423,7 @@ fn test_matmul_2d_2x2_square_matrices() raises:
     validate_matmul_2d_grads(a, b, c)
 
 
-fn test_matmul_2d_2x3_times_3x2() raises:
+def test_matmul_2d_2x3_times_3x2() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var b = Tensor[dtype].d2([[7.0, 8.0], [9.0, 10.0], [11.0, 12.0]])
@@ -433,7 +433,7 @@ fn test_matmul_2d_2x3_times_3x2() raises:
     validate_matmul_2d_grads(a, b, c)
 
 
-fn test_matmul_2d_1x3_times_3x1() raises:
+def test_matmul_2d_1x3_times_3x1() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]])
     var b = Tensor[dtype].d2([[4.0], [5.0], [6.0]])
@@ -443,7 +443,7 @@ fn test_matmul_2d_1x3_times_3x1() raises:
     validate_matmul_2d_grads(a, b, c)
 
 
-fn test_matmul_2d_3x1_times_1x3() raises:
+def test_matmul_2d_3x1_times_1x3() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0], [2.0], [3.0]])
     var b = Tensor[dtype].d2([[4.0, 5.0, 6.0]])
@@ -459,7 +459,7 @@ fn test_matmul_2d_3x1_times_1x3() raises:
     validate_matmul_2d_grads(a, b, c)
 
 
-fn test_matmul_2d_identity_matrix() raises:
+def test_matmul_2d_identity_matrix() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var identity = Tensor[dtype].d2(
@@ -471,7 +471,7 @@ fn test_matmul_2d_identity_matrix() raises:
     validate_matmul_2d_grads(a, identity, c)
 
 
-fn test_matmul_2d_zero_matrix() raises:
+def test_matmul_2d_zero_matrix() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var zeros = Tensor[dtype].d2([[0.0, 0.0], [0.0, 0.0]])
@@ -484,7 +484,7 @@ fn test_matmul_2d_zero_matrix() raises:
 # ===== EDGE CASES =====
 
 
-fn test_matmul_2d_single_element_vectors() raises:
+def test_matmul_2d_single_element_vectors() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[5.0]])
     var b = Tensor[dtype].d2([[3.0]])
@@ -492,7 +492,7 @@ fn test_matmul_2d_single_element_vectors() raises:
     assert_true(c.all_close(Tensor[dtype].d2([[15.0]])))
 
 
-fn test_matmul_2d_rectangular_tall_a() raises:
+def test_matmul_2d_rectangular_tall_a() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
     var b = Tensor[dtype].d2([[7.0, 8.0], [9.0, 10.0]])
@@ -500,7 +500,7 @@ fn test_matmul_2d_rectangular_tall_a() raises:
     assert_true(c.shape() == Shape(3, 2))
 
 
-fn test_matmul_2d_rectangular_wide_b() raises:
+def test_matmul_2d_rectangular_wide_b() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]])
     var b = Tensor[dtype].d2(
@@ -513,7 +513,7 @@ fn test_matmul_2d_rectangular_wide_b() raises:
 # ===== VIEWS AND NON-CONTIGUOUS MATRICES =====
 
 
-fn test_matmul_2d_contiguous_b_fast_path() raises:
+def test_matmul_2d_contiguous_b_fast_path() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])  # Contiguous by default
@@ -521,7 +521,7 @@ fn test_matmul_2d_contiguous_b_fast_path() raises:
     assert_true(c.all_close(Tensor[dtype].d2([[19.0, 22.0], [43.0, 50.0]])))
 
 
-fn test_matmul_2d_transposed_b_slow_path() raises:
+def test_matmul_2d_transposed_b_slow_path() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var b_orig = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
@@ -533,7 +533,7 @@ fn test_matmul_2d_transposed_b_slow_path() raises:
     validate_matmul_2d_grads(a, b, c)
 
 
-fn test_matmul_2d_view_slice_of_a() raises:
+def test_matmul_2d_view_slice_of_a() raises:
     comptime dtype = DType.float32
     var a_orig = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], requires_grad=True
@@ -548,7 +548,7 @@ fn test_matmul_2d_view_slice_of_a() raises:
     validate_matmul_2d_grads(a, b, c)
 
 
-fn test_matmul_2d_view_slice_of_b() raises:
+def test_matmul_2d_view_slice_of_b() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b_orig = Tensor[dtype].d2(
@@ -563,7 +563,7 @@ fn test_matmul_2d_view_slice_of_b() raises:
     validate_matmul_2d_grads(a, b, c)
 
 
-fn test_matmul_2d_both_views() raises:
+def test_matmul_2d_both_views() raises:
     comptime dtype = DType.float32
     var a_orig = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], requires_grad=True
@@ -586,7 +586,7 @@ fn test_matmul_2d_both_views() raises:
     validate_matmul_2d_grads(a, b, c)
 
 
-fn test_matmul_2d_strided_view_columns() raises:
+def test_matmul_2d_strided_view_columns() raises:
     comptime dtype = DType.float32
     var a_orig = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]], requires_grad=True
@@ -601,7 +601,7 @@ fn test_matmul_2d_strided_view_columns() raises:
     validate_matmul_2d_grads(a, b, c)
 
 
-fn test_matmul_2d_view_with_offset() raises:
+def test_matmul_2d_view_with_offset() raises:
     comptime dtype = DType.float32
     var a_orig = Tensor[dtype].d2(
         [
@@ -618,7 +618,7 @@ fn test_matmul_2d_view_with_offset() raises:
     assert_true(c.all_close(Tensor[dtype].d2([[3.0, 4.0], [9.0, 10.0]])))
 
 
-fn test_matmul_2d_contiguous_after_transpose() raises:
+def test_matmul_2d_contiguous_after_transpose() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var b_orig = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])

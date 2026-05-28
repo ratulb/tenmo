@@ -10,7 +10,7 @@ from std.sys import has_accelerator
 comptime dtype = DType.float32
 
 
-fn test_sparse_sgd_step_only_updates_specified_rows() raises:
+def test_sparse_sgd_step_only_updates_specified_rows() raises:
     """Sparse step with indices: only rows at those indices change."""
     var w = Tensor[dtype].d2(
         [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0]],
@@ -27,7 +27,7 @@ fn test_sparse_sgd_step_only_updates_specified_rows() raises:
     assert_true(w.all_close(expected))
 
 
-fn test_sparse_sgd_step_empty_indices_dense_fallback() raises:
+def test_sparse_sgd_step_empty_indices_dense_fallback() raises:
     """Empty indices => dense update (all rows change)."""
     var w = Tensor[dtype].d2(
         [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]],
@@ -44,7 +44,7 @@ fn test_sparse_sgd_step_empty_indices_dense_fallback() raises:
     assert_true(w.all_close(expected))
 
 
-fn test_sparse_sgd_step_all_indices_same_as_dense() raises:
+def test_sparse_sgd_step_all_indices_same_as_dense() raises:
     """All rows in indices => same as dense step."""
     var w = Tensor[dtype].d2(
         [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]],
@@ -61,7 +61,7 @@ fn test_sparse_sgd_step_all_indices_same_as_dense() raises:
     assert_true(w.all_close(expected))
 
 
-fn test_sparse_sgd_step_non_2d_skipped() raises:
+def test_sparse_sgd_step_non_2d_skipped() raises:
     """Sparse step on a non-2D param falls back to dense update."""
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -76,7 +76,7 @@ fn test_sparse_sgd_step_non_2d_skipped() raises:
     assert_true(w.all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
 
 
-fn test_sparse_sgd_zero_grad_only_zeros_specified_rows() raises:
+def test_sparse_sgd_zero_grad_only_zeros_specified_rows() raises:
     """Sparse zero_grad: only rows at indices are zeroed."""
     var w = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
@@ -98,7 +98,7 @@ fn test_sparse_sgd_zero_grad_only_zeros_specified_rows() raises:
     )
 
 
-fn test_sparse_sgd_zero_grad_non_specified_retain() raises:
+def test_sparse_sgd_zero_grad_non_specified_retain() raises:
     """Verifies non-specified rows truly retain their gradients."""
     var w = Tensor[dtype].d2(
         [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0]],
@@ -115,7 +115,7 @@ fn test_sparse_sgd_zero_grad_non_specified_retain() raises:
     assert_true(w.gradients()[].all_close(expected))
 
 
-fn test_sparse_sgd_zero_grad_empty_indices_dense() raises:
+def test_sparse_sgd_zero_grad_empty_indices_dense() raises:
     """Empty indices => dense zero_grad (all rows zeroed)."""
     var w = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0]],
@@ -129,7 +129,7 @@ fn test_sparse_sgd_zero_grad_empty_indices_dense() raises:
     assert_true(w.gradients()[].all_close(Tensor[dtype].zeros(w.shape())))
 
 
-fn test_sparse_sgd_step_then_zero_grad_same_indices() raises:
+def test_sparse_sgd_step_then_zero_grad_same_indices() raises:
     """Step then zero_grad with same indices: params updated, grads cleared."""
     var w = Tensor[dtype].d2(
         [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]],
@@ -154,7 +154,7 @@ fn test_sparse_sgd_step_then_zero_grad_same_indices() raises:
     assert_true(w.gradients()[].all_close(expected_g))
 
 
-fn test_sparse_sgd_with_momentum() raises:
+def test_sparse_sgd_with_momentum() raises:
     """Sparse step with momentum: only specified rows updated, velocity tracked.
     """
     var w = Tensor[dtype].d2(
@@ -175,7 +175,7 @@ fn test_sparse_sgd_with_momentum() raises:
     assert_true(w.all_close(expected))
 
 
-fn test_sparse_sgd_momentum_velocity_zeroed() raises:
+def test_sparse_sgd_momentum_velocity_zeroed() raises:
     """Sparse zero_grad with momentum also zeros velocity for those rows."""
     var w = Tensor[dtype].d2(
         [[10.0, 10.0], [20.0, 20.0], [30.0, 30.0]],
@@ -204,7 +204,7 @@ fn test_sparse_sgd_momentum_velocity_zeroed() raises:
     assert_true(w.all_close(expected))
 
 
-fn test_sparse_sgd_momentum_velocity_retained_for_other_rows() raises:
+def test_sparse_sgd_momentum_velocity_retained_for_other_rows() raises:
     """Sparse zero_grad on some rows does NOT zero momentum velocity for other rows.
     """
     var w = Tensor[dtype].d2(
@@ -235,7 +235,7 @@ fn test_sparse_sgd_momentum_velocity_retained_for_other_rows() raises:
     assert_true(w.all_close(expected))
 
 
-fn test_sparse_sgd_with_weight_decay() raises:
+def test_sparse_sgd_with_weight_decay() raises:
     """Sparse step with weight decay: only specified rows affected."""
     var w = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
@@ -258,7 +258,7 @@ fn test_sparse_sgd_with_weight_decay() raises:
     assert_true(w.all_close(expected))
 
 
-fn test_sparse_sgd_multiple_steps_different_indices() raises:
+def test_sparse_sgd_multiple_steps_different_indices() raises:
     """Multiple sparse steps with different indices accumulate correctly."""
     var w = Tensor[dtype].d2(
         [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]],
@@ -295,7 +295,7 @@ fn test_sparse_sgd_multiple_steps_different_indices() raises:
     assert_true(w.all_close(expected))
 
 
-fn test_sparse_sgd_step_zero_grad_different_indices() raises:
+def test_sparse_sgd_step_zero_grad_different_indices() raises:
     """Step with one set of indices, zero_grad with a different set."""
     var w = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]],
@@ -329,7 +329,7 @@ fn test_sparse_sgd_step_zero_grad_different_indices() raises:
     assert_true(w.gradients()[].all_close(expected_g))
 
 
-fn test_sparse_sgd_out_of_order_indices() raises:
+def test_sparse_sgd_out_of_order_indices() raises:
     """Sparse step with indices in non-sorted order works correctly."""
     var w = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
@@ -348,7 +348,7 @@ fn test_sparse_sgd_out_of_order_indices() raises:
     assert_true(w.all_close(expected))
 
 
-fn test_sparse_sgd_duplicate_indices() raises:
+def test_sparse_sgd_duplicate_indices() raises:
     """Sparse step with duplicate indices: same row updated multiple times."""
     var w = Tensor[dtype].d2(
         [[10.0, 10.0], [20.0, 20.0]],
@@ -368,10 +368,13 @@ fn test_sparse_sgd_duplicate_indices() raises:
     assert_true(w.all_close(expected))
 
 
-fn test_gpu_sparse_sgd_step_only_updates_specified_rows() raises:
+def test_gpu_sparse_sgd_step_only_updates_specified_rows() raises:
     """Sparse step on GPU: only rows at specified indices change."""
     comptime if not has_accelerator():
-        print("No GPU available — skipping test_gpu_sparse_sgd_step_only_updates_specified_rows")
+        print(
+            "No GPU available — skipping"
+            " test_gpu_sparse_sgd_step_only_updates_specified_rows"
+        )
         return
     var w_cpu = Tensor[dtype].d2(
         [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0]],
@@ -390,7 +393,7 @@ fn test_gpu_sparse_sgd_step_only_updates_specified_rows() raises:
     assert_true(result.all_close(expected))
 
 
-fn test_gpu_sparse_sgd_with_momentum() raises:
+def test_gpu_sparse_sgd_with_momentum() raises:
     """Sparse momentum step on GPU: only specified rows updated."""
     comptime if not has_accelerator():
         print("No GPU available — skipping test_gpu_sparse_sgd_with_momentum")
@@ -415,6 +418,6 @@ fn test_gpu_sparse_sgd_with_momentum() raises:
     assert_true(result.all_close(expected))
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("All sparse SGD tests passed ✓")

@@ -15,6 +15,7 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var bwd_arg = (
             output.ancestry().backward_fn_arg().get[MinMaxArg[Self.dtype]]()
@@ -49,6 +50,8 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var grad_contrib = grad_expanded * mask_grad
         ancestor.update_grad(grad_contrib^, AddTensor, None)
         parent_ids.append(ancestor._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init

@@ -20,15 +20,16 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         comptime if has_accelerator():
             if output.is_on_gpu():
                 Self.backward_gpu(output, parent_ids)
-                ref gradbox = output.gradbox[]
+                ref gradbox = output.gradbox.unsafe_value()[]
                 gradbox.zero_grad()
                 return
         Self.backward_cpu(output, parent_ids)
-        ref gradbox = output.gradbox[]
+        ref gradbox = output.gradbox.unsafe_value()[]
         gradbox.zero_grad()
 
     @staticmethod

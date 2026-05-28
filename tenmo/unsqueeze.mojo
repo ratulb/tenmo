@@ -13,6 +13,7 @@ struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var axes = output.ancestry().backward_fn_arg().get[IntArrayArg]().array
         ref gradbox = output.gradients()[]

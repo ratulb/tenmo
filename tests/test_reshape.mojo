@@ -335,7 +335,7 @@ def main() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_cpu_1d_forward() raises:
+def test_cpu_1d_forward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], requires_grad=True)
     var b = a.reshape(2, 3)
@@ -344,7 +344,7 @@ fn test_cpu_1d_forward() raises:
     )
 
 
-fn test_cpu_1d_backward_grad_flows_to_a() raises:
+def test_cpu_1d_backward_grad_flows_to_a() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], requires_grad=True)
     var b = a.reshape(2, 3)
@@ -357,7 +357,7 @@ fn test_cpu_1d_backward_grad_flows_to_a() raises:
     )
 
 
-fn test_cpu_1d_b_has_no_grad() raises:
+def test_cpu_1d_b_has_no_grad() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], requires_grad=True)
     var b = a.reshape(2, 3)
@@ -368,7 +368,7 @@ fn test_cpu_1d_b_has_no_grad() raises:
     assert_true(b.requires_grad)
 
 
-fn test_cpu_1d_shared_buffer() raises:
+def test_cpu_1d_shared_buffer() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var b = a.reshape(2, 2)
@@ -381,7 +381,7 @@ fn test_cpu_1d_shared_buffer() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_cpu_2d_to_1d_forward() raises:
+def test_cpu_2d_to_1d_forward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -390,7 +390,7 @@ fn test_cpu_2d_to_1d_forward() raises:
     assert_true(b.all_close(Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])))
 
 
-fn test_cpu_2d_to_1d_backward() raises:
+def test_cpu_2d_to_1d_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -409,7 +409,7 @@ fn test_cpu_2d_to_1d_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_cpu_2d_to_3d_forward() raises:
+def test_cpu_2d_to_3d_forward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]], requires_grad=True
@@ -424,7 +424,7 @@ fn test_cpu_2d_to_3d_forward() raises:
     )
 
 
-fn test_cpu_2d_to_3d_backward() raises:
+def test_cpu_2d_to_3d_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]], requires_grad=True
@@ -445,7 +445,7 @@ fn test_cpu_2d_to_3d_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_cpu_3d_to_2d_forward() raises:
+def test_cpu_3d_to_2d_forward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -458,7 +458,7 @@ fn test_cpu_3d_to_2d_forward() raises:
     )
 
 
-fn test_cpu_3d_to_2d_backward() raises:
+def test_cpu_3d_to_2d_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -481,7 +481,7 @@ fn test_cpu_3d_to_2d_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_cpu_3d_to_1d_forward() raises:
+def test_cpu_3d_to_1d_forward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -492,7 +492,7 @@ fn test_cpu_3d_to_1d_forward() raises:
     )
 
 
-fn test_cpu_3d_to_1d_backward() raises:
+def test_cpu_3d_to_1d_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -515,14 +515,14 @@ fn test_cpu_3d_to_1d_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_cpu_scalar_forward() raises:
+def test_cpu_scalar_forward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([42.0], requires_grad=True)
     var b = a.reshape()  # single-element → scalar Shape()
     assert_true(b.all_close(Tensor[dtype].full(Shape(), 42.0)))
 
 
-fn test_cpu_scalar_backward() raises:
+def test_cpu_scalar_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([3.0], requires_grad=True)
     var b = a.reshape()
@@ -537,7 +537,7 @@ fn test_cpu_scalar_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_cpu_shape_overload_2d_to_2d() raises:
+def test_cpu_shape_overload_2d_to_2d() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -548,7 +548,7 @@ fn test_cpu_shape_overload_2d_to_2d() raises:
     )
 
 
-fn test_cpu_shape_overload_backward() raises:
+def test_cpu_shape_overload_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
@@ -567,7 +567,7 @@ fn test_cpu_shape_overload_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_cpu_list_overload_forward() raises:
+def test_cpu_list_overload_forward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], requires_grad=True)
     var dims = List[Int]()
@@ -579,7 +579,7 @@ fn test_cpu_list_overload_forward() raises:
     )
 
 
-fn test_cpu_list_overload_backward() raises:
+def test_cpu_list_overload_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], requires_grad=True)
     var dims = List[Int]()
@@ -599,7 +599,7 @@ fn test_cpu_list_overload_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_cpu_chained_reshape_forward() raises:
+def test_cpu_chained_reshape_forward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1(
         [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], requires_grad=True
@@ -613,7 +613,7 @@ fn test_cpu_chained_reshape_forward() raises:
     )
 
 
-fn test_cpu_chained_reshape_backward() raises:
+def test_cpu_chained_reshape_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1(
         [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], requires_grad=True
@@ -635,7 +635,7 @@ fn test_cpu_chained_reshape_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_cpu_op_between_two_reshapes_backward() raises:
+def test_cpu_op_between_two_reshapes_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = a.reshape(4)  # 2x2 → 1-D view
@@ -652,7 +652,7 @@ fn test_cpu_op_between_two_reshapes_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_cpu_non_scalar_backward() raises:
+def test_cpu_non_scalar_backward() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var b = a.reshape(2, 2)
@@ -667,7 +667,7 @@ fn test_cpu_non_scalar_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_cpu_float64_forward_backward() raises:
+def test_cpu_float64_forward_backward() raises:
     comptime dtype = DType.float64
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], requires_grad=True)
     var b = a.reshape(2, 3)
@@ -689,7 +689,7 @@ fn test_cpu_float64_forward_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_gpu_1d_to_2d_forward() raises:
+def test_gpu_1d_to_2d_forward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1(
@@ -704,7 +704,7 @@ fn test_gpu_1d_to_2d_forward() raises:
         )
 
 
-fn test_gpu_1d_to_2d_backward() raises:
+def test_gpu_1d_to_2d_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1(
@@ -720,7 +720,7 @@ fn test_gpu_1d_to_2d_backward() raises:
         )
 
 
-fn test_gpu_1d_to_2d_b_no_grad() raises:
+def test_gpu_1d_to_2d_b_no_grad() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
@@ -737,7 +737,7 @@ fn test_gpu_1d_to_2d_b_no_grad() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_gpu_2d_to_1d_forward() raises:
+def test_gpu_2d_to_1d_forward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -752,7 +752,7 @@ fn test_gpu_2d_to_1d_forward() raises:
         )
 
 
-fn test_gpu_2d_to_1d_backward() raises:
+def test_gpu_2d_to_1d_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -775,7 +775,7 @@ fn test_gpu_2d_to_1d_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_gpu_2d_to_3d_forward() raises:
+def test_gpu_2d_to_3d_forward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -792,7 +792,7 @@ fn test_gpu_2d_to_3d_forward() raises:
         )
 
 
-fn test_gpu_2d_to_3d_backward() raises:
+def test_gpu_2d_to_3d_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -815,7 +815,7 @@ fn test_gpu_2d_to_3d_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_gpu_3d_to_2d_forward() raises:
+def test_gpu_3d_to_2d_forward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -833,7 +833,7 @@ fn test_gpu_3d_to_2d_forward() raises:
         )
 
 
-fn test_gpu_3d_to_2d_backward() raises:
+def test_gpu_3d_to_2d_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -859,7 +859,7 @@ fn test_gpu_3d_to_2d_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_gpu_3d_to_1d_forward() raises:
+def test_gpu_3d_to_1d_forward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -875,7 +875,7 @@ fn test_gpu_3d_to_1d_forward() raises:
         )
 
 
-fn test_gpu_3d_to_1d_backward() raises:
+def test_gpu_3d_to_1d_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -901,7 +901,7 @@ fn test_gpu_3d_to_1d_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_gpu_scalar_forward() raises:
+def test_gpu_scalar_forward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([42.0], requires_grad=True)
@@ -910,7 +910,7 @@ fn test_gpu_scalar_forward() raises:
         assert_true(b.to_cpu().all_close(Tensor[dtype].full(Shape(), 42.0)))
 
 
-fn test_gpu_scalar_backward() raises:
+def test_gpu_scalar_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([3.0], requires_grad=True)
@@ -927,7 +927,7 @@ fn test_gpu_scalar_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_gpu_chained_reshape_forward() raises:
+def test_gpu_chained_reshape_forward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1(
@@ -945,7 +945,7 @@ fn test_gpu_chained_reshape_forward() raises:
         )
 
 
-fn test_gpu_chained_reshape_backward() raises:
+def test_gpu_chained_reshape_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1(
@@ -969,7 +969,7 @@ fn test_gpu_chained_reshape_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_gpu_op_between_two_reshapes_backward() raises:
+def test_gpu_op_between_two_reshapes_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -989,7 +989,7 @@ fn test_gpu_op_between_two_reshapes_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_gpu_non_scalar_backward() raises:
+def test_gpu_non_scalar_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
@@ -1005,7 +1005,7 @@ fn test_gpu_non_scalar_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_gpu_shape_overload_forward_backward() raises:
+def test_gpu_shape_overload_forward_backward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -1033,7 +1033,7 @@ fn test_gpu_shape_overload_forward_backward() raises:
 # ─────────────────────────────────────────────
 
 
-fn test_gpu_grad_stays_on_cpu() raises:
+def test_gpu_grad_stays_on_cpu() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)

@@ -96,7 +96,7 @@ trait ArgumentType(ImplicitlyCopyable & Movable):
     pass
 
 
-comptime DestroyerFn = def(UnsafePointer[UInt8, MutAnyOrigin]) -> None
+comptime DestroyerFn = def(UnsafePointer[UInt8, MutAnyOrigin]) thin -> None
 
 
 def make_destroyer[T: ArgumentType]() -> DestroyerFn:
@@ -107,7 +107,7 @@ def make_destroyer[T: ArgumentType]() -> DestroyerFn:
     return destroy
 
 
-comptime CopyFn = fn(UnsafePointer[UInt8, MutAnyOrigin]) -> UnsafePointer[
+comptime CopyFn = def(UnsafePointer[UInt8, MutAnyOrigin]) thin -> UnsafePointer[
     UInt8, MutAnyOrigin
 ]
 
@@ -149,17 +149,17 @@ struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
     def __del__(deinit self):
         self.destroy(self.ptr)  # calls T.__del__
 
-    def __moveinit__(out self, deinit take: Self):
-        self.op_code = take.op_code
-        self.ptr = take.ptr
-        self.destroy = take.destroy
-        self.copy_fn = take.copy_fn
+    def __init__(out self, deinit existing: Self):
+        self.op_code = existing.op_code
+        self.ptr = existing.ptr
+        self.destroy = existing.destroy
+        self.copy_fn = existing.copy_fn
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.op_code = copy.op_code
         self.destroy = copy.destroy
         self.copy_fn = copy.copy_fn
-        self.ptr = self.copy_fn(copy.ptr)  # deep copy via T.__copyinit__
+        self.ptr = self.copy_fn(copy.ptr)  # deep copy via T.__init__
 
     def get[T: ArgumentType](ref self) -> ref[self.ptr] T:
         return self.ptr.bitcast[T]()[]
@@ -282,7 +282,7 @@ struct ShuffleArg(ArgumentType):
     var axis: Int
     var permutation: List[Int]
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.axis = copy.axis
         self.permutation = copy.permutation.copy()
 
@@ -292,7 +292,7 @@ struct PadArg(ArgumentType):
     var pad: List[Tuple[Int, Int]]
     var mode: String
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.pad = copy.pad.copy()
         self.mode = copy.mode.copy()
 
@@ -360,6 +360,7 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     def invoke(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ) where Self.dtype.is_floating_point():
         if not output.has_ancestry():
             print("Inside Backward invoke: output ancestry is not set")
@@ -367,124 +368,216 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         ref arg = output.ancestry().backward_fn_arg()
         var op_code = arg.op_code
         if op_code == BACKWARD_ADD_SCALAR:
-            AddBackwardScalar[Self.dtype].backward(output, parent_ids)
+            AddBackwardScalar[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_SUM:
-            SumBackward[Self.dtype].backward(output, parent_ids)
+            SumBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_MEAN:
-            MeanBackward[Self.dtype].backward(output, parent_ids)
+            MeanBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_RESHAPE:
-            ReshapeBackward[Self.dtype].backward(output, parent_ids)
+            ReshapeBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_TRANSPOSE:
-            TransposeBackward[Self.dtype].backward(output, parent_ids)
+            TransposeBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_PERMUTE:
-            PermuteBackward[Self.dtype].backward(output, parent_ids)
+            PermuteBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_RELU:
-            ReLUBackward[Self.dtype].backward(output, parent_ids)
+            ReLUBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_VIEW:
-            ViewBackward[Self.dtype].backward(output, parent_ids)
+            ViewBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_CE_CLASS_INDICES:
-            CEClassIndicesBackward[Self.dtype].backward(output, parent_ids)
+            CEClassIndicesBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_CE_PROBABILITIES:
-            CEProbabilitiesBackward[Self.dtype].backward(output, parent_ids)
+            CEProbabilitiesBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_CONTIGUOUS:
-            ContiguousBackward[Self.dtype].backward(output, parent_ids)
+            ContiguousBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_SIGMOID:
-            SigmoidBackward[Self.dtype].backward(output, parent_ids)
+            SigmoidBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_EXPONENTIATION:
-            ExponentiationBackward[Self.dtype].backward(output, parent_ids)
+            ExponentiationBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_EXPAND:
-            ExpandBackward[Self.dtype].backward(output, parent_ids)
+            ExpandBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_FLATTEN:
-            FlattenBackward[Self.dtype].backward(output, parent_ids)
+            FlattenBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_SQUEEZE:
-            SqueezeBackward[Self.dtype].backward(output, parent_ids)
+            SqueezeBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_UNSQUEEZE:
-            UnsqueezeBackward[Self.dtype].backward(output, parent_ids)
+            UnsqueezeBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_SHUFFLE:
-            ShuffleBackward[Self.dtype].backward(output, parent_ids)
+            ShuffleBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_MINMAX:
-            MinMaxBackward[Self.dtype].backward(output, parent_ids)
+            MinMaxBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_SOFTMAX:
-            SoftmaxBackward[Self.dtype].backward(output, parent_ids)
+            SoftmaxBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_LOG_SOFTMAX:
-            LogSoftmaxBackward[Self.dtype].backward(output, parent_ids)
+            LogSoftmaxBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_TILE:
-            TileBackward[Self.dtype].backward(output, parent_ids)
+            TileBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_TANH:
-            TanhBackward[Self.dtype].backward(output, parent_ids)
+            TanhBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_LOG:
-            LogBackward[Self.dtype].backward(output, parent_ids)
+            LogBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_CLIP:
-            ClipBackward[Self.dtype].backward(output, parent_ids)
+            ClipBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_SQRT:
-            SqrtBackward[Self.dtype].backward(output, parent_ids)
+            SqrtBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_VARIANCE:
-            VarianceBackward[Self.dtype].backward(output, parent_ids)
+            VarianceBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_STD:
-            StdBackward[Self.dtype].backward(output, parent_ids)
+            StdBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_PAD:
-            PadBackward[Self.dtype].backward(output, parent_ids)
+            PadBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_MAXPOOL2D:
-            MaxPool2dBackward[Self.dtype].backward(output, parent_ids)
+            MaxPool2dBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_DROPOUT:
-            DropoutBackward[Self.dtype].backward(output, parent_ids)
+            DropoutBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_DEVICE_TRANSFER:
-            DeviceTransferBackward[Self.dtype].backward(output, parent_ids)
+            DeviceTransferBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_MAX_SCALAR:
-            MaxBackwardScalar[Self.dtype].backward(output, parent_ids)
+            MaxBackwardScalar[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_MIN_SCALAR:
-            MinBackwardScalar[Self.dtype].backward(output, parent_ids)
+            MinBackwardScalar[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_EXPONENTIAL:
-            ExponentialBackward[Self.dtype].backward(output, parent_ids)
+            ExponentialBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_PRODUCT:
-            ProductBackward[Self.dtype].backward(output, parent_ids)
+            ProductBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_BROADCAST_TO:
-            BroadcastToBackward[Self.dtype].backward(output, parent_ids)
+            BroadcastToBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_GATHER:
-            GatherBackward[Self.dtype].backward(output, parent_ids)
+            GatherBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_SUB_SCALAR:
-            SubLeftRightBackwardScalar[Self.dtype].backward(output, parent_ids)
+            SubLeftRightBackwardScalar[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_MULTIPLY_SCALAR:
-            MultiplyBackwardScalar[Self.dtype].backward(output, parent_ids)
+            MultiplyBackwardScalar[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_DIV_SCALAR:
-            TrueDivBackwardScalar[Self.dtype].backward(output, parent_ids)
+            TrueDivBackwardScalar[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_RIGHT_DIV_SCALAR:
-            RightTrueDivBackwardScalar[Self.dtype].backward(output, parent_ids)
+            RightTrueDivBackwardScalar[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_ADD:
-            AddBackward[Self.dtype].backward(output, parent_ids)
+            AddBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_ADD_BROADCAST:
-            AddBroadcastBackward[Self.dtype].backward(output, parent_ids)
+            AddBroadcastBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_SUB:
-            SubBackward[Self.dtype].backward(output, parent_ids)
+            SubBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_SUBTRACT_BROADCAST:
-            SubtractBroadcastBackward[Self.dtype].backward(output, parent_ids)
+            SubtractBroadcastBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_MULTIPLY:
-            MultiplyBackward[Self.dtype].backward(output, parent_ids)
+            MultiplyBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_MULTIPLY_BROADCAST:
-            MultiplyBroadcastBackward[Self.dtype].backward(output, parent_ids)
+            MultiplyBroadcastBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_DIVIDE:
-            DivideBackward[Self.dtype].backward(output, parent_ids)
+            DivideBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_MATMUL_2D:
-            Matmul2dBackward[Self.dtype].backward(output, parent_ids)
+            Matmul2dBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_MATMUL_ND:
-            MatmulNdBackward[Self.dtype].backward(output, parent_ids)
+            MatmulNdBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BLAS_BACKWARD_MATMUL_2D:
-            BLASMatmul2dBackward[Self.dtype].backward(output, parent_ids)
+            BLASMatmul2dBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_VECTOR_MATMUL:
-            VectorMatmulNdBackward[Self.dtype].backward(output, parent_ids)
+            VectorMatmulNdBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_MATRIX_VECTOR_MUL:
-            MatrixVectorMulNdBackward[Self.dtype].backward(output, parent_ids)
+            MatrixVectorMulNdBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_DOT:
-            DotBackward[Self.dtype].backward(output, parent_ids)
+            DotBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_FUSED_CONV:
-            FusedCol2ImBackward[Self.dtype].backward(output, parent_ids)
+            FusedCol2ImBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_LAYER_NORM:
-            LayerNormBackward[Self.dtype].backward(output, parent_ids)
+            LayerNormBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_CONCAT:
-            ConcatBackward[Self.dtype].backward(output, parent_ids)
+            ConcatBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_STACK:
-            StackBackward[Self.dtype].backward(output, parent_ids)
+            StackBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_BCE_WITH_LOGITS:
-            BCEWithLogitsBackward[Self.dtype].backward(output, parent_ids)
+            BCEWithLogitsBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
         elif op_code == BACKWARD_BCE:
-            BCELossBackward[Self.dtype].backward(output, parent_ids)
+            BCELossBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )

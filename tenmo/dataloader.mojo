@@ -124,7 +124,7 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
     ]
     var _last_batch_size: Int
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.dataset = copy.dataset
         self.batch_size = copy.batch_size
         self.shuffle_data = copy.shuffle_data

@@ -30,6 +30,7 @@ pixi install              # install deps
 - The `gpu` test suite is a defined subset of tests that have GPU guards — not all tests run on GPU
 - The `gpu_all` test alias in `execute.sh` runs the consolidated file `tests/test_gpu_all.mojo` (1138 tests from 49 files, single compile ~3.5 min)
 - `--only` flag for filtering individual tests is **not supported** in Mojo's TestSuite — run individual test files via `./execute.sh <name>` instead
+- **Always use ≥12 min timeout** (720s) when launching tests via `mojo` or `./execute.sh`. Mojo compiles the entire library from scratch each time — single-test suites take ~5 min to compile, `tensors` takes ~8 min.
 
 ## CI (`.github/workflows/test.yml`)
 
@@ -525,7 +526,7 @@ Direct gradient update on Tensor (used by some paths):
 ## Pixi / Environment
 
 - Platform: **linux-64 only**
-- Mojo pinned to `==0.26.2` from `conda.modular.com/max-nightly`
+- Mojo pinned to `==1.0.0b1` from `conda.modular.com/max-nightly`
 - Python 3.10–3.14
 - PyPI deps: `mnist-datasets`, `pure-cifar-10`, `tiktoken`
 - Dev feature includes `mojodoc` and a local `bpe` at `../bpe`
@@ -633,16 +634,6 @@ See [`PERFORMANCE_BOTTLENECKS.md`](PERFORMANCE_BOTTLENECKS.md) for a ranked
 list of all performance bottlenecks across GPU kernels, autograd, memory
 management, and SIMD paths — with root causes and fix suggestions for each.
 
-## What to Improve in Tenmo
-
-1. **Sparse optimizer support** — Add a sparse gradient mode to `SGD` (or a separate `SparseSGD`) that only touches rows with non-zero gradients. This would make `Embedding` + autograd practical for word2vec-style tasks.
-
-2. **Embedding integration with `Module`/`Sequential`** — `Embedding` was not included in the `Layer` variant (`net.mojo:740`). `Sequential.parameters()` returned an empty list for Embedding. **FIXED** — added `Embedding[dtype]` to `Layer` variant and dispatch in `Module.parameters()`.
-
-3. **Fused BCE backward CPU-only** — `bce_with_logits_backward` / `bce_backward` in `ndbuffer.mojo` have no GPU kernel yet; GPU path falls through to CPU. Also, the contiguous-fast-path only checks `self.is_contiguous()` (not all operand buffers), so if view-backed (non-contiguous) sigmoid/safe/target/grad_output NDBuffers are passed, the SIMD Buffer path will read from `buffer.load(0)` ignoring strides/offset. The scalar `index_iterator()` fallback is correct for non-contiguous. Same latent bug exists in `bce_with_logits_forward_cpu` / `bce_forward_cpu`.
-
-4. **Large-weight `add_ancestry` deep copy overhead** — `add_ancestry` in `tensor.mojo:1104` deep-copies the parent's data buffer into the ancestry chain (for ops that need it in backward). For large weights (252K×100 Embedding = 100MB), this is ~25ms per forward gather. The copy is unavoidable without making the original tensor's buffer shared, but the user should not have their Tensor's buffer silently converted to shared. **Fix idea:** Layer structs (Embedding, Linear, Conv2d) that "take over" weights from the user at init time can call `self.weight.buffer.buffer.shared()` internally — the user handed off ownership, so sharing is fine. This eliminates the deep copy entirely for those weights, reducing gather cost from ~25ms to ~ns.
-
 ## Running Selective Tests
 
 **`./execute.sh <name>`** — runs a single test alias from the test runner (e.g. `./execute.sh gather`)
@@ -653,3 +644,18 @@ To run specific test functions within a file, the `TestSuite` discovers all `fn 
 - `mojo run <file.mojo> --only test_foo test_bar` — run only specified tests
 - `mojo run <file.mojo> --skip test_slow test_flaky` — skip specified tests
 - See `TestSuite` documentation for full CLI filtering capabilities.
+
+## Mojo 1.0.0b1 Migration Notes
+
+- **No `address_of`** — Use `UnsafePointer(to=...)` or `Pointer(to=...)` instead.
+- **`alloc[T](count)` returns `UnsafePointer[T, MutAnyOrigin]`** — All `MutExternalOrigin` on `alloc`-assigned pointers should be `MutAnyOrigin`.
+- **`Optional[UnsafePointer[...]]` pattern** — Field must be `Optional[UnsafePointer[T, MutAnyOrigin]]` (not `MutExternalOrigin`) to match `alloc` return type.
+- **`.unsafe_value()` not `.value()`** — `.value()` requires `ref` receiver; `.unsafe_value()` works on value receivers and is the consistent accessor for `Optional[UnsafePointer[...]]`.
+- **`def(...) thin` function pointers** — Replace `ScalarPredicate` trait and broken `fn(...)` types. Works with parameterized types like `def(Scalar[Self.dtype]) thin -> Bool`. Named functions only (no lambdas).
+- **Atomic API change** — `from std.os.atomic` → `from std.atomic`. `Atomic[UInt64]` → `Atomic[DType.uint64]` (takes `DType` now). `Consistency.MONOTONIC` → `Ordering.RELAXED`, `.RELEASE` → `.RELEASE`, `.ACQUIRE` → `.ACQUIRE`.
+- **Standard origin: `MutAnyOrigin`** — All `UnsafePointer` fields should use `MutAnyOrigin`. External pointers (numpy via `ndarray_ptr` → `MutAnyOrigin`, `alloc` → `MutAnyOrigin`) both flow through this origin. `MutExternalOrigin` is never constructed directly.
+- **Numpy interop** — `ndarray_ptr` at `numpy_interop.mojo:45` returns `UnsafePointer[Scalar[dtype], MutAnyOrigin]`. The `from_ndarray` non-copy path passes it to `Tensor.__init__` which forwards to `Buffer.__init__` — all typed `MutAnyOrigin`.
+- **`UnsafePointer(...)()` null constructor removed** — Use `Optional[UnsafePointer[...]]` with `{}` (None) or `self.field = {}` for absent pointers. Never construct a null `UnsafePointer` directly.
+- **`fn` is deprecated** — Use `def` instead of `fn` for all function/struct method declarations.
+- **`alias` is deprecated** — Use `comptime` instead of `alias` for compile-time constants (e.g. `comptime dtype = DType.float32`).
+

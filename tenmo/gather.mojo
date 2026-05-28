@@ -571,6 +571,7 @@ struct GatherBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         """Scatter incoming gradient back to the gathered rows.
 
@@ -592,7 +593,7 @@ struct GatherBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         its own gradbox via ZeroGrad.
         """
         var parent = output.ancestry().get(0)
-        ref incoming_grad = output.gradbox[]
+        ref incoming_grad = output.gradbox.unsafe_value()[]
         ref bwd_arg = output.ancestry().backward_fn_arg().get[GatherArg]()
 
         var extra_arg = output.ancestry().backward_fn_arg()
@@ -603,9 +604,9 @@ struct GatherBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         else:
             parent.update_grad(incoming_grad, ScatterAddTensor, extra_arg)
 
-        output.gradbox[].zero_grad()
-
         parent_ids.append(parent._id)
+        if not retain_graph:
+            output.gradbox.unsafe_value()[].zero_grad()
 
 
 # =============================================================================
@@ -815,8 +816,12 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         comptime if has_accelerator():
             if self.is_on_gpu():
                 var flat = Self.forward[track_grad](
-                    self, normalized, axis=ax, reduction=reduction,
-                    padding_idx=padding_idx, requires_grad=requires_grad,
+                    self,
+                    normalized,
+                    axis=ax,
+                    reduction=reduction,
+                    padding_idx=padding_idx,
+                    requires_grad=requires_grad,
                 )
                 return flat.reshape[track_grad](Shape(out_dims))
 
@@ -840,7 +845,10 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
                 and (reduction.is_sum() or reduction.is_mean())
             ):
                 out = Self._gather_copy(
-                    self, ax=ax, normalized=normalized, reduction=Reduction(2),
+                    self,
+                    ax=ax,
+                    normalized=normalized,
+                    reduction=Reduction(2),
                     indices_shape=indices_shape_arr,
                 )
                 out.requires_grad_(True)
@@ -855,7 +863,10 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
                     out = out.mean[track_grad=True](IntArray(ax))
             else:
                 out = Self._gather_copy(
-                    self, ax=ax, normalized=normalized, reduction=reduction,
+                    self,
+                    ax=ax,
+                    normalized=normalized,
+                    reduction=reduction,
                     indices_shape=indices_shape_arr,
                 )
                 if grad_required:
@@ -867,7 +878,9 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
                     out.add_ancestry(bfa^, self)
         else:
             out = Self._gather_copy(
-                self, ax=ax, normalized=normalized,
+                self,
+                ax=ax,
+                normalized=normalized,
                 reduction=reduction if is_fast_path else Reduction(2),
                 indices_shape=indices_shape_arr,
             )
@@ -1008,7 +1021,9 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
                 src_offset += coords[d] * self.strides()[d]
             src_offset += src_idx * self.strides()[ax]
             for k in range(rank - ax - 1):
-                src_offset += coords[ax + indices_rank + k] * self.strides()[ax + 1 + k]
+                src_offset += (
+                    coords[ax + indices_rank + k] * self.strides()[ax + 1 + k]
+                )
 
             gathered.set(flat, self.get(src_offset))
 

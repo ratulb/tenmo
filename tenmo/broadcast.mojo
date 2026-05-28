@@ -17,10 +17,11 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         # This is the gradient flowing *into* this broadcasted op.
         # We need to call copy explicitly because we have not annotated Gradbox with `ImplicitlyCopyable` yet - Intententionally
-        ref incoming_grad = output.gradbox[]
+        ref incoming_grad = output.gradbox.unsafe_value()[]
 
         # Extract parents (ancestors)
         var left_parent = output.ancestry().get(0)
@@ -48,6 +49,8 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
 
             right_parent.update_grad(right_parent_grad^, Self.rhs_op, None)
             parent_ids.append(right_parent._id)
+        if not retain_graph:
+            incoming_grad.zero_grad()
 
     @staticmethod
     def upstream_grad_share(
@@ -86,9 +89,10 @@ struct BroadcastToBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var parent = output.ancestry().get(0)
-        ref incoming_grad = output.gradbox[]
+        ref incoming_grad = output.gradbox.unsafe_value()[]
 
         var grad: Gradbox[Self.dtype]
 
@@ -109,6 +113,8 @@ struct BroadcastToBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         parent.update_grad(grad^, AddTensor, None)
         parent_ids.append(parent._id)
+        if not retain_graph:
+            incoming_grad.zero_grad()
 
 
 @fieldwise_init

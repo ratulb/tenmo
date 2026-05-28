@@ -336,6 +336,7 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref bwd_arg = (
             output.ancestry()
@@ -434,6 +435,8 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         if logits.requires_grad:
             logits.update_grad(grad_final, AddTensor, None)
         parent_ids.append(logits._id)
+        if not retain_graph:
+            upstream.zero_grad()
 
 
 # CEClassIndicesForward
@@ -592,6 +595,7 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref bwd_arg = (
             output.ancestry()
@@ -638,6 +642,8 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         if logits.requires_grad:
             logits.update_grad(gradbox, AddTensor, None)
         parent_ids.append(logits._id)
+        if not retain_graph:
+            upstream.zero_grad()
 
 
 # CEProbabilitiesForward
@@ -799,7 +805,7 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         self.label_smoothing = label_smoothing
         self.training = training
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.reduction = copy.reduction
         self.ignore_index = copy.ignore_index
         self.label_smoothing = copy.label_smoothing

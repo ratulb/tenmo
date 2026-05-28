@@ -32,7 +32,7 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
     var initialized: Bool
     var pad_spec: List[Tuple[Int, Int]]
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.initialized = copy.initialized
         self.pad_spec = copy.pad_spec.copy()
 
@@ -561,6 +561,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         var bwd_arg = (
             output.ancestry().backward_fn_arg().get[FusedIm2ColBwdArg]()
@@ -653,6 +654,9 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
             padded_image_ref.update_grad(grad_padded^, AddTensor, None)
             parent_ids.append(padded_image_ref._id)
+
+        if not retain_graph:
+            grad_output.zero_grad()
 
     # BIAS GRADIENT
     @always_inline
@@ -800,7 +804,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # Convert back to Gradbox (consumes Tensor)
         # contiguous=True ensures the result is contiguous (will copy if needed)
         # share=False means the buffer is NOT ref-counted (owned by this Gradbox)
-        return grad_kernel_tensor.as_gradbox(share=False, contiguous=True)
+        return grad_kernel_tensor^.as_gradbox(share=False, contiguous=True)
 
     # INPUT GRADIENT
     @always_inline

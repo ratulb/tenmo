@@ -14,6 +14,7 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def backward(
         output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
         ref bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
         var (axes, keepdims) = bwd_arg.axes, bwd_arg.keepdims
@@ -47,6 +48,8 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             ancestor.update_grad(grad_contrib^, AddTensor, None)
 
         parent_ids.append(ancestor._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 
 
 @fieldwise_init
