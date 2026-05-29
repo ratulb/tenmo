@@ -64,139 +64,6 @@ from tenmo.mnemonics import (
 )
 
 
-struct Layout(ImplicitlyCopyable & Movable & Equatable):
-    """
-    Pure metadata describing how data is laid out in memory.
-    No data, no device, no allocation.
-    Device-agnostic — same for CPU and GPU.
-    """
-
-    var shape: Shape
-    var strides: Strides
-    var offset: Int
-    var _contiguous: Bool
-
-    def __init__(out self):
-        self.shape = Shape()
-        self.strides = Strides.Zero()
-        self.offset = 0
-        self._contiguous = True
-
-    def __init__(
-        out self,
-        shape: Shape,
-        strides: Strides,
-        offset: Int = 0,
-    ):
-        self.shape = shape
-        self.strides = strides
-        self.offset = offset
-        self._contiguous = strides.is_contiguous(shape)
-
-    def __init__(out self, *, copy: Self):
-        self.shape = copy.shape.copy()
-        self.strides = copy.strides.copy()
-        self.offset = copy.offset
-        self._contiguous = copy._contiguous
-
-    def __init__(out self, deinit existing: Self):
-        self.shape = existing.shape^
-        self.strides = existing.strides^
-        self.offset = existing.offset
-        self._contiguous = existing._contiguous
-
-    def __eq__(self, other: Self) -> Bool:
-        return (
-            self.shape == other.shape
-            and self.strides == other.strides
-            and self.offset == other.offset
-        )
-
-    def __ne__(self, other: Self) -> Bool:
-        return not self.__eq__(other)
-
-    @always_inline
-    def is_contiguous(self) -> Bool:
-        return self._contiguous
-
-    @always_inline
-    def num_elements(self) -> Int:
-        return self.shape.num_elements()
-
-    @always_inline
-    def rank(self) -> Int:
-        return self.shape.rank()
-
-    @always_inline
-    def max_index(self) -> Int:
-        """Calculate the highest accessible memory offset.
-
-        For dimensions with positive strides, the maximum is reached at the
-        last index of that dimension. For negative strides, the highest
-        address is already at index 0 (the base offset), so those dimensions
-        do not contribute.
-
-        Returns:
-            The highest valid memory offset.
-
-        Example:
-            ```mojo
-            var buf = NDBuffer[DType.float32](Shape(3, 2), strides=Strides(4, -1), offset=10)
-            print(buf.max_index())  # 10 + 1*4 = 14
-            ```
-        """
-        var max_idx = self.offset
-        for i in range(self.shape.rank()):
-            if self.strides[i] > 0:
-                max_idx += (self.shape[i] - 1) * self.strides[i]
-        return max_idx
-
-
-struct Storage[dtype: DType](ImplicitlyCopyable & Movable):
-    """
-    Pure data carrier — CPU buffer or GPU device state.
-    No shape knowledge. No layout knowledge.
-    copy() is cheap — just a refcount bump.
-    """
-
-    var buffer: Buffer[Self.dtype]
-    var device_state: Optional[DeviceState[Self.dtype]]
-
-    def __init__(out self):
-        self.buffer = Buffer[Self.dtype]()
-        self.device_state = None
-
-    def __init__(out self, var buffer: Buffer[Self.dtype]):
-        self.buffer = buffer^
-        self.device_state = None
-
-    def __init__(out self, var device_state: DeviceState[Self.dtype]):
-        self.buffer = Buffer[Self.dtype]()
-        self.device_state = Optional(device_state^)
-
-    def __init__(out self, *, copy: Self):
-        self.buffer = copy.buffer.copy()  # Buffer refcount bump if shared
-        self.device_state = copy.device_state.copy()  # Ref count bump for GPU
-
-    def __init__(out self, deinit existing: Self):
-        self.buffer = existing.buffer^
-        self.device_state = existing.device_state^
-
-    @always_inline
-    def is_on_gpu(self) -> Bool:
-        comptime if has_accelerator():
-            return self.device_state is not None
-        return False
-
-    @always_inline
-    def is_on_cpu(self) -> Bool:
-        return not self.is_on_gpu()
-
-    def copy(self) -> Self:
-        """Explicit copy — refcount bump only, no data copy."""
-        return self
-
-
 comptime TILE_SIZE = 32
 
 
@@ -309,15 +176,6 @@ struct NDBuffer[dtype: DType](
         )
         ndb.device_state = device_state^
         return ndb^
-
-    def buffer_layout(self) -> Layout:
-        return Layout(self.shape, self.strides, self.offset)
-
-    def buffer_storage(self) -> Storage[Self.dtype]:
-        var storage = Storage[Self.dtype]()
-        storage.buffer = self.buffer.copy()
-        storage.device_state = self.device_state.copy()
-        return storage^
 
     def sync(self):
         comptime if has_accelerator():
@@ -497,7 +355,7 @@ struct NDBuffer[dtype: DType](
             result.copy_from_alike[overwrite=True, validate=False](viewed^)
             return 0, result^
 
-    def is_on_gpu(self) -> Bool:
+    def is_on_gpu(ref self) -> Bool:
         comptime if has_accelerator():
             return not self.device_state == None
         return False
@@ -507,7 +365,7 @@ struct NDBuffer[dtype: DType](
             return self.device_state.value().get_gpu().id
         return -1
 
-    def is_on_cpu(self) -> Bool:
+    def is_on_cpu(ref self) -> Bool:
         return self.is_on_gpu() == False
 
     @staticmethod

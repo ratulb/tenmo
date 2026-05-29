@@ -34,15 +34,10 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var src_offset = 0
             for i in range(count):
                 ref parent = output.ancestry().get(i)
-                _="""var tensor = Tensor[Self.dtype](
-                    parent.buffer(), requires_grad=parent.requires_grad
-                )"""
-                #var num_elements = tensor.numels()
-                var num_elements = parent.buffer().numels()
-                #if tensor.requires_grad:
+                ref parent_shape = parent.shape()
+                var num_elements = parent_shape.numels()
                 if parent.requires_grad:
-                    #var grad_input = Gradbox[Self.dtype].zeros(tensor.shape())
-                    var grad_input = Gradbox[Self.dtype].zeros(parent.shape())
+                    var grad_input = Gradbox[Self.dtype].zeros(parent_shape)
                     var grad_input_data = grad_input.data_ptr()
                     for j in range(num_elements):
                         grad_input_data[j] = grad_data[src_offset + j]
@@ -56,22 +51,19 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # General path: any axis
         var offset = 0
         for i in range(count):
-            var parent = output.ancestry().get(i)
-            var tensor = Tensor[Self.dtype](
-                parent.buffer(), requires_grad=parent.requires_grad
-            )
-            if not tensor.requires_grad:
-                offset += tensor.shape()[axis]
+            ref parent = output.ancestry().get(i)
+            ref parent_shape = parent.shape()
+            if not parent.requires_grad:
+                offset += parent_shape[axis]
                 continue
 
-            ref tensor_shape = tensor.shape()
-            var grad_input = Gradbox[Self.dtype].zeros(tensor_shape)
+            var grad_input = Gradbox[Self.dtype].zeros(parent_shape)
             var grad_input_data = grad_input.data_ptr()
 
             var elem_idx = 0
             for dest_idx in grad_input.index_iterator():
                 var coord = IndexCalculator.index_to_coord(
-                    tensor_shape, elem_idx
+                    parent_shape, elem_idx
                 )
                 var grad_coord = IntArray.filled(grad_shape.rank(), 0)
                 for d in range(grad_shape.rank()):
@@ -82,7 +74,7 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 grad_input_data[dest_idx] = grad_data[src_idx]
                 elem_idx += 1
 
-            offset += tensor.shape()[axis]
+            offset += parent_shape[axis]
             parent.update_grad(grad_input^, AddTensor, None)
             parent_ids.append(parent._id)
 

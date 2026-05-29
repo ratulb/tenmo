@@ -63,7 +63,7 @@ The library has undergone significant architectural work. The changes prioritize
 
 **Backward system redesign** — moved from stateful handler instances to pure static methods with a type-erased `BackwardFnArg`. Dispatch is now a direct integer-tag jump table. No variant extraction, no handler instances, no redundant copies.
 
-**Ancestry redesign** — `Ancestors` no longer stores full `Tensor` copies. Each ancestor is now a lightweight `Ancestor` handle carrying only what backward needs: an id, a `requires_grad` flag, a refcounted gradbox pointer, a `Layout` (shape/strides/offset), and a `Storage` (CPU Buffer or GPU DeviceState). The recursive deep-copy explosion on every `add_ancestry` call is gone.
+**Ancestry redesign** — `Ancestors` no longer stores full `Tensor` copies. Each ancestor is now a lightweight `Ancestor` handle carrying only what backward needs: an id, `requires_grad`, a refcounted gradbox pointer, and a shared `NDBuffer`. The recursive deep-copy explosion on every `add_ancestry` call is gone.
 
 **GPU support** — tensor operations, backward passes, and gradient flow now work on GPU. `DType.bool` is handled correctly via internal `uint8` storage throughout kernels.
 
@@ -294,19 +294,15 @@ Ancestor[dtype: DType]
 ├── _id: UInt                 # Identity
 ├── requires_grad: Bool       # Gradient tracking flag
 ├── gradbox: UnsafePointer    # Refcounted gradbox pointer for gradient routing
-├── layout: Layout            # Shape/strides/offset (pure metadata, no allocation)
-├── storage: Storage          # CPU Buffer or GPU DeviceState (cheap ref-count bump)
+├── ndb: NDBuffer             # Data + layout (refcount bump only, no data copy)
 └── parents: Optional         # Ancestor chain for graph traversal
 
 NDBuffer[dtype: DType]
 ├── buffer: Buffer            # Underlying data (ref-counted for views)
 ├── shape: Shape              # Tensor dimensions
 ├── strides: Strides          # Memory layout
-└── offset: Int               # View offset into parent buffer
-
-Buffer[dtype: DType]
-└── UnsafePointer[Scalar]     # SIMD-capable linear storage
-```
+├── offset: Int               # View offset into parent buffer
+└── device_state: Optional    # GPU storage
 
 ### Design Rationale
 
@@ -314,7 +310,7 @@ Buffer[dtype: DType]
 Gradients don't need the full Tensor API. A `Gradbox` encapsulates only an `NDBuffer`, keeping gradient storage minimal and explicit — **70% less code than full Tensors**. Gradbox buffers are always ref-counted — gradients land in the right place regardless of how many tensor copies or views exist.
 
 **Ancestors is not a Tensor**
-The autograd graph no longer stores full `Tensor` copies. An `Ancestor` handle carries only what backward needs: an id, `requires_grad` flag, a refcounted gradbox pointer, a `Layout` (shape/strides/offset), and a `Storage` (refcount bump). This eliminates the recursive deep-copy explosion on every `add_ancestry` call.
+The autograd graph no longer stores full `Tensor` copies. An `Ancestor` handle carries only what backward needs: an id, `requires_grad` flag, a refcounted gradbox pointer, and a shared `NDBuffer`. This eliminates the recursive deep-copy explosion on every `add_ancestry` call.
 
 **NDBuffer as Single Source of Truth**
 Shape, strides, and offset logic is centralized in `NDBuffer`, which serves both `Tensor` and `Gradbox`. This ensures views, slicing, and broadcasting behave consistently across the system.
@@ -456,7 +452,6 @@ for batch in train_loader:
 
 ### Medium Term
 - [ ] Transparent GPU Support: Unified CPU/GPU tensor operations
-- [ ] `NDBuffer` refactor: compose from `Layout` + `Storage` for cleaner device movement
 - [ ] Zero-copy ancestry tracking: eliminate remaining deep copies on forward pass
 
 ### Long Term

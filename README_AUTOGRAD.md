@@ -63,8 +63,7 @@ struct Ancestor[dtype: DType]:
     var _id: UInt                     # graph traversal
     var requires_grad: Bool         # grad routing decision
     var gradbox: UnsafePointer      # refcounted pointer to gradient storage
-    var layout: Layout             # shape + strides + offset (copied once)
-    var storage: Storage           # Buffer or DeviceState (refcount bump only)
+    var ndb: NDBuffer               # data + layout (refcount bump only)
     var parents: Optional[Ancestors] # recursive graph structure
 ```
 
@@ -339,7 +338,7 @@ struct BackwardFnArg:
 | Full Tensor Copy | Ancestor Handle |
 |----------------|----------------|
 | Recursive gradbox allocation | No new gradbox |
-| Full NDBuffer copy | Layout + Storage refcount bump |
+| Full NDBuffer copy | NDBuffer refcount bump |
 | Copy backwardFnArg heap block | Reference existing argument |
 | O(n) per ancestry entry | O(1) per ancestry entry |
 

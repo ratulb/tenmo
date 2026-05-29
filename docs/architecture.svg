@@ -1,6 +1,6 @@
 <svg width="680" viewBox="0 0 680 940" xmlns="http://www.w3.org/2000/svg" role="img">
 <title>Tenmo architecture diagram</title>
-<desc>Structural diagram showing how Tensor, NDBuffer, Buffer, Gradbox, Ancestor, Ancestors, BackwardFnArg, Layout, Storage and GPU components fit together in Tenmo</desc>
+<desc>Structural diagram showing how Tensor, NDBuffer, Buffer, Gradbox, Ancestor, Ancestors, BackwardFnArg, and GPU components fit together in Tenmo</desc>
 
 <defs>
 <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -109,45 +109,31 @@
 <text class="th t-blue" x="530" y="218" text-anchor="middle" dominant-baseline="central">Ancestors[dtype]</text>
 <text class="ts s-blue" x="530" y="235" text-anchor="middle" dominant-baseline="central">refs: List[Ancestor] · backward_arg</text>
 
-<!-- NDBuffer → Layout -->
-<line x1="110" y1="250" x2="96"  y2="346" class="arr" marker-end="url(#arrow)"/>
-<!-- NDBuffer → Storage -->
-<line x1="180" y1="250" x2="246" y2="346" class="arr" marker-end="url(#arrow)"/>
+<!-- NDBuffer → Buffer -->
+<line x1="110" y1="250" x2="149" y2="486" class="arr" marker-end="url(#arrow)"/>
+<!-- NDBuffer → DeviceState -->
+<line x1="180" y1="250" x2="363" y2="486" class="arr" marker-end="url(#arrow)"/>
 <!-- Ancestors → BackwardFnArg -->
 <line x1="475" y1="250" x2="398" y2="346" class="arr" marker-end="url(#arrow)"/>
 <!-- Ancestors → Ancestor -->
-<line x1="530" y1="250" x2="548" y2="346" class="arr" marker-end="url(#arrow)"/>
+<line x1="530" y1="250" x2="530" y2="346" class="arr" marker-end="url(#arrow)"/>
 
 <!-- ══════════════════════════════════════════
-     ROW 3 — Layout · Storage · BackwardFnArg · Ancestor
+     ROW 3 — BackwardFnArg · Ancestor
      ══════════════════════════════════════════ -->
 
-<!-- Layout -->
-<rect x="30" y="346" width="148" height="54" rx="8" stroke-width="0.5" class="b-teal"/>
-<text class="th t-teal" x="104" y="368" text-anchor="middle" dominant-baseline="central">Layout</text>
-<text class="ts s-teal" x="104" y="385" text-anchor="middle" dominant-baseline="central">shape · strides · offset</text>
-
-<!-- Storage -->
-<rect x="194" y="346" width="148" height="54" rx="8" stroke-width="0.5" class="b-teal"/>
-<text class="th t-teal" x="268" y="368" text-anchor="middle" dominant-baseline="central">Storage[dtype]</text>
-<text class="ts s-teal" x="268" y="385" text-anchor="middle" dominant-baseline="central">Buffer · DeviceState</text>
-
 <!-- BackwardFnArg -->
-<rect x="358" y="346" width="152" height="54" rx="8" stroke-width="0.5" class="b-amber"/>
-<text class="th t-amber" x="434" y="368" text-anchor="middle" dominant-baseline="central">BackwardFnArg</text>
-<text class="ts s-amber" x="434" y="385" text-anchor="middle" dominant-baseline="central">op_code · type-erased arg</text>
+<rect x="342" y="346" width="152" height="54" rx="8" stroke-width="0.5" class="b-amber"/>
+<text class="th t-amber" x="418" y="368" text-anchor="middle" dominant-baseline="central">BackwardFnArg</text>
+<text class="ts s-amber" x="418" y="385" text-anchor="middle" dominant-baseline="central">op_code · type-erased arg</text>
 
 <!-- Ancestor -->
-<rect x="526" y="346" width="124" height="54" rx="8" stroke-width="0.5" class="b-blue"/>
-<text class="th t-blue" x="588" y="368" text-anchor="middle" dominant-baseline="central">Ancestor[dtype]</text>
-<text class="ts s-blue" x="588" y="385" text-anchor="middle" dominant-baseline="central">id · gradbox* · layout · storage</text>
+<rect x="524" y="346" width="126" height="54" rx="8" stroke-width="0.5" class="b-blue"/>
+<text class="th t-blue" x="587" y="368" text-anchor="middle" dominant-baseline="central">Ancestor[dtype]</text>
+<text class="ts s-blue" x="587" y="385" text-anchor="middle" dominant-baseline="central">id · gradbox* · ndb</text>
 
-<!-- Storage → Buffer -->
-<line x1="230" y1="400" x2="164" y2="486" class="arr" marker-end="url(#arrow)"/>
-<!-- Storage → DeviceState -->
-<line x1="306" y1="400" x2="368" y2="486" class="arr" marker-end="url(#arrow)"/>
 <!-- BackwardFnArg → Backward.invoke -->
-<line x1="480" y1="400" x2="532" y2="486" class="arr" marker-end="url(#arrow)"/>
+<line x1="468" y1="400" x2="532" y2="486" class="arr" marker-end="url(#arrow)"/>
 
 <!-- ══════════════════════════════════════════
      ROW 4 — Buffer · DeviceState · Backward.invoke

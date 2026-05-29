@@ -187,22 +187,19 @@ Gradbox[dtype]
 - `map_to_host()`: required for any CPU-side access to GPU memory
 
 ### Layer 3: `NDBuffer` (shaped tensor view) — `tenmo/ndbuffer.mojo`
-Combines **Layout** + **Storage** into the single source of truth:
+Single source of truth, combining metadata and data:
 
 ```
-NDBuffer
-├── Layout (metadata only)
-│   ├── shape: Shape
-│   ├── strides: Strides
-│   ├── offset: Int
-│   └── _contiguous: Bool
-└── Storage (data carrier)
-    ├── buffer: Buffer[dtype]          ← CPU
-    └── device_state: DeviceState[dtype] ← GPU (Optional)
+NDBuffer[dtype]
+├── shape: Shape                    # Tensor dimensions
+├── strides: Strides                # Memory layout
+├── offset: Int                     # View offset
+├── _contiguous: Bool               # Cache
+├── buffer: Buffer[dtype]           # CPU data
+└── device_state: Optional[DeviceState]  # GPU data
 ```
 
 **Key rules:**
-- `Storage` holds **either** CPU buffer **or** GPU device state — never both active
 - `copy()` is always cheap — refcount bump on both Buffer and DeviceState
 - `share(shape?, strides?, offset?)` creates a view: enables refcount on CPU, copies device_state ref
 - `transpose(shared=True)` returns a view with permuted shape/strides; `shared=False` returns contiguous copy
@@ -379,15 +376,14 @@ Ancestor[dtype]
 ├── _id: UInt                           # graph traversal key
 ├── requires_grad: Bool                 # skip gradient update if False
 ├── gradbox: UnsafePointer[Gradbox]     # gradient storage (refcount bumped)
-├── layout: Layout                      # shape, strides, offset, _contiguous
-├── storage: Storage[dtype]             # buffer or device_state (refcount bumped)
+├── ndb: NDBuffer[dtype]                # data + layout (refcount bumped)
 └── parents: Optional[Ancestors[dtype]] # recursive ancestry chain
 ```
 
 - `__copyinit__`: bumps gradbox refcount via `fetch_add[MONOTONIC](1)`
 - `__del__`: decrements refcount via `fetch_sub[RELEASE](1)`; destroys gradbox when count hits 0 (with `ACQUIRE` fence)
-- `from_tensor()`: extracts layout/storage from Tensor's NDBuffer, bumps gradbox refcount if present
-- `buffer()`: reconstructs `NDBuffer` on-demand from layout + storage
+- `from_tensor()`: copies tensor's NDBuffer into `ndb`, bumps gradbox refcount if present
+- `buffer()`: returns `self.ndb.copy()` — cheap refcount bump, no data copy
 - `update_grad(incoming, op_code, extra_arg)`: applies gradient to gradbox via op_code dispatch:
   - `AddTensor`: `gradbox += incoming`
   - `SubtractTensor`: `gradbox -= incoming`
