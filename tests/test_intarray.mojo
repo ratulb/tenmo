@@ -1003,7 +1003,7 @@ def test_repeated_growth() raises:
 
 
 def test_reserve_preserves_data() raises:
-    """reserve() must preserve existing data through multiple growth phases."""
+    """Reserve() must preserve existing data through multiple growth phases."""
     var a = IntArray.with_capacity(2)
     a.append(10)
     a.append(20)

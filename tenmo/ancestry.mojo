@@ -2,7 +2,7 @@ from std.memory import Pointer
 from .tensor import Tensor
 from .gradbox import Gradbox
 from .backpropagation import BackwardFnArg
-from .ndbuffer import NDBuffer, Layout, Storage
+from .ndbuffer import NDBuffer
 from .common_utils import panic, i, s
 from .shapes import Shape
 from std.atomic import Ordering, fence
@@ -15,8 +15,8 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
     Carries everything needed for:
     1. Graph traversal        — _id
     2. Grad routing           — requires_grad, gradbox ptr
-    3. Data (CPU+GPU)   — nd_buffer (shared NDBuffer, refcount bump only)
-    4. Backward compute       — nd_buffer (shape/strides/data for matmul etc.)
+    3. Data (CPU+GPU)   — ndb (shared NDBuffer, refcount bump only)
+    4. Backward compute       — ndb (shape/strides/data for matmul etc.)
     5. Backward invoke        — backwardFnArg, parents
 
     What is NOT here vs full Tensor copy:
@@ -27,24 +27,21 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
     var _id: UInt
     var requires_grad: Bool
     var gradbox: Optional[UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]]
-    var layout: Layout
-    var storage: Storage[Self.dtype]
+    var ndb: NDBuffer[Self.dtype]
     var parents: Optional[Ancestors[Self.dtype]]
 
     def __init__(out self):
         self._id = 0
         self.requires_grad = False
         self.gradbox = {}
-        self.layout = Layout()
-        self.storage = Storage[Self.dtype]()
+        self.ndb = NDBuffer[Self.dtype]()
         self.parents = None
 
     def __init__(out self, *, copy: Self):
         self._id = copy._id
         self.requires_grad = copy.requires_grad
         self.gradbox = copy.gradbox
-        self.layout = copy.layout.copy()
-        self.storage = copy.storage.copy()
+        self.ndb = copy.ndb.copy()
         self.parents = copy.parents.copy()
         if self.gradbox:
             _ = (
@@ -57,28 +54,19 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         self._id = take._id
         self.requires_grad = take.requires_grad
         self.gradbox = take.gradbox
-        self.layout = take.layout^
-        self.storage = take.storage^
+        self.ndb = take.ndb^
         self.parents = take.parents^
 
-    def has_ancestry(self) -> Bool:
+    def has_ancestry(ref self) -> Bool:
         return self.parents is not None and len(self.parents.value()) > 0
 
-    def shape(ref self) -> ref[self.layout.shape] Shape:
-        return self.layout.shape
+    def shape(ref self) -> ref[self.ndb.shape] Shape:
+        return self.ndb.shape
 
     def buffer(ref self) -> NDBuffer[Self.dtype]:
-        """Reconstruct NDBuffer on demand for ops that need full access."""
-        var ndb = NDBuffer[Self.dtype]()
-        ndb.shape = self.layout.shape.copy()
-        ndb.strides = self.layout.strides.copy()
-        ndb.offset = self.layout.offset
-        ndb._contiguous = self.layout._contiguous
-        ndb.buffer = self.storage.buffer.copy()
-        ndb.device_state = self.storage.device_state.copy()
-        return ndb^
+        return self.ndb.copy()
 
-    def gradients(self) -> UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]:
+    def gradients(ref self) -> UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]:
         return self.gradbox.unsafe_value()
 
     def ancestry(
@@ -89,15 +77,14 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         return self.parents.value()
 
     def is_on_gpu(self) -> Bool:
-        return self.storage.is_on_gpu()
+        return self.ndb.is_on_gpu()
 
     @staticmethod
     def from_tensor(ref tensor: Tensor[Self.dtype]) -> Ancestor[Self.dtype]:
         var out = Ancestor[Self.dtype]()
         out._id = tensor._id
         out.requires_grad = tensor.requires_grad
-        out.layout = tensor.buffer.buffer_layout()
-        out.storage = tensor.buffer.buffer_storage()
+        out.ndb = tensor.buffer.copy()
         if tensor.ancestors:
             out.parents = tensor.ancestors.copy()
         # Only bump and store if gradbox exists!
@@ -171,8 +158,7 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
 
 
 # ========================================
-# Ancestors — new name for Ancestors
-# holds List[Ancestor] instead of List[Tensor]
+# Ancestors — holds List[Ancestor] + BackwardFnArg
 # ========================================
 
 

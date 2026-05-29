@@ -652,6 +652,36 @@ See [`PERFORMANCE_BOTTLENECKS.md`](PERFORMANCE_BOTTLENECKS.md) for a ranked
 list of all performance bottlenecks across GPU kernels, autograd, memory
 management, and SIMD paths — with root causes and fix suggestions for each.
 
+## Broadcast Optimization (`broadcast_nd_buffer`)
+
+`broadcast_nd_buffer` at `tenmo/ndbuffer.mojo:2712` handles ND-broadcast arithmetic (both operands non-scalar, different shapes). Three-tier dispatch:
+
+1. **Both unit-stride in last dim** (`self_eff[-1]==1 AND other_eff[-1]==1`) — SIMD-SIMD tile inner dimension. Reads `simd_width` consecutive elements from both buffers, vector op, vector store. Outer dims iterate via odometer.
+2. **One broadcasts, one unit-stride** (`self_eff[-1]==1 AND other_eff[-1]==0`, or vice versa) — splat scalar from broadcasting side, SIMD-load from contiguous side, vector op, vector store.
+3. **Scalar odometer** — per-element loop with incremental offset updates via effective strides. No `translate_index`/`flatten_index` overhead.
+
+### Correctness guarantees (generically proven by effective strides)
+
+For any valid broadcast pair `(shape_a, shape_b)` producing `result_shape`:
+- Each output coordinate maps to `base_a + Σ coord[d] × eff_stride_a[d]` in operand A, where `eff_stride[d] = 0` if dim `d` is broadcast, else original stride.
+- All three tiers evaluate the same mapping — only iteration strategy differs.
+- Result is allocated contiguous; output offset is always the flat linear index.
+
+### Performance boundaries (where Path 3 applies)
+
+| Condition | Cause |
+|---|---|
+| `self_eff[-1] != 1 AND other_eff[-1] != 1` | Neither operand has unit stride in last dim (e.g. transposed views, both broadcast in last dim) |
+| `dtype == DType.bool` | `simd_width` forced to 1 |
+| `last_dim < simd_width` | Remainder loop — implicit, correct |
+| Uncommon op codes (SIGMOID_BACKWARD, POW, etc.) | Fall through to scalar-per-tile in inner SIMD loop |
+
+None of these affect correctness — only throughput. See `tests/bench_broadcast.mojo` for benchmark patterns.
+
+### `broadcast_scalar_buffer` (scalar-size operand)
+
+Handled separately at `ndbuffer.mojo:2556` — SIMD via `buffer.arithmetic_ops_scalar`. Not affected by `broadcast_nd_buffer` changes.
+
 ## Running Selective Tests
 
 **`./execute.sh <name>`** — runs a single test alias from the test runner (e.g. `./execute.sh gather`)
@@ -676,4 +706,5 @@ To run specific test functions within a file, the `TestSuite` discovers all `fn 
 - **`UnsafePointer(...)()` null constructor removed** — Use `Optional[UnsafePointer[...]]` with `{}` (None) or `self.field = {}` for absent pointers. Never construct a null `UnsafePointer` directly.
 - **`fn` is deprecated** — Use `def` instead of `fn` for all function/struct method declarations.
 - **`alias` is deprecated** — Use `comptime` instead of `alias` for compile-time constants (e.g. `comptime dtype = DType.float32`).
+- **`@parameter` decorator is deprecated** — Use `comptime if` instead of `@parameter if` for compile-time conditional blocks. The `@parameter` decorator (which forced a `for` loop body to be unrolled at compile time) is no longer needed — write `comptime for` directly. In branches: `@parameter if cond:` → `comptime if cond:`.
 

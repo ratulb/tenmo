@@ -2664,26 +2664,263 @@ struct NDBuffer[dtype: DType](
             self.shape, other.shape
         )
 
-        var mask1 = ShapeBroadcaster.broadcast_mask(self.shape, result_shape)
-        var mask2 = ShapeBroadcaster.broadcast_mask(other.shape, result_shape)
+        var rank = result_shape.rank()
+        var self_rank = self.shape.rank()
+        var other_rank = other.shape.rank()
+        var extra_self = rank - self_rank
+        var extra_other = rank - other_rank
+
+        # Effective strides: zero for broadcast dims, original stride otherwise
+        var self_eff = IntArray.with_capacity(rank)
+        var other_eff = IntArray.with_capacity(rank)
+
+        for i in range(rank):
+            var self_i = i - extra_self
+            if self_i < 0:
+                self_eff.append(0)
+            elif self.shape[self_i] == 1 and result_shape[i] > 1:
+                self_eff.append(0)
+            else:
+                self_eff.append(self.strides[self_i])
+
+            var other_i = i - extra_other
+            if other_i < 0:
+                other_eff.append(0)
+            elif other.shape[other_i] == 1 and result_shape[i] > 1:
+                other_eff.append(0)
+            else:
+                other_eff.append(other.strides[other_i])
 
         var buffer = Buffer[Self.dtype](result_shape.num_elements())
-        var strides = Strides.default(result_shape)
+        var total = buffer.size
 
-        for coord in result_shape:
-            var self_coord = ShapeBroadcaster.translate_index(
-                self.shape, coord, mask1, result_shape
-            )
-            var other_coord = ShapeBroadcaster.translate_index(
-                other.shape, coord, mask2, result_shape
-            )
-            var index = IndexCalculator.flatten_index(
-                result_shape, coord, strides, 0
-            )
+        comptime simd_width = simd_width_of[
+            Self.dtype
+        ]() if Self.dtype != DType.bool else 1
 
-            buffer[index] = Self.scalar_fn[op_code](
-                self[self_coord], other[other_coord]
+        # Fast path: SIMD-tile the last dimension when both have unit stride
+        if (
+            simd_width > 1
+            and rank >= 1
+            and self_eff[rank - 1] == 1
+            and other_eff[rank - 1] == 1
+        ):
+            var last_dim = result_shape[rank - 1]
+            var outer_rank = rank - 1
+            var outer_count = total // last_dim
+
+            # Odometer for outer dimensions (all except last)
+            var outer_coords = IntArray.filled(outer_rank, 0)
+            var self_off = self.offset
+            var other_off = other.offset
+
+            for outer_idx in range(outer_count):
+                var out_base = outer_idx * last_dim
+
+                # SIMD tile the last dimension
+                var j = 0
+                while j + simd_width <= last_dim:
+                    var self_v = self.buffer.load[simdwidth=simd_width](
+                        self_off + j
+                    )
+                    var other_v = other.buffer.load[simdwidth=simd_width](
+                        other_off + j
+                    )
+                    var op_result: SIMD[Self.dtype, simd_width]
+
+                    comptime if op_code == Add:
+                        op_result = self_v + other_v
+                    elif op_code == Subtract:
+                        op_result = self_v - other_v
+                    elif op_code == ReverseSubtract:
+                        op_result = other_v - self_v
+                    elif op_code == Multiply:
+                        op_result = self_v * other_v
+                    elif op_code == Divide:
+                        op_result = self_v / other_v
+                    elif op_code == MAX:
+                        op_result = max(self_v, other_v)
+                    elif op_code == MIN:
+                        op_result = min(self_v, other_v)
+                    else:
+                        # uncommon opcodes — scalar fallback
+                        for k in range(j, j + simd_width):
+                            buffer[out_base + k] = Self.scalar_fn[op_code](
+                                self.buffer[self_off + k],
+                                other.buffer[other_off + k],
+                            )
+                        j += simd_width
+                        continue
+
+                    buffer.store[simdwidth=simd_width](out_base + j, op_result)
+                    j += simd_width
+
+                # Scalar remainder
+                for k in range(j, last_dim):
+                    buffer[out_base + k] = Self.scalar_fn[op_code](
+                        self.buffer[self_off + k],
+                        other.buffer[other_off + k],
+                    )
+
+                # Advance outer dims (odometer)
+                if outer_idx + 1 < outer_count:
+                    for d in range(outer_rank - 1, -1, -1):
+                        outer_coords[d] += 1
+                        if outer_coords[d] < result_shape[d]:
+                            self_off += self_eff[d]
+                            other_off += other_eff[d]
+                            break
+                        else:
+                            self_off -= (result_shape[d] - 1) * self_eff[d]
+                            other_off -= (result_shape[d] - 1) * other_eff[d]
+                            outer_coords[d] = 0
+
+        elif (
+            simd_width > 1
+            and rank >= 1
+            and (
+                (self_eff[rank - 1] == 1 and other_eff[rank - 1] == 0)
+                or (other_eff[rank - 1] == 1 and self_eff[rank - 1] == 0)
             )
+        ):
+            # One-sided broadcast SIMD: one input broadcasts in last dim
+            var self_broadcasts_last = self_eff[rank - 1] != 1
+            var last_dim = result_shape[rank - 1]
+            var outer_rank = rank - 1
+            var outer_count = total // last_dim
+
+            var outer_coords = IntArray.filled(outer_rank, 0)
+            var self_off = self.offset
+            var other_off = other.offset
+
+            for outer_idx in range(outer_count):
+                var out_base = outer_idx * last_dim
+
+                # Scalar from the broadcasting side (same for the whole row)
+                var scalar_v = self.buffer[
+                    self_off
+                ] if self_broadcasts_last else other.buffer[other_off]
+
+                # Splat scalar to SIMD for uniform vec-vec ops below
+                var scalar_vec = SIMD[Self.dtype, simd_width](scalar_v)
+                var j = 0
+                while j + simd_width <= last_dim:
+                    # SIMD load from the non-broadcasting side
+                    var vec = other.buffer.load[simdwidth=simd_width](
+                        other_off + j
+                    ) if self_broadcasts_last else self.buffer.load[
+                        simdwidth=simd_width
+                    ](
+                        self_off + j
+                    )
+                    var op_result: SIMD[Self.dtype, simd_width]
+
+                    comptime if op_code == Add:
+                        op_result = (
+                            scalar_vec
+                            + vec if self_broadcasts_last else vec
+                            + scalar_vec
+                        )
+                    elif op_code == Subtract:
+                        op_result = (
+                            scalar_vec
+                            - vec if self_broadcasts_last else vec
+                            - scalar_vec
+                        )
+                    elif op_code == ReverseSubtract:
+                        op_result = (
+                            vec
+                            - scalar_vec if self_broadcasts_last else scalar_vec
+                            - vec
+                        )
+                    elif op_code == Multiply:
+                        op_result = (
+                            scalar_vec
+                            * vec if self_broadcasts_last else vec
+                            * scalar_vec
+                        )
+                    elif op_code == Divide:
+                        op_result = (
+                            scalar_vec
+                            / vec if self_broadcasts_last else vec
+                            / scalar_vec
+                        )
+                    elif op_code == MAX:
+                        op_result = max(
+                            scalar_vec, vec
+                        ) if self_broadcasts_last else max(vec, scalar_vec)
+                    elif op_code == MIN:
+                        op_result = min(
+                            scalar_vec, vec
+                        ) if self_broadcasts_last else min(vec, scalar_vec)
+                    else:
+                        for k in range(j, j + simd_width):
+                            var self_i = self_off if self_broadcasts_last else (
+                                self_off + k
+                            )
+                            var other_i = (
+                                other_off
+                                + k if self_broadcasts_last else other_off
+                            )
+                            buffer[out_base + k] = Self.scalar_fn[op_code](
+                                self.buffer[self_i],
+                                other.buffer[other_i],
+                            )
+                        j += simd_width
+                        continue
+
+                    buffer.store[simdwidth=simd_width](out_base + j, op_result)
+                    j += simd_width
+
+                # Scalar remainder
+                for k in range(j, last_dim):
+                    var self_i = self_off if self_broadcasts_last else (
+                        self_off + k
+                    )
+                    var other_i = (
+                        other_off + k if self_broadcasts_last else other_off
+                    )
+                    buffer[out_base + k] = Self.scalar_fn[op_code](
+                        self.buffer[self_i],
+                        other.buffer[other_i],
+                    )
+
+                # Advance outer dims
+                if outer_idx + 1 < outer_count:
+                    for d in range(outer_rank - 1, -1, -1):
+                        outer_coords[d] += 1
+                        if outer_coords[d] < result_shape[d]:
+                            self_off += self_eff[d]
+                            other_off += other_eff[d]
+                            break
+                        else:
+                            self_off -= (result_shape[d] - 1) * self_eff[d]
+                            other_off -= (result_shape[d] - 1) * other_eff[d]
+                            outer_coords[d] = 0
+
+        else:
+            # Scalar path: manual odometer with effective strides
+            var self_off = self.offset
+            var other_off = other.offset
+            var coords = IntArray.filled(rank, 0)
+
+            for i in range(total):
+                buffer[i] = Self.scalar_fn[op_code](
+                    self.buffer[self_off], other.buffer[other_off]
+                )
+
+                # Odometer increment
+                for d in range(rank - 1, -1, -1):
+                    coords[d] += 1
+                    if coords[d] < result_shape[d]:
+                        self_off += self_eff[d]
+                        other_off += other_eff[d]
+                        break
+                    else:
+                        self_off -= (result_shape[d] - 1) * self_eff[d]
+                        other_off -= (result_shape[d] - 1) * other_eff[d]
+                        coords[d] = 0
+
         return NDBuffer[Self.dtype](buffer^, result_shape)
 
     def broadcast_to(self, target_shape: Shape) -> NDBuffer[Self.dtype]:
