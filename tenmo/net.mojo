@@ -1264,7 +1264,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         self.kernel_size = kernel_size
         self.stride = stride
         self.dilation = dilation
-        self.padding = padding
+        self.padding = padding.copy()
         self.training = True
 
         # Initialize weights: (out_channels, in_channels, kernel_size, kernel_size)
@@ -1347,6 +1347,30 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         print("  Out channels:", out_channels)
         print("  Kernel size:", kernel_size, "×", kernel_size)
         print("  Parameters:", self.num_parameters())
+
+    def __init__(out self, *, copy: Self):
+        self.weight = copy.weight
+        self.bias = copy.bias
+        self.in_channels = copy.in_channels
+        self.out_channels = copy.out_channels
+        self.kernel_size = copy.kernel_size
+        self.stride = copy.stride
+        self.dilation = copy.dilation
+        self.padding = copy.padding.copy()
+        self.training = copy.training
+        self.delegate = copy.delegate
+
+    def __init__(out self, *, deinit take: Self):
+        self.weight = take.weight^
+        self.bias = take.bias^
+        self.in_channels = take.in_channels
+        self.out_channels = take.out_channels
+        self.kernel_size = take.kernel_size
+        self.stride = take.stride
+        self.dilation = take.dilation
+        self.padding = take.padding^
+        self.training = take.training
+        self.delegate = take.delegate^
 
     def __call__(mut self, image: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         """

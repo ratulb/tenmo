@@ -33,13 +33,16 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if axis == 0:
             var src_offset = 0
             for i in range(count):
-                var parent = output.ancestry().get(i)
-                var tensor = Tensor[Self.dtype](
+                ref parent = output.ancestry().get(i)
+                _="""var tensor = Tensor[Self.dtype](
                     parent.buffer(), requires_grad=parent.requires_grad
-                )
-                var num_elements = tensor.numels()
-                if tensor.requires_grad:
-                    var grad_input = Gradbox[Self.dtype].zeros(tensor.shape())
+                )"""
+                #var num_elements = tensor.numels()
+                var num_elements = parent.buffer().numels()
+                #if tensor.requires_grad:
+                if parent.requires_grad:
+                    #var grad_input = Gradbox[Self.dtype].zeros(tensor.shape())
+                    var grad_input = Gradbox[Self.dtype].zeros(parent.shape())
                     var grad_input_data = grad_input.data_ptr()
                     for j in range(num_elements):
                         grad_input_data[j] = grad_data[src_offset + j]

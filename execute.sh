@@ -248,6 +248,7 @@ if [ $# -eq 0 ]; then
     echo "  $0 gpu                        - Run all GPU-guarded tests"
     echo "  $0 gpu from relu              - Run relu and all GPU tests after it"
     echo "  $0 gpu relu tanh              - Run only relu and tanh"
+    echo "  $0 select softmax test_softmax_1d   - Isolate and run a single test function"
     echo ""
     print_colored "$CYAN" "Available tests:"
     echo "  reshape, dot, division, embedding, layer_norm, reciprocal, product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
@@ -258,7 +259,9 @@ if [ $# -eq 0 ]; then
     echo "  indexhelper, losses, tanh, data, softmax, repeat, mmnd, attn_matmul"
     echo "  attn_matmul, bce, intarray, mm2d, vm, mv, slice, view_slice, tiles, linspace, argminmax"
     echo "  minmax, relu, shuffle, permute, flatten, gather, squeeze, unsqueeze"
-    echo "  gpu_all          Run all GPU tests from a single file"
+    echo "  select <test_name> <fn>  Extract and run a single test function from a file"
+    echo "  gpu_all [N..M] [N]...  Run GPU tests: monolithic; chunk N; range (2..4); or list (2 4 6)"
+    echo "  cpu_all [N..M] [N]...  Run CPU tests: monolithic; chunk N; range (2..4); or list (2 4 6)"
     echo "  retain_graph   Test retain_graph=True/False for all backward handlers"
     echo "  checkpoint, shapebroadcast, validators, ce, synth_mnist"
     echo ""
@@ -306,9 +309,10 @@ SCRIPT_START=$(date +%s%N)
 FAILED_TESTS=()
 PASSED_TESTS=()
 
-# Function to run a test by name
+# Function to run a test by name (accepts optional chunk arg for cpu_all)
 run_test_by_name() {
     local test_name=$1
+    local chunk_arg="${2:-}"
     local exit_code=0
 
     case $test_name in
@@ -417,8 +421,35 @@ run_test_by_name() {
         checkpoint)     run_test "checkpoint" "tests/test_checkpoint.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         synth_mnist)    run_test "synth_mnist" "tests/test_synthetic_mnist.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         gpu_all)
-            print_colored "$BLUE" "Running all GPU tests from single file..."
-            run_test "gpu_all" "tests/test_gpu_all.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+            if [ -n "$chunk_arg" ]; then
+                local chunk_file="tests/test_gpu_all_${chunk_arg}.mojo"
+                if [ -f "$chunk_file" ]; then
+                    print_colored "$BLUE" "Running GPU test chunk $chunk_arg..."
+                    run_test "gpu_all_${chunk_arg}" "$chunk_file" "$DEBUG_MODE"
+                else
+                    print_colored "$RED" "Error: chunk file $chunk_file does not exist"
+                    return 1
+                fi
+            else
+                print_colored "$BLUE" "Running all GPU tests from single file..."
+                run_test "gpu_all" "tests/test_gpu_all.mojo" "$DEBUG_MODE"
+            fi
+            exit_code=$? ;;
+        cpu_all)
+            if [ -n "$chunk_arg" ]; then
+                local chunk_file="tests/test_cpu_all_${chunk_arg}.mojo"
+                if [ -f "$chunk_file" ]; then
+                    print_colored "$BLUE" "Running CPU test chunk $chunk_arg..."
+                    run_test "cpu_all_${chunk_arg}" "$chunk_file" "$DEBUG_MODE"
+                else
+                    print_colored "$RED" "Error: chunk file $chunk_file does not exist"
+                    return 1
+                fi
+            else
+                print_colored "$BLUE" "Running all CPU tests from single file..."
+                run_test "cpu_all" "tests/test_cpu_all.mojo" "$DEBUG_MODE"
+            fi
+            exit_code=$? ;;
         quick)
             print_colored "$BLUE" "Running quick sanity tests..."
             run_test "tensors" "tests/test_tensors.mojo" "$DEBUG_MODE"; exit_code=$?
@@ -549,6 +580,32 @@ if [ "${SPECIFIC_TESTS[0]}" = "gpu" ]; then
     else
         run_test_by_name "gpu"
     fi
+elif [ "${SPECIFIC_TESTS[0]}" = "select" ]; then
+    if [ ${#SPECIFIC_TESTS[@]} -lt 3 ]; then
+        print_colored "$RED" "Usage: $0 select <test_name> <test_fn_name>"
+        exit 1
+    fi
+    select_test_name="${SPECIFIC_TESTS[1]}"
+    select_test_fn="${SPECIFIC_TESTS[2]}"
+    case $select_test_name in
+        test_*) select_file="tests/${select_test_name}.mojo" ;;
+        *)      select_file="tests/test_${select_test_name}.mojo" ;;
+    esac
+    if [ ! -f "$select_file" ]; then
+        print_colored "$RED" "Error: test file not found: $select_file"
+        exit 1
+    fi
+    print_colored "$CYAN" "Extracting $select_test_fn from $(basename $select_file)..."
+    select_output=$(python3 scripts/select_test.py "$select_file" "$select_test_fn")
+    if [ $? -ne 0 ]; then
+        FAILED_TESTS+=("$select_test_fn")
+    else
+        if run_test "$select_test_fn" "$select_output" "$DEBUG_MODE"; then
+            PASSED_TESTS+=("$select_test_fn")
+        else
+            FAILED_TESTS+=("$select_test_fn")
+        fi
+    fi
 elif [ "$FROM_MODE" = true ]; then
     if [ -z "$START_TEST" ]; then
         print_colored "$RED" "Error: 'from' mode requires a test name"
@@ -556,7 +613,59 @@ elif [ "$FROM_MODE" = true ]; then
     fi
     run_from_test "$START_TEST"
 elif [ ${#SPECIFIC_TESTS[@]} -gt 0 ]; then
-    for test_name in "${SPECIFIC_TESTS[@]}"; do
+    for ((i=0; i<${#SPECIFIC_TESTS[@]}; i++)); do
+        test_name="${SPECIFIC_TESTS[$i]}"
+        # Handle "cpu_all/gpu_all [N M..P ...]" — collect chunk args
+        if [ "$test_name" = "cpu_all" ] || [ "$test_name" = "gpu_all" ]; then
+            chunk_args=()
+            j=$((i+1))
+            while [ $j -lt ${#SPECIFIC_TESTS[@]} ]; do
+                arg="${SPECIFIC_TESTS[$j]}"
+                if [[ "$arg" =~ ^[0-9]+$ ]]; then
+                    chunk_args+=("$arg")
+                elif [[ "$arg" =~ ^[0-9]+\.\.[0-9]+$ ]]; then
+                    start="${arg%..*}"
+                    end="${arg#*..}"
+                    [ "$start" -le "$end" ] || { start=$end; end="${arg%..*}"; }
+                    for ((k=start; k<=end; k++)); do
+                        chunk_args+=("$k")
+                    done
+                else
+                    break
+                fi
+                j=$((j+1))
+            done
+            i=$((j-1))
+            if [ ${#chunk_args[@]} -eq 0 ]; then
+                # No chunk args: try monolithic, fall back to all chunks
+                if [ -f "tests/${test_name}.mojo" ]; then
+                    if run_test_by_name "$test_name"; then
+                        PASSED_TESTS+=("$test_name")
+                    else
+                        FAILED_TESTS+=("$test_name")
+                    fi
+                else
+                    c=1
+                    while [ -f "tests/${test_name}_${c}.mojo" ]; do
+                        if run_test_by_name "$test_name" "$c"; then
+                            PASSED_TESTS+=("${test_name}_${c}")
+                        else
+                            FAILED_TESTS+=("${test_name}_${c}")
+                        fi
+                        c=$((c+1))
+                    done
+                fi
+            else
+                for chunk in "${chunk_args[@]}"; do
+                    if run_test_by_name "$test_name" "$chunk"; then
+                        PASSED_TESTS+=("${test_name}_${chunk}")
+                    else
+                        FAILED_TESTS+=("${test_name}_${chunk}")
+                    fi
+                done
+            fi
+            continue
+        fi
         if run_test_by_name "$test_name"; then
             PASSED_TESTS+=("$test_name")
         else

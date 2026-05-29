@@ -1213,7 +1213,8 @@ def test_concat_view_with_tensor_ct() raises:
     var base = Tensor[dtype].ones(2, 3, requires_grad=True)
     var view = base.view([2, 3], offset=0)
 
-    var regular = Tensor[dtype].ones(1, 3, requires_grad=True) * 2.0
+    var regular_weight = Tensor[dtype].ones(1, 3, requires_grad=True)
+    var regular = regular_weight * 2.0
 
     var tensors = List[Tensor[dtype]]()
     tensors.append(view)
@@ -1235,8 +1236,12 @@ def test_concat_view_with_tensor_ct() raises:
     assert_true(
         base.grad().all_close[atol=1e-6](Tensor[dtype].ones(base.shape()))
     )
+    # regular is an intermediate (regular_weight * 2.0);
+    # its gradient is zeroed after backward — check leaf instead
     assert_true(
-        regular.grad().all_close[atol=1e-6](Tensor[dtype].ones(regular.shape()))
+        regular_weight.grad().all_close[atol=1e-6](
+            Tensor[dtype].full(regular_weight.shape(), 2.0)
+        )
     )
 
 

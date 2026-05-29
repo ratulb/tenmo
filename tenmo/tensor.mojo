@@ -3043,28 +3043,29 @@ struct Tensor[dtype: DType](
         """
         if not output.requires_grad:
             return
-        var shape = output.shape()
-        var seed_tensor = Tensor[Self.dtype].full(shape, start_grad)
-        output.backward[graph_size](seed_tensor, retain_graph)
+        output.seed_grad(start_grad)
+        # We have already seeded, pass None
+        output.backward[graph_size](None, retain_graph=retain_graph)
 
     def backward[
         graph_size: Int = 50,
     ](
         mut output: Tensor[Self.dtype],
-        seed_tensor: Tensor[Self.dtype],
+        seed_tensor: Optional[Tensor[Self.dtype]],
+        *,
         retain_graph: Bool = False,
     ) where Self.dtype.is_floating_point():
         """Run backward pass with a specific seed tensor.
 
         Args:
-            seed_tensor: Tensor containing initial gradients.
+            seed_tensor: Tensor containing initial gradients - if None, assumed to be already seeded.
             graph_size: Maximum graph size for traversal.
             retain_graph: If True, intermediate gradients are preserved.
         """
         if not output.requires_grad:
             return
-
-        output.seed_grad(seed_tensor)
+        if seed_tensor:
+            output.seed_grad(seed_tensor.value())
 
         try:
             var topo_ids = List[UInt](capacity=graph_size)
