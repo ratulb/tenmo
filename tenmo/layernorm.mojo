@@ -32,11 +32,110 @@ from .gradbox import Gradbox
 from .ancestry import Ancestor
 from .backpropagation import BackwardFnArg, BACKWARD_LAYER_NORM
 from .ndbuffer import NDBuffer
+from .buffers import Buffer
 from .mnemonics import LAYER_NORM, AddTensor
 from .device import GPU
 from .common_utils import panic
+from .layernorm_kernel import LayerNormKernel
 from tenmo.intarray import IntArray
 from .named_parameter import NamedParameter
+from std.sys import has_accelerator
+from std.math import rsqrt
+
+# =============================================================================
+# CPU normalize kernel — extracted from NDBuffer.layernorm_normalize
+# =============================================================================
+
+
+@fieldwise_init
+struct LayerNormCpu[dtype: DType](ImplicitlyCopyable & Movable):
+    @staticmethod
+    def normalize(
+        x: NDBuffer[Self.dtype],
+        mean: NDBuffer[Self.dtype],
+        var_: NDBuffer[Self.dtype],
+        gamma: NDBuffer[Self.dtype],
+        beta: NDBuffer[Self.dtype],
+        eps: Scalar[Self.dtype],
+    ) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ]:
+        """Fused normalize: rstd + x_hat + out in single pass.
+
+        Pass 2 of LayerNorm forward — Welford (Pass 1) already ran.
+        Returns (out_ndb, x_hat_ndb, rstd_ndb).
+        out and x_hat are shape (*, D). rstd is shape (*, 1).
+
+        Args:
+         x:     Input (*, D). Must be contiguous.
+         mean:  Per-row mean (*, 1) from Welford.
+         var_:  Per-row variance (*, 1) from Welford.
+         gamma: Scale (D,).
+         beta:  Shift (D,).
+         eps:   Numerical stability constant.
+        """
+        comptime if has_accelerator():
+            if x.is_on_gpu():
+                try:
+                    return LayerNormKernel[Self.dtype].launch(
+                        x, mean, var_, gamma, beta, eps
+                    )
+                except e:
+                    print(e)
+                    panic("LayerNormCpu.normalize → GPU operation failed")
+                    return (
+                        NDBuffer[Self.dtype].Empty(),
+                        NDBuffer[Self.dtype].Empty(),
+                        NDBuffer[Self.dtype].Empty(),
+                    )  # unreachable
+        return LayerNormCpu[Self.dtype].normalize_cpu(
+            x, mean, var_, gamma, beta, eps
+        )
+
+    @staticmethod
+    def normalize_cpu(
+        x: NDBuffer[Self.dtype],
+        mean: NDBuffer[Self.dtype],
+        var_: NDBuffer[Self.dtype],
+        gamma: NDBuffer[Self.dtype],
+        beta: NDBuffer[Self.dtype],
+        eps: Scalar[Self.dtype],
+    ) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ]:
+        """CPU fused normalize — serial over rows, element-wise per row."""
+        var D = x.shape[-1]
+        var outer_size = x.numels() // D
+        var out_shape = x.shape
+        var rstd_shape = out_shape[0:-1] + [1]
+
+        var out_buf = Buffer[Self.dtype](x.numels())
+        var x_hat_buf = Buffer[Self.dtype](x.numels())
+        var rstd_buf = Buffer[Self.dtype](outer_size)
+
+        for row in range(outer_size):
+            var row_mean = mean.buffer[row]
+            var row_var = var_.buffer[row]
+            var safe_var = row_var + eps
+            var rstd = rsqrt(
+                safe_var if safe_var
+                > Scalar[Self.dtype](0) else Scalar[Self.dtype](eps)
+            )
+            rstd_buf[row] = rstd
+
+            var row_base = row * D
+            for i in range(D):
+                var x_i = x.buffer[x.offset + row_base + i]
+                var x_hat_i = (x_i - row_mean) * rstd
+                var out_i = gamma.buffer[i] * x_hat_i + beta.buffer[i]
+                x_hat_buf[row_base + i] = x_hat_i
+                out_buf[row_base + i] = out_i
+
+        var out_ndb = NDBuffer[Self.dtype](out_buf^, out_shape)
+        var x_hat_ndb = NDBuffer[Self.dtype](x_hat_buf^, out_shape)
+        var rstd_ndb = NDBuffer[Self.dtype](rstd_buf^, rstd_shape)
+        return (out_ndb^, x_hat_ndb^, rstd_ndb^)
+
 
 # =============================================================================
 # Backward argument — saved from forward, zero recomputation in backward
@@ -164,8 +263,8 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # ── Pass 2: fused normalize — rstd + x_hat + out in single pass ──
         # rstd = rsqrt(var + eps) computed inside kernel — saved for backward
         # x_hat saved for backward — written in pass 2 anyway, zero extra cost
-        var (out_ndb, x_hat_ndb, rstd_ndb) = self.buffer.layernorm_normalize(
-            mean_ndb, var_ndb, gamma.buffer, beta.buffer, eps
+        var (out_ndb, x_hat_ndb, rstd_ndb) = LayerNormCpu[Self.dtype].normalize(
+            self.buffer, mean_ndb, var_ndb, gamma.buffer, beta.buffer, eps
         )
         # Make them shared so that BackwardFnArg is lighter
         x_hat_ndb.buffer.shared()

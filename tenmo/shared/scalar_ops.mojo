@@ -96,7 +96,9 @@ struct ScalarOps[dtype: DType](
     @always_inline
     def float_unary_fn_helper[
         op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
-    ](scalar: Scalar[Self.dtype]) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
+    ](scalar: Scalar[Self.dtype]) -> Scalar[
+        Self.dtype
+    ] where Self.dtype.is_floating_point():
         comptime if op_code == LOG:
             return log(max(scalar, epsilon))
         elif op_code == SIGMOID_FORWARD:
@@ -139,75 +141,6 @@ struct ScalarOps[dtype: DType](
         x: Scalar[Self.dtype], epsilon: Scalar[Self.dtype]
     ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
         return x.clamp(epsilon, Scalar[Self.dtype](1.0) - epsilon)
-
-    @staticmethod
-    def bce_with_logits_element(
-        x: Scalar[Self.dtype],
-        y: Scalar[Self.dtype],
-        epsilon: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        var s = Self.sigmoid_fn(x)
-        var safe = Self.clip_fn(s, epsilon)
-        return -(
-            y * log(safe)
-            + (Scalar[Self.dtype](1.0) - y)
-            * log(Scalar[Self.dtype](1.0) - safe)
-        )
-
-    @staticmethod
-    def bce_element(
-        p: Scalar[Self.dtype],
-        y: Scalar[Self.dtype],
-        epsilon: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        var safe = Self.clip_fn(p, epsilon)
-        return -(
-            y * log(safe)
-            + (Scalar[Self.dtype](1.0) - y)
-            * log(Scalar[Self.dtype](1.0) - safe)
-        )
-
-    @staticmethod
-    def bce_with_logits_backward_element(
-        sigmoid: Scalar[Self.dtype],
-        target: Scalar[Self.dtype],
-        grad: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        return (sigmoid - target) * grad
-
-    @staticmethod
-    def bce_backward_element(
-        safe: Scalar[Self.dtype],
-        target: Scalar[Self.dtype],
-        grad: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        var one = Scalar[Self.dtype](1.0)
-        var one_minus_target = one - target
-        var one_minus_safe = one - safe
-        return -(target / safe - one_minus_target / one_minus_safe) * grad
-
-    @staticmethod
-    def rdiv_scalar_backward_element(
-        grad_out: Scalar[Self.dtype],
-        x: Scalar[Self.dtype],
-        scalar: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype]:
-        return scalar * grad_out / (x * x)
-
-    @staticmethod
-    def divide_backward_x_element(
-        grad_out: Scalar[Self.dtype],
-        y: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype]:
-        return grad_out / y
-
-    @staticmethod
-    def divide_backward_y_element(
-        grad_out: Scalar[Self.dtype],
-        x: Scalar[Self.dtype],
-        y: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype]:
-        return grad_out * x / (y * y)
 
     # ------------------------------------------------------------------
     # Float64 cast helper  (used by PRODUCT reduction)

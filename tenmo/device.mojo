@@ -6,7 +6,6 @@ from std.utils import Variant
 from .ndbuffer import NDBuffer
 from .shapes import Shape
 from .buffers import Buffer
-from .shared import ScalarPredicate
 from std.sys.defines import get_defined_int
 
 comptime DeviceType = Variant[CPU, GPU]
@@ -209,11 +208,9 @@ struct DeviceState[dtype: DType](
         return device_state
 
     @staticmethod
-    def map_where[
-        Pred: ScalarPredicate
-    ](
+    def map_where(
         ref ndb: NDBuffer[Self.dtype],
-        pred: Pred,
+        pred: def(Scalar[Self.dtype]) thin -> Bool,
         value: Scalar[Self.dtype],
         sync: Bool = True,
     ) raises -> DeviceState[Self.dtype]:

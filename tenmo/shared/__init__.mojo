@@ -1,11 +1,6 @@
 from tenmo.common_utils import panic
 
 
-trait ScalarPredicate:
-    def __call__[dtype: DType](self, x: Scalar[dtype]) -> Bool:
-        ...
-
-
 struct Reduction(ImplicitlyCopyable, RegisterPassable):
     var reduction: Int
 

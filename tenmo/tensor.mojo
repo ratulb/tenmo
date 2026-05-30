@@ -33,7 +33,7 @@ from .broadcasthelper import ShapeBroadcaster
 from .ndbuffer import NDBuffer
 from std.gpu.host import DeviceBuffer, DeviceContext
 from .device import Device, CPU, GPU
-from tenmo.shared import Reduction, ScalarPredicate
+from tenmo.shared import Reduction
 from std.sys.info import has_accelerator
 
 
@@ -131,42 +131,6 @@ struct Tensor[dtype: DType](
         self.gradbox = {}
         self.ancestors = None
         self.init_gradbox()
-
-    @staticmethod
-    def from_device_buffer(
-        buffer: DeviceBuffer[Self.dtype],
-        shape: Optional[Shape] = None,
-        strides: Optional[Strides] = None,
-        offset: Int = 0,
-        requires_grad: Bool = False,
-    ) raises -> Tensor[Self.dtype]:
-        """Create a tensor from a GPU device buffer.
-
-        Args:
-            buffer: GPU device buffer containing the data.
-            shape: Tensor shape. If None, inferred from buffer length.
-            strides: Memory strides. If None, inferred from shape.
-            offset: Base memory offset (default: 0).
-            requires_grad: Whether this tensor requires gradient tracking.
-
-        Returns:
-            A new tensor wrapping the device buffer.
-
-        Raises:
-            Any error from mapping device buffer to host.
-        """
-        var out: Tensor[Self.dtype]
-        with buffer.map_to_host() as host_buffer:
-            var shape_realized = shape.or_else(Shape(len(host_buffer)))
-            out = Tensor[Self.dtype](
-                host_buffer.unsafe_ptr(),
-                shape_realized,
-                strides,
-                offset,
-                requires_grad,
-                copy=True,
-            )
-        return out
 
     def as_gradbox(
         deinit self, share: Bool = False, *, contiguous: Bool = True
@@ -1168,13 +1132,13 @@ struct Tensor[dtype: DType](
         """
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
-    def all[Pred: ScalarPredicate](self, pred: Pred) -> Bool:
+    def all(self, pred: def(Scalar[Self.dtype]) thin -> Bool) -> Bool:
         """Returns True if pred holds for all elements.
         Uses NDBuffer.map_to_bool — handles GPU via CPU materialisation.
         """
         return self.buffer.map_to_bool(pred).all_true()
 
-    def any[Pred: ScalarPredicate](self, pred: Pred) -> Bool:
+    def any(self, pred: def(Scalar[Self.dtype]) thin -> Bool) -> Bool:
         """Returns True if pred holds for any element.
         Uses NDBuffer.map_to_bool — handles GPU via CPU materialisation.
         """
@@ -1231,11 +1195,9 @@ struct Tensor[dtype: DType](
         """
         self.buffer.fill(value)
 
-    def map_where[
-        Pred: ScalarPredicate
-    ](
+    def map_where(
         self,
-        pred: Pred,
+        pred: def(Scalar[Self.dtype]) thin -> Bool,
         value: Scalar[Self.dtype],
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
@@ -3917,23 +3879,6 @@ struct Tensor[dtype: DType](
         return BCEWithLogitsLoss[Self.dtype].forward[track_grad](
             logits, target, epsilon, reduction
         )
-
-    def sum_over_broadcasted_axes(
-        batch_tensor: Tensor[Self.dtype], target_shape: Shape
-    ) -> Tensor[Self.dtype]:
-        """Sum broadcasted tensor over axes matching target shape.
-
-        Args:
-            batch_tensor: Tensor to sum.
-            target_shape: Shape to broadcast to before summing.
-
-        Returns:
-            Tensor summed over broadcasted axes.
-        """
-        var nd_buffer = batch_tensor.buffer.sum_over_broadcasted_axes(
-            target_shape
-        )
-        return Tensor[Self.dtype](nd_buffer^, requires_grad=False)
 
     def matmul[
         track_grad: Bool = True, mode: Int = mnemonics.mm

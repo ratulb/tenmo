@@ -1,14 +1,12 @@
 from tenmo.shapes import Shape
 from tenmo.strides import Strides
 from tenmo.buffers import Buffer
-from tenmo.shared import ScalarPredicate
 from tenmo.intarray import IntArray
 from tenmo.indexhelper import IndexCalculator, IndexIterator
 from tenmo.matrixshapevalidator import MatrixShapeValidator
 from tenmo.broadcasthelper import ShapeBroadcaster
 from tenmo.common_utils import panic, log_debug, print_buffer, Epsilon, One
-from tenmo.bce_kernel import BceKernel
-from tenmo.division_kernel import DivisionKernel
+
 from tenmo.validators import Validator
 from std.memory import memcpy, AddressSpace
 from std.gpu.host import DeviceBuffer, DeviceContext
@@ -27,7 +25,6 @@ from tenmo.cpu_broadcast import CpuBroadcast
 from tenmo.shared.scalar_ops import ScalarOps
 from tenmo.compare_kernel import AllClose, Compare, CompareScalar
 from tenmo.reduction_kernel import Reduction, ProductArg
-from tenmo.layernorm_kernel import LayerNormKernel
 from tenmo.minmax_kernel import ReductionMinMax
 from tenmo.minmax_reducer import MinMaxReducer
 from tenmo.std_variance_backward_kernel import StdVarianceBackwardKernel
@@ -1060,9 +1057,11 @@ struct NDBuffer[dtype: DType](
             out = NDBuffer[Self.dtype].Empty()
         return out^
 
-    def map_where[
-        Pred: ScalarPredicate
-    ](self, pred: Pred, value: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def map_where(
+        self,
+        pred: def(Scalar[Self.dtype]) thin -> Bool,
+        value: Scalar[Self.dtype],
+    ) -> NDBuffer[Self.dtype]:
         comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
@@ -1081,9 +1080,11 @@ struct NDBuffer[dtype: DType](
         return self.map_where_cpu(pred, value)
 
     @always_inline
-    def map_where_cpu[
-        Pred: ScalarPredicate
-    ](self, pred: Pred, value: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+    def map_where_cpu(
+        self,
+        pred: def(Scalar[Self.dtype]) thin -> Bool,
+        value: Scalar[Self.dtype],
+    ) -> NDBuffer[Self.dtype]:
         var buffer = Buffer[Self.dtype](len(self))
         var index = 0
         for next in self.index_iterator():
@@ -1451,9 +1452,9 @@ struct NDBuffer[dtype: DType](
                         -1 if neg_count % 2 == 1 else 1
                     )
                     # out[out_coord] = (sign * exp(log_abs_sum)).cast[Self.dtype]()
-                    out[out_coord] = ScalarOps[Self.dtype].cast_result[Self.dtype](
-                        sign * exp(log_abs_sum)
-                    )
+                    out[out_coord] = ScalarOps[Self.dtype].cast_result[
+                        Self.dtype
+                    ](sign * exp(log_abs_sum))
 
         # excl_product: compute now or defer to backward
         var excl_optional: Optional[NDBuffer[Self.dtype]] = None
@@ -2264,9 +2265,9 @@ struct NDBuffer[dtype: DType](
             elif self.is_contiguous() and not other.is_contiguous():
                 var index = self.offset
                 for idx in other.index_iterator():
-                    self.buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
-                        self.buffer[index], other.buffer[idx]
-                    )
+                    self.buffer[index] = ScalarOps[Self.dtype].scalar_fn[
+                        op_code
+                    ](self.buffer[index], other.buffer[idx])
                     index += 1
 
             elif not self.is_contiguous() and other.is_contiguous():
@@ -2286,9 +2287,9 @@ struct NDBuffer[dtype: DType](
                         print(e)
                         panic("Raised StopIteration in NDBuffer → inplace_ops")
 
-                    self.buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
-                        self.buffer[index], other.buffer[next_index]
-                    )
+                    self.buffer[index] = ScalarOps[Self.dtype].scalar_fn[
+                        op_code
+                    ](self.buffer[index], other.buffer[next_index])
 
     @always_inline
     def inplace_scalar_ops[
@@ -2503,17 +2504,17 @@ struct NDBuffer[dtype: DType](
             if self.is_contiguous() and not other.is_contiguous():
                 var offset = self.offset
                 for idx in other.index_iterator():
-                    result_buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
-                        self.buffer[offset + index], other.buffer[idx], epsilon
-                    )
+                    result_buffer[index] = ScalarOps[Self.dtype].scalar_fn[
+                        op_code
+                    ](self.buffer[offset + index], other.buffer[idx], epsilon)
                     index += 1
 
             elif not self.is_contiguous() and other.is_contiguous():
                 var offset = other.offset
                 for idx in self.index_iterator():
-                    result_buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
-                        self.buffer[idx], other.buffer[offset + index], epsilon
-                    )
+                    result_buffer[index] = ScalarOps[Self.dtype].scalar_fn[
+                        op_code
+                    ](self.buffer[idx], other.buffer[offset + index], epsilon)
                     index += 1
 
             else:
@@ -2528,9 +2529,9 @@ struct NDBuffer[dtype: DType](
                             "Raised StopIteration in NDBuffer → arithmetic_ops"
                         )
 
-                    result_buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
-                        self.buffer[idx], other.buffer[next_index], epsilon
-                    )
+                    result_buffer[index] = ScalarOps[Self.dtype].scalar_fn[
+                        op_code
+                    ](self.buffer[idx], other.buffer[next_index], epsilon)
                     index += 1
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
@@ -2699,9 +2700,9 @@ struct NDBuffer[dtype: DType](
             var result_buffer = Buffer[Self.dtype](self.numels())
 
             for idx in self.index_iterator():
-                result_buffer[index] = ScalarOps[Self.dtype].unary_fn_helper[op_code](
-                    self.buffer[idx]
-                )
+                result_buffer[index] = ScalarOps[Self.dtype].unary_fn_helper[
+                    op_code
+                ](self.buffer[idx])
                 index += 1
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
@@ -2846,95 +2847,12 @@ struct NDBuffer[dtype: DType](
             var result_buffer = Buffer[Self.dtype](self.numels())
 
             for idx in self.index_iterator():
-                result_buffer[index] = ScalarOps[Self.dtype].float_unary_fn_helper[
-                    op_code, epsilon
-                ](self.buffer[idx])
+                result_buffer[index] = ScalarOps[
+                    Self.dtype
+                ].float_unary_fn_helper[op_code, epsilon](self.buffer[idx])
                 index += 1
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
-
-    def layernorm_normalize(
-        self: NDBuffer[Self.dtype],
-        mean: NDBuffer[Self.dtype],
-        var_: NDBuffer[Self.dtype],
-        gamma: NDBuffer[Self.dtype],
-        beta: NDBuffer[Self.dtype],
-        eps: Scalar[Self.dtype],
-    ) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ]:
-        """Fused normalize: rstd + x_hat + out in single pass.
-
-        Pass 2 of LayerNorm forward — Welford (Pass 1) already ran.
-        Returns (out_ndb, x_hat_ndb, rstd_ndb).
-        out and x_hat are shape (*, D). rstd is shape (*, 1).
-
-        Args:
-         self:  Input (*, D). Must be contiguous.
-         mean:  Per-row mean (*, 1) from tenmo.elford.
-         var_:  Per-row variance (*, 1) from tenmo.elford.
-         gamma: Scale (D,).
-         beta:  Shift (D,).
-         eps:   Numerical stability constant.
-        """
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    return LayerNormKernel[Self.dtype].launch(
-                        self, mean, var_, gamma, beta, eps
-                    )
-                except e:
-                    print(e)
-                    panic("NDBuffer layernorm_normalize → GPU operation failed")
-                    return (
-                        Self.Empty(),
-                        Self.Empty(),
-                        Self.Empty(),
-                    )  # unreachable
-        return self.layernorm_normalize_cpu(mean, var_, gamma, beta, eps)
-
-    def layernorm_normalize_cpu(
-        self: NDBuffer[Self.dtype],
-        mean: NDBuffer[Self.dtype],
-        var_: NDBuffer[Self.dtype],
-        gamma: NDBuffer[Self.dtype],
-        beta: NDBuffer[Self.dtype],
-        eps: Scalar[Self.dtype],
-    ) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ]:
-        """CPU fused normalize — serial over rows, element-wise per row."""
-        var D = self.shape[-1]
-        var outer_size = self.numels() // D
-        var out_shape = self.shape
-        var rstd_shape = out_shape[0:-1] + [1]
-
-        var out_buf = Buffer[Self.dtype](self.numels())
-        var x_hat_buf = Buffer[Self.dtype](self.numels())
-        var rstd_buf = Buffer[Self.dtype](outer_size)
-
-        for row in range(outer_size):
-            var row_mean = mean.buffer[row]
-            var row_var = var_.buffer[row]
-            var safe_var = row_var + eps
-            # rsqrt(var + eps) = 1/sqrt(var+eps) — rstd directly
-            var rstd = rsqrt(
-                safe_var if safe_var
-                > Scalar[Self.dtype](0) else Scalar[Self.dtype](eps)
-            )
-            rstd_buf[row] = rstd
-            var row_base = row * D
-            for i in range(D):
-                var x_i = self.buffer[self.offset + row_base + i]
-                var x_hat_i = (x_i - row_mean) * rstd
-                var out_i = gamma.buffer[i] * x_hat_i + beta.buffer[i]
-                x_hat_buf[row_base + i] = x_hat_i
-                out_buf[row_base + i] = out_i
-
-        var out_ndb = NDBuffer[Self.dtype](out_buf^, out_shape)
-        var x_hat_ndb = NDBuffer[Self.dtype](x_hat_buf^, out_shape)
-        var rstd_ndb = NDBuffer[Self.dtype](rstd_buf^, rstd_shape)
-        return (out_ndb^, x_hat_ndb^, rstd_ndb^)
 
     def variance_backward_normalize(
         self: NDBuffer[Self.dtype],
@@ -3118,698 +3036,6 @@ struct NDBuffer[dtype: DType](
             return result_ndb, mask_ndb
         else:
             return result_ndb, NDBuffer[Self.dtype].Empty()
-
-    def bce_with_logits_backward(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        grad_output: NDBuffer[Self.dtype],
-    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
-        """Fused BCEWithLogits backward. Returns gradient for logits.
-
-        Device-aware: GPU → BceKernel.launch_bce_with_logits_backward.
-        CPU → bce_with_logits_backward_cpu.
-        """
-        result: NDBuffer[Self.dtype]
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    var gpu_target = (
-                        target if target.is_on_gpu() else target.to_device(
-                            self.device()
-                        )[1]
-                    )
-                    var gpu_grad = grad_output if grad_output.is_on_gpu() else grad_output.to_device(
-                        self.device()
-                    )[
-                        1
-                    ]
-                    result = BceKernel[
-                        Self.dtype
-                    ].launch_bce_with_logits_backward(
-                        self, gpu_target, gpu_grad
-                    )
-                except e:
-                    print(e)
-                    panic(
-                        "NDBuffer bce_with_logits_backward → GPU operation"
-                        " failed"
-                    )
-                    result = Self.Empty()
-            else:
-                result = self.bce_with_logits_backward_cpu(target, grad_output)
-        else:
-            result = self.bce_with_logits_backward_cpu(target, grad_output)
-        return result^
-
-    @always_inline
-    def bce_with_logits_backward_cpu(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        grad_output: NDBuffer[Self.dtype],
-    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
-        if self.is_contiguous():
-            var buf = self.buffer.bce_with_logits_backward(
-                target.buffer, grad_output.buffer
-            )
-            return NDBuffer[Self.dtype](buf^, self.shape)
-        else:
-            var extent = self.numels()
-            var grad_buf = Buffer[Self.dtype](extent)
-            var idx = 0
-            for coord in self.index_iterator():
-                grad_buf[idx] = ScalarOps[Self.dtype].bce_with_logits_backward_element(
-                    self.buffer[coord],
-                    target.buffer[coord],
-                    grad_output.buffer[coord],
-                )
-                idx += 1
-            return NDBuffer[Self.dtype](grad_buf^, self.shape)
-
-    @always_inline
-    def bce_with_logits_backward_scaled(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        scalar_grad: Scalar[Self.dtype],
-    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
-        """Fused BCEWithLogits backward with scalar gradient.
-
-        grad[i] = (sigmoid[i] - target[i]) * scalar_grad.
-        Device-aware: GPU → BceKernel.launch_bce_with_logits_backward_scaled.
-        CPU → bce_with_logits_backward_scaled_cpu.
-        """
-        result: NDBuffer[Self.dtype]
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    result = BceKernel[
-                        Self.dtype
-                    ].launch_bce_with_logits_backward_scaled(
-                        self, target, scalar_grad
-                    )
-                except e:
-                    print(e)
-                    panic(
-                        "NDBuffer bce_with_logits_backward_scaled → GPU"
-                        " operation failed"
-                    )
-                    result = Self.Empty()
-            else:
-                result = self.bce_with_logits_backward_scaled_cpu(
-                    target, scalar_grad
-                )
-        else:
-            result = self.bce_with_logits_backward_scaled_cpu(
-                target, scalar_grad
-            )
-        return result^
-
-    @always_inline
-    def bce_with_logits_backward_scaled_cpu(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        scalar_grad: Scalar[Self.dtype],
-    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
-        if self.is_contiguous():
-            var buf = self.buffer.bce_with_logits_backward_scaled(
-                target.buffer, scalar_grad
-            )
-            return NDBuffer[Self.dtype](buf^, self.shape)
-        else:
-            var extent = self.numels()
-            var grad_buf = Buffer[Self.dtype](extent)
-            var idx = 0
-            for coord in self.index_iterator():
-                grad_buf[idx] = ScalarOps[Self.dtype].bce_with_logits_backward_element(
-                    self.buffer[coord],
-                    target.buffer[coord],
-                    scalar_grad,
-                )
-                idx += 1
-            return NDBuffer[Self.dtype](grad_buf^, self.shape)
-
-    @always_inline
-    def bce_backward(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        grad_output: NDBuffer[Self.dtype],
-    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
-        """Fused BCELoss backward. Returns gradient for pred.
-
-        Device-aware: GPU → BceKernel.launch_bce_backward.
-        CPU → bce_backward_cpu.
-        """
-        result: NDBuffer[Self.dtype]
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    var gpu_target = (
-                        target if target.is_on_gpu() else target.to_device(
-                            self.device()
-                        )[1]
-                    )
-                    var gpu_grad = grad_output if grad_output.is_on_gpu() else grad_output.to_device(
-                        self.device()
-                    )[
-                        1
-                    ]
-                    result = BceKernel[Self.dtype].launch_bce_backward(
-                        self, gpu_target, gpu_grad
-                    )
-                except e:
-                    print(e)
-                    panic("NDBuffer bce_backward → GPU operation failed")
-                    result = Self.Empty()
-            else:
-                result = self.bce_backward_cpu(target, grad_output)
-        else:
-            result = self.bce_backward_cpu(target, grad_output)
-        return result^
-
-    @always_inline
-    def bce_backward_cpu(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        grad_output: NDBuffer[Self.dtype],
-    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
-        if self.is_contiguous():
-            var buf = self.buffer.bce_backward(
-                target.buffer, grad_output.buffer
-            )
-            return NDBuffer[Self.dtype](buf^, self.shape)
-        else:
-            var extent = self.numels()
-            var grad_buf = Buffer[Self.dtype](extent)
-            var idx = 0
-            for coord in self.index_iterator():
-                grad_buf[idx] = ScalarOps[Self.dtype].bce_backward_element(
-                    self.buffer[coord],
-                    target.buffer[coord],
-                    grad_output.buffer[coord],
-                )
-                idx += 1
-            return NDBuffer[Self.dtype](grad_buf^, self.shape)
-
-    @always_inline
-    def bce_backward_scaled(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        scalar_grad: Scalar[Self.dtype],
-    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
-        """Fused BCELoss backward with scalar gradient.
-
-        grad[i] = -(target[i]/safe[i] - (1-target[i])/(1-safe[i])) * scalar_grad.
-        Device-aware: GPU → BceKernel.launch_bce_backward_scaled.
-        CPU → bce_backward_scaled_cpu.
-        """
-        result: NDBuffer[Self.dtype]
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    result = BceKernel[Self.dtype].launch_bce_backward_scaled(
-                        self, target, scalar_grad
-                    )
-                except e:
-                    print(e)
-                    panic("NDBuffer bce_backward_scaled → GPU operation failed")
-                    result = Self.Empty()
-            else:
-                result = self.bce_backward_scaled_cpu(target, scalar_grad)
-        else:
-            result = self.bce_backward_scaled_cpu(target, scalar_grad)
-        return result^
-
-    @always_inline
-    def bce_backward_scaled_cpu(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        scalar_grad: Scalar[Self.dtype],
-    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
-        if self.is_contiguous():
-            var buf = self.buffer.bce_backward_scaled(
-                target.buffer, scalar_grad
-            )
-            return NDBuffer[Self.dtype](buf^, self.shape)
-        else:
-            var extent = self.numels()
-            var grad_buf = Buffer[Self.dtype](extent)
-            var idx = 0
-            for coord in self.index_iterator():
-                grad_buf[idx] = ScalarOps[Self.dtype].bce_backward_element(
-                    self.buffer[coord],
-                    target.buffer[coord],
-                    scalar_grad,
-                )
-                idx += 1
-            return NDBuffer[Self.dtype](grad_buf^, self.shape)
-
-    @always_inline
-    def rdiv_scalar_backward(
-        self: NDBuffer[Self.dtype],
-        divisor: NDBuffer[Self.dtype],
-        scalar: Scalar[Self.dtype],
-    ) -> NDBuffer[Self.dtype]:
-        """Fused backward for s / x. Returns gradient for divisor.
-
-        Device-aware: GPU → DivisionKernel.launch_rdiv_scalar_backward.
-        CPU → _rdiv_scalar_backward_cpu.
-        """
-        result: NDBuffer[Self.dtype]
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    result = DivisionKernel[
-                        Self.dtype
-                    ].launch_rdiv_scalar_backward(self, divisor, scalar)
-                except e:
-                    print(e)
-                    panic(
-                        "NDBuffer rdiv_scalar_backward → GPU operation failed"
-                    )
-                    result = Self.Empty()
-            else:
-                result = self._rdiv_scalar_backward_cpu(divisor, scalar)
-        else:
-            result = self._rdiv_scalar_backward_cpu(divisor, scalar)
-        return result^
-
-    @always_inline
-    def _rdiv_scalar_backward_cpu(
-        self: NDBuffer[Self.dtype],
-        divisor: NDBuffer[Self.dtype],
-        scalar: Scalar[Self.dtype],
-    ) -> NDBuffer[Self.dtype]:
-        if self.is_contiguous() and divisor.is_contiguous():
-            var buf = self.buffer.rdiv_scalar_backward(divisor.buffer, scalar)
-            return NDBuffer[Self.dtype](buf^, self.shape)
-        else:
-            var extent = self.numels()
-            var grad_buf = Buffer[Self.dtype](extent)
-            var idx = 0
-            for coord in self.index_iterator():
-                grad_buf[idx] = ScalarOps[Self.dtype].rdiv_scalar_backward_element(
-                    self.buffer[coord],
-                    divisor.buffer[coord],
-                    scalar,
-                )
-                idx += 1
-            return NDBuffer[Self.dtype](grad_buf^, self.shape)
-
-    @always_inline
-    def divide_backward(
-        self: NDBuffer[Self.dtype],
-        x: NDBuffer[Self.dtype],
-        y: NDBuffer[Self.dtype],
-    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
-        """Fused backward for x / y. Returns (grad_x, grad_y).
-
-        Device-aware: GPU → DivisionKernel.launch_divide_backward.
-        CPU → _divide_backward_cpu.
-        """
-        result_x: NDBuffer[Self.dtype]
-        result_y: NDBuffer[Self.dtype]
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    (result_x, result_y) = DivisionKernel[
-                        Self.dtype
-                    ].launch_divide_backward(self, x, y)
-                except e:
-                    print(e)
-                    panic("NDBuffer divide_backward → GPU operation failed")
-                    result_x = Self.Empty()
-                    result_y = Self.Empty()
-            else:
-                (result_x, result_y) = self._divide_backward_cpu(x, y)
-        else:
-            (result_x, result_y) = self._divide_backward_cpu(x, y)
-        return (result_x^, result_y^)
-
-    @always_inline
-    def _divide_backward_cpu(
-        self: NDBuffer[Self.dtype],
-        x: NDBuffer[Self.dtype],
-        y: NDBuffer[Self.dtype],
-    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
-        # Fast path: same-shape contiguous → buffer-level SIMD kernel
-        if (
-            self.is_contiguous()
-            and x.is_contiguous()
-            and y.is_contiguous()
-            and self.shape == x.shape
-            and x.shape == y.shape
-        ):
-            var (buf_x, buf_y) = self.buffer.divide_backward(x.buffer, y.buffer)
-            return (
-                NDBuffer[Self.dtype](buf_x^, self.shape),
-                NDBuffer[Self.dtype](buf_y^, self.shape),
-            )
-        # Fallback: element-wise with broadcast support
-        var out_shape = self.shape
-        var out_rank = out_shape.rank()
-        var x_rank = x.shape.rank()
-        var y_rank = y.shape.rank()
-        var extent = self.numels()
-        var gx_buf = Buffer[Self.dtype](extent)
-        var gy_buf = Buffer[Self.dtype](extent)
-        var idx = 0
-        for flat_idx in self.index_iterator():
-            var g = self.buffer[flat_idx]
-            var out_coord = IndexCalculator.index_to_coord(out_shape, flat_idx)
-            # Map output coord → x coord (handle broadcasting)
-            var xv: Scalar[Self.dtype]
-            if x_rank == out_rank:
-                var x_coord = IntArray.filled(out_rank, 0)
-                for d in range(out_rank):
-                    x_coord[d] = 0 if x.shape[d] == 1 else out_coord[d]
-                xv = x[x_coord]
-            else:
-                var x_skip = out_rank - x_rank
-                var x_coord = IntArray.filled(x_rank, 0)
-                for d in range(x_rank):
-                    x_coord[d] = 0 if x.shape[d] == 1 else out_coord[d + x_skip]
-                xv = x[x_coord]
-            # Map output coord → y coord (handle broadcasting)
-            var yv: Scalar[Self.dtype]
-            if y_rank == out_rank:
-                var y_coord = IntArray.filled(out_rank, 0)
-                for d in range(out_rank):
-                    y_coord[d] = 0 if y.shape[d] == 1 else out_coord[d]
-                yv = y[y_coord]
-            else:
-                var y_skip = out_rank - y_rank
-                var y_coord = IntArray.filled(y_rank, 0)
-                for d in range(y_rank):
-                    y_coord[d] = 0 if y.shape[d] == 1 else out_coord[d + y_skip]
-                yv = y[y_coord]
-            gx_buf[idx] = ScalarOps[Self.dtype].divide_backward_x_element(g, yv)
-            gy_buf[idx] = ScalarOps[Self.dtype].divide_backward_y_element(g, xv, yv)
-            idx += 1
-        return (
-            NDBuffer[Self.dtype](gx_buf^, out_shape),
-            NDBuffer[Self.dtype](gy_buf^, out_shape),
-        )
-
-    @always_inline
-    def bce_with_logits_forward(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        epsilon: Scalar[Self.dtype],
-    ) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ] where Self.dtype.is_floating_point():
-        """Fused BCEWithLogits forward. Returns (per_element_loss, sigmoid).
-
-        Device-aware: GPU → BceKernel.launch_forward_with_logits.
-        CPU → buffer.bce_with_logits_forward (contiguous) or scalar fallback.
-        """
-        var loss_ndb: NDBuffer[Self.dtype]
-        var bw_ndb: NDBuffer[Self.dtype]
-
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    var result = BceKernel[
-                        Self.dtype
-                    ].launch_forward_with_logits(self, target, epsilon)
-                    loss_ndb = result[0]
-                    bw_ndb = result[1]
-                except e:
-                    print(e)
-                    panic(
-                        "NDBuffer bce_with_logits_forward → GPU operation"
-                        " failed"
-                    )
-                    loss_ndb = Self.Empty()
-                    bw_ndb = Self.Empty()
-            else:
-                (loss_ndb, bw_ndb) = self.bce_with_logits_forward_cpu(
-                    target, epsilon
-                )
-        else:
-            (loss_ndb, bw_ndb) = self.bce_with_logits_forward_cpu(
-                target, epsilon
-            )
-
-        return (loss_ndb^, bw_ndb^)
-
-    @always_inline
-    def bce_with_logits_forward_cpu(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        epsilon: Scalar[Self.dtype],
-    ) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ] where Self.dtype.is_floating_point():
-        if self.is_contiguous():
-            var result = self.buffer.bce_with_logits_forward(
-                target.buffer, epsilon
-            )
-            var loss_ndb = NDBuffer[Self.dtype](result[0], self.shape)
-            var bw_ndb = NDBuffer[Self.dtype](result[1], self.shape)
-            return (loss_ndb^, bw_ndb^)
-        else:
-            var extent = self.numels()
-            var loss_buf = Buffer[Self.dtype](extent)
-            var sig_buf = Buffer[Self.dtype](extent)
-            var idx = 0
-            for coord in self.index_iterator():
-                loss_buf[idx] = ScalarOps[Self.dtype].bce_with_logits_element(
-                    self.buffer[coord], target.buffer[coord], epsilon
-                )
-                sig_buf[idx] = ScalarOps[Self.dtype].sigmoid_fn(self.buffer[coord])
-                idx += 1
-            return (
-                NDBuffer[Self.dtype](loss_buf^, self.shape),
-                NDBuffer[Self.dtype](sig_buf^, self.shape),
-            )
-
-    @always_inline
-    def bce_with_logits_forward_reduce(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        epsilon: Scalar[Self.dtype],
-        is_mean: Bool,
-    ) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ] where Self.dtype.is_floating_point():
-        """Fused BCEWithLogits forward with mean/sum reduction.
-
-        Returns (scalar_loss, sigmoid[N]).
-        Device-aware: GPU → BceKernel.launch_forward_with_logits_reduce.
-        CPU → buffer.bce_with_logits_forward_reduce (contiguous) or scalar fallback.
-        """
-        var scalar_ndb: NDBuffer[Self.dtype]
-        var sig_ndb: NDBuffer[Self.dtype]
-
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    var result = BceKernel[
-                        Self.dtype
-                    ].launch_forward_with_logits_reduce(
-                        self, target, epsilon, is_mean
-                    )
-                    scalar_ndb = result[0]
-                    sig_ndb = result[1]
-                except e:
-                    print(e)
-                    panic(
-                        "NDBuffer bce_with_logits_forward_reduce → GPU"
-                        " operation failed"
-                    )
-                    scalar_ndb = Self.Empty()
-                    sig_ndb = Self.Empty()
-            else:
-                (scalar_ndb, sig_ndb) = self.bce_with_logits_forward_reduce_cpu(
-                    target, epsilon, is_mean
-                )
-        else:
-            (scalar_ndb, sig_ndb) = self.bce_with_logits_forward_reduce_cpu(
-                target, epsilon, is_mean
-            )
-
-        return (scalar_ndb^, sig_ndb^)
-
-    @always_inline
-    def bce_with_logits_forward_reduce_cpu(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        epsilon: Scalar[Self.dtype],
-        is_mean: Bool,
-    ) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ] where Self.dtype.is_floating_point():
-        if self.is_contiguous():
-            var result = self.buffer.bce_with_logits_forward_reduce(
-                target.buffer, epsilon, is_mean
-            )
-            var scalar_ndb = NDBuffer[Self.dtype](result[0], Shape())
-            var sig_ndb = NDBuffer[Self.dtype](result[1], self.shape)
-            return (scalar_ndb^, sig_ndb^)
-        else:
-            var extent = self.numels()
-            var sig_buf = Buffer[Self.dtype](extent)
-            var total = Scalar[Self.dtype](0)
-            var idx = 0
-            for coord in self.index_iterator():
-                var s = ScalarOps[Self.dtype].sigmoid_fn(self.buffer[coord])
-                sig_buf[idx] = s
-                total += ScalarOps[Self.dtype].bce_with_logits_element(
-                    self.buffer[coord], target.buffer[coord], epsilon
-                )
-                idx += 1
-            if is_mean:
-                total /= Scalar[Self.dtype](extent)
-            var scalar_buf = Buffer[Self.dtype](1)
-            scalar_buf[0] = total
-            return (
-                NDBuffer[Self.dtype](scalar_buf^, Shape()),
-                NDBuffer[Self.dtype](sig_buf^, self.shape),
-            )
-
-    @always_inline
-    def bce_forward(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        epsilon: Scalar[Self.dtype],
-    ) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ] where Self.dtype.is_floating_point():
-        """Fused BCELoss forward (probabilities). Returns (per_element_loss, clipped_pred).
-
-        Device-aware: GPU → BceKernel.launch_forward.
-        CPU → buffer.bce_forward (contiguous) or scalar fallback.
-        """
-        var loss_ndb: NDBuffer[Self.dtype]
-        var bw_ndb: NDBuffer[Self.dtype]
-
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    var result = BceKernel[Self.dtype].launch_forward(
-                        self, target, epsilon
-                    )
-                    loss_ndb = result[0]
-                    bw_ndb = result[1]
-                except e:
-                    print(e)
-                    panic("NDBuffer bce_forward → GPU operation failed")
-                    loss_ndb = Self.Empty()
-                    bw_ndb = Self.Empty()
-            else:
-                (loss_ndb, bw_ndb) = self.bce_forward_cpu(target, epsilon)
-        else:
-            (loss_ndb, bw_ndb) = self.bce_forward_cpu(target, epsilon)
-
-        return (loss_ndb^, bw_ndb^)
-
-    @always_inline
-    def bce_forward_cpu(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        epsilon: Scalar[Self.dtype],
-    ) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ] where Self.dtype.is_floating_point():
-        if self.is_contiguous():
-            var result = self.buffer.bce_forward(target.buffer, epsilon)
-            var loss_ndb = NDBuffer[Self.dtype](result[0], self.shape)
-            var bw_ndb = NDBuffer[Self.dtype](result[1], self.shape)
-            return (loss_ndb^, bw_ndb^)
-        else:
-            var extent = self.numels()
-            var loss_buf = Buffer[Self.dtype](extent)
-            var safe_buf = Buffer[Self.dtype](extent)
-            var idx = 0
-            for coord in self.index_iterator():
-                loss_buf[idx] = ScalarOps[Self.dtype].bce_element(
-                    self.buffer[coord], target.buffer[coord], epsilon
-                )
-                safe_buf[idx] = ScalarOps[Self.dtype].clip_fn(self.buffer[coord], epsilon)
-                idx += 1
-            return (
-                NDBuffer[Self.dtype](loss_buf^, self.shape),
-                NDBuffer[Self.dtype](safe_buf^, self.shape),
-            )
-
-    @always_inline
-    def bce_forward_reduce(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        epsilon: Scalar[Self.dtype],
-        is_mean: Bool,
-    ) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ] where Self.dtype.is_floating_point():
-        """Fused BCELoss forward with mean/sum reduction (probabilities input).
-
-        Returns (scalar_loss, clipped_pred[N]).
-        Device-aware: GPU → BceKernel.launch_forward_reduce.
-        CPU → buffer.bce_forward_reduce (contiguous) or scalar fallback.
-        """
-        var scalar_ndb: NDBuffer[Self.dtype]
-        var safe_ndb: NDBuffer[Self.dtype]
-
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    var result = BceKernel[Self.dtype].launch_forward_reduce(
-                        self, target, epsilon, is_mean
-                    )
-                    scalar_ndb = result[0]
-                    safe_ndb = result[1]
-                except e:
-                    print(e)
-                    panic("NDBuffer bce_forward_reduce → GPU operation failed")
-                    scalar_ndb = Self.Empty()
-                    safe_ndb = Self.Empty()
-            else:
-                (scalar_ndb, safe_ndb) = self.bce_forward_reduce_cpu(
-                    target, epsilon, is_mean
-                )
-        else:
-            (scalar_ndb, safe_ndb) = self.bce_forward_reduce_cpu(
-                target, epsilon, is_mean
-            )
-
-        return (scalar_ndb^, safe_ndb^)
-
-    @always_inline
-    def bce_forward_reduce_cpu(
-        self: NDBuffer[Self.dtype],
-        target: NDBuffer[Self.dtype],
-        epsilon: Scalar[Self.dtype],
-        is_mean: Bool,
-    ) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ] where Self.dtype.is_floating_point():
-        if self.is_contiguous():
-            var result = self.buffer.bce_forward_reduce(
-                target.buffer, epsilon, is_mean
-            )
-            var scalar_ndb = NDBuffer[Self.dtype](result[0], Shape())
-            var safe_ndb = NDBuffer[Self.dtype](result[1], self.shape)
-            return (scalar_ndb^, safe_ndb^)
-        else:
-            var extent = self.numels()
-            var safe_buf = Buffer[Self.dtype](extent)
-            var total = Scalar[Self.dtype](0)
-            var idx = 0
-            for coord in self.index_iterator():
-                var safe = ScalarOps[Self.dtype].clip_fn(self.buffer[coord], epsilon)
-                safe_buf[idx] = safe
-                total += ScalarOps[Self.dtype].bce_element(
-                    self.buffer[coord], target.buffer[coord], epsilon
-                )
-                idx += 1
-            if is_mean:
-                total /= Scalar[Self.dtype](extent)
-            var scalar_buf = Buffer[Self.dtype](1)
-            scalar_buf[0] = total
-            return (
-                NDBuffer[Self.dtype](scalar_buf^, Shape()),
-                NDBuffer[Self.dtype](safe_buf^, self.shape),
-            )
 
     def clamp(
         self: NDBuffer[Self.dtype],
@@ -4060,9 +3286,9 @@ struct NDBuffer[dtype: DType](
 
         return result
 
-    def map_to_bool[
-        Pred: ScalarPredicate
-    ](self, pred: Pred,) -> NDBuffer[DType.bool]:
+    def map_to_bool(
+        self, pred: def(Scalar[Self.dtype]) thin -> Bool
+    ) -> NDBuffer[DType.bool]:
         """Apply predicate to each element, returning a boolean NDBuffer.
         GPU path: transfers to CPU, applies pred, transfers back if needed.
         CPU path: iterates through elements, applying pred.

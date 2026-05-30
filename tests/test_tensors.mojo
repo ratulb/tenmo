@@ -5,7 +5,7 @@ from tenmo.shapes import Shape
 from tenmo.common_utils import *
 from std.utils.numerics import min_finite
 from tenmo.mnemonics import AddTensor
-from tenmo.shared import ScalarPredicate
+
 from tenmo.strides import Strides
 
 
@@ -1823,28 +1823,24 @@ def test_arange() raises:
     assert_true(is_true, "arange negative step assertion failed")
 
 
-@fieldwise_init
-struct PredAll(ScalarPredicate):
-    def __call__[dtype: DType](self, e: Scalar[dtype]) -> Bool:
-        return e >= 0 and e < 1
+def pred_all(e: Scalar[DType.float32]) -> Bool:
+    return e >= 0 and e < 1
 
 
-@fieldwise_init
-struct PredAll2(ScalarPredicate):
-    def __call__[dtype: DType](self, e: Scalar[dtype]) -> Bool:
-        return e >= -2 and e < 2
+def pred_all2(e: Scalar[DType.float32]) -> Bool:
+    return e >= -2 and e < 2
 
 
 def test_random() raises:
     comptime dtype = DType.float32
     rand_tensor = Tensor[dtype].rand([10])
 
-    holds_true = rand_tensor.all(PredAll())
+    holds_true = rand_tensor.all(pred_all)
     assert_true(holds_true, "rand min and max range assertion failed")
 
     rand_tensor2 = Tensor[dtype].rand([10, 20], low=-2, high=2)
 
-    holds_true = rand_tensor2.all(PredAll2())
+    holds_true = rand_tensor2.all(pred_all2)
     assert_true(holds_true, "rand min(-2) and max(2) range assertion failed")
 
 
