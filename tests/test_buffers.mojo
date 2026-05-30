@@ -4037,26 +4037,6 @@ def test_compare_scalar_manual() raises:
     )
 
 
-def test_select_manual_relu_backward() raises:
-    var input_buf = Buffer[DType.float32](MEDIUM_SIZE)
-    var grad_buf = Buffer[DType.float32](MEDIUM_SIZE)
-
-    for i in range(MEDIUM_SIZE):
-        input_buf[i] = Float32(i - 30)  # Values from -30 to 37
-        grad_buf[i] = 1.0  # All gradients are 1.0
-
-    var result = input_buf.select[RELU_BACKWARD](grad_buf)
-
-    # Check that gradients are zeroed where input <= 0
-    var all_correct = True
-    for i in range(MEDIUM_SIZE):
-        var expected = Float32(0) if i < 31 else Float32(1.0)
-        if abs(result[i] - expected) > 1e-6:
-            all_correct = False
-            break
-
-    assert_true(all_correct, "select_manual_relu_backward: failed")
-
 
 def test_compare_buffer_manual_gt() raises:
     var buf1 = Buffer[DType.int32](MEDIUM_SIZE)

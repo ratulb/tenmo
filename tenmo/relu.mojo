@@ -1,5 +1,5 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor, RELU_BACKWARD
+from .mnemonics import AddTensor
 from .backpropagation import (
     BackwardFnArg,
     BufferArg,

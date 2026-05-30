@@ -1,7 +1,5 @@
-from std.algorithm import vectorize, parallelize
-from std.sys.info import num_physical_cores
 from std.sys import simd_width_of, size_of
-from std.memory import memset_zero, memcpy, AddressSpace
+from std.memory import memset_zero, memcpy
 from std.math import exp, log, ceil, tanh, sqrt
 from .common_utils import log_debug, panic, Epsilon, One
 from std.utils.numerics import max_finite
@@ -15,7 +13,6 @@ from .mnemonics import (
     MAX,
     MIN,
     Overwrite,
-    RELU_BACKWARD,
     SIGMOID_BACKWARD,
     LOG,
     EXP,
@@ -120,12 +117,8 @@ struct Buffer[dtype: DType = DType.float32](
 
     def is_shared(self) -> Bool:
         """Check if this buffer has ref counting enabled."""
-        return (
-            self._refcount
-            != None  # UnsafePointer[Atomic[DType.uint64], MutAnyOrigin]()
-        )
+        return self._refcount != None
 
-    # def shared(mut self) -> Self:
     def shared(mut self):
         """
         Convert this buffer to shared mode (enable ref counting).
@@ -135,13 +128,13 @@ struct Buffer[dtype: DType = DType.float32](
         After:  [refcount: 8 bytes][data array]
         """
         if self.is_shared():
-            return  # self  # Already shared
+            return  # Already shared
 
         if self.external:
             panic("Cannot share external buffer")
 
         if self.size == 0:
-            return  # self  # Nothing to share
+            return  # Nothing to share
 
         # Allocate new memory: [refcount][data]
         var refcount_size = size_of[Atomic[DType.uint64]]()
@@ -1160,80 +1153,6 @@ struct Buffer[dtype: DType = DType.float32](
                     result = val <= scalar
 
                 out[idx] = result
-
-        return out^
-
-    @always_inline
-    def select[
-        op_code: Int, validate: Bool = True
-    ](
-        self: Buffer[Self.dtype],
-        other: Buffer[Self.dtype],
-        self_start: Int = 0,
-        self_end: Optional[Int] = None,
-        other_start: Int = 0,
-        other_end: Optional[Int] = None,
-    ) -> Buffer[Self.dtype]:
-        var self_extent = self_end.or_else(self.size) - self_start
-        var other_extent = other_end.or_else(other.size) - other_start
-
-        comptime if validate:
-            if (
-                self_extent <= 0
-                or other_extent <= 0
-                or self_extent != other_extent
-            ):
-                panic(
-                    "Buffer -> select: range mismatch: self range -> "
-                    + String(self_extent)
-                    + ", other range: ",
-                    String(other_extent),
-                )
-
-        var out = Buffer[Self.dtype].zeros(self_extent)
-        var zero = Scalar[Self.dtype](0)
-
-        comptime smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
-            Self.dtype
-        ]()
-
-        # Manual vectorization
-        var num_full_chunks = self_extent // smdwidth
-        var remainder = self_extent % smdwidth
-
-        # Process full SIMD chunks
-        for chunk in range(num_full_chunks):
-            var idx = chunk * smdwidth
-            var selected: SIMD[Self.dtype, smdwidth]
-
-            comptime if op_code == RELU_BACKWARD:
-                var cond_block = self.load[simdwidth=smdwidth](self_start + idx)
-                var true_block = other.load[simdwidth=smdwidth](
-                    other_start + idx
-                )
-                var false_block = out.load[simdwidth=smdwidth](idx)
-                selected = (cond_block.gt(zero)).select(true_block, false_block)
-            else:  # Bogus
-                selected = out.load[simdwidth=smdwidth](idx)
-
-            out.store[simdwidth=smdwidth](idx, selected)
-
-        # Process remaining elements
-        if remainder > 0:
-            var start_idx = num_full_chunks * smdwidth
-            for i in range(remainder):
-                var idx = start_idx + i
-                var selected: Scalar[Self.dtype]
-
-                comptime if op_code == RELU_BACKWARD:
-                    var cond_val = self[self_start + idx]
-                    var true_val = other[other_start + idx]
-                    var false_val = out[idx]
-                    selected = true_val if cond_val > zero else false_val
-                else:  # Bogus
-                    selected = out[idx]
-
-                out[idx] = selected
 
         return out^
 
