@@ -1,9 +1,8 @@
-# from std.math import exp, floor, log, cos, sin, sqrt, pi
 from std.math import exp, log, sqrt
 from std.random import seed, random_float64
 from std.sys import simd_width_of
 from std.utils.numerics import min_finite
-from std.memory import memcpy, memset, memset_zero, AddressSpace
+from std.memory import memcpy, memset, memset_zero
 from .shapes import Shape, ShapeIndexIterator
 from .ancestry import Ancestors, Ancestor
 from .strides import Strides
@@ -22,7 +21,7 @@ from .common_utils import (
 )
 from .mnemonics import *
 from .indexhelper import IndexIterator
-from .backpropagation import Backward, BackwardFnArg, IntArrayArg
+from .backpropagation import Backward, BackwardFnArg
 from .forwards import *
 from .buffers import Buffer
 from .validators import Validator

@@ -1,5 +1,7 @@
 from tenmo.tensor import Tensor
 from tenmo.relu import ReLU
+from tenmo.relu_helpers import ReluBuffer
+from tenmo.buffers import Buffer
 from std.sys import has_accelerator
 from std.testing import assert_true, assert_equal, TestSuite
 from tenmo.shapes import Shape
@@ -705,6 +707,42 @@ def test_rlv_parity_bwd_2d() raises:
         var gpu_grad = a_cpu2.grad()
 
         assert_true(cpu_grad.all_close(gpu_grad))
+
+
+# =============================================================================
+# ── BUFFER-LEVEL TESTS ──────────────────────────────────────────────────────
+# =============================================================================
+
+
+def test_relu_buffer_forward_with_mask() raises:
+    var buffer = Buffer[DType.float32](10)
+    for i in range(10):
+        buffer[i] = Float32(i - 5)  # Values from -5 to 4
+
+    var result = ReluBuffer[DType.float32].forward(buffer)
+    var output = result[0]
+    var mask = result[1]
+
+    # Check output: negative values should be 0
+    var output_correct = True
+    for i in range(10):
+        var expected = Float32(0) if i < 6 else Float32(i - 5)
+        if abs(output[i] - expected) > 1e-6:
+            output_correct = False
+            break
+
+    # Check mask: should be 0.0 for negative inputs, 1.0 for positive
+    var mask_correct = True
+    for i in range(10):
+        var expected = Float32(0) if i < 6 else Float32(1)
+        if abs(mask[i] - expected) > 1e-6:
+            mask_correct = False
+            break
+
+    assert_true(
+        output_correct, "relu_buffer_forward_with_mask: output incorrect"
+    )
+    assert_true(mask_correct, "relu_buffer_forward_with_mask: mask incorrect")
 
 
 # =============================================================================

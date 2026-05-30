@@ -5,6 +5,7 @@ from .gradbox import Gradbox
 from .common_utils import panic
 from .ancestry import Ancestor
 from tenmo.intarray import IntArray
+from .variance_helpers import VarStdBackward
 
 
 @fieldwise_init
@@ -53,7 +54,9 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if axis == -100 or axis == last_axis:
             # ── Pass 1: fused (x - mean) * scale — stride-aware ─────────────
             # Produces contiguous (*, D) output regardless of x layout
-            var normed_ndb = x_ndb.variance_backward_normalize(mean_ndb, scale)
+            var normed_ndb = VarStdBackward[
+                Self.dtype
+            ].variance_backward_normalize(x_ndb, mean_ndb, scale)
             local_grad = Tensor[Self.dtype](normed_ndb^)
 
         else:

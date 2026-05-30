@@ -8,7 +8,7 @@ from tenmo.broadcasthelper import ShapeBroadcaster
 from tenmo.common_utils import panic, log_debug, print_buffer, Epsilon, One
 
 from tenmo.validators import Validator
-from std.memory import memcpy, AddressSpace
+from std.memory import memcpy
 from std.gpu.host import DeviceBuffer, DeviceContext
 from std.algorithm import parallelize
 from std.sys.info import num_physical_cores
@@ -25,9 +25,7 @@ from tenmo.cpu_broadcast import CpuBroadcast
 from tenmo.shared.scalar_ops import ScalarOps
 from tenmo.compare_kernel import AllClose, Compare, CompareScalar
 from tenmo.reduction_kernel import Reduction, ProductArg
-from tenmo.minmax_kernel import ReductionMinMax
-from tenmo.minmax_reducer import MinMaxReducer
-from tenmo.std_variance_backward_kernel import StdVarianceBackwardKernel
+from tenmo.minmax_helpers import MinmaxNdBuffer
 from std.math import sqrt, log, exp, tanh
 from tenmo.mnemonics import (
     Multiply,
@@ -48,7 +46,6 @@ from tenmo.mnemonics import (
     SIGMOID_BACKWARD,
     TANH_FORWARD,
     TANH_BACKWARD,
-    RELU_FORWARD,
     SQRT_BACKWARD,
     Overwrite,
     ReverseDivide,
@@ -996,8 +993,8 @@ struct NDBuffer[dtype: DType](
     ) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
-        var (max_values, _) = self.minmax[is_max=True](
-            normalized_axes, keepdims=True
+        var (max_values, _) = MinmaxNdBuffer[Self.dtype].minmax[is_max=True](
+            self, normalized_axes, keepdims=True
         )
         var stable = self - max_values
         var stable_exp = stable.exp()
@@ -2708,94 +2705,6 @@ struct NDBuffer[dtype: DType](
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
     @always_inline
-    def unary_ops_with_mask[
-        op_code: Int,
-    ](self: NDBuffer[Self.dtype]) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ]:
-        """Device-aware unary op + mask. Returns (output, mask).
-
-        CPU path: delegates to Buffer.unary_ops_with_mask (vectorized).
-        GPU path: single kernel pass via UnaryOpsKernel.launch_with_mask.
-
-        Non-contiguous input is handled efficiently on both paths:
-        - CPU: index_iterator() loop (acceptable, matches existing slow path).
-        - GPU: contiguous_device_state() does ONE map_to_host copy, then
-               the kernel runs on the flat buffer — no per-element host calls.
-
-        Returns:
-            Tuple of (output NDBuffer, mask NDBuffer).
-            Both share the same device as self.
-        """
-        var out: NDBuffer[Self.dtype]
-        var mask: NDBuffer[Self.dtype]
-
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    var result = UnaryOpsKernel[Self.dtype].launch_with_mask[
-                        op_code
-                    ](self)
-                    out = result[0]
-                    mask = result[1]
-                except e:
-                    panic(
-                        "NDBuffer unary_ops_with_mask → GPU launch failed: ",
-                        "opcode = ",
-                        String(op_code),
-                        String(e),
-                    )
-                    # Unreachable
-                    out = Self.Empty()
-                    mask = Self.Empty()
-            else:
-                (out, mask) = self.unary_ops_with_mask_cpu[op_code]()
-        else:
-            (out, mask) = self.unary_ops_with_mask_cpu[op_code]()
-
-        return (out^, mask^)
-
-    @always_inline
-    def unary_ops_with_mask_cpu[
-        op_code: Int,
-    ](self: NDBuffer[Self.dtype]) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ]:
-        """CPU path for unary_ops_with_mask. Delegates to Buffer."""
-        if self.is_contiguous():
-            var start = self.offset
-            var end = start + self.numels()
-            var result = self.buffer.unary_ops_with_mask[op_code](start, end)
-            var out_ndb = NDBuffer[Self.dtype](result[0], self.shape)
-            var mask_ndb = NDBuffer[Self.dtype](result[1], self.shape)
-            return (out_ndb^, mask_ndb^)
-        else:
-            # Non-contiguous CPU slow path
-            var numels = self.numels()
-            var out_buf = Buffer[Self.dtype](numels)
-            var mask_buf = Buffer[Self.dtype](numels)
-            var zero = Scalar[Self.dtype](0)
-            var one = Scalar[Self.dtype](1)
-            var index = 0
-            for idx in self.index_iterator():
-                var val = self.buffer[idx]
-                comptime if op_code == RELU_FORWARD:
-                    if val > zero:
-                        out_buf[index] = val
-                        mask_buf[index] = one
-                    else:
-                        out_buf[index] = zero
-                        mask_buf[index] = zero
-                else:
-                    out_buf[index] = val
-                    mask_buf[index] = one
-                index += 1
-            return (
-                NDBuffer[Self.dtype](out_buf^, self.shape),
-                NDBuffer[Self.dtype](mask_buf^, self.shape),
-            )
-
-    @always_inline
     def float_unary_ops[
         op_code: Int,
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
@@ -2853,189 +2762,6 @@ struct NDBuffer[dtype: DType](
                 index += 1
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
-
-    def variance_backward_normalize(
-        self: NDBuffer[Self.dtype],
-        mean: NDBuffer[Self.dtype],
-        scale: Scalar[Self.dtype],
-    ) -> NDBuffer[Self.dtype]:
-        """Fused variance backward: (x - mean) * scale.
-
-        Single pass over (*, D).
-        x (self) may be non-contiguous — stride-aware on CPU and GPU.
-        out is always a fresh contiguous allocation.
-
-        Mean is (*, 1) keepdims=True — one scalar per row.
-        scale = 2 / divisor — uniform across all rows.
-
-        Caller multiplies result by upstream grad (pass 2).
-
-        Replaces in VarianceBackward:
-            diff       = x - mean         pass 1
-            local_grad = diff * scale     pass 2
-            (upstream multiply is still pass 2, done by caller)
-
-        Args:
-            self:  Input x (*, D). May be strided view.
-            mean:  Per-row mean (*, 1) from .arianceBwdArg.
-            scale: 2 / divisor scalar.
-
-        Returns:
-            Contiguous NDBuffer (*, D) — (x - mean) * scale.
-        """
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    return StdVarianceBackwardKernel[
-                        Self.dtype
-                    ].launch_variance_backward(self, mean, scale)
-                except e:
-                    print(e)
-                    panic("NDBuffer variance_backward_normalize → GPU failed")
-                    return Self.Empty()
-        return self._variance_backward_normalize_cpu(mean, scale)
-
-    def _variance_backward_normalize_cpu(
-        self: NDBuffer[Self.dtype],
-        mean: NDBuffer[Self.dtype],
-        scale: Scalar[Self.dtype],
-    ) -> NDBuffer[Self.dtype]:
-        """CPU variance backward normalize — stride-aware via self[coord]."""
-        var D = self.shape[-1]
-        # var outer_size = self.numels() // D
-        var out_buf = Buffer[Self.dtype](self.numels())
-        var out_shape = self.shape
-
-        # Outer loop — iterate over all row coordinates
-        # Use index_iterator on the non-last dims to handle any stride layout
-        var row = 0
-        for outer_coord in self.shape[0:-1]:
-            var row_mean = mean.buffer[row]  # mean is (*, 1) contiguous
-            var out_base = row * D
-            for i in range(D):
-                # Build full coord: outer_coord + [i]
-                var full_coord = outer_coord.insert(len(outer_coord), i)
-                out_buf[out_base + i] = (self[full_coord] - row_mean) * scale
-                # Equivalent: (self[coord] - row_mean) * scale
-                # Written as two muls to avoid a temporary sub tensor
-            row += 1
-
-        return NDBuffer[Self.dtype](out_buf^, out_shape)
-
-    def std_backward_normalize(
-        self: NDBuffer[Self.dtype],
-        mean: NDBuffer[Self.dtype],
-        denom: NDBuffer[Self.dtype],
-    ) -> NDBuffer[Self.dtype]:
-        """Fused std backward: (x - mean) / denom.
-
-        Single pass over (*, D).
-        x (self) may be non-contiguous — stride-aware on CPU and GPU.
-        out is always a fresh contiguous allocation.
-
-        Mean is (*, 1) keepdims=True — one scalar per row.
-        Denom is (*, 1) — (std + eps) * divisor, one scalar per row.
-
-        Caller multiplies result by upstream grad (pass 2).
-
-        Replaces in StdBackward:
-            diff       = x - mean              pass 1
-            local_grad = diff / denom          pass 2
-            (upstream multiply is still pass 2, done by caller)
-
-        Args:
-            self:  Input x (*, D). May be strided view.
-            mean:  Per-row mean (*, 1) from .tdBwdArg.
-            denom: Per-row denominator (*, 1) — (std+eps)*divisor.
-
-        Returns:
-            Contiguous NDBuffer (*, D) — (x - mean) / denom.
-        """
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    return StdVarianceBackwardKernel[
-                        Self.dtype
-                    ].launch_std_backward(self, mean, denom)
-                except e:
-                    print(e)
-                    panic("NDBuffer std_backward_normalize → GPU failed")
-                    return Self.Empty()
-        return self._std_backward_normalize_cpu(mean, denom)
-
-    def _std_backward_normalize_cpu(
-        self: NDBuffer[Self.dtype],
-        mean: NDBuffer[Self.dtype],
-        denom: NDBuffer[Self.dtype],
-    ) -> NDBuffer[Self.dtype]:
-        """CPU std backward normalize — stride-aware via self[coord]."""
-        var D = self.shape[-1]
-        # var outer_size = self.numels() // D
-        var out_buf = Buffer[Self.dtype](self.numels())
-        var out_shape = self.shape
-
-        var row = 0
-        for outer_coord in self.shape[0:-1]:
-            var row_mean = mean.buffer[row]  # (*, 1) contiguous
-            var row_denom = denom.buffer[row]  # (*, 1) contiguous
-            var out_base = row * D
-            for i in range(D):
-                var full_coord = outer_coord.insert(len(outer_coord), i)
-                out_buf[out_base + i] = (
-                    (self[full_coord] - row_mean)
-                ) / row_denom
-            row += 1
-
-        return NDBuffer[Self.dtype](out_buf^, out_shape)
-
-    def minmax[
-        is_max: Bool
-    ](
-        self, axes: IntArray, keepdims: Bool = False, paired: Bool = False
-    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
-        ref shape = self.shape
-        var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
-
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    var (result_ndb, mask_ndb) = ReductionMinMax[
-                        Self.dtype
-                    ].launch[is_max=is_max](self, normalized_axes, keepdims)
-                    return result_ndb, mask_ndb
-                except e:
-                    print(e)
-                    panic("NDBuffer minmax: gpu path failed")
-                    # Unreachable
-                    return (
-                        NDBuffer[Self.dtype].Empty(),
-                        NDBuffer[Self.dtype].Empty(),
-                    )
-            else:
-                return self.minmax_cpu[is_max](
-                    normalized_axes, keepdims, paired
-                )
-        else:
-            return self.minmax_cpu[is_max](normalized_axes, keepdims, paired)
-
-    def minmax_cpu[
-        is_max: Bool
-    ](
-        self,
-        normalized_axes: IntArray,
-        keepdims: Bool = False,
-        paired: Bool = False,
-    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
-        var result_ndb = MinMaxReducer[Self.dtype].reduce_minmax[is_max](
-            self, normalized_axes, keepdims
-        )
-        if paired:
-            var mask_ndb = MinMaxReducer[Self.dtype].build_minmax_mask[is_max](
-                self, result_ndb, normalized_axes, keepdims
-            )
-            return result_ndb, mask_ndb
-        else:
-            return result_ndb, NDBuffer[Self.dtype].Empty()
 
     def clamp(
         self: NDBuffer[Self.dtype],

@@ -4037,24 +4037,6 @@ def test_compare_scalar_manual() raises:
     )
 
 
-def test_unary_ops_manual_relu() raises:
-    var buffer = Buffer[DType.float32](MEDIUM_SIZE)
-    for i in range(MEDIUM_SIZE):
-        buffer[i] = Float32(i - 30)  # Values from -30 to 37
-
-    var result = buffer.unary_ops[RELU_FORWARD]()
-
-    # Check that negative values are zeroed
-    var all_correct = True
-    for i in range(MEDIUM_SIZE):
-        var expected = Float32(0) if i < 30 else Float32(i - 30)
-        if abs(result[i] - expected) > 1e-6:
-            all_correct = False
-            break
-
-    assert_true(all_correct, "unary_ops_manual_relu: ReLU forward failed")
-
-
 def test_select_manual_relu_backward() raises:
     var input_buf = Buffer[DType.float32](MEDIUM_SIZE)
     var grad_buf = Buffer[DType.float32](MEDIUM_SIZE)
@@ -4114,35 +4096,6 @@ def test_unary_ops_manual_sigmoid() raises:
             break
 
     assert_true(all_in_range, "unary_ops_manual_sigmoid: values out of range")
-
-
-def test_relu_forward_with_mask() raises:
-    var buffer = Buffer[DType.float32](10)
-    for i in range(10):
-        buffer[i] = Float32(i - 5)  # Values from -5 to 4
-
-    var result = buffer.unary_ops_with_mask[RELU_FORWARD]()
-    var output = result[0]
-    var mask = result[1]
-
-    # Check output: negative values should be 0
-    var output_correct = True
-    for i in range(10):
-        var expected = Float32(0) if i < 6 else Float32(i - 5)
-        if abs(output[i] - expected) > 1e-6:
-            output_correct = False
-            break
-
-    # Check mask: should be 0.0 for negative inputs, 1.0 for positive
-    var mask_correct = True
-    for i in range(10):
-        var expected = Float32(0) if i < 6 else Float32(1)
-        if abs(mask[i] - expected) > 1e-6:
-            mask_correct = False
-            break
-
-    assert_true(output_correct, "relu_forward_with_mask: output incorrect")
-    assert_true(mask_correct, "relu_forward_with_mask: mask incorrect")
 
 
 def test_buffer_multiply() raises:

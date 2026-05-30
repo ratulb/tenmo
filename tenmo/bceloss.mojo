@@ -30,7 +30,6 @@ from tenmo.ancestry import Ancestor
 from tenmo.mnemonics import AddTensor
 from tenmo.common_utils import Epsilon
 from tenmo.shared import Reduction
-from tenmo.shared.scalar_ops import ScalarOps
 from tenmo.common_utils import panic
 from std.sys import simd_width_of, has_accelerator
 from std.math import exp, log
@@ -44,13 +43,25 @@ from std.math import exp, log
 @fieldwise_init
 struct BceElement[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
+    def sigmoid_fn(
+        x: Scalar[Self.dtype],
+    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
+        return Scalar[Self.dtype](1.0) / (Scalar[Self.dtype](1.0) + exp(-x))
+
+    @staticmethod
+    def clip_fn(
+        x: Scalar[Self.dtype], epsilon: Scalar[Self.dtype]
+    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
+        return x.clamp(epsilon, Scalar[Self.dtype](1.0) - epsilon)
+
+    @staticmethod
     def with_logits_element(
         x: Scalar[Self.dtype],
         y: Scalar[Self.dtype],
         epsilon: Scalar[Self.dtype],
     ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        var s = ScalarOps[Self.dtype].sigmoid_fn(x)
-        var safe = ScalarOps[Self.dtype].clip_fn(s, epsilon)
+        var s = Self.sigmoid_fn(x)
+        var safe = Self.clip_fn(s, epsilon)
         return -(
             y * log(safe)
             + (Scalar[Self.dtype](1.0) - y)
@@ -63,7 +74,7 @@ struct BceElement[dtype: DType](ImplicitlyCopyable & Movable):
         y: Scalar[Self.dtype],
         epsilon: Scalar[Self.dtype],
     ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        var safe = ScalarOps[Self.dtype].clip_fn(p, epsilon)
+        var safe = Self.clip_fn(p, epsilon)
         return -(
             y * log(safe)
             + (Scalar[Self.dtype](1.0) - y)
@@ -611,7 +622,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                 loss_buf[idx] = BceElement[Self.dtype].with_logits_element(
                     logits.buffer[coord], target.buffer[coord], epsilon
                 )
-                sig_buf[idx] = ScalarOps[Self.dtype].sigmoid_fn(
+                sig_buf[idx] = BceElement[Self.dtype].sigmoid_fn(
                     logits.buffer[coord]
                 )
                 idx += 1
@@ -691,7 +702,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
             var total = Scalar[Self.dtype](0)
             var idx = 0
             for coord in logits.index_iterator():
-                var s = ScalarOps[Self.dtype].sigmoid_fn(logits.buffer[coord])
+                var s = BceElement[Self.dtype].sigmoid_fn(logits.buffer[coord])
                 sig_buf[idx] = s
                 total += BceElement[Self.dtype].with_logits_element(
                     logits.buffer[coord], target.buffer[coord], epsilon
@@ -770,7 +781,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                 loss_buf[idx] = BceElement[Self.dtype].element(
                     pred.buffer[coord], target.buffer[coord], epsilon
                 )
-                safe_buf[idx] = ScalarOps[Self.dtype].clip_fn(
+                safe_buf[idx] = BceElement[Self.dtype].clip_fn(
                     pred.buffer[coord], epsilon
                 )
                 idx += 1
@@ -843,7 +854,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
             var total = Scalar[Self.dtype](0)
             var idx = 0
             for coord in pred.index_iterator():
-                var safe = ScalarOps[Self.dtype].clip_fn(
+                var safe = BceElement[Self.dtype].clip_fn(
                     pred.buffer[coord], epsilon
                 )
                 safe_buf[idx] = safe

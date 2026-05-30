@@ -1,5 +1,5 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor, RELU_FORWARD, RELU_BACKWARD
+from .mnemonics import AddTensor, RELU_BACKWARD
 from .backpropagation import (
     BackwardFnArg,
     BufferArg,
@@ -10,6 +10,7 @@ from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
 from .buffers import Buffer
 from .ancestry import Ancestor
+from .relu_helpers import ReluNdBuffer
 
 
 @fieldwise_init
@@ -65,7 +66,7 @@ struct ReLU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             Output tensor with ReLU applied.
         """
 
-        var result = self.buffer.unary_ops_with_mask[RELU_FORWARD]()
+        var result = ReluNdBuffer[Self.dtype].forward(self.buffer)
         var out_ndb = result[0]  # NDBuffer — output values
         var mask_ndb = result[1]  # NDBuffer — gradient mask
 

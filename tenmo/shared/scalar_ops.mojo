@@ -127,22 +127,6 @@ struct ScalarOps[dtype: DType](
             return scalar.__abs__()
 
     # ------------------------------------------------------------------
-    # Loss-function element primitives
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def sigmoid_fn(
-        x: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        return Scalar[Self.dtype](1.0) / (Scalar[Self.dtype](1.0) + exp(-x))
-
-    @staticmethod
-    def clip_fn(
-        x: Scalar[Self.dtype], epsilon: Scalar[Self.dtype]
-    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        return x.clamp(epsilon, Scalar[Self.dtype](1.0) - epsilon)
-
-    # ------------------------------------------------------------------
     # Float64 cast helper  (used by PRODUCT reduction)
     # ------------------------------------------------------------------
 

@@ -16,7 +16,6 @@ from .mnemonics import (
     MIN,
     Overwrite,
     RELU_BACKWARD,
-    RELU_FORWARD,
     SIGMOID_BACKWARD,
     LOG,
     EXP,
@@ -1302,9 +1301,7 @@ struct Buffer[dtype: DType = DType.float32](
         smdwidth: Int,
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](block: SIMD[Self.dtype, smdwidth]) -> SIMD[Self.dtype, smdwidth]:
-        comptime if op_code == RELU_FORWARD:
-            return max(block, 0.0)
-        elif op_code == SQRT:
+        comptime if op_code == SQRT:
             return sqrt(block)
         elif op_code == INVERT:
             return block.__invert__()
@@ -1315,86 +1312,6 @@ struct Buffer[dtype: DType = DType.float32](
 
         else:
             return block
-
-    @always_inline
-    def unary_ops_with_mask[
-        op_code: Int
-    ](
-        self: Buffer[Self.dtype],
-        start_index: Int = 0,
-        end_index: Optional[Int] = None,
-    ) -> Tuple[
-        Buffer[Self.dtype],
-        Buffer[Self.dtype],
-    ]:
-        """Compute unary operation and mask simultaneously.
-
-        For ReLU: output = max(0, x), mask = (x > 0) ? 1.0 : 0.0
-
-        Returns:
-            Tuple of (output_buffer, mask_buffer).
-        """
-        var extent = end_index.or_else(self.size) - start_index
-        var out = Buffer[Self.dtype](extent)
-        var mask = Buffer[Self.dtype](extent)
-
-        comptime simd_width = 1 if Self.dtype == DType.bool else simd_width_of[
-            Self.dtype
-        ]()
-
-        # Manual vectorization
-        var num_full_chunks = extent // simd_width
-        var remainder = extent % simd_width
-        var zero = SIMD[Self.dtype, simd_width](0)
-        var one = SIMD[Self.dtype, simd_width](1)
-
-        # Process full SIMD chunks
-        for chunk in range(num_full_chunks):
-            var idx = chunk * simd_width
-            var block = self.load[simdwidth=simd_width](start_index + idx)
-
-            # Compute output
-            var result = Self.unary_ops_helper[op_code, simd_width](block)
-
-            # Compute mask based on operation
-            var mask_block: SIMD[Self.dtype, simd_width]
-
-            comptime if op_code == RELU_FORWARD:
-                # Mask is 1.0 where input > 0, else 0.0
-                mask_block = block.gt(SIMD[Self.dtype, simd_width](0)).select(
-                    one, zero
-                )
-            else:
-                # For other ops, no masking needed (can extend later)
-                mask_block = one
-
-            out.store[simdwidth=simd_width](idx, result)
-            mask.store[simdwidth=simd_width](idx, mask_block)
-
-        # Process remaining elements
-        if remainder > 0:
-            var start_idx = num_full_chunks * simd_width
-            var zero_scalar = Scalar[Self.dtype](0)
-            var one_scalar = Scalar[Self.dtype](1)
-
-            for i in range(remainder):
-                var idx = start_idx + i
-                var val = self.load[simdwidth=1](start_index + idx)
-                var result = Self.unary_ops_helper[op_code, 1](val)
-
-                var mask_val: Scalar[Self.dtype]
-
-                comptime if op_code == RELU_FORWARD:
-                    mask_val = (
-                        one_scalar if val[0] > zero_scalar else zero_scalar
-                    )
-                else:
-                    mask_val = one_scalar
-
-                out.store[simdwidth=1](idx, result)
-                mask.store[simdwidth=1](idx, SIMD[Self.dtype, 1](mask_val))
-
-        return (out^, mask^)
 
     def exp(
         self, start_index: Int = 0, end_index: Optional[Int] = None

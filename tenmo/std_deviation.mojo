@@ -4,6 +4,7 @@ from .backpropagation import BackwardFnArg, StdArg, BACKWARD_STD
 from .gradbox import Gradbox
 from .ancestry import Ancestor
 from tenmo.common_utils import Epsilon
+from .variance_helpers import VarStdBackward
 
 # =============================================================================
 # Updated StdBwdArg — goes in std.mojo
@@ -68,7 +69,9 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             # ── Pass 1: fused (x - mean) / denom — stride-aware ─────────────
             # Produces contiguous (*, D) output regardless of x layout
-            var normed_ndb = x_ndb.std_backward_normalize(mean_ndb, denom_ndb)
+            var normed_ndb = VarStdBackward[Self.dtype].std_backward_normalize(
+                x_ndb, mean_ndb, denom_ndb
+            )
             local_grad = Tensor[Self.dtype](normed_ndb^)
         else:
             # ── fallback — non-last axis, use original ops ───────────────────

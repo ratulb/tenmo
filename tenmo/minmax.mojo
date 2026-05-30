@@ -7,6 +7,7 @@ from .intarray import IntArray
 from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
 from .ancestry import Ancestor
+from .minmax_helpers import MinmaxNdBuffer
 
 
 @fieldwise_init
@@ -70,9 +71,9 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var tracking_grad = track_grad and requires_grad.or_else(
             self.requires_grad
         )
-        var (result_ndb, mask_ndb) = self.buffer.minmax[is_max=max](
-            normalized_axes, keepdims, tracking_grad
-        )
+        var (result_ndb, mask_ndb) = MinmaxNdBuffer[Self.dtype].minmax[
+            is_max=max
+        ](self.buffer, normalized_axes, keepdims, tracking_grad)
         var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
 
         comptime if track_grad:
