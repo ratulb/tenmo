@@ -17,3 +17,7 @@ model_weights.npy
 !.pixi/config.toml
 logs/
 scripts/__pycache__/
+tests/test_cpu_all_[0-9]*.mojo
+tests/test_cpu_all.mojo
+tests/test_gpu_all_[0-9]*.mojo
+tests/test_gpu_all.mojo

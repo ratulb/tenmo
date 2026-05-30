@@ -378,6 +378,63 @@ STD_PREAMBLE = [
 ]
 
 
+# ── Import dedup ─────────────────────────────────────────────────────────
+
+
+# Names built into Mojo — importing them from std.math is redundant.
+# Only bare names (not aliased with `as`) are filtered.
+BUILTIN_NAMES = {"abs", "max", "min", "round", "pow"}
+
+
+def merge_imports(imports: OrderedDict) -> list:
+    """Merge duplicate 'from X import ...' lines by module.
+
+    Strips built-in names (e.g. bare `abs`, `max`) from `std.math` imports
+    since those are available in Mojo without import.
+
+    Input: OrderedDict of import strings (keys are the import lines).
+    Output: list of deduplicated import strings.
+    """
+    from_groups = OrderedDict()
+    bare_seen = OrderedDict()
+
+    for imp in imports:
+        imp_stripped = imp.strip()
+        if imp_stripped.startswith("from "):
+            m = re.match(r"^from\s+(\S+)\s+import\s+(.+)$", imp_stripped)
+            if m:
+                module = m.group(1)
+                names_part = m.group(2).strip()
+                names_part = names_part.strip("()")
+                names = [n.strip().strip("()") for n in names_part.split(",") if n.strip().strip("()")]
+                has_star = "*" in names
+                if module not in from_groups:
+                    from_groups[module] = {"has_star": False, "names": set()}
+                if has_star:
+                    from_groups[module]["has_star"] = True
+                else:
+                    for n in names:
+                        if n == "*":
+                            continue
+                        # Strip bare built-in names (keep aliased like "abs as scalar_abs")
+                        if module.startswith("std.math") and n in BUILTIN_NAMES:
+                            continue
+                        from_groups[module]["names"].add(n)
+        elif imp_stripped.startswith("import "):
+            bare_seen[imp_stripped] = None
+
+    result = []
+    for module, info in from_groups.items():
+        if info["has_star"]:
+            result.append(f"from {module} import *")
+        elif info["names"]:
+            sorted_names = sorted(info["names"])
+            result.append(f"from {module} import {', '.join(sorted_names)}")
+
+    result.extend(bare_seen.keys())
+    return result
+
+
 # ── Chunked output writer ─────────────────────────────────────────────────
 
 
@@ -385,8 +442,7 @@ def write_chunk(
     output_path: str,
     chunk_label: str,
     chunk_file_data: OrderedDict,
-    all_imports: OrderedDict,
-    all_helper_names: set,
+    chunk_imports: OrderedDict,
     old_to_new: dict,
     _rename_test_calls,
     total_source_funcs: int,
@@ -407,15 +463,41 @@ def write_chunk(
             f.write(line + "\n")
         f.write("\n")
 
-        # Write imports, skipping those that conflict with helper/struct names
-        for imp in all_imports:
-            normalized = re.sub(r"\s+", " ", imp)
-            if normalized in std_norm:
-                continue
+        # Parse STD_PREAMBLE names per module (e.g. std.testing → {assert_true, ...})
+        preamble_names = {}
+        for line in STD_PREAMBLE:
+            if line.startswith("from "):
+                m = re.match(r"^from\s+(\S+)\s+import\s+(.+)$", line)
+                if m:
+                    mod = m.group(1)
+                    names = [n.strip() for n in m.group(2).split(",")]
+                    preamble_names[mod] = set(n.strip() for n in names)
+
+        # Collect struct names in this chunk (still unprefixed — can conflict with imports)
+        chunk_struct_names = set()
+        for data in chunk_file_data.values():
+            for sname, _ in data["structs"]:
+                chunk_struct_names.add(sname)
+
+        # Write imports, merging by module and skipping names already in
+        # preamble or names that conflict with local struct defs
+        merged = merge_imports(chunk_imports)
+        for imp in merged:
+            m = re.match(r"^from\s+(\S+)\s+import\s+(.+)$", imp)
+            if m:
+                module = m.group(1)
+                names_part = m.group(2).strip()
+                if module in preamble_names:
+                    # Only emit names not already provided by STD_PREAMBLE
+                    names = [n.strip() for n in names_part.split(",")]
+                    remaining = [n for n in names if n not in preamble_names[module]]
+                    if remaining:
+                        f.write(f"from {module} import {', '.join(remaining)}\n")
+                    continue
             if "import " in imp and " as " not in imp:
                 after = imp.split("import ", 1)[-1]
                 imported_names = re.findall(r'\b\w+\b', after)
-                if any(n in all_helper_names for n in imported_names):
+                if any(n in chunk_struct_names for n in imported_names):
                     continue
             f.write(f"{imp}\n")
 
@@ -425,6 +507,9 @@ def write_chunk(
         used_names = set()
         dup_renamed = 0
         total_written = 0
+        seen_structs = set()
+        seen_aliases = set()
+        seen_helpers_short = set()
         for bname, data in chunk_file_data.items():
             prefix = _file_prefix(bname)
 
@@ -445,39 +530,82 @@ def write_chunk(
                     return alias_rename_map[m.group(0)]
                 return alias_rename_re.sub(_replacer, text)
 
+            # Build per-file helper rename map for long names (>=5 chars).
+            # Short helper names (inf, nan, d1, etc.) are deduped instead —
+            # they're too short/common and cause false matches in MLIR attrs.
+            helper_old_to_new = {}
+            if data["helpers"]:
+                for hname, _ in data["helpers"]:
+                    if hname not in SKIP_HELPERS and len(hname) >= 5:
+                        helper_old_to_new[hname] = f"{prefix}_{hname}"
+            _helper_rename_re = None
+            if helper_old_to_new:
+                sorted_h = sorted(helper_old_to_new.keys(), key=len, reverse=True)
+                _helper_rename_re = re.compile(
+                    '|'.join(r'(?<!\.)\b' + re.escape(old) + r'\b' for old in sorted_h)
+                )
+            def _apply_helper_renames(text: str) -> str:
+                if _helper_rename_re is None:
+                    return text
+                def _replacer(m):
+                    return helper_old_to_new[m.group(0)]
+                return _helper_rename_re.sub(_replacer, text)
+
+            def _rename_all(text: str) -> str:
+                """Apply alias, helper, and test function renames in order."""
+                return _rename_test_calls(_apply_helper_renames(_apply_alias_renames(text)))
+
             f.write(f"# === From {bname} ===\n\n")
 
-            # Write per-file aliases (prefixed with file name)
+            # Write per-file aliases (prefixed with file name), skip duplicates
             if data["aliases"]:
+                first = True
                 for alias_line, alias_name in data["aliases"]:
                     renamed = rename_alias(alias_line, alias_name, prefix)
-                    f.write(renamed + "\n")
-                f.write("\n")
+                    renamed_name = f"{prefix}_{alias_name}"
+                    if renamed_name not in seen_aliases:
+                        seen_aliases.add(renamed_name)
+                        f.write(renamed + "\n")
+                        first = False
+                if not first:
+                    f.write("\n")
 
-            # Write struct definitions (with alias usage renamed)
+            # Write struct definitions (with all renames applied), skip duplicates
             for sname, stext in data["structs"]:
-                f.write(_apply_alias_renames(stext))
-                f.write("\n\n")
+                if sname not in seen_structs:
+                    seen_structs.add(sname)
+                    f.write(_rename_all(stext))
+                    f.write("\n\n")
 
-            # Write helpers (with test function calls + alias usage renamed)
+            # Write helpers: long names get prefix-renamed, short names deduped
             for hname, htext in data["helpers"]:
                 if hname in SKIP_HELPERS:
                     continue
-                modified = _rename_test_calls(_apply_alias_renames(htext))
-                f.write(modified)
-                f.write("\n\n")
+                if len(hname) < 5:
+                    if hname in seen_helpers_short:
+                        continue
+                    seen_helpers_short.add(hname)
+                    f.write(_rename_test_calls(_apply_alias_renames(htext)))
+                    f.write("\n\n")
+                else:
+                    lines = htext.split("\n")
+                    lines[0] = _apply_helper_renames(lines[0])
+                    body = "\n".join(lines)
+                    f.write(_rename_all(body))
+                    f.write("\n\n")
 
-            # Write test functions (renamed + alias usage + test call sites renamed)
+            # Write test functions (renamed + all renames applied to bodies)
             for func_name, func_text in data["functions"]:
                 renamed_text = _apply_alias_renames(func_text)
                 new_name, new_text, used_names = rename_test_function(
                     func_name, renamed_text, prefix, used_names
                 )
-                # Rename test function calls in body (skip line 0 — already
-                # handled by rename_test_function)
+                # Rename bodies (skip line 0 — already handled by rename_test_function)
                 lines = new_text.split("\n")
                 for idx in range(1, len(lines)):
-                    lines[idx] = _rename_test_calls(lines[idx])
+                    lines[idx] = _rename_test_calls(
+                        _apply_helper_renames(lines[idx])
+                    )
                 new_text = "\n".join(lines)
                 if new_name != func_name:
                     dup_renamed += 1
@@ -514,7 +642,7 @@ def main():
         basename = os.path.basename(filepath)
         if basename in SKIP_FILES:
             continue
-        if basename.endswith("_all.mojo"):
+        if "_all" in basename:
             continue
 
         with open(filepath) as f:
@@ -571,24 +699,36 @@ def main():
             return old_to_new[m.group(0)]
         return _old_to_new_re.sub(_replacer, text)
 
-    # Deduplicate imports across files
-    all_imports = OrderedDict()
-    for data in file_data.values():
-        for imp in data["imports"]:
-            all_imports[imp] = None
-
     total_source_funcs = sum(len(d["functions"]) for d in file_data.values())
 
-    # ── Distribute across chunks ──────────────────────────────────────────
-    sorted_files = sorted(file_data.keys())
+    # ── Distribute across chunks (balanced by test count) ─────────────────
+    # Greedy bin-packing: sort files descending by test count, assign each
+    # to the chunk with the fewest tests so far.
 
     if num_chunks > 1:
+        # (file_name, test_count) pairs, sorted largest first
+        file_counts = sorted(
+            [(f, len(d["functions"])) for f, d in file_data.items()],
+            key=lambda x: x[1],
+            reverse=True,
+        )
+
+        bins = [[] for _ in range(num_chunks)]
+        bin_counts = [0] * num_chunks
+
+        for fname, count in file_counts:
+            # Find bin with fewest tests
+            best = min(range(num_chunks), key=lambda i: bin_counts[i])
+            bins[best].append(fname)
+            bin_counts[best] += count
+
         for chunk_id in range(1, num_chunks + 1):
-            chunk_files = [
-                f for i, f in enumerate(sorted_files)
-                if i % num_chunks == chunk_id - 1
-            ]
+            chunk_files = bins[chunk_id - 1]
             chunk_data = OrderedDict((f, file_data[f]) for f in chunk_files)
+            chunk_imports = OrderedDict()
+            for data in chunk_data.values():
+                for imp in data["imports"]:
+                    chunk_imports[imp] = None
             output_path = os.path.join(
                 TESTS_DIR, f"test_cpu_all_{chunk_id}.mojo"
             )
@@ -596,19 +736,25 @@ def main():
                 output_path=output_path,
                 chunk_label=f"chunk {chunk_id}/{num_chunks}",
                 chunk_file_data=chunk_data,
-                all_imports=all_imports,
-                all_helper_names=all_helper_names,
+                chunk_imports=chunk_imports,
                 old_to_new=old_to_new,
                 _rename_test_calls=_rename_test_calls,
                 total_source_funcs=total_source_funcs,
             )
+
+        # Report balance
+        for i, count in enumerate(bin_counts):
+            print(f"  Chunk {i+1}: {count} tests, {len(bins[i])} files")
     else:
+        all_imports = OrderedDict()
+        for data in file_data.values():
+            for imp in data["imports"]:
+                all_imports[imp] = None
         write_chunk(
             output_path=OUTPUT,
             chunk_label="monolithic",
             chunk_file_data=file_data,
-            all_imports=all_imports,
-            all_helper_names=all_helper_names,
+            chunk_imports=all_imports,
             old_to_new=old_to_new,
             _rename_test_calls=_rename_test_calls,
             total_source_funcs=total_source_funcs,

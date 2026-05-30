@@ -391,9 +391,9 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
         else:
             # Shapes differ but broadcastable
-            var broadcast_shape = ShapeBroadcaster.broadcast_shape[
-                validated=True
-            ](source_shape, shape)
+            var broadcast_shape = ShapeBroadcaster.broadcast_shape(
+                source_shape, shape
+            )
             if broadcast_shape != shape:
                 panic(
                     "Filler → fill: broadcast shape",

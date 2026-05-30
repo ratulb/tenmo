@@ -30,19 +30,9 @@ struct ShapeBroadcaster(ImplicitlyCopyable, RegisterPassable):
 
     @always_inline
     @staticmethod
-    def broadcast_shape[
-        validated: Bool = False
-    ](this: Shape, that: Shape) -> Shape:
+    def broadcast_shape(this: Shape, that: Shape) -> Shape:
         """Compute the broadcasted shape from two input shapes."""
 
-        comptime if not validated:
-            if not ShapeBroadcaster.broadcastable(this, that):
-                panic(
-                    "ShapeBroadcaster → broadcast_shape - not broadcastable: "
-                    + this.__str__()
-                    + " <=> "
-                    + that.__str__()
-                )
         # Explicitly handle true scalars (Shape())
         if this == Shape():
             return that.copy()  # Scalar + Tensor -> Tensor's shape
@@ -50,11 +40,9 @@ struct ShapeBroadcaster(ImplicitlyCopyable, RegisterPassable):
             return this.copy()  # Tensor + Scalar -> Tensor's shape
 
         var padded = ShapeBroadcaster.pad_shapes(this, that)
-        var shape1 = padded[0].copy()
-        var shape2 = padded[1].copy()
-        var result_shape = IntArray.with_capacity(len(shape1))
-        var s1 = shape1.intarray()
-        var s2 = shape2.intarray()
+        var result_shape = IntArray.with_capacity(len(padded[0]))
+        var s1 = padded[0].intarray()
+        var s2 = padded[1].intarray()
 
         for dims in s1.zip(s2):
             if dims[0] == dims[1]:

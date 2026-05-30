@@ -23,6 +23,8 @@ from tenmo.binary_ops_kernel import BinaryOperations
 from tenmo.binary_inplace_ops_kernel import BinaryInplaceOperations
 from tenmo.unary_ops_kernel import UnaryOpsKernel
 from tenmo.matmul_kernel import MatmulNdGpu
+from tenmo.cpu_broadcast import CpuBroadcast
+from tenmo.shared.scalar_ops import ScalarOps
 from tenmo.compare_kernel import AllClose, Compare, CompareScalar
 from tenmo.reduction_kernel import Reduction, ProductArg
 from tenmo.layernorm_kernel import LayerNormKernel
@@ -1419,7 +1421,7 @@ struct NDBuffer[dtype: DType](
                     -1 if neg_count % 2 == 1 else 1
                 )
                 # out[IntArray()] = (sign * exp(log_abs_sum)).cast[Self.dtype]()
-                out[IntArray()] = Self._cast_result[Self.dtype](
+                out[IntArray()] = ScalarOps[Self.dtype].cast_result[Self.dtype](
                     sign * exp(log_abs_sum)
                 )
         else:
@@ -1449,7 +1451,7 @@ struct NDBuffer[dtype: DType](
                         -1 if neg_count % 2 == 1 else 1
                     )
                     # out[out_coord] = (sign * exp(log_abs_sum)).cast[Self.dtype]()
-                    out[out_coord] = Self._cast_result[Self.dtype](
+                    out[out_coord] = ScalarOps[Self.dtype].cast_result[Self.dtype](
                         sign * exp(log_abs_sum)
                     )
 
@@ -1535,7 +1537,7 @@ struct NDBuffer[dtype: DType](
                 var val = self.buffer[idx].cast[DType.float64]()
                 excl.set(
                     idx,
-                    Self._excl_one_cpu(
+                    ScalarOps[Self.dtype].excl_one_cpu(
                         val, total_log, total_neg, total_zero, f64_zero
                     ),
                 )
@@ -1567,59 +1569,11 @@ struct NDBuffer[dtype: DType](
                         normalized_axes, red_coord
                     )
                     var val = self[self_coord].cast[DType.float64]()
-                    excl[self_coord] = Self._excl_one_cpu(
+                    excl[self_coord] = ScalarOps[Self.dtype].excl_one_cpu(
                         val, total_log, total_neg, total_zero, f64_zero
                     )
 
         return excl^
-
-    @always_inline
-    @staticmethod
-    def _cast_result[
-        datatype: DType
-    ](val: Scalar[DType.float64]) -> Scalar[datatype]:
-        """Cast float64 log-space result back to dtype.
-        Rounds to nearest integer for integral types before casting —
-        prevents log/exp precision loss from tenmo.roducing 23 instead of 24.
-        For floating point types, direct cast (no rounding needed).
-        """
-        comptime if datatype.is_integral():
-            return round(val).cast[datatype]()
-        else:
-            return val.cast[datatype]()
-
-    @staticmethod
-    def _excl_one_cpu(
-        val: Scalar[DType.float64],
-        total_log: Scalar[DType.float64],
-        total_neg: Int,
-        total_zero: Int,
-        f64_zero: Scalar[DType.float64],
-    ) -> Scalar[Self.dtype]:
-        """Compute exclusive product for one element. CPU helper."""
-        if total_zero > 1:
-            return Scalar[Self.dtype](0)
-        elif total_zero == 1:
-            if val == f64_zero:
-                # This is the zero — excl = product of all non-zero others
-                var sign = Scalar[DType.float64](
-                    -1 if total_neg % 2 == 1 else 1
-                )
-                # return (sign * exp(total_log)).cast[Self.dtype]()
-                return Self._cast_result[Self.dtype](sign * exp(total_log))
-            else:
-                # Non-zero element in a one-zero slice → excl contains zero
-                return Scalar[Self.dtype](0)
-        else:
-            # No zeros
-            if val == f64_zero:
-                return Scalar[Self.dtype](0)  # Shouldn't reach here
-            var val_neg = 1 if val < f64_zero else 0
-            var excl_log = total_log - log(abs(val))
-            var excl_neg = total_neg - val_neg
-            var sign = Scalar[DType.float64](-1 if excl_neg % 2 == 1 else 1)
-            # return (sign * exp(excl_log)).cast[Self.dtype]()
-            return Self._cast_result[Self.dtype](sign * exp(excl_log))
 
     def log_sum(
         self, normalized_axes: IntArray, keepdims: Bool = False
@@ -2289,7 +2243,9 @@ struct NDBuffer[dtype: DType](
                 )
 
             # Get the broadcasted result which is now of self's shape
-            var broadcast_result = self.broadcast_buffer[op_code](other)
+            var broadcast_result = CpuBroadcast[Self.dtype].apply[op_code](
+                self, other
+            )
             self.copy_from_alike[overwrite=True, validate=False](
                 broadcast_result^
             )
@@ -2308,7 +2264,7 @@ struct NDBuffer[dtype: DType](
             elif self.is_contiguous() and not other.is_contiguous():
                 var index = self.offset
                 for idx in other.index_iterator():
-                    self.buffer[index] = Self.scalar_fn[op_code](
+                    self.buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
                         self.buffer[index], other.buffer[idx]
                     )
                     index += 1
@@ -2316,7 +2272,7 @@ struct NDBuffer[dtype: DType](
             elif not self.is_contiguous() and other.is_contiguous():
                 var index = other.offset
                 for idx in self.index_iterator():
-                    self.buffer[idx] = Self.scalar_fn[op_code](
+                    self.buffer[idx] = ScalarOps[Self.dtype].scalar_fn[op_code](
                         self.buffer[idx], other.buffer[index]
                     )
                     index += 1
@@ -2330,7 +2286,7 @@ struct NDBuffer[dtype: DType](
                         print(e)
                         panic("Raised StopIteration in NDBuffer → inplace_ops")
 
-                    self.buffer[index] = Self.scalar_fn[op_code](
+                    self.buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
                         self.buffer[index], other.buffer[next_index]
                     )
 
@@ -2378,7 +2334,7 @@ struct NDBuffer[dtype: DType](
 
         else:
             for index in self.index_iterator():
-                self.buffer[index] = Self.scalar_fn[op_code](
+                self.buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
                     self.buffer[index], scalar
                 )
 
@@ -2523,7 +2479,7 @@ struct NDBuffer[dtype: DType](
     ) -> NDBuffer[Self.dtype]:
         # Handle broadcasting case
         if self.shape != other.shape:
-            return self.broadcast_buffer[op_code](other)
+            return CpuBroadcast[Self.dtype].apply[op_code](self, other)
 
         if self.is_contiguous() and other.is_contiguous():
             self_start = self.offset
@@ -2547,7 +2503,7 @@ struct NDBuffer[dtype: DType](
             if self.is_contiguous() and not other.is_contiguous():
                 var offset = self.offset
                 for idx in other.index_iterator():
-                    result_buffer[index] = Self.scalar_fn[op_code](
+                    result_buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
                         self.buffer[offset + index], other.buffer[idx], epsilon
                     )
                     index += 1
@@ -2555,7 +2511,7 @@ struct NDBuffer[dtype: DType](
             elif not self.is_contiguous() and other.is_contiguous():
                 var offset = other.offset
                 for idx in self.index_iterator():
-                    result_buffer[index] = Self.scalar_fn[op_code](
+                    result_buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
                         self.buffer[idx], other.buffer[offset + index], epsilon
                     )
                     index += 1
@@ -2572,356 +2528,12 @@ struct NDBuffer[dtype: DType](
                             "Raised StopIteration in NDBuffer → arithmetic_ops"
                         )
 
-                    result_buffer[index] = Self.scalar_fn[op_code](
+                    result_buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
                         self.buffer[idx], other.buffer[next_index], epsilon
                     )
                     index += 1
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
-
-    @always_inline
-    def broadcast_buffer[
-        op_code: Int,
-    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
-        Self.dtype
-    ]:
-        var self_is_scalar = self.shape.rank() <= 1 and self.numels() == 1
-        var other_is_scalar = other.shape.rank() <= 1 and other.numels() == 1
-        if self_is_scalar or other_is_scalar:
-            if self_is_scalar:
-                comptime if op_code == Subtract or op_code == Divide:
-                    if op_code == Subtract:
-                        return self.broadcast_scalar_buffer[ReverseSubtract](
-                            other, self_is_scalar
-                        )
-                    else:
-                        return self.broadcast_scalar_buffer[ReverseDivide](
-                            other, self_is_scalar
-                        )
-
-            return self.broadcast_scalar_buffer[op_code](other, self_is_scalar)
-        else:
-            return self.broadcast_nd_buffer[op_code](other)
-
-    @always_inline
-    def broadcast_scalar_buffer[
-        op_code: Int
-    ](
-        self: NDBuffer[Self.dtype],
-        other: NDBuffer[Self.dtype],
-        self_is_scalar: Bool,
-    ) -> NDBuffer[Self.dtype]:
-        var result_shape = ShapeBroadcaster.broadcast_shape(
-            self.shape, other.shape
-        )
-        var is_contiguous = (
-            other.is_contiguous() if self_is_scalar else self.is_contiguous()
-        )
-        var item = self.item() if self_is_scalar else other.item()
-        var buffer: Buffer[Self.dtype]
-        if is_contiguous:
-            var offset = other.offset if self_is_scalar else self.offset
-            var numels = other.numels() if self_is_scalar else self.numels()
-            buffer = (
-                other.buffer.copied(
-                    offset, offset + numels
-                ) if self_is_scalar else self.buffer.copied(
-                    offset, offset + numels
-                )
-            ).arithmetic_ops_scalar[op_code](item)
-
-        else:
-            buffer = Buffer[Self.dtype](result_shape.num_elements())
-            var index = 0
-
-            if self_is_scalar:
-                for idx in other.index_iterator():
-                    comptime if op_code == ReverseSubtract or op_code == ReverseDivide:
-                        buffer[index] = Self.scalar_fn[op_code](
-                            other.buffer[idx], item
-                        )
-                    else:
-                        buffer[index] = Self.scalar_fn[op_code](
-                            item, other.buffer[idx]
-                        )
-                    index += 1
-            else:
-                for idx in self.index_iterator():
-                    buffer[index] = Self.scalar_fn[op_code](
-                        self.buffer[idx], item
-                    )
-                    index += 1
-
-        return NDBuffer[Self.dtype](buffer^, result_shape)
-
-    @always_inline
-    def broadcast_nd_buffer[
-        op_code: Int
-    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
-        Self.dtype
-    ]:
-        var result_shape = ShapeBroadcaster.broadcast_shape(
-            self.shape, other.shape
-        )
-
-        var rank = result_shape.rank()
-        var self_rank = self.shape.rank()
-        var other_rank = other.shape.rank()
-        var extra_self = rank - self_rank
-        var extra_other = rank - other_rank
-
-        # Effective strides: zero for broadcast dims, original stride otherwise
-        var self_eff = IntArray.with_capacity(rank)
-        var other_eff = IntArray.with_capacity(rank)
-
-        for i in range(rank):
-            var self_i = i - extra_self
-            if self_i < 0:
-                self_eff.append(0)
-            elif self.shape[self_i] == 1 and result_shape[i] > 1:
-                self_eff.append(0)
-            else:
-                self_eff.append(self.strides[self_i])
-
-            var other_i = i - extra_other
-            if other_i < 0:
-                other_eff.append(0)
-            elif other.shape[other_i] == 1 and result_shape[i] > 1:
-                other_eff.append(0)
-            else:
-                other_eff.append(other.strides[other_i])
-
-        var buffer = Buffer[Self.dtype](result_shape.num_elements())
-        var total = buffer.size
-
-        comptime simd_width = simd_width_of[
-            Self.dtype
-        ]() if Self.dtype != DType.bool else 1
-
-        # Fast path: SIMD-tile the last dimension when both have unit stride
-        if (
-            simd_width > 1
-            and rank >= 1
-            and self_eff[rank - 1] == 1
-            and other_eff[rank - 1] == 1
-        ):
-            var last_dim = result_shape[rank - 1]
-            var outer_rank = rank - 1
-            var outer_count = total // last_dim
-
-            # Odometer for outer dimensions (all except last)
-            var outer_coords = IntArray.filled(outer_rank, 0)
-            var self_off = self.offset
-            var other_off = other.offset
-
-            for outer_idx in range(outer_count):
-                var out_base = outer_idx * last_dim
-
-                # SIMD tile the last dimension
-                var j = 0
-                while j + simd_width <= last_dim:
-                    var self_v = self.buffer.load[simdwidth=simd_width](
-                        self_off + j
-                    )
-                    var other_v = other.buffer.load[simdwidth=simd_width](
-                        other_off + j
-                    )
-                    var op_result: SIMD[Self.dtype, simd_width]
-
-                    comptime if op_code == Add:
-                        op_result = self_v + other_v
-                    elif op_code == Subtract:
-                        op_result = self_v - other_v
-                    elif op_code == ReverseSubtract:
-                        op_result = other_v - self_v
-                    elif op_code == Multiply:
-                        op_result = self_v * other_v
-                    elif op_code == Divide:
-                        op_result = self_v / other_v
-                    elif op_code == MAX:
-                        op_result = max(self_v, other_v)
-                    elif op_code == MIN:
-                        op_result = min(self_v, other_v)
-                    else:
-                        # uncommon opcodes — scalar fallback
-                        for k in range(j, j + simd_width):
-                            buffer[out_base + k] = Self.scalar_fn[op_code](
-                                self.buffer[self_off + k],
-                                other.buffer[other_off + k],
-                            )
-                        j += simd_width
-                        continue
-
-                    buffer.store[simdwidth=simd_width](out_base + j, op_result)
-                    j += simd_width
-
-                # Scalar remainder
-                for k in range(j, last_dim):
-                    buffer[out_base + k] = Self.scalar_fn[op_code](
-                        self.buffer[self_off + k],
-                        other.buffer[other_off + k],
-                    )
-
-                # Advance outer dims (odometer)
-                if outer_idx + 1 < outer_count:
-                    for d in range(outer_rank - 1, -1, -1):
-                        outer_coords[d] += 1
-                        if outer_coords[d] < result_shape[d]:
-                            self_off += self_eff[d]
-                            other_off += other_eff[d]
-                            break
-                        else:
-                            self_off -= (result_shape[d] - 1) * self_eff[d]
-                            other_off -= (result_shape[d] - 1) * other_eff[d]
-                            outer_coords[d] = 0
-
-        elif (
-            simd_width > 1
-            and rank >= 1
-            and (
-                (self_eff[rank - 1] == 1 and other_eff[rank - 1] == 0)
-                or (other_eff[rank - 1] == 1 and self_eff[rank - 1] == 0)
-            )
-        ):
-            # One-sided broadcast SIMD: one input broadcasts in last dim
-            var self_broadcasts_last = self_eff[rank - 1] != 1
-            var last_dim = result_shape[rank - 1]
-            var outer_rank = rank - 1
-            var outer_count = total // last_dim
-
-            var outer_coords = IntArray.filled(outer_rank, 0)
-            var self_off = self.offset
-            var other_off = other.offset
-
-            for outer_idx in range(outer_count):
-                var out_base = outer_idx * last_dim
-
-                # Scalar from the broadcasting side (same for the whole row)
-                var scalar_v = self.buffer[
-                    self_off
-                ] if self_broadcasts_last else other.buffer[other_off]
-
-                # Splat scalar to SIMD for uniform vec-vec ops below
-                var scalar_vec = SIMD[Self.dtype, simd_width](scalar_v)
-                var j = 0
-                while j + simd_width <= last_dim:
-                    # SIMD load from the non-broadcasting side
-                    var vec = other.buffer.load[simdwidth=simd_width](
-                        other_off + j
-                    ) if self_broadcasts_last else self.buffer.load[
-                        simdwidth=simd_width
-                    ](
-                        self_off + j
-                    )
-                    var op_result: SIMD[Self.dtype, simd_width]
-
-                    comptime if op_code == Add:
-                        op_result = (
-                            scalar_vec
-                            + vec if self_broadcasts_last else vec
-                            + scalar_vec
-                        )
-                    elif op_code == Subtract:
-                        op_result = (
-                            scalar_vec
-                            - vec if self_broadcasts_last else vec
-                            - scalar_vec
-                        )
-                    elif op_code == ReverseSubtract:
-                        op_result = (
-                            vec
-                            - scalar_vec if self_broadcasts_last else scalar_vec
-                            - vec
-                        )
-                    elif op_code == Multiply:
-                        op_result = (
-                            scalar_vec
-                            * vec if self_broadcasts_last else vec
-                            * scalar_vec
-                        )
-                    elif op_code == Divide:
-                        op_result = (
-                            scalar_vec
-                            / vec if self_broadcasts_last else vec
-                            / scalar_vec
-                        )
-                    elif op_code == MAX:
-                        op_result = max(
-                            scalar_vec, vec
-                        ) if self_broadcasts_last else max(vec, scalar_vec)
-                    elif op_code == MIN:
-                        op_result = min(
-                            scalar_vec, vec
-                        ) if self_broadcasts_last else min(vec, scalar_vec)
-                    else:
-                        for k in range(j, j + simd_width):
-                            var self_i = self_off if self_broadcasts_last else (
-                                self_off + k
-                            )
-                            var other_i = (
-                                other_off
-                                + k if self_broadcasts_last else other_off
-                            )
-                            buffer[out_base + k] = Self.scalar_fn[op_code](
-                                self.buffer[self_i],
-                                other.buffer[other_i],
-                            )
-                        j += simd_width
-                        continue
-
-                    buffer.store[simdwidth=simd_width](out_base + j, op_result)
-                    j += simd_width
-
-                # Scalar remainder
-                for k in range(j, last_dim):
-                    var self_i = self_off if self_broadcasts_last else (
-                        self_off + k
-                    )
-                    var other_i = (
-                        other_off + k if self_broadcasts_last else other_off
-                    )
-                    buffer[out_base + k] = Self.scalar_fn[op_code](
-                        self.buffer[self_i],
-                        other.buffer[other_i],
-                    )
-
-                # Advance outer dims
-                if outer_idx + 1 < outer_count:
-                    for d in range(outer_rank - 1, -1, -1):
-                        outer_coords[d] += 1
-                        if outer_coords[d] < result_shape[d]:
-                            self_off += self_eff[d]
-                            other_off += other_eff[d]
-                            break
-                        else:
-                            self_off -= (result_shape[d] - 1) * self_eff[d]
-                            other_off -= (result_shape[d] - 1) * other_eff[d]
-                            outer_coords[d] = 0
-
-        else:
-            # Scalar path: manual odometer with effective strides
-            var self_off = self.offset
-            var other_off = other.offset
-            var coords = IntArray.filled(rank, 0)
-
-            for i in range(total):
-                buffer[i] = Self.scalar_fn[op_code](
-                    self.buffer[self_off], other.buffer[other_off]
-                )
-
-                # Odometer increment
-                for d in range(rank - 1, -1, -1):
-                    coords[d] += 1
-                    if coords[d] < result_shape[d]:
-                        self_off += self_eff[d]
-                        other_off += other_eff[d]
-                        break
-                    else:
-                        self_off -= (result_shape[d] - 1) * self_eff[d]
-                        other_off -= (result_shape[d] - 1) * other_eff[d]
-                        coords[d] = 0
-
-        return NDBuffer[Self.dtype](buffer^, result_shape)
 
     def broadcast_to(self, target_shape: Shape) -> NDBuffer[Self.dtype]:
         """
@@ -2970,66 +2582,6 @@ struct NDBuffer[dtype: DType](
 
         # Materialise — handles GPU via contiguous_device_state()
         return view.contiguous()
-
-    @staticmethod
-    @always_inline
-    def scalar_fn[
-        op_code: Int,
-    ](
-        lhs: Scalar[Self.dtype],
-        rhs: Scalar[Self.dtype],
-        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
-    ) -> Scalar[Self.dtype]:
-        comptime if op_code == Add:
-            return lhs + rhs
-        elif op_code == Subtract:
-            return lhs - rhs
-        elif op_code == ReverseSubtract:
-            return rhs - lhs
-        elif op_code == Multiply:
-            return lhs * rhs
-        elif op_code == Divide:
-            return lhs / rhs
-        elif op_code == MAX:
-            return max(lhs, rhs)
-        elif op_code == MIN:
-            return min(lhs, rhs)
-        elif op_code == SIGMOID_BACKWARD:
-            # lhs = sigmoid output, rhs = grad
-            return rhs * lhs * (One[Self.dtype].value() - lhs)
-
-        elif op_code == SQRT_BACKWARD:
-            return rhs * (
-                One[Self.dtype].value()
-                / (epsilon + Scalar[Self.dtype](2) * sqrt(lhs))
-            )
-        elif op_code == TANH_BACKWARD:
-            # lhs = tanh output, rhs = grad
-            return rhs * (One[Self.dtype].value() - lhs * lhs)
-
-        elif op_code == POW:
-            return lhs**rhs
-
-        else:  # op_code == ReverseDivide
-            return rhs / lhs
-
-    @staticmethod
-    @always_inline
-    def float_unary_fn_helper[
-        op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
-    ](scalar: Scalar[Self.dtype]) -> Scalar[
-        Self.dtype
-    ] where Self.dtype.is_floating_point():
-        comptime if op_code == LOG:
-            return log(max(scalar, epsilon))
-        elif op_code == SIGMOID_FORWARD:
-            return One[Self.dtype].value() / (
-                One[Self.dtype].value() + exp(scalar)
-            )
-        elif op_code == TANH_FORWARD:
-            return tanh(scalar)
-        else:  # op_code == EXP:
-            return exp(scalar)
 
     @always_inline
     def scalar_ops[
@@ -3096,7 +2648,7 @@ struct NDBuffer[dtype: DType](
             var result_buffer = Buffer[Self.dtype](self.numels())
 
             for idx in self.index_iterator():
-                result_buffer[index] = Self.scalar_fn[op_code](
+                result_buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
                     self.buffer[idx], scalar, epsilon
                 )
                 index += 1
@@ -3147,24 +2699,12 @@ struct NDBuffer[dtype: DType](
             var result_buffer = Buffer[Self.dtype](self.numels())
 
             for idx in self.index_iterator():
-                result_buffer[index] = Self.unary_fn_helper[op_code](
+                result_buffer[index] = ScalarOps[Self.dtype].unary_fn_helper[op_code](
                     self.buffer[idx]
                 )
                 index += 1
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
-
-    @staticmethod
-    @always_inline
-    def unary_fn_helper[
-        op_code: Int
-    ](scalar: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
-        comptime if op_code == NEGATE:
-            return -scalar
-        elif op_code == SQRT:
-            return sqrt(scalar)
-        else:  # op_code == ABS:
-            return scalar.__abs__()
 
     @always_inline
     def unary_ops_with_mask[
@@ -3306,7 +2846,7 @@ struct NDBuffer[dtype: DType](
             var result_buffer = Buffer[Self.dtype](self.numels())
 
             for idx in self.index_iterator():
-                result_buffer[index] = Self.float_unary_fn_helper[
+                result_buffer[index] = ScalarOps[Self.dtype].float_unary_fn_helper[
                     op_code, epsilon
                 ](self.buffer[idx])
                 index += 1
@@ -3579,93 +3119,6 @@ struct NDBuffer[dtype: DType](
         else:
             return result_ndb, NDBuffer[Self.dtype].Empty()
 
-    @staticmethod
-    def sigmoid_fn(
-        x: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        return Scalar[Self.dtype](1.0) / (Scalar[Self.dtype](1.0) + exp(-x))
-
-    @staticmethod
-    def clip_fn(
-        x: Scalar[Self.dtype], epsilon: Scalar[Self.dtype]
-    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        return x.clamp(epsilon, Scalar[Self.dtype](1.0) - epsilon)
-
-    @staticmethod
-    def bce_with_logits_element(
-        x: Scalar[Self.dtype],
-        y: Scalar[Self.dtype],
-        epsilon: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        var s = Self.sigmoid_fn(x)
-        var safe = Self.clip_fn(s, epsilon)
-        return -(
-            y * log(safe)
-            + (Scalar[Self.dtype](1.0) - y)
-            * log(Scalar[Self.dtype](1.0) - safe)
-        )
-
-    @staticmethod
-    def bce_element(
-        p: Scalar[Self.dtype],
-        y: Scalar[Self.dtype],
-        epsilon: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        var safe = Self.clip_fn(p, epsilon)
-        return -(
-            y * log(safe)
-            + (Scalar[Self.dtype](1.0) - y)
-            * log(Scalar[Self.dtype](1.0) - safe)
-        )
-
-    @staticmethod
-    def bce_with_logits_backward_element(
-        sigmoid: Scalar[Self.dtype],
-        target: Scalar[Self.dtype],
-        grad: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        return (sigmoid - target) * grad
-
-    @staticmethod
-    def bce_backward_element(
-        safe: Scalar[Self.dtype],
-        target: Scalar[Self.dtype],
-        grad: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        var one = Scalar[Self.dtype](1.0)
-        var one_minus_target = one - target
-        var one_minus_safe = one - safe
-        return -(target / safe - one_minus_target / one_minus_safe) * grad
-
-    @staticmethod
-    def rdiv_scalar_backward_element(
-        grad_out: Scalar[Self.dtype],
-        x: Scalar[Self.dtype],
-        scalar: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype]:
-        """Element-wise s / x backward: s * grad_out / x² (positive, caller does SubtractTensor)
-        """
-        return scalar * grad_out / (x * x)
-
-    @staticmethod
-    def divide_backward_x_element(
-        grad_out: Scalar[Self.dtype],
-        y: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype]:
-        """Element-wise grad_x for x / y backward: grad_out / y"""
-        return grad_out / y
-
-    @staticmethod
-    def divide_backward_y_element(
-        grad_out: Scalar[Self.dtype],
-        x: Scalar[Self.dtype],
-        y: Scalar[Self.dtype],
-    ) -> Scalar[Self.dtype]:
-        """Element-wise grad_y for x / y backward: grad_out * x / y² (positive, caller does SubtractTensor)
-        """
-        return grad_out * x / (y * y)
-
-    @always_inline
     def bce_with_logits_backward(
         self: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
@@ -3724,7 +3177,7 @@ struct NDBuffer[dtype: DType](
             var grad_buf = Buffer[Self.dtype](extent)
             var idx = 0
             for coord in self.index_iterator():
-                grad_buf[idx] = Self.bce_with_logits_backward_element(
+                grad_buf[idx] = ScalarOps[Self.dtype].bce_with_logits_backward_element(
                     self.buffer[coord],
                     target.buffer[coord],
                     grad_output.buffer[coord],
@@ -3786,7 +3239,7 @@ struct NDBuffer[dtype: DType](
             var grad_buf = Buffer[Self.dtype](extent)
             var idx = 0
             for coord in self.index_iterator():
-                grad_buf[idx] = Self.bce_with_logits_backward_element(
+                grad_buf[idx] = ScalarOps[Self.dtype].bce_with_logits_backward_element(
                     self.buffer[coord],
                     target.buffer[coord],
                     scalar_grad,
@@ -3848,7 +3301,7 @@ struct NDBuffer[dtype: DType](
             var grad_buf = Buffer[Self.dtype](extent)
             var idx = 0
             for coord in self.index_iterator():
-                grad_buf[idx] = Self.bce_backward_element(
+                grad_buf[idx] = ScalarOps[Self.dtype].bce_backward_element(
                     self.buffer[coord],
                     target.buffer[coord],
                     grad_output.buffer[coord],
@@ -3901,7 +3354,7 @@ struct NDBuffer[dtype: DType](
             var grad_buf = Buffer[Self.dtype](extent)
             var idx = 0
             for coord in self.index_iterator():
-                grad_buf[idx] = Self.bce_backward_element(
+                grad_buf[idx] = ScalarOps[Self.dtype].bce_backward_element(
                     self.buffer[coord],
                     target.buffer[coord],
                     scalar_grad,
@@ -3953,7 +3406,7 @@ struct NDBuffer[dtype: DType](
             var grad_buf = Buffer[Self.dtype](extent)
             var idx = 0
             for coord in self.index_iterator():
-                grad_buf[idx] = Self.rdiv_scalar_backward_element(
+                grad_buf[idx] = ScalarOps[Self.dtype].rdiv_scalar_backward_element(
                     self.buffer[coord],
                     divisor.buffer[coord],
                     scalar,
@@ -4048,8 +3501,8 @@ struct NDBuffer[dtype: DType](
                 for d in range(y_rank):
                     y_coord[d] = 0 if y.shape[d] == 1 else out_coord[d + y_skip]
                 yv = y[y_coord]
-            gx_buf[idx] = Self.divide_backward_x_element(g, yv)
-            gy_buf[idx] = Self.divide_backward_y_element(g, xv, yv)
+            gx_buf[idx] = ScalarOps[Self.dtype].divide_backward_x_element(g, yv)
+            gy_buf[idx] = ScalarOps[Self.dtype].divide_backward_y_element(g, xv, yv)
             idx += 1
         return (
             NDBuffer[Self.dtype](gx_buf^, out_shape),
@@ -4120,10 +3573,10 @@ struct NDBuffer[dtype: DType](
             var sig_buf = Buffer[Self.dtype](extent)
             var idx = 0
             for coord in self.index_iterator():
-                loss_buf[idx] = Self.bce_with_logits_element(
+                loss_buf[idx] = ScalarOps[Self.dtype].bce_with_logits_element(
                     self.buffer[coord], target.buffer[coord], epsilon
                 )
-                sig_buf[idx] = Self.sigmoid_fn(self.buffer[coord])
+                sig_buf[idx] = ScalarOps[Self.dtype].sigmoid_fn(self.buffer[coord])
                 idx += 1
             return (
                 NDBuffer[Self.dtype](loss_buf^, self.shape),
@@ -4199,9 +3652,9 @@ struct NDBuffer[dtype: DType](
             var total = Scalar[Self.dtype](0)
             var idx = 0
             for coord in self.index_iterator():
-                var s = Self.sigmoid_fn(self.buffer[coord])
+                var s = ScalarOps[Self.dtype].sigmoid_fn(self.buffer[coord])
                 sig_buf[idx] = s
-                total += Self.bce_with_logits_element(
+                total += ScalarOps[Self.dtype].bce_with_logits_element(
                     self.buffer[coord], target.buffer[coord], epsilon
                 )
                 idx += 1
@@ -4269,10 +3722,10 @@ struct NDBuffer[dtype: DType](
             var safe_buf = Buffer[Self.dtype](extent)
             var idx = 0
             for coord in self.index_iterator():
-                loss_buf[idx] = Self.bce_element(
+                loss_buf[idx] = ScalarOps[Self.dtype].bce_element(
                     self.buffer[coord], target.buffer[coord], epsilon
                 )
-                safe_buf[idx] = Self.clip_fn(self.buffer[coord], epsilon)
+                safe_buf[idx] = ScalarOps[Self.dtype].clip_fn(self.buffer[coord], epsilon)
                 idx += 1
             return (
                 NDBuffer[Self.dtype](loss_buf^, self.shape),
@@ -4343,9 +3796,9 @@ struct NDBuffer[dtype: DType](
             var total = Scalar[Self.dtype](0)
             var idx = 0
             for coord in self.index_iterator():
-                var safe = Self.clip_fn(self.buffer[coord], epsilon)
+                var safe = ScalarOps[Self.dtype].clip_fn(self.buffer[coord], epsilon)
                 safe_buf[idx] = safe
-                total += Self.bce_element(
+                total += ScalarOps[Self.dtype].bce_element(
                     self.buffer[coord], target.buffer[coord], epsilon
                 )
                 idx += 1

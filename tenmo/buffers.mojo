@@ -36,6 +36,7 @@ from .mnemonics import (
     GreaterThanEqual,
 )
 from .shared import ScalarPredicate
+from .shared.scalar_ops import ScalarOps
 
 
 struct Buffer[dtype: DType = DType.float32](
@@ -104,7 +105,6 @@ struct Buffer[dtype: DType = DType.float32](
     def __init__(
         out self,
         size: Int,
-        # data: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
         data: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
         copy: Bool = False,
     ):
@@ -1820,7 +1820,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * smdwidth
 
         for k in range(i, total):
-            if not Self.compare_pair[op_code](
+            if not ScalarOps[Self.dtype].compare_pair[op_code](
                 self.load[simdwidth=1](k), scalar
             ):
                 return False
@@ -1996,7 +1996,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * smdwidth
 
         for k in range(i, total):
-            if not Self.compare_pair[op_code](
+            if not ScalarOps[Self.dtype].compare_pair[op_code](
                 self.load[simdwidth=1](k), other.load[simdwidth=1](k)
             ):
                 return False
@@ -2044,25 +2044,6 @@ struct Buffer[dtype: DType = DType.float32](
     ) -> Bool:
         return self.compare_buffer[GreaterThanEqual](other)
 
-    @always_inline
-    @staticmethod
-    def compare_pair[
-        op_code: Int
-    ](left: Scalar[Self.dtype], right: Scalar[Self.dtype]) -> Bool:
-        comptime if op_code == Equal:
-            return left == right
-        elif op_code == NotEqual:
-            return left != right
-        elif op_code == GreaterThanEqual:
-            return left >= right
-        elif op_code == GreaterThan:
-            return left > right
-        elif op_code == LessThanEqual:
-            return left <= right
-        else:  # op_code == LessThan
-            return left < right
-
-    @always_inline
     def float(self) -> Buffer[DType.float32]:
         return self.to_dtype[DType.float32]()
 

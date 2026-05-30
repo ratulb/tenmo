@@ -298,6 +298,63 @@ STD_PREAMBLE = [
 ]
 
 
+# ── Import dedup ─────────────────────────────────────────────────────────
+
+
+# Names built into Mojo — importing them from std.math is redundant.
+# Only bare names (not aliased with `as`) are filtered.
+BUILTIN_NAMES = {"abs", "max", "min", "round", "pow"}
+
+
+def merge_imports(imports: OrderedDict) -> list:
+    """Merge duplicate 'from X import ...' lines by module.
+
+    Strips built-in names (e.g. bare `abs`, `max`) from `std.math` imports
+    since those are available in Mojo without import.
+
+    Input: OrderedDict of import strings (keys are the import lines).
+    Output: list of deduplicated import strings.
+    """
+    from_groups = OrderedDict()
+    bare_seen = OrderedDict()
+
+    for imp in imports:
+        imp_stripped = imp.strip()
+        if imp_stripped.startswith("from "):
+            m = re.match(r"^from\s+(\S+)\s+import\s+(.+)$", imp_stripped)
+            if m:
+                module = m.group(1)
+                names_part = m.group(2).strip()
+                names_part = names_part.strip("()")
+                names = [n.strip().strip("()") for n in names_part.split(",") if n.strip().strip("()")]
+                has_star = "*" in names
+                if module not in from_groups:
+                    from_groups[module] = {"has_star": False, "names": set()}
+                if has_star:
+                    from_groups[module]["has_star"] = True
+                else:
+                    for n in names:
+                        if n == "*":
+                            continue
+                        # Strip bare built-in names (keep aliased like "abs as scalar_abs")
+                        if module.startswith("std.math") and n in BUILTIN_NAMES:
+                            continue
+                        from_groups[module]["names"].add(n)
+        elif imp_stripped.startswith("import "):
+            bare_seen[imp_stripped] = None
+
+    result = []
+    for module, info in from_groups.items():
+        if info["has_star"]:
+            result.append(f"from {module} import *")
+        elif info["names"]:
+            sorted_names = sorted(info["names"])
+            result.append(f"from {module} import {', '.join(sorted_names)}")
+
+    result.extend(bare_seen.keys())
+    return result
+
+
 # ── Chunked output writer ─────────────────────────────────────────────────
 
 
@@ -305,8 +362,7 @@ def write_chunk(
     output_path: str,
     chunk_label: str,
     chunk_file_data: OrderedDict,
-    all_imports: OrderedDict,
-    all_helper_names: set,
+    chunk_imports: OrderedDict,
 ):
     """Write a single chunk file with imports + subset of file_data."""
     std_norm = set()
@@ -325,35 +381,70 @@ def write_chunk(
             f.write(line + "\n")
         f.write("\n")
 
-        # Write imports, skipping those that conflict with helper names
-        for imp in all_imports:
-            normalized = re.sub(r"\s+", " ", imp)
-            if normalized in std_norm:
-                continue
+        # Parse STD_PREAMBLE names per module (e.g. std.testing → {assert_true, ...})
+        preamble_names = {}
+        for line in STD_PREAMBLE:
+            if line.startswith("from "):
+                m = re.match(r"^from\s+(\S+)\s+import\s+(.+)$", line)
+                if m:
+                    mod = m.group(1)
+                    names = [n.strip() for n in m.group(2).split(",")]
+                    preamble_names[mod] = set(n.strip() for n in names)
+
+        # Collect struct names in this chunk (still unprefixed — can conflict with imports)
+        chunk_struct_names = set()
+        for data in chunk_file_data.values():
+            for sname, _ in data.get("structs", []):
+                chunk_struct_names.add(sname)
+
+        # Write imports, merging by module and skipping names already in
+        # preamble or names that conflict with local struct defs
+        merged = merge_imports(chunk_imports)
+        for imp in merged:
+            m = re.match(r"^from\s+(\S+)\s+import\s+(.+)$", imp)
+            if m:
+                module = m.group(1)
+                names_part = m.group(2).strip()
+                if module in preamble_names:
+                    # Only emit names not already provided by STD_PREAMBLE
+                    names = [n.strip() for n in names_part.split(",")]
+                    remaining = [n for n in names if n not in preamble_names[module]]
+                    if remaining:
+                        f.write(f"from {module} import {', '.join(remaining)}\n")
+                    continue
             if "import " in imp and " as " not in imp:
                 after = imp.split("import ", 1)[-1]
                 imported_names = re.findall(r'\b\w+\b', after)
-                if any(n in all_helper_names for n in imported_names):
+                if any(n in chunk_struct_names for n in imported_names):
                     continue
             f.write(f"{imp}\n")
 
         f.write("\n\n")
 
         dup_names = set()
+        seen_helpers = set()
+        seen_aliases = set()
         dup_count = 0
         for bname, data in chunk_file_data.items():
             f.write(f"# === From {bname} ===\n\n")
 
             if data["aliases"]:
+                first = True
                 for a in data["aliases"]:
-                    f.write(a + "\n")
-                f.write("\n")
+                    if a not in seen_aliases:
+                        seen_aliases.add(a)
+                        f.write(a + "\n")
+                        first = False
+                if not first:
+                    f.write("\n")
 
             for hname, htext in data["helpers"]:
                 if hname in SKIP_HELPERS:
                     continue
-                f.write(htext)
-                f.write("\n\n")
+                if hname not in seen_helpers:
+                    seen_helpers.add(hname)
+                    f.write(htext)
+                    f.write("\n\n")
 
             for func_name, func_text in data["functions"]:
                 if func_name in dup_names:
@@ -369,7 +460,7 @@ def write_chunk(
     print(f"Wrote {output_path}")
     print(f"  Source files: {len(chunk_file_data)}")
     print(f"  Functions:    {total_funcs}")
-    print(f"  Imports:      {len(all_imports)}")
+    print(f"  Imports:      {len(chunk_imports)}")
     if dup_count:
         print(f"  Duplicates:   {dup_count}")
     print()
@@ -394,7 +485,7 @@ def main():
         basename = os.path.basename(filepath)
         if basename in NO_GPU:
             continue
-        if basename.endswith("_all.mojo"):
+        if "_all" in basename:
             continue
 
         with open(filepath) as f:
@@ -421,22 +512,32 @@ def main():
         for hname, _ in data["helpers"]:
             all_helper_names.add(hname)
 
-    # Deduplicate imports across files
-    all_imports = OrderedDict()
-    for data in file_data.values():
-        for imp in data["imports"]:
-            all_imports[imp] = None
-
-    # ── Distribute across chunks ──────────────────────────────────────────
-    sorted_files = sorted(file_data.keys())
+    # ── Distribute across chunks (balanced by test count) ─────────────────
+    # Greedy bin-packing: sort files descending by test count, assign each
+    # to the chunk with the fewest tests so far.
 
     if num_chunks > 1:
+        file_counts = sorted(
+            [(f, len(d["functions"])) for f, d in file_data.items()],
+            key=lambda x: x[1],
+            reverse=True,
+        )
+
+        bins = [[] for _ in range(num_chunks)]
+        bin_counts = [0] * num_chunks
+
+        for fname, count in file_counts:
+            best = min(range(num_chunks), key=lambda i: bin_counts[i])
+            bins[best].append(fname)
+            bin_counts[best] += count
+
         for chunk_id in range(1, num_chunks + 1):
-            chunk_files = [
-                f for i, f in enumerate(sorted_files)
-                if i % num_chunks == chunk_id - 1
-            ]
+            chunk_files = bins[chunk_id - 1]
             chunk_data = OrderedDict((f, file_data[f]) for f in chunk_files)
+            chunk_imports = OrderedDict()
+            for data in chunk_data.values():
+                for imp in data["imports"]:
+                    chunk_imports[imp] = None
             output_path = os.path.join(
                 TESTS_DIR, f"test_gpu_all_{chunk_id}.mojo"
             )
@@ -444,16 +545,21 @@ def main():
                 output_path=output_path,
                 chunk_label=f"chunk {chunk_id}/{num_chunks}",
                 chunk_file_data=chunk_data,
-                all_imports=all_imports,
-                all_helper_names=all_helper_names,
+                chunk_imports=chunk_imports,
             )
+
+        for i, count in enumerate(bin_counts):
+            print(f"  Chunk {i+1}: {count} tests, {len(bins[i])} files")
     else:
+        all_imports = OrderedDict()
+        for data in file_data.values():
+            for imp in data["imports"]:
+                all_imports[imp] = None
         write_chunk(
             output_path=OUTPUT,
             chunk_label="monolithic",
             chunk_file_data=file_data,
-            all_imports=all_imports,
-            all_helper_names=all_helper_names,
+            chunk_imports=all_imports,
         )
 
 
