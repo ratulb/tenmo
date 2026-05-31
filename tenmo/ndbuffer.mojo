@@ -2595,16 +2595,18 @@ struct NDBuffer[dtype: DType](
                         var k_end = min(k_tile + tile_size, n)
 
                         for i in range(i_tile, i_end):
+                            # A may be strided — use full formula
                             var a_row_base = i * A_stride0 + A_offset
-                            # C.offset = 0, C_stride0 = p
-                            # var c_row_base = i * C_stride0 + C_offset
+
+                            # C is always zeros() → contiguous: stride0=p, stride1=1, offset=0
+                            # Full: i * C_stride0 + C_offset → simplified: i * p
                             var c_row_base = i * p
 
                             var j = j_tile
 
                             # Main vectorized loop
                             while j + simdwidth <= j_end:
-                                # var c_addr = c_row_base + j * C_stride1, C_stride1 = 1
+                                # Full c_addr: c_row_base + j * C_stride1 → C_stride1=1 → simplified: c_row_base + j
                                 var c_addr = c_row_base + j
                                 var accumulator = C_data.load[width=simdwidth](
                                     c_addr
@@ -2613,8 +2615,9 @@ struct NDBuffer[dtype: DType](
                                 for k in range(k_tile, k_end):
                                     var a_addr = a_row_base + k * A_stride1
                                     var a_ik = A_data[a_addr]
+                                    # B is contiguous here (stride1=1), offset preserved
+                                    # Full: k * B_stride0 + B_offset + j * B_stride1 → simplified: k * B_stride0 + B_offset + j
                                     var b_addr = (
-                                        #k * B_stride0 + B_offset + j * B_stride1
                                         k * B_stride0 + B_offset + j
                                     )
                                     var b_vec = B_data.load[width=simdwidth](
@@ -2630,14 +2633,13 @@ struct NDBuffer[dtype: DType](
 
                             # Tail handling
                             while j < j_end:
-                                # var c_addr = c_row_base + j * C_stride1, C_stride1 =1
                                 var c_addr = c_row_base + j
                                 var accumulator = C_data[c_addr]
 
                                 for k in range(k_tile, k_end):
                                     var a_addr = a_row_base + k * A_stride1
+                                    # B is contiguous (stride1=1) — same simplification as above
                                     var b_addr = (
-                                        #k * B_stride0 + B_offset + j * B_stride1
                                         k * B_stride0 + B_offset + j
                                     )
                                     accumulator += (
@@ -2650,11 +2652,12 @@ struct NDBuffer[dtype: DType](
             parallelize[process_row_tile](num_tiles_i, num_physical_cores())
 
         else:
-            # Non-contiguous path (scalar)
+            # Non-contiguous B — must use full stride formula for B
             for i in range(m):
+                # A may be strided — use full formula
                 var a_row_base = i * A_stride0 + A_offset
-                # C_stride0 = p, C_offset = 0
-                # var c_row_base = i * C_stride0 + C_offset
+
+                # C is always zeros() → contiguous: stride0=p, stride1=1, offset=0
                 var c_row_base = i * p
 
                 for j in range(p):
@@ -2662,10 +2665,11 @@ struct NDBuffer[dtype: DType](
 
                     for k in range(n):
                         var a_addr = a_row_base + k * A_stride1
+                        # B is non-contiguous — must use full formula with B_stride1
                         var b_addr = k * B_stride0 + B_offset + j * B_stride1
                         accumulator += A_data[a_addr] * B_data[b_addr]
 
-                    # var c_addr = c_row_base + j * C_stride1, C_stride1
+                    # C_stride1=1 → simplified: c_row_base + j
                     var c_addr = c_row_base + j
                     C_data[c_addr] = accumulator
 
