@@ -11,7 +11,7 @@ from .mnemonics import AddTensor
 from .tensor import Tensor
 from .validators import Validator
 from .ancestry import Ancestor
-from .minmax_helpers import MinmaxNdBuffer
+from .minmax import MinMax
 from .reduction_kernel import Reduction
 from .sum_mean_reduction import SumMeanReduction
 from .common_utils import Epsilon
@@ -111,7 +111,7 @@ struct SoftmaxNdBuffer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ndb: NDBuffer[Self.dtype],
         normalized_axes: IntArray,
     ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]] where Self.dtype.is_floating_point():
-        var (max_values, _) = MinmaxNdBuffer[Self.dtype].minmax[is_max=True](
+        var (max_values, _) = MinMax[Self.dtype].minmax[is_max=True](
             ndb, normalized_axes, keepdims=True
         )
         var stable = ndb - max_values

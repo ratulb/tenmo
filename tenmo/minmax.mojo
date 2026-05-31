@@ -7,7 +7,10 @@ from .intarray import IntArray
 from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
 from .ancestry import Ancestor
-from .minmax_helpers import MinmaxNdBuffer
+from .minmax_kernel import ReductionMinMax
+from .minmax_reducer import MinMaxReducer
+from .common_utils import panic
+from std.sys.info import has_accelerator
 
 
 @fieldwise_init
@@ -71,7 +74,7 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var tracking_grad = track_grad and requires_grad.or_else(
             self.requires_grad
         )
-        var (result_ndb, mask_ndb) = MinmaxNdBuffer[Self.dtype].minmax[
+        var (result_ndb, mask_ndb) = Self.minmax[
             is_max=max
         ](self.buffer, normalized_axes, keepdims, tracking_grad)
         var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
@@ -87,3 +90,60 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^
+
+
+    @always_inline
+    @staticmethod
+    def minmax[
+        is_max: Bool
+    ](
+        ndb: NDBuffer[Self.dtype],
+        axes: IntArray,
+        keepdims: Bool = False,
+        paired: Bool = False,
+    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+        ref shape = ndb.shape
+        var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
+
+        comptime if has_accelerator():
+            if ndb.is_on_gpu():
+                try:
+                    var (result_ndb, mask_ndb) = ReductionMinMax[
+                        Self.dtype
+                    ].launch[is_max=is_max](ndb, normalized_axes, keepdims)
+                    return result_ndb, mask_ndb
+                except e:
+                    print(e)
+                    panic("MinmaxNdBuffer minmax: gpu path failed")
+                    return (
+                        NDBuffer[Self.dtype].Empty(),
+                        NDBuffer[Self.dtype].Empty(),
+                    )
+            else:
+                return Self.minmax_cpu[is_max](
+                    ndb, normalized_axes, keepdims, paired
+                )
+        else:
+            return Self.minmax_cpu[is_max](
+                ndb, normalized_axes, keepdims, paired
+            )
+
+    @staticmethod
+    def minmax_cpu[
+        is_max: Bool
+    ](
+        ndb: NDBuffer[Self.dtype],
+        normalized_axes: IntArray,
+        keepdims: Bool = False,
+        paired: Bool = False,
+    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+        var result_ndb = MinMaxReducer[Self.dtype].reduce_minmax[is_max](
+            ndb, normalized_axes, keepdims
+        )
+        if paired:
+            var mask_ndb = MinMaxReducer[Self.dtype].build_minmax_mask[is_max](
+                ndb, result_ndb, normalized_axes, keepdims
+            )
+            return result_ndb, mask_ndb
+        else:
+            return result_ndb, NDBuffer[Self.dtype].Empty()

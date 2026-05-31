@@ -1,412 +1,297 @@
-from tenmo import Tensor
+from tenmo import Tensor, NDBuffer, Shape
 from std.testing import assert_true
 from tenmo.common_utils import s, i
 from std.sys.defines import get_defined_string
+from tenmo.matrixshapevalidator import MatrixShapeValidator
+from std.sys import has_accelerator
+from std.algorithm import parallelize
+from std.sys.info import num_physical_cores
+from std.sys.intrinsics import PrefetchLocality
+from tenmo.matmul_kernel import MatmulNdGpu
 
 comptime dtype = DType.float32
 
 
 def main() raises:
-    sum_up()
-    # test_slice_every_second_row_column1()
-    # test_permute_backward()
-    # test_add_backward()
-    # test_concat_concat_view_with_tensor_ct()
     _ = """comptime BLAS_PATH = get_defined_string[
         "BLAS_PATH", "/lib/x86_64-linux-gnu/libopenblas.so.0"
     ]()
     print("BLAS_PATH: ", BLAS_PATH)"""
+    pass
 
 
-def test_slice_every_second_row_column1() raises:
-    print("test_slice_every_second_row_column1")
-    comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(15, requires_grad=True)
-    var r = a.reshape(5, 3)
-    var v = r[s(None, None, 2), i(1)]  # Select col 1 of rows 0, 2, 4
-    var loss = v.sum()
-    loss.backward()
-    grad = a.grad().copy()
-    assert_true(grad.shape() == a.shape())
-    assert_true(grad[1] == 1)  # r[0,1]
-    assert_true(grad[7] == 1)  # r[2,1]
-    assert_true(grad[13] == 1)  # r[4,1]
-    assert_true(grad.sum().item() == 3)
 
 
-def test_permute_backward() raises:
-    print("test_permute_backward")
-    comptime dtype = DType.float32
+# ─────────────────────────────────────────────────────────────
+#  Tuning constants
+#  Tune these for your hardware if benchmarking shows different
+#  sweet spots. L1 cache line = 64 bytes → 16 float32 values.
+# ─────────────────────────────────────────────────────────────
+comptime TILE_M = 64   # row tile — fits well in L2
+comptime TILE_N = 64   # shared-dim tile
+comptime TILE_P = 128  # col tile — wider for SIMD reuse
+comptime UNROLL = 4    # number of SIMD accumulators per j-strip
+comptime PREFETCH_DIST = 2  # tiles ahead to prefetch
 
-    var a = Tensor[dtype].arange(6, requires_grad=True)
-    var v = a.view([2, 3])
-    print("We are good 1?")
-    var p = v.permute([1, 0])  # shape (3, 2), stride [1, 3]
+def matmul_2d(
+    A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+) -> NDBuffer[Self.dtype]:
+    ref A_shape = A.shape
+    ref B_shape = B.shape
+    MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
 
-    print("We are good 2?")
-    var flat = p.reshape([6])
+    var C: NDBuffer[Self.dtype]
 
-    print("We are good 3?")
-    flat.backward()
+    comptime if has_accelerator():
+        if A.is_on_gpu() and B.is_on_gpu():
+            try:
+                C = MatmulNdGpu[Self.dtype].launch[tile_size=TILE_SIZE](
+                    A, B
+                )
+            except e:
+                print(e)
+                panic("NDBuffer matmul_2d → GPU operation failed")
+                C = NDBuffer[Self.dtype](Shape())
+        elif (A.is_on_gpu() and B.is_on_cpu()) or (
+            A.is_on_cpu() and B.is_on_gpu()
+        ):
+            panic(
+                " NDBuffer matmul_2d → both buffers must be on gpu. A"
+                " is on gpu?",
+                String(A.is_on_gpu()),
+                ", B is on gpu?",
+                String(B.is_on_gpu()),
+            )
+            C = NDBuffer[Self.dtype](Shape())
+        else:
+            C = A.matmul_2d_cpu(B)
+    else:
+        C = A.matmul_2d_cpu(B)
 
-    print("We are good 4?")
+    return C^
 
-    var expected = Tensor[dtype].d1([1, 1, 1, 1, 1, 1])
+def matmul_2d_cpu(
+    A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+) -> NDBuffer[Self.dtype]:
+    ref A_shape = A.shape
+    ref B_shape = B.shape
+    MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
 
-    print("We are good 5?")
-    assert_true((a.grad() == expected))
+    comptime simdwidth = simd_width_of[Self.dtype]()
+    # Process UNROLL * simdwidth columns of C per inner iteration.
+    # e.g. float32: simdwidth=8, UNROLL=4 → 32 columns at once.
+    comptime simd_unroll = simdwidth * UNROLL
 
-    print("We are good 6?")
+    var m = A_shape[0]
+    var n = A_shape[1]
+    var p = B_shape[1]
 
+    var C = NDBuffer[Self.dtype].zeros(Shape([m, p]))
 
-def test_add_backward() raises:
-    comptime dtype = DType.float32
-    A1 = Tensor[dtype].d2([[1, 2, 3]], requires_grad=True)
-    AV = A1.into_view()
-    AV.backward(3)
-    AV.backward()
-    AV.backward()
-    assert_true(
-        (A1.gradients()[] == Tensor[dtype].d2([[5, 5, 5]])),
-        "Tensor view backward 4 times grad assertion failed",
-    )
+    # ── Hoist all pointer/stride metadata ──────────────────────
+    ref A_strides = A.strides
+    var A_stride0 = A_strides[0]
+    var A_stride1 = A_strides[1]
+    var A_offset  = A.offset
+    var A_data    = A.data_ptr()
 
-    a = Tensor[dtype].d2([[1, 2, 3]], requires_grad=True)
-    b = Tensor[dtype].d1([1, 2, 3], requires_grad=True)
-    c = a + b
-    d = b + a
-    e = c + d
-    e.backward(26)
-    assert_true(
-        (a.gradients()[] == Tensor[dtype].d2([[52, 52, 52]])),
-        "2D + 1D grad assertion 1 failed",
-    )
-    assert_true(
-        (b.gradients()[] == Tensor[dtype].d1([52, 52, 52])),
-        "2D + 1D grad assertion 2 failed",
-    )
-    ev = e.into_view()
-    ev.backward()
-    a.gradients()[].print()
-    b.gradients()[].print()
-    assert_true(
-        (a.gradients()[] == Tensor[dtype].d2([[104, 104, 104]])),
-        "2D + 1D grad assertion 3 failed",
-    )
-    assert_true(
-        (b.gradients()[] == Tensor[dtype].d1([104, 104, 104])),
-        "2D + 1D grad assertion 4 failed",
-    )
+    ref B_strides = B.strides
+    var B_stride0 = B_strides[0]
+    var B_stride1 = B_strides[1]
+    var B_offset  = B.offset
+    var B_data    = B.data_ptr()
 
+    var C_data = C.data_ptr()
 
-def test_concat_concat_view_with_tensor_ct() raises:
-    """Test concatenating view with regular tensor."""
-    comptime dtype = DType.float32
+    if B.is_contiguous():
+        # ════════════════════════════════════════════════════════
+        #  OPTIMIZED TILED + UNROLLED + PREFETCHED MATMUL
+        #
+        #  Three-level tiling (TILE_M × TILE_N × TILE_P):
+        #    - TILE_M rows of A/C fit in L2
+        #    - TILE_N keeps the k-strip of A in L1
+        #    - TILE_P wide enough to saturate SIMD across j
+        #
+        #  Inside the innermost i/k loop:
+        #    - UNROLL accumulators per j-strip → fills FMA pipeline
+        #    - Prefetch next k-tile of B while computing current
+        #    - a_ik broadcast once, reused across all j accumulators
+        # ════════════════════════════════════════════════════════
+        var num_tiles_i = (m + TILE_M - 1) // TILE_M
 
-    var base = Tensor[dtype].ones(2, 3, requires_grad=True)
-    var view = base.view([2, 3], offset=0)
+        @parameter
+        def process_row_tile(tile_idx: Int):
+            var i_start = tile_idx * TILE_M
+            var i_end   = min(i_start + TILE_M, m)
 
-    var regular = Tensor[dtype].ones(1, 3, requires_grad=True) * 2.0
+            for j_tile in range(0, p, TILE_P):
+                var j_end = min(j_tile + TILE_P, p)
 
-    var tensors = List[Tensor[dtype]]()
-    tensors.append(view)
-    tensors.append(regular)
+                for k_tile in range(0, n, TILE_N):
+                    var k_end = min(k_tile + TILE_N, n)
 
-    var result = Tensor[dtype].concat(tensors, axis=0)
-    result.print()
+                    # ── Prefetch the NEXT k-tile of B into cache ──
+                    var next_k_tile = k_tile + TILE_N
+                    if next_k_tile < n:
+                        for k_pre in range(
+                            next_k_tile,
+                            min(next_k_tile + TILE_N, n),
+                        ):
+                            var b_pre_base = (
+                                k_pre * B_stride0 + B_offset + j_tile
+                            )
+                            prefetch[
+                                PrefetchLocality.HIGH,
+                                PrefetchRW.READ,
+                                PREFETCH_DIST,
+                            ](B_data + b_pre_base)
 
-    # Shape should be (3, 3)
-    assert_true(result.shape()[0] == 3)
+                    for i in range(i_start, i_end):
+                        var a_row_base = i * A_stride0 + A_offset
+                        var c_row_base = i * p
 
-    # Values check
-    assert_true(result[0, 0] == 1.0)
-    assert_true(result[2, 0] == 2.0)
+                        var j = j_tile
 
-    # Gradient flow
-    var loss = result.sum()
-    loss.backward()
+                        # ── Unrolled SIMD: UNROLL vectors at once ──
+                        while j + simd_unroll <= j_end:
+                            # Load UNROLL accumulators from C
+                            var acc0 = C_data.load[width=simdwidth](
+                                c_row_base + j
+                            )
+                            var acc1 = C_data.load[width=simdwidth](
+                                c_row_base + j + simdwidth
+                            )
+                            var acc2 = C_data.load[width=simdwidth](
+                                c_row_base + j + simdwidth * 2
+                            )
+                            var acc3 = C_data.load[width=simdwidth](
+                                c_row_base + j + simdwidth * 3
+                            )
 
-    assert_true(
-        base.grad().all_close[atol=1e-6](Tensor[dtype].ones(base.shape()))
-    )
-    regular.grad().print()
-    assert_true(
-        regular.grad().all_close[atol=1e-6](Tensor[dtype].ones(regular.shape()))
-    )
+                            for k in range(k_tile, k_end):
+                                # Load a_ik ONCE — broadcast across
+                                # all UNROLL accumulator updates
+                                var a_addr = a_row_base + k * A_stride1
+                                var a_ik = SIMD[Self.dtype, simdwidth](
+                                    A_data[a_addr]
+                                )
 
+                                var b_base = k * B_stride0 + B_offset + j
 
-def sum_up():
-    var a = Tensor[dtype].d2(
-        [
-            [0.025],
-            [0.124],
-            [0.050],
-            [0.014],
-            [0.227],
-            [0.033],
-            [0.029],
-            [0.023],
-            [0.075],
-            [0.093],
-            [0.084],
-            [0.072],
-            [0.104],
-            [0.118],
-            [0.108],
-            [0.040],
-            [0.098],
-            [0.052],
-            [0.161],
-            [0.019],
-            [0.059],
-            [0.065],
-            [0.101],
-            [0.036],
-            [0.133],
-            [0.095],
-            [0.089],
-            [0.038],
-            [0.100],
-            [0.103],
-            [0.099],
-            [0.132],
-            [0.119],
-            [0.237],
-            [0.117],
-            [0.402],
-            [0.122],
-            [0.190],
-            [0.185],
-            [0.165],
-            [0.163],
-            [0.155],
-            [0.142],
-            [0.169],
-            [0.111],
-            [5.089],
-            [0.135],
-            [0.054],
-            [0.201],
-            [0.160],
-            [0.196],
-            [0.023],
-            [0.109],
-            [0.626],
-            [0.177],
-            [0.151],
-            [0.008],
-            [0.006],
-            [0.004],
-            [0.004],
-            [0.097],
-            [0.010],
-            [0.006],
-            [0.060],
-            [0.048],
-            [0.074],
-            [0.031],
-            [0.031],
-            [0.038],
-            [0.096],
-            [0.016],
-            [0.014],
-            [0.372],
-            [0.020],
-            [0.018],
-            [0.011],
-            [0.020],
-            [0.014],
-            [0.012],
-            [0.011],
-            [0.013],
-            [0.009],
-            [0.067],
-            [0.048],
-            [0.044],
-            [0.041],
-            [0.007],
-            [0.007],
-            [0.094],
-            [0.170],
-            [0.057],
-            [0.140],
-            [0.141],
-            [0.237],
-            [0.402],
-            [0.155],
-            [0.147],
-            [0.143],
-            [0.234],
-            [0.103],
-            [0.166],
-            [0.269],
-            [0.153],
-            [0.126],
-            [0.129],
-            [0.074],
-            [0.083],
-            [0.084],
-            [0.080],
-            [0.076],
-            [0.061],
-            [0.060],
-            [0.057],
-            [0.009],
-            [0.003],
-            [0.003],
-            [0.009],
-            [0.010],
-            [0.009],
-            [0.008],
-            [0.003],
-            [0.005],
-            [0.007],
-            [0.006],
-            [0.010],
-            [0.010],
-            [0.015],
-            [0.011],
-            [0.008],
-            [0.024],
-            [0.008],
-            [78.054],
-            [0.013],
-            [0.094],
-            [0.076],
-            [0.080],
-            [0.168],
-            [0.113],
-            [0.013],
-            [0.079],
-            [0.044],
-            [0.060],
-            [0.107],
-            [0.045],
-            [0.082],
-            [0.091],
-            [0.094],
-            [0.081],
-            [0.092],
-            [0.044],
-            [0.068],
-            [0.025],
-            [0.041],
-            [0.026],
-            [0.014],
-            [0.012],
-            [0.014],
-            [0.023],
-            [0.016],
-            [0.013],
-            [0.020],
-            [0.017],
-            [0.019],
-            [0.013],
-            [0.052],
-            [0.060],
-            [0.047],
-            [0.056],
-            [0.086],
-            [0.039],
-            [0.016],
-            [0.015],
-            [0.023],
-            [0.086],
-            [0.071],
-            [0.082],
-            [0.005],
-            [0.003],
-            [0.003],
-            [0.003],
-            [0.003],
-            [0.003],
-            [0.002],
-            [0.003],
-            [0.004],
-            [0.004],
-            [0.004],
-            [0.004],
-            [0.004],
-            [0.004],
-            [0.004],
-            [0.008],
-            [0.015],
-            [0.013],
-            [0.013],
-            [0.004],
-            [0.940],
-            [1.883],
-            [1.069],
-            [22.733],
-            [0.006],
-            [0.016],
-            [0.005],
-            [0.004],
-            [0.006],
-            [0.008],
-            [0.008],
-            [106.006],
-            [0.009],
-            [0.005],
-            [0.008],
-            [0.006],
-            [0.005],
-            [0.006],
-            [0.007],
-            [0.007],
-            [0.016],
-            [0.005],
-            [0.034],
-            [0.004],
-            [0.022],
-            [0.004],
-            [0.049],
-            [0.027],
-            [0.023],
-            [0.025],
-            [0.027],
-            [0.044],
-            [0.046],
-            [0.033],
-            [0.034],
-            [0.019],
-            [0.011],
-            [0.015],
-            [0.012],
-            [0.012],
-            [0.012],
-            [0.014],
-            [0.049],
-            [0.034],
-            [0.037],
-            [0.036],
-            [0.036],
-            [0.037],
-            [0.040],
-            [0.018],
-            [0.012],
-            [0.013],
-            [0.101],
-            [0.023],
-            [0.040],
-            [0.049],
-            [0.088],
-            [0.027],
-            [0.020],
-            [0.021],
-            [0.022],
-            [0.027],
-            [0.031],
-            [0.027],
-            [0.026],
-            [0.038],
-            [0.020],
-            [0.019],
-            [0.024],
-            [0.019],
-            [0.024],
-        ]
-    )
+                                # FMA: acc += a_ik * b_vec
+                                acc0 = math.fma(
+                                    a_ik,
+                                    B_data.load[width=simdwidth](b_base),
+                                    acc0,
+                                )
+                                acc1 = math.fma(
+                                    a_ik,
+                                    B_data.load[width=simdwidth](
+                                        b_base + simdwidth
+                                    ),
+                                    acc1,
+                                )
+                                acc2 = math.fma(
+                                    a_ik,
+                                    B_data.load[width=simdwidth](
+                                        b_base + simdwidth * 2
+                                    ),
+                                    acc2,
+                                )
+                                acc3 = math.fma(
+                                    a_ik,
+                                    B_data.load[width=simdwidth](
+                                        b_base + simdwidth * 3
+                                    ),
+                                    acc3,
+                                )
 
-    var s = a.sum()
-    print(s.item())
+                            # Store UNROLL accumulators back to C
+                            C_data.store[width=simdwidth](
+                                c_row_base + j, acc0
+                            )
+                            C_data.store[width=simdwidth](
+                                c_row_base + j + simdwidth, acc1
+                            )
+                            C_data.store[width=simdwidth](
+                                c_row_base + j + simdwidth * 2, acc2
+                            )
+                            C_data.store[width=simdwidth](
+                                c_row_base + j + simdwidth * 3, acc3
+                            )
+                            j += simd_unroll
+
+                        # ── Single-vector SIMD tail ─────────────
+                        while j + simdwidth <= j_end:
+                            var c_addr = c_row_base + j
+                            var acc = C_data.load[width=simdwidth](c_addr)
+
+                            for k in range(k_tile, k_end):
+                                var a_addr = a_row_base + k * A_stride1
+                                var a_ik = SIMD[Self.dtype, simdwidth](
+                                    A_data[a_addr]
+                                )
+                                var b_base = k * B_stride0 + B_offset + j
+                                acc = math.fma(
+                                    a_ik,
+                                    B_data.load[width=simdwidth](b_base),
+                                    acc,
+                                )
+
+                            C_data.store[width=simdwidth](c_addr, acc)
+                            j += simdwidth
+
+                        # ── Scalar tail (remaining columns) ─────
+                        while j < j_end:
+                            var c_addr = c_row_base + j
+                            var acc: Scalar[Self.dtype] = C_data[c_addr]
+
+                            for k in range(k_tile, k_end):
+                                var a_addr = a_row_base + k * A_stride1
+                                var b_addr = (
+                                    #k * B_stride0 + B_offset + j * B_stride1
+                                    k * B_stride0 + B_offset + j
+                                )
+                                acc += A_data[a_addr] * B_data[b_addr]
+
+                            C_data[c_addr] = acc
+                            j += 1
+
+        parallelize[process_row_tile](num_tiles_i, num_physical_cores())
+
+    else:
+        # ════════════════════════════════════════════════════════
+        #  NON-CONTIGUOUS PATH — parallelized over row tiles
+        #
+        #  Original was fully serial. Now parallelized the same
+        #  way as the contiguous path. No SIMD because strides
+        #  mean elements aren't adjacent in memory.
+        # ════════════════════════════════════════════════════════
+        var num_tiles_i = (m + TILE_M - 1) // TILE_M
+
+        @parameter
+        def process_row_tile_noncontig(tile_idx: Int):
+            var i_start = tile_idx * TILE_M
+            var i_end   = min(i_start + TILE_M, m)
+
+            for i in range(i_start, i_end):
+                var a_row_base = i * A_stride0 + A_offset
+                var c_row_base = i * p
+
+                for j in range(p):
+                    var acc: Scalar[Self.dtype] = 0
+
+                    for k in range(n):
+                        var a_addr = a_row_base + k * A_stride1
+                        var b_addr = (
+                            k * B_stride0 + B_offset + j * B_stride1
+                        )
+                        acc += A_data[a_addr] * B_data[b_addr]
+
+                    C_data[c_row_base + j] = acc
+
+        parallelize[process_row_tile_noncontig](
+            num_tiles_i, num_physical_cores()
+        )
+
+    return C^

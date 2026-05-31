@@ -1,11 +1,9 @@
 from tenmo.tensor import Tensor
 from tenmo.relu import ReLU
-from tenmo.relu_helpers import ReluBuffer
 from tenmo.buffers import Buffer
 from std.sys import has_accelerator
 from std.testing import assert_true, assert_equal, TestSuite
 from tenmo.shapes import Shape
-from std.math import abs
 
 
 def test_relu_basic() raises:
@@ -664,7 +662,7 @@ def test_relu_buffer_forward_with_mask() raises:
     for i in range(10):
         buffer[i] = Float32(i - 5)  # Values from -5 to 4
 
-    var result = ReluBuffer[DType.float32].forward(buffer)
+    var result = ReLU[DType.float32]._buffer_forward(buffer)
     var output = result[0]
     var mask = result[1]
 

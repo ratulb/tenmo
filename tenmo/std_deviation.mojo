@@ -4,7 +4,7 @@ from .backpropagation import BackwardFnArg, StdArg, BACKWARD_STD
 from .gradbox import Gradbox
 from .ancestry import Ancestor
 from tenmo.common_utils import Epsilon
-from .variance_helpers import VarStdBackward
+from .variance import Variance
 from .welford import Welford
 
 # =============================================================================
@@ -70,7 +70,7 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             # ── Pass 1: fused (x - mean) / denom — stride-aware ─────────────
             # Produces contiguous (*, D) output regardless of x layout
-            var normed_ndb = VarStdBackward[Self.dtype].std_backward_normalize(
+            var normed_ndb = Variance[Self.dtype].std_backward_normalize(
                 x_ndb, mean_ndb, denom_ndb
             )
             local_grad = Tensor[Self.dtype](normed_ndb^)

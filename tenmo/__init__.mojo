@@ -112,7 +112,6 @@ from .matrixvector_kernel import *
 from .maxmin_scalar import *
 from .mean_reduction import *
 from .minmax import *
-from .minmax_helpers import *
 from .minmax_kernel import *
 from .minmax_reducer import *
 from .mnemonics import *
@@ -127,7 +126,6 @@ from .permute import *
 from .pooling import *
 from .reduction_kernel import *
 from .relu import *
-from .relu_helpers import *
 from .repeat import *
 from .reshape import *
 from .scalar_inplace_ops_kernel import *
@@ -153,9 +151,8 @@ from .transpose import *
 from .unary_ops_kernel import *
 from .unsqueeze import *
 from .validators import *
-from .welford import *
 from .variance import *
-from .variance_helpers import *
+from .welford import *
 from .vectormatrix import *
 from .vectormatrix_kernel import *
 from .views import *

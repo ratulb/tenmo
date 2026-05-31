@@ -5,8 +5,13 @@ from .gradbox import Gradbox
 from .common_utils import panic
 from .ancestry import Ancestor
 from tenmo.intarray import IntArray
-from .variance_helpers import VarStdBackward
+from .ndbuffer import NDBuffer
+from .buffers import Buffer
+from .device import DeviceState
+from .shapes import Shape
 from .welford import Welford
+from .std_variance_backward_kernel import StdVarianceBackwardKernel
+from std.sys.info import has_accelerator
 
 
 @fieldwise_init
@@ -55,9 +60,9 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if axis == -100 or axis == last_axis:
             # ── Pass 1: fused (x - mean) * scale — stride-aware ─────────────
             # Produces contiguous (*, D) output regardless of x layout
-            var normed_ndb = VarStdBackward[
-                Self.dtype
-            ].variance_backward_normalize(x_ndb, mean_ndb, scale)
+            var normed_ndb = Variance[Self.dtype].variance_backward_normalize(
+                x_ndb, mean_ndb, scale
+            )
             local_grad = Tensor[Self.dtype](normed_ndb^)
 
         else:
@@ -163,3 +168,89 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 result.add_ancestry(backwardFnArg^, self)
 
         return result^
+
+    @always_inline
+    @staticmethod
+    def variance_backward_normalize(
+        x: NDBuffer[Self.dtype],
+        mean: NDBuffer[Self.dtype],
+        scale: Scalar[Self.dtype],
+    ) -> NDBuffer[Self.dtype]:
+        comptime if has_accelerator():
+            if x.is_on_gpu():
+                try:
+                    return StdVarianceBackwardKernel[
+                        Self.dtype
+                    ].launch_variance_backward(x, mean, scale)
+                except e:
+                    print(e)
+                    panic(
+                        "VarStdBackward variance_backward_normalize → GPU"
+                        " failed"
+                    )
+                    return NDBuffer[Self.dtype].Empty()
+        return Self._variance_backward_normalize_cpu(x, mean, scale)
+
+    @always_inline
+    @staticmethod
+    def _variance_backward_normalize_cpu(
+        x: NDBuffer[Self.dtype],
+        mean: NDBuffer[Self.dtype],
+        scale: Scalar[Self.dtype],
+    ) -> NDBuffer[Self.dtype]:
+        var D = x.shape[-1]
+        var out_buf = Buffer[Self.dtype](x.numels())
+        var out_shape = x.shape
+
+        var row = 0
+        for outer_coord in x.shape[0:-1]:
+            var row_mean = mean.buffer[row]
+            var out_base = row * D
+            for i in range(D):
+                var full_coord = outer_coord.insert(len(outer_coord), i)
+                out_buf[out_base + i] = (x[full_coord] - row_mean) * scale
+            row += 1
+
+        return NDBuffer[Self.dtype](out_buf^, out_shape)
+
+    @always_inline
+    @staticmethod
+    def std_backward_normalize(
+        x: NDBuffer[Self.dtype],
+        mean: NDBuffer[Self.dtype],
+        denom: NDBuffer[Self.dtype],
+    ) -> NDBuffer[Self.dtype]:
+        comptime if has_accelerator():
+            if x.is_on_gpu():
+                try:
+                    return StdVarianceBackwardKernel[
+                        Self.dtype
+                    ].launch_std_backward(x, mean, denom)
+                except e:
+                    print(e)
+                    panic("VarStdBackward std_backward_normalize → GPU failed")
+                    return NDBuffer[Self.dtype].Empty()
+        return Self._std_backward_normalize_cpu(x, mean, denom)
+
+    @always_inline
+    @staticmethod
+    def _std_backward_normalize_cpu(
+        x: NDBuffer[Self.dtype],
+        mean: NDBuffer[Self.dtype],
+        denom: NDBuffer[Self.dtype],
+    ) -> NDBuffer[Self.dtype]:
+        var D = x.shape[-1]
+        var out_buf = Buffer[Self.dtype](x.numels())
+        var out_shape = x.shape
+
+        var row = 0
+        for outer_coord in x.shape[0:-1]:
+            var row_mean = mean.buffer[row]
+            var row_denom = denom.buffer[row]
+            var out_base = row * D
+            for i in range(D):
+                var full_coord = outer_coord.insert(len(outer_coord), i)
+                out_buf[out_base + i] = ((x[full_coord] - row_mean)) / row_denom
+            row += 1
+
+        return NDBuffer[Self.dtype](out_buf^, out_shape)

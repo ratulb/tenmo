@@ -2556,7 +2556,7 @@ struct NDBuffer[dtype: DType](
         MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
 
         comptime tile_size = TILE_SIZE
-        comptime simdwidth = simd_width_of[Self.dtype]()
+        comptime simdwidth = simd_width_of[Self.dtype]() * 2
 
         var m = A_shape[0]
         var n = A_shape[1]
@@ -2613,9 +2613,9 @@ struct NDBuffer[dtype: DType](
                                 for k in range(k_tile, k_end):
                                     var a_addr = a_row_base + k * A_stride1
                                     var a_ik = A_data[a_addr]
-
                                     var b_addr = (
-                                        k * B_stride0 + B_offset + j * B_stride1
+                                        #k * B_stride0 + B_offset + j * B_stride1
+                                        k * B_stride0 + B_offset + j
                                     )
                                     var b_vec = B_data.load[width=simdwidth](
                                         b_addr
@@ -2637,7 +2637,8 @@ struct NDBuffer[dtype: DType](
                                 for k in range(k_tile, k_end):
                                     var a_addr = a_row_base + k * A_stride1
                                     var b_addr = (
-                                        k * B_stride0 + B_offset + j * B_stride1
+                                        #k * B_stride0 + B_offset + j * B_stride1
+                                        k * B_stride0 + B_offset + j
                                     )
                                     accumulator += (
                                         A_data[a_addr] * B_data[b_addr]
