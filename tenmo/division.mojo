@@ -13,6 +13,7 @@ from tenmo.ancestry import Ancestor
 from tenmo.ndbuffer import NDBuffer
 from tenmo.buffers import Buffer
 from tenmo.division_kernel import DivisionKernel
+from tenmo.sum_mean_reduction import SumMeanReduction
 from tenmo.intarray import IntArray
 from tenmo.indexhelper import IndexCalculator
 from std.sys import simd_width_of, has_accelerator
@@ -356,7 +357,7 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         if ancestor_top.requires_grad:
             if grad_num.shape != buffer_top.shape:
-                grad_num = grad_num.sum_over_broadcasted_axes(buffer_top.shape)
+                grad_num = SumMeanReduction[Self.dtype].sum_over_broadcasted_axes(grad_num, buffer_top.shape)
             ancestor_top.update_grad(
                 Gradbox[Self.dtype](grad_num^, share=False),
                 AddTensor,
@@ -366,8 +367,8 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         if ancestor_bottom.requires_grad:
             if grad_den.shape != buffer_bottom.shape:
-                grad_den = grad_den.sum_over_broadcasted_axes(
-                    buffer_bottom.shape
+                grad_den = SumMeanReduction[Self.dtype].sum_over_broadcasted_axes(
+                    grad_den, buffer_bottom.shape
                 )
             ancestor_bottom.update_grad(
                 Gradbox[Self.dtype](grad_den^, share=False),

@@ -4,6 +4,7 @@ from .intarray import IntArray
 from .shapes import Shape
 from .backpropagation import BackwardFnArg, ReductionArg, BACKWARD_SUM
 from .validators import Validator
+from .sum_mean_reduction import SumMeanReduction
 from .gradbox import Gradbox
 from .ancestry import Ancestor
 
@@ -65,7 +66,7 @@ struct Summer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ) -> Tensor[Self.dtype]:
         var shape = tensor.shape()
         var reduction_axes = Validator.normalize_reduction_axes(shape, axes)
-        var nd_buffer = tensor.buffer.reduce[SUM](reduction_axes, keepdims)
+        var nd_buffer = SumMeanReduction[Self.dtype].reduce[op_code=SUM](tensor.buffer, reduction_axes, keepdims)
         var out = Tensor[Self.dtype](nd_buffer^, requires_grad=False)
 
         comptime if track_grad:

@@ -33,6 +33,7 @@ from .ndbuffer import NDBuffer
 from std.gpu.host import DeviceBuffer, DeviceContext
 from .device import Device, CPU, GPU
 from tenmo.shared import Reduction
+from tenmo.sum_mean_reduction import SumMeanReduction
 from std.sys.info import has_accelerator
 
 
@@ -2572,7 +2573,7 @@ struct Tensor[dtype: DType](
         comptime assert (
             Self.dtype.is_numeric()
         ), "Tensor → sum_all is for numeric data types only"
-        return self.buffer.sum_all()
+        return SumMeanReduction[Self.dtype].sum_all(self.buffer)
 
     def product_all(self) -> Scalar[Self.dtype]:
         """Compute the product of all elements - CPU only op.
@@ -2584,7 +2585,7 @@ struct Tensor[dtype: DType](
             Self.dtype.is_numeric()
         ), "Tensor → product_all is for numeric data types only"
 
-        return self.buffer.product_all()
+        return Product.product_all(self.buffer)
 
     def exp[
         track_grad: Bool = True

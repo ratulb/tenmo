@@ -4,6 +4,7 @@ from tenmo.intarray import IntArray
 from tenmo.shapes import Shape
 from tenmo.strides import Strides
 from tenmo.ndbuffer import NDBuffer
+from tenmo.sum_mean_reduction import SumMeanReduction
 from tenmo.mnemonics import *
 from std.sys import has_accelerator
 from tenmo.tensor import Tensor
@@ -1286,7 +1287,7 @@ def test_ndbuffer_sum_all() raises:
             val += 1
     # Values: 1,2,3,4,5,6 -> sum = 21
 
-    var result = ndb.sum_all()
+    var result = SumMeanReduction[DType.int32].sum_all(ndb)
     assert_true(result == 21, "sum_all should be 21")
 
 
@@ -1302,7 +1303,7 @@ def test_ndbuffer_sum_axis() raises:
                 val += 1
 
         # Sum over axis 0 (rows) -> shape (3,)
-        var result = ndb.reduce(IntArray(0), keepdims=False)
+        var result = SumMeanReduction[DType.int32].reduce(ndb, IntArray(0), keepdims=False)
         assert_true(result.shape == Shape(3), "Sum axis 0 shape")
         assert_true(result[IntArray(0)] == 5, "Sum col 0: 1+4=5")
         assert_true(result[IntArray(1)] == 7, "Sum col 1: 2+5=7")
@@ -1320,7 +1321,7 @@ def test_ndbuffer_sum_axis_keepdims() raises:
             ndb[IntArray(i, j)] = Int32(val)
             val += 1
 
-    var result = ndb.reduce(IntArray(0), keepdims=True)
+    var result = SumMeanReduction[DType.int32].reduce(ndb, IntArray(0), keepdims=True)
     assert_true(result.shape == Shape(1, 3), "Sum keepdims shape")
 
 
@@ -1495,20 +1496,20 @@ def test_buffer_sum() raises:
 
     buffer = Buffer[dtype](l)
     ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
-    result = ndb.reduce(IntArray(0), True)
+    result = SumMeanReduction[dtype].reduce(ndb, IntArray(0), True)
     assert_true(
         result.data_buffer() == Buffer[dtype]([21, 24, 27, 30, 33, 36, 39])
     )
 
-    result = ndb.reduce(IntArray(0), False)
+    result = SumMeanReduction[dtype].reduce(ndb, IntArray(0), False)
     assert_true(
         result.data_buffer() == Buffer[dtype]([21, 24, 27, 30, 33, 36, 39])
     )
 
-    result = ndb.reduce(IntArray(0, 1), True)
+    result = SumMeanReduction[dtype].reduce(ndb, IntArray(0, 1), True)
     assert_true(result.data_buffer() == Buffer[dtype]([210]))
 
-    result = ndb.reduce(IntArray(1), True)
+    result = SumMeanReduction[dtype].reduce(ndb, IntArray(1), True)
     assert_true(result.data_buffer() == Buffer[dtype]([21, 70, 119]))
 
 
@@ -1523,24 +1524,24 @@ def test_buffer_sum_all() raises:
         buffer = Buffer[dtype](l)
         ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
 
-        assert_true(ndb.sum_all() == 210)
+        assert_true(SumMeanReduction[dtype].sum_all(ndb) == 210)
         shared = ndb.share(Shape(5, 2), offset=1, strides=Strides(2, 2))
-        assert_true(shared.sum_all() == 60)
+        assert_true(SumMeanReduction[dtype].sum_all(shared) == 60)
         # Scalar
         ndb = NDBuffer[dtype](Shape())
         ndb.fill(42)
-        assert_true(ndb.sum_all() == 42)
+        assert_true(SumMeanReduction[dtype].sum_all(ndb) == 42)
         shared = ndb.share()
         assert_true(
-            shared.sum_all() == 42 and shared.item() == 42 and ndb.item() == 42
+            SumMeanReduction[dtype].sum_all(shared) == 42 and shared.item() == 42 and ndb.item() == 42
         )
         # Shape(1)
         ndb = NDBuffer[dtype](Shape(1))
         ndb.fill(39)
-        assert_true(ndb.sum_all() == 39 and ndb[IntArray(0)] == 39)
+        assert_true(SumMeanReduction[dtype].sum_all(ndb) == 39 and ndb[IntArray(0)] == 39)
         shared = ndb.share()
         assert_true(
-            shared.sum_all() == 39 and shared.item() == 39 and ndb.item() == 39
+            SumMeanReduction[dtype].sum_all(shared) == 39 and shared.item() == 39 and ndb.item() == 39
         )
     except e:
         print(e)

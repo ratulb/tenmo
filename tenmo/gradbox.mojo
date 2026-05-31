@@ -13,6 +13,7 @@ from tenmo.buffers import Buffer
 from tenmo.forwards import Mean, Sqrt
 from tenmo.indexhelper import IndexIterator
 from tenmo.filler import Filler
+from tenmo.sum_mean_reduction import SumMeanReduction
 from tenmo.common_utils import Idx, panic, print_buffer
 from tenmo.device import Device, CPU, GPU
 from tenmo.device_transfer import DeviceTransfer
@@ -401,9 +402,7 @@ struct Gradbox[dtype: DType](
         var normalized_axes = Validator.validate_and_normalize_axes(
             self.shape(), axes
         )
-        var nd_buffer = self.buffer.reduce(
-            normalized_axes=normalized_axes, keepdims=keepdims
-        )
+        var nd_buffer = SumMeanReduction[Self.dtype].reduce(self.buffer, normalized_axes=normalized_axes, keepdims=keepdims)
         return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     @always_inline
@@ -434,8 +433,8 @@ struct Gradbox[dtype: DType](
         Returns:
             A new Gradbox summed to the target shape.
         """
-        var nd_buffer = extended_grad.buffer.sum_over_broadcasted_axes(
-            target_shape
+        var nd_buffer = SumMeanReduction[Self.dtype].sum_over_broadcasted_axes(
+            extended_grad.buffer, target_shape
         )
         return Gradbox[Self.dtype](nd_buffer^, share=False)
 

@@ -39,6 +39,7 @@ from .common_utils import panic
 from .layernorm_kernel import LayerNormKernel
 from tenmo.intarray import IntArray
 from .named_parameter import NamedParameter
+from .welford import Welford
 from std.sys import has_accelerator
 from std.math import rsqrt
 
@@ -256,8 +257,8 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             panic("LayerNorm: gamma and beta shape mismatch")
 
         # ── Pass 1: Welford — mean + var in single pass ──────────────────
-        var (mean_ndb, var_ndb) = self.buffer.welford(
-            axes=IntArray(self.rank() - 1), unbiased=False, keepdims=True
+        var (mean_ndb, var_ndb) = Welford[Self.dtype].forward(
+            self.buffer, IntArray(self.rank() - 1), unbiased=False, keepdims=True
         )
 
         # ── Pass 2: fused normalize — rstd + x_hat + out in single pass ──

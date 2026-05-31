@@ -6,6 +6,7 @@ from .common_utils import panic
 from .ancestry import Ancestor
 from tenmo.intarray import IntArray
 from .variance_helpers import VarStdBackward
+from .welford import Welford
 
 
 @fieldwise_init
@@ -130,8 +131,8 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var axes = IntArray.range(
             0, self.rank()
         ) if normalized_axis == -100 else IntArray(normalized_axis)
-        var (mean_ndb, var_ndb) = self.buffer.welford(
-            axes, unbiased, keepdims=True
+        var (mean_ndb, var_ndb) = Welford[Self.dtype].forward(
+            self.buffer, axes, unbiased, keepdims=True
         )
         # For the output, squeeze if user requested keepdims=False
         var result_ndb = var_ndb

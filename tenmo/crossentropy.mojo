@@ -14,6 +14,8 @@ from tenmo.ndbuffer import NDBuffer
 from tenmo.intarray import IntArray
 from tenmo.ancestry import Ancestor
 from tenmo.shared import Reduction
+from tenmo.softmax import SoftmaxNdBuffer
+from tenmo.sum_mean_reduction import SumMeanReduction
 
 
 # Validation
@@ -267,9 +269,9 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     out_dims.append(spatial_shape[i])
                 transformed = losses.reshape(Shape(out_dims))
         elif reduction.is_sum():
-            transformed = losses.sum(IntArray())
+            transformed = SumMeanReduction[Self.dtype].sum(losses, IntArray())
         else:  # mean
-            transformed = losses.sum(IntArray())
+            transformed = SumMeanReduction[Self.dtype].sum(losses, IntArray())
             if valid_count > 0:
                 transformed /= Scalar[Self.dtype](valid_count)
         return Tensor[Self.dtype](transformed^, requires_grad=False)
@@ -286,7 +288,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         GPU safe — log_softmax and softmax are both GPU ready.
         Returns NDBuffers — safe for backward storage.
         """
-        return logits_2d.log_softmax(IntArray([1]), validated=True)
+        return SoftmaxNdBuffer[Self.dtype].log_softmax(logits_2d, IntArray([1]), validated=True)
 
     @staticmethod
     def scale_grad_by_upstream(
@@ -311,7 +313,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
             return grad * ug_expanded
         else:
-            var ug_scalar = upstream.buffer.sum(IntArray()).item()
+            var ug_scalar = SumMeanReduction[Self.dtype].sum(upstream.buffer, IntArray()).item()
             var scale = Scalar[Self.dtype](
                 valid_count if reduction.is_mean() and valid_count > 0 else 1
             )
@@ -519,7 +521,7 @@ struct CEClassIndicesForward[dtype: DType](
             target_1d_ndb, ignore_index
         )
         var valid_count = (
-            ignore_mask_ndb.sum(normalized_axes=IntArray()).item().__int__()
+            SumMeanReduction[Self.dtype].sum(ignore_mask_ndb, normalized_axes=IntArray()).item().__int__()
         )
         # onehot — ignore_index rows become all zeros
         var device = logits.device()
@@ -536,17 +538,11 @@ struct CEClassIndicesForward[dtype: DType](
 
         if ls > Scalar[Self.dtype](0):
             # loss = -(1-ls)*log_p[target] - ls * mean(log_p)
-            var nll = -(onehot_mask * log_probs_ndb).sum(
-                normalized_axes=IntArray(1)
-            )
-            var mean_log_p = log_probs_ndb.sum(
-                normalized_axes=IntArray(1)
-            ) / Scalar[Self.dtype](C2)
+            var nll = -SumMeanReduction[Self.dtype].sum(onehot_mask * log_probs_ndb, normalized_axes=IntArray(1))
+            var mean_log_p = SumMeanReduction[Self.dtype].sum(log_probs_ndb, normalized_axes=IntArray(1)) / Scalar[Self.dtype](C2)
             losses = (Scalar[Self.dtype](1) - ls) * nll - ls * mean_log_p
         else:
-            losses = -(onehot_mask * log_probs_ndb).sum(
-                normalized_axes=IntArray(1)
-            )
+            losses = -SumMeanReduction[Self.dtype].sum(onehot_mask * log_probs_ndb, normalized_axes=IntArray(1))
 
         # Zero ignored positions
         losses = losses * ignore_mask_ndb
@@ -722,7 +718,7 @@ struct CEProbabilitiesForward[dtype: DType](
             smoothed_target_ndb = target_2d_ndb
 
         # loss = -sum(smoothed_target * log_probs, axis=1)
-        var losses = -(smoothed_target_ndb * log_probs_ndb).sum(IntArray(1))
+        var losses = -SumMeanReduction[Self.dtype].sum(smoothed_target_ndb * log_probs_ndb, IntArray(1))
 
         # M = valid_count (no ignore_index for probabilities)
         var out = CECommon[Self.dtype].apply_reduction(

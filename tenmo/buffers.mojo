@@ -1071,18 +1071,7 @@ struct Buffer[dtype: DType = DType.float32](
                 var other_val = other[idx]
                 var result: Bool
 
-                comptime if op_code == Equal:
-                    result = self_val == other_val
-                elif op_code == NotEqual:
-                    result = self_val != other_val
-                elif op_code == GreaterThan:
-                    result = self_val > other_val
-                elif op_code == GreaterThanEqual:
-                    result = self_val >= other_val
-                elif op_code == LessThan:
-                    result = self_val < other_val
-                else:  # LessThanEqual
-                    result = self_val <= other_val
+                result = ScalarOps[Self.dtype].compare_pair[op_code](self_val, other_val)
 
                 out[idx] = result
 
@@ -1139,18 +1128,7 @@ struct Buffer[dtype: DType = DType.float32](
                 var val = self[idx]
                 var result: Bool
 
-                comptime if op_code == Equal:
-                    result = val == scalar
-                elif op_code == NotEqual:
-                    result = val != scalar
-                elif op_code == GreaterThan:
-                    result = val > scalar
-                elif op_code == GreaterThanEqual:
-                    result = val >= scalar
-                elif op_code == LessThan:
-                    result = val < scalar
-                else:  # LessThanEqual
-                    result = val <= scalar
+                result = ScalarOps[Self.dtype].compare_pair[op_code](val, scalar)
 
                 out[idx] = result
 

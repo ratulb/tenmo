@@ -5,6 +5,7 @@ from .gradbox import Gradbox
 from .ancestry import Ancestor
 from tenmo.common_utils import Epsilon
 from .variance_helpers import VarStdBackward
+from .welford import Welford
 
 # =============================================================================
 # Updated StdBwdArg — goes in std.mojo
@@ -143,8 +144,8 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var axes = IntArray.range(
             0, self.rank()
         ) if normalized_axis == -100 else IntArray(normalized_axis)
-        var (mean_ndb, var_ndb) = self.buffer.welford(
-            axes, unbiased, keepdims=True
+        var (mean_ndb, var_ndb) = Welford[Self.dtype].forward(
+            self.buffer, axes, unbiased, keepdims=True
         )
 
         # std from var — keepdims=True shape preserved

@@ -1,5 +1,6 @@
 from tenmo.tensor import Tensor
 from tenmo.ndbuffer import NDBuffer
+from tenmo.sum_mean_reduction import SumMeanReduction
 from tenmo.intarray import IntArray
 from tenmo.shapes import Shape
 from std.testing import assert_true, TestSuite
@@ -237,7 +238,7 @@ def test_v2_ndbuffer_sum_1d() raises:
     var ndb = NDBuffer[DType.float32](Shape(5))
     for i in range(5):
         ndb[IntArray(i)] = Float32(i + 1)  # 1,2,3,4,5
-    var result = ndb.reduce(normalized_axes=IntArray(0))
+    var result = SumMeanReduction[DType.float32].reduce(ndb, normalized_axes=IntArray(0))
     assert_true(result[IntArray()] == 15)
 
 
@@ -249,7 +250,7 @@ def test_v2_ndbuffer_sum_2d_axis0() raises:
             ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # [[1,2,3],[4,5,6]] -> axis0 -> [5,7,9]
-    var result = ndb.reduce(normalized_axes=IntArray(0))
+    var result = SumMeanReduction[DType.float32].reduce(ndb, normalized_axes=IntArray(0))
     assert_true(result[IntArray(0)] == 5)
     assert_true(result[IntArray(1)] == 7)
     assert_true(result[IntArray(2)] == 9)
@@ -263,7 +264,7 @@ def test_v2_ndbuffer_sum_2d_axis1() raises:
             ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # [[1,2,3],[4,5,6]] -> axis1 -> [6,15]
-    var result = ndb.reduce(normalized_axes=IntArray(1))
+    var result = SumMeanReduction[DType.float32].reduce(ndb, normalized_axes=IntArray(1))
     assert_true(result[IntArray(0)] == 6)
     assert_true(result[IntArray(1)] == 15)
 
@@ -276,7 +277,7 @@ def test_v2_ndbuffer_mean_2d_axis0() raises:
             ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # [[1,2,3],[4,5,6]] -> mean axis0 -> [2.5, 3.5, 4.5]
-    var result = ndb.reduce[MEAN](normalized_axes=IntArray(0))
+    var result = SumMeanReduction[DType.float32].reduce[op_code=MEAN](ndb, normalized_axes=IntArray(0))
     assert_true(result[IntArray(0)] == 2.5)
     assert_true(result[IntArray(1)] == 3.5)
     assert_true(result[IntArray(2)] == 4.5)
@@ -290,7 +291,7 @@ def test_v2_ndbuffer_mean_2d_axis1() raises:
             ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # [[1,2,3],[4,5,6]] -> mean axis1 -> [2.0, 5.0]
-    var result = ndb.reduce[MEAN](normalized_axes=IntArray(1))
+    var result = SumMeanReduction[DType.float32].reduce[op_code=MEAN](ndb, normalized_axes=IntArray(1))
     assert_true(result[IntArray(0)] == 2.0)
     assert_true(result[IntArray(1)] == 5.0)
 
@@ -303,7 +304,7 @@ def test_v2_ndbuffer_sum_keepdims() raises:
             ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # keepdims -> shape (1, 3)
-    var result = ndb.reduce(normalized_axes=IntArray(0), keepdims=True)
+    var result = SumMeanReduction[DType.float32].reduce(ndb, normalized_axes=IntArray(0), keepdims=True)
     assert_true(result[IntArray(0, 0)] == 5)
     assert_true(result[IntArray(0, 1)] == 7)
     assert_true(result[IntArray(0, 2)] == 9)
@@ -317,7 +318,7 @@ def test_v2_ndbuffer_mean_keepdims() raises:
             ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # keepdims -> shape (2, 1)
-    var result = ndb.reduce[MEAN](normalized_axes=IntArray(1), keepdims=True)
+    var result = SumMeanReduction[DType.float32].reduce[op_code=MEAN](ndb, normalized_axes=IntArray(1), keepdims=True)
     assert_true(result[IntArray(0, 0)] == 2.0)
     assert_true(result[IntArray(1, 0)] == 5.0)
 
@@ -476,7 +477,7 @@ def test_v2_gpu_ndbuffer_mean_2d_axis0() raises:
         var a = Tensor[dtype].d2([[1, 2, 3], [3, 4, 5]])
         var a_gpu = a.to_gpu()
         var gpu_ndb = a_gpu.buffer
-        var gpu_result = gpu_ndb.reduce[MEAN](IntArray(0), keepdims=False)
+        var gpu_result = SumMeanReduction[dtype].reduce[op_code=MEAN](gpu_ndb, IntArray(0), keepdims=False)
         var expected = Tensor[dtype].d1([2, 3, 4])
         expected = expected.to_gpu()
         assert_true(expected.buffer.all_close(gpu_result))

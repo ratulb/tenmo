@@ -4,6 +4,7 @@ from .mnemonics import AddTensor, MEAN
 from .shapes import Shape
 from .backpropagation import BackwardFnArg, ReductionArg, BACKWARD_MEAN
 from .validators import Validator
+from .sum_mean_reduction import SumMeanReduction
 from .gradbox import Gradbox
 from .common_utils import panic
 from .ancestry import Ancestor
@@ -71,7 +72,7 @@ struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         normalized_axes = Validator.validate_and_normalize_axes(
             tensor.shape(), axes
         )
-        var ndb = tensor.buffer.reduce[op_code=MEAN](normalized_axes, keepdims)
+        var ndb = SumMeanReduction[Self.dtype].reduce[op_code=MEAN](tensor.buffer, normalized_axes, keepdims)
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         comptime if track_grad:
@@ -97,7 +98,7 @@ struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         normalized_axes = Validator.validate_and_normalize_axes(
             gradbox_shape, axes
         )
-        var ndb = gradbox.buffer.reduce[op_code=MEAN](normalized_axes, keepdims)
+        var ndb = SumMeanReduction[Self.dtype].reduce[op_code=MEAN](gradbox.buffer, normalized_axes, keepdims)
         var out = Gradbox[Self.dtype](ndb^, share=False)
 
         return out^

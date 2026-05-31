@@ -9,7 +9,7 @@ from tenmo.subtraction import SubtractScalar, SubtractFromScalar, Subtractor
 from tenmo.reshape import Reshape
 from tenmo.multiplication import MultiplyScalar, Multiplicator
 from tenmo.division import DivideByScalar, DivideScalar, Divider
-from tenmo.summation import Summer
+from tenmo.sum_reduction import Summer
 from tenmo.mean_reduction import Mean
 from tenmo.product_reduction import Product
 from tenmo.transpose import Transpose

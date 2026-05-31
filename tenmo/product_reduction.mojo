@@ -9,8 +9,8 @@
 # ───────
 # Product.forward:
 #   1. Validate and normalize axes.
-#   2. Call tensor.buffer.product(normalized_axes, keepdims)
-#      → NDBuffer dispatches to GPU (Reduction.launch_product) or CPU.
+#   2. Call Product.product(normalized_axes, keepdims)
+#      → dispatches to GPU (Reduction.launch_product) or CPU.
 #   3. Wrap result in Tensor.
 #   4. If grad required: store BackwardFnArg(BACKWARD_PRODUCT, ProductArg)
 #      and register ancestry.
@@ -26,6 +26,7 @@
 #   Obtained from ProductArg:
 #     store_excl_product=True  → ProductArg.excl_product is Some(ndb) — use directly
 #     store_excl_product=False → ProductArg.excl_product is None — recompute
+#     via Product.compute_excl_product.
 #
 #   Zero handling (via zero_counts, always stored):
 #     zero_count == 0  → grad_input[i] = grad_out * excl_product[i]
@@ -35,17 +36,11 @@
 #     zero_count >= 2  → grad_input[i] = 0 (excl_product also gives 0 here)
 #   No special-casing needed — zero semantics fall out of excl_product naturally.
 #
-# NDBuffer changes
-# ────────────────
-#   reduce[mean: Bool]     →  reduce[op_code: Int]   (SUM / MEAN only)
-#   NEW: product(axes, keepdims)  dispatches to GPU or CPU product path
-#   NEW: product_cpu(axes, keepdims) — CPU reference implementation
-#
 # =============================================================================
 
-# from .mnemonics import AddTensor, PRODUCT, BACKWARD_PRODUCT
+from .intarray import IntArray
 from .mnemonics import AddTensor
-from .reduction_kernel import ProductArg
+from .reduction_kernel import ProductArg, Reduction
 from .backpropagation import BackwardFnArg, BACKWARD_PRODUCT
 from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
@@ -54,91 +49,252 @@ from .ancestry import Ancestor
 from .shapes import Shape
 from .common_utils import panic
 from .validators import Validator
-
-
-struct ProductBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    def backward(
-        output: Ancestor[Self.dtype],
-        mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
-    ):
-        var bwd_arg = (
-            output.ancestry().backward_fn_arg().get[ProductArg[Self.dtype]]()
-        )
-        ref gradbox = output.gradients()[]
-        ref gradbox_shape = gradbox.shape()
-        var ancestor = output.ancestry().get(0)
-        ref ancestor_shape = ancestor.shape()
-
-        # ── Step 1: expand grad to input shape (same pattern as MeanBackward) ─
-        var expanded = gradbox.copy()
-
-        if gradbox_shape == Shape():
-            # Full reduction to scalar — broadcast scalar grad to input shape
-            var scalar_grad = gradbox.item()
-            expanded = Gradbox[Self.dtype].full(
-                ancestor_shape,
-                scalar_grad,
-                share=False,
-                device=gradbox.device(),
-            )
-        elif not bwd_arg.keepdims:
-            # Re-insert the reduced axes as size-1 dims before broadcasting
-            expanded = expanded.reshape(
-                Shape(
-                    gradbox_shape.intarray().insert(
-                        bwd_arg.axes,
-                        IntArray.filled(len(bwd_arg.axes), 1),
-                    )
-                )
-            )
-
-        # expanded is now broadcastable to ancestor_shape
-        var grad_broadcast = expanded.broadcast_to(ancestor_shape)
-
-        # ── Step 2: get or recompute excl_product ─────────────────────────────
-        var excl_ndb: NDBuffer[Self.dtype]
-
-        if bwd_arg.excl_product:
-            # Stored during forward — use directly (GPU or CPU NDBuffer)
-            excl_ndb = bwd_arg.excl_product.value()
-        else:
-            # Recompute from stored input
-            # NDBuffer.compute_excl_product dispatches GPU or CPU
-            excl_ndb = bwd_arg.input.compute_excl_product(
-                bwd_arg.axes, bwd_arg.keepdims
-            )
-
-        # ── Step 3: grad_input = grad_broadcast * excl_product ───────────────
-        # NDBuffer multiply — device-aware, stays on GPU if on GPU.
-        # Zero handling falls out naturally from excl_product values:
-        #   zero_count >= 2 → excl_product = 0 everywhere in slice
-        #   zero_count == 1 → excl_product = 0 for non-zero elements,
-        #                     product-of-others for the zero element
-        #   zero_count == 0 → standard product-of-others
-        # No explicit zero_counts check needed here.
-        var grad_input = grad_broadcast.buffer * excl_ndb
-
-        var gradbox_ancestor = Gradbox[Self.dtype](grad_input^, share=False)
-        ancestor.update_grad(gradbox_ancestor^, AddTensor, None)
-        parent_ids.append(ancestor._id)
-        if not retain_graph:
-            gradbox.zero_grad()
-
-
-# =============================================================================
-# SECTION 3 — Product forward
-# =============================================================================
-#
-# Mirrors Mean.forward exactly.
-# store_excl_product comptime flag flows from forward into ProductArg —
-# backward reads the same flag's effect via excl_product being Some or None.
-# =============================================================================
+from .shared.scalar_ops import ScalarOps
+from std.sys.info import has_accelerator
+from std.math import log, exp
 
 
 @fieldwise_init
 struct Product[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+    # ── Helper: CPU exclusive product (leaf) ───────────────────────────────
+
+    @staticmethod
+    def excl_product_cpu(
+        ndb: NDBuffer[Self.dtype],
+        normalized_axes: IntArray,
+        keepdims: Bool,
+    ) -> NDBuffer[Self.dtype]:
+        var excl = NDBuffer[Self.dtype].zeros(ndb.shape)
+        var f64_zero = Scalar[DType.float64](0)
+        var out_shape = ndb.shape.compute_output_shape(
+            normalized_axes, keepdims, validated=True
+        )
+        var reduction_axes_shape = ndb.shape.reduced_shape(normalized_axes)
+
+        if out_shape == Shape():
+            var total_log = f64_zero
+            var total_neg = 0
+            var total_zero = 0
+            for idx in ndb.index_iterator():
+                var val = ndb.buffer[idx].cast[DType.float64]()
+                if val == f64_zero:
+                    total_zero += 1
+                else:
+                    if val < f64_zero:
+                        total_neg += 1
+                    total_log += log(abs(val))
+
+            for idx in ndb.index_iterator():
+                var val = ndb.buffer[idx].cast[DType.float64]()
+                excl.set(
+                    idx,
+                    ScalarOps[Self.dtype].excl_one_cpu(
+                        val, total_log, total_neg, total_zero, f64_zero
+                    ),
+                )
+        else:
+            for out_coord in out_shape:
+                var total_log = f64_zero
+                var total_neg = 0
+                var total_zero = 0
+                for red_coord in reduction_axes_shape:
+                    var self_coord = out_coord.replace(
+                        normalized_axes, red_coord
+                    ) if keepdims else out_coord.insert(
+                        normalized_axes, red_coord
+                    )
+                    var val = ndb[self_coord].cast[DType.float64]()
+                    if val == f64_zero:
+                        total_zero += 1
+                    else:
+                        if val < f64_zero:
+                            total_neg += 1
+                        total_log += log(abs(val))
+
+                for red_coord in reduction_axes_shape:
+                    var self_coord = out_coord.replace(
+                        normalized_axes, red_coord
+                    ) if keepdims else out_coord.insert(
+                        normalized_axes, red_coord
+                    )
+                    var val = ndb[self_coord].cast[DType.float64]()
+                    excl[self_coord] = ScalarOps[Self.dtype].excl_one_cpu(
+                        val, total_log, total_neg, total_zero, f64_zero
+                    )
+
+        return excl^
+
+    # ── Helper: CPU product reduction (float64 log-space) ──────────────────
+
+    @staticmethod
+    def product_cpu[
+        store_excl_product: Bool = True,
+    ](
+        ndb: NDBuffer[Self.dtype],
+        normalized_axes: IntArray,
+        keepdims: Bool,
+    ) -> Tuple[NDBuffer[Self.dtype], ProductArg[Self.dtype]]:
+        var out_shape = ndb.shape.compute_output_shape(
+            normalized_axes, keepdims, validated=True
+        )
+        var out = NDBuffer[Self.dtype].zeros(out_shape)
+        var zero_counts = NDBuffer[DType.int32].zeros(out_shape)
+
+        var f64_zero = Scalar[DType.float64](0)
+
+        if out_shape == Shape():
+            var log_abs_sum = f64_zero
+            var neg_count = 0
+            var zero_count = 0
+            for idx in ndb.index_iterator():
+                var val = ndb.buffer[idx].cast[DType.float64]()
+                if val == f64_zero:
+                    zero_count += 1
+                else:
+                    if val < f64_zero:
+                        neg_count += 1
+                    log_abs_sum += log(abs(val))
+            zero_counts[IntArray()] = Scalar[DType.int32](zero_count)
+            if zero_count > 0:
+                out[IntArray()] = Scalar[Self.dtype](0)
+            else:
+                var sign = Scalar[DType.float64](
+                    -1 if neg_count % 2 == 1 else 1
+                )
+                out[IntArray()] = ScalarOps[Self.dtype].cast_result[Self.dtype](
+                    sign * exp(log_abs_sum)
+                )
+        else:
+            var reduction_axes_shape = ndb.shape.reduced_shape(normalized_axes)
+            for out_coord in out_shape:
+                var log_abs_sum = f64_zero
+                var neg_count = 0
+                var zero_count = 0
+                for red_coord in reduction_axes_shape:
+                    var self_coord = out_coord.replace(
+                        normalized_axes, red_coord
+                    ) if keepdims else out_coord.insert(
+                        normalized_axes, red_coord
+                    )
+                    var val = ndb[self_coord].cast[DType.float64]()
+                    if val == f64_zero:
+                        zero_count += 1
+                    else:
+                        if val < f64_zero:
+                            neg_count += 1
+                        log_abs_sum += log(abs(val))
+                zero_counts[out_coord] = Scalar[DType.int32](zero_count)
+                if zero_count > 0:
+                    out[out_coord] = Scalar[Self.dtype](0)
+                else:
+                    var sign = Scalar[DType.float64](
+                        -1 if neg_count % 2 == 1 else 1
+                    )
+                    out[out_coord] = ScalarOps[Self.dtype].cast_result[
+                        Self.dtype
+                    ](sign * exp(log_abs_sum))
+
+        var excl_optional: Optional[NDBuffer[Self.dtype]] = None
+        comptime if store_excl_product:
+            excl_optional = Optional(
+                Product.excl_product_cpu(ndb, normalized_axes, keepdims)
+            )
+
+        var reduced_volume = ndb.shape.reduced_shape(normalized_axes).product()
+
+        var arg = ProductArg[Self.dtype](
+            input=ndb,
+            excl_product=excl_optional^,
+            zero_counts=zero_counts^,
+            axes=normalized_axes,
+            keepdims=keepdims,
+            reduced_volume=reduced_volume,
+        )
+
+        return (out^, arg^)
+
+    # ── Helper: exclusive product recompute (for backward) ─────────────────
+
+    @staticmethod
+    def compute_excl_product(
+        ndb: NDBuffer[Self.dtype],
+        normalized_axes: IntArray,
+        keepdims: Bool,
+    ) -> NDBuffer[Self.dtype]:
+        comptime if has_accelerator():
+            if ndb.is_on_gpu():
+                try:
+                    var (_, productArg) = Reduction[Self.dtype].launch_product[
+                        store_excl_product=True
+                    ](ndb, normalized_axes, keepdims)
+                    return productArg.excl_product.value()
+                except e:
+                    panic(
+                        "Product.compute_excl_product — GPU failed: ",
+                        String(e),
+                    )
+                    return NDBuffer[Self.dtype].Empty()
+        return Product.excl_product_cpu(ndb, normalized_axes, keepdims)
+
+    # ── Main product dispatch (GPU / CPU) ──────────────────────────────────
+
+    @always_inline
+    @staticmethod
+    def product[
+        store_excl_product: Bool = True,
+    ](
+        ndb: NDBuffer[Self.dtype],
+        normalized_axes: IntArray,
+        keepdims: Bool = False,
+    ) -> Tuple[NDBuffer[Self.dtype], ProductArg[Self.dtype]]:
+        var out: NDBuffer[Self.dtype]
+        var arg: ProductArg[Self.dtype]
+
+        comptime if has_accelerator():
+            if ndb.is_on_gpu():
+                try:
+                    var result = Reduction[Self.dtype].launch_product[
+                        store_excl_product
+                    ](ndb, normalized_axes, keepdims)
+                    out = result[0]
+                    arg = result[1]
+                except e:
+                    print(e)
+                    panic(
+                        "Product.product — GPU operation failed: ", String(e)
+                    )
+                    out = NDBuffer[Self.dtype].Empty()
+                    arg = ProductArg[Self.dtype].Empty()
+            else:
+                (out, arg) = Product.product_cpu[store_excl_product](
+                    ndb, normalized_axes, keepdims
+                )
+        else:
+            (out, arg) = Product.product_cpu[store_excl_product](
+                ndb, normalized_axes, keepdims
+            )
+
+        return (out^, arg^)
+
+    # ── Scalar product of all elements (CPU only) ──────────────────────────
+
+    @always_inline
+    @staticmethod
+    def product_all(
+        ndb: NDBuffer[Self.dtype],
+    ) -> Scalar[Self.dtype]:
+        if ndb.is_contiguous():
+            var start = ndb.offset
+            var end = start + ndb.numels()
+            return ndb.buffer.product(start, end)
+        else:
+            var product: Scalar[Self.dtype] = Scalar[Self.dtype](1)
+            for index in ndb.index_iterator():
+                product *= ndb.buffer[index]
+            return product
+
+    # ── Forward entry point ────────────────────────────────────────────────
+
     @always_inline
     @staticmethod
     def forward[
@@ -181,12 +337,11 @@ struct Product[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             tensor.shape(), axes
         )
 
-        # NDBuffer.product dispatches to GPU or CPU (see Section 4)
-        var result = tensor.buffer.product[store_excl_product](
-            normalized_axes, keepdims
+        var result = Product.product[store_excl_product](
+            tensor.buffer, normalized_axes, keepdims
         )
-        var ndb = result[0]  # NDBuffer — product output
-        var bwd_arg = result[1]  # ProductArg — for backward
+        var ndb = result[0]
+        var bwd_arg = result[1]
 
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
@@ -201,3 +356,61 @@ struct Product[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^
+
+
+struct ProductBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+    @staticmethod
+    def backward(
+        output: Ancestor[Self.dtype],
+        mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
+    ):
+        var bwd_arg = (
+            output.ancestry().backward_fn_arg().get[ProductArg[Self.dtype]]()
+        )
+        ref gradbox = output.gradients()[]
+        ref gradbox_shape = gradbox.shape()
+        var ancestor = output.ancestry().get(0)
+        ref ancestor_shape = ancestor.shape()
+
+        # ── Step 1: expand grad to input shape ─────────────────────────────
+        var expanded = gradbox.copy()
+
+        if gradbox_shape == Shape():
+            var scalar_grad = gradbox.item()
+            expanded = Gradbox[Self.dtype].full(
+                ancestor_shape,
+                scalar_grad,
+                share=False,
+                device=gradbox.device(),
+            )
+        elif not bwd_arg.keepdims:
+            expanded = expanded.reshape(
+                Shape(
+                    gradbox_shape.intarray().insert(
+                        bwd_arg.axes,
+                        IntArray.filled(len(bwd_arg.axes), 1),
+                    )
+                )
+            )
+
+        var grad_broadcast = expanded.broadcast_to(ancestor_shape)
+
+        # ── Step 2: get or recompute excl_product ──────────────────────────
+        var excl_ndb: NDBuffer[Self.dtype]
+
+        if bwd_arg.excl_product:
+            excl_ndb = bwd_arg.excl_product.value()
+        else:
+            excl_ndb = Product.compute_excl_product(
+                bwd_arg.input, bwd_arg.axes, bwd_arg.keepdims
+            )
+
+        # ── Step 3: grad_input = grad_broadcast * excl_product ─────────────
+        var grad_input = grad_broadcast.buffer * excl_ndb
+
+        var gradbox_ancestor = Gradbox[Self.dtype](grad_input^, share=False)
+        ancestor.update_grad(gradbox_ancestor^, AddTensor, None)
+        parent_ids.append(ancestor._id)
+        if not retain_graph:
+            gradbox.zero_grad()
