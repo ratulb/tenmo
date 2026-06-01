@@ -337,7 +337,7 @@ struct NDBuffer[dtype: DType](
         # ---------------------------------------
         # Materialize contiguous CPU buffer
         # New NDBuffer alltogether!
-        if self.is_contiguous():
+        if self.is_contiguous() and self.offset == 0:
             return 0, curr_state.into(self.shape)
         else:
             # Materialise respecting strides
