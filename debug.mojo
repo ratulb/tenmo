@@ -1,4 +1,4 @@
-from tenmo import Tensor, NDBuffer, Shape
+from tenmo import Tensor, NDBuffer, Shape, SGD
 from std.testing import assert_true
 from tenmo.common_utils import s, i, panic
 from std.sys.defines import get_defined_string
@@ -7,7 +7,7 @@ from std.sys import has_accelerator, simd_width_of
 from std.algorithm import parallelize
 from std.sys.info import num_physical_cores
 from std.sys.intrinsics import PrefetchLocality
-from tenmo.matmul_kernel import MatmulNdGpu
+from tenmo.kernels.matmul_kernel import MatmulNdGpu
 from std.sys import prefetch, PrefetchOptions
 from std import math
 
@@ -458,3 +458,19 @@ struct MM[dtype: DType]:
             )
 
         return C^
+
+def main() raises:
+    test_sgd_gpu_backward_integration()
+
+def test_sgd_gpu_backward_integration() raises:
+    var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var x = Tensor[dtype].d1([1.0, 1.0, 1.0])
+    var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
+    params.append(UnsafePointer(to=w))
+    var sgd = SGD(params, lr=0.1)
+    var loss = (w * x).sum()
+    loss.backward()
+    sgd.step()
+    # grad_w = x = [1,1,1], w = w - 0.1*1 = [0.9, 1.9, 2.9]
+    assert_true(w.all_close(Tensor[dtype].d1([0.9, 1.9, 2.9])))
+    assert_true(w.grad().all_close(Tensor[dtype].d1([1.0, 1.0, 1.0])))

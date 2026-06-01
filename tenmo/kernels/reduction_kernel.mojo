@@ -1264,7 +1264,7 @@ struct Reduction[dtype: DType = DType.float32](
         max_block_width: Int = 512,
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](
-        A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool
+            A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool, sync: Bool = True,
     ) raises -> NDBuffer[Self.dtype]:
         var shape_A = A.shape
         var strides_A = A.strides
