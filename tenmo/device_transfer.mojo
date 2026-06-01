@@ -97,9 +97,6 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
 
         parent_ids.append(ancestor_ref._id)
 
-        if not retain_graph:
-            gradbox.zero_grad()
-
 
 @fieldwise_init
 struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
