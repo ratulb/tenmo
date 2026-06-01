@@ -128,6 +128,7 @@ struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
         p: Scalar[Self.dtype],
         scale: Scalar[Self.dtype],
         rng_seed: UInt64,
+        sync: Bool = True,
     ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         """Launch dropout forward kernel. Returns (output, mask) on GPU.
 
@@ -189,7 +190,7 @@ struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu

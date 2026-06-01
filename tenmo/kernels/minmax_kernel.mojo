@@ -231,6 +231,7 @@ struct ReductionMinMax[dtype: DType = DType.float32](
         A: NDBuffer[Self.dtype],
         normalized_axes: IntArray,
         keepdims: Bool,
+        sync: Bool = True,
     ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         """
         Returns (result, mask) both on GPU.
@@ -279,7 +280,7 @@ struct ReductionMinMax[dtype: DType = DType.float32](
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         # ── Pass 2: build normalised mask ────────────────────────────────────
         var mask_buffer = device_context.enqueue_create_buffer[Self.dtype](
@@ -305,7 +306,7 @@ struct ReductionMinMax[dtype: DType = DType.float32](
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
         var result_ndb = NDBuffer[Self.dtype].with_device_state(

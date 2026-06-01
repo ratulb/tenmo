@@ -288,7 +288,7 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
-    ](M: Tensor[Self.dtype], v: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    ](M: Tensor[Self.dtype], v: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         _ = """var M_shape = M.shape()
         var v_shape = v.shape()
 
@@ -371,7 +371,7 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             if M.is_on_gpu() and v.is_on_gpu():
                 try:
                     out = MatrixVectorNdGpu[Self.dtype].launch[block_size=256](
-                        M.buffer, v.buffer
+                        M.buffer, v.buffer, sync=sync
                     )
                 except e:
                     print(e)

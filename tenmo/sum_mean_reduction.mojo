@@ -32,6 +32,7 @@ struct SumMeanReduction[dtype: DType]:
         ndb: NDBuffer[Self.dtype],
         normalized_axes: IntArray,
         keepdims: Bool = False,
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype]:
         """Sum / mean reduction. Axes must be already normalized.
         op_code: SUM or MEAN."""
@@ -41,7 +42,7 @@ struct SumMeanReduction[dtype: DType]:
             if ndb.is_on_gpu():
                 try:
                     out = Reduction[Self.dtype].launch[op_code](
-                        ndb, normalized_axes, keepdims
+                        ndb, normalized_axes, keepdims, sync=sync
                     )
                 except e:
                     print(e)

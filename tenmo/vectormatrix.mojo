@@ -340,14 +340,14 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
-    ](v: Tensor[Self.dtype], M: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    ](v: Tensor[Self.dtype], M: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         var out: NDBuffer[Self.dtype]
 
         comptime if has_accelerator():
             if v.is_on_gpu() and M.is_on_gpu():
                 try:
                     out = VectorMatmulNdGpu[Self.dtype].launch[block_size=256](
-                        v.buffer, M.buffer
+                        v.buffer, M.buffer, sync=sync
                     )
                 except e:
                     print(e)

@@ -86,6 +86,7 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         A: NDBuffer[Self.dtype],
         permutation: List[Int],
         axis: Int,
+        sync: Bool = True,
     ) raises -> NDBuffer[Self.dtype]:
         var shape = A.shape
         var total_elements = shape.num_elements()
@@ -126,7 +127,7 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(result_state^, shape)
@@ -136,6 +137,7 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         grad: NDBuffer[Self.dtype],
         permutation: List[Int],
         axis: Int,
+        sync: Bool = True,
     ) raises -> NDBuffer[Self.dtype]:
         var shape = grad.shape
         var total_elements = shape.num_elements()
@@ -177,7 +179,7 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(result_state^, shape)

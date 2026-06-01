@@ -479,6 +479,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
         A: NDBuffer[Self.dtype],
         B: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
+        sync: Bool = True,
     ) raises -> NDBuffer[Self.dtype]:
         comptime simdwidth = simd_width_of[Self.dtype]()
         var A_shape = A.shape
@@ -534,7 +535,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
-            device_context.synchronize()
+            if sync: device_context.synchronize()
             var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
             return NDBuffer[Self.dtype].with_device_state(
                 device_state^, broadcast_shape
@@ -578,7 +579,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
-            device_context.synchronize()
+            if sync: device_context.synchronize()
             var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
             return NDBuffer[Self.dtype].with_device_state(
                 device_state^, broadcast_shape
@@ -614,7 +615,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
-            device_context.synchronize()
+            if sync: device_context.synchronize()
             var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
             return NDBuffer[Self.dtype].with_device_state(
                 device_state^, broadcast_shape
@@ -646,7 +647,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
-        device_context.synchronize()
+        if sync: device_context.synchronize()
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(
             device_state^, broadcast_shape

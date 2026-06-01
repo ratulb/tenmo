@@ -192,7 +192,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) raises -> NDBuffer[
+    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) raises -> NDBuffer[
         Self.dtype
     ]:
         var numels = A.numels()
@@ -236,7 +236,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
         var out = NDBuffer[Self.dtype].with_device_state(device_state^, A.shape)
 
@@ -244,7 +244,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
 
     @staticmethod
     def launch_pow(
-        A: NDBuffer[Self.dtype], exponent: Scalar[Self.dtype]
+        A: NDBuffer[Self.dtype], exponent: Scalar[Self.dtype], sync: Bool = True
     ) raises -> NDBuffer[Self.dtype]:
         """
         Dedicated POW launcher — dispatches to typed f32/f64 kernels.
@@ -310,7 +310,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
                 "ScalarOperations: POW only supported for float32 and float64"
             )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(device_state^, A.shape)
 

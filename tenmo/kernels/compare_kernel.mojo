@@ -153,7 +153,7 @@ struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         treat_nan_equal: Bool = True,
         simd_width: Int = simd_width_of[Self.dtype](),
         simd_vectors_per_thread: Int = 2,
-    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]) raises -> Bool:
+    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = True) raises -> Bool:
         comptime simdwidth = simd_width_of[Self.dtype]()
 
         var (threads_per_block, num_blocks) = Self.launch_config(A.numels())
@@ -197,7 +197,7 @@ struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
         var all_close_result: Bool
         with result_buffer.map_to_host() as host_buffer:
             all_close_result = True if host_buffer[0] == 1 else False
@@ -312,7 +312,7 @@ struct Compare[dtype: DType = DType.float32](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]) raises -> NDBuffer[
+    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = True) raises -> NDBuffer[
         DType.bool
     ]:
         comptime simdwidth = simd_width_of[Self.datatype]()
@@ -350,7 +350,7 @@ struct Compare[dtype: DType = DType.float32](
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var device_state = DeviceState[DType.bool].__init__[True](
             result_buffer^, gpu
@@ -457,7 +457,7 @@ struct CompareScalar[dtype: DType = DType.float32](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) raises -> NDBuffer[
+    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) raises -> NDBuffer[
         DType.bool
     ]:
         var numels = A.numels()
@@ -515,7 +515,7 @@ struct CompareScalar[dtype: DType = DType.float32](
                 block_dim=threads_per_block,
             )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var device_state = DeviceState[DType.bool].__init__[True](
             result_buffer^, gpu

@@ -385,7 +385,7 @@ struct BinaryInplaceOperations[dtype: DType](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]) raises:
+    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = True) raises:
         comptime simdwidth = simd_width_of[Self.dtype]()
         var A_shape = A.shape
         var B_shape = B.shape
@@ -454,7 +454,7 @@ struct BinaryInplaceOperations[dtype: DType](
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
-            device_context.synchronize()
+            if sync: device_context.synchronize()
             return
 
         # Broadcast strides are only needed for paths 2-4.
@@ -502,7 +502,7 @@ struct BinaryInplaceOperations[dtype: DType](
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
-            device_context.synchronize()
+            if sync: device_context.synchronize()
             return
 
         # PATH 3: A strided, B contiguous, NO broadcasting.
@@ -539,7 +539,7 @@ struct BinaryInplaceOperations[dtype: DType](
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
-            device_context.synchronize()
+            if sync: device_context.synchronize()
             return
 
         # PATH 4: Universal fallback — both strided and/or
@@ -578,7 +578,7 @@ struct BinaryInplaceOperations[dtype: DType](
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
     # ──────────────────────────────────────────────────────────
     # launch_config: returns (threads_per_block, num_blocks).

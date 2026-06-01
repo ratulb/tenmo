@@ -91,7 +91,7 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) raises:
+    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) raises:
         var numels = A.numels()
 
         comptime simdwidth = simd_width_of[Self.dtype]()
@@ -130,7 +130,7 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
         # var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
         # var out = NDBuffer[Self.dtype].with_device_state(device_state^, A.shape)
 

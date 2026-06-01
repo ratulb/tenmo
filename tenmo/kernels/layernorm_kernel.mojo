@@ -120,6 +120,7 @@ struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         gamma: NDBuffer[Self.dtype],  # (D,)
         beta: NDBuffer[Self.dtype],  # (D,)
         eps: Scalar[Self.dtype],
+        sync: Bool = True,
     ) raises -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ]:
@@ -196,7 +197,7 @@ struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         # rstd shape is (*, 1) — same as mean/var from Welford
         var rstd_shape = out_shape[0:-1] + [1]

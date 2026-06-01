@@ -45,12 +45,13 @@ struct SoftmaxNdBuffer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ndb: NDBuffer[Self.dtype],
         normalized_axes: IntArray,
         keepdims: Bool = False,
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         comptime if has_accelerator():
             if ndb.is_on_gpu():
                 try:
                     return Reduction[Self.dtype].launch_log_sum(
-                        ndb, normalized_axes, keepdims
+                        ndb, normalized_axes, keepdims, sync=sync
                     )
                 except e:
                     print(e)

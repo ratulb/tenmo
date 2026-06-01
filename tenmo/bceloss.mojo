@@ -561,6 +561,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         logits: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
+        sync: Bool = True,
     ) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -577,7 +578,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                 try:
                     var result = BceKernel[
                         Self.dtype
-                    ].launch_forward_with_logits(logits, target, epsilon)
+                    ].launch_forward_with_logits(logits, target, epsilon, sync=sync)
                     loss_ndb = result[0]
                     bw_ndb = result[1]
                 except e:
@@ -637,6 +638,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
         is_mean: Bool,
+        sync: Bool = True,
     ) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -655,7 +657,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                     var result = BceKernel[
                         Self.dtype
                     ].launch_forward_with_logits_reduce(
-                        logits, target, epsilon, is_mean
+                        logits, target, epsilon, is_mean, sync=sync
                     )
                     scalar_ndb = result[0]
                     sig_ndb = result[1]
@@ -722,6 +724,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         pred: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
+        sync: Bool = True,
     ) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -737,7 +740,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
             if pred.is_on_gpu():
                 try:
                     var result = BceKernel[Self.dtype].launch_forward(
-                        pred, target, epsilon
+                        pred, target, epsilon, sync=sync
                     )
                     loss_ndb = result[0]
                     bw_ndb = result[1]
@@ -796,6 +799,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
         is_mean: Bool,
+        sync: Bool = True,
     ) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -812,7 +816,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
             if pred.is_on_gpu():
                 try:
                     var result = BceKernel[Self.dtype].launch_forward_reduce(
-                        pred, target, epsilon, is_mean
+                        pred, target, epsilon, is_mean, sync=sync
                     )
                     scalar_ndb = result[0]
                     safe_ndb = result[1]
@@ -876,6 +880,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         sigmoid: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         grad_output: NDBuffer[Self.dtype],
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Fused BCEWithLogits backward. Returns gradient for logits.
 
@@ -899,7 +904,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                     result = BceKernel[
                         Self.dtype
                     ].launch_bce_with_logits_backward(
-                        sigmoid, gpu_target, gpu_grad
+                        sigmoid, gpu_target, gpu_grad, sync=sync
                     )
                 except e:
                     print(e)
@@ -949,6 +954,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         sigmoid: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         scalar_grad: Scalar[Self.dtype],
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Fused BCEWithLogits backward with scalar gradient.
 
@@ -963,7 +969,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                     result = BceKernel[
                         Self.dtype
                     ].launch_bce_with_logits_backward_scaled(
-                        sigmoid, target, scalar_grad
+                        sigmoid, target, scalar_grad, sync=sync
                     )
                 except e:
                     print(e)
@@ -1013,6 +1019,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         safe: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         grad_output: NDBuffer[Self.dtype],
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Fused BCELoss backward. Returns gradient for pred.
 
@@ -1034,7 +1041,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                         1
                     ]
                     result = BceKernel[Self.dtype].launch_bce_backward(
-                        safe, gpu_target, gpu_grad
+                        safe, gpu_target, gpu_grad, sync=sync
                     )
                 except e:
                     print(e)
@@ -1079,6 +1086,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         safe: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         scalar_grad: Scalar[Self.dtype],
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Fused BCELoss backward with scalar gradient.
 
@@ -1091,7 +1099,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
             if safe.is_on_gpu():
                 try:
                     result = BceKernel[Self.dtype].launch_bce_backward_scaled(
-                        safe, target, scalar_grad
+                        safe, target, scalar_grad, sync=sync
                     )
                 except e:
                     print(e)

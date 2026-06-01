@@ -1627,7 +1627,7 @@ struct NDBuffer[dtype: DType](
     @always_inline
     def inplace_ops[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]):
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype], sync: Bool = True):
         # Broadcast validation
         if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
             panic(
@@ -1641,7 +1641,7 @@ struct NDBuffer[dtype: DType](
             if self.is_on_gpu() and other.is_on_gpu():
                 try:
                     BinaryInplaceOperations[Self.dtype].launch[op_code](
-                        self, other
+                        self, other, sync=sync
                     )
                 except e:
                     print(e)
@@ -1736,7 +1736,7 @@ struct NDBuffer[dtype: DType](
     @always_inline
     def inplace_scalar_ops[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]):
+    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True):
         comptime if op_code == Divide:
             if scalar == Scalar[Self.dtype](0):
                 panic("NDBuffer → inplace_scalar_ops: cannot divide by zero")
@@ -1745,7 +1745,7 @@ struct NDBuffer[dtype: DType](
             if self.is_on_gpu():
                 try:
                     InplaceScalarOperations[Self.dtype].launch[op_code](
-                        self, scalar
+                        self, scalar, sync=sync
                     )
                 except e:
                     print(e)
@@ -1868,6 +1868,7 @@ struct NDBuffer[dtype: DType](
         self: NDBuffer[Self.dtype],
         other: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype]:
         # Broadcast validation
         if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
@@ -1884,7 +1885,7 @@ struct NDBuffer[dtype: DType](
             if self.is_on_gpu() and other.is_on_gpu():
                 try:
                     out = BinaryOperations[Self.dtype].launch[op_code](
-                        self, other, epsilon
+                        self, other, epsilon, sync=sync
                     )
                 except e:
                     print(e)
@@ -2029,7 +2030,7 @@ struct NDBuffer[dtype: DType](
     @always_inline
     def scalar_ops[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
+    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) -> NDBuffer[
         Self.dtype
     ]:
         comptime if op_code == Divide:
@@ -2043,11 +2044,11 @@ struct NDBuffer[dtype: DType](
                 try:
                     comptime if op_code == POW:
                         out = ScalarOperations[Self.dtype].launch_pow(
-                            self, scalar
+                            self, scalar, sync=sync
                         )
                     else:
                         out = ScalarOperations[Self.dtype].launch[op_code](
-                            self, scalar
+                            self, scalar, sync=sync
                         )
                 except e:
                     print(e)
@@ -2101,13 +2102,13 @@ struct NDBuffer[dtype: DType](
     @always_inline
     def unary_ops[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
+    ](self: NDBuffer[Self.dtype], sync: Bool = True) -> NDBuffer[Self.dtype]:
         var out: NDBuffer[Self.dtype]
 
         comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
-                    out = UnaryOpsKernel[Self.dtype].launch[op_code](self)
+                    out = UnaryOpsKernel[Self.dtype].launch[op_code](self, sync=sync)
                 except e:
                     print(e)
                     panic(
@@ -2153,7 +2154,7 @@ struct NDBuffer[dtype: DType](
     def float_unary_ops[
         op_code: Int,
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
-    ](self: NDBuffer[Self.dtype]) -> NDBuffer[
+    ](self: NDBuffer[Self.dtype], sync: Bool = True) -> NDBuffer[
         Self.dtype
     ] where Self.dtype.is_floating_point():
         """For LOG/EXP/SIGMOID/TANH."""
@@ -2163,7 +2164,7 @@ struct NDBuffer[dtype: DType](
             if self.is_on_gpu():
                 try:
                     out = UnaryOpsKernel[Self.dtype].launch[op_code, epsilon](
-                        self
+                        self, sync=sync
                     )
                 except e:
                     print(e)
@@ -2265,7 +2266,7 @@ struct NDBuffer[dtype: DType](
     @always_inline
     def compare[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype], sync: Bool = True) -> NDBuffer[
         DType.bool
     ]:
         if not self.shape == other.shape:
@@ -2280,7 +2281,7 @@ struct NDBuffer[dtype: DType](
         comptime if has_accelerator():
             if self.is_on_gpu() and other.is_on_gpu():
                 try:
-                    result = Compare[Self.dtype].launch[op_code](self, other)
+                    result = Compare[Self.dtype].launch[op_code](self, other, sync=sync)
                 except e:
                     print(e)
                     panic("NDBuffer compare → GPU operation failed")
@@ -2341,7 +2342,7 @@ struct NDBuffer[dtype: DType](
     @always_inline
     def compare_scalar[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
+    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) -> NDBuffer[
         DType.bool
     ]:
         var result: NDBuffer[DType.bool]
@@ -2350,7 +2351,7 @@ struct NDBuffer[dtype: DType](
             if self.is_on_gpu():
                 try:
                     result = CompareScalar[Self.dtype].launch[op_code](
-                        self, scalar
+                        self, scalar, sync=sync
                     )
                 except e:
                     print(e)
@@ -2396,7 +2397,7 @@ struct NDBuffer[dtype: DType](
     def all_close[
         rtol: Scalar[Self.dtype] = 1e-5,
         atol: Scalar[Self.dtype] = 1e-8,
-    ](self, other: Self) -> Bool:
+    ](self, other: Self, sync: Bool = True) -> Bool:
         comptime assert (
             Self.dtype.is_floating_point()
         ), "NDBuffer → all_close is for floating point data types only"
@@ -2414,7 +2415,7 @@ struct NDBuffer[dtype: DType](
             if self.is_on_gpu() and other.is_on_gpu():
                 try:
                     result = AllClose[Self.dtype].launch[rtol=rtol, atol=atol](
-                        self, other
+                        self, other, sync=sync
                     )
                 except e:
                     print(e)
@@ -2528,7 +2529,7 @@ struct NDBuffer[dtype: DType](
         return MmCpu2d[Self.dtype].matmul_2d(A, B)
 
     def matmul_2d_good(
-        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = True
     ) -> NDBuffer[Self.dtype]:
         ref A_shape = A.shape
         ref B_shape = B.shape
@@ -2540,7 +2541,7 @@ struct NDBuffer[dtype: DType](
             if A.is_on_gpu() and B.is_on_gpu():
                 try:
                     C = MatmulNdGpu[Self.dtype].launch[tile_size=TILE_SIZE](
-                        A, B
+                        A, B, sync=sync
                     )
                 except e:
                     print(e)
@@ -2692,7 +2693,7 @@ struct NDBuffer[dtype: DType](
         return C^
 
     def matmul_nd(
-        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = True
     ) -> NDBuffer[Self.dtype]:
         var A_shape = A.shape
         var B_shape = B.shape
@@ -2721,7 +2722,7 @@ struct NDBuffer[dtype: DType](
             if A.is_on_gpu() and B.is_on_gpu():
                 try:
                     C = MatmulNdGpu[Self.dtype].launch[tile_size=TILE_SIZE](
-                        A, B
+                        A, B, sync=sync
                     )
                 except e:
                     print(e)
@@ -2997,7 +2998,7 @@ struct MmCpu2d[
     # ─────────────────────────────────────────────────────────────────────────
     @staticmethod
     def matmul_2d(
-        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = True
     ) -> NDBuffer[Self.dtype]:
         ref A_shape = A.shape
         ref B_shape = B.shape
@@ -3009,7 +3010,7 @@ struct MmCpu2d[
             if A.is_on_gpu() and B.is_on_gpu():
                 try:
                     C = MatmulNdGpu[Self.dtype].launch[tile_size=GPU_TILE_SIZE](
-                        A, B
+                        A, B, sync=sync
                     )
                 except e:
                     print(e)

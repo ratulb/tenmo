@@ -130,6 +130,7 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
     ](
         A: NDBuffer[Self.dtype],
         B: NDBuffer[Self.dtype],
+        sync: Bool = True,
     ) raises -> NDBuffer[
         Self.dtype
     ]:
@@ -273,7 +274,7 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
             block_dim=block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
         var out = NDBuffer[Self.dtype].with_device_state(

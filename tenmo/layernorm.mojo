@@ -58,6 +58,7 @@ struct LayerNormCpu[dtype: DType](ImplicitlyCopyable & Movable):
         gamma: NDBuffer[Self.dtype],
         beta: NDBuffer[Self.dtype],
         eps: Scalar[Self.dtype],
+        sync: Bool = True,
     ) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ]:
@@ -79,7 +80,7 @@ struct LayerNormCpu[dtype: DType](ImplicitlyCopyable & Movable):
             if x.is_on_gpu():
                 try:
                     return LayerNormKernel[Self.dtype].launch(
-                        x, mean, var_, gamma, beta, eps
+                        x, mean, var_, gamma, beta, eps, sync=sync
                     )
                 except e:
                     print(e)

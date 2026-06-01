@@ -40,6 +40,7 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         target: NDBuffer[Self.dtype],
         value: Scalar[Self.dtype],
         indices: VariadicList[Idx, _],
+        sync: Bool = True,
     ):
         try:
             var (
@@ -54,7 +55,7 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             comptime if has_accelerator():
                 if target.is_on_gpu():
                     FillerGpu[Self.dtype]._fill_scalar_gpu(
-                        target, value, shape, strides, absolute_offset
+                        target, value, shape, strides, absolute_offset, sync=sync
                     )
                     return
             Self._fill_scalar_cpu(
@@ -74,6 +75,7 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         target: NDBuffer[Self.dtype],
         source: NDBuffer[Self.dtype],
         indices: VariadicList[Idx, _],
+        sync: Bool = True,
     ):
         try:
             var (
@@ -94,7 +96,7 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             comptime if has_accelerator():
                 if target.is_on_gpu():
                     FillerGpu[Self.dtype]._fill_buffer_gpu(
-                        target, source, shape, strides, absolute_offset
+                        target, source, shape, strides, absolute_offset, sync=sync
                     )
                     return
             Self._fill_buffer_cpu(
@@ -115,6 +117,7 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         source: NDBuffer[Self.dtype],  # incoming grad
         indices: IntArray,
         axis: Int = 0,
+        sync: Bool = True,
     ):
         """Scatter-add source into target at given indices along axis.
 
@@ -134,7 +137,7 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             comptime if has_accelerator():
                 if target.is_on_gpu():
                     FillerGpu[Self.dtype]._scatter_add_gpu(
-                        target, source, indices, n_indices, slice_volume
+                        target, source, indices, n_indices, slice_volume, sync=sync
                     )
                     return
             Self._scatter_add_cpu(

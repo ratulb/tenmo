@@ -389,6 +389,7 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         normalized: IntArray,
         reduction: Reduction,
         indices_shape: IntArray = IntArray(),
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Gather + optional reduce, single dispatch.
 
@@ -425,7 +426,7 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
                 if self.is_on_gpu():
                     try:
                         var ndb = GatherGpu[Self.dtype].gather_gpu(
-                            self.buffer, ax, normalized, reduction
+                            self.buffer, ax, normalized, reduction, sync=sync
                         )
                         return Tensor[Self.dtype](ndb^, requires_grad=False)
                     except e:
@@ -454,7 +455,7 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
             if self.is_on_gpu() and not use_nd:
                 try:
                     var ndb = GatherGpu[Self.dtype].gather_gpu(
-                        self.buffer, ax, normalized, Reduction(2)
+                        self.buffer, ax, normalized, Reduction(2), sync=sync
                     )
                     var gathered = Tensor[Self.dtype](ndb^, requires_grad=False)
                     if reduction.is_sum():

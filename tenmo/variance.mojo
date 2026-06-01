@@ -175,13 +175,14 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         x: NDBuffer[Self.dtype],
         mean: NDBuffer[Self.dtype],
         scale: Scalar[Self.dtype],
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype]:
         comptime if has_accelerator():
             if x.is_on_gpu():
                 try:
                     return StdVarianceBackwardKernel[
                         Self.dtype
-                    ].launch_variance_backward(x, mean, scale)
+                    ].launch_variance_backward(x, mean, scale, sync=sync)
                 except e:
                     print(e)
                     panic(
@@ -219,13 +220,14 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         x: NDBuffer[Self.dtype],
         mean: NDBuffer[Self.dtype],
         denom: NDBuffer[Self.dtype],
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype]:
         comptime if has_accelerator():
             if x.is_on_gpu():
                 try:
                     return StdVarianceBackwardKernel[
                         Self.dtype
-                    ].launch_std_backward(x, mean, denom)
+                    ].launch_std_backward(x, mean, denom, sync=sync)
                 except e:
                     print(e)
                     panic("VarStdBackward std_backward_normalize → GPU failed")

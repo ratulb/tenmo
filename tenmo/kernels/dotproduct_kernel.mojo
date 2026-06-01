@@ -116,7 +116,7 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
         num_blocks: Int = 1,
         threads_per_block: Int = 512,
         suppress_validation: Bool = False,
-    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) raises -> Tensor[
+    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True) raises -> Tensor[
         Self.dtype
     ]:
         comptime assert (
@@ -189,7 +189,7 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 block_dim=threads_per_block,
             )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
         var device_state = DeviceState[Self.dtype](
             result_buffer^, A_device_state.get_gpu()
         )

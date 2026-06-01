@@ -184,6 +184,7 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         axis: Int,
         indices: IntArray,
         reduction: Reduction = Reduction(0),
+        sync: Bool = True,
     ) raises -> NDBuffer[Self.dtype]:
         comptime datatype = DType.uint8 if Self.dtype == DType.bool else Self.dtype
 
@@ -246,7 +247,7 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     grid_dim=1,
                     block_dim=block_cols,
                 )
-            ctx.synchronize()
+            if sync: ctx.synchronize()
             var out_shape = Shape(in_cols)
             var result_state = DeviceState[Self.dtype].__init__[special=True](
                 out_dev^, gpu
@@ -405,7 +406,7 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 total_output,
             )
 
-        ctx.synchronize()
+        if sync: ctx.synchronize()
         var result_state = DeviceState[Self.dtype].__init__[special=True](
             out_dev^, gpu
         )

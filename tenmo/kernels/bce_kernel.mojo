@@ -512,6 +512,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         A: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
+        sync: Bool = True,
     ) raises -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -564,7 +565,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var loss_state = DeviceState[Self.dtype](loss_buffer^, device_state.gpu)
         var sigmoid_state = DeviceState[Self.dtype](
@@ -586,6 +587,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
         is_mean: Bool,
+        sync: Bool = True,
     ) raises -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -641,7 +643,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var scalar_state = DeviceState[Self.dtype](
             scalar_buffer^, device_state.gpu
@@ -670,6 +672,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         A: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
+        sync: Bool = True,
     ) raises -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -723,7 +726,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var loss_state = DeviceState[Self.dtype](loss_buffer^, device_state.gpu)
         var safe_state = DeviceState[Self.dtype](safe_buffer^, device_state.gpu)
@@ -743,6 +746,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
         is_mean: Bool,
+        sync: Bool = True,
     ) raises -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -798,7 +802,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var scalar_state = DeviceState[Self.dtype](
             scalar_buffer^, device_state.gpu
@@ -825,6 +829,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         sigmoid: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         grad_output: NDBuffer[Self.dtype],
+        sync: Bool = True,
     ) raises -> NDBuffer[Self.dtype]:
         """Fused BCEWithLogits backward. Returns gradient for logits."""
         debug_assert(sigmoid.is_on_gpu())
@@ -873,7 +878,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu
@@ -890,6 +895,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         sigmoid: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         scalar_grad: Scalar[Self.dtype],
+        sync: Bool = True,
     ) raises -> NDBuffer[Self.dtype]:
         """Fused BCEWithLogits backward with scalar gradient. Returns gradient for logits.
         """
@@ -937,7 +943,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu
@@ -954,6 +960,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         safe: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         grad_output: NDBuffer[Self.dtype],
+        sync: Bool = True,
     ) raises -> NDBuffer[Self.dtype]:
         """Fused BCELoss backward. Returns gradient for pred."""
         debug_assert(safe.is_on_gpu())
@@ -1002,7 +1009,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu
@@ -1019,6 +1026,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         safe: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         scalar_grad: Scalar[Self.dtype],
+        sync: Bool = True,
     ) raises -> NDBuffer[Self.dtype]:
         """Fused BCELoss backward with scalar gradient. Returns gradient for pred.
         """
@@ -1066,7 +1074,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu

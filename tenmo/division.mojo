@@ -146,6 +146,7 @@ struct DivNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         grad_output: NDBuffer[Self.dtype],
         divisor: NDBuffer[Self.dtype],
         scalar: Scalar[Self.dtype],
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype]:
         """Fused backward for s / x. Returns gradient for divisor.
         Device-aware: GPU → DivisionKernel.launch_rdiv_scalar_backward.
@@ -157,7 +158,7 @@ struct DivNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                 try:
                     result = DivisionKernel[
                         Self.dtype
-                    ].launch_rdiv_scalar_backward(grad_output, divisor, scalar)
+                    ].launch_rdiv_scalar_backward(grad_output, divisor, scalar, sync=sync)
                 except e:
                     print(e)
                     panic(
@@ -207,6 +208,7 @@ struct DivNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         grad_output: NDBuffer[Self.dtype],
         x: NDBuffer[Self.dtype],
         y: NDBuffer[Self.dtype],
+        sync: Bool = True,
     ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         """Fused backward for x / y. Returns (grad_x, grad_y).
         Device-aware: GPU → DivisionKernel.launch_divide_backward.
@@ -219,7 +221,7 @@ struct DivNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                 try:
                     (result_x, result_y) = DivisionKernel[
                         Self.dtype
-                    ].launch_divide_backward(grad_output, x, y)
+                    ].launch_divide_backward(grad_output, x, y, sync=sync)
                 except e:
                     print(e)
                     panic("DivNdBuffer divide_backward → GPU operation failed")

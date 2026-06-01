@@ -115,6 +115,7 @@ struct ArgMinMaxGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         out_shape: Shape,
         total_output: Int,
         reduced_volume: Int,
+        sync: Bool = True,
     ) raises -> NDBuffer[DType.int32]:
         ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
@@ -148,7 +149,7 @@ struct ArgMinMaxGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var out_state = DeviceState[DType.int32](out_device_buf^, gpu)
         return NDBuffer[DType.int32].with_device_state(out_state^, out_shape)

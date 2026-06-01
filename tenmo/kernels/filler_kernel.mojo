@@ -131,6 +131,7 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         shape: Shape,
         strides: Strides,
         absolute_offset: Int,
+        sync: Bool = True,
     ) raises:
         comptime if has_accelerator():
             ref device_state = target.device_state.value()
@@ -152,7 +153,7 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                     grid_dim=blocks,
                     block_dim=tpb,
                 )
-                ctx.synchronize()
+                if sync: ctx.synchronize()
             else:
                 var index_iterator = IndexIterator(
                     shape=Pointer(to=shape),
@@ -169,6 +170,7 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         shape: Shape,
         strides: Strides,
         absolute_offset: Int,
+        sync: Bool = True,
     ) raises:
         comptime if has_accelerator():
             ref t_state = target.device_state.value()
@@ -197,7 +199,7 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                     grid_dim=blocks,
                     block_dim=tpb,
                 )
-                ctx.synchronize()
+                if sync: ctx.synchronize()
             else:
                 if shape == source.shape:
                     var src_offset = source.offset
@@ -240,6 +242,7 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         indices: IntArray,
         n_indices: Int,
         row_width: Int,
+        sync: Bool = True,
     ) raises:
         comptime if has_accelerator():
             ref t_state = target.device_state.value()
@@ -291,4 +294,4 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                     block_dim=tpb,
                 )
 
-            ctx.synchronize()
+            if sync: ctx.synchronize()

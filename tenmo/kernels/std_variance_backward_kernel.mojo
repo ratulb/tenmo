@@ -297,6 +297,7 @@ struct StdVarianceBackwardKernel[dtype: DType](
         x: NDBuffer[Self.dtype],
         mean: NDBuffer[Self.dtype],
         scale: Scalar[Self.dtype],
+        sync: Bool = True,
     ) raises -> NDBuffer[Self.dtype]:
         """Launch fused variance backward normalize kernel.
 
@@ -361,7 +362,7 @@ struct StdVarianceBackwardKernel[dtype: DType](
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var out_state = DeviceState[Self.dtype](out_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(out_state^, out_shape)
@@ -371,6 +372,7 @@ struct StdVarianceBackwardKernel[dtype: DType](
         x: NDBuffer[Self.dtype],
         mean: NDBuffer[Self.dtype],
         denom: NDBuffer[Self.dtype],
+        sync: Bool = True,
     ) raises -> NDBuffer[Self.dtype]:
         """Launch fused std backward normalize kernel.
 
@@ -435,7 +437,7 @@ struct StdVarianceBackwardKernel[dtype: DType](
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var out_state = DeviceState[Self.dtype](out_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(out_state^, out_shape)

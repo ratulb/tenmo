@@ -115,6 +115,7 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
         grad_output: NDBuffer[Self.dtype],
         divisor: NDBuffer[Self.dtype],
         scalar: Scalar[Self.dtype],
+        sync: Bool = True,
     ) raises -> NDBuffer[Self.dtype]:
         """Fused rdiv_scalar_backward GPU kernel. Returns gradient for divisor.
         """
@@ -162,7 +163,7 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         # var result_state = DeviceState[Self.dtype].__init__[True](
         var result_state = DeviceState[Self.dtype](
@@ -180,6 +181,7 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
         grad_output: NDBuffer[Self.dtype],
         x: NDBuffer[Self.dtype],
         y: NDBuffer[Self.dtype],
+        sync: Bool = True,
     ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         """Fused divide_backward GPU kernel. Returns (grad_x, grad_y).
 
@@ -242,7 +244,7 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var grad_x_state = DeviceState[Self.dtype](
             grad_x_buffer^, device_state.gpu

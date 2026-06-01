@@ -23,6 +23,7 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         A: NDBuffer[Self.dtype],
         axis: Int,
         keepdims: Bool = False,
+        sync: Bool = True,
     ) raises -> NDBuffer[DType.int32]:
         var shape = A.shape
         var rank = shape.rank()
@@ -51,7 +52,7 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             if A.is_on_gpu():
                 return ArgMinMaxGpu[Self.dtype]._gpu_reduce[
                     is_max, max_block_size
-                ](A, ax, keepdims, out_shape, total_output, reduced_volume)
+                ](A, ax, keepdims, out_shape, total_output, reduced_volume, sync=sync)
 
         return Self._cpu_reduce[is_max](A, ax, keepdims, out_shape)
 

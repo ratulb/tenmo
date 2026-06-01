@@ -87,6 +87,7 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
     ](
         M: NDBuffer[Self.dtype],
         v: NDBuffer[Self.dtype],
+        sync: Bool = True,
     ) raises -> NDBuffer[
         Self.dtype
     ]:
@@ -161,7 +162,7 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
             block_dim=block_size,
         )
 
-        device_context.synchronize()
+        if sync: device_context.synchronize()
 
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
         var out = NDBuffer[Self.dtype].with_device_state(

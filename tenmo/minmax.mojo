@@ -99,6 +99,7 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         axes: IntArray,
         keepdims: Bool = False,
         paired: Bool = False,
+        sync: Bool = True,
     ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         ref shape = ndb.shape
         var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
@@ -108,7 +109,7 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 try:
                     var (result_ndb, mask_ndb) = ReductionMinMax[
                         Self.dtype
-                    ].launch[is_max=is_max](ndb, normalized_axes, keepdims)
+                    ].launch[is_max=is_max](ndb, normalized_axes, keepdims, sync=sync)
                     return result_ndb, mask_ndb
                 except e:
                     print(e)
