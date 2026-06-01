@@ -1,10 +1,10 @@
 from std.gpu import thread_idx, block_dim, grid_dim, block_idx
 from std.sys import simd_width_of
 
-from .tensor import Tensor
-from .common_utils import panic
-from .shapes import Shape
-from .mnemonics import (
+from tenmo.tensor import Tensor
+from tenmo.common_utils import panic
+from tenmo.shapes import Shape
+from tenmo.mnemonics import (
     Multiply,
     Add,
     Subtract,
@@ -14,8 +14,8 @@ from .mnemonics import (
     MIN,
     POW,
 )
-from .device import DeviceState
-from .ndbuffer import NDBuffer
+from tenmo.device import DeviceState
+from tenmo.ndbuffer import NDBuffer
 
 # Kernel template for various arithmetic ops involving ND Tensor and a single scalar
 # Simplification - views becomes contiguous when copied to device and offset becomes 0

@@ -4,7 +4,7 @@ from std.atomic import Atomic, Ordering
 from std.memory import AddressSpace, stack_allocation
 from std.utils.numerics import isnan, isinf
 
-from .mnemonics import (
+from tenmo.mnemonics import (
     Equal,
     NotEqual,
     LessThan,
@@ -12,8 +12,8 @@ from .mnemonics import (
     GreaterThan,
     GreaterThanEqual,
 )
-from .device import DeviceState
-from .ndbuffer import NDBuffer
+from tenmo.device import DeviceState
+from tenmo.ndbuffer import NDBuffer
 
 
 def atomic_and[

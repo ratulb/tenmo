@@ -1,13 +1,13 @@
 from std.gpu import thread_idx, block_idx, block_dim, barrier
 from std.memory import AddressSpace, stack_allocation
 
-from .array import Array
-from .device import DeviceState
-from .ndbuffer import NDBuffer
-from .intarray import IntArray
-from .mnemonics import max_rank
-from .strides import Strides
-from .broadcasthelper import ShapeBroadcaster
+from tenmo.array import Array
+from tenmo.device import DeviceState
+from tenmo.ndbuffer import NDBuffer
+from tenmo.intarray import IntArray
+from tenmo.mnemonics import max_rank
+from tenmo.strides import Strides
+from tenmo.broadcasthelper import ShapeBroadcaster
 
 
 def vector_matmul_nd[

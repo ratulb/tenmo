@@ -10,7 +10,7 @@ from .buffers import Buffer
 from .device import DeviceState
 from .shapes import Shape
 from .welford import Welford
-from .std_variance_backward_kernel import StdVarianceBackwardKernel
+from tenmo.kernels.std_variance_backward_kernel import StdVarianceBackwardKernel
 from std.sys.info import has_accelerator
 
 

@@ -12,7 +12,7 @@ from .tensor import Tensor
 from .validators import Validator
 from .ancestry import Ancestor
 from .minmax import MinMax
-from .reduction_kernel import Reduction
+from tenmo.kernels.reduction_kernel import Reduction
 from .sum_mean_reduction import SumMeanReduction
 from .common_utils import Epsilon
 from std.sys import has_accelerator
@@ -35,7 +35,9 @@ struct SoftmaxNdBuffer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var (_, stable_exp) = SoftmaxNdBuffer._softmax_components(
             ndb, normalized_axes
         )
-        var exp_sum = SumMeanReduction[Self.dtype].sum(stable_exp, normalized_axes, keepdims=True)
+        var exp_sum = SumMeanReduction[Self.dtype].sum(
+            stable_exp, normalized_axes, keepdims=True
+        )
         return stable_exp / exp_sum
 
     @staticmethod
@@ -53,7 +55,9 @@ struct SoftmaxNdBuffer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 except e:
                     print(e)
                     panic("SoftmaxNdBuffer.log_sum - GPU operation failed")
-        return SoftmaxNdBuffer[Self.dtype]._log_sum_cpu(ndb, normalized_axes, keepdims)
+        return SoftmaxNdBuffer[Self.dtype]._log_sum_cpu(
+            ndb, normalized_axes, keepdims
+        )
 
     @staticmethod
     def _log_sum_cpu(
@@ -91,7 +95,9 @@ struct SoftmaxNdBuffer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ndb: NDBuffer[Self.dtype],
         axes: IntArray,
         validated: Bool = False,
-    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]] where Self.dtype.is_floating_point():
+    ) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ] where Self.dtype.is_floating_point():
         var normalized_axes = (
             axes if validated else Validator.validate_and_normalize_axes(
                 ndb.shape, axes
@@ -103,14 +109,18 @@ struct SoftmaxNdBuffer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var log_sum_exp = SoftmaxNdBuffer[Self.dtype].log_sum(
             stable, normalized_axes, keepdims=True
         )
-        var exp_sum = SumMeanReduction[Self.dtype].sum(stable_exp, normalized_axes, keepdims=True)
+        var exp_sum = SumMeanReduction[Self.dtype].sum(
+            stable_exp, normalized_axes, keepdims=True
+        )
         return stable - log_sum_exp, stable_exp / exp_sum
 
     @staticmethod
     def _softmax_components(
         ndb: NDBuffer[Self.dtype],
         normalized_axes: IntArray,
-    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]] where Self.dtype.is_floating_point():
+    ) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ] where Self.dtype.is_floating_point():
         var (max_values, _) = MinMax[Self.dtype].minmax[is_max=True](
             ndb, normalized_axes, keepdims=True
         )
@@ -143,13 +153,17 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
 
         comptime if Self.is_log:
             # g - softmax(x) * sum(g, axes, keepdims=True)
-            var sum_grad = SumMeanReduction[Self.dtype].sum(gradbox.buffer, axes, keepdims=True)
+            var sum_grad = SumMeanReduction[Self.dtype].sum(
+                gradbox.buffer, axes, keepdims=True
+            )
             var softmax_sum = softmax_out * sum_grad
             local_grad_ndb = gradbox.buffer - softmax_sum
         else:
             # y * (g - sum(g * y, axes, keepdims=True))
             var gy = gradbox.buffer * softmax_out
-            var gy_sum = SumMeanReduction[Self.dtype].sum(gy, axes, keepdims=True)
+            var gy_sum = SumMeanReduction[Self.dtype].sum(
+                gy, axes, keepdims=True
+            )
             var grad_diff = gradbox.buffer - gy_sum
             local_grad_ndb = softmax_out * grad_diff
 
@@ -175,7 +189,9 @@ struct Softmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # Normalize axes
         var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
 
-        var ndb = SoftmaxNdBuffer[Self.dtype].softmax(this.buffer, normalized_axes, validated=True)
+        var ndb = SoftmaxNdBuffer[Self.dtype].softmax(
+            this.buffer, normalized_axes, validated=True
+        )
         var out = Tensor[Self.dtype](ndb, requires_grad=False)
 
         comptime if track_grad:
@@ -212,7 +228,9 @@ struct LogSoftmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # Normalize axes
         var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
 
-        var (ndb, softmax_vals) = SoftmaxNdBuffer[Self.dtype].log_softmax(this.buffer, normalized_axes, validated=True)
+        var (ndb, softmax_vals) = SoftmaxNdBuffer[Self.dtype].log_softmax(
+            this.buffer, normalized_axes, validated=True
+        )
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         comptime if track_grad:

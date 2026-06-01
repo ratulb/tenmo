@@ -40,7 +40,7 @@
 
 from .intarray import IntArray
 from .mnemonics import AddTensor
-from .reduction_kernel import ProductArg, Reduction
+from tenmo.kernels.reduction_kernel import ProductArg, Reduction
 from .backpropagation import BackwardFnArg, BACKWARD_PRODUCT
 from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
@@ -260,9 +260,7 @@ struct Product[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     arg = result[1]
                 except e:
                     print(e)
-                    panic(
-                        "Product.product — GPU operation failed: ", String(e)
-                    )
+                    panic("Product.product — GPU operation failed: ", String(e))
                     out = NDBuffer[Self.dtype].Empty()
                     arg = ProductArg[Self.dtype].Empty()
             else:

@@ -12,5 +12,6 @@ if [ ! -f "$TARGET_FILE" ]; then
     exit 1
 fi
 
-# Run mojo
-mojo -I . "$TARGET_FILE"
+# Run mojo with all args
+shift
+mojo -I . "$TARGET_FILE" "$@"

@@ -29,12 +29,12 @@ from std.gpu import thread_idx, block_dim, grid_dim, block_idx
 from std.sys import simd_width_of
 from std.math import rsqrt
 
-from .ndbuffer import NDBuffer
-from .buffers import Buffer
-from .device import DeviceState
-from .common_utils import panic
-from .shapes import Shape
-from .array import Array
+from tenmo.ndbuffer import NDBuffer
+from tenmo.buffers import Buffer
+from tenmo.device import DeviceState
+from tenmo.common_utils import panic
+from tenmo.shapes import Shape
+from tenmo.array import Array
 
 
 def layernorm_normalize[

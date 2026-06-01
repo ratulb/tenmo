@@ -105,57 +105,17 @@ from std.memory import AddressSpace, stack_allocation
 from std.sys import simd_width_of, has_accelerator
 from std.math import log, exp, abs, max, round
 
-from .ndbuffer import NDBuffer
-from .device import DeviceState
-from .common_utils import panic, Epsilon
-from .shapes import Shape
-from .buffers import Buffer
-from .mnemonics import SUM, MEAN, PRODUCT
-from .backpropagation import ArgumentType
-from .array import Array
-from .intarray import IntArray
+from tenmo.ndbuffer import NDBuffer
+from tenmo.device import DeviceState
+from tenmo.common_utils import panic, Epsilon
+from tenmo.shapes import Shape
+from tenmo.buffers import Buffer
+from tenmo.mnemonics import SUM, MEAN, PRODUCT
+from tenmo.backpropagation import ArgumentType
+from tenmo.array import Array
+from tenmo.intarray import IntArray
 
-# =============================================================================
-# SECTION 1 — Shared index helpers
-# =============================================================================
-
-
-def output_to_input_base(
-    out_idx: Int,
-    in_shape: Array,
-    in_strides: Array,
-    reduction_axes: Array,
-) -> Int:
-    var remaining = out_idx
-    var input_base = 0
-
-    if len(reduction_axes) == 0:
-        return 0
-
-    for k in reversed(range(len(in_shape))):
-        if k not in reduction_axes:
-            var coord = remaining % in_shape[k]
-            remaining //= in_shape[k]
-            input_base += coord * in_strides[k]
-
-    return input_base
-
-
-def rank_to_reduced_offset(
-    rank: Int, in_shape: Array, in_strides: Array, reduction_axes: Array
-) -> Int:
-    var tmp = rank
-    var offset = 0
-    var reduce_all = len(reduction_axes) == 0
-
-    for k in reversed(range(len(in_shape))):
-        if reduce_all or k in reduction_axes:
-            var coord = tmp % in_shape[k]
-            tmp //= in_shape[k]
-            offset += coord * in_strides[k]
-
-    return offset
-
+from . import output_to_input_base, rank_to_reduced_offset
 
 # =============================================================================
 # SECTION 2 — reduce kernel: SUM and MEAN

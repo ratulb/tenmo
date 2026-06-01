@@ -36,7 +36,7 @@ from .buffers import Buffer
 from .mnemonics import LAYER_NORM, AddTensor
 from .device import GPU
 from .common_utils import panic
-from .layernorm_kernel import LayerNormKernel
+from tenmo.kernels.layernorm_kernel import LayerNormKernel
 from tenmo.intarray import IntArray
 from .named_parameter import NamedParameter
 from .welford import Welford
@@ -258,7 +258,10 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # ── Pass 1: Welford — mean + var in single pass ──────────────────
         var (mean_ndb, var_ndb) = Welford[Self.dtype].forward(
-            self.buffer, IntArray(self.rank() - 1), unbiased=False, keepdims=True
+            self.buffer,
+            IntArray(self.rank() - 1),
+            unbiased=False,
+            keepdims=True,
         )
 
         # ── Pass 2: fused normalize — rstd + x_hat + out in single pass ──

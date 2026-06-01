@@ -11,7 +11,7 @@ from .ndbuffer import NDBuffer
 from .buffers import Buffer
 from .named_parameter import NamedParameter
 from .net import Module, Layer
-from .dropout_kernel import DropoutKernel
+from tenmo.kernels.dropout_kernel import DropoutKernel
 from .ancestry import Ancestor
 
 # =============================================================================

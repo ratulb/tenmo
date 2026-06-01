@@ -15,16 +15,15 @@ from std.sys.info import num_physical_cores
 from tenmo.device import Device, CPU, GPU, DeviceState
 from std.collections import Set
 from std.sys import simd_width_of, has_accelerator
-from tenmo.scalar_ops_kernel import ScalarOperations
-from tenmo.scalar_inplace_ops_kernel import InplaceScalarOperations
-from tenmo.binary_ops_kernel import BinaryOperations
-from tenmo.binary_inplace_ops_kernel import BinaryInplaceOperations
-from tenmo.unary_ops_kernel import UnaryOpsKernel
-from tenmo.matmul_kernel import MatmulNdGpu
+from tenmo.kernels.scalar_ops_kernel import ScalarOperations
+from tenmo.kernels.scalar_inplace_ops_kernel import InplaceScalarOperations
+from tenmo.kernels.binary_ops_kernel import BinaryOperations
+from tenmo.kernels.binary_inplace_ops_kernel import BinaryInplaceOperations
+from tenmo.kernels.unary_ops_kernel import UnaryOpsKernel
+from tenmo.kernels.matmul_kernel import MatmulNdGpu
 from tenmo.cpu_broadcast import CpuBroadcast
 from tenmo.shared.scalar_ops import ScalarOps
-from tenmo.compare_kernel import AllClose, Compare, CompareScalar
-from tenmo.reduction_kernel import Reduction
+from tenmo.kernels.compare_kernel import AllClose, Compare, CompareScalar
 
 from std.math import sqrt, log, exp, tanh
 from tenmo.mnemonics import (
@@ -516,6 +515,18 @@ struct NDBuffer[dtype: DType](
         )
         self.set(index, value)
 
+    def __getitem__(self, *indices: Int) -> Scalar[Self.dtype]:
+        index = IndexCalculator.flatten_index(
+            self.shape, IntArray(indices), self.strides, self.offset
+        )
+        return self.get(index)
+
+    def __setitem__(self, *indices: Int, value: Scalar[Self.dtype]):
+        index = IndexCalculator.flatten_index(
+            self.shape, IntArray(indices), self.strides, self.offset
+        )
+        self.set(index, value)
+
     def __getitem__(self, indices: VariadicList[Int, _]) -> Scalar[Self.dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, IntArray(indices), self.strides, self.offset
@@ -709,7 +720,7 @@ struct NDBuffer[dtype: DType](
         s = String("NDBuffer [")
         s += "Shape: " + String(self.shape)
         s += ", Type: " + String(Self.dtype)
-        s += ", Shared : " + String(self.shared())
+        s += ", Shared : " + String(self.is_shared())
         s += ", Strides : " + String(self.strides)
         s += ", Offset : " + String(self.offset)
         s += ", Contiguous : " + String(self.is_contiguous())
@@ -866,7 +877,7 @@ struct NDBuffer[dtype: DType](
         self.inplace_ops[Divide](other)
 
     @always_inline
-    def shared(self) -> Bool:
+    def is_shared(self) -> Bool:
         """Check if underlying buffer is shared."""
         comptime if has_accelerator():
             if self.is_on_gpu():
@@ -909,7 +920,7 @@ struct NDBuffer[dtype: DType](
                 + String(offset)
             )
         # Enable ref counting on CPU only
-        if self.is_on_cpu() and size > 0 and not self.shared():
+        if self.is_on_cpu() and size > 0 and not self.is_shared():
             self.buffer.shared()
 
         var ndb = NDBuffer[Self.dtype](
@@ -1145,7 +1156,7 @@ struct NDBuffer[dtype: DType](
         # CPU path — unchanged
         if (
             self.is_contiguous()
-            and not self.shared()
+            and not self.is_shared()
             and target_shape == self.shape
         ):
             return self
@@ -1460,7 +1471,7 @@ struct NDBuffer[dtype: DType](
         # CPU contiguous fast path
         var uniques = Set[Scalar[Self.dtype]]()
         if self.is_contiguous():
-            if not self.shared():
+            if not self.is_shared():
                 for i in range(self.numels()):
                     uniques.add(self.buffer[i])
             else:
@@ -2319,7 +2330,9 @@ struct NDBuffer[dtype: DType](
 
                 var other_val = other.buffer[next_index]
 
-                buffer[index] = ScalarOps[Self.dtype].compare_pair[op_code](self_val, other_val)
+                buffer[index] = ScalarOps[Self.dtype].compare_pair[op_code](
+                    self_val, other_val
+                )
 
                 index += 1
 
@@ -2371,7 +2384,9 @@ struct NDBuffer[dtype: DType](
             for idx in self.index_iterator():
                 var value = self.buffer[idx]
 
-                buffer[index] = ScalarOps[Self.dtype].compare_pair[op_code](value, scalar)
+                buffer[index] = ScalarOps[Self.dtype].compare_pair[op_code](
+                    value, scalar
+                )
 
                 index += 1
 
@@ -2510,6 +2525,11 @@ struct NDBuffer[dtype: DType](
     def matmul_2d(
         A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
     ) -> NDBuffer[Self.dtype]:
+        return MmCpu2d[Self.dtype].matmul_2d(A, B)
+
+    def matmul_2d_good(
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+    ) -> NDBuffer[Self.dtype]:
         ref A_shape = A.shape
         ref B_shape = B.shape
         MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
@@ -2617,9 +2637,7 @@ struct NDBuffer[dtype: DType](
                                     var a_ik = A_data[a_addr]
                                     # B is contiguous here (stride1=1), offset preserved
                                     # Full: k * B_stride0 + B_offset + j * B_stride1 → simplified: k * B_stride0 + B_offset + j
-                                    var b_addr = (
-                                        k * B_stride0 + B_offset + j
-                                    )
+                                    var b_addr = k * B_stride0 + B_offset + j
                                     var b_vec = B_data.load[width=simdwidth](
                                         b_addr
                                     )
@@ -2639,9 +2657,7 @@ struct NDBuffer[dtype: DType](
                                 for k in range(k_tile, k_end):
                                     var a_addr = a_row_base + k * A_stride1
                                     # B is contiguous (stride1=1) — same simplification as above
-                                    var b_addr = (
-                                        k * B_stride0 + B_offset + j
-                                    )
+                                    var b_addr = k * B_stride0 + B_offset + j
                                     accumulator += (
                                         A_data[a_addr] * B_data[b_addr]
                                     )
@@ -2930,5 +2946,546 @@ struct NDBuffer[dtype: DType](
                         C_data[c_row_base + j] = accumulator
 
         parallelize[process_tile](total_tiles, num_physical_cores())
+
+        return C^
+
+
+from std.sys import prefetch, PrefetchOptions
+from std import math
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Tuning constants
+#
+#  PREFETCH_POLICY : 0 = Off (no prefetch instructions emitted),
+#                    1 = Conservative (light prefetch, capped at 32 lines),
+#                    2 = Aggressive (full prefetch, up to 128 lines)
+#
+#  GPU_TILE_SIZE : tile dimension for the GPU kernel (separate from CPU tiles)
+#
+#  CPU tiles — three independent dimensions:
+#    TILE_M : rows of A/C per parallel chunk → sized to fit A-rows in L2
+#    TILE_N : shared k-dimension strip       → sized to fit A k-strip in L1
+#    TILE_P : columns of B/C per j-tile      → wide enough to saturate SIMD
+#
+#  UNROLL     : number of SIMD accumulators per j-strip inside the hot loop.
+#               float32 with simdwidth=8 and UNROLL=4 → 32 columns per iter.
+#               More unroll = better FMA pipeline utilisation, but more
+#               register pressure. 4 is a good balance for most CPUs.
+# ─────────────────────────────────────────────────────────────────────────────
+comptime PREFETCH_POLICY = 0  # 0=Off, 1=Conservative, 2=Aggressive
+comptime prefetch_opts = PrefetchOptions().for_read().high_locality().to_data_cache()
+comptime MAX_PREFETCH_LINES = 32 if PREFETCH_POLICY <= 1 else 128
+comptime GPU_TILE_SIZE = 32  # GPU kernel tile — separate concern from CPU
+comptime UNROLL = 4  # SIMD accumulators per j-strip
+
+
+struct MmCpu2d[
+    dtype: DType, TILE_M: Int = 32, TILE_N: Int = 32, TILE_P: Int = 32
+]:
+    # ─────────────────────────────────────────────────────────────────────────
+    #  matmul_2d
+    #
+    #  Entry point. Dispatches to GPU or CPU path at runtime, with the
+    #  GPU branch compiled away entirely (comptime if) when no accelerator
+    #  is present — zero overhead on CPU-only builds.
+    #
+    #  CPU tile config selected at runtime by matrix size:
+    #    Tiny   (32,32,32) — m,n,p ≤ 32          → one-tile, no boundary waste
+    #    Medium (64,64,128) — up to ~128×256     → fits L1/L2 well
+    #    Large  (128,64,256) — big matrices       → fewer tile-boundary iters
+    # ─────────────────────────────────────────────────────────────────────────
+    @staticmethod
+    def matmul_2d(
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+    ) -> NDBuffer[Self.dtype]:
+        ref A_shape = A.shape
+        ref B_shape = B.shape
+        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
+
+        var C: NDBuffer[Self.dtype]
+
+        comptime if has_accelerator():
+            if A.is_on_gpu() and B.is_on_gpu():
+                try:
+                    C = MatmulNdGpu[Self.dtype].launch[tile_size=GPU_TILE_SIZE](
+                        A, B
+                    )
+                except e:
+                    print(e)
+                    panic("NDBuffer matmul_2d → GPU operation failed")
+                    C = NDBuffer[Self.dtype](
+                        Shape()
+                    )  # unreachable; satisfies compiler
+            elif (A.is_on_gpu() and B.is_on_cpu()) or (
+                A.is_on_cpu() and B.is_on_gpu()
+            ):
+                panic(
+                    (
+                        "NDBuffer matmul_2d → both buffers must be on same"
+                        " device. A on gpu? "
+                    ),
+                    String(A.is_on_gpu()),
+                    ", B on gpu? ",
+                    String(B.is_on_gpu()),
+                )
+                C = NDBuffer[Self.dtype](Shape())  # unreachable
+            else:
+                C = MmCpu2d[Self.dtype].pick_cpu(A, B)
+        else:
+            C = MmCpu2d[Self.dtype].pick_cpu(A, B)
+
+        return C^
+
+    @staticmethod
+    def pick_cpu(
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+    ) -> NDBuffer[Self.dtype]:
+        ref A_shape = A.shape
+        var m = A_shape[0]
+        var n = A_shape[1]
+        # var p = B.shape[1]
+        if m > 256 and n > 128:
+            return MmCpu2d[Self.dtype, 64, 64, 128].matmul_2d_cpu(A, B)
+        else:
+            return MmCpu2d[Self.dtype, 32, 32, 32].matmul_2d_cpu(A, B)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    #  matmul_2d_cpu
+    #
+    #  High-performance CPU matmul: C = A @ B
+    #    A : (m, n)
+    #    B : (n, p)
+    #    C : (m, p)  — freshly allocated, zero-initialised
+    #
+    #  Two top-level paths selected at runtime:
+    #    1. B contiguous  → tiled + parallelised + SIMD + FMA + prefetch
+    #                       further sub-divided by whether A is contiguous
+    #                       (eliminates the last stride multiply in hot loop)
+    #    2. B non-contig  → tiled + parallelised scalar
+    #                       (SIMD requires contiguous memory; falls back to
+    #                        scalar but still tiles k and parallelises rows)
+    #
+    #  Prefetch governed by comptime PREFETCH_POLICY (0=Off, 1=Conservative,
+    #  2=Aggressive). When Off no prefetch instructions are emitted.
+    #
+    #  FIX vs previous version:
+    #    - a_also_contiguous runtime branch removed from innermost k loop;
+    #      the two A-contiguity cases are now separate @parameter fns so
+    #      the compiler sees each as a straight-line hot path.
+    #    - Prefetch governed by comptime PREFETCH_POLICY.
+    #    - Non-contiguous path now tiles the k dimension for cache locality.
+    # ─────────────────────────────────────────────────────────────────────────
+    @staticmethod
+    def matmul_2d_cpu(
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+    ) -> NDBuffer[Self.dtype]:
+        ref A_shape = A.shape
+        ref B_shape = B.shape
+        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
+
+        comptime simdwidth = simd_width_of[Self.dtype]()
+        comptime simd_unroll = simdwidth * UNROLL
+
+        var m = A_shape[0]
+        var n = A_shape[1]
+        var p = B_shape[1]
+
+        var C = NDBuffer[Self.dtype].zeros(Shape([m, p]))
+
+        # ── Hoist all pointer and stride metadata ────────────────────────────
+        ref A_strides = A.strides
+        var A_stride0 = A_strides[0]
+        var A_stride1 = A_strides[1]
+        var A_offset = A.offset
+        var A_data = A.data_ptr()
+
+        ref B_strides = B.strides
+        var B_stride0 = B_strides[0]
+        var B_stride1 = B_strides[1]
+        var B_offset = B.offset
+        var B_data = B.data_ptr()
+
+        var C_data = C.data_ptr()
+        # C is freshly allocated and always contiguous:
+        #   C_stride0 = p, C_stride1 = 1  (inlined as literals below)
+
+        if B.is_contiguous():
+            # ════════════════════════════════════════════════════════════════
+            #  CONTIGUOUS B PATH
+            #
+            #  B_stride1 = 1 → "+ j" replaces "+ j * B_stride1" everywhere.
+            #
+            #  We further split on whether A is also contiguous.
+            #  When A is contiguous, A_stride1 = 1 → "+ k" replaces
+            #  "+ k * A_stride1" in the innermost loop — one fewer multiply
+            #  per FMA, which matters at high iteration counts.
+            #
+            #  The two cases are expressed as separate @parameter closures
+            #  so the compiler generates two distinct hot paths with no
+            #  runtime branches inside the k loop.
+            # ════════════════════════════════════════════════════════════════
+            var num_tiles_i = (m + Self.TILE_M - 1) // Self.TILE_M
+
+            if A.is_contiguous():
+                # ── A contiguous, B contiguous ─────────────────────────────
+                # Both strides are 1 in the innermost dimension.
+                # a_addr = a_row_base + k   (no multiply)
+                # b_base = k * B_stride0 + B_offset + j   (B_stride0 = p)
+                @parameter
+                def process_contig_contig(tile_idx: Int):
+                    var i_start = tile_idx * Self.TILE_M
+                    var i_end = min(i_start + Self.TILE_M, m)
+
+                    for k_tile in range(0, n, Self.TILE_N):
+                        var k_end = min(k_tile + Self.TILE_N, n)
+
+                        comptime if PREFETCH_POLICY != 0:
+                            # ── Prefetch next k-tile of B (capped) ────────────
+                            var next_k = k_tile + Self.TILE_N
+                            if next_k < n:
+                                var next_k_end = min(next_k + Self.TILE_N, n)
+
+                        for j_tile in range(0, p, Self.TILE_P):
+                            var j_end = min(j_tile + Self.TILE_P, p)
+
+                            for i in range(i_start, i_end):
+                                var a_row_base = i * A_stride0 + A_offset
+                                var c_row_base = i * p
+                                var j = j_tile
+
+                                # ── Unrolled SIMD (4 accumulators) ────────
+                                while j + simd_unroll <= j_end:
+                                    var cj = c_row_base + j
+
+                                    var acc0: SIMD[Self.dtype, simdwidth]
+                                    var acc1: SIMD[Self.dtype, simdwidth]
+                                    var acc2: SIMD[Self.dtype, simdwidth]
+                                    var acc3: SIMD[Self.dtype, simdwidth]
+
+                                    if k_tile == 0:
+                                        acc0 = SIMD[Self.dtype, simdwidth](0)
+                                        acc1 = SIMD[Self.dtype, simdwidth](0)
+                                        acc2 = SIMD[Self.dtype, simdwidth](0)
+                                        acc3 = SIMD[Self.dtype, simdwidth](0)
+                                    else:
+                                        acc0 = C_data.load[width=simdwidth](cj)
+                                        acc1 = C_data.load[width=simdwidth](
+                                            cj + simdwidth
+                                        )
+                                        acc2 = C_data.load[width=simdwidth](
+                                            cj + simdwidth * 2
+                                        )
+                                        acc3 = C_data.load[width=simdwidth](
+                                            cj + simdwidth * 3
+                                        )
+
+                                    for k in range(k_tile, k_end):
+                                        # A contiguous: no multiply for a_addr
+                                        var a_ik = SIMD[Self.dtype, simdwidth](
+                                            A_data[a_row_base + k]
+                                        )
+                                        var b_base = (
+                                            k * B_stride0 + B_offset + j
+                                        )
+                                        acc0 = math.fma(
+                                            a_ik,
+                                            B_data.load[width=simdwidth](
+                                                b_base
+                                            ),
+                                            acc0,
+                                        )
+                                        acc1 = math.fma(
+                                            a_ik,
+                                            B_data.load[width=simdwidth](
+                                                b_base + simdwidth
+                                            ),
+                                            acc1,
+                                        )
+                                        acc2 = math.fma(
+                                            a_ik,
+                                            B_data.load[width=simdwidth](
+                                                b_base + simdwidth * 2
+                                            ),
+                                            acc2,
+                                        )
+                                        acc3 = math.fma(
+                                            a_ik,
+                                            B_data.load[width=simdwidth](
+                                                b_base + simdwidth * 3
+                                            ),
+                                            acc3,
+                                        )
+
+                                    C_data.store[width=simdwidth](cj, acc0)
+                                    C_data.store[width=simdwidth](
+                                        cj + simdwidth, acc1
+                                    )
+                                    C_data.store[width=simdwidth](
+                                        cj + simdwidth * 2, acc2
+                                    )
+                                    C_data.store[width=simdwidth](
+                                        cj + simdwidth * 3, acc3
+                                    )
+                                    j += simd_unroll
+
+                                # ── Single-vector SIMD tail ────────────────
+                                while j + simdwidth <= j_end:
+                                    var c_addr = c_row_base + j
+                                    var acc: SIMD[Self.dtype, simdwidth]
+                                    if k_tile == 0:
+                                        acc = SIMD[Self.dtype, simdwidth](0)
+                                    else:
+                                        acc = C_data.load[width=simdwidth](
+                                            c_addr
+                                        )
+                                    for k in range(k_tile, k_end):
+                                        var a_ik = SIMD[Self.dtype, simdwidth](
+                                            A_data[a_row_base + k]
+                                        )
+                                        var b_base = (
+                                            k * B_stride0 + B_offset + j
+                                        )
+                                        acc = math.fma(
+                                            a_ik,
+                                            B_data.load[width=simdwidth](
+                                                b_base
+                                            ),
+                                            acc,
+                                        )
+                                    C_data.store[width=simdwidth](c_addr, acc)
+                                    j += simdwidth
+
+                                # ── Scalar tail ───────────────────────────
+                                while j < j_end:
+                                    var c_addr = c_row_base + j
+                                    var acc: Scalar[Self.dtype]
+                                    if k_tile == 0:
+                                        acc = 0
+                                    else:
+                                        acc = C_data[c_addr]
+                                    for k in range(k_tile, k_end):
+                                        var b_addr = (
+                                            k * B_stride0 + B_offset + j
+                                        )
+                                        acc += (
+                                            A_data[a_row_base + k]
+                                            * B_data[b_addr]
+                                        )
+                                    C_data[c_addr] = acc
+                                    j += 1
+
+                parallelize[process_contig_contig](
+                    num_tiles_i, num_physical_cores()
+                )
+
+            else:
+                # ── A non-contiguous, B contiguous ─────────────────────────
+                # A_stride1 != 1 → a_addr = a_row_base + k * A_stride1
+                # B_stride1 = 1  → b_base = k * B_stride0 + B_offset + j
+                @parameter
+                def process_noncontig_contig(tile_idx: Int):
+                    var i_start = tile_idx * Self.TILE_M
+                    var i_end = min(i_start + Self.TILE_M, m)
+
+                    for k_tile in range(0, n, Self.TILE_N):
+                        var k_end = min(k_tile + Self.TILE_N, n)
+
+                        comptime if PREFETCH_POLICY != 0:
+                            # ── Prefetch next k-tile of B (capped) ────────────
+                            var next_k = k_tile + Self.TILE_N
+                            if next_k < n:
+                                var next_k_end = min(next_k + Self.TILE_N, n)
+                                var lines_issued = 0
+                                for k_pre in range(next_k, next_k_end):
+                                    if lines_issued >= MAX_PREFETCH_LINES:
+                                        break
+                                    var row_base = k_pre * B_stride0 + B_offset
+                                    var cl = 0
+                                    while (
+                                        cl < p
+                                        and lines_issued < MAX_PREFETCH_LINES
+                                    ):
+                                        prefetch[prefetch_opts](
+                                            B_data + row_base + cl
+                                        )
+                                        cl += 16
+                                        lines_issued += 1
+
+                        for j_tile in range(0, p, Self.TILE_P):
+                            var j_end = min(j_tile + Self.TILE_P, p)
+
+                            for i in range(i_start, i_end):
+                                var a_row_base = i * A_stride0 + A_offset
+                                var c_row_base = i * p
+                                var j = j_tile
+
+                                # ── Unrolled SIMD (4 accumulators) ────────
+                                while j + simd_unroll <= j_end:
+                                    var cj = c_row_base + j
+
+                                    var acc0: SIMD[Self.dtype, simdwidth]
+                                    var acc1: SIMD[Self.dtype, simdwidth]
+                                    var acc2: SIMD[Self.dtype, simdwidth]
+                                    var acc3: SIMD[Self.dtype, simdwidth]
+
+                                    if k_tile == 0:
+                                        acc0 = SIMD[Self.dtype, simdwidth](0)
+                                        acc1 = SIMD[Self.dtype, simdwidth](0)
+                                        acc2 = SIMD[Self.dtype, simdwidth](0)
+                                        acc3 = SIMD[Self.dtype, simdwidth](0)
+                                    else:
+                                        acc0 = C_data.load[width=simdwidth](cj)
+                                        acc1 = C_data.load[width=simdwidth](
+                                            cj + simdwidth
+                                        )
+                                        acc2 = C_data.load[width=simdwidth](
+                                            cj + simdwidth * 2
+                                        )
+                                        acc3 = C_data.load[width=simdwidth](
+                                            cj + simdwidth * 3
+                                        )
+
+                                    for k in range(k_tile, k_end):
+                                        # A non-contiguous: multiply by A_stride1
+                                        var a_ik = SIMD[Self.dtype, simdwidth](
+                                            A_data[a_row_base + k * A_stride1]
+                                        )
+                                        var b_base = (
+                                            k * B_stride0 + B_offset + j
+                                        )
+                                        acc0 = math.fma(
+                                            a_ik,
+                                            B_data.load[width=simdwidth](
+                                                b_base
+                                            ),
+                                            acc0,
+                                        )
+                                        acc1 = math.fma(
+                                            a_ik,
+                                            B_data.load[width=simdwidth](
+                                                b_base + simdwidth
+                                            ),
+                                            acc1,
+                                        )
+                                        acc2 = math.fma(
+                                            a_ik,
+                                            B_data.load[width=simdwidth](
+                                                b_base + simdwidth * 2
+                                            ),
+                                            acc2,
+                                        )
+                                        acc3 = math.fma(
+                                            a_ik,
+                                            B_data.load[width=simdwidth](
+                                                b_base + simdwidth * 3
+                                            ),
+                                            acc3,
+                                        )
+
+                                    C_data.store[width=simdwidth](cj, acc0)
+                                    C_data.store[width=simdwidth](
+                                        cj + simdwidth, acc1
+                                    )
+                                    C_data.store[width=simdwidth](
+                                        cj + simdwidth * 2, acc2
+                                    )
+                                    C_data.store[width=simdwidth](
+                                        cj + simdwidth * 3, acc3
+                                    )
+                                    j += simd_unroll
+
+                                # ── Single-vector SIMD tail ────────────────
+                                while j + simdwidth <= j_end:
+                                    var c_addr = c_row_base + j
+                                    var acc: SIMD[Self.dtype, simdwidth]
+                                    if k_tile == 0:
+                                        acc = SIMD[Self.dtype, simdwidth](0)
+                                    else:
+                                        acc = C_data.load[width=simdwidth](
+                                            c_addr
+                                        )
+                                    for k in range(k_tile, k_end):
+                                        var a_ik = SIMD[Self.dtype, simdwidth](
+                                            A_data[a_row_base + k * A_stride1]
+                                        )
+                                        var b_base = (
+                                            k * B_stride0 + B_offset + j
+                                        )
+                                        acc = math.fma(
+                                            a_ik,
+                                            B_data.load[width=simdwidth](
+                                                b_base
+                                            ),
+                                            acc,
+                                        )
+                                    C_data.store[width=simdwidth](c_addr, acc)
+                                    j += simdwidth
+
+                                # ── Scalar tail ───────────────────────────
+                                while j < j_end:
+                                    var c_addr = c_row_base + j
+                                    var acc: Scalar[Self.dtype]
+                                    if k_tile == 0:
+                                        acc = 0
+                                    else:
+                                        acc = C_data[c_addr]
+                                    for k in range(k_tile, k_end):
+                                        var b_addr = (
+                                            k * B_stride0 + B_offset + j
+                                        )
+                                        acc += (
+                                            A_data[a_row_base + k * A_stride1]
+                                            * B_data[b_addr]
+                                        )
+                                    C_data[c_addr] = acc
+                                    j += 1
+
+                parallelize[process_noncontig_contig](
+                    num_tiles_i, num_physical_cores()
+                )
+
+        else:
+            # ════════════════════════════════════════════════════════════════
+            #  NON-CONTIGUOUS B PATH
+            #
+            #  B has non-unit column stride (e.g. after a transpose or slice).
+            #  SIMD loads require contiguous memory so we fall back to scalar.
+            #
+            #  FIX vs previous version:
+            #    - k dimension is now tiled (TILE_N) for L1 cache locality.
+            #      Previously k ran 0..n without tiling — for large n the
+            #      A k-strip thrashed L1 on every row.
+            #    - Rows are still parallelised over physical cores.
+            #    - B_stride1 is always respected (never collapsed to +j).
+            # ════════════════════════════════════════════════════════════════
+            var num_tiles_i = (m + Self.TILE_M - 1) // Self.TILE_M
+
+            @parameter
+            def process_noncontig_b(tile_idx: Int):
+                var i_start = tile_idx * Self.TILE_M
+                var i_end = min(i_start + Self.TILE_M, m)
+
+                for i in range(i_start, i_end):
+                    var a_row_base = i * A_stride0 + A_offset
+                    var c_row_base = i * p
+
+                    for j in range(p):
+                        var acc: Scalar[Self.dtype] = 0
+
+                        # Tile k for cache locality even on the scalar path.
+                        for k_tile in range(0, n, Self.TILE_N):
+                            var k_end = min(k_tile + Self.TILE_N, n)
+                            for k in range(k_tile, k_end):
+                                var a_addr = a_row_base + k * A_stride1
+                                # B_stride1 != 1 — must multiply
+                                var b_addr = (
+                                    k * B_stride0 + B_offset + j * B_stride1
+                                )
+                                acc += A_data[a_addr] * B_data[b_addr]
+
+                        C_data[c_row_base + j] = acc
+
+            parallelize[process_noncontig_b](num_tiles_i, num_physical_cores())
 
         return C^

@@ -1,297 +1,460 @@
 from tenmo import Tensor, NDBuffer, Shape
 from std.testing import assert_true
-from tenmo.common_utils import s, i
+from tenmo.common_utils import s, i, panic
 from std.sys.defines import get_defined_string
 from tenmo.matrixshapevalidator import MatrixShapeValidator
-from std.sys import has_accelerator
+from std.sys import has_accelerator, simd_width_of
 from std.algorithm import parallelize
 from std.sys.info import num_physical_cores
 from std.sys.intrinsics import PrefetchLocality
 from tenmo.matmul_kernel import MatmulNdGpu
+from std.sys import prefetch, PrefetchOptions
+from std import math
 
 comptime dtype = DType.float32
 
+comptime prefetch_opts = PrefetchOptions().for_read().high_locality().to_data_cache()
 
-def main() raises:
-    _ = """comptime BLAS_PATH = get_defined_string[
-        "BLAS_PATH", "/lib/x86_64-linux-gnu/libopenblas.so.0"
-    ]()
-    print("BLAS_PATH: ", BLAS_PATH)"""
-    pass
-
-
-
-
-# ─────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 #  Tuning constants
-#  Tune these for your hardware if benchmarking shows different
-#  sweet spots. L1 cache line = 64 bytes → 16 float32 values.
-# ─────────────────────────────────────────────────────────────
-comptime TILE_M = 64   # row tile — fits well in L2
-comptime TILE_N = 64   # shared-dim tile
-comptime TILE_P = 128  # col tile — wider for SIMD reuse
-comptime UNROLL = 4    # number of SIMD accumulators per j-strip
-comptime PREFETCH_DIST = 2  # tiles ahead to prefetch
+#
+#  GPU_TILE_SIZE : tile dimension for the GPU kernel (separate from CPU tiles)
+#
+#  CPU tiles — three independent dimensions:
+#    TILE_M : rows of A/C per parallel chunk → sized to fit A-rows in L2
+#    TILE_N : shared k-dimension strip       → sized to fit A k-strip in L1
+#    TILE_P : columns of B/C per j-tile      → wide enough to saturate SIMD
+#
+#  UNROLL     : number of SIMD accumulators per j-strip inside the hot loop.
+#               float32 with simdwidth=8 and UNROLL=4 → 32 columns per iter.
+#               More unroll = better FMA pipeline utilisation, but more
+#               register pressure. 4 is a good balance for most CPUs.
+#
+#  PREFETCH_DIST : kept for documentation; actual prefetch distance is
+#                  controlled by the PrefetchLocality hint, not a scalar.
+# ─────────────────────────────────────────────────────────────────────────────
+comptime GPU_TILE_SIZE = 32  # GPU kernel tile — separate concern from CPU
+comptime TILE_M = 64  # CPU row tile    — fits A rows in L2
+comptime TILE_N = 64  # CPU k-dim tile  — fits A k-strip in L1
+comptime TILE_P = 128  # CPU col tile    — wide for SIMD reuse
+comptime UNROLL = 4  # SIMD accumulators per j-strip
+comptime PREFETCH_DIST = 2  # informational only
 
-def matmul_2d(
-    A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
-) -> NDBuffer[Self.dtype]:
-    ref A_shape = A.shape
-    ref B_shape = B.shape
-    MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
 
-    var C: NDBuffer[Self.dtype]
+struct MM[dtype: DType]:
+    # ─────────────────────────────────────────────────────────────────────────
+    #  matmul_2d
+    #
+    #  Entry point. Dispatches to GPU or CPU path at runtime, with the
+    #  GPU branch compiled away entirely (comptime if) when no accelerator
+    #  is present — zero overhead on CPU-only builds.
+    # ─────────────────────────────────────────────────────────────────────────
+    @staticmethod
+    def matmul_2d(
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+    ) -> NDBuffer[Self.dtype]:
+        ref A_shape = A.shape
+        ref B_shape = B.shape
+        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
 
-    comptime if has_accelerator():
-        if A.is_on_gpu() and B.is_on_gpu():
-            try:
-                C = MatmulNdGpu[Self.dtype].launch[tile_size=TILE_SIZE](
-                    A, B
+        var C: NDBuffer[Self.dtype]
+
+        comptime if has_accelerator():
+            if A.is_on_gpu() and B.is_on_gpu():
+                # Both operands on GPU — launch tiled GPU kernel.
+                try:
+                    C = MatmulNdGpu[Self.dtype].launch[tile_size=GPU_TILE_SIZE](
+                        A, B
+                    )
+                except e:
+                    print(e)
+                    panic("NDBuffer matmul_2d → GPU operation failed")
+                    C = NDBuffer[Self.dtype](
+                        Shape()
+                    )  # unreachable; satisfies compiler
+            elif (A.is_on_gpu() and B.is_on_cpu()) or (
+                A.is_on_cpu() and B.is_on_gpu()
+            ):
+                # Mixed device operands are not supported — data must be on the
+                # same device before calling matmul.
+                panic(
+                    (
+                        "NDBuffer matmul_2d → both buffers must be on same"
+                        " device. A on gpu? "
+                    ),
+                    String(A.is_on_gpu()),
+                    ", B on gpu? ",
+                    String(B.is_on_gpu()),
                 )
-            except e:
-                print(e)
-                panic("NDBuffer matmul_2d → GPU operation failed")
-                C = NDBuffer[Self.dtype](Shape())
-        elif (A.is_on_gpu() and B.is_on_cpu()) or (
-            A.is_on_cpu() and B.is_on_gpu()
-        ):
-            panic(
-                " NDBuffer matmul_2d → both buffers must be on gpu. A"
-                " is on gpu?",
-                String(A.is_on_gpu()),
-                ", B is on gpu?",
-                String(B.is_on_gpu()),
-            )
-            C = NDBuffer[Self.dtype](Shape())
+                C = NDBuffer[Self.dtype](Shape())  # unreachable
+            else:
+                # GPU present but both operands are on CPU — use CPU path.
+                C = MM[Self.dtype].matmul_2d_cpu(A, B)
         else:
-            C = A.matmul_2d_cpu(B)
-    else:
-        C = A.matmul_2d_cpu(B)
+            # No accelerator compiled in — always CPU.
+            C = MM[Self.dtype].matmul_2d_cpu(A, B)
 
-    return C^
+        return C^
 
-def matmul_2d_cpu(
-    A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
-) -> NDBuffer[Self.dtype]:
-    ref A_shape = A.shape
-    ref B_shape = B.shape
-    MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
+    # ─────────────────────────────────────────────────────────────────────────
+    #  matmul_2d_cpu
+    #
+    #  High-performance CPU matmul: C = A @ B
+    #    A : (m, n)
+    #    B : (n, p)
+    #    C : (m, p)  — freshly allocated, zero-initialised
+    #
+    #  Two paths:
+    #    1. B contiguous  → tiled + parallelised + SIMD + FMA + prefetch
+    #    2. B non-contig  → parallelised scalar (strides may not be unit)
+    #
+    #  The contiguous path adds a further fast lane when A is also
+    #  contiguous, eliminating the remaining stride multiplications.
+    # ─────────────────────────────────────────────────────────────────────────
+    @staticmethod
+    def matmul_2d_cpu(
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+    ) -> NDBuffer[Self.dtype]:
+        ref A_shape = A.shape
+        ref B_shape = B.shape
+        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
 
-    comptime simdwidth = simd_width_of[Self.dtype]()
-    # Process UNROLL * simdwidth columns of C per inner iteration.
-    # e.g. float32: simdwidth=8, UNROLL=4 → 32 columns at once.
-    comptime simd_unroll = simdwidth * UNROLL
+        # simdwidth  : how many dtype elements fit in one SIMD register
+        #              e.g. 8 for float32 on AVX2, 16 for float16
+        # simd_unroll: total columns processed per unrolled iteration
+        #              = UNROLL × simdwidth  (e.g. 4 × 8 = 32 for float32)
+        comptime simdwidth = simd_width_of[Self.dtype]()
+        comptime simd_unroll = simdwidth * UNROLL
 
-    var m = A_shape[0]
-    var n = A_shape[1]
-    var p = B_shape[1]
+        var m = A_shape[0]  # rows of A
+        var n = A_shape[1]  # shared dimension (cols of A = rows of B)
+        var p = B_shape[1]  # cols of B
 
-    var C = NDBuffer[Self.dtype].zeros(Shape([m, p]))
+        # Output matrix — zero-initialised so partial k-tile accumulations
+        # can safely load-accumulate-store across multiple k_tile iterations.
+        var C = NDBuffer[Self.dtype].zeros(Shape([m, p]))
 
-    # ── Hoist all pointer/stride metadata ──────────────────────
-    ref A_strides = A.strides
-    var A_stride0 = A_strides[0]
-    var A_stride1 = A_strides[1]
-    var A_offset  = A.offset
-    var A_data    = A.data_ptr()
+        # ── Hoist all pointer and stride metadata out of every loop ──────────
+        # Accessing struct fields inside a hot loop forces repeated loads.
+        # Storing them in locals lets the compiler keep them in registers.
+        ref A_strides = A.strides
+        var A_stride0 = A_strides[0]  # bytes/elems to advance one row in A
+        var A_stride1 = A_strides[1]  # bytes/elems to advance one col in A
+        var A_offset = A.offset  # base offset for non-zero-origin views
+        var A_data = A.data_ptr()
 
-    ref B_strides = B.strides
-    var B_stride0 = B_strides[0]
-    var B_stride1 = B_strides[1]
-    var B_offset  = B.offset
-    var B_data    = B.data_ptr()
+        ref B_strides = B.strides
+        var B_stride0 = B_strides[0]  # row stride of B
+        var B_stride1 = B_strides[1]  # col stride of B (1 when contiguous)
+        var B_offset = B.offset
+        var B_data = B.data_ptr()
 
-    var C_data = C.data_ptr()
+        var C_data = C.data_ptr()
+        # C is freshly allocated and always contiguous:
+        #   C_stride0 = p   (one full row)
+        #   C_stride1 = 1   (adjacent columns)
+        # These are inlined as literals below rather than stored in variables.
 
-    if B.is_contiguous():
-        # ════════════════════════════════════════════════════════
-        #  OPTIMIZED TILED + UNROLLED + PREFETCHED MATMUL
-        #
-        #  Three-level tiling (TILE_M × TILE_N × TILE_P):
-        #    - TILE_M rows of A/C fit in L2
-        #    - TILE_N keeps the k-strip of A in L1
-        #    - TILE_P wide enough to saturate SIMD across j
-        #
-        #  Inside the innermost i/k loop:
-        #    - UNROLL accumulators per j-strip → fills FMA pipeline
-        #    - Prefetch next k-tile of B while computing current
-        #    - a_ik broadcast once, reused across all j accumulators
-        # ════════════════════════════════════════════════════════
-        var num_tiles_i = (m + TILE_M - 1) // TILE_M
+        # ════════════════════════════════════════════════════════════════════
+        #  CONTIGUOUS B PATH
+        #  When B is contiguous in memory its column stride is 1, so
+        #  "j * B_stride1" collapses to just "j" — one fewer multiply per
+        #  address calculation in the hot loop.
+        # ════════════════════════════════════════════════════════════════════
+        if B.is_contiguous():
+            # Determine whether A is also contiguous.
+            # When true, A_stride1 = 1, so "k * A_stride1" → "k".
+            # This eliminates the last stride multiply in the innermost loop.
+            var a_also_contiguous = A.is_contiguous()
 
-        @parameter
-        def process_row_tile(tile_idx: Int):
-            var i_start = tile_idx * TILE_M
-            var i_end   = min(i_start + TILE_M, m)
+            # Split the m-dimension into row tiles for parallelism.
+            # Each tile is processed by one logical task (mapped to a core).
+            var num_tiles_i = (m + TILE_M - 1) // TILE_M
 
-            for j_tile in range(0, p, TILE_P):
-                var j_end = min(j_tile + TILE_P, p)
+            @parameter
+            def process_row_tile(tile_idx: Int):
+                var i_start = tile_idx * TILE_M
+                var i_end = min(i_start + TILE_M, m)
 
+                # ── Three-level tiling: k → j → i ────────────────────────
+                #
+                # Loop order matters for cache behaviour:
+                #
+                #   k outermost tile:
+                #     Load a TILE_N-wide strip of A (rows i_start..i_end,
+                #     cols k_tile..k_end) into L1 once per k_tile.
+                #     Reuse that strip across ALL j_tiles before evicting.
+                #     → A k-strip touches L1 exactly once per k_tile. ✓
+                #
+                #   j middle tile:
+                #     Load a TILE_P-wide strip of B rows into cache.
+                #     Wide enough to keep SIMD units busy.
+                #
+                #   i inner loop:
+                #     Iterate over actual rows within the current i-tile.
+                #     Short loop; a_row_base computed once per row.
+                #
+                # Previous order (j → k → i) was wrong: for each j_tile
+                # the entire k loop ran, evicting A's k-strip from L1
+                # between j iterations — defeating the tiling intent.
+                # ─────────────────────────────────────────────────────────
                 for k_tile in range(0, n, TILE_N):
                     var k_end = min(k_tile + TILE_N, n)
 
-                    # ── Prefetch the NEXT k-tile of B into cache ──
-                    var next_k_tile = k_tile + TILE_N
-                    if next_k_tile < n:
-                        for k_pre in range(
-                            next_k_tile,
-                            min(next_k_tile + TILE_N, n),
-                        ):
-                            var b_pre_base = (
-                                k_pre * B_stride0 + B_offset + j_tile
-                            )
-                            prefetch[
-                                PrefetchLocality.HIGH,
-                                PrefetchRW.READ,
-                                PREFETCH_DIST,
-                            ](B_data + b_pre_base)
+                    # ── Prefetch the NEXT k-tile of B into cache ──────────
+                    # Issue prefetch instructions for the k-tile that will be
+                    # needed in the next outer iteration while we compute the
+                    # current one. This hides DRAM latency (typically 100+ns).
+                    #
+                    # We prefetch full cache lines (16 × float32 = 64 bytes)
+                    # across the entire TILE_P column width so the hardware
+                    # prefetcher has the data ready before we touch it.
+                    #
+                    # Placement: outside the j_tile loop so we issue the
+                    # prefetch ONCE per k_tile, not once per (k_tile, j_tile).
+                    var next_k = k_tile + TILE_N
+                    if next_k < n:
+                        var next_k_end = min(next_k + TILE_N, n)
+                        for k_pre in range(next_k, next_k_end):
+                            var row_base = k_pre * B_stride0 + B_offset
+                            # Prefetch cache lines across the full column width.
+                            # 16 float32 = one 64-byte cache line.
+                            for cl in range(0, p, 16):
+                                prefetch[prefetch_opts](B_data + row_base + cl)
 
-                    for i in range(i_start, i_end):
-                        var a_row_base = i * A_stride0 + A_offset
-                        var c_row_base = i * p
+                    for j_tile in range(0, p, TILE_P):
+                        var j_end = min(j_tile + TILE_P, p)
 
-                        var j = j_tile
+                        for i in range(i_start, i_end):
+                            # a_row_base: flat index of row i in A, accounting
+                            # for non-zero offsets (views, slices).
+                            var a_row_base = i * A_stride0 + A_offset
 
-                        # ── Unrolled SIMD: UNROLL vectors at once ──
-                        while j + simd_unroll <= j_end:
-                            # Load UNROLL accumulators from C
-                            var acc0 = C_data.load[width=simdwidth](
-                                c_row_base + j
-                            )
-                            var acc1 = C_data.load[width=simdwidth](
-                                c_row_base + j + simdwidth
-                            )
-                            var acc2 = C_data.load[width=simdwidth](
-                                c_row_base + j + simdwidth * 2
-                            )
-                            var acc3 = C_data.load[width=simdwidth](
-                                c_row_base + j + simdwidth * 3
-                            )
+                            # c_row_base: flat index of row i in C.
+                            # C is always contiguous so stride0 = p, offset = 0.
+                            var c_row_base = i * p
 
-                            for k in range(k_tile, k_end):
-                                # Load a_ik ONCE — broadcast across
-                                # all UNROLL accumulator updates
-                                var a_addr = a_row_base + k * A_stride1
-                                var a_ik = SIMD[Self.dtype, simdwidth](
-                                    A_data[a_addr]
+                            var j = j_tile
+
+                            # ── Unrolled SIMD: process UNROLL vectors/iter ──
+                            #
+                            # Each iteration handles simd_unroll = UNROLL *
+                            # simdwidth columns of C simultaneously.
+                            # For float32 / AVX2: 4 × 8 = 32 columns per iter.
+                            #
+                            # Why unroll?
+                            #   A single SIMD FMA has latency ~4 cycles but
+                            #   throughput ~0.5 cycles. With only one
+                            #   accumulator the CPU stalls waiting for the
+                            #   result. Four independent accumulators let the
+                            #   CPU overlap four FMAs and approach peak
+                            #   throughput.
+                            #
+                            # Pattern per k:
+                            #   1. Load a_ik scalar → broadcast to SIMD vector
+                            #      (one load, reused 4× across accumulators)
+                            #   2. Load 4 consecutive B vectors (b_base + 0/8/16/24)
+                            #   3. FMA: acc_n += a_ik * b_vec_n  (4 FMAs, independent)
+                            # ───────────────────────────────────────────────
+                            while j + simd_unroll <= j_end:
+                                var cj = c_row_base + j
+
+                                # Load existing C values. Necessary because
+                                # previous k_tile iterations may have already
+                                # accumulated partial sums here.
+                                # Exception: first k_tile — C is still zero,
+                                # so loading zeros is correct (though wasteful;
+                                # see the k_tile==0 optimisation below).
+                                var acc0: SIMD[Self.dtype, simdwidth]
+                                var acc1: SIMD[Self.dtype, simdwidth]
+                                var acc2: SIMD[Self.dtype, simdwidth]
+                                var acc3: SIMD[Self.dtype, simdwidth]
+
+                                if k_tile == 0:
+                                    # First k-tile: C is zeroed, skip the load.
+                                    # This avoids 4 unnecessary memory reads
+                                    # on what is typically the first (and often
+                                    # only) k_tile for small n.
+                                    acc0 = SIMD[Self.dtype, simdwidth](0)
+                                    acc1 = SIMD[Self.dtype, simdwidth](0)
+                                    acc2 = SIMD[Self.dtype, simdwidth](0)
+                                    acc3 = SIMD[Self.dtype, simdwidth](0)
+                                else:
+                                    # Subsequent k-tiles: load partial sums.
+                                    acc0 = C_data.load[width=simdwidth](cj)
+                                    acc1 = C_data.load[width=simdwidth](
+                                        cj + simdwidth
+                                    )
+                                    acc2 = C_data.load[width=simdwidth](
+                                        cj + simdwidth * 2
+                                    )
+                                    acc3 = C_data.load[width=simdwidth](
+                                        cj + simdwidth * 3
+                                    )
+
+                                for k in range(k_tile, k_end):
+                                    # a_ik: single element A[i, k].
+                                    # Broadcast it to a full SIMD vector so
+                                    # it can be multiplied against b_vec in
+                                    # one FMA instruction.
+                                    # Broadcast is free on modern CPUs (vbroadcastss).
+                                    var a_addr: Int
+                                    if a_also_contiguous:
+                                        # A_stride1 = 1 — no multiply needed
+                                        a_addr = a_row_base + k
+                                    else:
+                                        a_addr = a_row_base + k * A_stride1
+                                    var a_ik = SIMD[Self.dtype, simdwidth](
+                                        A_data[a_addr]
+                                    )
+
+                                    # b_base: start of B row k at column j.
+                                    # B_stride0 = p when contiguous, but we
+                                    # use the hoisted variable for correctness
+                                    # with non-unit-stride views.
+                                    # B_stride1 = 1 (B is contiguous) so
+                                    # "+ j" replaces "+ j * B_stride1".
+                                    var b_base = k * B_stride0 + B_offset + j
+
+                                    # Four FMA operations, all independent.
+                                    # The CPU can pipeline these because
+                                    # acc0..acc3 do not depend on each other.
+                                    acc0 = math.fma(
+                                        a_ik,
+                                        B_data.load[width=simdwidth](b_base),
+                                        acc0,
+                                    )
+                                    acc1 = math.fma(
+                                        a_ik,
+                                        B_data.load[width=simdwidth](
+                                            b_base + simdwidth
+                                        ),
+                                        acc1,
+                                    )
+                                    acc2 = math.fma(
+                                        a_ik,
+                                        B_data.load[width=simdwidth](
+                                            b_base + simdwidth * 2
+                                        ),
+                                        acc2,
+                                    )
+                                    acc3 = math.fma(
+                                        a_ik,
+                                        B_data.load[width=simdwidth](
+                                            b_base + simdwidth * 3
+                                        ),
+                                        acc3,
+                                    )
+
+                                # Write all four accumulators back to C.
+                                C_data.store[width=simdwidth](cj, acc0)
+                                C_data.store[width=simdwidth](
+                                    cj + simdwidth, acc1
                                 )
+                                C_data.store[width=simdwidth](
+                                    cj + simdwidth * 2, acc2
+                                )
+                                C_data.store[width=simdwidth](
+                                    cj + simdwidth * 3, acc3
+                                )
+                                j += simd_unroll
 
-                                var b_base = k * B_stride0 + B_offset + j
+                            # ── Single-vector SIMD tail ──────────────────
+                            # Handles the columns that didn't fill a full
+                            # simd_unroll block (0 to simd_unroll-1 columns).
+                            while j + simdwidth <= j_end:
+                                var c_addr = c_row_base + j
 
-                                # FMA: acc += a_ik * b_vec
-                                acc0 = math.fma(
-                                    a_ik,
-                                    B_data.load[width=simdwidth](b_base),
-                                    acc0,
-                                )
-                                acc1 = math.fma(
-                                    a_ik,
-                                    B_data.load[width=simdwidth](
-                                        b_base + simdwidth
-                                    ),
-                                    acc1,
-                                )
-                                acc2 = math.fma(
-                                    a_ik,
-                                    B_data.load[width=simdwidth](
-                                        b_base + simdwidth * 2
-                                    ),
-                                    acc2,
-                                )
-                                acc3 = math.fma(
-                                    a_ik,
-                                    B_data.load[width=simdwidth](
-                                        b_base + simdwidth * 3
-                                    ),
-                                    acc3,
-                                )
+                                var acc: SIMD[Self.dtype, simdwidth]
+                                if k_tile == 0:
+                                    acc = SIMD[Self.dtype, simdwidth](0)
+                                else:
+                                    acc = C_data.load[width=simdwidth](c_addr)
 
-                            # Store UNROLL accumulators back to C
-                            C_data.store[width=simdwidth](
-                                c_row_base + j, acc0
+                                for k in range(k_tile, k_end):
+                                    var a_addr: Int
+                                    if a_also_contiguous:
+                                        a_addr = a_row_base + k
+                                    else:
+                                        a_addr = a_row_base + k * A_stride1
+                                    var a_ik = SIMD[Self.dtype, simdwidth](
+                                        A_data[a_addr]
+                                    )
+                                    var b_base = k * B_stride0 + B_offset + j
+                                    acc = math.fma(
+                                        a_ik,
+                                        B_data.load[width=simdwidth](b_base),
+                                        acc,
+                                    )
+
+                                C_data.store[width=simdwidth](c_addr, acc)
+                                j += simdwidth
+
+                            # ── Scalar tail ───────────────────────────────
+                            # Handles the remaining 0 to simdwidth-1 columns
+                            # that couldn't fill even a single SIMD vector.
+                            # B_stride1 = 1 (contiguous) → "+ j" not "+ j * B_stride1"
+                            while j < j_end:
+                                var c_addr = c_row_base + j
+
+                                var acc: Scalar[Self.dtype]
+                                if k_tile == 0:
+                                    acc = 0
+                                else:
+                                    acc = C_data[c_addr]
+
+                                for k in range(k_tile, k_end):
+                                    var a_addr: Int
+                                    if a_also_contiguous:
+                                        a_addr = a_row_base + k
+                                    else:
+                                        a_addr = a_row_base + k * A_stride1
+                                    var b_addr = k * B_stride0 + B_offset + j
+                                    acc += A_data[a_addr] * B_data[b_addr]
+
+                                C_data[c_addr] = acc
+                                j += 1
+
+            # Launch all row tiles in parallel across physical cores.
+            # Each tile_idx maps to a disjoint set of rows → no data races.
+            parallelize[process_row_tile](num_tiles_i, num_physical_cores())
+
+        else:
+            # ════════════════════════════════════════════════════════════════
+            #  NON-CONTIGUOUS B PATH
+            #
+            #  B has non-unit column stride (e.g. after a transpose or slice).
+            #  SIMD loads require contiguous memory, so we fall back to scalar.
+            #  We still parallelise over row tiles to use all cores.
+            #
+            #  B_stride1 must be respected here — do NOT collapse to "+ j".
+            # ════════════════════════════════════════════════════════════════
+            var num_tiles_i = (m + TILE_M - 1) // TILE_M
+
+            @parameter
+            def process_row_tile_noncontig(tile_idx: Int):
+                var i_start = tile_idx * TILE_M
+                var i_end = min(i_start + TILE_M, m)
+
+                for i in range(i_start, i_end):
+                    var a_row_base = i * A_stride0 + A_offset
+                    var c_row_base = i * p
+
+                    for j in range(p):
+                        var acc: Scalar[Self.dtype] = 0
+
+                        for k in range(n):
+                            var a_addr = a_row_base + k * A_stride1
+                            # B_stride1 may not be 1 — must multiply.
+                            var b_addr = (
+                                k * B_stride0 + B_offset + j * B_stride1
                             )
-                            C_data.store[width=simdwidth](
-                                c_row_base + j + simdwidth, acc1
-                            )
-                            C_data.store[width=simdwidth](
-                                c_row_base + j + simdwidth * 2, acc2
-                            )
-                            C_data.store[width=simdwidth](
-                                c_row_base + j + simdwidth * 3, acc3
-                            )
-                            j += simd_unroll
+                            acc += A_data[a_addr] * B_data[b_addr]
 
-                        # ── Single-vector SIMD tail ─────────────
-                        while j + simdwidth <= j_end:
-                            var c_addr = c_row_base + j
-                            var acc = C_data.load[width=simdwidth](c_addr)
+                        C_data[c_row_base + j] = acc
 
-                            for k in range(k_tile, k_end):
-                                var a_addr = a_row_base + k * A_stride1
-                                var a_ik = SIMD[Self.dtype, simdwidth](
-                                    A_data[a_addr]
-                                )
-                                var b_base = k * B_stride0 + B_offset + j
-                                acc = math.fma(
-                                    a_ik,
-                                    B_data.load[width=simdwidth](b_base),
-                                    acc,
-                                )
+            parallelize[process_row_tile_noncontig](
+                num_tiles_i, num_physical_cores()
+            )
 
-                            C_data.store[width=simdwidth](c_addr, acc)
-                            j += simdwidth
-
-                        # ── Scalar tail (remaining columns) ─────
-                        while j < j_end:
-                            var c_addr = c_row_base + j
-                            var acc: Scalar[Self.dtype] = C_data[c_addr]
-
-                            for k in range(k_tile, k_end):
-                                var a_addr = a_row_base + k * A_stride1
-                                var b_addr = (
-                                    #k * B_stride0 + B_offset + j * B_stride1
-                                    k * B_stride0 + B_offset + j
-                                )
-                                acc += A_data[a_addr] * B_data[b_addr]
-
-                            C_data[c_addr] = acc
-                            j += 1
-
-        parallelize[process_row_tile](num_tiles_i, num_physical_cores())
-
-    else:
-        # ════════════════════════════════════════════════════════
-        #  NON-CONTIGUOUS PATH — parallelized over row tiles
-        #
-        #  Original was fully serial. Now parallelized the same
-        #  way as the contiguous path. No SIMD because strides
-        #  mean elements aren't adjacent in memory.
-        # ════════════════════════════════════════════════════════
-        var num_tiles_i = (m + TILE_M - 1) // TILE_M
-
-        @parameter
-        def process_row_tile_noncontig(tile_idx: Int):
-            var i_start = tile_idx * TILE_M
-            var i_end   = min(i_start + TILE_M, m)
-
-            for i in range(i_start, i_end):
-                var a_row_base = i * A_stride0 + A_offset
-                var c_row_base = i * p
-
-                for j in range(p):
-                    var acc: Scalar[Self.dtype] = 0
-
-                    for k in range(n):
-                        var a_addr = a_row_base + k * A_stride1
-                        var b_addr = (
-                            k * B_stride0 + B_offset + j * B_stride1
-                        )
-                        acc += A_data[a_addr] * B_data[b_addr]
-
-                    C_data[c_row_base + j] = acc
-
-        parallelize[process_row_tile_noncontig](
-            num_tiles_i, num_physical_cores()
-        )
-
-    return C^
+        return C^

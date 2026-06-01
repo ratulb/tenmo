@@ -94,14 +94,6 @@ struct Gradbox[dtype: DType](
         """
         return self._refcount[].load[ordering=Ordering.RELAXED]()
 
-    def is_shared(self) -> Bool:
-        """Check if this Gradbox is shared (ref_count > 1).
-
-        Returns:
-            True if shared by multiple owners.
-        """
-        return self.ref_count() > 1
-
     @always_inline
     def as_tensor(
         deinit self, requires_grad: Bool = False
@@ -141,7 +133,7 @@ struct Gradbox[dtype: DType](
             A new contiguous Gradbox with transposed axes.
         """
         var owned_buffer = self.buffer.copy()
-        var nd_buffer = owned_buffer.transpose(axes, shared=False)
+        var nd_buffer = owned_buffer.transpose(axes, shared=True)
         return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     def __abs__(self) -> Gradbox[Self.dtype]:
@@ -378,13 +370,13 @@ struct Gradbox[dtype: DType](
         """
         return Gradbox[Self.dtype](self.buffer.contiguous(), share=share)
 
-    def shared(self) -> Bool:
+    def is_shared(self) -> Bool:
         """Check if the underlying buffer is shared.
 
         Returns:
             True if the buffer is shared.
         """
-        return self.buffer.shared()
+        return self.buffer.is_shared()
 
     @always_inline
     def sum(
@@ -402,7 +394,9 @@ struct Gradbox[dtype: DType](
         var normalized_axes = Validator.validate_and_normalize_axes(
             self.shape(), axes
         )
-        var nd_buffer = SumMeanReduction[Self.dtype].reduce(self.buffer, normalized_axes=normalized_axes, keepdims=keepdims)
+        var nd_buffer = SumMeanReduction[Self.dtype].reduce(
+            self.buffer, normalized_axes=normalized_axes, keepdims=keepdims
+        )
         return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     @always_inline
@@ -477,7 +471,7 @@ struct Gradbox[dtype: DType](
         Raises:
             Panic if called on an unshared Gradbox.
         """
-        if not self.shared():
+        if not self.is_shared():
             panic(
                 "Gradbox -> __getitem__(self, *indices: Idx): can not call on"
                 " an unshared gradbox"
@@ -523,7 +517,7 @@ struct Gradbox[dtype: DType](
         Raises:
             Panic if called on an unshared Gradbox.
         """
-        if not self.shared():
+        if not self.is_shared():
             panic("Gradbox -> slice: can not call on an unshared gradbox")
         var shape, strides, offset = (
             Validator.validate_and_compute_slice_metadata(
@@ -957,7 +951,7 @@ struct Gradbox[dtype: DType](
             s += "Gradbox"
         s += String(self.shape())
         s += ", Type: " + String(Self.dtype)
-        s += ", Shared : " + String(self.shared())
+        s += ", Shared : " + String(self.is_shared())
         s += ", Strides : " + String(self.strides())
         s += ", Offset : " + String(self.offset())
         s += (

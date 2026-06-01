@@ -6,7 +6,7 @@ from .broadcasthelper import ShapeBroadcaster
 from .common_utils import panic
 from std.sys import simd_width_of, has_accelerator
 from .ndbuffer import NDBuffer
-from .vectormatrix_kernel import VectorMatmulNdGpu
+from tenmo.kernels.vectormatrix_kernel import VectorMatmulNdGpu
 from .ancestry import Ancestor
 
 

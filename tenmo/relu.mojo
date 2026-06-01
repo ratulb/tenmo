@@ -10,7 +10,7 @@ from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
 from .buffers import Buffer
 from .ancestry import Ancestor
-from .unary_ops_kernel import UnaryOpsKernel
+from tenmo.kernels.unary_ops_kernel import UnaryOpsKernel
 from .common_utils import panic
 from std.sys import simd_width_of, has_accelerator
 

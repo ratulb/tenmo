@@ -12,7 +12,7 @@
 
 from .ndbuffer import NDBuffer
 from .intarray import IntArray
-from .reduction_kernel import Reduction
+from tenmo.kernels.reduction_kernel import Reduction
 from std.sys import has_accelerator
 
 

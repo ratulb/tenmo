@@ -139,7 +139,8 @@ declare -a ALL_TESTS_IN_ORDER=(
     "repeat|tests/test_repeat.mojo"
     "mmnd|tests/test_mmnd.mojo"
     "intarray|tests/test_intarray.mojo"
-    "mm2d|tests/test_mm2d.mojo"
+    "        mm2d|tests/test_mm2d.mojo"
+    "matmul_2d_verify|tests/test_matmul_2d_verify.mojo"
     "vm|tests/test_vm.mojo"
     "mv|tests/test_mv.mojo"
     "slice|tests/test_slice.mojo"
@@ -257,7 +258,7 @@ if [ $# -eq 0 ]; then
     echo "  sgd, sparse_sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout, dev_transfer"
     echo "  std_variance, stack, logarithm, concat, variance, variance_and_std, utils, onehot, power"
     echo "  indexhelper, losses, tanh, data, softmax, repeat, mmnd, attn_matmul"
-    echo "  attn_matmul, bce, intarray, mm2d, vm, mv, slice, view_slice, tiles, linspace, argminmax"
+    echo "  attn_matmul, bce, intarray, mm2d, matmul_2d_verify, vm, mv, slice, view_slice, tiles, linspace, argminmax"
     echo "  minmax, relu, shuffle, permute, flatten, gather, squeeze, unsqueeze"
     echo "  select <test_name> <fn>  Extract and run a single test function from a file"
     echo "  gpu_all [N..M] [N]...  Run GPU tests: monolithic; chunk N; range (2..4); or list (2 4 6)"
@@ -392,6 +393,7 @@ run_test_by_name() {
         mmnd)           run_test "mmnd" "tests/test_mmnd.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         intarray)       run_test "intarray" "tests/test_intarray.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         mm2d)           run_test "mm2d" "tests/test_mm2d.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        matmul_2d_verify) run_test "matmul_2d_verify" "tests/test_matmul_2d_verify.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         vm)             run_test "vm" "tests/test_vm.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         mv)             run_test "mv" "tests/test_mv.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         slice)          run_test "slice" "tests/test_slice.mojo" "$DEBUG_MODE"; exit_code=$? ;;

@@ -88,7 +88,6 @@ def ndb_ops_test_arithmetic_self_contiguous_other_noncontiguous() raises:
 
 
 def ndb_ops_test_arithmetic_self_noncontiguous_other_contiguous() raises:
-
     # Create non-contiguous self
     var self_buffer = Buffer[DType.int32](12)
     for i in range(12):
@@ -108,7 +107,6 @@ def ndb_ops_test_arithmetic_self_noncontiguous_other_contiguous() raises:
 
 
 def ndb_ops_test_arithmetic_both_noncontiguous() raises:
-
     var a_buffer = Buffer[DType.int32](12)
     var b_buffer = Buffer[DType.int32](12)
     for i in range(12):
@@ -127,7 +125,6 @@ def ndb_ops_test_arithmetic_both_noncontiguous() raises:
 
 
 def ndb_ops_test_arithmetic_with_offset() raises:
-
     # Create buffers with offsets
     var a_buffer = Buffer[DType.int32](20)
     var b_buffer = Buffer[DType.int32](20)
@@ -289,7 +286,6 @@ def ndb_ops_test_inplace_self_contiguous_other_noncontiguous() raises:
 
 
 def ndb_ops_test_inplace_self_noncontiguous_other_contiguous() raises:
-
     var self_buffer = Buffer[DType.int32](12)
     for i in range(12):
         self_buffer[i] = Int32(i * 10)
@@ -313,7 +309,6 @@ def ndb_ops_test_inplace_self_noncontiguous_other_contiguous() raises:
 
 
 def ndb_ops_test_inplace_both_noncontiguous() raises:
-
     var a_buffer = Buffer[DType.int32](12)
     var b_buffer = Buffer[DType.int32](12)
     for i in range(12):
@@ -369,7 +364,6 @@ def ndb_ops_test_inplace_broadcast_col() raises:
 
 
 def ndb_ops_test_inplace_with_offset() raises:
-
     var a_buffer = Buffer[DType.int32](20)
     var b_buffer = Buffer[DType.int32](20)
     for i in range(20):
@@ -442,7 +436,6 @@ def ndb_ops_test_inplace_scalar_div_contiguous() raises:
 
 
 def ndb_ops_test_inplace_scalar_noncontiguous() raises:
-
     var a_buffer = Buffer[DType.int32](12)
     for i in range(12):
         a_buffer[i] = 10
@@ -456,7 +449,6 @@ def ndb_ops_test_inplace_scalar_noncontiguous() raises:
 
 
 def ndb_ops_test_inplace_scalar_with_offset() raises:
-
     var a_buffer = Buffer[DType.int32](20)
     for i in range(20):
         a_buffer[i] = 10
@@ -559,7 +551,6 @@ def ndb_ops_test_scalar_reverse_div_contiguous() raises:
 
 
 def ndb_ops_test_scalar_noncontiguous() raises:
-
     var a_buffer = Buffer[DType.int32](12)
     for i in range(12):
         a_buffer[i] = 10
@@ -575,7 +566,6 @@ def ndb_ops_test_scalar_noncontiguous() raises:
 
 
 def ndb_ops_test_scalar_with_offset() raises:
-
     var a_buffer = Buffer[DType.int32](20)
     for i in range(20):
         a_buffer[i] = 10
@@ -745,7 +735,6 @@ def ndb_ops_test_scalar_ndbuffer_ops() raises:
 
 
 def ndb_ops_test_different_dtypes() raises:
-
     # Float64
     var f64 = NDBuffer[DType.float64].full(Shape(2, 2), 3.14159)
     var f64_result = f64.scalar_ops[Multiply](2.0)
@@ -764,7 +753,6 @@ def ndb_ops_test_different_dtypes() raises:
     assert_true(i8_result[IntArray(0, 0)] == 20, "int8 scalar mul")
 
 
-
 def ndb_ops_test_large_buffer() raises:
     var a = NDBuffer[DType.int32].full(Shape(100, 100), 1)
     var b = NDBuffer[DType.int32].full(Shape(100, 100), 2)
@@ -775,7 +763,6 @@ def ndb_ops_test_large_buffer() raises:
     assert_true(result[IntArray(0, 0)] == 3, "Large buffer [0,0]")
     assert_true(result[IntArray(50, 50)] == 3, "Large buffer [50,50]")
     assert_true(result[IntArray(99, 99)] == 3, "Large buffer [99,99]")
-
 
 
 # ============================================
@@ -834,7 +821,6 @@ def test_copy_from_equal_shaped_dest_contiguous_src_noncontiguous_overwrite() ra
 
 
 def test_copy_from_equal_shaped_dest_noncontiguous_src_contiguous_overwrite() raises:
-
     # Create non-contiguous dest
     var dest_buffer = Buffer[DType.int32](12)
     dest_buffer.fill(0)
@@ -855,7 +841,6 @@ def test_copy_from_equal_shaped_dest_noncontiguous_src_contiguous_overwrite() ra
 
 
 def test_copy_from_equal_shaped_both_noncontiguous_overwrite() raises:
-
     # Non-contiguous dest
     var dest_buffer = Buffer[DType.int32](12)
     dest_buffer.fill(0)
@@ -884,7 +869,6 @@ def test_copy_from_equal_shaped_both_noncontiguous_overwrite() raises:
 
 
 def test_copy_from_equal_shaped_both_noncontiguous_add() raises:
-
     # Non-contiguous dest with initial values
     var dest_buffer = Buffer[DType.int32](12)
     dest_buffer.fill(10)
@@ -907,7 +891,6 @@ def test_copy_from_equal_shaped_both_noncontiguous_add() raises:
 
 
 def test_copy_from_equal_shaped_with_offset() raises:
-
     # Dest with offset (simulating a view into larger buffer)
     var dest_buffer = Buffer[DType.int32](20)
     dest_buffer.fill(0)
@@ -1080,9 +1063,7 @@ def test_fill_self_panics() raises:
     # ndb.fill(ndb)  # Would panic with "cannot fill with self"
 
 
-
 def test_fill_preserves_dest_structure() raises:
-
     # Non-contiguous dest
     var dest_buffer = Buffer[DType.int32](12)
     dest_buffer.fill(0)
@@ -1103,7 +1084,6 @@ def test_fill_preserves_dest_structure() raises:
 
 
 def test_fill_different_dtypes() raises:
-
     # Float32
     var dest_f32 = NDBuffer[DType.float32].zeros(Shape(2, 2))
     var src_f32 = NDBuffer[DType.float32].full(Shape(2, 2), 3.14)
@@ -1121,8 +1101,6 @@ def test_fill_different_dtypes() raises:
     var src_i64 = NDBuffer[DType.int64].full(Shape(2, 2), 9999)
     dest_i64.fill(src_i64)
     assert_true(dest_i64[IntArray(0, 0)] == 9999, "int64 fill")
-
-
 
 
 # ============================================
@@ -1303,7 +1281,9 @@ def test_ndbuffer_sum_axis() raises:
                 val += 1
 
         # Sum over axis 0 (rows) -> shape (3,)
-        var result = SumMeanReduction[DType.int32].reduce(ndb, IntArray(0), keepdims=False)
+        var result = SumMeanReduction[DType.int32].reduce(
+            ndb, IntArray(0), keepdims=False
+        )
         assert_true(result.shape == Shape(3), "Sum axis 0 shape")
         assert_true(result[IntArray(0)] == 5, "Sum col 0: 1+4=5")
         assert_true(result[IntArray(1)] == 7, "Sum col 1: 2+5=7")
@@ -1321,7 +1301,9 @@ def test_ndbuffer_sum_axis_keepdims() raises:
             ndb[IntArray(i, j)] = Int32(val)
             val += 1
 
-    var result = SumMeanReduction[DType.int32].reduce(ndb, IntArray(0), keepdims=True)
+    var result = SumMeanReduction[DType.int32].reduce(
+        ndb, IntArray(0), keepdims=True
+    )
     assert_true(result.shape == Shape(1, 3), "Sum keepdims shape")
 
 
@@ -1448,11 +1430,11 @@ def test_ndbuffer_to_dtype() raises:
 def test_ndbuffer_share() raises:
     try:
         var ndb = NDBuffer[DType.int32].full(Shape(2, 3), 42)
-        assert_true(not ndb.shared(), "Initially not shared")
+        assert_true(not ndb.is_shared(), "Initially not shared")
 
         var view = ndb.share()
-        assert_true(ndb.shared(), "Now shared")
-        assert_true(view.shared(), "View is shared")
+        assert_true(ndb.is_shared(), "Now shared")
+        assert_true(view.is_shared(), "View is shared")
 
         # Modify original
         ndb[IntArray(0, 0)] = 99
@@ -1460,6 +1442,7 @@ def test_ndbuffer_share() raises:
     except e:
         print(e)
         raise e^
+
 
 def test_ndbuffer_simd_load_store() raises:
     var ndb = NDBuffer[DType.float32](Shape(4, 8))
@@ -1533,15 +1516,22 @@ def test_buffer_sum_all() raises:
         assert_true(SumMeanReduction[dtype].sum_all(ndb) == 42)
         shared = ndb.share()
         assert_true(
-            SumMeanReduction[dtype].sum_all(shared) == 42 and shared.item() == 42 and ndb.item() == 42
+            SumMeanReduction[dtype].sum_all(shared) == 42
+            and shared.item() == 42
+            and ndb.item() == 42
         )
         # Shape(1)
         ndb = NDBuffer[dtype](Shape(1))
         ndb.fill(39)
-        assert_true(SumMeanReduction[dtype].sum_all(ndb) == 39 and ndb[IntArray(0)] == 39)
+        assert_true(
+            SumMeanReduction[dtype].sum_all(ndb) == 39
+            and ndb[IntArray(0)] == 39
+        )
         shared = ndb.share()
         assert_true(
-            SumMeanReduction[dtype].sum_all(shared) == 39 and shared.item() == 39 and ndb.item() == 39
+            SumMeanReduction[dtype].sum_all(shared) == 39
+            and shared.item() == 39
+            and ndb.item() == 39
         )
     except e:
         print(e)
@@ -1735,7 +1725,7 @@ def test_dtype_conversion() raises:
 
     assert_true(
         converted.data_buffer() == Buffer[DType.float64]([4, 5, 6])
-        and not converted.shared()
+        and not converted.is_shared()
         and converted.strides == Strides(3, 1)
         and converted._contiguous
     )
@@ -1759,7 +1749,7 @@ def test_add() raises:
     result = ndb1_shared + ndb2
     assert_true(
         result.data_buffer() == Buffer[dtype]([14, 25, 36])
-        and result.shared() == False
+        and result.is_shared() == False
     )
 
 
@@ -1928,9 +1918,11 @@ def test_ndbuffer_fill_orig() raises:
     assert_true(
         ndb.data_buffer() == expected, "NDBuffer fill assertion 1 failed"
     )
-    assert_false(ndb.shared(), "NDBuffer not shared assertion failed")
+    assert_false(ndb.is_shared(), "NDBuffer not shared assertion failed")
     shared = ndb.share()
-    assert_true(ndb.shared(), "NDBuffer shared assertion failed - post sharing")
+    assert_true(
+        ndb.is_shared(), "NDBuffer shared assertion failed - post sharing"
+    )
     shared.fill(91)
     expected = Buffer[dtype].full(91, 8)
     assert_true(
@@ -1992,7 +1984,6 @@ def test_ndbuffer_fill_orig() raises:
 
 
 def test_ndbuffer_broadcast_ops() raises:
-
     comptime dtype = DType.float32
     buffer1 = Buffer[dtype]([42, 42, 42, 42, 42, 42])
     shape1 = Shape(2, 3)
@@ -2012,7 +2003,6 @@ def test_ndbuffer_broadcast_ops() raises:
 
 
 def test_ndbuffer_inplace_ops() raises:
-
     comptime dtype = DType.float32
     buffer1 = Buffer[dtype](30)
     buffer1.fill(42)
@@ -2040,11 +2030,10 @@ def test_ndbuffer_inplace_ops() raises:
     assert_true(
         shared_buffer.data_buffer() == expected, "NDBuffer sharing failed"
     )
-    assert_true(ndbuffer1.shared(), "NDBuffer buffer nullification failed")
+    assert_true(ndbuffer1.is_shared(), "NDBuffer buffer nullification failed")
 
 
 def test_ndbuffer_set_get() raises:
-
     comptime dtype = DType.float32
     buffer = Buffer[dtype](1)
     buffer[0] = 42

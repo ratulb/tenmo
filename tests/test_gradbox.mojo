@@ -32,7 +32,6 @@ def test_gradbox_unsqueeze_basic() raises:
     assert_true(g.flatten() == g3.flatten())
 
 
-
 def test_gradbox_squeeze_basic() raises:
     comptime dtype = DType.float32
     var _tmp0 = Gradbox[dtype].arange(6)
@@ -54,7 +53,6 @@ def test_gradbox_squeeze_basic() raises:
     assert_true(g.flatten() == g4.flatten())
 
 
-
 def test_gradbox_squeeze_unsqueeze_symmetry() raises:
     comptime dtype = DType.float32
     var _tmp0 = Gradbox[dtype].arange(12)
@@ -65,7 +63,6 @@ def test_gradbox_squeeze_unsqueeze_symmetry() raises:
 
     assert_true(g.shape() == s.shape())
     assert_true(g.flatten() == s.flatten())
-
 
 
 def test_gradbox_unsqueeze_negative_axes() raises:
@@ -86,7 +83,6 @@ def test_gradbox_unsqueeze_negative_axes() raises:
     assert_true(g.flatten() == g3.flatten())
 
 
-
 def test_gradbox_squeeze_unsqueeze_multiple_axes() raises:
     comptime dtype = DType.float32
     var _tmp0 = Gradbox[dtype].arange(8)
@@ -99,7 +95,6 @@ def test_gradbox_squeeze_unsqueeze_multiple_axes() raises:
 
     assert_true(g.flatten() == s.flatten())
     assert_true(s.flatten() == u.flatten())
-
 
 
 def test_gradbox_permute_basic() raises:
@@ -207,9 +202,9 @@ def test_gradbox_squeeze_preserves_value_semantics() raises:
     var g = Gradbox[DType.float32].full(
         Shape.of(1, 2, 1), Scalar[DType.float32](3.0), share=False
     )
-    assert_true(g.shared() == False)
+    assert_true(g.is_shared() == False)
     var s = g.squeeze()
-    assert_true(s.shared() == False)
+    assert_true(s.is_shared() == False)
     assert_true(s.shape() == Shape.of(2))
     assert_true(
         s.as_tensor(requires_grad=False).all_close(Tensor[dtype].d1([3, 3]))
@@ -278,12 +273,13 @@ def test_gradbox_squeeze_chain_of_ops() raises:
 
 # ── __getitem__ [Idx] tests (the broken GPU path) ──────────────────────
 
+
 def test_gradbox_getitem_shared_cpu() raises:
     """CPU: basic slice on a Gradbox created via shared constructor."""
     comptime dtype = DType.float32
     var ndb = NDBuffer[dtype].arange(12).reshape(Shape(3, 4))
     var g = Gradbox[dtype](ndb^, share=True)  # explicitly shared
-    var row = g[i(1), s()]          # shape (4,), returns unshared (share=False)
+    var row = g[i(1), s()]  # shape (4,), returns unshared (share=False)
     assert_true(row.shape() == Shape(4))
     # Use List[Int] accessor to read values (no shared check)
     assert_true(row[[0]] == 4.0 and row[[3]] == 7.0)
@@ -318,6 +314,7 @@ def test_gradbox_getitem_detach_share_true_cpu() raises:
 
 # ── GPU __getitem__ tests (guarded) ────────────────────────────────────
 
+
 def test_gpu_gradbox_getitem_device_state_propagation() raises:
     """GPU: slice propagates device_state so to_cpu reads correct data."""
     comptime if has_accelerator():
@@ -343,7 +340,7 @@ def test_gpu_gradbox_getitem_after_detach() raises:
         var g = Gradbox[dtype].full(Shape(3, 4), 42.0, share=False)
         g = g.to_gpu()
         # detach(share=False) returns unshared at Gradbox level,
-        # but NDBuffer.shared() returns True on GPU (DeviceBuffer always ref-counted)
+        # but NDBuffer.is_shared() returns True on GPU (DeviceBuffer always ref-counted)
         var detached = g.detach(share=False)
         var sliced = detached[i(1), s()]
         sliced = sliced.to_cpu()
@@ -360,11 +357,12 @@ def test_gpu_gradbox_getitem_chained() raises:
         var s1 = g[i(0), s(), s()]
         s1 = s1.to_cpu()
         assert_true(s1.shape() == Shape(3, 4))
-        assert_true(s1[i(0), i(0)].item() == 0.0)   # g[0,0,0]
+        assert_true(s1[i(0), i(0)].item() == 0.0)  # g[0,0,0]
         assert_true(s1[i(2), i(3)].item() == 11.0)  # g[0,2,3]
 
 
 # ── original tests follow ──────────────────────────────────────────────
+
 
 def test_gradbox_reverse_division() raises:
     comptime dtype = DType.float32
@@ -426,7 +424,8 @@ def test_gradbox_is_shared() raises:
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
     gradbox = Gradbox[dtype](ndb^)
     assert_true(
-        gradbox.buffer.shared(), "Gradbox buffer is shared - assertion failed"
+        gradbox.buffer.is_shared(),
+        "Gradbox buffer is shared - assertion failed",
     )
 
 

@@ -1,8 +1,8 @@
 from std.random.philox import Random as PhiloxRandom
 from std.sys import simd_width_of
 from std.gpu import thread_idx, block_dim, grid_dim, block_idx
-from .ndbuffer import NDBuffer
-from .device import GPU, DeviceState
+from tenmo.ndbuffer import NDBuffer
+from tenmo.device import GPU, DeviceState
 
 
 # Key design points:

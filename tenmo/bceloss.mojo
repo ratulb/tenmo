@@ -17,7 +17,7 @@ from tenmo.tensor import Tensor
 from tenmo.ndbuffer import NDBuffer
 from tenmo.buffers import Buffer
 from tenmo.shapes import Shape
-from tenmo.bce_kernel import BceKernel
+from tenmo.kernels.bce_kernel import BceKernel
 from tenmo.backpropagation import (
     BackwardFnArg,
     BCEWithLogitsBwdArg,

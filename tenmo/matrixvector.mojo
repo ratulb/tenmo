@@ -7,7 +7,7 @@ from .common_utils import panic
 from .matmul import Matmul2d, MatmulNd
 from std.sys import simd_width_of, has_accelerator
 from .ndbuffer import NDBuffer
-from .matrixvector_kernel import MatrixVectorNdGpu
+from tenmo.kernels.matrixvector_kernel import MatrixVectorNdGpu
 from .ancestry import Ancestor
 
 

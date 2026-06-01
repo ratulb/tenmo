@@ -109,13 +109,13 @@
 
 from std.gpu import thread_idx, block_dim, block_idx
 
-from .ndbuffer import NDBuffer
-from .buffers import Buffer
-from .device import DeviceState
-from .common_utils import panic, Epsilon
-from .shapes import Shape
-from .array import Array
-from .reduction_kernel import output_to_input_base, rank_to_reduced_offset
+from tenmo.ndbuffer import NDBuffer
+from tenmo.buffers import Buffer
+from tenmo.device import DeviceState
+from tenmo.common_utils import panic, Epsilon
+from tenmo.shapes import Shape
+from tenmo.array import Array
+from . import output_to_input_base, rank_to_reduced_offset
 
 
 # =============================================================================

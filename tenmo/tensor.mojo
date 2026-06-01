@@ -247,13 +247,13 @@ struct Tensor[dtype: DType](
         return self.buffer.is_contiguous()
 
     @always_inline
-    def shared(self) -> Bool:
+    def is_shared(self) -> Bool:
         """Check if the underlying buffer is shared by multiple views.
 
         Returns:
             True if the buffer is reference-counted and shared.
         """
-        return self.buffer.shared()
+        return self.buffer.is_shared()
 
     def is_leaf(self) -> Bool:
         """Check if this tensor is a leaf in the autograd graph.
@@ -744,7 +744,7 @@ struct Tensor[dtype: DType](
         else:
             s += "Tensor"
         s += String(self.shape())
-        if self.buffer.shared():
+        if self.buffer.is_shared():
             s += ", strides: " + String(self.strides())
             s += ", offset: " + String(self.offset())
         s += ", Type: " + String(Self.dtype)
@@ -1061,7 +1061,7 @@ struct Tensor[dtype: DType](
 
         ref ancestors = self.ancestors.value()
         for parent in parents:
-            if not parent.buffer.shared():
+            if not parent.buffer.is_shared():
                 var parent_copy = parent.copy()
                 parent_copy.buffer.buffer.shared()
                 ancestors.append(parent_copy^)
@@ -3271,7 +3271,7 @@ struct Tensor[dtype: DType](
         Returns:
             A view tensor sharing the underlying buffer.
         """
-        if self.shared():
+        if self.is_shared():
             log_warning("Tensor → into_view: already shared")
             return self.copy()
         var shape, strides, offset = self.shape(), self.strides(), self.offset()

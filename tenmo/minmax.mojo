@@ -7,8 +7,7 @@ from .intarray import IntArray
 from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
 from .ancestry import Ancestor
-from .minmax_kernel import ReductionMinMax
-from .minmax_reducer import MinMaxReducer
+from tenmo.kernels.minmax_kernel import ReductionMinMax
 from .common_utils import panic
 from std.sys.info import has_accelerator
 
@@ -74,9 +73,9 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var tracking_grad = track_grad and requires_grad.or_else(
             self.requires_grad
         )
-        var (result_ndb, mask_ndb) = Self.minmax[
-            is_max=max
-        ](self.buffer, normalized_axes, keepdims, tracking_grad)
+        var (result_ndb, mask_ndb) = Self.minmax[is_max=max](
+            self.buffer, normalized_axes, keepdims, tracking_grad
+        )
         var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
 
         comptime if track_grad:
@@ -90,7 +89,6 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^
-
 
     @always_inline
     @staticmethod

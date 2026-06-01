@@ -11,7 +11,7 @@
 from .ndbuffer import NDBuffer
 from .intarray import IntArray
 from .shapes import Shape
-from .reduction_kernel import Reduction
+from tenmo.kernels.reduction_kernel import Reduction
 from .common_utils import Epsilon
 from .mnemonics import SUM, MEAN
 from std.sys import has_accelerator
@@ -46,7 +46,10 @@ struct SumMeanReduction[dtype: DType]:
                 except e:
                     print(e)
                     panic(
-                        "SumMeanReduction reduce — GPU operation failed for op_code: ",
+                        (
+                            "SumMeanReduction reduce — GPU operation failed for"
+                            " op_code: "
+                        ),
                         String(op_code),
                     )
                     out = NDBuffer[Self.dtype].Empty()
@@ -85,7 +88,9 @@ struct SumMeanReduction[dtype: DType]:
 
         if out_shape == Shape():
             comptime if op_code == MEAN:
-                out[IntArray()] = SumMeanReduction[Self.dtype].sum_all(ndb) / reduced_volume
+                out[IntArray()] = (
+                    SumMeanReduction[Self.dtype].sum_all(ndb) / reduced_volume
+                )
             else:
                 out[IntArray()] = SumMeanReduction[Self.dtype].sum_all(ndb)
         else:

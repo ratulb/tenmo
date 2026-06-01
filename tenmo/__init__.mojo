@@ -75,8 +75,8 @@ from .argminmax import *
 
 # from  .array import *
 from .backpropagation import *
-from .binary_inplace_ops_kernel import *
-from .binary_ops_kernel import *
+from .kernels.binary_inplace_ops_kernel import *
+from .kernels.binary_ops_kernel import *
 from .blashandle import *
 from .broadcast import *
 from .broadcasthelper import *
@@ -84,7 +84,7 @@ from .broadcasthelper import *
 from .clip import *
 from .cnn import *
 from .common_utils import *
-from .compare_kernel import *
+from .kernels.compare_kernel import *
 from .concate import *
 from .contiguous import *
 from .crossentropy import *
@@ -105,14 +105,14 @@ from .indexhelper import *
 
 from .logarithm import *
 from .matmul import *
-from .matmul_kernel import *
+from .kernels.matmul_kernel import *
 from .matrixshapevalidator import *
 from .matrixvector import *
-from .matrixvector_kernel import *
+from .kernels.matrixvector_kernel import *
 from .maxmin_scalar import *
 from .mean_reduction import *
 from .minmax import *
-from .minmax_kernel import *
+from .kernels.minmax_kernel import *
 from .minmax_reducer import *
 from .mnemonics import *
 from .named_parameter import NamedParameter
@@ -124,12 +124,12 @@ from .numpy_interop import *
 from .pad import *
 from .permute import *
 from .pooling import *
-from .reduction_kernel import *
+from .kernels.reduction_kernel import *
 from .relu import *
 from .repeat import *
 from .reshape import *
-from .scalar_inplace_ops_kernel import *
-from .scalar_ops_kernel import *
+from .kernels.scalar_inplace_ops_kernel import *
+from .kernels.scalar_ops_kernel import *
 from .sgd import *
 
 from .shuffle import *
@@ -148,12 +148,12 @@ from .tanh import *
 
 from .tiles import *
 from .transpose import *
-from .unary_ops_kernel import *
+from .kernels.unary_ops_kernel import *
 from .unsqueeze import *
 from .validators import *
 from .variance import *
 from .welford import *
 from .vectormatrix import *
-from .vectormatrix_kernel import *
+from .kernels.vectormatrix_kernel import *
 from .views import *
 from .walkback import *
