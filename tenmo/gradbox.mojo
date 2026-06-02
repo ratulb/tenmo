@@ -43,15 +43,15 @@ struct Gradbox[dtype: DType](
     def __init__(out self, shape: Shape, share: Bool = True):
         """Initialize a Gradbox with the given shape.
 
+        Uses shared-from-birth allocation when share=True (default).
         Args:
             shape: The tensor shape.
-            share: If True, share the underlying buffer. If False, create own copy.
+            share: If True, share the underlying buffer for refcounting.
         """
-        var ndb = NDBuffer[Self.dtype](shape)
         if share:
-            self.buffer = ndb.share()
-            _ = ndb^
+            self.buffer = NDBuffer[Self.dtype].shared(shape)
         else:
+            var ndb = NDBuffer[Self.dtype](shape)
             self.buffer = ndb^
         self._refcount = alloc[Atomic[DType.uint64]](1)
         self._refcount[] = Atomic[DType.uint64](1)

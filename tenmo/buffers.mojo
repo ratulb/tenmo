@@ -160,6 +160,37 @@ struct Buffer[dtype: DType = DType.float32](
         self.data = new_data
         self._refcount = refcount_ptr
 
+    @staticmethod
+    def shared(size: Int) -> Buffer[Self.dtype]:
+        """Create a buffer that is already refcounted from birth.
+
+        Allocates [refcount][data] in one contiguous block, avoiding the
+        O(n) reallocation + copy that the instance `shared()` method performs.
+
+        Args:
+            size: Number of elements.
+
+        Returns:
+            A new Buffer with refcount initialised to 1.
+        """
+        if size < 0:
+            panic("Buffer size must be >= 0")
+
+        var refcount_size = size_of[Atomic[DType.uint64]]()
+        var data_size = size * size_of[Scalar[Self.dtype]]()
+        var total_size = refcount_size + data_size
+        var new_alloc = alloc[UInt8](total_size)
+
+        var refcount_ptr = new_alloc.bitcast[Atomic[DType.uint64]]()
+        refcount_ptr[] = Atomic[DType.uint64](1)
+
+        var result = Buffer[Self.dtype]()
+        result.size = size
+        result.data = (new_alloc + refcount_size).bitcast[Scalar[Self.dtype]]()
+        result._refcount = refcount_ptr
+        result.external = False
+        return result^
+
     def ref_count(self) -> UInt64:
         """Count the amount of current references.
 

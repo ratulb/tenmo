@@ -8,6 +8,7 @@ Tenmo is a tensor library and neural network framework built in **Mojo**. Autogr
 pixi shell                # enter dev environment (Mojo 0.26.2, linux-64 only)
 pixi install              # install deps
 ./execute.sh all          # run all tests sequentially
+# ⚠️ Only run ONE test at a time — parallel tests overwhelm the machine
 ./execute.sh <name>       # run single test (e.g. tensors, matmul, softmax)
 ./execute.sh quick        # fast sanity: tensors + shapes + strides + summean
 ./execute.sh gpu          # run all GPU-guarded tests
