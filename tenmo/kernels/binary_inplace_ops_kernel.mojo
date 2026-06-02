@@ -463,10 +463,10 @@ struct BinaryInplaceOperations[dtype: DType](
         # B_broadcast_strides may have stride-0 axes where B is
         # smaller than A and needs replication.
         var A_broadcast_strides = ShapeBroadcaster.broadcast_strides(
-            A_shape, Strides.default(A_shape), broadcast_shape
+            A_shape, A.strides, broadcast_shape
         )
         var B_broadcast_strides = ShapeBroadcaster.broadcast_strides(
-            B_shape, Strides.default(B_shape), broadcast_shape
+            B_shape, B.strides, broadcast_shape
         )
 
         # PATH 2: A contiguous, B strided or broadcast-expanded.

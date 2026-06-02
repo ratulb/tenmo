@@ -1361,6 +1361,7 @@ struct Reduction[dtype: DType = DType.float32](
         A: NDBuffer[Self.dtype],
         normalized_axes: IntArray,
         keepdims: Bool,
+        sync: Bool = True,
     ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         """Launch Welford mean + M2 reduction on GPU.
 
