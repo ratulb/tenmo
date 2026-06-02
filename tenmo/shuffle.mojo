@@ -45,6 +45,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
                     )
                 parent.update_grad(gradbox_parent^, AddTensor, None)
                 parent_ids.append(parent._id)
+                return
 
         # CPU path
         # parent.shape == gradients.shape, only difference is coord postions
