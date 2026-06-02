@@ -1627,7 +1627,11 @@ struct NDBuffer[dtype: DType](
     @always_inline
     def inplace_ops[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype], sync: Bool = True):
+    ](
+        self: NDBuffer[Self.dtype],
+        other: NDBuffer[Self.dtype],
+        sync: Bool = True,
+    ):
         # Broadcast validation
         if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
             panic(
@@ -1736,7 +1740,11 @@ struct NDBuffer[dtype: DType](
     @always_inline
     def inplace_scalar_ops[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True):
+    ](
+        self: NDBuffer[Self.dtype],
+        scalar: Scalar[Self.dtype],
+        sync: Bool = True,
+    ):
         comptime if op_code == Divide:
             if scalar == Scalar[Self.dtype](0):
                 panic("NDBuffer → inplace_scalar_ops: cannot divide by zero")
@@ -2030,9 +2038,11 @@ struct NDBuffer[dtype: DType](
     @always_inline
     def scalar_ops[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) -> NDBuffer[
-        Self.dtype
-    ]:
+    ](
+        self: NDBuffer[Self.dtype],
+        scalar: Scalar[Self.dtype],
+        sync: Bool = True,
+    ) -> NDBuffer[Self.dtype]:
         comptime if op_code == Divide:
             if scalar == Scalar[Self.dtype](0):
                 panic("NDBuffer → scalar_ops: cannot divide by zero")
@@ -2108,7 +2118,9 @@ struct NDBuffer[dtype: DType](
         comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
-                    out = UnaryOpsKernel[Self.dtype].launch[op_code](self, sync=sync)
+                    out = UnaryOpsKernel[Self.dtype].launch[op_code](
+                        self, sync=sync
+                    )
                 except e:
                     print(e)
                     panic(
@@ -2266,9 +2278,11 @@ struct NDBuffer[dtype: DType](
     @always_inline
     def compare[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype], sync: Bool = True) -> NDBuffer[
-        DType.bool
-    ]:
+    ](
+        self: NDBuffer[Self.dtype],
+        other: NDBuffer[Self.dtype],
+        sync: Bool = True,
+    ) -> NDBuffer[DType.bool]:
         if not self.shape == other.shape:
             panic(
                 "NDBuffer → compare(self, other): dimension mismatch: "
@@ -2281,7 +2295,9 @@ struct NDBuffer[dtype: DType](
         comptime if has_accelerator():
             if self.is_on_gpu() and other.is_on_gpu():
                 try:
-                    result = Compare[Self.dtype].launch[op_code](self, other, sync=sync)
+                    result = Compare[Self.dtype].launch[op_code](
+                        self, other, sync=sync
+                    )
                 except e:
                     print(e)
                     panic("NDBuffer compare → GPU operation failed")
@@ -2342,9 +2358,11 @@ struct NDBuffer[dtype: DType](
     @always_inline
     def compare_scalar[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) -> NDBuffer[
-        DType.bool
-    ]:
+    ](
+        self: NDBuffer[Self.dtype],
+        scalar: Scalar[Self.dtype],
+        sync: Bool = True,
+    ) -> NDBuffer[DType.bool]:
         var result: NDBuffer[DType.bool]
 
         comptime if has_accelerator():
@@ -2421,14 +2439,10 @@ struct NDBuffer[dtype: DType](
                     print(e)
                     panic("NDBuffer all_close → GPU operation failed")
                     result = False
-            elif (self.is_on_gpu() and other.is_on_cpu()) or (
-                self.is_on_cpu() and other.is_on_gpu()
-            ):
-                panic(
-                    "NDBuffer all_close → both buffers must be on the same"
-                    " device"
-                )
-                result = False
+            elif self.is_on_gpu() and other.is_on_cpu():
+                result = self.to_cpu().all_close[rtol=rtol, atol=atol](other)
+            elif self.is_on_cpu() and other.is_on_gpu():
+                result = self.all_close[rtol=rtol, atol=atol](other.to_cpu())
             else:
                 result = self.contiguous_buffer().all_close[
                     rtol=rtol, atol=atol
