@@ -2440,9 +2440,25 @@ struct NDBuffer[dtype: DType](
                     panic("NDBuffer all_close → GPU operation failed")
                     result = False
             elif self.is_on_gpu() and other.is_on_cpu():
-                result = self.to_cpu().all_close[rtol=rtol, atol=atol](other)
+                try:
+                    result = self.to_cpu().all_close[rtol=rtol, atol=atol](other)
+                except e:
+                    print(e)
+                    panic(
+                        "NDBuffer all_close → to_cpu failed: " + String(e)
+                    )
+                    result = False
             elif self.is_on_cpu() and other.is_on_gpu():
-                result = self.all_close[rtol=rtol, atol=atol](other.to_cpu())
+                try:
+                    result = self.all_close[rtol=rtol, atol=atol](
+                        other.to_cpu()
+                    )
+                except e:
+                    print(e)
+                    panic(
+                        "NDBuffer all_close → to_cpu failed: " + String(e)
+                    )
+                    result = False
             else:
                 result = self.contiguous_buffer().all_close[
                     rtol=rtol, atol=atol

@@ -13,6 +13,24 @@ from std import math
 
 comptime dtype = DType.float32
 
+
+def main() raises:
+    test_sgd_gpu_backward_integration()
+
+def test_sgd_gpu_backward_integration() raises:
+    var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var x = Tensor[dtype].d1([1.0, 1.0, 1.0])
+    var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
+    params.append(UnsafePointer(to=w))
+    var sgd = SGD(params, lr=0.1)
+    var loss = (w * x).sum()
+    loss.backward()
+    sgd.step()
+    # grad_w = x = [1,1,1], w = w - 0.1*1 = [0.9, 1.9, 2.9]
+    assert_true(w.all_close(Tensor[dtype].d1([0.9, 1.9, 2.9])))
+    assert_true(w.grad().all_close(Tensor[dtype].d1([1.0, 1.0, 1.0])))
+
+
 comptime prefetch_opts = PrefetchOptions().for_read().high_locality().to_data_cache()
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -459,18 +477,3 @@ struct MM[dtype: DType]:
 
         return C^
 
-def main() raises:
-    test_sgd_gpu_backward_integration()
-
-def test_sgd_gpu_backward_integration() raises:
-    var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
-    var x = Tensor[dtype].d1([1.0, 1.0, 1.0])
-    var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
-    params.append(UnsafePointer(to=w))
-    var sgd = SGD(params, lr=0.1)
-    var loss = (w * x).sum()
-    loss.backward()
-    sgd.step()
-    # grad_w = x = [1,1,1], w = w - 0.1*1 = [0.9, 1.9, 2.9]
-    assert_true(w.all_close(Tensor[dtype].d1([0.9, 1.9, 2.9])))
-    assert_true(w.grad().all_close(Tensor[dtype].d1([1.0, 1.0, 1.0])))
