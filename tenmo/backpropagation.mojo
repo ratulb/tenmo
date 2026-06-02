@@ -358,7 +358,7 @@ struct BCELossBwdArg[dtype: DType](ArgumentType):
 struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     @staticmethod
     def invoke(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ) where Self.dtype.is_floating_point():

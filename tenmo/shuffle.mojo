@@ -15,7 +15,7 @@ from .kernels.shuffle_kernel import ShuffleGPU
 struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
         sync: Bool = True,
@@ -23,7 +23,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
         ref bwd_fn_arg = output.ancestry().backward_fn_arg().get[ShuffleArg]()
         var axis = bwd_fn_arg.axis
         var permutation = bwd_fn_arg.permutation.copy()
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
         var shape = gradbox.shape()
         var gradbox_parent: Gradbox[Self.dtype]

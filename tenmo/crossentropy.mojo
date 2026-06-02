@@ -336,7 +336,7 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -366,7 +366,7 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
             bwd_arg.M,
             bwd_arg.C,
         )
-        ref upstream = output.gradients()[]
+        ref upstream = output.gradients()
         var logits = output.ancestry().get(0)
 
         var device = upstream.device()
@@ -589,7 +589,7 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -615,7 +615,7 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
             bwd_arg.M,
             bwd_arg.C,
         )
-        ref upstream = output.gradients()[]
+        ref upstream = output.gradients()
         var logits = output.ancestry().get(0)
 
         # grad = softmax - smoothed_target

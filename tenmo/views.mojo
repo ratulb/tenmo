@@ -18,23 +18,23 @@ from .ancestry import Ancestor
 struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
         comptime if has_accelerator():
             if output.is_on_gpu():
                 Self.backward_gpu(output, parent_ids)
-                ref gradbox = output.gradbox.unsafe_value()[]
+                ref gradbox = output.gradients()
                 gradbox.zero_grad()
                 return
         Self.backward_cpu(output, parent_ids)
-        ref gradbox = output.gradbox.unsafe_value()[]
+        ref gradbox = output.gradients()
         gradbox.zero_grad()
 
     @staticmethod
     def backward_cpu(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
     ):
         ref bwd_arg = output.ancestry().backward_fn_arg().get[ViewArg]()
@@ -47,7 +47,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var parent = Tensor[Self.dtype](
             parent_ref.buffer(), requires_grad=parent_ref.requires_grad
         )
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
 
         var parent_shape = parent.shape()
         ref parent_strides = parent.strides()
@@ -128,7 +128,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     def backward_gpu(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
     ):
         ref bwd_arg = output.ancestry().backward_fn_arg().get[ViewArg]()
@@ -141,7 +141,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var parent = Tensor[Self.dtype](
             parent_ref.buffer(), requires_grad=parent_ref.requires_grad
         )
-        ref gradbox = output.gradients()[]  # GPU gradbox
+        ref gradbox = output.gradients()  # GPU gradbox
 
         var parent_shape = parent.shape()
         var parent_offset = parent.offset()

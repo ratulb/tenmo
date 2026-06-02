@@ -9,11 +9,11 @@ from .ancestry import Ancestor
 struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         ref parent = output.ancestry().get(0)
         var ndb = output.buffer().arithmetic_ops[TANH_BACKWARD](gradbox.buffer)
         var gradbox_ancestor = Gradbox[Self.dtype](ndb^)

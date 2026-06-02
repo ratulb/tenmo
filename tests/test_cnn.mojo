@@ -235,7 +235,7 @@ def test_gradient_input() raises:
     output.backward(grad_output)
 
     # Check that gradients exist
-    var grad_input = image.gradients()[]
+    var grad_input = image.gradients()
 
     # Manual numerical gradient check for center pixel
     var epsilon = Scalar[DType.float32](1e-4)
@@ -291,7 +291,7 @@ def test_gradient_kernel() raises:
     var grad_output = Tensor[DType.float32].ones(output.shape())
     output.backward(grad_output)
 
-    var grad_kernel = kernel.gradients()[]
+    var grad_kernel = kernel.gradients()
 
     # Numerical gradient check for one kernel element
     var epsilon = Scalar[DType.float32](1e-4)
@@ -338,7 +338,7 @@ def test_gradient_bias() raises:
     var grad_output = Tensor[DType.float32].ones(output.shape())
     output.backward(grad_output)
 
-    var grad_bias = bias.gradients()[]
+    var grad_bias = bias.gradients()
 
     # Bias gradient should equal number of spatial positions x batch size
     # Output is 2x2 spatial, 2 batch ? 2*2*2 = 8
@@ -968,7 +968,7 @@ def test_gradient_correctness() raises:
     var loss1 = out1.sum()
     loss1.backward()
 
-    var analytical_img_grad = img.gradients()[].copy()
+    var analytical_img_grad = img.gradients().copy()
     var numerical_img_grad = compute_numerical_gradient(
         img,
         kernel,
@@ -997,7 +997,7 @@ def test_gradient_correctness() raises:
     var loss2 = out2.sum()
     loss2.backward()
 
-    var analytical_kernel_grad = kernel.gradients()[].copy()
+    var analytical_kernel_grad = kernel.gradients().copy()
     var numerical_kernel_grad = compute_numerical_gradient(
         img,
         kernel,
@@ -1026,7 +1026,7 @@ def test_gradient_correctness() raises:
     var loss3 = out3.sum()
     loss3.backward()
 
-    var analytical_bias_grad = bias.gradients()[].copy()
+    var analytical_bias_grad = bias.gradients().copy()
     var numerical_bias_grad = compute_numerical_gradient(
         img,
         kernel,
@@ -1082,7 +1082,7 @@ def test_gradient_stride_dilation() raises:
     )
 
     assert_tensor_close(
-        img_s2.gradients()[],
+        img_s2.gradients(),
         numerical_s2.as_gradbox(),
         "Stride=2 image gradient",
         rtol=1e-1,
@@ -1113,7 +1113,7 @@ def test_gradient_stride_dilation() raises:
     )
 
     assert_tensor_close(
-        kernel_d2.gradients()[],
+        kernel_d2.gradients(),
         numerical_d2.as_gradbox(),
         "Dilation=2 kernel gradient",
         rtol=1e-2,
@@ -1143,7 +1143,7 @@ def test_gradient_accumulation() raises:
     var loss1 = out1.sum()
     loss1.backward()
 
-    # var grad_after_first = img.gradients()[].copy()
+    # var grad_after_first = img.gradients().copy()
     var grad_after_first = img.grad()
 
     # Second backward pass (should accumulate)
@@ -1151,7 +1151,7 @@ def test_gradient_accumulation() raises:
     var loss2 = out2.sum() * 2.0
     loss2.backward()
 
-    var grad_after_second = img.gradients()[]
+    var grad_after_second = img.gradients()
 
     # Check that gradients accumulated (not replaced)
     # grad_after_second should be approximately grad_after_first * 3

@@ -6,7 +6,7 @@ from std.memory import memcpy, memset, memset_zero
 from .shapes import Shape, ShapeIndexIterator
 from .ancestry import Ancestors, Ancestor
 from .strides import Strides
-from std.atomic import Atomic, Ordering, fence
+
 from .common_utils import (
     IDGen,
     log_warning,
@@ -71,7 +71,7 @@ struct Tensor[dtype: DType](
     var _id: UInt
     var buffer: NDBuffer[Self.dtype]
     var requires_grad: Bool
-    var gradbox: Optional[UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]]
+    var gradbox: Optional[Gradbox[Self.dtype]]
     var ancestors: Optional[Ancestors[Self.dtype]]
 
     def __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
@@ -172,12 +172,6 @@ struct Tensor[dtype: DType](
         self.requires_grad = copy.requires_grad
         self.gradbox = copy.gradbox
         self.ancestors = copy.ancestors.copy()
-        if self.gradbox:
-            _ = (
-                self.gradbox.unsafe_value()[]
-                ._refcount[]
-                .fetch_add[ordering=Ordering.RELAXED](1)
-            )
 
     def shallow_copy(self) -> Tensor[Self.dtype]:
         """Create a shallow copy with the underlying buffer.
@@ -232,9 +226,7 @@ struct Tensor[dtype: DType](
             else:
                 gradbox = Gradbox[Self.dtype](self.shape())
                 gradbox.zero_grad()
-            var gb_ptr = alloc[Gradbox[Self.dtype]](1)
-            gb_ptr.init_pointee_move(gradbox^)
-            self.gradbox = gb_ptr
+            self.gradbox = gradbox^
 
     @always_inline
     def is_contiguous(self) -> Bool:
@@ -871,21 +863,21 @@ struct Tensor[dtype: DType](
         return self.gradbox != None
 
     @always_inline
-    def zero_grad(self):
+    def zero_grad(mut self):
         """Zero out accumulated gradients.
 
         Call this before backward() to reset gradients to zero.
         Only affects tensors that require and have gradients.
         """
         if self.requires_grad and self.has_grad():
-            self.gradbox.unsafe_value()[].zero_grad()
+            self.gradbox.value().zero_grad()
 
     @always_inline
-    def gradients(self) -> UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]:
-        """Get raw pointer to the gradient buffer.
+    def gradients(ref self) -> ref[self.gradbox.value()] Gradbox[Self.dtype]:
+        """Get reference to the gradient buffer.
 
         Returns:
-            Pointer to the Gradbox storing accumulated gradients.
+            Reference to the Gradbox storing accumulated gradients.
 
         Raises:
             Panic if called on a tensor that does not require grad or has no gradient.
@@ -895,7 +887,7 @@ struct Tensor[dtype: DType](
                 "Tensor → gradients(self): called on a tensor that does not"
                 " require grad or grad not initialized"
             )
-        return self.gradbox.unsafe_value()
+        return self.gradbox.value()
 
     @always_inline
     def grad(self) -> Gradbox[Self.dtype]:
@@ -912,7 +904,7 @@ struct Tensor[dtype: DType](
                 "Tensor → grad(self): called on a tensor that does not require"
                 " grad or grad not initialized"
             )
-        return self.gradbox.unsafe_value()[].detach()
+        return self.gradbox.value().detach()
 
     def rows(self) -> Int:
         if not self.rank() == 2:
@@ -1174,7 +1166,7 @@ struct Tensor[dtype: DType](
             return
         if not self.has_grad():
             self.requires_grad_()
-        self.gradbox.unsafe_value()[].seed_grad(with_tensor)
+        self.gradbox.value().seed_grad(with_tensor)
 
     def seed_grad(mut self, value: Scalar[Self.dtype]):
         """Seed gradient accumulation with a scalar value.
@@ -2950,17 +2942,8 @@ struct Tensor[dtype: DType](
         )
 
     def __del__(deinit self):
-        if self.gradbox:
-            if (
-                self.gradbox.unsafe_value()[]
-                ._refcount[]
-                .fetch_sub[ordering=Ordering.RELEASE](1)
-                != 1
-            ):
-                return  # other owners exist
-            fence[ordering=Ordering.ACQUIRE]()
-            self.gradbox.unsafe_value().destroy_pointee()
-            self.gradbox.unsafe_value().free()
+        # Gradbox is Optional[Gradbox] — auto-managed by Mojo lifecycle
+        pass
 
     def mse[
         track_grad: Bool = True
@@ -3092,11 +3075,11 @@ struct Tensor[dtype: DType](
         except e:
             print(e)
 
-    def update_grad[opcode: Int](ref self, incoming: Gradbox[Self.dtype]):
+    def update_grad[opcode: Int](mut self, incoming: Gradbox[Self.dtype]):
         if not self.requires_grad:
             print("Tensor update_grad -> does not require grad")
             return
-        ref gradbox = self.gradbox.unsafe_value()[]
+        ref gradbox = self.gradbox.value()
         if opcode == MulTensor:
             gradbox *= incoming
         elif opcode == AddTensor:

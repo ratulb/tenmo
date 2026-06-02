@@ -26,8 +26,8 @@ def test_gpu_scalar_add_backward_only() raises:
         var a_gpu = a.to_gpu()
         var b_gpu = b.to_gpu()
         var gpu_result = a_gpu + b_gpu  # Shape() on GPU
-        assert_true(gpu_result.gradbox.unsafe_value()[].is_on_gpu())
-        assert_true(gpu_result.gradbox.unsafe_value()[].buffer.numels() == 1)
+        assert_true(gpu_result.gradbox.value().is_on_gpu())
+        assert_true(gpu_result.gradbox.value().buffer.numels() == 1)
         gpu_result.backward()
 
 

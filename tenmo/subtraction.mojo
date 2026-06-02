@@ -19,12 +19,12 @@ from .ancestry import Ancestor
 struct SubBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
         var signs = output.ancestry().backward_fn_arg().get[IntArrayArg]().array
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         count = len(output.ancestry())
         for i in range(count):
             var ancestor = output.ancestry().get(i)
@@ -41,12 +41,12 @@ struct SubLeftRightBackwardScalar[dtype: DType](
 ):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
         var negate = output.ancestry().backward_fn_arg().get[Boolean]().is_true
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         ref ancestor = output.ancestry().get(0)
         var op_code = SubtractTensor if negate else AddTensor
         ancestor.update_grad(gradbox, op_code, None)

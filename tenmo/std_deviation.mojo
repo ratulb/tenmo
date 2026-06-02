@@ -35,7 +35,7 @@ struct StdBwdArg[dtype: DType](ArgumentType):
 struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -46,7 +46,7 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var unbiased = bwd_arg.unbiased
         var keepdims = bwd_arg.keepdims
         var n = bwd_arg.n
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
 
         # x_ndb preserves original strides — may be non-contiguous

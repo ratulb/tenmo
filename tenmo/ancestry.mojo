@@ -5,7 +5,7 @@ from .backpropagation import BackwardFnArg
 from .ndbuffer import NDBuffer
 from .common_utils import panic, i, s
 from .shapes import Shape
-from std.atomic import Ordering, fence
+
 
 
 struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
@@ -26,7 +26,7 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
 
     var _id: UInt
     var requires_grad: Bool
-    var gradbox: Optional[UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]]
+    var gradbox: Optional[Gradbox[Self.dtype]]
     var ndb: NDBuffer[Self.dtype]
     var parents: Optional[Ancestors[Self.dtype]]
 
@@ -43,12 +43,6 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         self.gradbox = copy.gradbox
         self.ndb = copy.ndb.copy()
         self.parents = copy.parents.copy()
-        if self.gradbox:
-            _ = (
-                self.gradbox.unsafe_value()[]
-                ._refcount[]
-                .fetch_add[ordering=Ordering.RELAXED](1)
-            )
 
     def __init__(out self, *, deinit take: Self):
         self._id = take._id
@@ -66,11 +60,11 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
     def buffer(ref self) -> NDBuffer[Self.dtype]:
         return self.ndb.copy()
 
-    def gradients(ref self) -> UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]:
-        return self.gradbox.unsafe_value()
+    def gradients(mut self) -> ref[self.gradbox.value()] Gradbox[Self.dtype]:
+        return self.gradbox.value()
 
     def ancestry(
-        ref self,
+        mut self,
     ) -> ref[self.parents.value()] Ancestors[Self.dtype]:
         if self.parents == None:
             panic("Ancestor → ancestry: ancestors not initialized")
@@ -87,19 +81,14 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         out.ndb = tensor.buffer.copy()
         if tensor.ancestors:
             out.parents = tensor.ancestors.copy()
-        # Only bump and store if gradbox exists!
+        # Copy Gradbox inline — shares underlying Buffer via NDBuffer refcounting
         if tensor.gradbox:
-            _ = (
-                tensor.gradbox.unsafe_value()[]
-                ._refcount[]
-                .fetch_add[ordering=Ordering.RELAXED](1)
-            )
             out.gradbox = tensor.gradbox
 
         return out^
 
     def update_grad(
-        ref self,
+        mut self,
         ref incoming: Gradbox[Self.dtype],
         op_code: Int,
         extra_arg: Optional[BackwardFnArg[Self.dtype]] = None,
@@ -118,43 +107,36 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         if not self.requires_grad or not self.gradbox:
             return
 
+        ref gradbox = self.gradbox.value()
+
         if op_code == AddTensor:
-            self.gradbox.unsafe_value()[] += incoming
+            gradbox += incoming
 
         elif op_code == SubtractTensor:
-            self.gradbox.unsafe_value()[] -= incoming
+            gradbox -= incoming
 
         elif op_code == ZeroGrad:
-            self.gradbox.unsafe_value()[].zero_grad()
+            gradbox.zero_grad()
 
         elif op_code == ScatterAddTensor:
             ref arg = extra_arg.value().get[GatherArg]()
             Filler[Self.dtype].scatter_add(
-                self.gradbox.unsafe_value()[].buffer,
+                gradbox.buffer,
                 incoming.buffer,
                 arg.indices,
                 arg.axis,
             )
             # Zero padding row grad if set
             if arg.padding_idx:
-                self.gradbox.unsafe_value()[].fill(
+                gradbox.fill(
                     0.0, i(arg.padding_idx.value()), s()
                 )
         else:
             print("Ancestor → update_grad: unknown op_code", String(op_code))
 
     def __del__(deinit self):
-        if self.gradbox:
-            if (
-                self.gradbox.unsafe_value()[]
-                ._refcount[]
-                .fetch_sub[ordering=Ordering.RELEASE](1)
-                != 1
-            ):
-                return
-            fence[ordering=Ordering.ACQUIRE]()
-            self.gradbox.unsafe_value().destroy_pointee()
-            self.gradbox.unsafe_value().free()
+        # Gradbox is Optional[Gradbox] — auto-managed by Mojo lifecycle
+        pass
 
 
 # ========================================
@@ -193,14 +175,15 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         self.origins.append(Ancestor[Self.dtype].from_tensor(parent))
 
     @always_inline
-    def __del__(deinit self):
-        self.origins.clear()
+    def get(mut self, idx: Int) -> ref[self.origins] Ancestor[Self.dtype]:
+        return self.origins[idx]
 
-    def get(ref self, idx: Int) -> ref[self.origins] Ancestor[Self.dtype]:
+    @always_inline
+    def ref_get(ref self, idx: Int) -> ref[self.origins] Ancestor[Self.dtype]:
         return self.origins[idx]
 
     def tensor(ref self, idx: Int) -> Tensor[Self.dtype]:
-        ref ancestor = self.get(idx)
+        ref ancestor = self.ref_get(idx)
         return Tensor[Self.dtype](
             ancestor.buffer(), requires_grad=ancestor.requires_grad
         )
@@ -216,7 +199,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         total = len(self)
         print("Ancestors[", total, "] = ", end="")
         for i in range(total):
-            print(self.get(i)._id, end=" ")
+            print(self.ref_get(i)._id, end=" ")
         print()
 
     def __iter__(
@@ -249,7 +232,7 @@ struct AncestorIterator[dtype: DType, origin: ImmutOrigin](
 
     def __next__(mut self) -> Ancestor[Self.dtype]:
         self.index += 1
-        return self.src[].get(self.index - 1).copy()
+        return self.src[].ref_get(self.index - 1).copy()
 
     def __has_next__(self) -> Bool:
         return self.__len__() > 0

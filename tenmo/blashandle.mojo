@@ -16,7 +16,7 @@ struct BLASMatmul2dBackward[dtype: DType](
 ):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -28,7 +28,7 @@ struct BLASMatmul2dBackward[dtype: DType](
             bwd_arg.transpose_B,
             bwd_arg.blas,
         )
-        ref grad_out = output.gradients()[]
+        ref grad_out = output.gradients()
         var A_ancestor = output.ancestry().get(0)
         var B_ancestor = output.ancestry().get(1)
 

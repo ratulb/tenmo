@@ -45,7 +45,7 @@ struct DeviceTransferBwdArg(ArgumentType):
 struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -53,7 +53,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
             output.ancestry().backward_fn_arg().get[DeviceTransferBwdArg]()
         )
         var (flow, device) = bwd_arg.flow, bwd_arg.device
-        var gradbox = output.gradients()[]
+        var gradbox = output.gradients()
         var ancestor_ref = output.ancestry().get(0)
         var ancestor = Tensor[Self.dtype](
             ancestor_ref.buffer(), requires_grad=ancestor_ref.requires_grad

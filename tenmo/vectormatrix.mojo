@@ -18,11 +18,11 @@ struct VectorMatmulNdBackward[dtype: DType](
     def backward[
         simdwidth: Int = simd_width_of[Self.dtype]()
     ](
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
-        ref grad_out = output.gradients()[]
+        ref grad_out = output.gradients()
         ref v_ref = output.ancestry().get(0)
         var v = Tensor[Self.dtype](
             v_ref.buffer(), requires_grad=v_ref.requires_grad

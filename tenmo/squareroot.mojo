@@ -12,7 +12,7 @@ from .ancestry import Ancestor
 struct SqrtBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -22,7 +22,7 @@ struct SqrtBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             .get[ScalarArg[Self.dtype]]()
             .value
         )
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
         var ndb = parent.buffer().arithmetic_ops[SQRT_BACKWARD](
             gradbox.buffer, epsilon

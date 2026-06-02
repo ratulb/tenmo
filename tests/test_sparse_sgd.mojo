@@ -86,13 +86,13 @@ def test_sparse_sgd_zero_grad_only_zeros_specified_rows() raises:
     params.append(UnsafePointer(to=w))
     var sgd = SGD(params, lr=0.1)
     # Set different gradients per row
-    w.gradients()[].seed_grad(
+    w.gradients().seed_grad(
         Tensor[dtype].d2([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]])
     )
     sgd.zero_grad(IntArray([1]))
     # Row 1 should be zeroed, rows 0 and 2 unchanged
     assert_true(
-        w.gradients()[].all_close(
+        w.gradients().all_close(
             Tensor[dtype].d2([[1.0, 1.0], [0.0, 0.0], [3.0, 3.0]])
         )
     )
@@ -112,7 +112,7 @@ def test_sparse_sgd_zero_grad_non_specified_retain() raises:
     var expected = Tensor[dtype].d2(
         [[0.0, 0.0], [7.0, 7.0], [0.0, 0.0], [7.0, 7.0], [0.0, 0.0]],
     )
-    assert_true(w.gradients()[].all_close(expected))
+    assert_true(w.gradients().all_close(expected))
 
 
 def test_sparse_sgd_zero_grad_empty_indices_dense() raises:
@@ -126,7 +126,7 @@ def test_sparse_sgd_zero_grad_empty_indices_dense() raises:
     var sgd = SGD(params, lr=0.1)
     w.seed_grad(5.0)
     sgd.zero_grad(IntArray())
-    assert_true(w.gradients()[].all_close(Tensor[dtype].zeros(w.shape())))
+    assert_true(w.gradients().all_close(Tensor[dtype].zeros(w.shape())))
 
 
 def test_sparse_sgd_step_then_zero_grad_same_indices() raises:
@@ -151,7 +151,7 @@ def test_sparse_sgd_step_then_zero_grad_same_indices() raises:
     var expected_g = Tensor[dtype].d2(
         [[0.0, 0.0], [1.0, 1.0], [0.0, 0.0]],
     )
-    assert_true(w.gradients()[].all_close(expected_g))
+    assert_true(w.gradients().all_close(expected_g))
 
 
 def test_sparse_sgd_with_momentum() raises:
@@ -326,7 +326,7 @@ def test_sparse_sgd_step_zero_grad_different_indices() raises:
     var expected_g = Tensor[dtype].d2(
         [[5.0, 5.0], [0.0, 0.0], [5.0, 5.0], [0.0, 0.0]],
     )
-    assert_true(w.gradients()[].all_close(expected_g))
+    assert_true(w.gradients().all_close(expected_g))
 
 
 def test_sparse_sgd_out_of_order_indices() raises:

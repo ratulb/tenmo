@@ -159,7 +159,7 @@ def test_sgd_cpu_zero_grad() raises:
     sgd.step()
     sgd.zero_grad()
     # grad should be zero
-    assert_true(w.gradients()[].all_close(Tensor[dtype].zeros(w.shape())))
+    assert_true(w.gradients().all_close(Tensor[dtype].zeros(w.shape())))
 
 
 def test_sgd_cpu_weight_decay() raises:

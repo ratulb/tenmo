@@ -16,7 +16,7 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -30,7 +30,7 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         """
         var bwd_arg = output.ancestry().backward_fn_arg().get[StackArg]()
         var (axis, num_tensors) = bwd_arg.axis, bwd_arg.num_tensors
-        ref grad_output = output.gradients()[]
+        ref grad_output = output.gradients()
         # var grad_data = grad_output.buffer.buffer.data
         var grad_data = grad_output.data_ptr()
         ref grad_shape = grad_output.shape()

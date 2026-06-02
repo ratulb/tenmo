@@ -738,7 +738,7 @@ def test_varstd_var_bwd_cpu_3d_axis1() raises:
     assert_true(x.grad().shape() == Shape(2, 3, 4))
     # grad sum should be zero — variance grad sums to zero per reduced axis
     assert_true(
-        x.gradients()[][i(0), s(), s()]
+        x.gradients()[i(0), s(), s()]
         .sum()
         .all_close[atol=1e-4](Tensor[dtype].scalar(0.0))
     )

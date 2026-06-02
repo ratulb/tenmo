@@ -159,7 +159,7 @@ struct LayerNormBwdArg[dtype: DType](ArgumentType):
 struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -168,7 +168,7 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             .backward_fn_arg()
             .get[LayerNormBwdArg[Self.dtype]]()
         )
-        ref gradbox = output.gradients()[]  # upstream dL/dy  (*, D)
+        ref gradbox = output.gradients()  # upstream dL/dy  (*, D)
 
         var input_ancestor = output.ancestry().get(0)  # x
         var gamma_ancestor = output.ancestry().get(1)  # gamma

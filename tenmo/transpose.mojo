@@ -11,12 +11,12 @@ from .ancestry import Ancestor
 struct TransposeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
         var axes = output.ancestry().backward_fn_arg().get[IntArrayArg]().array
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
         var inverted_axes = IntArray.invert_permutation(axes^)
         var gradbox_transposed_contiguous = gradbox.transpose(inverted_axes^)

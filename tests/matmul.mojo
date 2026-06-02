@@ -22,9 +22,9 @@ from .ancestry import Ancestor
 struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
     ) -> List[Tuple[UInt, Gradbox[Self.dtype], Int]]:
-        ref grad_out = output.gradients()[]
+        ref grad_out = output.gradients()
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
 
@@ -96,9 +96,9 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
     ) -> List[Tuple[UInt, Gradbox[Self.dtype], Int]]:
-        ref grad_out = output.gradients()[]
+        ref grad_out = output.gradients()
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
         var A_buffer = A.buffer()

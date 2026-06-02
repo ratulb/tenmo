@@ -296,7 +296,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             ref parameter = self.parameters[i][]
             if not (parameter.requires_grad and parameter.has_grad()):
                 continue
-            ref grad = parameter.gradients()[]
+            ref grad = parameter.gradients()
             var num_elements = grad.num_elements()
 
             comptime if has_accelerator():
@@ -349,7 +349,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                     ref parameter = self.parameters[i][]
                     if not (parameter.requires_grad and parameter.has_grad()):
                         continue
-                    ref grad = parameter.gradients()[]
+                    ref grad = parameter.gradients()
                     var num_elements = grad.num_elements()
 
                     comptime if has_accelerator():
@@ -377,7 +377,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 ref parameter = self.parameters[i][]
                 if not (parameter.requires_grad and parameter.has_grad()):
                     continue
-                ref grad = parameter.gradients()[]
+                ref grad = parameter.gradients()
                 var num_elements = grad.num_elements()
 
                 comptime if has_accelerator():
@@ -427,7 +427,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             if not (parameter.requires_grad and parameter.has_grad()):
                 continue
 
-            ref grad = parameter.gradients()[]
+            ref grad = parameter.gradients()
             var num_elements = parameter.num_elements()
 
             if is_sparse:
@@ -570,7 +570,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             ref parameter = self.parameters[i][]
             if not parameter.has_grad():
                 continue
-            ref grad = parameter.gradients()[]
+            ref grad = parameter.gradients()
             if is_sparse:
                 var shape = parameter.shape()
                 if shape.rank() != 2:

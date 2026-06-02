@@ -13,12 +13,12 @@ from .ancestry import Ancestor
 struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
         var bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         ref gradbox_shape = gradbox.shape()
         var ancestor = output.ancestry().get(0)
         ref ancestor_shape = ancestor.shape()

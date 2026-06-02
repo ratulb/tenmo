@@ -17,13 +17,13 @@ struct MatrixVectorMulNdBackward[dtype: DType](
 ):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
         comptime simdwidth = simd_width_of[Self.dtype]()
 
-        ref grad_out = output.gradients()[]
+        ref grad_out = output.gradients()
         var M_ref = output.ancestry().get(0)
         var v_ref = output.ancestry().get(1)
         var M = Tensor[Self.dtype](

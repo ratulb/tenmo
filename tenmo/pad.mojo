@@ -42,7 +42,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -52,7 +52,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
         ref bwd_arg = output.ancestry().backward_fn_arg().get[PadArg]()
         var pad = bwd_arg.pad.copy()
         var mode = bwd_arg.mode.copy()
-        ref grad_out = output.gradients()[]
+        ref grad_out = output.gradients()
         var ancestor_ref = output.ancestry().get(0)
         var parent = Tensor[Self.dtype](
             ancestor_ref.buffer(), requires_grad=ancestor_ref.requires_grad

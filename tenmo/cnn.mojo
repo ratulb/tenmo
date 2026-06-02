@@ -559,7 +559,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -591,7 +591,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             bwd_arg.stride,
             bwd_arg.dilation,
         )
-        ref grad_output = output.gradients()[]
+        ref grad_output = output.gradients()
 
         var padded_image_ref = output.ancestry().get(0)
         var padded_image = Tensor[Self.dtype](

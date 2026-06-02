@@ -11,12 +11,12 @@ from .ancestry import Ancestor
 struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
         var axes = output.ancestry().backward_fn_arg().get[IntArrayArg]().array
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         # Remove the axis we had inserted
         var squeezed_gradbox = gradbox.squeeze(axes)
 

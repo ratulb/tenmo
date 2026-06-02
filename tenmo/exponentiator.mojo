@@ -12,7 +12,7 @@ struct ExponentiationBackward[dtype: DType](
 ):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -26,7 +26,7 @@ struct ExponentiationBackward[dtype: DType](
             .get[ScalarArg[Self.dtype]]()
             .value
         )
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
 
         # Step 1: x ** (n-1) — NDBuffer.pow, GPU safe

@@ -17,12 +17,12 @@ from .ancestry import Ancestor
 struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
         var axis = output.ancestry().backward_fn_arg().get[Integer]().value
-        ref grad_output = output.gradients()[]
+        ref grad_output = output.gradients()
         var grad_data = grad_output.data_ptr()
         ref grad_shape = grad_output.shape()
         ref grad_strides = grad_output.strides()

@@ -38,14 +38,14 @@ struct ArgDropout[dtype: DType](ArgumentType):
 struct DropoutBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
         ref arg_dropout = (
             output.ancestry().backward_fn_arg().get[ArgDropout[Self.dtype]]()
         )
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
         ref shape = ancestor.shape()
 

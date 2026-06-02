@@ -16,7 +16,7 @@ from .ancestry import Ancestor
 struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -24,7 +24,7 @@ struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             panic("Addition add scalar backward: parent_refs is None!")
         ref parent = output.ancestry().get(0)
         if parent.requires_grad:
-            ref gradbox = output.gradbox.unsafe_value()[]
+            ref gradbox = output.gradients()
             if parent.shape() != gradbox.shape():
                 var reshaped = gradbox.reshape(parent.shape())
                 parent.update_grad(reshaped, AddTensor, None)
@@ -32,7 +32,7 @@ struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 parent.update_grad(gradbox, AddTensor, None)
         parent_ids.append(parent._id)
         if not retain_graph:
-            output.gradbox.unsafe_value()[].zero_grad()
+            output.gradients().zero_grad()
 
 
 comptime AddBroadcastBackward[dtype: DType] = BroadcastBackward[
@@ -114,11 +114,11 @@ struct Adder[dtype: DType](Copyable, RegisterPassable):
 struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
-        var gradbox = output.gradbox.unsafe_value()[]
+        var gradbox = output.gradients()
         count = len(output.ancestry())
 
         if count == 1:

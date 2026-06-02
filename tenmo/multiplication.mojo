@@ -20,7 +20,7 @@ struct MultiplyBackwardScalar[dtype: DType](
 ):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -30,7 +30,7 @@ struct MultiplyBackwardScalar[dtype: DType](
             .get[ScalarArg[Self.dtype]]()
             .value
         )
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
         scaled_gradbox = gradbox * factor
         ancestor.update_grad(scaled_gradbox^, AddTensor, None)
@@ -43,11 +43,11 @@ struct MultiplyBackwardScalar[dtype: DType](
 struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         count = len(output.ancestry())
         var ancestor_lhs = output.ancestry().get(0)
 

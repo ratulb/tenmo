@@ -13,13 +13,13 @@ from .ancestry import Ancestor
 struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
         ref bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
         var (axes, keepdims) = bwd_arg.axes, bwd_arg.keepdims
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
         ref shape = ancestor.shape()
 

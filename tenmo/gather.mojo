@@ -59,7 +59,7 @@ struct GatherArg(ArgumentType):
 struct GatherBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -83,7 +83,7 @@ struct GatherBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         its own gradbox via ZeroGrad.
         """
         var parent = output.ancestry().get(0)
-        ref incoming_grad = output.gradbox.unsafe_value()[]
+        ref incoming_grad = output.gradients()
         ref bwd_arg = output.ancestry().backward_fn_arg().get[GatherArg]()
 
         var extra_arg = output.ancestry().backward_fn_arg()
@@ -96,7 +96,7 @@ struct GatherBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         parent_ids.append(parent._id)
         if not retain_graph:
-            output.gradbox.unsafe_value()[].zero_grad()
+            output.gradients().zero_grad()
 
 
 # =============================================================================

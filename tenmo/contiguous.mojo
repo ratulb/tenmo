@@ -10,11 +10,11 @@ from .ancestry import Ancestor
 struct ContiguousBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
         ref parent_shape = parent.shape()
         var parent_gradbox: Gradbox[Self.dtype]

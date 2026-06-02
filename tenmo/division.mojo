@@ -289,7 +289,7 @@ struct TrueDivBackwardScalar[dtype: DType](
 ):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -299,7 +299,7 @@ struct TrueDivBackwardScalar[dtype: DType](
             .get[ScalarArg[Self.dtype]]()
             .value
         )
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         ancestor = output.ancestry().get(0)
         # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
         var divided = gradbox / scalar
@@ -315,7 +315,7 @@ struct RightTrueDivBackwardScalar[dtype: DType](
 ):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -325,7 +325,7 @@ struct RightTrueDivBackwardScalar[dtype: DType](
             .get[ScalarArg[Self.dtype]]()
             .value
         )
-        var gradbox = output.gradients()[]
+        var gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
         # Fused: -s * grad_output / x² in one pass
         var grad_ndb = DivNdBuffer[Self.dtype].rdiv_scalar_backward(
@@ -342,11 +342,11 @@ struct RightTrueDivBackwardScalar[dtype: DType](
 struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var ancestor_top = output.ancestry().get(0)
         var ancestor_bottom = output.ancestry().get(1)
         var buffer_top = ancestor_top.buffer()

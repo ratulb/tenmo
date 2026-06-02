@@ -2882,7 +2882,7 @@ def test_reshape_backward() raises:
     d.backward()
 
     assert_true(
-        (a.gradients()[] == Tensor[dtype].d2([[2, 2, 2]])),
+        (a.gradients() == Tensor[dtype].d2([[2, 2, 2]])),
         "Tensor view reshape grad assertion failed",
     )
 
@@ -2895,7 +2895,7 @@ def test_add_backward() raises:
     AV.backward()
     AV.backward()
     assert_true(
-        (A1.gradients()[] == Tensor[dtype].d2([[5, 5, 5]])),
+        (A1.gradients() == Tensor[dtype].d2([[5, 5, 5]])),
         "Tensor view backward 4 times grad assertion failed",
     )
 
@@ -2906,21 +2906,21 @@ def test_add_backward() raises:
     e = c + d
     e.backward(26)
     assert_true(
-        (a.gradients()[] == Tensor[dtype].d2([[52, 52, 52]])),
+        (a.gradients() == Tensor[dtype].d2([[52, 52, 52]])),
         "2D + 1D grad assertion 1 failed",
     )
     assert_true(
-        (b.gradients()[] == Tensor[dtype].d1([52, 52, 52])),
+        (b.gradients() == Tensor[dtype].d1([52, 52, 52])),
         "2D + 1D grad assertion 2 failed",
     )
     ev = e.into_view()
     ev.backward()
     assert_true(
-        (a.gradients()[] == Tensor[dtype].d2([[54, 54, 54]])),
+        (a.gradients() == Tensor[dtype].d2([[54, 54, 54]])),
         "2D + 1D grad assertion 3 failed",
     )
     assert_true(
-        (b.gradients()[] == Tensor[dtype].d1([54, 54, 54])),
+        (b.gradients() == Tensor[dtype].d1([54, 54, 54])),
         "2D + 1D grad assertion 4 failed",
     )
 
@@ -2932,7 +2932,7 @@ def test_reshape_backward_scalar() raises:
     v = r.into_view()
     v.backward(42)
     assert_true(
-        a.gradients()[].item() == 42,
+        a.gradients().item() == 42,
         "reshape -> view -> scalar grad assertion failed",
     )
 
@@ -3076,7 +3076,7 @@ def test_grad_update() raises:
     grad = Gradbox[dtype].full(Shape.of(3, 4), 42)
     v.update_grad[AddTensor](grad)
     assert_true(
-        (v.gradients()[] == grad),
+        (v.gradients() == grad),
         "update_grad assertion failed",
     )
 

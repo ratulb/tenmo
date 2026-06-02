@@ -12,12 +12,12 @@ from .ancestry import Ancestor
 struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
         ref ancestor = output.ancestry().get(0)
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var ancestor_gradbox: Gradbox[Self.dtype]
         var original_shape = ancestor.shape()
         if ancestor.requires_grad:

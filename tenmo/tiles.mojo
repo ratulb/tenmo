@@ -13,13 +13,13 @@ from .ancestry import Ancestor
 struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
         var bwd_arg = output.ancestry().backward_fn_arg().get[TilesArg]()
         var (repeat, orig_shape) = bwd_arg.repeat, bwd_arg.orig_shape
-        ref grad_out = output.gradients()[]
+        ref grad_out = output.gradients()
         var parent = output.ancestry().get(0)
         var parent_shape = orig_shape
         var parent_rank = len(parent_shape)

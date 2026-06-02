@@ -14,11 +14,11 @@ from .ancestry import Ancestor
 struct ExpandBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         ancestor = output.ancestry().get(0)
         parent_shape = ancestor.shape()
         gradbox_contracted = gradbox.sum_over_broadcasted_axes(parent_shape)

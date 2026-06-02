@@ -16,7 +16,7 @@ from std.sys.info import has_accelerator
 struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -28,7 +28,7 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
             bwd_arg.keepdims,
             bwd_arg.mask,
         )
-        var gradbox = output.gradients()[]
+        var gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
         var shape = ancestor.shape()
         var mask_grad = Gradbox[Self.dtype](mask)

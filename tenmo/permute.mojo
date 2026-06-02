@@ -14,7 +14,7 @@ from .ancestry import Ancestor
 struct PermuteBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -27,7 +27,7 @@ struct PermuteBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var permutation = (
             output.ancestry().backward_fn_arg().get[IntArrayArg]().array
         )
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
 
         # Invert the forward permutation

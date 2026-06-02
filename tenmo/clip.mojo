@@ -10,7 +10,7 @@ from .ancestry import Ancestor
 struct ClipBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -19,7 +19,7 @@ struct ClipBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             output.ancestry().backward_fn_arg().get[ClipArg[Self.dtype]]()
         )
         var (min_val, max_val) = bwd_arg.min_val, bwd_arg.max_val
-        ref grad_output = output.gradients()[]
+        ref grad_output = output.gradients()
         var parent = output.ancestry().get(0)
         ref shape = parent.shape()
         var parent_buffer = parent.buffer()

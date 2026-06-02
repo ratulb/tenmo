@@ -17,17 +17,17 @@ from tenmo.sum_mean_reduction import SumMeanReduction
 from tenmo.common_utils import Idx, panic, print_buffer
 from tenmo.device import Device, CPU, GPU
 from tenmo.device_transfer import DeviceTransfer
-from std.atomic import Atomic, Ordering, fence
 
 
 struct Gradbox[dtype: DType](
     ImplicitlyCopyable & Movable & Sized & Writable & Equatable & Absable
 ):
-    """Gradient storage container with reference counting for efficient gradient accumulation.
+    """Gradient storage container with shared NDBuffer for efficient gradient operations.
 
-    Gradbox wraps an NDBuffer with reference-counted ownership, optimized for gradient
-    computation in the autograd system. It provides arithmetic and tensor operations
-    that are used during backward pass for gradient accumulation.
+    Gradbox wraps a shared NDBuffer (reference-counted at the Buffer level). Copies
+    share the underlying data via refcount bump — in-place mutations are visible to
+    all sharers. No separate refcount needed: Mojo's lifecycle + Buffer refcounting
+    handles everything.
 
     Example:
     ```mojo
@@ -37,7 +37,6 @@ struct Gradbox[dtype: DType](
     """
 
     var buffer: NDBuffer[Self.dtype]
-    var _refcount: UnsafePointer[Atomic[DType.uint64], MutAnyOrigin]
     comptime Empty = Gradbox[Self.dtype].zeros(Shape())
 
     def __init__(out self, shape: Shape):
@@ -48,8 +47,6 @@ struct Gradbox[dtype: DType](
             shape: The tensor shape.
         """
         self.buffer = NDBuffer[Self.dtype].shared(shape)
-        self._refcount = alloc[Atomic[DType.uint64]](1)
-        self._refcount[] = Atomic[DType.uint64](1)
 
     def __init__(
         out self, var buffer: NDBuffer[Self.dtype]
@@ -76,33 +73,14 @@ struct Gradbox[dtype: DType](
             var strides = buffer.strides
             var offset = buffer.offset
             self.buffer = buffer.share(shape, strides, offset)
-        self._refcount = alloc[Atomic[DType.uint64]](1)
-        self._refcount[] = Atomic[DType.uint64](1)
 
     def __moveinit__(out self, *, deinit take: Self):
         """Move constructor — transfer ownership without copying."""
-        self._refcount = take._refcount
         self.buffer = take.buffer^
 
     def __copyinit__(out self, *, copy: Self):
-        """Copy constructor — increments reference count."""
+        """Copy constructor — shares underlying data via NDBuffer/Buffer refcounting."""
         self.buffer = copy.buffer.copy()
-        self._refcount = copy._refcount
-        _ = self._refcount[].fetch_add[ordering=Ordering.RELAXED](1)
-
-    def __del__(deinit self):
-        # _refcount lifecycle is owned by Tensor/Ancestor.__del__
-        # They call destroy_pointee(gradbox) which triggers this __del__
-        # By that point _refcount is already freed — do NOT touch it!
-        pass
-
-    def ref_count(self) -> UInt64:
-        """Get the current reference count.
-
-        Returns:
-            Number of references to this Gradbox.
-        """
-        return self._refcount[].load[ordering=Ordering.RELAXED]()
 
     @always_inline
     def as_tensor(

@@ -9,11 +9,11 @@ from .ancestry import Ancestor
 struct ExponentialBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ) where Self.dtype.is_floating_point():
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
         # Gradient of exp: incoming grad * exp(A) = incoming grad * output
         var exp_grad = Gradbox[Self.dtype](

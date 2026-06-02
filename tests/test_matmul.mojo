@@ -53,8 +53,8 @@ def test_basic_2d_times_3d() raises:
     result.backward(grad_output)
 
     # Verify gradients exist and have correct shapes
-    var grad_A = A.gradients()[]
-    var grad_B = B.gradients()[]
+    var grad_A = A.gradients()
+    var grad_B = B.gradients()
 
     assert_equal(grad_A.shape()[0], 2)
     assert_equal(grad_A.shape()[1], 4)
@@ -90,8 +90,8 @@ def test_3d_times_2d() raises:
     var grad_output = Tensor[DType.float32].ones(1, 2, 9)
     result.backward(grad_output)
 
-    var grad_A = A.gradients()[]
-    var grad_B = B.gradients()[]
+    var grad_A = A.gradients()
+    var grad_B = B.gradients()
 
     assert_true(result == Tensor[dtype].full(Shape(1, 2, 9), 4))
     assert_true(grad_A == Gradbox[dtype].full(Shape(1, 2, 4), 9))
@@ -128,8 +128,8 @@ def test_batch_broadcasting() raises:
     var grad_output = Tensor[DType.float32].ones(3, 2, 9)
     result.backward(grad_output)
 
-    var grad_A = A.gradients()[]
-    var grad_B = B.gradients()[]
+    var grad_A = A.gradients()
+    var grad_B = B.gradients()
 
     assert_true(result == Tensor[dtype].full(Shape(3, 2, 9), 4))
     assert_true(grad_A == Gradbox[dtype].full(Shape(3, 2, 4), 9))
@@ -166,8 +166,8 @@ def test_multi_batch_broadcasting() raises:
     var grad_output = Tensor[DType.float32].ones(5, 3, 2, 9)
     result.backward(grad_output)
 
-    var grad_A = A.gradients()[]
-    var grad_B = B.gradients()[]
+    var grad_A = A.gradients()
+    var grad_B = B.gradients()
 
     assert_equal(grad_A.shape()[0], 5)
     assert_equal(grad_A.shape()[1], 1, "grad_A[1] sums over broadcast")
@@ -229,8 +229,8 @@ def test_numerical_correctness() raises:
     var grad_output = Tensor[DType.float32].ones(1, 2, 4)
     result.backward(grad_output)
 
-    var grad_A = A.gradients()[]
-    var _grad_B = B.gradients()[]
+    var grad_A = A.gradients()
+    var _grad_B = B.gradients()
 
     # grad_A[i,j] = sum over k,l: grad_output[0,i,l] * B[0,j,l]
     # For A[0,0]: sum of B[0,0,:] = 1+2+3+4 = 10
@@ -260,7 +260,7 @@ def test_gradient_with_numerical_check() raises:
     var grad_output = Tensor[DType.float32].randn(1, 2, 4)
     result.backward(grad_output)
 
-    # var grad_A = A.gradients()[]
+    # var grad_A = A.gradients()
     var grad_A = A.grad()
 
     # Numerical gradient check for A[0,0]
@@ -328,8 +328,8 @@ def test_symmetric_broadcasting() raises:
     var grad_output = Tensor[DType.float32].ones(5, 3, 2, 9)
     result.backward(grad_output)
 
-    var grad_A = A.gradients()[]
-    var grad_B = B.gradients()[]
+    var grad_A = A.gradients()
+    var grad_B = B.gradients()
 
     assert_equal(grad_A.shape()[0], 1, "grad_A[0] sums over broadcast dim")
     assert_equal(grad_A.shape()[1], 3)
@@ -365,8 +365,8 @@ def test_complex_broadcasting() raises:
     var grad_output = Tensor[DType.float32].ones(result.shape())
     result.backward(grad_output)
 
-    var grad_A = A.gradients()[]
-    var grad_B = B.gradients()[]
+    var grad_A = A.gradients()
+    var grad_B = B.gradients()
 
     # Check dimensions that should sum
     assert_equal(grad_A.shape()[1], 1, "Dimension 1 should sum")
@@ -426,8 +426,8 @@ def test_large_batch() raises:
     var grad_output = Tensor[DType.float32].ones(result.shape())
     result.backward(grad_output)
 
-    var grad_A = A.gradients()[]
-    var grad_B = B.gradients()[]
+    var grad_A = A.gradients()
+    var grad_B = B.gradients()
 
     assert_equal(grad_A.shape()[1], 1, "grad_A correctly sums broadcast")
     assert_equal(grad_B.shape()[0], 1, "grad_B correctly sums broadcast")
@@ -515,7 +515,7 @@ def test_gradient_accumulation() raises:
 
     result.backward(grad_output)
 
-    var grad_B = B.gradients()[]
+    var grad_B = B.gradients()
 
     # grad_B should have accumulated gradients from all 3 batches
     # Verify it's not zero (which would indicate missing accumulation)
@@ -550,8 +550,8 @@ def test_non_contiguous_gradients() raises:
     var grad_output = Tensor[DType.float32].ones(4, 3, 5)
     result.backward(grad_output)
 
-    var grad_A = A.gradients()[]
-    var _grad_B = B.gradients()[]
+    var grad_A = A.gradients()
+    var _grad_B = B.gradients()
 
     # Verify no NaN or Inf in gradients
     for i in range(4):

@@ -13,11 +13,11 @@ from .kernels.dotproduct_kernel import DotproductKernel
 struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var scalar_grad_value = gradbox.item()  # Scalar
         var tensor_lhs_ref = output.ancestry().get(0)
         var tensor_rhs_ref = output.ancestry().get(1)

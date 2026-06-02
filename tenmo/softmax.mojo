@@ -140,7 +140,7 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
 ):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -148,7 +148,7 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
             output.ancestry().backward_fn_arg().get[SoftmaxArg[Self.dtype]]()
         )
         var (axes, softmax_out) = bwd_arg.axes, bwd_arg.softmax_out
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
         var local_grad_ndb: NDBuffer[Self.dtype]
 

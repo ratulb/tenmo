@@ -25,7 +25,7 @@ struct MaxPool2dBwdArg(ArgumentType):
 struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
@@ -37,7 +37,7 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
             bwd_arg.input_shape,
             bwd_arg.argmax_mask,
         )
-        ref grad_output = output.gradients()[]
+        ref grad_output = output.gradients()
 
         var input_tensor_ref = output.ancestry().get(0)
 

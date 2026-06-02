@@ -1292,7 +1292,7 @@ struct BCELoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
 struct BCEWithLogitsBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ) where Self.dtype.is_floating_point():
@@ -1303,7 +1303,7 @@ struct BCEWithLogitsBackward[dtype: DType](ImplicitlyCopyable & Movable):
         )
         var sigmoid = bwd_arg.sigmoid
         var target = bwd_arg.target
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
 
         if bwd_arg.reduction.is_none():
@@ -1330,7 +1330,7 @@ struct BCEWithLogitsBackward[dtype: DType](ImplicitlyCopyable & Movable):
 struct BCELossBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ) where Self.dtype.is_floating_point():
@@ -1339,7 +1339,7 @@ struct BCELossBackward[dtype: DType](ImplicitlyCopyable & Movable):
         )
         var safe = bwd_arg.clipped_pred
         var target = bwd_arg.target
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
 
         if bwd_arg.reduction.is_none():

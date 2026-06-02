@@ -10,11 +10,11 @@ from .ancestry import Ancestor
 struct FlattenBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
         var ancestor_shape = ancestor.shape()
         var reshaped_grad = gradbox.reshape(ancestor_shape)

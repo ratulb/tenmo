@@ -50,7 +50,7 @@ def validate_matmul_2d_grads[
         return
 
     var gradC = (
-        C.gradients()[].copy()
+        C.gradients().copy()
     )  # Guaranteed to exist if C.requires_grad == True
 
     var B_T = B.transpose[track_grad=False](1, 0)

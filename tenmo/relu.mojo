@@ -19,12 +19,12 @@ from std.sys import simd_width_of, has_accelerator
 struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
         ref arg = output.ancestry().backward_fn_arg()
-        ref gradbox = output.gradients()[]
+        ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
         ref shape = ancestor.shape()
 

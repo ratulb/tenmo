@@ -26,7 +26,7 @@ def test_item_cpu_gradbox_scalar() raises:
     var c = a + b
     c.backward()
     # c.gradbox is seeded with 1.0 — shape ()
-    assert_true(c.gradients()[].item() == 0.0)
+    assert_true(c.gradients().item() == 0.0)
 
 
 def test_item_gpu_scalar_tensor() raises:
@@ -58,7 +58,7 @@ def test_item_gpu_gradbox_scalar() raises:
         var seed = seed_cpu.to_gpu()
         c_gpu.seed_grad(seed)
         # item() on GPU gradbox
-        assert_true(c_gpu.gradients()[].item() == 1.0)
+        assert_true(c_gpu.gradients().item() == 1.0)
 
 
 def test_item_gpu_gradbox_after_backward() raises:
