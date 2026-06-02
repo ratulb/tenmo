@@ -108,7 +108,7 @@ def test_as_gradbox_cpu_with_offset() raises:
 
 def test_as_gradbox_cpu_share_true() raises:
     var t = Tensor[dtype].arange(4)
-    var g = t.as_gradbox(share=True)
+    var g = t.as_gradbox()
     assert_true(g.is_on_cpu())
     assert_true(g.shape() == Shape(4))
 
