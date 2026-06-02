@@ -211,4 +211,4 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # Either CPU->CPU or GPU->GPU on same device — no transfer needed
         if code == -1:
             return self
-        return Gradbox[Self.dtype](ndb^, share=False)
+        return Gradbox[Self.dtype](ndb^, share=True)

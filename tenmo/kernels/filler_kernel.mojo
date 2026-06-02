@@ -274,11 +274,6 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                     block_dim=tpb,
                 )
             else:
-                if target.shape.rank() != 2 or source.shape.rank() != 2:
-                    panic(
-                        "Filler._scatter_add_gpu: only 2D tensors supported "
-                        "for non-broadcast path"
-                    )
                 var compiled = ctx.compile_function[
                     scatter_add_rows_kernel[Self.dtype],
                     scatter_add_rows_kernel[Self.dtype],

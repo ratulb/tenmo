@@ -361,6 +361,22 @@ def test_gpu_gradbox_getitem_chained() raises:
         assert_true(s1[i(2), i(3)].item() == 11.0)  # g[0,2,3]
 
 
+def test_gpu_gradbox_roundtrip_slice() raises:
+    """GPU: full → to_gpu → slice → to_cpu → index (regression guard)."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        # Create on CPU, send to GPU, slice on GPU, bring back to CPU
+        var g = Gradbox[dtype].full(Shape(3, 4), 42.0)
+        g = g.to_gpu()
+        var sliced = g[i(1), s()]
+        sliced = sliced.to_cpu()
+        assert_true(sliced.shape() == Shape(4))
+        assert_true(sliced[i(0)].item() == 42.0)
+        assert_true(sliced[i(1)].item() == 42.0)
+        assert_true(sliced[i(2)].item() == 42.0)
+        assert_true(sliced[i(3)].item() == 42.0)
+
+
 # ── original tests follow ──────────────────────────────────────────────
 
 
