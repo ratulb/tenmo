@@ -27,7 +27,7 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         if gradbox.shape() == Shape():
             grad_contrib = Gradbox[Self.dtype].full(
-                shape, gradbox.item(), share=False, device=gradbox.device()
+                shape, gradbox.item(), device=gradbox.device()
             )
         else:
             if not keepdims:
@@ -41,9 +41,9 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 )
                 unsqueezed_shape = Shape(axes)
                 unsqueezed_grad = gradbox.reshape(unsqueezed_shape)
-                grad_contrib = unsqueezed_grad.broadcast_to(shape, share=False)
+                grad_contrib = unsqueezed_grad.broadcast_to(shape)
             else:
-                grad_contrib = gradbox.broadcast_to(shape, share=False)
+                grad_contrib = gradbox.broadcast_to(shape)
 
         if ancestor.requires_grad:
             ancestor.update_grad(grad_contrib^, AddTensor, None)

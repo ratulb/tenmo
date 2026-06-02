@@ -83,7 +83,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
                     try:
                         var gpu_grad = Gradbox[Self.dtype](
                             gradbox.buffer.to_gpu(device.kind[GPU]),
-                            share=False,
+                            
                         )
                         ancestor_ref.update_grad(gpu_grad, AddTensor, None)
                     except e:
@@ -211,4 +211,4 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # Either CPU->CPU or GPU->GPU on same device — no transfer needed
         if code == -1:
             return self
-        return Gradbox[Self.dtype](ndb^, share=True)
+        return Gradbox[Self.dtype](ndb^)

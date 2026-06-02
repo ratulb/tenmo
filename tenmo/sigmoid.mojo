@@ -18,7 +18,7 @@ struct SigmoidBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var ndb = output.buffer().arithmetic_ops[SIGMOID_BACKWARD](
             gradbox.buffer
         )
-        var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
+        var gradbox_ancestor = Gradbox[Self.dtype](ndb^)
 
         parent.update_grad(gradbox_ancestor^, AddTensor, None)
 

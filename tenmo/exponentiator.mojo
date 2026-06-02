@@ -38,7 +38,7 @@ struct ExponentiationBackward[dtype: DType](
         # Step 3: local_grad * upstream_grad — arithmetic_ops[Multiply], GPU safe
         var grad_result = local_grad * gradbox.buffer
 
-        var parent_gradbox = Gradbox[Self.dtype](grad_result^, share=False)
+        var parent_gradbox = Gradbox[Self.dtype](grad_result^)
 
         ancestor.update_grad(parent_gradbox^, AddTensor, None)
 

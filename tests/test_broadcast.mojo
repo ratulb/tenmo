@@ -1376,7 +1376,7 @@ def test_D1_backward_scalar_left() raises:
     var c = a * b
     c.backward()
     assert_true(a.grad().all_close(Tensor[dtype].scalar(6.0)))
-    var gb = b.grad().detach(share=True)
+    var gb = b.grad().detach()
     assert_true(gb.all_close(Tensor[dtype].d1([2.0, 2.0, 2.0])))
     print("  D1 backward scalar-left: ✓")
 
@@ -1386,7 +1386,7 @@ def test_D2_backward_scalar_right() raises:
     var b = _scalar(2.0, rg=True)
     var c = a * b
     c.backward()
-    var ga = a.grad().detach(share=True)
+    var ga = a.grad().detach()
     assert_true(ga.all_close(Tensor[dtype].d1([2.0, 2.0, 2.0])))
     assert_true(b.grad().all_close(Tensor[dtype].scalar(6.0)))
     print("  D2 backward scalar-right: ✓")
@@ -1398,7 +1398,7 @@ def test_D3_backward_sub_scalar_left() raises:
     var c = a - b
     c.backward()
     assert_true(a.grad().all_close(Tensor[dtype].scalar(3.0)))
-    var gb = b.grad().detach(share=True)
+    var gb = b.grad().detach()
     assert_true(gb.all_close(Tensor[dtype].d1([-1.0, -1.0, -1.0])))
     print("  D3 backward sub scalar-left: ✓")
 
@@ -1414,7 +1414,7 @@ def test_D4_backward_div_scalar_left() raises:
         + Float32(1.0) / Float32(4.0)
     )
     assert_true(a.grad().all_close(Tensor[dtype].scalar(exp_ga)))
-    var gb = b.grad().detach(share=True)
+    var gb = b.grad().detach()
     assert_true(
         gb.all_close(
             Tensor[dtype].d1(
@@ -1435,7 +1435,7 @@ def test_D5_backward_scalar1_left() raises:
     var c = a * b
     c.backward()
     assert_true(a.grad().all_close(Tensor[dtype].d1([6.0])))
-    var gb = b.grad().detach(share=True)
+    var gb = b.grad().detach()
     assert_true(gb.all_close(Tensor[dtype].d1([2.0, 2.0, 2.0])))
     print("  D5 backward scalar1-left: ✓")
 
@@ -1456,7 +1456,7 @@ def test_D7_backward_2d_broadcast() raises:
     var c = a * b
     c.backward()
     assert_true(a.grad().all_close(Tensor[dtype].scalar(21.0)))
-    var gb = b.grad().detach(share=True)
+    var gb = b.grad().detach()
     assert_true(gb.all_close(Tensor[dtype].full(Shape(2, 3), 5.0)))
     print("  D7 backward 2d broadcast: ✓")
 
@@ -1467,7 +1467,7 @@ def test_D8_backward_scalar1_2d() raises:
     var c = a + b
     c.backward()
     assert_true(a.grad().all_close(Tensor[dtype].d1([4.0])))
-    var gb = b.grad().detach(share=True)
+    var gb = b.grad().detach()
     assert_true(gb.all_close(Tensor[dtype].full(Shape(2, 2), 1.0)))
     print("  D8 backward scalar1+2d: ✓")
 
@@ -1480,7 +1480,7 @@ def test_D9_backward_noncontig() raises:
     var loss = c.sum()
     loss.backward()
     assert_true(a.grad().all_close(Tensor[dtype].scalar(21.0)))
-    var ga = A.grad().detach(share=True)
+    var ga = A.grad().detach()
     assert_true(ga.all_close(Tensor[dtype].full(Shape(3, 2), 2.0)))
     print("  D9 backward noncontig: ✓")
 

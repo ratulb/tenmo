@@ -1310,7 +1310,7 @@ struct BCEWithLogitsBackward[dtype: DType](ImplicitlyCopyable & Movable):
             var grad_ndb = BceNdBuffer[Self.dtype].backward_with_logits(
                 sigmoid, target, gradbox.buffer
             )
-            var grad_parent = Gradbox[Self.dtype](grad_ndb^, share=False)
+            var grad_parent = Gradbox[Self.dtype](grad_ndb^)
             parent.update_grad(grad_parent^, AddTensor, None)
         else:
             var multiplier = gradbox.item()
@@ -1319,7 +1319,7 @@ struct BCEWithLogitsBackward[dtype: DType](ImplicitlyCopyable & Movable):
             var grad_ndb = BceNdBuffer[Self.dtype].backward_with_logits_scaled(
                 sigmoid, target, multiplier
             )
-            var grad_parent = Gradbox[Self.dtype](grad_ndb^, share=False)
+            var grad_parent = Gradbox[Self.dtype](grad_ndb^)
             parent.update_grad(grad_parent^, AddTensor, None)
         parent_ids.append(parent._id)
         if not retain_graph:
@@ -1346,7 +1346,7 @@ struct BCELossBackward[dtype: DType](ImplicitlyCopyable & Movable):
             var grad_ndb = BceNdBuffer[Self.dtype].backward(
                 safe, target, gradbox.buffer
             )
-            var grad_parent = Gradbox[Self.dtype](grad_ndb^, share=False)
+            var grad_parent = Gradbox[Self.dtype](grad_ndb^)
             parent.update_grad(grad_parent^, AddTensor, None)
         else:
             var multiplier = gradbox.item()
@@ -1355,7 +1355,7 @@ struct BCELossBackward[dtype: DType](ImplicitlyCopyable & Movable):
             var grad_ndb = BceNdBuffer[Self.dtype].backward_scaled(
                 safe, target, multiplier
             )
-            var grad_parent = Gradbox[Self.dtype](grad_ndb^, share=False)
+            var grad_parent = Gradbox[Self.dtype](grad_ndb^)
             parent.update_grad(grad_parent^, AddTensor, None)
         parent_ids.append(parent._id)
         if not retain_graph:

@@ -154,7 +154,7 @@ def test_gradbox_permute_high_rank() raises:
 
 
 def test_gradbox_squeeze_noop() raises:
-    var g = Gradbox[DType.float32].zeros(Shape.of(2, 3), share=False)
+    var g = Gradbox[DType.float32].zeros(Shape.of(2, 3))
     var s = g.squeeze()  # no size-1 axes -> should be same shape
     assert_true(s.shape() == Shape.of(2, 3))
     # values unchanged
@@ -167,7 +167,7 @@ def test_gradbox_squeeze_remove_all_singletons() raises:
         NDBuffer[DType.float32].full(
             Shape.of(1, 3, 1), Scalar[DType.float32](1.0)
         ),
-        share=False,
+        
     )
     var s = g.squeeze()  # should remove axes 0 and 2 -> shape (3,)
     assert_true(s.shape() == Shape.of(3))
@@ -183,7 +183,7 @@ def test_gradbox_squeeze_with_axes_list() raises:
         NDBuffer[DType.float32].full(
             Shape.of(2, 1, 3), Scalar[DType.float32](2.0)
         ),
-        share=False,
+        
     )
     # specify axis 1 to squeeze -> shape becomes (2,3)
     var s = g.squeeze(IntArray([1]))
@@ -197,14 +197,14 @@ def test_gradbox_squeeze_with_axes_list() raises:
 
 
 def test_gradbox_squeeze_preserves_value_semantics() raises:
-    # create non-shared gradbox and squeeze; result must not be shared (share=False semantics)
+    # Gradbox always shares the buffer — both original and squeezed views are shared
     comptime dtype = DType.float32
     var g = Gradbox[DType.float32].full(
-        Shape.of(1, 2, 1), Scalar[DType.float32](3.0), share=False
+        Shape.of(1, 2, 1), Scalar[DType.float32](3.0), 
     )
-    assert_true(g.is_shared() == False)
+    assert_true(g.is_shared() == True)
     var s = g.squeeze()
-    assert_true(s.is_shared() == False)
+    assert_true(s.is_shared() == True)
     assert_true(s.shape() == Shape.of(2))
     assert_true(
         s.as_tensor(requires_grad=False).all_close(Tensor[dtype].d1([3, 3]))
@@ -217,10 +217,10 @@ def test_gradbox_squeeze_after_broadcast_and_sum_over_broadcasted_axes() raises:
         NDBuffer[DType.float32].full(
             Shape.of(1, 3, 1), Scalar[DType.float32](1.0)
         ),
-        share=False,
+        
     )
     # broadcast to (2,3,4)
-    var broadcasted = base.broadcast_to(Shape.of(2, 3, 4), share=False)
+    var broadcasted = base.broadcast_to(Shape.of(2, 3, 4))
     # sum over broadcasted axes back to (1,3,1) -- uses NDBuffer.sum_over_broadcasted_axes
     var collapsed = Gradbox[DType.float32].sum_over_broadcasted_axes(
         broadcasted, Shape.of(1, 3, 1)
@@ -278,7 +278,7 @@ def test_gradbox_getitem_shared_cpu() raises:
     """CPU: basic slice on a Gradbox created via shared constructor."""
     comptime dtype = DType.float32
     var ndb = NDBuffer[dtype].arange(12).reshape(Shape(3, 4))
-    var g = Gradbox[dtype](ndb^, share=True)  # explicitly shared
+    var g = Gradbox[dtype](ndb^)  # explicitly shared
     var row = g[i(1), s()]  # shape (4,), returns unshared (share=False)
     assert_true(row.shape() == Shape(4))
     # Use List[Int] accessor to read values (no shared check)
@@ -292,7 +292,7 @@ def test_gradbox_getitem_multi_axis_cpu() raises:
     """CPU: multi-axis slice with mixed int/slice indices."""
     comptime dtype = DType.float32
     var ndb = NDBuffer[dtype].arange(24).reshape(Shape(2, 3, 4))
-    var g = Gradbox[dtype](ndb^, share=True)
+    var g = Gradbox[dtype](ndb^)
     var slice1 = g[i(0), s(), i(1)]
     assert_true(slice1.shape() == Shape(3))
     assert_true(slice1[[0]] == 1.0 and slice1[[2]] == 9.0)
@@ -305,8 +305,8 @@ def test_gradbox_getitem_detach_share_true_cpu() raises:
     """CPU: detach(share=True) then slice."""
     comptime dtype = DType.float32
     var ndb = NDBuffer[dtype].full(Shape(3, 4), Scalar[dtype](7.0))
-    var g = Gradbox[dtype](ndb^, share=True)
-    var detached = g.detach(share=True)
+    var g = Gradbox[dtype](ndb^)
+    var detached = g.detach()
     var sliced = detached[i(1), s()]
     assert_true(sliced.shape() == Shape(4))
     assert_true(sliced[[0]] == 7.0 and sliced[[3]] == 7.0)
@@ -337,11 +337,11 @@ def test_gpu_gradbox_getitem_after_detach() raises:
     """GPU: detach(share=False) → slice (matching embedding test pattern)."""
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var g = Gradbox[dtype].full(Shape(3, 4), 42.0, share=False)
+        var g = Gradbox[dtype].full(Shape(3, 4), 42.0)
         g = g.to_gpu()
         # detach(share=False) returns unshared at Gradbox level,
         # but NDBuffer.is_shared() returns True on GPU (DeviceBuffer always ref-counted)
-        var detached = g.detach(share=False)
+        var detached = g.detach()
         var sliced = detached[i(1), s()]
         sliced = sliced.to_cpu()
         assert_true(sliced[i(0)].item() == 42.0)

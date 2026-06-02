@@ -168,7 +168,7 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
             var grad_diff = gradbox.buffer - gy_sum
             local_grad_ndb = softmax_out * grad_diff
 
-        var local_grad = Gradbox[Self.dtype](local_grad_ndb^, share=False)
+        var local_grad = Gradbox[Self.dtype](local_grad_ndb^)
         ancestor.update_grad(local_grad^, AddTensor, None)
         parent_ids.append(ancestor._id)
         if not retain_graph:

@@ -22,14 +22,14 @@ struct ContiguousBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             parent_gradbox = Gradbox[Self.dtype].full(
                 parent_shape,
                 gradbox.item(),
-                share=False,
+                
                 device=gradbox.device(),
             )
         else:
             parent_gradbox = Gradbox[Self.dtype].full(
                 parent_shape,
                 Scalar[Self.dtype](0),
-                share=False,
+                
                 device=gradbox.device(),
             )
             for coord in parent_shape:

@@ -31,7 +31,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             grad_contrib = Gradbox[Self.dtype].full(
                 ancestor_shape,
                 scalar_grad,
-                share=False,
+                
                 device=gradbox.device(),
             )
         else:
@@ -99,6 +99,6 @@ struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             gradbox_shape, axes
         )
         var ndb = SumMeanReduction[Self.dtype].reduce[op_code=MEAN](gradbox.buffer, normalized_axes, keepdims)
-        var out = Gradbox[Self.dtype](ndb^, share=False)
+        var out = Gradbox[Self.dtype](ndb^)
 
         return out^

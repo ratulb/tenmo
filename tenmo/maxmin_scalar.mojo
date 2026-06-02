@@ -49,7 +49,7 @@ struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var mask_float = mask_bool.to_dtype[Self.dtype]()
         # wrap mask_float as Gradbox and multiply
         var grad_input = Gradbox[Self.dtype](
-            mask_float * gradbox.buffer, share=False
+            mask_float * gradbox.buffer, 
         )
 
         parent_ref.update_grad(grad_input^, AddTensor, None)
@@ -91,7 +91,7 @@ struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         var mask_float = mask_bool.to_dtype[Self.dtype]()
         var grad_input = Gradbox[Self.dtype](
-            mask_float * gradbox.buffer, share=False
+            mask_float * gradbox.buffer, 
         )
         parent_ref.update_grad(grad_input^, AddTensor, None)
         parent_ids.append(parent_ref._id)

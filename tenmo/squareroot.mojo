@@ -27,7 +27,7 @@ struct SqrtBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var ndb = parent.buffer().arithmetic_ops[SQRT_BACKWARD](
             gradbox.buffer, epsilon
         )
-        var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
+        var gradbox_ancestor = Gradbox[Self.dtype](ndb^)
 
         parent.update_grad(gradbox_ancestor^, AddTensor, None)
 
@@ -71,7 +71,7 @@ struct Sqrt[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         var buffer = self.buffer.data_buffer().unary_ops[SQRT]()
         out = Gradbox[Self.dtype](
-            NDBuffer[Self.dtype](buffer^, shape), share=False
+            NDBuffer[Self.dtype](buffer^, shape), 
         )
 
         return out^

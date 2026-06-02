@@ -34,7 +34,7 @@ struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 scalar_grad_value
             )
             var gradbox_lhs = grad_tensor^.as_gradbox(
-                share=False, contiguous=False
+                contiguous=False
             )
             tensor_lhs_ref.update_grad(gradbox_lhs^, AddTensor, None)
             parent_ids.append(tensor_lhs_ref._id)
@@ -44,7 +44,7 @@ struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 scalar_grad_value
             )
             var gradbox_rhs = grad_tensor^.as_gradbox(
-                share=False, contiguous=False
+                contiguous=False
             )
             tensor_rhs_ref.update_grad(gradbox_rhs^, AddTensor, None)
             parent_ids.append(tensor_rhs_ref._id)

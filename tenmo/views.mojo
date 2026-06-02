@@ -163,7 +163,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var cpu_ndb = cpu_ndb_flat.share(
                 shape, Strides.default(shape), offset
             )
-            cpu_gradbox = Gradbox[Self.dtype](cpu_ndb^, share=False)
+            cpu_gradbox = Gradbox[Self.dtype](cpu_ndb^)
         except e:
             panic(
                 "ViewBackward backward_gpu: failed to materialise GPU gradbox:"
@@ -255,7 +255,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var gpu_ndb = NDBuffer[Self.dtype].with_device_state(
                     ds^, parent_shape
                 )
-                final_gradbox = Gradbox[Self.dtype](gpu_ndb^, share=False)
+                final_gradbox = Gradbox[Self.dtype](gpu_ndb^)
             except e:
                 panic(
                     "ViewBackward backward_gpu: failed to move parent_gradbox"

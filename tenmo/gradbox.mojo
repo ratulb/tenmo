@@ -40,34 +40,44 @@ struct Gradbox[dtype: DType](
     var _refcount: UnsafePointer[Atomic[DType.uint64], MutAnyOrigin]
     comptime Empty = Gradbox[Self.dtype].zeros(Shape())
 
-    def __init__(out self, shape: Shape, share: Bool = True):
+    def __init__(out self, shape: Shape):
         """Initialize a Gradbox with the given shape.
 
-        Uses shared-from-birth allocation when share=True (default).
+        Always uses shared-from-birth allocation.
         Args:
             shape: The tensor shape.
-            share: If True, share the underlying buffer for refcounting.
         """
-        if share:
-            self.buffer = NDBuffer[Self.dtype].shared(shape)
-        else:
-            var ndb = NDBuffer[Self.dtype](shape)
-            self.buffer = ndb^
+        self.buffer = NDBuffer[Self.dtype].shared(shape)
         self._refcount = alloc[Atomic[DType.uint64]](1)
         self._refcount[] = Atomic[DType.uint64](1)
 
     def __init__(
-        out self, var buffer: NDBuffer[Self.dtype], share: Bool = True
+        out self, var buffer: NDBuffer[Self.dtype]
     ):
         """Initialize a Gradbox from an existing NDBuffer.
 
+        On CPU: the buffer is made shared for refcounting,
+        preserving the original shape, strides, and offset.
+        On GPU: DeviceBuffer is already refcounted, ownership taken directly.
         Args:
-            buffer: The NDBuffer to wrap.
-            share: If True, share the buffer. If False, take ownership.
+            buffer: The data buffer (ownership consumed).
         """
+        comptime if has_accelerator():
+            if buffer.is_on_gpu():
+                # GPU: DeviceBuffer always refcounted — take ownership as-is
+                self.buffer = buffer^
+            else:
+                var shape = buffer.shape
+                var strides = buffer.strides
+                var offset = buffer.offset
+                self.buffer = buffer.share(shape, strides, offset)
+        else:
+            var shape = buffer.shape
+            var strides = buffer.strides
+            var offset = buffer.offset
+            self.buffer = buffer.share(shape, strides, offset)
         self._refcount = alloc[Atomic[DType.uint64]](1)
         self._refcount[] = Atomic[DType.uint64](1)
-        self.buffer = buffer.share() if share else buffer^
 
     def __moveinit__(out self, *, deinit take: Self):
         """Move constructor — transfer ownership without copying."""
@@ -134,7 +144,7 @@ struct Gradbox[dtype: DType](
         """
         var owned_buffer = self.buffer.copy()
         var nd_buffer = owned_buffer.transpose(axes, shared=True)
-        return Gradbox[Self.dtype](nd_buffer^, share=False)
+        return Gradbox[Self.dtype](nd_buffer^)
 
     def __abs__(self) -> Gradbox[Self.dtype]:
         """Compute element-wise absolute value.
@@ -142,7 +152,7 @@ struct Gradbox[dtype: DType](
         Returns:
             A new Gradbox with absolute values.
         """
-        return Gradbox[Self.dtype](self.buffer.__abs__(), share=False)
+        return Gradbox[Self.dtype](self.buffer.__abs__())
 
     def sqrt(
         self,
@@ -185,7 +195,7 @@ struct Gradbox[dtype: DType](
             return sum_sq.sqrt()
         else:
             panic("Only L2 norm (p=2) currently supported")
-            return Gradbox[Self.dtype](Shape(), share=False)
+            return Gradbox[Self.dtype](Shape())
 
     @staticmethod
     def arange(
@@ -200,7 +210,7 @@ struct Gradbox[dtype: DType](
             A 1D Gradbox with values from start to stop.
         """
         nd_buffer = NDBuffer[Self.dtype].arange(args)
-        return Gradbox[Self.dtype](nd_buffer^, share=False)
+        return Gradbox[Self.dtype](nd_buffer^)
 
     def flatten(
         self, start_dim: Int = 0, end_dim: Optional[Int] = None
@@ -215,7 +225,7 @@ struct Gradbox[dtype: DType](
             A flattened Gradbox.
         """
         flattened_buffer = self.buffer.flatten(start_dim, end_dim)
-        return Gradbox[Self.dtype](flattened_buffer^, share=False)
+        return Gradbox[Self.dtype](flattened_buffer^)
 
     def squeeze(self, axes: IntArray) -> Gradbox[Self.dtype]:
         """Remove dimensions of size 1.
@@ -228,7 +238,7 @@ struct Gradbox[dtype: DType](
         """
         var buffer = self.buffer.copy()
         var ndb = buffer.squeeze(axes, shared=False)
-        return Gradbox[Self.dtype](ndb^, share=False)
+        return Gradbox[Self.dtype](ndb^)
 
     def squeeze(self, axes: List[Int] = []) -> Gradbox[Self.dtype]:
         """Remove dimensions of size 1.
@@ -252,7 +262,7 @@ struct Gradbox[dtype: DType](
         """
         var buffer = self.buffer.copy()
         var ndb = buffer.unsqueeze(axes, shared=False)
-        return Gradbox[Self.dtype](ndb^, share=False)
+        return Gradbox[Self.dtype](ndb^)
 
     def unsqueeze(self, axes: List[Int]) -> Gradbox[Self.dtype]:
         """Add dimensions of size 1.
@@ -276,14 +286,13 @@ struct Gradbox[dtype: DType](
         """
         var self_buffer = self.buffer.copy()
         var result_ndb = self_buffer.permute(axes, shared=False)
-        return Gradbox[Self.dtype](result_ndb^, share=False)
+        return Gradbox[Self.dtype](result_ndb^)
 
     @staticmethod
     @always_inline
     def full(
         shape: Shape,
         scalar: Scalar[Self.dtype],
-        share: Bool = False,
         device: Device = CPU().into(),
     ) -> Gradbox[Self.dtype]:
         """Create a Gradbox filled with a scalar value.
@@ -291,34 +300,31 @@ struct Gradbox[dtype: DType](
         Args:
             shape: The tensor shape.
             scalar: The value to fill with.
-            share: If True, share the buffer. If False, create owned copy.
             device: The target device (CPU or GPU).
 
         Returns:
             A new Gradbox filled with the scalar value.
         """
         return Gradbox[Self.dtype](
-            NDBuffer.full(shape, scalar, device), share=share
+            NDBuffer.full(shape, scalar, device)
         )
 
     @staticmethod
     @always_inline
     def zeros(
-        shape: Shape, share: Bool = False, device: Device = CPU().into()
+        shape: Shape, device: Device = CPU().into()
     ) -> Gradbox[Self.dtype]:
         """Create a Gradbox of zeros.
 
         Args:
             shape: The tensor shape.
-            share: If True, share the buffer. If False, create owned copy.
             device: The target device (CPU or GPU).
 
         Returns:
-            A new Gradbox filled with zeros.
+            A new Gradbox of zeros.
         """
-        return Gradbox[Self.dtype](
-            NDBuffer.full(shape, Scalar[Self.dtype](0), device=device),
-            share=share,
+        return Gradbox[Self.dtype].full(
+            shape, Scalar[Self.dtype](0), device=device
         )
 
     @staticmethod
@@ -328,7 +334,6 @@ struct Gradbox[dtype: DType](
         max: Scalar[Self.dtype] = 1,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
-        share: Bool = False,
     ) -> Gradbox[Self.dtype]:
         """Create a Gradbox with uniform random values.
 
@@ -337,8 +342,6 @@ struct Gradbox[dtype: DType](
             min: Lower bound (inclusive).
             max: Upper bound (exclusive).
             init_seed: Random seed. If None, randomizes each call.
-            requires_grad: Whether to track gradients (unused, for API compat).
-            share: If True, share the buffer. If False, create owned copy.
 
         Returns:
             A new Gradbox with random values in [min, max).
@@ -355,20 +358,19 @@ struct Gradbox[dtype: DType](
             ).cast[Self.dtype]()
 
         return Gradbox[Self.dtype](
-            NDBuffer[Self.dtype](buffer^, shape), share=share
+            NDBuffer[Self.dtype](buffer^, shape)
         )
 
     @always_inline
-    def detach(self, share: Bool = False) -> Gradbox[Self.dtype]:
+    def detach(self) -> Gradbox[Self.dtype]:
         """Create a detached (contiguous) copy of this Gradbox.
 
-        Args:
-            share: If True, share the buffer. If False, create owned copy.
+        The result always has a shared (refcounted) buffer.
 
         Returns:
             A new contiguous Gradbox.
         """
-        return Gradbox[Self.dtype](self.buffer.contiguous(), share=share)
+        return Gradbox[Self.dtype](self.buffer.contiguous())
 
     def is_shared(self) -> Bool:
         """Check if the underlying buffer is shared.
@@ -397,7 +399,8 @@ struct Gradbox[dtype: DType](
         var nd_buffer = SumMeanReduction[Self.dtype].reduce(
             self.buffer, normalized_axes=normalized_axes, keepdims=keepdims
         )
-        return Gradbox[Self.dtype](nd_buffer^, share=False)
+        return Gradbox[Self.dtype](nd_buffer^)
+
 
     @always_inline
     def mean(
@@ -430,16 +433,16 @@ struct Gradbox[dtype: DType](
         var nd_buffer = SumMeanReduction[Self.dtype].sum_over_broadcasted_axes(
             extended_grad.buffer, target_shape
         )
-        return Gradbox[Self.dtype](nd_buffer^, share=False)
+        return Gradbox[Self.dtype](nd_buffer^)
+
 
     def broadcast_to(
-        self, target_shape: Shape, share: Bool = False
+        self, target_shape: Shape
     ) -> Gradbox[Self.dtype]:
         """Broadcast this Gradbox to the target shape.
 
         Args:
             target_shape: The shape to broadcast to.
-            share: If True, share the buffer. If False, create owned copy.
 
         Returns:
             A new Gradbox with the target shape.
@@ -456,7 +459,7 @@ struct Gradbox[dtype: DType](
             )
 
         var broadcasted_buffer = self.buffer.broadcast_to(target_shape)
-        var out = Gradbox[Self.dtype](broadcasted_buffer^, share=share)
+        var out = Gradbox[Self.dtype](broadcasted_buffer^)
         return out^
 
     def __getitem__(self, *indices: Idx) -> Gradbox[Self.dtype]:
@@ -467,15 +470,7 @@ struct Gradbox[dtype: DType](
 
         Returns:
             A new Gradbox view over the indexed region.
-
-        Raises:
-            Panic if called on an unshared Gradbox.
         """
-        if not self.is_shared():
-            panic(
-                "Gradbox -> __getitem__(self, *indices: Idx): can not call on"
-                " an unshared gradbox"
-            )
         # Compute view metadata
         view_shape, view_strides, relative_offset = (
             Validator.validate_and_compute_advanced_indexing_metadata(
@@ -499,7 +494,7 @@ struct Gradbox[dtype: DType](
         comptime if has_accelerator():
             ndb.device_state = self.buffer.device_state.copy()
 
-        return Gradbox[Self.dtype](ndb^, share=False)
+        return Gradbox[Self.dtype](ndb^)
 
     def slice(
         self, start: Int, end: Int, step: Int = 1, axis: Int = 0
@@ -514,11 +509,7 @@ struct Gradbox[dtype: DType](
 
         Returns:
             A gradbox over the sliced region.
-        Raises:
-            Panic if called on an unshared Gradbox.
         """
-        if not self.is_shared():
-            panic("Gradbox -> slice: can not call on an unshared gradbox")
         var shape, strides, offset = (
             Validator.validate_and_compute_slice_metadata(
                 self.shape(), self.strides(), axis, start, end, step
@@ -544,7 +535,7 @@ struct Gradbox[dtype: DType](
         comptime if has_accelerator():
             ndb.device_state = self.buffer.device_state.copy()
 
-        return Gradbox[Self.dtype](ndb^, share=False)
+        return Gradbox[Self.dtype](ndb^)
 
     @always_inline
     def __getitem__(self, indices: List[Int]) -> Scalar[Self.dtype]:
@@ -1053,7 +1044,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with max values.
         """
         return Gradbox[Self.dtype](
-            self.buffer.scalar_ops[MAX](scalar), share=False
+            self.buffer.scalar_ops[MAX](scalar)
         )
 
     def min(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
@@ -1066,7 +1057,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with min values.
         """
         return Gradbox[Self.dtype](
-            self.buffer.scalar_ops[MIN](scalar), share=False
+            self.buffer.scalar_ops[MIN](scalar)
         )
 
     def __mul__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
@@ -1079,7 +1070,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer.scalar_ops[Multiply](scalar), share=False
+            self.buffer.scalar_ops[Multiply](scalar)
         )
 
     def __rmul__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
@@ -1103,7 +1094,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer.scalar_ops[Add](scalar), share=False
+            self.buffer.scalar_ops[Add](scalar)
         )
 
     def __radd__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
@@ -1127,7 +1118,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer.scalar_ops[Subtract](scalar), share=False
+            self.buffer.scalar_ops[Subtract](scalar)
         )
 
     def __rsub__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
@@ -1140,7 +1131,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer.scalar_ops[ReverseSubtract](scalar), share=False
+            self.buffer.scalar_ops[ReverseSubtract](scalar)
         )
 
     def __truediv__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
@@ -1158,7 +1149,7 @@ struct Gradbox[dtype: DType](
         if scalar == Scalar[Self.dtype](0):
             panic("Gradbox → __truediv__(scalar): can not divide by zero")
         return Gradbox[Self.dtype](
-            self.buffer.scalar_ops[Divide](scalar), share=False
+            self.buffer.scalar_ops[Divide](scalar)
         )
 
     def __rtruediv__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
@@ -1171,7 +1162,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer.scalar_ops[ReverseDivide](scalar), share=False
+            self.buffer.scalar_ops[ReverseDivide](scalar)
         )
 
     def __mul__(self, other: Self) -> Gradbox[Self.dtype]:
@@ -1184,7 +1175,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer.arithmetic_ops[Multiply](other.buffer), share=False
+            self.buffer.arithmetic_ops[Multiply](other.buffer)
         )
 
     def __mul__(self, other: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
@@ -1197,7 +1188,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer.arithmetic_ops[Multiply](other.buffer), share=False
+            self.buffer.arithmetic_ops[Multiply](other.buffer)
         )
 
     def matmul(
@@ -1224,7 +1215,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer.arithmetic_ops[Add](other.buffer), share=False
+            self.buffer.arithmetic_ops[Add](other.buffer)
         )
 
     def __add__(self, other: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
@@ -1237,7 +1228,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer.arithmetic_ops[Add](other.buffer), share=False
+            self.buffer.arithmetic_ops[Add](other.buffer)
         )
 
     def __sub__(self, other: Self) -> Gradbox[Self.dtype]:
@@ -1250,7 +1241,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer.arithmetic_ops[Subtract](other.buffer), share=False
+            self.buffer.arithmetic_ops[Subtract](other.buffer)
         )
 
     def __sub__(self, other: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
@@ -1263,7 +1254,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer.arithmetic_ops[Subtract](other.buffer), share=False
+            self.buffer.arithmetic_ops[Subtract](other.buffer)
         )
 
     def __truediv__(self, other: Self) -> Gradbox[Self.dtype]:
@@ -1276,7 +1267,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer.arithmetic_ops[Divide](other.buffer), share=False
+            self.buffer.arithmetic_ops[Divide](other.buffer)
         )
 
     def __imul__(self, scalar: Scalar[Self.dtype]):
@@ -1408,11 +1399,8 @@ struct Gradbox[dtype: DType](
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
     @always_inline
-    def reshape(self, share: Bool = False) -> Gradbox[Self.dtype]:
+    def reshape(self) -> Gradbox[Self.dtype]:
         """Reshape to a scalar Gradbox.
-
-        Args:
-            share: If True, share the buffer. If False, create owned copy.
 
         Returns:
             A scalar Gradbox.
@@ -1425,25 +1413,24 @@ struct Gradbox[dtype: DType](
                 "Gradbox → reshape: only gradbox with single element can be"
                 " reshaped to scalar gradbox"
             )
-        return self.reshape(Shape(), validated=True, share=share)
+        return self.reshape(Shape(), validated=True)
 
     @always_inline
     def reshape(
-        self, new_shape: Shape, validated: Bool = False, share: Bool = False
+        self, new_shape: Shape, validated: Bool = False
     ) -> Gradbox[Self.dtype]:
         """Reshape to a new shape.
 
         Args:
             new_shape: The target shape.
             validated: If True, skip validation (caller guarantees validity).
-            share: If True, share the buffer. If False, create owned copy.
 
         Returns:
             A new Gradbox with the reshaped buffer.
         """
         var nd_buffer = self.buffer.reshape(new_shape, validated)
 
-        return Gradbox[Self.dtype](nd_buffer^, share=share)
+        return Gradbox[Self.dtype](nd_buffer^)
 
     def __eq__(self, tensor: Tensor[Self.dtype]) -> Bool:
         """Check equality with a Tensor.

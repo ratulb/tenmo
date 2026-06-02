@@ -61,7 +61,7 @@ struct DropoutBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var mask_ndb = NDBuffer[Self.dtype](arg_dropout.mask_cpu, shape)
             result_ndb = gradbox.buffer * mask_ndb
 
-        var gradbox_ancestor = Gradbox[Self.dtype](result_ndb^, share=False)
+        var gradbox_ancestor = Gradbox[Self.dtype](result_ndb^)
         if ancestor.requires_grad:
             ancestor.update_grad(gradbox_ancestor^, AddTensor, None)
         parent_ids.append(ancestor._id)

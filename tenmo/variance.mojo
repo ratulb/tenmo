@@ -84,7 +84,7 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 gradbox_ancestor = Gradbox[Self.dtype].full(
                     x_ndb.shape,
                     scalar_grad,
-                    share=False,
+                    
                     device=gradbox.device(),
                 )
         else:

@@ -23,7 +23,7 @@ struct ClipBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var parent = output.ancestry().get(0)
         ref shape = parent.shape()
         var parent_buffer = parent.buffer()
-        var parent_gradbox = Gradbox[Self.dtype].zeros(shape, share=False)
+        var parent_gradbox = Gradbox[Self.dtype].zeros(shape)
 
         if parent_buffer.is_contiguous():
             var src = parent_buffer.data_ptr()

@@ -47,7 +47,7 @@ struct VectorMatmulNdBackward[dtype: DType](
         # Gradient for v: dv[k] = grad_out[n] @ M^T[n, k]
         # This is equivalent to: dv[k] = sum_j(grad_out[j] * M[k, j])
         if v.requires_grad:
-            var grad_v = Gradbox[Self.dtype].zeros(v_shape, share=True)
+            var grad_v = Gradbox[Self.dtype].zeros(v_shape)
 
             # Hoist metadata
             var grad_out_stride = grad_out.strides()[-1]
@@ -104,7 +104,7 @@ struct VectorMatmulNdBackward[dtype: DType](
 
         # Gradient for M: dM[k, n] = v[k] ⊗ grad_out[n] (outer product)
         if M.requires_grad:
-            var grad_M = Gradbox[Self.dtype].zeros(M_shape, share=True)
+            var grad_M = Gradbox[Self.dtype].zeros(M_shape)
 
             # Hoist metadata
             var v_stride = v.buffer.strides[-1]

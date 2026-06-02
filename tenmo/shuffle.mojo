@@ -35,13 +35,13 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
                         gradbox.buffer, permutation, axis, sync=sync
                     )
                     gradbox_parent = Gradbox[Self.dtype](
-                        result_ndb^, share=False
+                        result_ndb^, 
                     )
                 except e:
                     panic("ShuffleBackward GPU scatter failed: " + String(e))
                     # Unreachable
                     gradbox_parent = Gradbox[Self.dtype].zeros(
-                        shape, share=False
+                        shape, 
                     )
                 parent.update_grad(gradbox_parent^, AddTensor, None)
                 parent_ids.append(parent._id)
@@ -53,7 +53,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
         # Scatter gradients back using the original permutation
         # For each position in the output gradient, find where it came from in the input
 
-        gradbox_parent = Gradbox[Self.dtype].zeros(shape, share=False)
+        gradbox_parent = Gradbox[Self.dtype].zeros(shape)
         for grad_coord in shape:
             var parent_coord = grad_coord
             parent_coord[axis] = permutation[grad_coord[axis]]

@@ -379,7 +379,7 @@ struct ProductBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             expanded = Gradbox[Self.dtype].full(
                 ancestor_shape,
                 scalar_grad,
-                share=False,
+                
                 device=gradbox.device(),
             )
         elif not bwd_arg.keepdims:
@@ -407,7 +407,7 @@ struct ProductBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # ── Step 3: grad_input = grad_broadcast * excl_product ─────────────
         var grad_input = grad_broadcast.buffer * excl_ndb
 
-        var gradbox_ancestor = Gradbox[Self.dtype](grad_input^, share=False)
+        var gradbox_ancestor = Gradbox[Self.dtype](grad_input^)
         ancestor.update_grad(gradbox_ancestor^, AddTensor, None)
         parent_ids.append(ancestor._id)
         if not retain_graph:

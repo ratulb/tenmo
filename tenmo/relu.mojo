@@ -38,7 +38,7 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
             var result_buf = gradbox.buffer.data_buffer() * mask_buf
             result_ndb = NDBuffer[Self.dtype](result_buf^, shape)
 
-        var ancestor_gbx = Gradbox[Self.dtype](result_ndb^, share=False)
+        var ancestor_gbx = Gradbox[Self.dtype](result_ndb^)
         ancestor.update_grad(ancestor_gbx^, AddTensor, None)
 
         parent_ids.append(ancestor._id)

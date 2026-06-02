@@ -51,7 +51,7 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
             var H_out = output_shape[2]
             var W_out = output_shape[3]
 
-            var grad_input = Gradbox[Self.dtype].zeros(input_shape, share=False)
+            var grad_input = Gradbox[Self.dtype].zeros(input_shape)
 
             # Direct buffer access
             var grad_out_ptr = grad_output.data_ptr()

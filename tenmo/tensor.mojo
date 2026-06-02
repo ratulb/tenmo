@@ -133,21 +133,20 @@ struct Tensor[dtype: DType](
         self.init_gradbox()
 
     def as_gradbox(
-        deinit self, share: Bool = False, *, contiguous: Bool = True
+        deinit self, *, contiguous: Bool = True
     ) -> Gradbox[Self.dtype]:
         """Convert tensor to a Gradbox for gradient operations.
 
         Args:
-            share: If True, shared gradbox. If False, gradbox is not shared.
             contiguous: If True, materializes a contiguous copy first.
 
         Returns:
             A Gradbox containing the tensor's data.
         """
         if contiguous:
-            return Gradbox[Self.dtype](self^.buffer.contiguous(), share=share)
+            return Gradbox[Self.dtype](self^.buffer.contiguous())
         else:
-            return Gradbox[Self.dtype](self^.buffer^, share=share)
+            return Gradbox[Self.dtype](self^.buffer^)
 
     def as_list(self) -> List[Scalar[Self.dtype]]:
         """Copy tensor data into a Mojo List.
@@ -217,7 +216,7 @@ struct Tensor[dtype: DType](
                         var ndb = NDBuffer[Self.dtype].with_device_state(
                             device_state^, self.shape()
                         )
-                        gradbox = Gradbox[Self.dtype](ndb^, share=False)
+                        gradbox = Gradbox[Self.dtype](ndb^)
                     except e:
                         print(e)
                         panic(
@@ -2193,7 +2192,6 @@ struct Tensor[dtype: DType](
             grad_contrib = Gradbox[Self.dtype].full(
                 self.shape(),
                 upstream_grad.item(),
-                share=False,
                 device=upstream_grad.device(),
             )
         else:

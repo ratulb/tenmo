@@ -225,9 +225,9 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var d_x = rstd.__mul__[track_grad=False](bracket)  # (*, D)
 
         # ── Wrap into Gradbox and update parents ────────────────────────────
-        var d_input = Gradbox[Self.dtype](d_x.buffer, share=False)
-        var d_gamma = Gradbox[Self.dtype](d_gamma_ndb, share=False)
-        var d_beta = Gradbox[Self.dtype](d_beta_ndb, share=False)
+        var d_input = Gradbox[Self.dtype](d_x.buffer)
+        var d_gamma = Gradbox[Self.dtype](d_gamma_ndb)
+        var d_beta = Gradbox[Self.dtype](d_beta_ndb)
 
         input_ancestor.update_grad(d_input^, AddTensor, None)
         parent_ids.append(input_ancestor._id)

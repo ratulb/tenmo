@@ -50,20 +50,20 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                             Gradbox[Self.dtype].full(
                                 parameter.shape(),
                                 Scalar[Self.dtype](0),
-                                share=False,
+                                
                                 device=parameter.device(),
                             )
                         )
                     else:
                         self.velocities.append(
                             Gradbox[Self.dtype].zeros(
-                                parameter.shape(), share=False
+                                parameter.shape(), 
                             )
                         )
                 else:
                     self.velocities.append(
                         Gradbox[Self.dtype].zeros(
-                            parameter.shape(), share=False
+                            parameter.shape(), 
                         )
                     )
 

@@ -31,7 +31,7 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         var shape = ancestor.shape()
-        var mask_grad = Gradbox[Self.dtype](mask, share=False)
+        var mask_grad = Gradbox[Self.dtype](mask)
 
         if shape.rank() == 0:
             ancestor.update_grad(mask_grad^, AddTensor, None)
@@ -41,14 +41,14 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var grad_expanded: Gradbox[Self.dtype]
         if gradbox.shape() == Shape():
             grad_expanded = Gradbox[Self.dtype].full(
-                shape, gradbox.item(), share=False, device=mask.device()
+                shape, gradbox.item(), device=mask.device()
             )
         elif not keepdims:
             grad_expanded = gradbox.unsqueeze(axes).broadcast_to(
-                shape, share=False
+                shape, 
             )
         else:
-            grad_expanded = gradbox.broadcast_to(shape, share=False)
+            grad_expanded = gradbox.broadcast_to(shape)
 
         var grad_contrib = grad_expanded * mask_grad
         ancestor.update_grad(grad_contrib^, AddTensor, None)

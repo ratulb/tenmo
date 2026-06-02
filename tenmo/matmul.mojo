@@ -36,7 +36,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var ndb = grad_out.buffer.matmul_2d(
                 B_buffer.transpose(IntArray(-1, -2))
             )
-            var grad_A = Gradbox[Self.dtype](ndb^, share=False)
+            var grad_A = Gradbox[Self.dtype](ndb^)
 
             A.update_grad(grad_A^, AddTensor, None)
             parent_ids.append(A._id)
@@ -46,7 +46,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var A_buffer = A.buffer()
             var A_buffer_transposed = A_buffer.transpose(IntArray(-1, -2))
             var ndb = A_buffer_transposed.matmul_2d(grad_out.buffer)
-            var grad_B = Gradbox[Self.dtype](ndb^, share=False)
+            var grad_B = Gradbox[Self.dtype](ndb^)
 
             B.update_grad(grad_B^, AddTensor, None)
             parent_ids.append(B._id)
@@ -81,7 +81,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         var ndb = A.buffer.matmul_2d(B.buffer)
-        var C = Gradbox[Self.dtype](ndb^, share=False)
+        var C = Gradbox[Self.dtype](ndb^)
         return C^
 
     @staticmethod
@@ -90,7 +90,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         A: Gradbox[Self.dtype], B: Tensor[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         var ndb = A.buffer.matmul_2d(B.buffer)
-        var C = Gradbox[Self.dtype](ndb^, share=False)
+        var C = Gradbox[Self.dtype](ndb^)
         return C^
 
 
@@ -175,7 +175,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if A_shape.rank() == 2 and B_shape.rank() == 2:
             return Matmul2d[Self.dtype].forward(A, B)
         var ndb = A.buffer.matmul_nd(B.buffer)
-        var C = Gradbox[Self.dtype](ndb^, share=False)
+        var C = Gradbox[Self.dtype](ndb^)
 
         return C^
 
@@ -191,7 +191,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             return Matmul2d[Self.dtype].forward(A, B)
 
         var ndb = A.buffer.matmul_nd(B.buffer)
-        var C = Gradbox[Self.dtype](ndb^, share=False)
+        var C = Gradbox[Self.dtype](ndb^)
 
         return C^
 

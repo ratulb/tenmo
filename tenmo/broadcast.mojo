@@ -63,7 +63,7 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
             grad_contrib = Gradbox[Self.dtype].full(
                 self.shape,
                 upstream_grad.item(),
-                share=False,
+                
                 device=upstream_grad.device(),
             )
         else:

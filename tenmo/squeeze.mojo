@@ -25,7 +25,7 @@ struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 ancestor_gradbox = Gradbox[Self.dtype].full(
                     original_shape,
                     gradbox.item(),
-                    share=False,
+                    
                     device=gradbox.device(),
                 )
             else:

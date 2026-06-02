@@ -25,7 +25,7 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var result_ndb = parent.buffer().arithmetic_ops[LOG_BACKWARD](
             gradbox.buffer, epsilon
         )
-        var parent_gradbox = Gradbox[Self.dtype](result_ndb^, share=False)
+        var parent_gradbox = Gradbox[Self.dtype](result_ndb^)
 
         parent.update_grad(parent_gradbox^, AddTensor, None)
 

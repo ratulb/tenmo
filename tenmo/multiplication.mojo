@@ -53,7 +53,7 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         if count == 1:  # B = A * A, A is the only ancestor of B
             var gradbox_prod = (
-                Gradbox[Self.dtype](ancestor_lhs.buffer(), share=False)
+                Gradbox[Self.dtype](ancestor_lhs.buffer())
                 * gradbox
             )
             gradbox_prod = gradbox_prod * Scalar[Self.dtype](2)
@@ -67,14 +67,14 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         if ancestor_lhs.requires_grad:
             var gradbox_prod = gradbox * Gradbox[Self.dtype](
-                ancestor_rhs.buffer(), share=False
+                ancestor_rhs.buffer(), 
             )
             ancestor_lhs.update_grad(gradbox_prod^, AddTensor, None)
             parent_ids.append(ancestor_lhs._id)
 
         if ancestor_rhs.requires_grad:
             var gradbox_prod = gradbox * Gradbox[Self.dtype](
-                ancestor_lhs.buffer(), share=False
+                ancestor_lhs.buffer(), 
             )
             ancestor_rhs.update_grad(gradbox_prod^, AddTensor, None)
             parent_ids.append(ancestor_rhs._id)
@@ -163,4 +163,4 @@ struct Multiplicator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         self: Tensor[Self.dtype], other: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         var nd_buffer = self.buffer.arithmetic_ops[Multiply](other.buffer)
-        return Gradbox[Self.dtype](nd_buffer^, share=False)
+        return Gradbox[Self.dtype](nd_buffer^)

@@ -410,7 +410,7 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
             C,
         )
         # Step 6: Reshape back to original logits shape
-        var _tmp0 = Gradbox[Self.dtype](scaled^, share=False)
+        var _tmp0 = Gradbox[Self.dtype](scaled^)
         var grad_final = _tmp0.reshape(logits_shape)
         # Step 6: Reshape and UNPERMUTE back to original logits shape
         var rank = logits_shape.rank()
@@ -634,7 +634,7 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         # Reshape to original logits shape
         var grad_final = scaled.reshape(logits_shape)
 
-        var gradbox = Gradbox[Self.dtype](grad_final, share=False)
+        var gradbox = Gradbox[Self.dtype](grad_final)
         if logits.requires_grad:
             logits.update_grad(gradbox, AddTensor, None)
         parent_ids.append(logits._id)

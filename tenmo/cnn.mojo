@@ -675,7 +675,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         For each channel co, data is at indices:
           [n*C_out*H_out*W_out + co*H_out*W_out + spatial_pos]
         """
-        var grad_bias = Gradbox[Self.dtype].zeros(Shape(C_out), share=False)
+        var grad_bias = Gradbox[Self.dtype].zeros(Shape(C_out))
         var grad_ptr = grad_output.data_ptr()
         var bias_ptr = grad_bias.data_ptr()
 
@@ -803,8 +803,8 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # Convert back to Gradbox (consumes Tensor)
         # contiguous=True ensures the result is contiguous (will copy if needed)
-        # share=False means the buffer is NOT ref-counted (owned by this Gradbox)
-        return grad_kernel_tensor^.as_gradbox(share=False, contiguous=True)
+        # Gradbox is always shared (refcounted)
+        return grad_kernel_tensor^.as_gradbox(contiguous=True)
 
     # INPUT GRADIENT
     @always_inline
@@ -836,7 +836,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         Note: Hard to vectorize due to scatter pattern. Focus on cache optimization.
         """
         var grad_padded = Gradbox[Self.dtype].zeros(
-            Shape(N, C_in, H_pad, W_pad), share=False
+            Shape(N, C_in, H_pad, W_pad), 
         )
 
         var grad_ptr = grad_output.data_ptr()

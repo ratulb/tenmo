@@ -61,7 +61,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
         if parent.requires_grad:
             ref parent_shape = parent.shape()
             var grad_parent = Gradbox[Self.dtype].zeros(
-                parent_shape, share=False
+                parent_shape, 
             )
 
             # Different backward pass based on mode

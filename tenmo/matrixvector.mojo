@@ -47,7 +47,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](
 
         # Gradient for M: dM[m, k] = grad_out[m] *(elementwise) v[k] (outer product)
         if M.requires_grad:
-            var grad_M = Gradbox[Self.dtype].zeros(M_shape, share=True)
+            var grad_M = Gradbox[Self.dtype].zeros(M_shape)
 
             # Hoist metadata
             var grad_out_stride = grad_out.strides()[-1]
@@ -144,7 +144,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](
         # Gradient for v: dv[k] = M^T[k, m] @ grad_out[m]
         # This is: dv[k] = sum_i(M[i, k] * grad_out[i])
         if v.requires_grad:
-            var grad_v = Gradbox[Self.dtype].zeros(v_shape, share=True)
+            var grad_v = Gradbox[Self.dtype].zeros(v_shape)
 
             # Hoist metadata
             var M_stride0 = M.buffer.strides[-2]

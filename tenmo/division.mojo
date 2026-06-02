@@ -331,7 +331,7 @@ struct RightTrueDivBackwardScalar[dtype: DType](
         var grad_ndb = DivNdBuffer[Self.dtype].rdiv_scalar_backward(
             gradbox.buffer, ancestor.buffer(), scalar
         )
-        var grad_parent = Gradbox[Self.dtype](grad_ndb^, share=False)
+        var grad_parent = Gradbox[Self.dtype](grad_ndb^)
         ancestor.update_grad(grad_parent^, SubtractTensor, None)
         parent_ids.append(ancestor._id)
         if not retain_graph:
@@ -363,7 +363,7 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     Self.dtype
                 ].sum_over_broadcasted_axes(grad_num, buffer_top.shape)
             ancestor_top.update_grad(
-                Gradbox[Self.dtype](grad_num^, share=False),
+                Gradbox[Self.dtype](grad_num^),
                 AddTensor,
                 None,
             )
@@ -375,7 +375,7 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     Self.dtype
                 ].sum_over_broadcasted_axes(grad_den, buffer_bottom.shape)
             ancestor_bottom.update_grad(
-                Gradbox[Self.dtype](grad_den^, share=False),
+                Gradbox[Self.dtype](grad_den^),
                 SubtractTensor,
                 None,
             )
