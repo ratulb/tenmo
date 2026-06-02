@@ -708,3 +708,17 @@ To run specific test functions within a file, the `TestSuite` discovers all `fn 
 - **`alias` is deprecated** — Use `comptime` instead of `alias` for compile-time constants (e.g. `comptime dtype = DType.float32`).
 - **`@parameter` decorator is deprecated** — Use `comptime if` instead of `@parameter if` for compile-time conditional blocks. The `@parameter` decorator (which forced a `for` loop body to be unrolled at compile time) is no longer needed — write `comptime for` directly. In branches: `@parameter if cond:` → `comptime if cond:`.
 
+## Known Issues / Future Work
+
+### GPU `scatter_add` only supports axis=0
+
+GPU kernels `scatter_add_rows_kernel` and `scatter_add_broadcast_kernel` (`tenmo/kernels/filler_kernel.mojo`) compute target flat indices assuming row-major layout where `indices` pick rows (axis=0). For axis != 0, `Filler.scatter_add` (`tenmo/filler.mojo:138`) falls back to `_scatter_add_cpu`, which accesses GPU memory element-by-element via `device_state[idx]` — correct but very slow.
+
+**Fix:** Thread `axis` through `_scatter_add_gpu` to the GPU kernel. The kernel should compute target flat index as either:
+- axis=0: `target_offset + indices[row] * stride0 + col * stride1`
+- axis=1: `target_offset + col * stride0 + indices[row] * stride1`
+
+The unused `scatter_add_rows_strided_kernel` (line 72) already accepts strides and offset — it just needs an `axis` parameter to swap which factor uses `indices[row]`. Then wire it into `_scatter_add_gpu`'s dispatch.
+
+Not urgent — all production callers (embedding backward, gather axis=0) use axis=0.
+

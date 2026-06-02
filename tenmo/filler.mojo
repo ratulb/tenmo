@@ -135,7 +135,7 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             var slice_volume = target.numels() // tgt_ax_size
 
             comptime if has_accelerator():
-                if target.is_on_gpu():
+                if target.is_on_gpu() and axis == 0:
                     FillerGpu[Self.dtype]._scatter_add_gpu(
                         target, source, indices, n_indices, slice_volume, sync=sync
                     )
