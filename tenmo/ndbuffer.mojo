@@ -172,6 +172,23 @@ struct NDBuffer[dtype: DType](
         ndb.device_state = device_state^
         return ndb^
 
+    @staticmethod
+    def shared(shape: Shape) -> NDBuffer[Self.dtype]:
+        """Create a contiguous NDBuffer backed by a shared-from-birth Buffer.
+
+        The underlying Buffer is already refcounted — no conversion needed.
+        Used by Gradbox for persistent gradient storage.
+
+        Args:
+            shape: The tensor shape.
+
+        Returns:
+            A new NDBuffer with a shared Buffer.
+        """
+        var numels = shape.num_elements()
+        var buf = Buffer[Self.dtype].shared(numels)
+        return NDBuffer[Self.dtype](buf^, shape=shape)
+
     def sync(self):
         comptime if has_accelerator():
             if self.is_on_gpu():
@@ -2441,7 +2458,10 @@ struct NDBuffer[dtype: DType](
                     result = False
             elif self.is_on_gpu() and other.is_on_cpu():
                 try:
-                    result = self.to_cpu().all_close[rtol=rtol, atol=atol](other)
+                    var cpu_self = self.to_cpu()
+                    result = cpu_self.contiguous_buffer().all_close[
+                        rtol=rtol, atol=atol
+                    ](other.contiguous_buffer())
                 except e:
                     print(e)
                     panic(
@@ -2450,9 +2470,10 @@ struct NDBuffer[dtype: DType](
                     result = False
             elif self.is_on_cpu() and other.is_on_gpu():
                 try:
-                    result = self.all_close[rtol=rtol, atol=atol](
-                        other.to_cpu()
-                    )
+                    var cpu_other = other.to_cpu()
+                    result = self.contiguous_buffer().all_close[
+                        rtol=rtol, atol=atol
+                    ](cpu_other.contiguous_buffer())
                 except e:
                     print(e)
                     panic(
