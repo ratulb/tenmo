@@ -997,7 +997,12 @@ struct Gradbox[dtype: DType](
     @always_inline
     def zero_grad(self):
         """Zero out all gradients."""
-        self._ndb_ptr.unsafe_value()[].buffer.zero()
+        ref ndb = self._ndb_ptr.unsafe_value()[]
+        comptime if has_accelerator():
+            if ndb.is_on_gpu():
+                ndb.zero()
+                return
+        ndb.buffer.zero()
 
     def fill(self, value: Scalar[Self.dtype], *indices: Idx):
         """Fill a region with a scalar value.
