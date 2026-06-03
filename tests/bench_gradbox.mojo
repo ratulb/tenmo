@@ -57,7 +57,7 @@ def bench_forward_graph():
         var num_iters = 2000
 
         var t0 = perf_counter_ns()
-        for iter in range(num_iters):
+        for _ in range(num_iters):
             var a = Tensor[dtype](Shape([32]), requires_grad=True)
             var b = Tensor[dtype](Shape([32]), requires_grad=True)
             for _ in range(depth):
@@ -86,7 +86,7 @@ def bench_backward():
         var num_iters = 500
 
         var t0 = perf_counter_ns()
-        for iter in range(num_iters):
+        for _ in range(num_iters):
             var a = Tensor[dtype](Shape([32]), requires_grad=True)
             var b = Tensor[dtype](Shape([32]), requires_grad=True)
             var out = a + b
@@ -117,7 +117,7 @@ def bench_full_pipeline():
         var num_iters = 2000
 
         var t0 = perf_counter_ns()
-        for iter in range(num_iters):
+        for _ in range(num_iters):
             var a = Tensor[dtype](shape, requires_grad=True)
             var b = Tensor[dtype](shape, requires_grad=True)
             var c = a + b
@@ -150,10 +150,10 @@ def bench_fanout():
         var num_iters = 500
 
         var t0 = perf_counter_ns()
-        for iter in range(num_iters):
+        for _ in range(num_iters):
             var root = Tensor[dtype](Shape([16]), requires_grad=True)
             var outs = List[Tensor[dtype]]()
-            for i in range(n):
+            for _ in range(n):
                 var leaf = Tensor[dtype](Shape([16]), requires_grad=True)
                 outs.append(root + leaf)
             var sum_outs = outs[0]
