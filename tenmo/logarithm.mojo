@@ -23,7 +23,7 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
         var result_ndb = parent.buffer().arithmetic_ops[LOG_BACKWARD](
-            gradbox.buffer, epsilon
+            gradbox.buffer(), epsilon
         )
         var parent_gradbox = Gradbox[Self.dtype](result_ndb^)
 

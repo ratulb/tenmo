@@ -33,8 +33,8 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref grad_output = output.gradients()
         # var grad_data = grad_output.buffer.buffer.data
         var grad_data = grad_output.data_ptr()
-        ref grad_shape = grad_output.shape()
-        ref grad_strides = grad_output.strides()
+        var grad_shape = grad_output.shape()
+        var grad_strides = grad_output.strides()
 
         var count = len(output.ancestry())
 

@@ -142,7 +142,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var pad_top = pad[2][0]
         var pad_left = pad[3][0]
 
-        ref grad_out_shape = grad_out.shape()
+        var grad_out_shape = grad_out.shape()
         var H_pad = grad_out_shape[2]
         var W_pad = grad_out_shape[3]
 

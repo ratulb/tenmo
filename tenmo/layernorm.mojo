@@ -174,7 +174,7 @@ struct LayerNormBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var gamma_ancestor = output.ancestry().get(1)  # gamma
         var beta_ancestor = output.ancestry().get(2)  # beta
 
-        var upstream = Tensor[Self.dtype](gradbox.buffer)  # (*, D)
+        var upstream = Tensor[Self.dtype](gradbox.buffer())  # (*, D)
         var x_hat = Tensor[Self.dtype](arg.x_hat)  # (*, D)
         var rstd = Tensor[Self.dtype](arg.rstd)  # (*, 1)
         var gamma = Tensor[Self.dtype](arg.gamma)  # (D,)

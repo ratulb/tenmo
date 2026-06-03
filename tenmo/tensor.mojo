@@ -219,7 +219,7 @@ struct Tensor[dtype: DType](
                         )
                         gradbox = Gradbox[
                             Self.dtype
-                        ].Empty  # unreachable, satisfies compiler
+                        ](Shape())  # unreachable, satisfies compiler
                 else:
                     gradbox = Gradbox[Self.dtype](self.shape())
                     gradbox.zero_grad()
@@ -713,7 +713,7 @@ struct Tensor[dtype: DType](
             gradbox: Source Gradbox to copy from.
             *indices: Idx objects (integers or slices) defining the destination region.
         """
-        Filler[Self.dtype].fill(self.buffer, gradbox.buffer, indices)
+        Filler[Self.dtype].fill(self.buffer, gradbox.buffer(), indices)
 
     def item(self) -> Scalar[Self.dtype]:
         return self.buffer.item()
@@ -2499,7 +2499,7 @@ struct Tensor[dtype: DType](
         Args:
             other: Gradbox to subtract.
         """
-        self.buffer.__isub__(other.buffer)
+        self.buffer.__isub__(other.buffer())
 
     def __imul__(self, other: Self):
         """In-place multiplication by another tensor.

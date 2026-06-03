@@ -64,11 +64,11 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             var view_data = gradbox.data_ptr()
             var view_offset = gradbox.offset()
-            ref view_strides = gradbox.strides()
+            var view_strides = gradbox.strides()
 
             var parent_grad_data = parent_gradbox.data_ptr()
             var parent_grad_offset = parent_gradbox.offset()
-            ref parent_grad_strides = parent_gradbox.strides()
+            var parent_grad_strides = parent_gradbox.strides()
 
             var use_fast_path = shape == parent_shape
 
@@ -156,7 +156,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var cpu_gradbox: Gradbox[Self.dtype]
         try:
             # Materialise entire GPU DeviceBuffer to CPU — raw flat copy
-            var ds = gradbox.buffer.device_state.value()
+            var ds = gradbox.buffer().device_state.value()
             var cpu_ndb_flat = ds.into(Shape(len(ds)))
             # Re-attach the view's logical shape/strides/offset
             # so backward_cpu coordinate mapping works correctly
@@ -184,12 +184,12 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             ref parent_strides = parent.strides()
             var parent_grad_offset = parent_gradbox.offset()
-            ref parent_grad_strides = parent_gradbox.strides()
+            var parent_grad_strides = parent_gradbox.strides()
             var parent_grad_data = parent_gradbox.data_ptr()
 
             var view_data = cpu_gradbox.data_ptr()
             var view_offset = cpu_gradbox.offset()
-            ref view_strides = cpu_gradbox.strides()
+            var view_strides = cpu_gradbox.strides()
 
             var use_fast_path = shape == parent_shape
 
@@ -249,9 +249,9 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             try:
                 var gpu = parent.buffer.device_state.value().get_gpu()
                 var ds = DeviceState[Self.dtype](
-                    parent_gradbox.buffer.numels(), gpu
+                    parent_gradbox.buffer().numels(), gpu
                 )
-                ds.fill(parent_gradbox.buffer)
+                ds.fill(parent_gradbox.buffer())
                 var gpu_ndb = NDBuffer[Self.dtype].with_device_state(
                     ds^, parent_shape
                 )

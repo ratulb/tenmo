@@ -162,5 +162,5 @@ struct Multiplicator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def forward(
         self: Tensor[Self.dtype], other: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
-        var nd_buffer = self.buffer.arithmetic_ops[Multiply](other.buffer)
+        var nd_buffer = self.buffer.arithmetic_ops[Multiply](other.buffer())
         return Gradbox[Self.dtype](nd_buffer^)

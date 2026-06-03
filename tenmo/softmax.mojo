@@ -155,17 +155,17 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
         comptime if Self.is_log:
             # g - softmax(x) * sum(g, axes, keepdims=True)
             var sum_grad = SumMeanReduction[Self.dtype].sum(
-                gradbox.buffer, axes, keepdims=True
+                gradbox.buffer(), axes, keepdims=True
             )
             var softmax_sum = softmax_out * sum_grad
-            local_grad_ndb = gradbox.buffer - softmax_sum
+            local_grad_ndb = gradbox.buffer() - softmax_sum
         else:
             # y * (g - sum(g * y, axes, keepdims=True))
-            var gy = gradbox.buffer * softmax_out
+            var gy = gradbox.buffer() * softmax_out
             var gy_sum = SumMeanReduction[Self.dtype].sum(
                 gy, axes, keepdims=True
             )
-            var grad_diff = gradbox.buffer - gy_sum
+            var grad_diff = gradbox.buffer() - gy_sum
             local_grad_ndb = softmax_out * grad_diff
 
         var local_grad = Gradbox[Self.dtype](local_grad_ndb^)

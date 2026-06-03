@@ -33,7 +33,7 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
             var left_parent_grad = Self.upstream_grad_share(
                 left_parent.buffer(),
                 right_parent.buffer(),
-                incoming_grad.buffer,
+                incoming_grad.buffer(),
             )
 
             left_parent.update_grad(left_parent_grad^, Self.lhs_op, None)
@@ -44,7 +44,7 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
             var right_parent_grad = Self.upstream_grad_share(
                 right_parent.buffer(),
                 left_parent.buffer(),
-                incoming_grad.buffer,
+                incoming_grad.buffer(),
             )
 
             right_parent.update_grad(right_parent_grad^, Self.rhs_op, None)

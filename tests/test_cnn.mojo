@@ -500,8 +500,8 @@ def assert_tensor_close(
     var total_elements = a.numels()
 
     for i in range(total_elements):
-        var diff = abs(a.buffer.data_buffer()[i] - b.buffer.data_buffer()[i])
-        var threshold = atol + rtol * abs(b.buffer.data_buffer()[i])
+        var diff = abs(a.buffer().data_buffer()[i] - b.buffer().data_buffer()[i])
+        var threshold = atol + rtol * abs(b.buffer().data_buffer()[i])
 
         if diff > threshold:
             max_diff = max(max_diff, diff)
@@ -511,9 +511,9 @@ def assert_tensor_close(
                     + " FAILED: Value mismatch at index "
                     + String(i)
                     + ". Expected "
-                    + String(b.buffer.data_buffer()[i])
+                    + String(b.buffer().data_buffer()[i])
                     + " got "
-                    + String(a.buffer.data_buffer()[i])
+                    + String(a.buffer().data_buffer()[i])
                     + " (diff: "
                     + String(diff)
                     + ")"
@@ -1157,8 +1157,8 @@ def test_gradient_accumulation() raises:
     # grad_after_second should be approximately grad_after_first * 3
     # (first pass: 1x, second pass: 2x)
     for i in range(grad_after_first.numels()):
-        var expected = grad_after_first.buffer.data_buffer()[i] * 3.0
-        var actual = grad_after_second.buffer.data_buffer()[i]
+        var expected = grad_after_first.buffer().data_buffer()[i] * 3.0
+        var actual = grad_after_second.buffer().data_buffer()[i]
         if abs(actual - expected) > 1e-3:
             raise Error(
                 "Gradient accumulation test failed at index " + String(i)
@@ -1873,7 +1873,7 @@ def test_conv2d_backward_input_gradient() raises:
     # Input gradient should be non-zero
     var grad_sum = Scalar[dtype](0)
     for i in range(16):
-        grad_sum += x.grad().buffer.data_buffer()[i]
+        grad_sum += x.grad().buffer().data_buffer()[i]
 
     assert_true(grad_sum > 0)
 

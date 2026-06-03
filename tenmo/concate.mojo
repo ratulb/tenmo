@@ -24,8 +24,8 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var axis = output.ancestry().backward_fn_arg().get[Integer]().value
         ref grad_output = output.gradients()
         var grad_data = grad_output.data_ptr()
-        ref grad_shape = grad_output.shape()
-        ref grad_strides = grad_output.strides()
+        var grad_shape = grad_output.shape()
+        var grad_strides = grad_output.strides()
 
         var count = len(output.ancestry())
 

@@ -36,7 +36,7 @@ struct ExponentiationBackward[dtype: DType](
         var local_grad = base_pow.scalar_ops[Multiply](exponent)
 
         # Step 3: local_grad * upstream_grad — arithmetic_ops[Multiply], GPU safe
-        var grad_result = local_grad * gradbox.buffer
+        var grad_result = local_grad * gradbox.buffer()
 
         var parent_gradbox = Gradbox[Self.dtype](grad_result^)
 

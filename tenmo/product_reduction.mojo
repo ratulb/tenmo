@@ -367,7 +367,7 @@ struct ProductBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             output.ancestry().backward_fn_arg().get[ProductArg[Self.dtype]]()
         )
         ref gradbox = output.gradients()
-        ref gradbox_shape = gradbox.shape()
+        var gradbox_shape = gradbox.shape()
         var ancestor = output.ancestry().get(0)
         ref ancestor_shape = ancestor.shape()
 
@@ -405,7 +405,7 @@ struct ProductBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
 
         # ── Step 3: grad_input = grad_broadcast * excl_product ─────────────
-        var grad_input = grad_broadcast.buffer * excl_ndb
+        var grad_input = grad_broadcast.buffer() * excl_ndb
 
         var gradbox_ancestor = Gradbox[Self.dtype](grad_input^)
         ancestor.update_grad(gradbox_ancestor^, AddTensor, None)

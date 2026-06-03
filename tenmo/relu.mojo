@@ -32,10 +32,10 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         if gradbox.is_on_gpu():
             var mask_ndb = arg.get[NDBufferArg[Self.dtype]]().ndb
-            result_ndb = gradbox.buffer * mask_ndb
+            result_ndb = gradbox.buffer() * mask_ndb
         else:
             var mask_buf = arg.get[BufferArg[Self.dtype]]().buffer
-            var result_buf = gradbox.buffer.data_buffer() * mask_buf
+            var result_buf = gradbox.buffer().data_buffer() * mask_buf
             result_ndb = NDBuffer[Self.dtype](result_buf^, shape)
 
         var ancestor_gbx = Gradbox[Self.dtype](result_ndb^)

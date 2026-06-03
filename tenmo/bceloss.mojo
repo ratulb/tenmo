@@ -1308,7 +1308,7 @@ struct BCEWithLogitsBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         if bwd_arg.reduction.is_none():
             var grad_ndb = BceNdBuffer[Self.dtype].backward_with_logits(
-                sigmoid, target, gradbox.buffer
+                sigmoid, target, gradbox.buffer()
             )
             var grad_parent = Gradbox[Self.dtype](grad_ndb^)
             parent.update_grad(grad_parent^, AddTensor, None)
@@ -1344,7 +1344,7 @@ struct BCELossBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         if bwd_arg.reduction.is_none():
             var grad_ndb = BceNdBuffer[Self.dtype].backward(
-                safe, target, gradbox.buffer
+                safe, target, gradbox.buffer()
             )
             var grad_parent = Gradbox[Self.dtype](grad_ndb^)
             parent.update_grad(grad_parent^, AddTensor, None)

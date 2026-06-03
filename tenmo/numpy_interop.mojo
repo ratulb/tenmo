@@ -53,7 +53,7 @@ def to_ndarray[dtype: DType, //](tensor: Tensor[dtype]) raises -> PythonObject:
 def to_ndarray[
     dtype: DType, //
 ](gradbox: Gradbox[dtype]) raises -> PythonObject:
-    return to_ndarray(gradbox.buffer)
+    return to_ndarray(gradbox.buffer())
 
 
 def to_ndarray[dtype: DType, //](ndb: NDBuffer[dtype]) raises -> PythonObject:

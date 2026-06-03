@@ -307,14 +307,14 @@ def test_dropout_backward_2d_tensor() raises:
             var expected = Tensor[DType.float32](1)
             expected[0] = 0.0
             var actual = Tensor[DType.float32](1)
-            actual[0] = grad.buffer.buffer[i]
+            actual[0] = grad.buffer().buffer[i]
             assert_true(actual.all_close[atol=1e-6](expected))
         else:
             # Kept element: gradient should be scale
             var expected = Tensor[DType.float32](1)
             expected[0] = scale
             var actual = Tensor[DType.float32](1)
-            actual[0] = grad.buffer.buffer[i]
+            actual[0] = grad.buffer().buffer[i]
             assert_true(actual.all_close[atol=1e-5](expected))
 
 
@@ -410,13 +410,13 @@ def test_dropout_backward_3d_tensor() raises:
             var expected = Tensor[DType.float32](1)
             expected[0] = 0.0
             var actual = Tensor[DType.float32](1)
-            actual[0] = grad.buffer.buffer[i]
+            actual[0] = grad.buffer().buffer[i]
             assert_true(actual.all_close[atol=1e-6](expected))
         else:
             var expected = Tensor[DType.float32](1)
             expected[0] = scale
             var actual = Tensor[DType.float32](1)
-            actual[0] = grad.buffer.buffer[i]
+            actual[0] = grad.buffer().buffer[i]
             assert_true(actual.all_close[atol=1e-5](expected))
 
 

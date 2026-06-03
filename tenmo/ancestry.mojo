@@ -121,8 +121,8 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         elif op_code == ScatterAddTensor:
             ref arg = extra_arg.value().get[GatherArg]()
             Filler[Self.dtype].scatter_add(
-                gradbox.buffer,
-                incoming.buffer,
+                gradbox.buffer(),
+                incoming.buffer(),
                 arg.indices,
                 arg.axis,
             )

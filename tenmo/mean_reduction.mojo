@@ -19,7 +19,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ):
         var bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
         ref gradbox = output.gradients()
-        ref gradbox_shape = gradbox.shape()
+        var gradbox_shape = gradbox.shape()
         var ancestor = output.ancestry().get(0)
         ref ancestor_shape = ancestor.shape()
 
@@ -98,7 +98,7 @@ struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         normalized_axes = Validator.validate_and_normalize_axes(
             gradbox_shape, axes
         )
-        var ndb = SumMeanReduction[Self.dtype].reduce[op_code=MEAN](gradbox.buffer, normalized_axes, keepdims)
+        var ndb = SumMeanReduction[Self.dtype].reduce[op_code=MEAN](gradbox.buffer(), normalized_axes, keepdims)
         var out = Gradbox[Self.dtype](ndb^)
 
         return out^

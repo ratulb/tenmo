@@ -55,11 +55,11 @@ struct DropoutBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             # GPU path — mask stays on device
             # NDBuffer arithmetic_ops dispatches through GPU kernel
             var mask_ndb = arg_dropout.mask_gpu.value()
-            result_ndb = gradbox.buffer * mask_ndb
+            result_ndb = gradbox.buffer() * mask_ndb
         else:
             # CPU path — wrap Buffer mask in NDBuffer, multiply
             var mask_ndb = NDBuffer[Self.dtype](arg_dropout.mask_cpu, shape)
-            result_ndb = gradbox.buffer * mask_ndb
+            result_ndb = gradbox.buffer() * mask_ndb
 
         var gradbox_ancestor = Gradbox[Self.dtype](result_ndb^)
         if ancestor.requires_grad:

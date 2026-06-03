@@ -302,7 +302,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             comptime if has_accelerator():
                 if parameter.is_on_gpu():
                     try:
-                        var ds = grad.buffer.device_state.value()
+                        var ds = grad.buffer().device_state.value()
                         with ds.buffer.map_to_host() as host:
                             var grad_ptr = host.unsafe_ptr().bitcast[
                                 Scalar[Self.dtype]
@@ -355,7 +355,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                     comptime if has_accelerator():
                         if parameter.is_on_gpu():
                             try:
-                                var ds = grad.buffer.device_state.value()
+                                var ds = grad.buffer().device_state.value()
                                 with ds.buffer.map_to_host() as host:
                                     self._apply_clip_norm_to_ptr[simd_w](
                                         host.unsafe_ptr().bitcast[
@@ -383,7 +383,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 comptime if has_accelerator():
                     if parameter.is_on_gpu():
                         try:
-                            var ds = grad.buffer.device_state.value()
+                            var ds = grad.buffer().device_state.value()
                             with ds.buffer.map_to_host() as host:
                                 self._apply_clip_value_to_ptr[simd_w](
                                     host.unsafe_ptr().bitcast[
@@ -440,11 +440,11 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                     if parameter.is_on_gpu():
                         try:
                             var param_ds = parameter.buffer.device_state.value()
-                            var grad_ds = grad.buffer.device_state.value()
+                            var grad_ds = grad.buffer().device_state.value()
                             if self.use_momentum:
                                 ref velocity = self.velocities[i]
                                 var vel_ds = (
-                                    velocity.buffer.device_state.value()
+                                    velocity.buffer().device_state.value()
                                 )
                                 with param_ds.buffer.map_to_host() as param_host, grad_ds.buffer.map_to_host() as grad_host, vel_ds.buffer.map_to_host() as vel_host:
                                     self._apply_momentum_sparse[simd_w](
@@ -501,11 +501,11 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 if parameter.is_on_gpu():
                     try:
                         var param_ds = parameter.buffer.device_state.value()
-                        var grad_ds = grad.buffer.device_state.value()
+                        var grad_ds = grad.buffer().device_state.value()
 
                         if self.use_momentum:
                             ref velocity = self.velocities[i]
-                            var vel_ds = velocity.buffer.device_state.value()
+                            var vel_ds = velocity.buffer().device_state.value()
                             with param_ds.buffer.map_to_host() as param_host, grad_ds.buffer.map_to_host() as grad_host, vel_ds.buffer.map_to_host() as vel_host:
                                 self._apply_momentum[simd_w](
                                     param_host.unsafe_ptr().bitcast[

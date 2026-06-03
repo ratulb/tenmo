@@ -585,8 +585,8 @@ def test_training_convergence() raises:
         loss.backward()
 
         # SGD
-        w.buffer -= lr * w.grad().buffer
-        b.buffer -= lr * b.grad().buffer
+        w.buffer -= lr * w.grad().buffer()
+        b.buffer -= lr * b.grad().buffer()
         w.zero_grad()
         b.zero_grad()
 

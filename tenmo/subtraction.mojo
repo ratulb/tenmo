@@ -184,7 +184,7 @@ struct Subtractor[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
 
         var out = Tensor[Self.dtype](
-            self.buffer.arithmetic_ops[Subtract](other.buffer),
+            self.buffer.arithmetic_ops[Subtract](other.buffer()),
             requires_grad=False,
         )
 

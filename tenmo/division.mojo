@@ -329,7 +329,7 @@ struct RightTrueDivBackwardScalar[dtype: DType](
         var ancestor = output.ancestry().get(0)
         # Fused: -s * grad_output / x² in one pass
         var grad_ndb = DivNdBuffer[Self.dtype].rdiv_scalar_backward(
-            gradbox.buffer, ancestor.buffer(), scalar
+            gradbox.buffer(), ancestor.buffer(), scalar
         )
         var grad_parent = Gradbox[Self.dtype](grad_ndb^)
         ancestor.update_grad(grad_parent^, SubtractTensor, None)
@@ -354,7 +354,7 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # Fused: both gradients in one pass
         var (grad_num, grad_den) = DivNdBuffer[Self.dtype].divide_backward(
-            gradbox.buffer, buffer_top, buffer_bottom
+            gradbox.buffer(), buffer_top, buffer_bottom
         )
 
         if ancestor_top.requires_grad:

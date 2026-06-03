@@ -47,7 +47,7 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
             var H_in = input_shape[2]
             var W_in = input_shape[3]
 
-            ref output_shape = grad_output.shape()
+            var output_shape = grad_output.shape()
             var H_out = output_shape[2]
             var W_out = output_shape[3]
 

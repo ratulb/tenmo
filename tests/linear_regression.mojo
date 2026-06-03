@@ -31,8 +31,8 @@ def main() raises:
             print(loss.item())
 
         # SGD update
-        w.buffer[0] -= learning_rate * w.gradbox[].buffer[0]
-        b.buffer[0] -= learning_rate * b.gradbox[].buffer[0]
+        w.buffer[0] -= learning_rate * w.gradbox[].buffer()[0]
+        b.buffer[0] -= learning_rate * b.gradbox[].buffer()[0]
 
         # Zero gradients for next step
         w.zero_grad()

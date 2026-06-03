@@ -16,7 +16,7 @@ struct SigmoidBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
         var ndb = output.buffer().arithmetic_ops[SIGMOID_BACKWARD](
-            gradbox.buffer
+            gradbox.buffer()
         )
         var gradbox_ancestor = Gradbox[Self.dtype](ndb^)
 

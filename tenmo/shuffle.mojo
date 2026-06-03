@@ -32,7 +32,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
             if gradbox.is_on_gpu():
                 try:
                     var result_ndb = ShuffleGPU[Self.dtype].launch_scatter(
-                        gradbox.buffer, permutation, axis, sync=sync
+                        gradbox.buffer(), permutation, axis, sync=sync
                     )
                     gradbox_parent = Gradbox[Self.dtype](
                         result_ndb^, 

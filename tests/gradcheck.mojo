@@ -1,34 +1,37 @@
-from tensors import Tensor
-from .common_utils import log_debug, RED, CYAN
-from layers import Sequential
+from tenmo import Tensor
+from tenmo.common_utils import log_debug, RED, CYAN
+from tenmo.net import Sequential
 
+comptime dtype = DType.float32
+
+def main() raises:
+    test_gradcheck1()
+    test_gradcheck2()
 
 # --------------------
 # Gradient checker (safe using parameters_ptrs)
 # --------------------
-def gradcheck_param[
-    dtype: DType = DType.float32
-](
-    model: Sequential[dtype],
-    x: Tensor[dtype],
+def gradcheck_param(
+    mut model: Sequential[dtype],
+    mut x: Tensor[dtype],
     y: Tensor[DType.int32],
-    loss_fn: def(Tensor[dtype], Tensor[DType.int32]) -> Tensor[dtype],
+    loss_fn: def(Tensor[dtype], Tensor[DType.int32]) thin -> Tensor[dtype],
     eps: Scalar[dtype] = Scalar[dtype](1e-3),
     tol: Scalar[dtype] = Scalar[dtype](1e-2),
-) raises -> Bool:
+) raises -> Bool where dtype.is_floating_point():
     # Run forward/backward once to populate analytical gradients
     var logits = model(x)
     var loss = loss_fn(logits, y)
     loss.backward()
 
     var ok = True
-    var ptrs = model.parameters_ptrs()
+    var ptrs = model.parameters()
 
     for idx in range(len(ptrs)):
         var p_ptr = ptrs[idx]
-        var ref p = p_ptr[]
+        var p = p_ptr[]
         log_debug(
-            "Gradcheck: checking param len=" + len(p.buffer).__str__(), CYAN
+            "Gradcheck: checking param len=" + String(len(p.buffer)), CYAN
         )
 
         if not p.has_grad():
@@ -51,7 +54,7 @@ def gradcheck_param[
             p.buffer[i] = orig
 
             grad_num = (lp - lm) / (2.0 * eps)
-            grad_an = p.gradbox[].buffer[i]
+            grad_an = p.gradbox[].buffer()[i]
 
             rel_err = abs(grad_an - grad_num) / (
                 abs(grad_an) + abs(grad_num) + 1e-8
@@ -79,22 +82,20 @@ def gradcheck_param[
 # --------------------
 # Example test in main
 # --------------------
-from .crossentropy import CrossEntropyLoss
-from layers import Linear, ReLU
+from tenmo.crossentropy import CrossEntropyLoss
+from tenmo.net import Linear, ReLU
 
 
 def test_gradcheck1() raises:
-    var model = Sequential()
-    model.append(Linear(4, 5).into())
-    model.append(ReLU().into())
-    model.append(Linear(5, 3).into())
+    var model = Sequential[dtype]()
+    model.append(Linear[dtype](4, 5).into())
+    model.append(ReLU[dtype]().into())
+    model.append(Linear[dtype](5, 3).into())
 
-    var x = Tensor.rand([2, 4], requires_grad=True)
+    var x = Tensor[dtype].rand([2, 4], requires_grad=True)
     var y = Tensor[DType.int32].d1([1, 2])
 
-    def criterion[
-        dtype: DType
-    ](logits: Tensor[dtype], target: Tensor[DType.int32]) -> Tensor[dtype]:
+    def criterion(logits: Tensor[dtype], target: Tensor[DType.int32]) -> Tensor[dtype]:
         var criterion = CrossEntropyLoss[dtype]()
         # print("ce logits/target shapes: ", logits.shape, target.shape)
         return criterion(logits, target)
@@ -103,7 +104,7 @@ def test_gradcheck1() raises:
         model,
         x,
         y,
-        criterion[DType.float32],
+        criterion,
         Scalar[DType.float32](1e-3),
         Scalar[DType.float32](1e-2),
     )
@@ -112,21 +113,19 @@ def test_gradcheck1() raises:
     else:
         print(RED, "Gradient check FAILED ❌")
 
-    _ = model
 
-
-from .mse import MSELoss
+from tenmo.mse import MSELoss
 
 
 def test_gradcheck2() raises:
-    var model = Sequential()
-    model.append(Linear(4, 5).into())
-    model.append(ReLU().into())
-    model.append(Linear(5, 3).into())
+    var model = Sequential[dtype]()
+    model.append(Linear[dtype](4, 5).into())
+    model.append(ReLU[dtype]().into())
+    model.append(Linear[dtype](5, 3).into())
 
-    var x = Tensor.rand([2, 4], requires_grad=True)
+    var x = Tensor[dtype].rand([2, 4], requires_grad=True)
     # Target must match output shape [2, 3]
-    var y = Tensor.randint32([2, 3])
+    var y = Tensor[DType.int32]([2, 3])
 
     def mse_loss[
         dtype: DType
@@ -148,6 +147,4 @@ def test_gradcheck2() raises:
         print(RED, "Gradient check FAILED ❌ (MSE)")
 
 
-def main() raises:
-    test_gradcheck1()
-    test_gradcheck2()
+

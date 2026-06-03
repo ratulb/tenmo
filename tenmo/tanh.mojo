@@ -15,7 +15,7 @@ struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ):
         ref gradbox = output.gradients()
         ref parent = output.ancestry().get(0)
-        var ndb = output.buffer().arithmetic_ops[TANH_BACKWARD](gradbox.buffer)
+        var ndb = output.buffer().arithmetic_ops[TANH_BACKWARD](gradbox.buffer())
         var gradbox_ancestor = Gradbox[Self.dtype](ndb^)
 
         parent.update_grad(gradbox_ancestor^, AddTensor, None)

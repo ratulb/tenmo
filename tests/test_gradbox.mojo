@@ -100,7 +100,7 @@ def test_gradbox_squeeze_unsqueeze_multiple_axes() raises:
 def test_gradbox_permute_basic() raises:
     comptime dtype = DType.float32
     g1 = Gradbox[dtype](Shape(3, 4))
-    g1.buffer.fill(Scalar[dtype](1.0))
+    g1.buffer().fill(Scalar[dtype](1.0))
     p = g1.permute(IntArray([1, 0]))
     assert_true(p.shape() == Shape(4, 3))
     assert_true(g1.numels() == p.numels())
@@ -109,7 +109,7 @@ def test_gradbox_permute_basic() raises:
 def test_gradbox_permute_3d() raises:
     comptime dtype = DType.float32
     g1 = Gradbox[dtype](Shape(3, 4, 5))
-    g1.buffer.fill(Scalar[dtype](2.0))
+    g1.buffer().fill(Scalar[dtype](2.0))
     p = g1.permute(IntArray([2, 0, 1]))
     assert_true(p.shape() == Shape(5, 3, 4))
     assert_true(g1.numels() == p.numels())
@@ -118,7 +118,7 @@ def test_gradbox_permute_3d() raises:
 def test_gradbox_permute_inverse() raises:
     comptime dtype = DType.float32
     g1 = Gradbox[dtype](Shape(2, 3, 4))
-    g1.buffer.fill(Scalar[dtype](3.0))
+    g1.buffer().fill(Scalar[dtype](3.0))
     p = g1.permute(IntArray([1, 2, 0]))
     inv = p.permute(IntArray([2, 0, 1]))
     assert_true(inv.shape() == g1.shape())
@@ -128,7 +128,7 @@ def test_gradbox_permute_inverse() raises:
 def test_gradbox_permute_identity() raises:
     comptime dtype = DType.float32
     g1 = Gradbox[dtype](Shape(3, 4, 5))
-    g1.buffer.fill(Scalar[dtype](5.0))
+    g1.buffer().fill(Scalar[dtype](5.0))
     p = g1.permute(IntArray([0, 1, 2]))
     assert_true(p.shape() == g1.shape())
     assert_true(p.all_close(g1))
@@ -137,7 +137,7 @@ def test_gradbox_permute_identity() raises:
 def test_gradbox_permute_singleton_dims() raises:
     comptime dtype = DType.float32
     g1 = Gradbox[dtype](Shape(1, 4, 1))
-    g1.buffer.fill(Scalar[dtype](7.0))
+    g1.buffer().fill(Scalar[dtype](7.0))
     p = g1.permute(IntArray([2, 1, 0]))
     assert_true(p.shape() == Shape(1, 4, 1))
     assert_true(p.numels() == g1.numels())
@@ -147,7 +147,7 @@ def test_gradbox_permute_singleton_dims() raises:
 def test_gradbox_permute_high_rank() raises:
     comptime dtype = DType.float32
     g1 = Gradbox[dtype](Shape(2, 3, 4, 5))
-    g1.buffer.fill(Scalar[dtype](9.0))
+    g1.buffer().fill(Scalar[dtype](9.0))
     p = g1.permute(IntArray([3, 2, 1, 0]))
     assert_true(p.shape() == Shape(5, 4, 3, 2))
     assert_true(g1.numels() == p.numels())
@@ -387,7 +387,7 @@ def test_gradbox_reverse_division() raises:
     gradbox = Gradbox[dtype](ndb^)
     result = 2 / gradbox
     assert_true(
-        result.buffer.data_buffer()
+        result.buffer().data_buffer()
         == Buffer[dtype]([2.0, 1.0, 0.6666667, 0.5, 0.4, 0.33333334])
     )
 
@@ -399,7 +399,7 @@ def test_gradbox_reverse_subtract() raises:
     gradbox = Gradbox[dtype](ndb^)
     result = 2 - gradbox
     assert_true(
-        result.buffer.data_buffer() == Buffer[dtype]([1, 0, -1, -2, -3, -4])
+        result.buffer().data_buffer() == Buffer[dtype]([1, 0, -1, -2, -3, -4])
     )
 
 
@@ -427,10 +427,10 @@ def test_gradbox_inplace_add() raises:
 
     gradbox += gradbox2
     assert_true(
-        gradbox.buffer.buffer == Buffer[dtype]([12, 14, 16, 18, 20, 22])
+        gradbox.buffer().buffer == Buffer[dtype]([12, 14, 16, 18, 20, 22])
     )
     assert_true(
-        gradbox.buffer.buffer == Buffer[dtype]([12, 14, 16, 18, 20, 22])
+        gradbox.buffer().buffer == Buffer[dtype]([12, 14, 16, 18, 20, 22])
     )
 
 
@@ -440,7 +440,7 @@ def test_gradbox_is_shared() raises:
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
     gradbox = Gradbox[dtype](ndb^)
     assert_true(
-        gradbox.buffer.is_shared(),
+        gradbox.buffer().is_shared(),
         "Gradbox buffer is shared - assertion failed",
     )
 
@@ -450,8 +450,8 @@ def test_seed_gradbox() raises:
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
     gradbox = Gradbox[dtype](ndb^)
-    assert_true(gradbox.buffer.buffer == Buffer[dtype]([1, 2, 3, 4, 5, 6]))
+    assert_true(gradbox.buffer().buffer == Buffer[dtype]([1, 2, 3, 4, 5, 6]))
     gradbox.seed_grad(42)
     assert_true(
-        gradbox.buffer.buffer == Buffer[dtype]([42, 42, 42, 42, 42, 42])
+        gradbox.buffer().buffer == Buffer[dtype]([42, 42, 42, 42, 42, 42])
     )

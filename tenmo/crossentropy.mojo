@@ -306,14 +306,14 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         GPU safe: all arithmetic ops.
         """
         if reduction.is_none():
-            var ug = upstream.buffer.copy()
+            var ug = upstream.buffer().copy()
             var ug_flat = ug.reshape(Shape(M))
             var ug_expanded = ug_flat.unsqueeze(IntArray(-1)).broadcast_to(
                 Shape(M, C)
             )
             return grad * ug_expanded
         else:
-            var ug_scalar = SumMeanReduction[Self.dtype].sum(upstream.buffer, IntArray()).item()
+            var ug_scalar = SumMeanReduction[Self.dtype].sum(upstream.buffer(), IntArray()).item()
             var scale = Scalar[Self.dtype](
                 valid_count if reduction.is_mean() and valid_count > 0 else 1
             )

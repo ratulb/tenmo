@@ -141,17 +141,23 @@ Tensor[dtype]
 ```
 
 ### Gradbox Structure (`gradbox.mojo`)
+
 ```
 Gradbox[dtype]
-├── buffer: NDBuffer[dtype]            # gradient data + layout
-└── _refcount: Atomic[UInt64]          # independent refcount from Tensor
+├── _ndb_ptr: Optional[UnsafePointer[NDBuffer]]  # pointer to heap NDBuffer
+└── _refcount: Optional[UnsafePointer[Atomic]]    # pointer to heap atomic refcount
 ```
 
-### Key Invariants
+Buffer-like combined heap allocation: `[Atomic[DType.uint64] | NDBuffer]`.
+- `_refcount` points to the Atomic at the start.
+- `_ndb_ptr` points to the NDBuffer after the Atomic.
+- `buffer()` method returns `ref self._ndb_ptr.unsafe_value()[]` — the NDBuffer reference.
 
-1. **Gradbox initialized upfront** — When `requires_grad=True`, `init_gradbox()` allocates gradient storage immediately (zeros). On GPU, a `DeviceState` is allocated; on CPU, a contiguous `NDBuffer` of zeros.
+### Key Invariants (Updated)
 
-2. **Independent refcounting** — Gradbox has its own atomic refcount separate from Tensor. This survives Mojo's ASAP destruction of intermediates, ensuring gradients persist through backward pass even when Tensor temporaries are freed.
+1. **Gradbox initialized upfront** — When `requires_grad=True`, `init_gradbox()` allocates gradient storage immediately (zeros) via combined heap allocation (`[Atomic | NDBuffer]`). On GPU, a `DeviceState` is allocated; on CPU, a contiguous `NDBuffer` of zeros.
+
+2. **Independent refcounting** — Gradbox has its own atomic refcount (`_refcount`) separate from Tensor. This survives Mojo's ASAP destruction of intermediates, ensuring gradients persist through backward pass even when Tensor temporaries are freed. `__copyinit__` bumps the refcount; `__del__` decrements and frees when last handle drops.
 
 3. **Views share data, own gradboxes** — When a view is created via `View.forward()`:
    - CPU: `buffer.share()` enables refcounting on the underlying `Buffer` — zero-copy slice
@@ -164,7 +170,7 @@ Gradbox[dtype]
 5. **Gradboxes are always contiguous with zero offset** — This is a hard invariant:
    - `Gradbox.__init__(shape)` creates a contiguous `NDBuffer(shape)` with default strides and offset 0
    - `init_gradbox()` for GPU creates a `DeviceState` via `.new(numels, 0)` — contiguous allocation
-   - `Gradbox.as_tensor()` calls `.buffer.contiguous()` if not already contiguous before converting
+   - `Gradbox.as_tensor()` calls `.buffer().contiguous()` if not already contiguous before converting
    - All Gradbox operations (`transpose`, `permute`, `detach`, `reshape`) return `share=False` — owned contiguous copies
 
 6. **GPU transfer makes data contiguous** — When `to_device()` transfers to GPU:

@@ -17,7 +17,7 @@ struct ExponentialBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var parent = output.ancestry().get(0)
         # Gradient of exp: incoming grad * exp(A) = incoming grad * output
         var exp_grad = Gradbox[Self.dtype](
-            gradbox.buffer * output.buffer(), 
+            gradbox.buffer() * output.buffer(), 
         )
         parent.update_grad(exp_grad, AddTensor, None)
         parent_ids.append(parent._id)
