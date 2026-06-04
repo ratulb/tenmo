@@ -77,6 +77,7 @@ struct Summer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_SUM, ReductionArg(reduction_axes, keepdims)
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^

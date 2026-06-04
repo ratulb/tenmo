@@ -1034,31 +1034,38 @@ struct Tensor[dtype: DType](
         var grad_required = requires_grad.or_else(self.requires_grad)
         return Tensor[NewType](new_type_buffer^, requires_grad=grad_required)
 
+    def to_ancestor(ref self) -> Ancestor[Self.dtype]:
+        var out = Ancestor[Self.dtype]()
+        out._id = self._id
+        out.requires_grad = self.requires_grad
+        if self.ancestors:
+            out.parents = self.ancestors.copy()
+        if self.gradbox:
+            out.gradbox = self.gradbox
+        return out^
+
     def add_ancestry(
         mut self,
         var backwardFnArg: BackwardFnArg[Self.dtype],
         *parents: Tensor[Self.dtype],
     ):
-        """Register parent tensors and backward function for autograd.
+        var needs_data = backwardFnArg.needs_parent_data
 
-        Args:
-            backwardFnArg: Backward pass function and metadata.
-            *parents: Parent tensors whose gradients this tensor depends on.
-        """
         if not self.ancestors:
             self.ancestors = Optional(Ancestors[Self.dtype](backwardFnArg^))
         else:
             self.ancestors.value().set_backward_fn_arg(backwardFnArg^)
 
         ref ancestors = self.ancestors.value()
-        for parent in parents:
-            if not parent.buffer.is_shared():
-                var parent_copy = parent.copy()
-                parent_copy.buffer.buffer.shared()
-                ancestors.append(parent_copy^)
 
-            else:
-                ancestors.append(parent)
+        for parent in parents:
+            var ancestor = parent.to_ancestor()
+            if needs_data:
+                var nd_buffer = parent.buffer.copy()
+                if not nd_buffer.is_shared():
+                    nd_buffer.buffer.shared()
+                ancestor.ndb = nd_buffer^
+            ancestors.append(ancestor^)
 
     def has_ancestry(self) -> Bool:
         """Check if this tensor has registered parent dependencies.
@@ -3018,7 +3025,8 @@ struct Tensor[dtype: DType](
             var fanin = Dict[UInt, Int]()
             var id_to_index = Dict[UInt, Int]()
 
-            var root = Ancestor[Self.dtype].from_tensor(output)
+            var root = output.to_ancestor()
+            root.ndb = output.buffer.copy()
             dfs_stack.append(root._id)
             node_list.append(root.copy())
             id_to_index[root._id] = 0

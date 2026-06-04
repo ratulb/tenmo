@@ -139,7 +139,7 @@ declare -a ALL_TESTS_IN_ORDER=(
     "repeat|tests/test_repeat.mojo"
     "mmnd|tests/test_mmnd.mojo"
     "intarray|tests/test_intarray.mojo"
-    "        mm2d|tests/test_mm2d.mojo"
+    "mm2d|tests/test_mm2d.mojo"
     "matmul_2d_verify|tests/test_matmul_2d_verify.mojo"
     "vm|tests/test_vm.mojo"
     "mv|tests/test_mv.mojo"

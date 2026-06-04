@@ -117,6 +117,7 @@ struct Dot[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_DOT
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, actual_lhs, actual_rhs)
 
         return out^

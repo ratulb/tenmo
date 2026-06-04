@@ -55,15 +55,21 @@ struct Gradbox[dtype: DType](
             if buffer.is_on_gpu():
                 ndb_ptr.init_pointee_move(buffer^)
             else:
+                if buffer.is_shared():
+                    ndb_ptr.init_pointee_move(buffer^)
+                else:
+                    var shape = buffer.shape
+                    var strides = buffer.strides
+                    var offset = buffer.offset
+                    ndb_ptr.init_pointee_move(buffer.share(shape, strides, offset))
+        else:
+            if buffer.is_shared():
+                ndb_ptr.init_pointee_move(buffer^)
+            else:
                 var shape = buffer.shape
                 var strides = buffer.strides
                 var offset = buffer.offset
                 ndb_ptr.init_pointee_move(buffer.share(shape, strides, offset))
-        else:
-            var shape = buffer.shape
-            var strides = buffer.strides
-            var offset = buffer.offset
-            ndb_ptr.init_pointee_move(buffer.share(shape, strides, offset))
         self._ndb_ptr = ndb_ptr
         self._refcount = ref_ptr
 

@@ -148,6 +148,7 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                         var backwardFnArg = BackwardFnArg[Self.dtype](
                             BACKWARD_DROPOUT, arg^
                         )
+                        backwardFnArg.needs_parent_data = True
                         out.add_ancestry(backwardFnArg^, x)
 
                     return out^
@@ -225,6 +226,7 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             var backwardFnArg = BackwardFnArg[Self.dtype](
                 BACKWARD_DROPOUT, arg^
             )
+            backwardFnArg.needs_parent_data = True
             out.add_ancestry(backwardFnArg^, x)
 
         return out^

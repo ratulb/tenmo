@@ -61,6 +61,7 @@ struct AddScalar[dtype: DType](Copyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_ADD_SCALAR
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, self)
         return out^
 
@@ -105,6 +106,7 @@ struct Adder[dtype: DType](Copyable, RegisterPassable):
                     var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                         BACKWARD_ADD_BROADCAST
                     )
+                    backwardFnArg.needs_parent_data = True
                     out.add_ancestry(backwardFnArg^, self, other)
 
         return out^

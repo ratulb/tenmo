@@ -1,6 +1,6 @@
 from .tensor import Tensor
 from .mnemonics import AddTensor, SIGMOID_BACKWARD
-from .backpropagation import BackwardFnArg, BACKWARD_SIGMOID
+from .backpropagation import BackwardFnArg, NDBufferArg, BACKWARD_SIGMOID
 from .gradbox import Gradbox
 from .ancestry import Ancestor
 
@@ -13,9 +13,11 @@ struct SigmoidBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
+        ref bwd_arg = output.ancestry().backward_fn_arg().get[NDBufferArg[Self.dtype]]()
+        var out_ndb = bwd_arg.ndb
         ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
-        var ndb = output.buffer().arithmetic_ops[SIGMOID_BACKWARD](
+        var ndb = out_ndb.arithmetic_ops[SIGMOID_BACKWARD](
             gradbox.buffer()
         )
         var gradbox_ancestor = Gradbox[Self.dtype](ndb^)
@@ -41,8 +43,9 @@ struct Sigmoid[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
-                    BACKWARD_SIGMOID
+                var out_ndb = out.buffer.copy()
+                var backwardFnArg = BackwardFnArg[Self.dtype].from_ndbuffer(
+                    BACKWARD_SIGMOID, out_ndb^
                 )
                 out.add_ancestry(backwardFnArg^, self)
 

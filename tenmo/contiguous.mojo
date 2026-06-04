@@ -61,6 +61,7 @@ struct Contiguous[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_CONTIGUOUS
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^

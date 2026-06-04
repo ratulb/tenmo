@@ -535,6 +535,7 @@ struct FusedIm2Col[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     ),
                 )
 
+                backwardFnArg.needs_parent_data = True
                 output.add_ancestry(backwardFnArg^, padded_image, kernel, bias)
 
         return output^

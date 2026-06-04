@@ -182,6 +182,7 @@ struct Concate[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].integer_arg(
                     BACKWARD_CONCAT, concat_axis
                 )
+                backwardFnArg.needs_parent_data = True
                 for i in range(len(tensors)):
                     result.add_ancestry(backwardFnArg, tensors[i])
 

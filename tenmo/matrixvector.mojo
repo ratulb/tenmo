@@ -396,6 +396,7 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_MATRIX_VECTOR_MUL
                 )
+                backwardFnArg.needs_parent_data = True
                 result.add_ancestry(backwardFnArg^, M, v)
 
         return result^

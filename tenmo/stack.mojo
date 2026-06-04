@@ -51,11 +51,8 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # ===== SPLIT GRADIENT ALONG STACKED AXIS =====
         for tensor_idx in range(count):
             var ancestor_ref = output.ancestry().get(tensor_idx)
-            var tensor = Tensor[Self.dtype](
-                ancestor_ref.buffer(), requires_grad=ancestor_ref.requires_grad
-            )
 
-            if not tensor.requires_grad:
+            if not ancestor_ref.requires_grad:
                 continue
 
             # Build grad_input shape (without the stacked dimension)

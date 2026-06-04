@@ -146,6 +146,7 @@ struct Multiplicator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                         BACKWARD_MULTIPLY
                     )
+                    backwardFnArg.needs_parent_data = True
                     if id(self) == id(other):  # B = A * A, self == other == A
                         out.add_ancestry(backwardFnArg^, self)
                     else:
@@ -154,6 +155,7 @@ struct Multiplicator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                         BACKWARD_MULTIPLY_BROADCAST
                     )
+                    backwardFnArg.needs_parent_data = True
                     out.add_ancestry(backwardFnArg^, self, other)
 
         return out^

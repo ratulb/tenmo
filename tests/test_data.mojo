@@ -1096,7 +1096,7 @@ def test_batch_buffers_reused_not_reallocated() raises:
 
     for batch in loader:
         # Track batch buffer pointer
-        var ptr = Int(batch.features.buffer.data_buffer().data)
+        var ptr = Int(batch.features.buffer.data_buffer().data.unsafe_value())
         batch_pointers.append(ptr)
 
     # Count unique pointers
@@ -1167,8 +1167,8 @@ def test_shuffle_preserves_data_location() raises:
     var labels = Tensor.d1([10.0, 20.0, 30.0, 40.0]).float()
 
     # Get pointer to original data
-    var original_features_ptr = Int(features.buffer.data_buffer().data)
-    var original_labels_ptr = Int(labels.buffer.data_buffer().data)
+    var original_features_ptr = Int(features.buffer.data_buffer().data.unsafe_value())
+    var original_labels_ptr = Int(labels.buffer.data_buffer().data.unsafe_value())
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1184,8 +1184,8 @@ def test_shuffle_preserves_data_location() raises:
             # Data should be accessible (no crash = test passes)
 
     # After all iterations, original data should still be at same location
-    var final_features_ptr = Int(features.buffer.data_buffer().data)
-    var final_labels_ptr = Int(labels.buffer.data_buffer().data)
+    var final_features_ptr = Int(features.buffer.data_buffer().data.unsafe_value())
+    var final_labels_ptr = Int(labels.buffer.data_buffer().data.unsafe_value())
 
     assert_equal(original_features_ptr, final_features_ptr)
     assert_equal(original_labels_ptr, final_labels_ptr)
@@ -1263,7 +1263,7 @@ def test_multi_epoch_no_memory_growth() raises:
     for _ in range(3):
         var batch_ptrs = List[Int]()
         for batch in loader:
-            var ptr = Int(batch.features.buffer.data_buffer().data)
+            var ptr = Int(batch.features.buffer.data_buffer().data.unsafe_value())
             batch_ptrs.append(ptr)
         epoch_pointers.append(batch_ptrs^)
 
@@ -1429,7 +1429,7 @@ def test_shuffle_uses_two_buffers() raises:
 
     for _ in range(10):  # Multiple epochs to see both buffers
         for batch in loader:
-            var ptr = Int(batch.features.buffer.data_buffer().data)
+            var ptr = Int(batch.features.buffer.data_buffer().data.unsafe_value())
 
             # Check if this pointer is new
             var is_new = True
@@ -1472,10 +1472,10 @@ def test_no_memory_growth_with_shuffle() raises:
     var epoch2_ptrs = List[Int]()
 
     for batch in loader:
-        epoch1_ptrs.append(Int(batch.features.buffer.data_buffer().data))
+        epoch1_ptrs.append(Int(batch.features.buffer.data_buffer().data.unsafe_value()))
 
     for batch in loader:
-        epoch2_ptrs.append(Int(batch.features.buffer.data_buffer().data))
+        epoch2_ptrs.append(Int(batch.features.buffer.data_buffer().data.unsafe_value()))
 
     # Count unique pointers in each epoch
     var unique1 = List[Int]()

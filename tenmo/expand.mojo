@@ -80,6 +80,7 @@ struct Expand[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_EXPAND
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^

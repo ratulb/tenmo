@@ -54,12 +54,9 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var mode = bwd_arg.mode.copy()
         ref grad_out = output.gradients()
         var ancestor_ref = output.ancestry().get(0)
-        var parent = Tensor[Self.dtype](
-            ancestor_ref.buffer(), requires_grad=ancestor_ref.requires_grad
-        )
 
-        if parent.requires_grad:
-            ref parent_shape = parent.shape()
+        if ancestor_ref.requires_grad:
+            ref parent_shape = ancestor_ref.shape()
             var grad_parent = Gradbox[Self.dtype].zeros(
                 parent_shape, 
             )
@@ -85,7 +82,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
             ancestor_ref.update_grad(grad_parent^, AddTensor, None)
 
-        if parent.requires_grad:
+        if ancestor_ref.requires_grad:
             parent_ids.append(ancestor_ref._id)
 
         if not retain_graph:
@@ -369,6 +366,7 @@ struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_PAD, PadArg(pad.copy(), mode)  # Add mode here
                 )
+                backwardFnArg.needs_parent_data = True
                 result.add_ancestry(backwardFnArg^, x)
 
         return result^

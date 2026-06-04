@@ -137,6 +137,7 @@ struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
     var ptr: UnsafePointer[UInt8, MutAnyOrigin]  # type-erased arg
     var destroy: DestroyerFn
     var copy_fn: CopyFn
+    var needs_parent_data: Bool
 
     def __init__[T: ArgumentType, //](out self, op_code: Int, var arg: T):
         var p = alloc[T](1)
@@ -145,6 +146,7 @@ struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
         self.ptr = p.bitcast[UInt8]()
         self.destroy = make_destroyer[T]()
         self.copy_fn = make_copier[T]()
+        self.needs_parent_data = False
 
     def __del__(deinit self):
         self.destroy(self.ptr)  # calls T.__del__
@@ -154,12 +156,14 @@ struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
         self.ptr = existing.ptr
         self.destroy = existing.destroy
         self.copy_fn = existing.copy_fn
+        self.needs_parent_data = existing.needs_parent_data
 
     def __init__(out self, *, copy: Self):
         self.op_code = copy.op_code
         self.destroy = copy.destroy
         self.copy_fn = copy.copy_fn
         self.ptr = self.copy_fn(copy.ptr)  # deep copy via T.__init__
+        self.needs_parent_data = copy.needs_parent_data
 
     def get[T: ArgumentType](ref self) -> ref[self.ptr] T:
         return self.ptr.bitcast[T]()[]

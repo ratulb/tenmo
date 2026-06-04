@@ -19,38 +19,71 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
     ):
-        # This is the gradient flowing *into* this broadcasted op.
-        # We need to call copy explicitly because we have not annotated Gradbox with `ImplicitlyCopyable` yet - Intententionally
         ref incoming_grad = output.gradients()
 
-        # Extract parents (ancestors)
         var left_parent = output.ancestry().get(0)
         var right_parent = output.ancestry().get(1)
 
         # For left parent: compute the gradient contribution if needed
         if left_parent.requires_grad:
-            # This function reduces the broadcast grad back to left_tensor shape.
-            var left_parent_grad = Self.upstream_grad_share(
-                left_parent.buffer(),
-                right_parent.buffer(),
-                incoming_grad.buffer(),
-            )
+            var left_parent_grad: Gradbox[Self.dtype]
+            comptime if Self.augment:
+                left_parent_grad = Self.upstream_grad_share(
+                    left_parent.buffer(),
+                    right_parent.buffer(),
+                    incoming_grad.buffer(),
+                )
+            else:
+                left_parent_grad = Self.upstream_grad_shape_only(
+                    left_parent.shape(),
+                    incoming_grad.buffer(),
+                )
 
             left_parent.update_grad(left_parent_grad^, Self.lhs_op, None)
             parent_ids.append(left_parent._id)
 
         # For right parent: compute its gradient if needed
         if right_parent.requires_grad:
-            var right_parent_grad = Self.upstream_grad_share(
-                right_parent.buffer(),
-                left_parent.buffer(),
-                incoming_grad.buffer(),
-            )
+            var right_parent_grad: Gradbox[Self.dtype]
+            comptime if Self.augment:
+                right_parent_grad = Self.upstream_grad_share(
+                    right_parent.buffer(),
+                    left_parent.buffer(),
+                    incoming_grad.buffer(),
+                )
+            else:
+                right_parent_grad = Self.upstream_grad_shape_only(
+                    right_parent.shape(),
+                    incoming_grad.buffer(),
+                )
 
             right_parent.update_grad(right_parent_grad^, Self.rhs_op, None)
             parent_ids.append(right_parent._id)
         if not retain_graph:
             incoming_grad.zero_grad()
+
+    @staticmethod
+    def upstream_grad_shape_only(
+        self_shape: Shape,
+        upstream_grad: NDBuffer[Self.dtype],
+    ) -> Gradbox[Self.dtype]:
+        var grad_contrib: Gradbox[Self.dtype]
+        if upstream_grad.shape == Shape():
+            grad_contrib = Gradbox[Self.dtype].full(
+                self_shape,
+                upstream_grad.item(),
+                device=upstream_grad.device(),
+            )
+        else:
+            grad_contrib = Gradbox[Self.dtype](upstream_grad)
+            if grad_contrib.shape() != self_shape:
+                axes = ShapeBroadcaster.broadcast_mask(
+                    self_shape, grad_contrib.shape()
+                ).indices_of(1)
+                grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
+            if grad_contrib.shape() != self_shape:
+                grad_contrib = grad_contrib.reshape(self_shape)
+        return grad_contrib^
 
     @staticmethod
     def upstream_grad_share(
@@ -67,10 +100,7 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
                 device=upstream_grad.device(),
             )
         else:
-            comptime if Self.augment:
-                grad_contrib = Gradbox[Self.dtype](upstream_grad * other)
-            else:
-                grad_contrib = Gradbox[Self.dtype](upstream_grad)
+            grad_contrib = Gradbox[Self.dtype](upstream_grad * other)
 
             if grad_contrib.shape() != self.shape:
                 axes = ShapeBroadcaster.broadcast_mask(
@@ -79,7 +109,6 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
                 grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
             if grad_contrib.shape() != self.shape:
                 grad_contrib = grad_contrib.reshape(self.shape)
-
         return grad_contrib^
 
 
@@ -137,6 +166,7 @@ struct Broadcast[dtype: DType](Copyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_BROADCAST_TO
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^

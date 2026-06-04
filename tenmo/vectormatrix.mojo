@@ -369,6 +369,7 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_VECTOR_MATMUL
                 )
+                backwardFnArg.needs_parent_data = True
                 result.add_ancestry(backwardFnArg^, v, M)
 
         return result^

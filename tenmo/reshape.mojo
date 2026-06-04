@@ -19,7 +19,7 @@ struct ReshapeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ):
         ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
-        var reshaped = gradbox.reshape(ancestor.buffer().shape)
+        var reshaped = gradbox.reshape(ancestor.shape())
         if ancestor.requires_grad:
             ancestor.update_grad(reshaped^, AddTensor, None)
         parent_ids.append(ancestor._id)
@@ -68,6 +68,7 @@ struct Reshape[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_RESHAPE
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^

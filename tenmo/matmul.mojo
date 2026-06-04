@@ -71,6 +71,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_MATMUL_2D
                 )
+                backwardFnArg.needs_parent_data = True
                 C.add_ancestry(backwardFnArg^, A, B)
 
         return C^
@@ -160,6 +161,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_MATMUL_ND
                 )
+                backwardFnArg.needs_parent_data = True
                 C.add_ancestry(backwardFnArg^, A, B)
 
         return C^

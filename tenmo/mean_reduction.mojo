@@ -83,6 +83,7 @@ struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_MEAN, ReductionArg(normalized_axes, keepdims)
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^

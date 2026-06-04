@@ -165,6 +165,7 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                         n,
                     ),
                 )
+                backwardFnArg.needs_parent_data = True
                 result.add_ancestry(backwardFnArg^, self)
 
         return result^

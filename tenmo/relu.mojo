@@ -88,7 +88,7 @@ struct ReLU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     backwardFnArg = BackwardFnArg[Self.dtype].from_buffer(
                         BACKWARD_RELU, mask_ndb.data_buffer()
                     )
-
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^

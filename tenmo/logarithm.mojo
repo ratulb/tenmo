@@ -54,6 +54,7 @@ struct Logarithm[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
                     BACKWARD_LOG, epsilon
                 )
+                backwardFnArg.needs_parent_data = True
 
                 out.add_ancestry(backwardFnArg^, self)
 

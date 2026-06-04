@@ -351,6 +351,7 @@ struct Product[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_PRODUCT, bwd_arg^
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^

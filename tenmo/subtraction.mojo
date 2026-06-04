@@ -165,6 +165,7 @@ struct Subtractor[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                         BACKWARD_SUBTRACT_BROADCAST
                     )
+                    backwardFnArg.needs_parent_data = True
                     out.add_ancestry(backwardFnArg^, self, other)
 
         return out^

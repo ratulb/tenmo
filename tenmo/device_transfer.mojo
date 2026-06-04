@@ -197,6 +197,7 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                             BACKWARD_DEVICE_TRANSFER,
                             DeviceTransferBwdArg(Flow.Cpu2Gpu, CPU().into()),
                         )
+                    backwardFnArg.needs_parent_data = True
                     out.add_ancestry(backwardFnArg^, self)
 
         return out^

@@ -7,34 +7,18 @@ from .common_utils import panic, i, s
 from .shapes import Shape
 
 
-
 struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
-    """
-    Lightweight handle for ancestry tracking.
-
-    Carries everything needed for:
-    1. Graph traversal        — _id
-    2. Grad routing           — requires_grad, gradbox ptr
-    3. Data (CPU+GPU)   — ndb (shared NDBuffer, refcount bump only)
-    4. Backward compute       — ndb (shape/strides/data for matmul etc.)
-    5. Backward invoke        — backwardFnArg, parents
-
-    What is NOT here vs full Tensor copy:
-    - No new gradbox allocation
-    - No recursive Tensor ancestor chain copy
-    """
-
     var _id: UInt
     var requires_grad: Bool
     var gradbox: Optional[Gradbox[Self.dtype]]
-    var ndb: NDBuffer[Self.dtype]
+    var ndb: Optional[NDBuffer[Self.dtype]]
     var parents: Optional[Ancestors[Self.dtype]]
 
     def __init__(out self):
         self._id = 0
         self.requires_grad = False
         self.gradbox = {}
-        self.ndb = NDBuffer[Self.dtype]()
+        self.ndb = {}
         self.parents = None
 
     def __init__(out self, *, copy: Self):
@@ -54,13 +38,13 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
     def has_ancestry(ref self) -> Bool:
         return self.parents is not None and len(self.parents.value()) > 0
 
-    def shape(ref self) -> ref[self.ndb.shape] Shape:
-        return self.ndb.shape
+    def shape(ref self) -> ref[self.ndb.value().shape] Shape:
+        return self.ndb.value().shape
 
-    def buffer(ref self) -> NDBuffer[Self.dtype]:
-        return self.ndb.copy()
+    def buffer(ref self) -> ref[self.ndb.value()]NDBuffer[Self.dtype]:
+        return self.ndb.value()
 
-    def gradients(mut self) -> ref[self.gradbox.value()] Gradbox[Self.dtype]:
+    def gradients(ref self) -> ref[self.gradbox.value()] Gradbox[Self.dtype]:
         return self.gradbox.value()
 
     def ancestry(
@@ -70,22 +54,20 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
             panic("Ancestor → ancestry: ancestors not initialized")
         return self.parents.value()
 
+    def strides(ref self) -> ref[self.ndb.value().strides] Strides:
+        return self.ndb.value().strides
+
+    def offset(self) -> Int:
+        return self.ndb.value().offset
+
+    def max_index(self) -> Int:
+        ref ndb = self.ndb.value()
+        return ndb.max_index()
+
     def is_on_gpu(self) -> Bool:
-        return self.ndb.is_on_gpu()
-
-    @staticmethod
-    def from_tensor(ref tensor: Tensor[Self.dtype]) -> Ancestor[Self.dtype]:
-        var out = Ancestor[Self.dtype]()
-        out._id = tensor._id
-        out.requires_grad = tensor.requires_grad
-        out.ndb = tensor.buffer.copy()
-        if tensor.ancestors:
-            out.parents = tensor.ancestors.copy()
-        # Copy Gradbox inline — shares underlying Buffer via NDBuffer refcounting
-        if tensor.gradbox:
-            out.gradbox = tensor.gradbox
-
-        return out^
+        if self.ndb:
+            return self.ndb.value().is_on_gpu()
+        return False
 
     def update_grad(
         mut self,
@@ -93,17 +75,6 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         op_code: Int,
         extra_arg: Optional[BackwardFnArg[Self.dtype]] = None,
     ):
-        """Apply incoming gradient to this ancestor's gradbox.
-
-        Args:
-            incoming:  Upstream gradient from backward handler.
-            op_code:   How to accumulate — AddTensor, SubtractTensor,
-                       ZeroGrad, ScatterAddTensor.
-            extra_arg: Type-erased argument for ops that need additional
-                       context beyond the gradient itself. Currently used
-                       by ScatterAddTensor to carry GatherArg (indices + axis).
-                       Future ops can store any ArgumentType here.
-        """
         if not self.requires_grad or not self.gradbox:
             return
 
@@ -126,7 +97,6 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
                 arg.indices,
                 arg.axis,
             )
-            # Zero padding row grad if set
             if arg.padding_idx:
                 gradbox.fill(
                     0.0, i(arg.padding_idx.value()), s()
@@ -135,7 +105,6 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
             print("Ancestor → update_grad: unknown op_code", String(op_code))
 
     def __del__(deinit self):
-        # Gradbox is Optional[Gradbox] — auto-managed by Mojo lifecycle
         pass
 
 
@@ -171,8 +140,8 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         self.backwardFnArg = backwardFnArg^
 
     @always_inline
-    def append(mut self, ref parent: Tensor[Self.dtype]):
-        self.origins.append(Ancestor[Self.dtype].from_tensor(parent))
+    def append(mut self, var ancestor: Ancestor[Self.dtype]):
+        self.origins.append(ancestor^)
 
     @always_inline
     def get(mut self, idx: Int) -> ref[self.origins] Ancestor[Self.dtype]:
@@ -184,9 +153,11 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
 
     def tensor(ref self, idx: Int) -> Tensor[Self.dtype]:
         ref ancestor = self.ref_get(idx)
-        return Tensor[Self.dtype](
-            ancestor.buffer(), requires_grad=ancestor.requires_grad
-        )
+        if ancestor.ndb:
+            return Tensor[Self.dtype](
+                ancestor.ndb.value().copy(), requires_grad=ancestor.requires_grad
+            )
+        panic("Ancestors.tensor: ancestor has no data")
 
     def __len__(self) -> Int:
         return len(self.origins)

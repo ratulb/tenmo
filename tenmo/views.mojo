@@ -44,15 +44,12 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             bwd_arg.offset,
         )
         ref parent_ref = output.ancestry().get(0)
-        var parent = Tensor[Self.dtype](
-            parent_ref.buffer(), requires_grad=parent_ref.requires_grad
-        )
         ref gradbox = output.gradients()
 
-        var parent_shape = parent.shape()
-        ref parent_strides = parent.strides()
-        var parent_offset = parent.offset()
-        var parent_max_index = parent.max_index()
+        var parent_shape = parent_ref.shape()
+        ref parent_strides = parent_ref.strides()
+        var parent_offset = parent_ref.offset()
+        var parent_max_index = parent_ref.max_index()
         var parent_gradbox = Gradbox[Self.dtype].zeros(parent_shape)
 
         # Special case: scalar parent
@@ -138,14 +135,11 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             bwd_arg.offset,
         )
         ref parent_ref = output.ancestry().get(0)
-        var parent = Tensor[Self.dtype](
-            parent_ref.buffer(), requires_grad=parent_ref.requires_grad
-        )
         ref gradbox = output.gradients()  # GPU gradbox
 
-        var parent_shape = parent.shape()
-        var parent_offset = parent.offset()
-        var parent_max_index = parent.max_index()
+        var parent_shape = parent_ref.shape()
+        var parent_offset = parent_ref.offset()
+        var parent_max_index = parent_ref.max_index()
 
         # ── Materialise view gradbox from GPU to CPU ──────────────────────────
         # DeviceState.into() maps GPU buffer to host contiguously.
@@ -182,7 +176,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var view_rank = shape.rank()
             var parent_rank = parent_shape.rank()
 
-            ref parent_strides = parent.strides()
+            ref parent_strides = parent_ref.strides()
             var parent_grad_offset = parent_gradbox.offset()
             var parent_grad_strides = parent_gradbox.strides()
             var parent_grad_data = parent_gradbox.data_ptr()
@@ -245,9 +239,9 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # ── Move parent_gradbox to GPU if parent is on GPU ────────────────────
         var final_gradbox: Gradbox[Self.dtype]
-        if parent.is_on_gpu():
+        if parent_ref.is_on_gpu():
             try:
-                var gpu = parent.buffer.device_state.value().get_gpu()
+                var gpu = parent_ref.ndb.value().device_state.value().get_gpu()
                 var ds = DeviceState[Self.dtype](
                     parent_gradbox.buffer().numels(), gpu
                 )
@@ -307,6 +301,7 @@ struct View[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_VIEW, ViewArg(shape, abs_strides, abs_offset)
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^

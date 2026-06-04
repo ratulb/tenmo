@@ -86,6 +86,7 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     BACKWARD_MINMAX,
                     MinMaxArg[Self.dtype](normalized_axes, keepdims, mask_ndb^),
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^

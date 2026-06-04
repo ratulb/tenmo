@@ -407,6 +407,7 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
                         transpose_A, transpose_B, self.lite_handle()
                     ),
                 )
+                backwardFnArg.needs_parent_data = True
 
                 C.add_ancestry(backwardFnArg^, A, B)
 
@@ -830,6 +831,7 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                     BLAS_BACKWARD_MATMUL_2D,
                     BlasArg[Self.dtype](transpose_A, transpose_B, self),
                 )
+                backwardFnArg.needs_parent_data = True
 
                 C.add_ancestry(backwardFnArg^, A, B)
 

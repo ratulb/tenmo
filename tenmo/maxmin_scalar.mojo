@@ -121,6 +121,7 @@ struct MaxScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
                     BACKWARD_MAX_SCALAR, scalar
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^
@@ -147,6 +148,7 @@ struct MinScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
                     BACKWARD_MIN_SCALAR, scalar
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^

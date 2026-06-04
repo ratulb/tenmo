@@ -406,6 +406,7 @@ struct DivideScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
                     BACKWARD_RIGHT_DIV_SCALAR, scalar
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^
@@ -471,6 +472,7 @@ struct Divider[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_DIVIDE
                 )
+                backwardFnArg.needs_parent_data = True
                 out.add_ancestry(backwardFnArg^, self, other)
 
         return out^
