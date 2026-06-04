@@ -1,18 +1,11 @@
-from tenmo import NDBuffer, Shape, Tensor
+from tenmo import NDBuffer, Shape, Tensor, MmCpu2d
 
-# from debug import MM
 from std.testing import assert_true, assert_equal
-from tenmo.ndbuffer import MmCpu2d
-from matmul_corrected_v2 import MmCpu2d as MmCpu2dV2
 
 comptime dtype = DType.float32
 
 
 def rref(A: NDBuffer[dtype], B: NDBuffer[dtype]) -> NDBuffer[dtype]:
-    return A.matmul_2d_good(B)
-
-
-def rref_naive(A: NDBuffer[dtype], B: NDBuffer[dtype]) -> NDBuffer[dtype]:
     ref A_shape = A.shape
     ref B_shape = B.shape
     var m = A_shape[0]
@@ -28,18 +21,14 @@ def rref_naive(A: NDBuffer[dtype], B: NDBuffer[dtype]) -> NDBuffer[dtype]:
 
 
 def trial(A: NDBuffer[dtype], B: NDBuffer[dtype]) -> NDBuffer[dtype]:
-    return MmCpu2d.matmul_2d_cpu(A, B)
-
-
-def trial_v2(A: NDBuffer[dtype], B: NDBuffer[dtype]) -> NDBuffer[dtype]:
-    return MmCpu2dV2[dtype].pick_cpu(A, B)
+    return MmCpu2d[dtype].pick_cpu(A, B)
 
 
 def check(M: Int, K: Int, N: Int, label: String) raises:
     var A = Tensor[dtype].randn(M, K)
     var B = Tensor[dtype].randn(K, N)
     # var r = rref(A.buffer, B.buffer)
-    var r = rref_naive(A.buffer, B.buffer)
+    var r = rref(A.buffer, B.buffer)
     var t = trial(A.buffer, B.buffer)
     assert_equal(r.shape, t.shape, "shape mismatch: " + label)
     assert_true(r.all_close[atol=1e-4](t), "value mismatch: " + label)
@@ -49,8 +38,8 @@ def check(M: Int, K: Int, N: Int, label: String) raises:
 def check_v2(M: Int, K: Int, N: Int, label: String) raises:
     var A = Tensor[dtype].randn(M, K)
     var B = Tensor[dtype].randn(K, N)
-    var r = rref_naive(A.buffer, B.buffer)
-    var t = trial_v2(A.buffer, B.buffer)
+    var r = rref(A.buffer, B.buffer)
+    var t = trial(A.buffer, B.buffer)
     assert_equal(r.shape, t.shape, "shape mismatch: " + label)
     assert_true(r.all_close[atol=1e-4](t), "value mismatch: " + label)
     print("  PASS v2:", label)
@@ -274,7 +263,7 @@ def test_v2_non_contiguous_A() raises:
         for j in range(K):
             A_contig[i, j] = A_wide[i, j]
     var r = rref(A_contig.buffer, B_strided)
-    var t = trial_v2(A_strided, B_strided)
+    var t = trial(A_strided, B_strided)
     assert_true(r.all_close[atol=1e-4](t), "v2 non-contiguous A mismatch")
     print("  PASS v2: non-contiguous A")
 
@@ -294,7 +283,7 @@ def test_v2_non_contiguous_B() raises:
         for j in range(N):
             B_contig[i, j] = B_wide[i, j]
     var r = rref(A.buffer, B_contig.buffer)
-    var t = trial_v2(A.buffer, B_strided)
+    var t = trial(A.buffer, B_strided)
     assert_true(r.all_close[atol=1e-4](t), "v2 non-contiguous B mismatch")
     print("  PASS v2: non-contiguous B")
 
@@ -321,7 +310,7 @@ def test_v2_both_non_contiguous() raises:
         for j in range(N):
             B_ref[i, j] = B_wide[i, j]
     var r = rref(A_ref.buffer, B_ref.buffer)
-    var t = trial_v2(A_strided, B_strided)
+    var t = trial(A_strided, B_strided)
     assert_true(r.all_close[atol=1e-4](t), "v2 both non-contiguous mismatch")
     print("  PASS v2: both A and B non-contiguous")
 
@@ -332,7 +321,7 @@ def test_v2_all_ones() raises:
     var N = 9
     var A = Tensor[dtype].ones(M, K)
     var B = Tensor[dtype].ones(K, N)
-    var t = trial_v2(A.buffer, B.buffer)
+    var t = trial(A.buffer, B.buffer)
     var expected = Tensor[dtype].full(Shape(M, N), Float32(K))
     assert_true(t.all_close[atol=1e-6](expected.buffer), "v2 all-ones mismatch")
     print("  PASS v2: all-ones")
@@ -343,7 +332,7 @@ def test_v2_identity() raises:
     var N = 7
     var A = Tensor[dtype].eye(M)
     var B = Tensor[dtype].randn(M, N)
-    var t = trial_v2(A.buffer, B.buffer)
+    var t = trial(A.buffer, B.buffer)
     assert_true(t.all_close[atol=1e-6](B.buffer), "v2 identity mismatch")
     print("  PASS v2: identity")
 

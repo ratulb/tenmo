@@ -89,17 +89,14 @@ struct IntArray(
 
     @always_inline("nodebug")
     def __init__(out self, *, copy: Self):
-        """Create a deep copy of another IntArray instance.
+        """Copy constructor.
 
-        Args:
-            copy: IntArray instance to copy from
-
-        Note:
-            This performs a deep copy, allocating new memory for the copied data.
+        Owning arrays get a deep copy (alloc + memcpy).
+        View arrays get a shallow copy — just the pointer, zero alloc.
         """
         self._size = copy._size
         self._capacity = copy._capacity
-        if copy._capacity > 0:
+        if copy.owning():
             self._data = alloc[Int](copy._capacity)
             memcpy(
                 dest=self._data.unsafe_value(),
@@ -107,15 +104,12 @@ struct IntArray(
                 count=copy._size,
             )
         else:
-            self._data = {}
+            self._data = copy._data
 
     @always_inline("nodebug")
     def __del__(deinit self):
-        """Free memory when the IntArray instance is deinitialized.
-
-        Releases any allocated memory back to the system.
-        """
-        if self._capacity > 0 and self._data:
+        """Free memory only if owning. Views are no-op."""
+        if self.owning() and self._data:
             self._data.unsafe_value().free()
 
     @staticmethod
@@ -247,8 +241,9 @@ struct IntArray(
 
         Returns:
             The total number of elements that can be stored without reallocation.
+            Returns 0 for views.
         """
-        return self._capacity
+        return self._capacity if self._capacity >= 0 else 0
 
     @always_inline("nodebug")
     def is_empty(self) -> Bool:
@@ -258,6 +253,34 @@ struct IntArray(
             True if the array contains no elements, False otherwise.
         """
         return self._size == 0
+
+    @always_inline("nodebug")
+    def owning(self) -> Bool:
+        """Check if this array owns its memory.
+
+        `_capacity >= 0` = owning (empty or allocated).
+        `_capacity == -1` = view (borrowed pointer, zero-alloc copy, no-op destroy).
+        Empty owning arrays (`_size=0, _capacity=0`) can still grow.
+        """
+        return self._capacity >= 0
+
+    @always_inline("nodebug")
+    def materialized(self) -> Self:
+        """Ensure the returned array is owning (deep copy if view, no-op if owning).
+
+        Use this when you need to outlive the original owner.
+        """
+        if self.owning():
+            return self
+        var result = Self.with_capacity(self._size)
+        if self._size > 0:
+            memcpy(
+                dest=result._data.unsafe_value(),
+                src=self._data.unsafe_value(),
+                count=self._size,
+            )
+            result._size = self._size
+        return result^
 
     @always_inline("nodebug")
     def __getitem__(ref self, idx: Int) -> ref[self] Int:
@@ -286,8 +309,10 @@ struct IntArray(
             value: New value to store at the specified index.
 
         Raises:
-            Panic if index is out of bounds.
+            Panic if index is out of bounds or array is a view.
         """
+        if not self.owning():
+            panic("IntArray: can't modify a view")
         var index = idx if idx >= 0 else idx + self._size
         if index < 0 or index >= self._size:
             panic("IntArray: index out of bounds")
@@ -295,48 +320,49 @@ struct IntArray(
 
     @always_inline("nodebug")
     def __getitem__(self, slice: Slice) -> Self:
-        """Get slice as new array.
+        """Slice into a view (step==1) or deep copy (step != 1).
 
-        Args:
-            slice: Slice specifying start, stop, and step values
-
-        Returns:
-            New IntArray containing the sliced elements
-
-        Note:
-            Supports negative indices and steps, similar to Python list slicing.
+        Contiguous slices return a view — zero-alloc, just a borrowed pointer.
+        Strided slices deep-copy. Supports negative indices.
         """
         var step = slice.step.or_else(1)
 
         if step == 0:
             panic("IntArray: slice step cannot be zero")
 
-        # Handle start and stop based on step direction
         var start: Int
         var stop: Int
 
         if step > 0:
             start = slice.start.or_else(0)
             stop = slice.end.or_else(self._size)
-        else:  # step < 0
+        else:
             start = slice.start.or_else(self._size - 1)
-            stop = slice.end.or_else(
-                -self._size - 1
-            )  # Use a value that's clearly before 0
+            stop = slice.end.or_else(-self._size - 1)
 
-        # Normalize negative indices
         if start < 0:
             start += self._size
         if stop < 0:
             stop += self._size
 
-        # Calculate size based on step direction
         var size: Int
         if step > 0:
             size = max(0, (stop - start + step - 1) // step)
         else:
             size = max(0, (start - stop - step - 1) // (-step))
 
+        # Contiguous forward slice → return a view
+        if step == 1:
+            if size == 0:
+                return Self()
+            var result = Self()
+            if self._data:
+                result._data = self._data.unsafe_value() + start
+            result._size = size
+            result._capacity = -1  # marks as view
+            return result^
+
+        # Strided or negative step → deep copy
         var result = IntArray.with_capacity(size)
         var src_idx = start
         var data = self._data.unsafe_value()
@@ -361,9 +387,14 @@ struct IntArray(
         Args:
             required: Minimum required capacity
 
+        Raises:
+            Panic if called on a non-owning (view) array.
+
         Note:
             Growth strategy: new capacity = max(required, current_capacity * 1.5 + 1)
         """
+        if not self.owning():
+            panic("IntArray: can't reserve on a view")
         if required <= self._capacity:
             return
 
@@ -423,13 +454,11 @@ struct IntArray(
         Args:
             other: IntArray to add element-wise to this array
 
-        Note:
-            Modifies this array in-place by adding corresponding elements from other.
-            Both arrays must have the same length.
-
         Raises:
-            Panic if arrays have unequal lengths.
+            Panic if arrays have unequal lengths or array is a view.
         """
+        if not self.owning() and self._size > 0:
+            panic("IntArray: can't mutate a view")
         if len(self) != len(other):
             panic("IntArray -> __iadd__(other): ", "unequal lengths")
         for i in range(len(self)):
@@ -442,13 +471,11 @@ struct IntArray(
         Args:
             other: Mojo List of integers to add element-wise to this array
 
-        Note:
-            Modifies this array in-place by adding corresponding elements from the list.
-            Both the array and list must have the same length.
-
         Raises:
-            Panic if array and list have unequal lengths.
+            Panic if array and list have unequal lengths or array is a view.
         """
+        if not self.owning() and self._size > 0:
+            panic("IntArray: can't mutate a view")
         if len(self) != len(other):
             panic("IntArray -> __iadd__(other[List]): ", "unequal lengths")
         for i in range(len(self)):
@@ -556,12 +583,11 @@ struct IntArray(
         Args:
             index: Index of element to remove (default: -1 for last element)
 
-        Returns:
-            The value that was removed from the array
-
         Raises:
-            Panic if array is empty or index is out of bounds.
+            Panic if array is empty, index is out of bounds, or array is a view.
         """
+        if not self.owning():
+            panic("IntArray: can't pop from a view")
         if self._size < 1:
             panic("IntArray: cannot pop from empty array")
         var i = index if index >= 0 else index + self._size
@@ -579,28 +605,32 @@ struct IntArray(
     def clear(mut self):
         """Remove all elements from the array.
 
+        Raises:
+            Panic if array is a view.
+
         Note:
             Does not free memory; only resets size to zero.
             The capacity remains unchanged for efficient reuse.
         """
+        if not self.owning():
+            panic("IntArray: can't clear a view")
         self._size = 0
 
     @always_inline("nodebug")
     def replace(self, idx: Int, value: Int) -> Self:
-        """Return copy with element at idx replaced."""
-        var result = self
+        """Return owning copy with element at idx replaced."""
+        var result = self.materialized()
         result[idx] = value
         return result^
 
     @always_inline("nodebug")
     def replace(self, indices: Self, values: Self) -> Self:
-        """Return copy with multiple replacements."""
+        """Return owning copy with multiple replacements."""
         var n = len(self)
         var m = len(indices)
         if m != len(values):
             panic("IntArray -> replace: indices and values must be same length")
 
-        # Validate indices: no out-of-bounds, no duplicates
         for i in range(m):
             var idx = indices[i]
             if idx < 0 or idx >= n:
@@ -608,8 +638,7 @@ struct IntArray(
                     "IntArray -> replace: index out of bounds: " + String(idx)
                 )
 
-        var result = self
-        # Apply replacements
+        var result = self.materialized()
         for i in range(m):
             result[indices[i]] = values[i]
 
@@ -679,8 +708,16 @@ struct IntArray(
         return result^
 
     def sort(mut self, asc: Bool = True):
-        """Insertion sort in place."""
-        for i in range(1, len(self)):
+        """Insertion sort in place.
+
+        Raises:
+            Panic if array is a view (and non-empty).
+        """
+        if not self.owning() and self._size > 0:
+            panic("IntArray: can't sort a view")
+        if self._size < 2:
+            return
+        for i in range(1, self._size):
             var elem = self[i]
             var j = i
             while j > 0 and (elem < self[j - 1] if asc else elem > self[j - 1]):
@@ -690,7 +727,7 @@ struct IntArray(
 
     def sorted(self, asc: Bool = True) -> Self:
         """Return sorted copy."""
-        var result = self.copy()
+        var result = self.materialized()
         result.sort(asc)
         return result^
 
@@ -705,7 +742,15 @@ struct IntArray(
 
     @always_inline("nodebug")
     def fill(mut self, value: Int):
-        """Fill with value."""
+        """Fill with value.
+
+        Raises:
+            Panic if array is a view (and non-empty).
+        """
+        if not self.owning() and self._size > 0:
+            panic("IntArray: can't fill a view")
+        if self._size == 0:
+            return
         var data = self._data.unsafe_value()
         for i in range(self._size):
             data[i] = value
@@ -813,10 +858,17 @@ struct IntArray(
     def reverse(mut self):
         """Reverse the array in place.
 
+        Raises:
+            Panic if array is a view (and non-empty).
+
         Note:
             Modifies the array in place, reversing the order of elements.
             Time complexity is O(n).
         """
+        if not self.owning() and self._size > 0:
+            panic("IntArray: can't reverse a view")
+        if self._size == 0:
+            return
         var data = self._data.unsafe_value()
         for i in range(self._size // 2):
             var temp = data[i]

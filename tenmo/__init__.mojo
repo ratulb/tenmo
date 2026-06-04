@@ -105,6 +105,7 @@ from .indexhelper import *
 
 from .logarithm import *
 from .matmul import *
+from .matmul_cpu2d import MmCpu2d
 from .kernels.matmul_kernel import *
 from .matrixshapevalidator import *
 from .matrixvector import *
