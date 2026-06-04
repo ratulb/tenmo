@@ -3,7 +3,7 @@ name: Mojo Tests
 on:
   push:
     branches:
-      - development
+      - gradbox_ndb_ptr
       - main
   pull_request:
     branches:
