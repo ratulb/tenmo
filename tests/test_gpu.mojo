@@ -1580,18 +1580,6 @@ def test_gpu_transfer_fidelity() raises:
         assert_true(B.all_close(B_back))
 
 
-def test_ancestry_storage_fidelity() raises:
-    comptime if has_accelerator():
-        var A = Tensor[dtype].rand(9, 80, requires_grad=True)
-        var A_gpu = A.to_gpu()
-        var B = Tensor[dtype].rand(80, 20)
-        var B_gpu = B.to_gpu()
-        var C_gpu = A_gpu.matmul(B_gpu)
-        var B_from_ancestry = C_gpu.ancestry().tensor(1)
-        var B_ancestry_back = B_from_ancestry.to_cpu()
-        assert_true(B.all_close(B_ancestry_back))
-
-
 def test_forward_matmul_fidelity() raises:
     comptime if has_accelerator():
         var A = Tensor[dtype].rand(9, 80, requires_grad=True)
@@ -1649,27 +1637,4 @@ def test_transposed_matmul_fidelity() raises:
         assert_true(grad_A_cpu.all_close(grad_A_gpu))
 
 
-def test_ancestry_transposed_matmul_fidelity() raises:
-    comptime if has_accelerator():
-        var A = Tensor[dtype].rand(9, 80, requires_grad=True)
-        var B = Tensor[dtype].rand(80, 20)
-        var A_gpu = A.to_gpu()
-        var B_gpu = B.to_gpu()
-        var C_gpu = A_gpu.matmul(B_gpu)
 
-        var grad_out = Tensor[dtype].ones(9, 20)
-        var grad_out_gpu = grad_out.to_gpu()
-
-        var BT_cpu = B.transpose(axes=IntArray(-1, -2))
-        var grad_A_cpu = grad_out.matmul(BT_cpu)
-
-        var B_anc = C_gpu.ancestry().tensor(1)
-        var BT_anc = B_anc.buffer.transpose(axes=IntArray(-1, -2))
-
-        var grad_A_anc_ndb = MatmulNdGpu[dtype].launch[tile_size=32](
-            grad_out_gpu.buffer, BT_anc
-        )
-        var grad_A_ANC = Tensor[dtype](grad_A_anc_ndb^)
-        var grad_A_anc = grad_A_ANC.to_cpu()
-
-        assert_true(grad_A_cpu.all_close(grad_A_anc))

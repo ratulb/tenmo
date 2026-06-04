@@ -151,14 +151,6 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     def ref_get(ref self, idx: Int) -> ref[self.origins] Ancestor[Self.dtype]:
         return self.origins[idx]
 
-    def tensor(ref self, idx: Int) -> Tensor[Self.dtype]:
-        ref ancestor = self.ref_get(idx)
-        if ancestor.ndb:
-            return Tensor[Self.dtype](
-                ancestor.ndb.value().copy(), requires_grad=ancestor.requires_grad
-            )
-        panic("Ancestors.tensor: ancestor has no data")
-
     def __len__(self) -> Int:
         return len(self.origins)
 

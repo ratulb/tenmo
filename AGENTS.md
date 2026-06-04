@@ -85,7 +85,7 @@ Key design facts:
 - `Tensor[dtype]` is generic over `DType` — use `alias dtype = DType.float32` or `comptime dtype = DType.float32`
 - `track_grad: Bool` is a **compile-time** parameter — `model.eval()` sets it to `False`, eliminating graph overhead entirely
 - `Gradbox` has its own refcount separate from `Tensor` — survives Mojo's ASAP destruction of intermediates
-- `Ancestor` stores only what backward needs (id, gradbox ptr, layout, storage) — no full Tensor copies
+- `Ancestor.ndb` is `Optional[NDBuffer]` — populated only for ops with `needs_parent_data=True`; `to_ancestor()` creates ancestors without ndb
 - Backward dispatch uses a jump table on integer `op_code` — no variant extraction
 - Views share `Buffer` via ref-counting — zero-copy slicing
 - `DType.bool` is stored internally as `uint8` in GPU kernels
@@ -136,7 +136,7 @@ Tensor[dtype]
 ├── _id: UInt                          # unique identifier
 ├── buffer: NDBuffer[dtype]            # data + layout (shape/strides/offset)
 ├── requires_grad: Bool                # compile-time track_grad gate
-├── gradbox: UnsafePointer[Gradbox]    # allocated only if requires_grad=True
+├── gradbox: Optional[Gradbox[dtype]]  # gradient storage (only if requires_grad=True)
 └── ancestors: Optional[Ancestors]     # computation graph parents
 ```
 
@@ -144,20 +144,21 @@ Tensor[dtype]
 
 ```
 Gradbox[dtype]
-├── _ndb_ptr: Optional[UnsafePointer[NDBuffer]]  # pointer to heap NDBuffer
-└── _refcount: Optional[UnsafePointer[Atomic]]    # pointer to heap atomic refcount
+├── _ndb_ptr: Optional[UnsafePointer[NDBuffer]]   # pointer to heap NDBuffer
+└── _refcount: Optional[UnsafePointer[Atomic]]     # pointer to heap atomic refcount
 ```
 
 Buffer-like combined heap allocation: `[Atomic[DType.uint64] | NDBuffer]`.
 - `_refcount` points to the Atomic at the start.
 - `_ndb_ptr` points to the NDBuffer after the Atomic.
 - `buffer()` method returns `ref self._ndb_ptr.unsafe_value()[]` — the NDBuffer reference.
+- Stored inline in both `Tensor` and `Ancestor` as `Optional[Gradbox[dtype]]` — no separate heap allocation for the Gradbox wrapper itself.
 
 ### Key Invariants (Updated)
 
 1. **Gradbox initialized upfront** — When `requires_grad=True`, `init_gradbox()` allocates gradient storage immediately (zeros) via combined heap allocation (`[Atomic | NDBuffer]`). On GPU, a `DeviceState` is allocated; on CPU, a contiguous `NDBuffer` of zeros.
 
-2. **Independent refcounting** — Gradbox has its own atomic refcount (`_refcount`) separate from Tensor. This survives Mojo's ASAP destruction of intermediates, ensuring gradients persist through backward pass even when Tensor temporaries are freed. `__copyinit__` bumps the refcount; `__del__` decrements and frees when last handle drops.
+2. **Independent refcounting** — Gradbox has its own atomic refcount (`_refcount`) separate from Tensor. This survives Mojo's ASAP destruction of intermediates, ensuring gradients persist through backward pass even when Tensor temporaries are freed. `__copyinit__` bumps the refcount; `__del__` decrements and frees when last handle drops. Stored inline in Tensor and Ancestor as `Optional[Gradbox[dtype]]`.
 
 3. **Views share data, own gradboxes** — When a view is created via `View.forward()`:
    - CPU: `buffer.share()` enables refcounting on the underlying `Buffer` — zero-copy slice
@@ -333,7 +334,7 @@ if tid == 0:
 Every differentiable operation follows this pattern:
 
 ```mojo
-fn forward[track_grad: Bool = True](self, ...) -> Tensor[Self.dtype]:
+def forward[track_grad: Bool = True](self, ...) -> Tensor[Self.dtype]:
     # 1. Compute output buffer
     var nd_buffer = ...  # operation on NDBuffer
 
@@ -342,11 +343,12 @@ fn forward[track_grad: Bool = True](self, ...) -> Tensor[Self.dtype]:
 
     # 3. Optionally register ancestry for backward
     comptime if track_grad:
-        grad_required = requires_grad.or_else(self.requires_grad)
+        var grad_required = requires_grad.or_else(self.requires_grad)
         if grad_required:
             out.requires_grad_(True)                          # allocates gradbox
             var backwardFnArg = BackwardFnArg[Self.dtype](
-                BACKWARD_*, OperationArg(...)                  # op_code + payload
+                BACKWARD_*, OperationArg(...),                  # op_code + payload
+                needs_parent_data=True                          # True if backward reads parent shape/buffer
             )
             out.add_ancestry(backwardFnArg^, self, other)     # register parents
     return out^
@@ -370,27 +372,28 @@ fn add_ancestry(mut self, var backwardFnArg: BackwardFnArg[Self.dtype], *parents
 
 - Creates `Ancestors` with the `backwardFnArg` if not already present
 - For each parent:
-  - If parent buffer is **not shared**: copies it and calls `buffer.share()` to enable refcounting, then appends the copy
-  - If parent buffer **is already shared**: appends the parent directly
-- `Ancestors.append()` converts `Tensor` → `Ancestor` via `Ancestor.from_tensor()`
+  - If `backwardFnArg.needs_parent_data == True`: copies parent's buffer and calls `buffer.share()` to enable refcounting, then appends with populated ndb
+  - If `needs_parent_data == False`: appends the parent via `to_ancestor()` — no ndb copy
+- `Ancestors.append()` converts `Tensor` → `Ancestor` via `Tensor.to_ancestor()`
 
 ### `Ancestor` (`ancestry.mojo`)
 
-Lightweight handle carrying everything backward needs — no full Tensor copy:
+Lightweight handle carrying only what backward needs — ndb is Optional, populated only when required:
 
 ```
 Ancestor[dtype]
 ├── _id: UInt                           # graph traversal key
 ├── requires_grad: Bool                 # skip gradient update if False
-├── gradbox: UnsafePointer[Gradbox]     # gradient storage (refcount bumped)
-├── ndb: NDBuffer[dtype]                # data + layout (refcount bumped)
+├── gradbox: Optional[Gradbox[dtype]]   # gradient storage (inline via Optional)
+├── ndb: Optional[NDBuffer[dtype]]      # data+layout (None unless needs_parent_data=True)
 └── parents: Optional[Ancestors[dtype]] # recursive ancestry chain
 ```
 
 - `__copyinit__`: bumps gradbox refcount via `fetch_add[MONOTONIC](1)`
 - `__del__`: decrements refcount via `fetch_sub[RELEASE](1)`; destroys gradbox when count hits 0 (with `ACQUIRE` fence)
-- `from_tensor()`: copies tensor's NDBuffer into `ndb`, bumps gradbox refcount if present
-- `buffer()`: returns `self.ndb.copy()` — cheap refcount bump, no data copy
+- `buffer()`: returns `ref[self.ndb.value()]NDBuffer[Self.dtype]` — reference, no copy; **panics if ndb is empty**
+- `shape()`, `strides()`, `offset()`, `max_index()`: delegate to `ndb.value()` — panic if empty
+- `is_on_gpu()`: safe — checks `if self.ndb:` first, returns `False` when empty
 - `update_grad(incoming, op_code, extra_arg)`: applies gradient to gradbox via op_code dispatch:
   - `AddTensor`: `gradbox += incoming`
   - `SubtractTensor`: `gradbox -= incoming`
@@ -401,8 +404,7 @@ Ancestor[dtype]
 
 Holds `List[Ancestor]` + `BackwardFnArg`:
 
-- `append(parent)`: converts `Tensor` → `Ancestor` via `from_tensor()`
-- `tensor(idx)`: reconstructs `Tensor` from `Ancestor` at index
+- `append(parent)`: converts `Tensor` → `Ancestor` via `to_ancestor()`
 - `backward_fn_arg()`: returns reference to stored `BackwardFnArg`
 
 ### `BackwardFnArg` (`backpropagation.mojo`)
@@ -434,6 +436,7 @@ BackwardFnArg[dtype]
 | `PadArg` | PAD | `pad: List[(Int,Int)]`, `mode` |
 | `MinMaxArg` | MINMAX | `axes`, `keepdims`, `mask: NDBuffer` |
 | `SoftmaxArg` | SOFTMAX | `axes`, `softmax_out: NDBuffer` |
+| `NDBufferArg` | SIGMOID_BACKWARD, TANH_BACKWARD, BACKWARD_EXPONENTIAL, RELU | `ndb: NDBuffer` |
 | `ClipArg` | CLIP | `min_val`, `max_val` |
 | `TilesArg` | TILE | `repeat`, `orig_shape` |
 | `StdArg` | STD | `axis`, `unbiased`, `keepdims`, `epsilon` |
@@ -455,7 +458,8 @@ fn backward[graph_size: Int = 50](mut output, seed_tensor: Tensor)
 
 **Phase 2: DFS graph collection**
 - Build `node_list: List[Ancestor]`, `id_to_index: Dict[UInt, Int]`, `fanin: Dict[UInt, Int]`
-- Start from output's `Ancestor`, DFS through parents via `ancestry()`
+- Start from output's `Ancestor` via `to_ancestor()`, then inject ndb: `root.ndb = output.buffer.copy()` (root always needs data)
+- DFS through parents via `ancestry()` — parent ancestors carry ndb only if their `BackwardFnArg.needs_parent_data` was True
 - Track `fanin` count (number of children depending on each node)
 - Record reverse topological order in `topo_ids`
 
@@ -490,41 +494,78 @@ def invoke(
 ```
 
 - Guards: returns early if `!output.has_ancestry()`
-- Each backward struct implements `def backward(output: Ancestor[Self.dtype], mut parent_ids: List[UInt])` — handlers call `parent.update_grad()` internally and append to `parent_ids`
+- Each backward struct implements `def backward(output: Ancestor[Self.dtype], mut parent_ids: List[UInt], retain_graph: Bool = False)` — handlers call `parent.update_grad()` and `parent_ids.append()`
+- Backward handlers that call `parent.shape()`, `parent.buffer()`, `parent.strides()`, `parent.offset()`, or `parent.max_index()` require `needs_parent_data=True` on the `BackwardFnArg`
+- 3 ops (sigmoid, tanh, exp) circumvent this by storing their own output NDBuffer in the payload — their backward reads from the payload, not from `output.buffer()`
 - All backward handlers are in separate modules, imported via `walkback.mojo`
 
-### Example: `SumBackward` (`tenmo/summation.mojo`)
+### Example: `SumBackward` (`tenmo/sum_reduction.mojo`)
 
 ```mojo
 def backward(
     output: Ancestor[Self.dtype],
     mut parent_ids: List[UInt],
+    retain_graph: Bool = False,
 ):
     # 1. Extract reduction parameters from BackwardFnArg
     ref bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
     var (axes, keepdims) = bwd_arg.axes, bwd_arg.keepdims
 
     # 2. Get the gradient and original shape
-    ref gradbox = output.gradients()[]
+    ref gradbox = output.gradients()
     var ancestor = output.ancestry().get(0)
     ref shape = ancestor.shape()
 
     # 3. Broadcast gradient back to original shape
     if gradbox.shape() == Shape():  # scalar case
-        grad_contrib = Gradbox.full(shape, gradbox.item(), share=False, device=...)
+        grad_contrib = Gradbox.full(shape, gradbox.item(), device=...)
     else if not keepdims:
         # Unsqueeze reduced dimensions back to size 1
         axes = gradbox.shape().intarray().insert(axes, IntArray.filled(len(axes), 1))
-        unsqueezed_grad = gradbox.reshape(Shape(axes))
-        grad_contrib = unsqueezed_grad.broadcast_to(shape, share=False)
+        unsqueezed_shape = Shape(axes)
+        unsqueezed_grad = gradbox.reshape(unsqueezed_shape)
+        grad_contrib = unsqueezed_grad.broadcast_to(shape)
     else:
-        grad_contrib = gradbox.broadcast_to(shape, share=False)
+        grad_contrib = gradbox.broadcast_to(shape)
 
     # 4. Accumulate into parent's gradbox and register parent for fanin
     if ancestor.requires_grad:
         ancestor.update_grad(grad_contrib^, AddTensor, None)
     parent_ids.append(ancestor._id)
+
+    # 5. Zero gradient if not retaining graph
+    if not retain_graph:
+        gradbox.zero_grad()
 ```
+
+### Ops That Store Output in BackwardFnArg Payload
+
+Most ops store only operation metadata in the payload (axes, keepdims, shape, etc.). Three ops store their **output NDBuffer** because their backward handler needs the forward output values:
+
+| Op | Payload Type | Why |
+|---|---|---|
+| Sigmoid | `NDBufferArg` | Backward formula: `grad * out * (1 - out)` — needs sigmoid output |
+| Tanh | `NDBufferArg` | Backward formula: `grad * (1 - out²)` — needs tanh output |
+| Exp | `NDBufferArg` | Backward formula: `grad * out` — needs exp output |
+
+These ops set `needs_parent_data=False` (they don't need their parent's ndb). The output ndb is stored during forward via `from_ndbuffer()`:
+
+```mojo
+var out_ndb = out.buffer.copy()
+var backwardFnArg = BackwardFnArg[Self.dtype].from_ndbuffer(
+    BACKWARD_SIGMOID, out_ndb^
+)
+out.add_ancestry(backwardFnArg^, self)
+```
+
+The backward handler reads from the payload:
+```mojo
+ref bwd_arg = output.ancestry().backward_fn_arg().get[NDBufferArg[Self.dtype]]()
+var out_ndb = bwd_arg.ndb
+var ndb = out_ndb.arithmetic_ops[SIGMOID_BACKWARD](gradbox.buffer())
+```
+
+This is identical to how ReLU stores its mask and Softmax stores its output via `SoftmaxArg`.
 
 ### `seed_grad()` (`tensor.mojo:1226`)
 
