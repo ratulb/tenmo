@@ -312,7 +312,7 @@ Gradients don't need the full Tensor API. A `Gradbox` encapsulates only an `NDBu
 Calling `A.grad()` returns a detached `Gradbox` with its own data via `Gradbox.detach()`, which deep-copies the underlying buffer (CPU: `memcpy`, GPU: `enqueue_copy_to`). The tensor's internal Gradbox is unaffected by subsequent `zero_grad()` or `.backward()` calls on the returned copy — safe to snapshot gradients mid-training.
 
 **Ancestors is not a Tensor**
-The autograd graph no longer stores full `Tensor` copies. An `Ancestor` handle carries only what backward needs: an id, `requires_grad` flag, a refcounted gradbox pointer, and a shared `NDBuffer`. This eliminates the recursive deep-copy explosion on every `add_ancestry` call.
+The autograd graph no longer stores full `Tensor` copies. An `Ancestor` handle carries only what backward needs: an id, `requires_grad` flag, a refcounted gradbox pointer, and a shared `NDBuffer`(if backward needs). This eliminates the recursive deep-copy explosion on every `add_ancestry` call.
 
 **NDBuffer as Single Source of Truth**
 Shape, strides, and offset logic is centralized in `NDBuffer`, which serves both `Tensor` and `Gradbox`. This ensures views, slicing, and broadcasting behave consistently across the system.
