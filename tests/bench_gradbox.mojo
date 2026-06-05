@@ -190,7 +190,7 @@ def bench_gradbox_churn():
 # ── Main ────────────────────────────────────────────────────────────────────
 def main():
     print("=" * 60)
-    print("GRADBOX BENCHMARK - Optional[Gradbox] (refactored)")
+    print("GRADBOX BENCHMARK - gpu_synchronize")
     print("=" * 60)
 
     bench_create_gradbox()
