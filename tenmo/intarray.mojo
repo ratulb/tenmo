@@ -265,11 +265,8 @@ struct IntArray(
         return self._capacity >= 0
 
     @always_inline("nodebug")
-    def materialized(self) -> Self:
-        """Ensure the returned array is owning (deep copy if view, no-op if owning).
-
-        Use this when you need to outlive the original owner.
-        """
+    def owned_copy(self) -> Self:
+        """Return an owning copy (deep copy if view, no-op if owning)."""
         if self.owning():
             return self
         var result = Self.with_capacity(self._size)
@@ -619,7 +616,7 @@ struct IntArray(
     @always_inline("nodebug")
     def replace(self, idx: Int, value: Int) -> Self:
         """Return owning copy with element at idx replaced."""
-        var result = self.materialized()
+        var result = self.owned_copy()
         result[idx] = value
         return result^
 
@@ -638,7 +635,7 @@ struct IntArray(
                     "IntArray -> replace: index out of bounds: " + String(idx)
                 )
 
-        var result = self.materialized()
+        var result = self.owned_copy()
         for i in range(m):
             result[indices[i]] = values[i]
 
@@ -727,7 +724,7 @@ struct IntArray(
 
     def sorted(self, asc: Bool = True) -> Self:
         """Return sorted copy."""
-        var result = self.materialized()
+        var result = self.owned_copy()
         result.sort(asc)
         return result^
 

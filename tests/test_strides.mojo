@@ -137,7 +137,7 @@ def test_strides_with_capacity() raises:
 
 
 def test_compute_default_strides() raises:
-    shape = Shape.of(2, 3, 4)
+    shape = Shape(2, 3, 4)
     strides = Strides.default(shape)
     assert_true(
         strides == Strides(12, 4, 1),

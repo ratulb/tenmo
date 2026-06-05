@@ -129,7 +129,7 @@ def test_shuf_cpu_1d_identity_perm() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var s = a.shuffle([0, 1, 2, 3], axis=0)
-    assert_true(s.shape() == Shape.of(4))
+    assert_true(s.shape() == Shape(4))
     assert_true(s.all_close(Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])))
     var loss = s.sum()
     loss.backward()
@@ -194,7 +194,7 @@ def test_shuf_cpu_2d_axis0_reverse() raises:
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
     )
     var s = a.shuffle([2, 1, 0], axis=0)
-    assert_true(s.shape() == Shape.of(3, 2))
+    assert_true(s.shape() == Shape(3, 2))
     assert_true(
         s.all_close(Tensor[dtype].d2([[5.0, 6.0], [3.0, 4.0], [1.0, 2.0]]))
     )
@@ -285,7 +285,7 @@ def test_shuf_cpu_3d_axis0_reverse() raises:
         requires_grad=True,
     )
     var s = a.shuffle([2, 1, 0], axis=0)
-    assert_true(s.shape() == Shape.of(3, 2, 2))
+    assert_true(s.shape() == Shape(3, 2, 2))
     assert_true(
         s.all_close(
             Tensor[dtype].d3(
@@ -313,7 +313,7 @@ def test_shuf_cpu_3d_axis1_arbitrary() raises:
     )
     # perm [2,0,1] along axis=1
     var s = a.shuffle([2, 0, 1], axis=1)
-    assert_true(s.shape() == Shape.of(2, 3, 2))
+    assert_true(s.shape() == Shape(2, 3, 2))
     assert_true(
         s.all_close(
             Tensor[dtype].d3(
@@ -389,7 +389,7 @@ def test_shuf_cpu_4d_axis0() raises:
     a.requires_grad_(True)
     var a_ref = a.copy()
     var s = a.shuffle([3, 1, 0, 2], axis=0)
-    assert_true(s.shape() == Shape.of(4, 3, 2, 5))
+    assert_true(s.shape() == Shape(4, 3, 2, 5))
     # s[0] = a[3], s[1] = a[1], s[2] = a[0], s[3] = a[2]
     assert_true(
         s.sum(axes=[1, 2, 3]).all_close(
@@ -406,7 +406,7 @@ def test_shuf_cpu_4d_axis2() raises:
     var a = Tensor[dtype].randn(2, 3, 4, 5)
     a.requires_grad_(True)
     var s = a.shuffle([3, 0, 2, 1], axis=2)
-    assert_true(s.shape() == Shape.of(2, 3, 4, 5))
+    assert_true(s.shape() == Shape(2, 3, 4, 5))
     var loss = s.sum()
     loss.backward()
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -423,7 +423,7 @@ def test_shuf_cpu_random_perm_grad_flow() raises:
     a.requires_grad_(True)
     # Empty perm → random shuffle
     var s = a.shuffle([], axis=0)
-    assert_true(s.shape() == Shape.of(5, 4))
+    assert_true(s.shape() == Shape(5, 4))
     var loss = s.sum()
     loss.backward()
     # Sum is permutation-invariant so grad is always ones
@@ -435,7 +435,7 @@ def test_shuf_cpu_random_perm_3d_grad_flow() raises:
     var a = Tensor[dtype].randn(6, 3, 4)
     a.requires_grad_(True)
     var s = a.shuffle([], axis=1)
-    assert_true(s.shape() == Shape.of(6, 3, 4))
+    assert_true(s.shape() == Shape(6, 3, 4))
     var loss = s.sum()
     loss.backward()
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -450,7 +450,7 @@ def test_shuf_cpu_track_grad_false() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var s = a.shuffle[track_grad=False]([1, 0], axis=0)
-    assert_true(s.shape() == Shape.of(2, 2))
+    assert_true(s.shape() == Shape(2, 2))
     assert_true(not s.requires_grad)
 
 
@@ -530,7 +530,7 @@ def test_shuf_gpu_1d_identity_perm() raises:
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
         var a_gpu = a.to_gpu()
         var s = a_gpu.shuffle([0, 1, 2, 3], axis=0)
-        assert_true(s.shape() == Shape.of(4))
+        assert_true(s.shape() == Shape(4))
         assert_true(
             s.to_cpu().all_close(Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0]))
         )
@@ -597,7 +597,7 @@ def test_shuf_gpu_2d_axis0_reverse() raises:
         )
         var a_gpu = a.to_gpu()
         var s = a_gpu.shuffle([2, 1, 0], axis=0)
-        assert_true(s.shape() == Shape.of(3, 2))
+        assert_true(s.shape() == Shape(3, 2))
         assert_true(
             s.to_cpu().all_close(
                 Tensor[dtype].d2([[5.0, 6.0], [3.0, 4.0], [1.0, 2.0]])
@@ -808,7 +808,7 @@ def test_shuf_gpu_4d_axis0() raises:
         a.requires_grad_(True)
         var a_gpu = a.to_gpu()
         var s = a_gpu.shuffle([3, 1, 0, 2], axis=0)
-        assert_true(s.shape() == Shape.of(4, 3, 2, 5))
+        assert_true(s.shape() == Shape(4, 3, 2, 5))
         var loss = s.sum()
         loss.backward()
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -821,7 +821,7 @@ def test_shuf_gpu_4d_axis2() raises:
         a.requires_grad_(True)
         var a_gpu = a.to_gpu()
         var s = a_gpu.shuffle([3, 0, 2, 1], axis=2)
-        assert_true(s.shape() == Shape.of(2, 3, 4, 5))
+        assert_true(s.shape() == Shape(2, 3, 4, 5))
         var loss = s.sum()
         loss.backward()
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -898,7 +898,7 @@ def test_shuf_gpu_random_perm_grad_flow() raises:
         a.requires_grad_(True)
         var a_gpu = a.to_gpu()
         var s = a_gpu.shuffle([], axis=0)
-        assert_true(s.shape() == Shape.of(5, 4))
+        assert_true(s.shape() == Shape(5, 4))
         var loss = s.sum()
         loss.backward()
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -915,7 +915,7 @@ def test_shuf_gpu_track_grad_false() raises:
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
         var s = a_gpu.shuffle[track_grad=False]([1, 0], axis=0)
-        assert_true(s.shape() == Shape.of(2, 2))
+        assert_true(s.shape() == Shape(2, 2))
         assert_true(not s.requires_grad)
 
 
@@ -975,7 +975,7 @@ def test_shuf_gpu_large_axis_dim() raises:
         for i in range(41, -1, -1):
             perm.append(i)
         var s = a_gpu.shuffle(perm, axis=0)
-        assert_true(s.shape() == Shape.of(42, 8))
+        assert_true(s.shape() == Shape(42, 8))
         var loss = s.sum()
         loss.backward()
         assert_true(a.grad().all_close(Tensor.ones_like(a)))

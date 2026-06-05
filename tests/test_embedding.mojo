@@ -236,7 +236,7 @@ def test_emb_cpu_bwd_single_index() raises:
     var loss = result.sum()
     loss.backward()
     # Row 2 gets grad=1 for each element, all other rows get grad=0
-    var grad = emb.weight.grad().detach()
+    var grad = emb.weight.grad()
     # var grad_row2 = emb.weight.grad()[i(2), s()]
     var grad_row2 = grad[i(2), s()]
     assert_true(grad_row2.all_close(Tensor[dtype].d1([1.0, 1.0, 1.0])))
@@ -254,7 +254,7 @@ def test_emb_cpu_bwd_multiple_indices() raises:
     var loss = result.sum()
     loss.backward()
     # Rows 0,1,2 each get grad=[1,1,1], rows 3,4 get grad=[0,0,0]
-    var shared_grad = emb.weight.grad().detach()
+    var shared_grad = emb.weight.grad()
     for row in range(3):
         assert_true(
             shared_grad[i(row), s()].all_close(
@@ -277,7 +277,7 @@ def test_emb_cpu_bwd_repeated_index_accumulates() raises:
     var loss = result.sum()
     loss.backward()
     # Row 2 contributes 2 × [1,1,1] = [2,2,2]
-    var shared_grad = emb.weight.grad().detach()
+    var shared_grad = emb.weight.grad()
     assert_true(
         shared_grad[i(2), s()].all_close(Tensor[dtype].d1([2.0, 2.0, 2.0]))
     )
@@ -296,7 +296,7 @@ def test_emb_cpu_bwd_fuse_sum() raises:
     loss.backward()
     # Each looked-up row receives same grad = [1,1,1]
     # (sum backward broadcasts scalar grad to all rows)
-    var shared_grad = emb.weight.grad().detach()
+    var shared_grad = emb.weight.grad()
     assert_true(
         shared_grad[i(0), s()].all_close(Tensor[dtype].d1([1.0, 1.0, 1.0]))
     )
@@ -341,7 +341,7 @@ def test_emb_cpu_bwd_fuse_mean() raises:
     var loss = result.sum()
     loss.backward()
     # MEAN backward: each looked-up row receives grad = [1/3, 1/3, 1/3]
-    var shared_grad = emb.weight.grad().detach()
+    var shared_grad = emb.weight.grad()
     assert_true(
         shared_grad[i(0), s()].all_close(
             Tensor[dtype].d1([1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0])
@@ -375,7 +375,7 @@ def test_emb_cpu_bwd_padding_idx_no_grad() raises:
     var loss = result.sum()
     loss.backward()
     # Row 0 (padding) must have zero grad
-    var shared_grad = emb.weight.grad().detach()
+    var shared_grad = emb.weight.grad()
     assert_true(shared_grad[i(0), s()].all_close(Tensor[dtype].zeros(Shape(3))))
     # Row 1 must have non-zero grad
     assert_true(
@@ -415,7 +415,7 @@ def test_emb_cpu_bwd_chained_linear() raises:
     loss = diff_sqrd.squeeze()
     loss.backward()
     # Grad must flow back to embedding rows 2 and 3
-    var shared_grad = emb.weight.grad().detach()
+    var shared_grad = emb.weight.grad()
     var grad2 = shared_grad[i(2), s()]
     var grad3 = shared_grad[i(3), s()]
     # Both should be non-zero (exact values depend on sigmoid derivative)
@@ -693,7 +693,7 @@ def test_emb_gpu_bwd_basic() raises:
         var loss = result.sum()
         loss.backward()
         # Rows 1 and 3 get grad=[1,1,1]
-        var shared_grad = emb.weight.grad().detach()
+        var shared_grad = emb.weight.grad()
         assert_true(
             shared_grad[i(1), s()]
             .to_cpu()
@@ -728,7 +728,7 @@ def test_emb_gpu_bwd_repeated_index_accumulates() raises:
         var loss = result.sum()
         loss.backward()
         # Row 0 looked up twice → grad = [2,2,2] via atomic scatter-add
-        var shared_grad = emb.weight.grad().detach()
+        var shared_grad = emb.weight.grad()
         assert_true(
             shared_grad[i(0), s()]
             .to_cpu()
@@ -759,7 +759,7 @@ def test_emb_gpu_bwd_fuse_sum() raises:
         var loss = result.sum()
         loss.backward()
         # Both looked-up rows receive same grad = [1,1,1]
-        var shared_grad = emb.weight.grad().detach()
+        var shared_grad = emb.weight.grad()
         assert_true(
             emb.weight.grad()[i(0), s()]
             .to_cpu()
@@ -828,7 +828,7 @@ def test_emb_gpu_bwd_fuse_mean() raises:
         var result = emb([0, 2])  # (3,) via MEAN
         var loss = result.sum()
         loss.backward()
-        var shared_grad = emb.weight.grad().detach()
+        var shared_grad = emb.weight.grad()
         assert_true(
             emb.weight.grad()[i(0), s()]
             .to_cpu()
@@ -863,7 +863,7 @@ def test_emb_gpu_bwd_padding_idx_no_grad() raises:
         var result = emb([0, 1])
         var loss = result.sum()
         loss.backward()
-        var shared_grad = emb.weight.grad().detach()
+        var shared_grad = emb.weight.grad()
         # Padding row must have zero grad
         assert_true(
             shared_grad[i(0), s()]
@@ -907,7 +907,7 @@ def test_emb_gpu_bwd_chained() raises:
         var diff_sqrd = diff * diff
         loss = diff_sqrd.squeeze()
         loss.backward()
-        var shared_grad = emb.weight.grad().detach()
+        var shared_grad = emb.weight.grad()
         # Grad flows back to rows 0 and 1
         assert_false(
             shared_grad[i(0), s()]

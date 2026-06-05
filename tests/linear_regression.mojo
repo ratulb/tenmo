@@ -1,13 +1,17 @@
-from tensors import Tensor
-from .shapes import Shape
+from tenmo.tensor import Tensor
+from tenmo.shapes import Shape
 
 
 def main() raises:
     # Training data (x: inputs, y: targets)
-    var x = Tensor.of(1.0, 2.0, 3.0, 4.0).to_dtype[DType.float32]()
-    var y = Tensor.of(5.0, 7.0, 9.0, 11.0).to_dtype[
-        DType.float32
-    ]()  # y = 2x + 3
+    var x = (
+        Tensor[DType.float64].d1([1.0, 2.0, 3.0, 4.0]).to_dtype[DType.float32]()
+    )
+    var y = (
+        Tensor[DType.float64]
+        .d1([5.0, 7.0, 9.0, 11.0])
+        .to_dtype[DType.float32]()
+    )  # y = 2x + 3
 
     # Parameters to learn (initialized arbitrarily)
     var w = Tensor.rand(1, requires_grad=True)

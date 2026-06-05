@@ -25,9 +25,9 @@ def test_uop_sqrt_forward_2d_cpu() raises:
 
 def test_uop_sqrt_forward_3d_cpu() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].full(Shape.of(2, 3, 4), 4.0)
+    var a = Tensor[dtype].full(Shape(2, 3, 4), 4.0)
     var result = a.sqrt()
-    assert_true(result.all_close(Tensor[dtype].full(Shape.of(2, 3, 4), 2.0)))
+    assert_true(result.all_close(Tensor[dtype].full(Shape(2, 3, 4), 2.0)))
 
 
 def test_uop_sqrt_backward_1d_cpu() raises:
@@ -88,21 +88,17 @@ def test_uop_sqrt_gpu() raises:
 def test_uop_sqrt_gpu_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].full(
-            Shape.of(2, 3, 4), 4.0, requires_grad=True
-        )
+        var a_cpu = Tensor[dtype].full(Shape(2, 3, 4), 4.0, requires_grad=True)
         var a_gpu = a_cpu.to_gpu()
         var result = a_gpu.sqrt()
         assert_true(
-            result.to_cpu().all_close(
-                Tensor[dtype].full(Shape.of(2, 3, 4), 2.0)
-            )
+            result.to_cpu().all_close(Tensor[dtype].full(Shape(2, 3, 4), 2.0))
         )
         var loss = result.sum()
         loss.backward()
         assert_true(
             a_cpu.grad().all_close[atol=1e-5](
-                Tensor[dtype].full(Shape.of(2, 3, 4), 0.25)
+                Tensor[dtype].full(Shape(2, 3, 4), 0.25)
             )
         )
 
@@ -128,9 +124,9 @@ def test_uop_negate_forward_2d_cpu() raises:
 
 def test_uop_negate_forward_3d_cpu() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].full(Shape.of(2, 3, 4), 5.0)
+    var a = Tensor[dtype].full(Shape(2, 3, 4), 5.0)
     var result = -a
-    assert_true(result.all_close(Tensor[dtype].full(Shape.of(2, 3, 4), -5.0)))
+    assert_true(result.all_close(Tensor[dtype].full(Shape(2, 3, 4), -5.0)))
 
 
 def test_uop_negate_backward_1d_cpu() raises:
@@ -139,7 +135,7 @@ def test_uop_negate_backward_1d_cpu() raises:
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var loss = (-a).sum()
     loss.backward()
-    assert_true(a.grad().all_close(Tensor[dtype].full(Shape.of(3), -1.0)))
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(3), -1.0)))
 
 
 def test_uop_negate_backward_2d_cpu() raises:
@@ -147,7 +143,7 @@ def test_uop_negate_backward_2d_cpu() raises:
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var loss = (-a).sum()
     loss.backward()
-    assert_true(a.grad().all_close(Tensor[dtype].full(Shape.of(2, 2), -1.0)))
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 2), -1.0)))
 
 
 def test_uop_negate_grad_flow_cpu() raises:
@@ -156,7 +152,7 @@ def test_uop_negate_grad_flow_cpu() raises:
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var loss = (-a + a).sum()
     loss.backward()
-    assert_true(a.grad().all_close(Tensor[dtype].full(Shape.of(3), 0.0)))
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(3), 0.0)))
 
 
 def test_uop_negate_gpu() raises:
@@ -175,27 +171,23 @@ def test_uop_negate_gpu() raises:
         var loss = result.sum()
         loss.backward()
         assert_true(
-            a_cpu.grad().all_close(Tensor[dtype].full(Shape.of(2, 2), -1.0))
+            a_cpu.grad().all_close(Tensor[dtype].full(Shape(2, 2), -1.0))
         )
 
 
 def test_uop_negate_gpu_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].full(
-            Shape.of(2, 3, 4), 5.0, requires_grad=True
-        )
+        var a_cpu = Tensor[dtype].full(Shape(2, 3, 4), 5.0, requires_grad=True)
         var a_gpu = a_cpu.to_gpu()
         var result = -a_gpu
         assert_true(
-            result.to_cpu().all_close(
-                Tensor[dtype].full(Shape.of(2, 3, 4), -5.0)
-            )
+            result.to_cpu().all_close(Tensor[dtype].full(Shape(2, 3, 4), -5.0))
         )
         var loss = result.sum()
         loss.backward()
         assert_true(
-            a_cpu.grad().all_close(Tensor[dtype].full(Shape.of(2, 3, 4), -1.0))
+            a_cpu.grad().all_close(Tensor[dtype].full(Shape(2, 3, 4), -1.0))
         )
 
 
@@ -220,9 +212,9 @@ def test_uop_abs_forward_2d_cpu() raises:
 
 def test_uop_abs_forward_3d_cpu() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].full(Shape.of(2, 3, 4), -5.0)
+    var a = Tensor[dtype].full(Shape(2, 3, 4), -5.0)
     var result = a.__abs__()
-    assert_true(result.all_close(Tensor[dtype].full(Shape.of(2, 3, 4), 5.0)))
+    assert_true(result.all_close(Tensor[dtype].full(Shape(2, 3, 4), 5.0)))
 
 
 def test_uop_abs_gpu() raises:
@@ -241,13 +233,11 @@ def test_uop_abs_gpu() raises:
 def test_uop_abs_gpu_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].full(Shape.of(2, 3, 4), -5.0)
+        var a_cpu = Tensor[dtype].full(Shape(2, 3, 4), -5.0)
         var a_gpu = a_cpu.to_gpu()
         var result = a_gpu.__abs__()
         assert_true(
-            result.to_cpu().all_close(
-                Tensor[dtype].full(Shape.of(2, 3, 4), 5.0)
-            )
+            result.to_cpu().all_close(Tensor[dtype].full(Shape(2, 3, 4), 5.0))
         )
 
 
@@ -272,9 +262,9 @@ def test_uop_relu_forward_2d_cpu() raises:
 
 def test_uop_relu_forward_3d_cpu() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].full(Shape.of(2, 3, 4), -1.0)
+    var a = Tensor[dtype].full(Shape(2, 3, 4), -1.0)
     var result = a.relu()
-    assert_true(result.all_close(Tensor[dtype].full(Shape.of(2, 3, 4), 0.0)))
+    assert_true(result.all_close(Tensor[dtype].full(Shape(2, 3, 4), 0.0)))
 
 
 def test_uop_relu_backward_1d_cpu() raises:
@@ -327,20 +317,16 @@ def test_uop_relu_gpu() raises:
 def test_uop_relu_gpu_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].full(
-            Shape.of(2, 3, 4), -1.0, requires_grad=True
-        )
+        var a_cpu = Tensor[dtype].full(Shape(2, 3, 4), -1.0, requires_grad=True)
         var a_gpu = a_cpu.to_gpu()
         var result = a_gpu.relu()
         assert_true(
-            result.to_cpu().all_close(
-                Tensor[dtype].full(Shape.of(2, 3, 4), 0.0)
-            )
+            result.to_cpu().all_close(Tensor[dtype].full(Shape(2, 3, 4), 0.0))
         )
         var loss = result.sum()
         loss.backward()
         assert_true(
-            a_cpu.grad().all_close(Tensor[dtype].full(Shape.of(2, 3, 4), 0.0))
+            a_cpu.grad().all_close(Tensor[dtype].full(Shape(2, 3, 4), 0.0))
         )
 
 
@@ -362,11 +348,11 @@ def test_uop_invert_bool_forward_2d_cpu() raises:
 
 
 def test_uop_invert_bool_forward_3d_cpu() raises:
-    var a = Tensor[DType.bool].full(Shape.of(2, 3, 4), Scalar[DType.bool](True))
+    var a = Tensor[DType.bool].full(Shape(2, 3, 4), Scalar[DType.bool](True))
     var result = ~a
     assert_true(
         result
-        == Tensor[DType.bool].full(Shape.of(2, 3, 4), Scalar[DType.bool](False))
+        == Tensor[DType.bool].full(Shape(2, 3, 4), Scalar[DType.bool](False))
     )
 
 
@@ -393,9 +379,9 @@ def test_uop_invert_int_forward_2d_cpu() raises:
 
 def test_uop_invert_int_forward_3d_cpu() raises:
     comptime dtype = DType.int32
-    var a = Tensor[dtype].full(Shape.of(2, 3, 4), 1)
+    var a = Tensor[dtype].full(Shape(2, 3, 4), 1)
     var result = ~a
-    assert_true(result == Tensor[dtype].full(Shape.of(2, 3, 4), -2))
+    assert_true(result == Tensor[dtype].full(Shape(2, 3, 4), -2))
 
 
 def test_uop_invert_bool_gpu() raises:
@@ -412,14 +398,14 @@ def test_uop_invert_bool_gpu() raises:
 def test_uop_invert_bool_gpu_3d() raises:
     comptime if has_accelerator():
         var a_cpu = Tensor[DType.bool].full(
-            Shape.of(2, 3, 4), Scalar[DType.bool](True)
+            Shape(2, 3, 4), Scalar[DType.bool](True)
         )
         var a_gpu = a_cpu.to_gpu()
         var result = ~a_gpu
         assert_true(
             result.to_cpu()
             == Tensor[DType.bool].full(
-                Shape.of(2, 3, 4), Scalar[DType.bool](False)
+                Shape(2, 3, 4), Scalar[DType.bool](False)
             )
         )
 
@@ -444,12 +430,10 @@ def test_uop_invert_int_gpu() raises:
 def test_uop_invert_int_gpu_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.int32
-        var a_cpu = Tensor[dtype].full(Shape.of(2, 3, 4), 1)
+        var a_cpu = Tensor[dtype].full(Shape(2, 3, 4), 1)
         var a_gpu = a_cpu.to_gpu()
         var result = ~a_gpu
-        assert_true(
-            result.to_cpu() == Tensor[dtype].full(Shape.of(2, 3, 4), -2)
-        )
+        assert_true(result.to_cpu() == Tensor[dtype].full(Shape(2, 3, 4), -2))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -2,6 +2,7 @@ from std.testing import assert_true, assert_false, TestSuite
 from tenmo.buffers import Buffer
 from tenmo.intarray import IntArray
 from tenmo.shapes import Shape
+from tenmo.common_utils import i, s
 from tenmo.strides import Strides
 from tenmo.ndbuffer import NDBuffer
 from tenmo.sum_mean_reduction import SumMeanReduction
@@ -1164,6 +1165,28 @@ def test_ndbuffer_item_scalar() raises:
     var ndb = NDBuffer[DType.float32](Shape(1))
     ndb[IntArray(0)] = 42.5
     assert_true(ndb.item() == 42.5, "item() should return scalar value")
+
+
+def test_ndbuffer_getitem_overload_coexistence() raises:
+    """Verify Int->Scalar and Idx/Slice->NDBuffer overloads coexist."""
+    var ndb = NDBuffer[DType.float32](Shape(3, 4))
+    for i in range(3 * 4):
+        ndb[IntArray(i // 4, i % 4)] = Float32(i)
+
+    # Int -> Scalar
+    var s = ndb[1, 2]
+    assert_true(s == Float32(1 * 4 + 2))
+
+    # Idx -> NDBuffer view
+    var v = ndb[i(1), i(2)]
+    assert_true(v.dtype == DType.float32)
+    assert_true(v.item() == Float32(1 * 4 + 2))
+
+    # Slice -> NDBuffer view
+    var sl = ndb[Slice(0, 3), Slice(0, 2)]
+    assert_true(sl.shape == Shape(3, 2))
+    assert_true(sl[IntArray(0, 0)] == Float32(0))
+    assert_true(sl[IntArray(2, 1)] == Float32(2 * 4 + 1))
 
 
 # ============================================

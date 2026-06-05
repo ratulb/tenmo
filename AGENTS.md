@@ -615,18 +615,20 @@ Direct gradient update on Tensor (used by some paths):
 
 ## Gradbox Testing Convention
 
-**Gradboxes are shared at birth** when the user requests gradients (backward needs to update them). Intermediate/temporary gradboxes are rarely shared.
+**Gradboxes are shared at birth** — `Gradbox.__init__` always calls `.share()` on the underlying NDBuffer's Buffer so that references survive Mojo's ASAP destruction.
 
-When inspecting gradients in tests, **always use `.grad().detach(share=True)`** before slicing or indexing:
+**`Tensor.grad()` returns an independent deep copy** — it calls `Gradbox.detach()` internally, which allocates fresh CPU or GPU storage and copies data. Slicing or indexing the returned Gradbox is safe:
 
 ```mojo
-var grad = tensor.grad().detach(share=True)
+var grad = tensor.grad()   # already a detached deep copy
 assert_true(grad[i(0), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
 ```
 
-Calling `.grad()` directly returns an unshared gradbox — slicing it with `[]` or `i()` will ABORT with: *"can not call on an unshared gradbox"*.
+`Gradbox.detach()` (`gradbox.mojo:136`) handles both CPU and GPU:
+- CPU: `NDBuffer.contiguous_buffer()` — allocates `Buffer(size)` + `memcpy`
+- GPU: `NDBuffer.contiguous_device_state()` — fresh `DeviceState` + GPU→GPU copy
 
-This pattern is used consistently in `test_embedding.mojo` and all backward-pass tests.
+No `.copy()` call is needed after `.grad()` — it's already independent. Use `.copy()` only when you need a second handle to the *same* independent data.
 
 ## Autograd & Optimizer Notes
 

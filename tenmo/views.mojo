@@ -305,3 +305,53 @@ struct View[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^
+
+    @always_inline
+    @staticmethod
+    def forward[
+        track_grad: Bool = True
+    ](
+        mut tensor: Tensor[Self.dtype],
+        *slices: Slice,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        var ndb = tensor.buffer.__getitem__(*slices)
+        var out = Tensor[Self.dtype](ndb^, requires_grad=False)
+
+        comptime if track_grad:
+            var grad_required = requires_grad.or_else(tensor.requires_grad)
+            if grad_required:
+                out.requires_grad_(True)
+                var backwardFnArg = BackwardFnArg[Self.dtype](
+                    BACKWARD_VIEW,
+                    ViewArg(out.shape(), out.strides(), out.offset()),
+                )
+                backwardFnArg.needs_parent_data = True
+                out.add_ancestry(backwardFnArg^, tensor)
+
+        return out^
+
+    @always_inline
+    @staticmethod
+    def forward[
+        track_grad: Bool = True
+    ](
+        mut tensor: Tensor[Self.dtype],
+        *indices: Idx,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        var ndb = tensor.buffer.__getitem__(*indices)
+        var out = Tensor[Self.dtype](ndb^, requires_grad=False)
+
+        comptime if track_grad:
+            var grad_required = requires_grad.or_else(tensor.requires_grad)
+            if grad_required:
+                out.requires_grad_(True)
+                var backwardFnArg = BackwardFnArg[Self.dtype](
+                    BACKWARD_VIEW,
+                    ViewArg(out.shape(), out.strides(), out.offset()),
+                )
+                backwardFnArg.needs_parent_data = True
+                out.add_ancestry(backwardFnArg^, tensor)
+
+        return out^

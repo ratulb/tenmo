@@ -254,7 +254,7 @@ def test_shape_compute_output_shape_multiple_axes() raises:
 
 
 def test_shape_of() raises:
-    var s = Shape.of(2, 3, 4)
+    var s = Shape(2, 3, 4)
     assert_true(s.rank() == 3, "Shape.of should create rank 3 shape")
     assert_true(s[1] == 3, "second dimension should be 3")
 
@@ -269,12 +269,12 @@ def test_shape_product() raises:
 def test_slice_shape() raises:
     shape = Shape([1, 2, 3, 4])
     assert_true(
-        shape[:-1] == Shape.of(1, 2, 3)
-        and shape[:-2] == Shape.of(1, 2)
+        shape[:-1] == Shape(1, 2, 3)
+        and shape[:-2] == Shape(1, 2)
         and shape[:-3] == Shape(1)
-        and shape[2::4] == Shape.of(3)
-        and shape[-1:] == Shape.of(4)
-        and shape[-2:] == Shape.of(3, 4),
+        and shape[2::4] == Shape(3)
+        and shape[-1:] == Shape(4)
+        and shape[-2:] == Shape(3, 4),
         "Shape slice assertion failed",
     )
 
@@ -288,17 +288,17 @@ def test_negative_indices() raises:
 
 
 def test_slice_from() raises:
-    shape = Shape.of(2, 3, 4)
+    shape = Shape(2, 3, 4)
     assert_true(
         shape[0:] == shape,
         "slice_from assertion from beginning failed",
     )
     assert_true(
-        shape[1:] == Shape.of(3, 4),
+        shape[1:] == Shape(3, 4),
         "slice_from assertion from from index 1 failed",
     )
     assert_true(
-        shape[2:] == Shape.of(4),
+        shape[2:] == Shape(4),
         "slice_from assertion from from index 2 failed",
     )
     assert_true(
@@ -308,14 +308,14 @@ def test_slice_from() raises:
 
 
 def test_reverse() raises:
-    shape = Shape.of(1, 2, 3)
+    shape = Shape(1, 2, 3)
     assert_true(
-        shape.reverse() == Shape.of(3, 2, 1), "Shape reversal assertion failed"
+        shape.reverse() == Shape(3, 2, 1), "Shape reversal assertion failed"
     )
 
 
 def test_equivalence() raises:
-    assert_true(Shape(IntArray(1, 4)) == Shape.of(1, 4), "Not equivalent")
+    assert_true(Shape(IntArray(1, 4)) == Shape(1, 4), "Not equivalent")
 
 
 def test_empty_shape() raises:
@@ -332,19 +332,19 @@ def test_empty_shape() raises:
 
 
 def test_replace() raises:
-    shape = Shape.of(3, 4, 2)
+    shape = Shape(3, 4, 2)
     shape = shape.replace(2, 5)
-    assert_true(shape == Shape.of(3, 4, 5), "replace assertion failed")
+    assert_true(shape == Shape(3, 4, 5), "replace assertion failed")
 
 
 def test_index_iter() raises:
-    shape = Shape.of(1)
+    shape = Shape(1)
     for each in shape:
         assert_true(
             IntArray(0) == each,
-            "Unit shape(Shape.of(1)) index iteration assertion failed",
+            "Unit shape(Shape(1)) index iteration assertion failed",
         )
-    shape = Shape.of(2, 1)
+    shape = Shape(2, 1)
     indices = shape.__iter__()
     assert_true(
         IntArray(0, 0) == indices.__next__()
@@ -354,7 +354,7 @@ def test_index_iter() raises:
 
 
 def test_shape_as_intlist() raises:
-    shape = Shape.of(2, 4, 5)
+    shape = Shape(2, 4, 5)
     fa = shape.intarray()
     assert_true(
         fa[0] == 2 and fa[1] == 4 and fa[2] == 5,
@@ -363,8 +363,8 @@ def test_shape_as_intlist() raises:
 
 
 def test_zip_reversed() raises:
-    shape1 = Shape.of(1, 2, 3, 4, 5)
-    shape2 = Shape.of(6)
+    shape1 = Shape(1, 2, 3, 4, 5)
+    shape2 = Shape(6)
     rzipped = shape1.intarray().zip_reversed(shape2.intarray())
     for each in rzipped:
         assert_true(

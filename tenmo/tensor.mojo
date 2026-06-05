@@ -217,9 +217,9 @@ struct Tensor[dtype: DType](
                             "init_gradbox: failed to allocate GPU gradbox: "
                             + String(e)
                         )
-                        gradbox = Gradbox[
-                            Self.dtype
-                        ](Shape())  # unreachable, satisfies compiler
+                        gradbox = Gradbox[Self.dtype](
+                            Shape()
+                        )  # unreachable, satisfies compiler
                 else:
                     gradbox = Gradbox[Self.dtype](self.shape())
                     gradbox.zero_grad()
@@ -454,23 +454,8 @@ struct Tensor[dtype: DType](
             var view = t[1:5, 2:8]
             ```
         """
-        var (
-            shape,
-            strides,
-            offset,
-        ) = Validator.validate_and_compute_view_metadata(
-            self.shape(),
-            self.strides(),
-            slices,
-        )
-        offset += self.offset()
         return View[Self.dtype].forward[track_grad=track_grad](
-            self,
-            shape=shape,
-            strides=strides,
-            offset=offset,
-            requires_grad=self.requires_grad,
-            validated=True,
+            self, *slices, requires_grad=self.requires_grad
         )
 
     def chunk(
@@ -487,36 +472,8 @@ struct Tensor[dtype: DType](
         Returns:
             A new tensor containing the selected chunks.
         """
-        shape, strides, offset = (
-            Validator.validate_and_compute_advanced_indexing_metadata(
-                self.shape(),
-                self.strides(),
-                indices,
-            )
-        )
-        var result = Tensor[Self.dtype](shape, requires_grad=requires_grad)
-        var absolute_offset = self.offset() + offset
-        if strides.is_contiguous(shape):
-            memcpy(
-                dest=result.data_ptr(),
-                src=self.data_ptr() + absolute_offset,
-                count=shape.num_elements(),
-            )
-        else:
-            var index = 0
-            var index_iterator = IndexIterator(
-                shape=Pointer(to=shape),
-                strides=Pointer(to=strides),
-                start_offset=absolute_offset,
-            )
-            ref result_buffer = result.buffer.data_buffer()
-            ref src_buffer = self.buffer.data_buffer()
-
-            for idx in index_iterator:
-                result_buffer[index] = src_buffer[idx]
-                index += 1
-
-        return result^
+        var ndb = self.buffer.chunk(*indices)
+        return Tensor[Self.dtype](ndb^, requires_grad=requires_grad)
 
     def __getitem__[
         track_grad: Bool = True
@@ -530,25 +487,8 @@ struct Tensor[dtype: DType](
         Returns:
             A view tensor over the indexed region.
         """
-        var (
-            view_shape,
-            view_strides,
-            offset,
-        ) = Validator.validate_and_compute_advanced_indexing_metadata(
-            self.shape(), self.strides(), indices
-        )
-
-        is_scalar = len(view_shape) == 0
-        shape = Shape() if is_scalar else view_shape
-        strides = Strides() if is_scalar else view_strides
-        abs_offset = self.offset() + offset
         return View[Self.dtype].forward[track_grad=track_grad](
-            self,
-            shape,
-            strides,
-            abs_offset,
-            self.requires_grad,
-            validated=True,
+            self, *indices, requires_grad=self.requires_grad
         )
 
     def gather[
@@ -891,7 +831,7 @@ struct Tensor[dtype: DType](
 
     @always_inline
     def grad(self) -> Gradbox[Self.dtype]:
-        """Get accumulated gradients as a Gradbox.
+        """Get accumulated gradients as a detached Gradbox.
 
         Returns:
             The Gradbox containing accumulated gradients.
@@ -1405,30 +1345,6 @@ struct Tensor[dtype: DType](
         Returns:
             A tensor of given shape with normally distributed values.
         """
-        _ = """if init_seed:
-            seed(init_seed.value())
-        else:
-            seed()
-
-        var numels = shape.num_elements()
-        var buffer = Buffer[Self.dtype](numels)
-
-        var i = 0
-        while i < numels:
-            var u1 = random_float64(0.0, 1.0)
-            var u2 = random_float64(0.0, 1.0)
-
-            if u1 < 1e-10:
-                u1 = 1e-10
-
-            var mag = std * sqrt(-2.0 * log(u1))
-            var z0 = mag * cos(2.0 * pi * u2) + mean
-            var z1 = mag * sin(2.0 * pi * u2) + mean
-
-            buffer[i] = z0.cast[Self.dtype]()
-            if i + 1 < numels:
-                buffer[i + 1] = z1.cast[Self.dtype]()
-            i += 2"""
 
         var nd_buffer = NDBuffer[Self.dtype].randn(shape, mean, std, init_seed)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
@@ -1852,52 +1768,6 @@ struct Tensor[dtype: DType](
         memcpy(dest=buffer.data, src=flattened.unsafe_ptr(), count=numels)
         nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
-
-    @staticmethod
-    def of(
-        *elems: Scalar[Self.dtype], requires_grad: Bool = False
-    ) -> Tensor[Self.dtype]:
-        """Create a 1D tensor from variadic scalar elements.
-
-        Args:
-            *elems: Scalar values as variadic arguments.
-            requires_grad: Whether to track gradients.
-
-        Returns:
-            A 1D tensor with len(elems) elements.
-        """
-        Validator.validate_dtype_consistency(
-            Self.dtype, requires_grad, "of(*elems)"
-        )
-        shape = Shape(IntArray(len(elems)))
-        tensor = Tensor[Self.dtype](shape, requires_grad)
-        for i in range(len(elems)):
-            tensor[i] = elems[i]
-        return tensor^
-
-    @staticmethod
-    def of(
-        elems: Self.Row,
-        requires_grad: Bool = False,
-    ) -> Tensor[Self.dtype]:
-        """Create a 1D tensor from a list of scalar elements.
-
-        Args:
-            elems: List of scalar values.
-            requires_grad: Whether to track gradients.
-
-        Returns:
-            A 1D tensor with len(elems) elements.
-        """
-        Validator.validate_dtype_consistency(
-            Self.dtype, requires_grad, "of(elems)"
-        )
-        shape = Shape(IntArray(len(elems)))
-        tensor = Tensor[Self.dtype](shape, requires_grad)
-        for i in range(len(elems)):
-            tensor[i] = elems[i]
-
-        return tensor^
 
     @staticmethod
     def scalar(

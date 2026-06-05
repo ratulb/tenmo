@@ -61,7 +61,9 @@ struct Gradbox[dtype: DType](
                     var shape = buffer.shape
                     var strides = buffer.strides
                     var offset = buffer.offset
-                    ndb_ptr.init_pointee_move(buffer.share(shape, strides, offset))
+                    ndb_ptr.init_pointee_move(
+                        buffer.share(shape, strides, offset)
+                    )
         else:
             if buffer.is_shared():
                 ndb_ptr.init_pointee_move(buffer^)
@@ -132,6 +134,32 @@ struct Gradbox[dtype: DType](
             return Tensor[Self.dtype](
                 self.buffer().contiguous(), requires_grad=requires_grad
             )
+
+    def detach(self) -> Gradbox[Self.dtype]:
+        """Return an independent deep copy of this Gradbox.
+
+        Handles both CPU and GPU. Always allocates new storage and copies
+        data — never shares the underlying buffer.
+
+        Returns:
+            A new Gradbox with independently owned data.
+        """
+        ref ndb = self.buffer()
+        comptime if has_accelerator():
+            if ndb.is_on_gpu():
+                try:
+                    var new_state = ndb.contiguous_device_state()
+                    var ndb_copy = NDBuffer[Self.dtype].with_device_state(
+                        new_state^, ndb.shape
+                    )
+                    return Gradbox[Self.dtype](ndb_copy^)
+                except e:
+                    panic(
+                        "Gradbox → detach: GPU deep copy failed: " + String(e)
+                    )
+        var buf = ndb.contiguous_buffer()
+        var ndb_copy = NDBuffer[Self.dtype](buf^, ndb.shape)
+        return Gradbox[Self.dtype](ndb_copy^)
 
     def device(self) -> Device:
         """Get the device this Gradbox is on.
@@ -368,16 +396,6 @@ struct Gradbox[dtype: DType](
         return Gradbox[Self.dtype](NDBuffer[Self.dtype](buffer^, shape))
 
     @always_inline
-    def detach(self) -> Gradbox[Self.dtype]:
-        """Create a detached (contiguous) copy of this Gradbox.
-
-        The result always has a shared (refcounted) buffer.
-
-        Returns:
-            A new contiguous Gradbox.
-        """
-        return Gradbox[Self.dtype](self.buffer().contiguous())
-
     def is_shared(self) -> Bool:
         """Check if the underlying buffer is shared.
 
@@ -470,7 +488,7 @@ struct Gradbox[dtype: DType](
         var out = Gradbox[Self.dtype](broadcasted_buffer^)
         return out^
 
-    def __getitem__(self, *indices: Idx) -> Gradbox[Self.dtype]:
+    def __getitem__(mut self, *indices: Idx) -> Gradbox[Self.dtype]:
         """Index the Gradbox with Idx objects (integers or slices).
 
         Args:
@@ -479,29 +497,7 @@ struct Gradbox[dtype: DType](
         Returns:
             A new Gradbox view over the indexed region.
         """
-        # Compute view metadata
-        view_shape, view_strides, relative_offset = (
-            Validator.validate_and_compute_advanced_indexing_metadata(
-                self.shape(), self.strides(), indices
-            )
-        )
-
-        # Handle scalar (rank-0) case
-        is_scalar = len(view_shape) == 0
-        shape = Shape() if is_scalar else view_shape
-        strides = Strides() if is_scalar else view_strides
-        abs_offset = self.offset() + relative_offset
-        shared_buffer = self.buffer().buffer.copy()
-        ndb = NDBuffer[Self.dtype](
-            shared_buffer^, shape=shape^, strides=strides^, offset=abs_offset
-        )
-        # ── Propagate device_state for GPU gradboxes ──────────────────────────
-        # On GPU the CPU Buffer is empty — the actual data lives in DeviceState.
-        # The sliced view must share the same DeviceState so get/set and to_cpu
-        # route correctly to GPU memory using abs_offset and slice_strides.
-        comptime if has_accelerator():
-            ndb.device_state = self.buffer().device_state.copy()
-
+        var ndb = self.buffer().__getitem__(*indices)
         return Gradbox[Self.dtype](ndb^)
 
     def slice(

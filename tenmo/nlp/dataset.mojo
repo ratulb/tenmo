@@ -85,5 +85,14 @@ struct LLMDataset[
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
+        normalize_mean: Optional[Scalar[Self._feature_dtype]] = None,
+        normalize_std: Optional[Scalar[Self._feature_dtype]] = None,
     ) -> DataLoader[Self, origin_of(self)]:
-        return DataLoader(Pointer(to=self), batch_size, shuffle, drop_last)
+        return DataLoader(
+            Pointer(to=self),
+            batch_size,
+            shuffle,
+            drop_last,
+            normalize_mean=normalize_mean,
+            normalize_std=normalize_std,
+        )

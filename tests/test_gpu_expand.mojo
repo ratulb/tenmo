@@ -21,7 +21,7 @@ def test_gpu_expand_1d_to_2d_new_batch_dim() raises:
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(4, 3)
-        assert_true(e.shape() == Shape.of(4, 3))
+        assert_true(e.shape() == Shape(4, 3))
         var expected = Tensor[dtype].d2(
             [[1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]
         )
@@ -38,7 +38,7 @@ def test_gpu_expand_1d_to_3d() raises:
         var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(3, 4, 2)
-        assert_true(e.shape() == Shape.of(3, 4, 2))
+        assert_true(e.shape() == Shape(3, 4, 2))
         var s = e.sum(axes=[0, 1]).to_cpu()
         assert_true(s.all_close(Tensor[dtype].d1([12.0, 24.0])))
         es = e.sum()
@@ -58,7 +58,7 @@ def test_gpu_expand_2d_row_vector_to_matrix() raises:
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(4, 3)
-        assert_true(e.shape() == Shape.of(4, 3))
+        assert_true(e.shape() == Shape(4, 3))
         var expected = Tensor[dtype].d2(
             [[1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]
         )
@@ -75,7 +75,7 @@ def test_gpu_expand_2d_col_vector_to_matrix() raises:
         var a = Tensor[dtype].d2([[1.0], [2.0], [3.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(3, 4)
-        assert_true(e.shape() == Shape.of(3, 4))
+        assert_true(e.shape() == Shape(3, 4))
         var expected = Tensor[dtype].d2(
             [[1.0, 1.0, 1.0, 1.0], [2.0, 2.0, 2.0, 2.0], [3.0, 3.0, 3.0, 3.0]]
         )
@@ -92,10 +92,8 @@ def test_gpu_expand_2d_both_dims_size1() raises:
         var a = Tensor[dtype].d2([[5.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(3, 4)
-        assert_true(e.shape() == Shape.of(3, 4))
-        assert_true(
-            e.to_cpu().all_close(Tensor[dtype].full(Shape.of(3, 4), 5.0))
-        )
+        assert_true(e.shape() == Shape(3, 4))
+        assert_true(e.to_cpu().all_close(Tensor[dtype].full(Shape(3, 4), 5.0)))
         es = e.sum()
         es.backward()
         assert_true(a.grad().all_close(Tensor[dtype].d2([[12.0]])))
@@ -108,7 +106,7 @@ def test_gpu_expand_2d_no_op_same_shape() raises:
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(2, 2)
-        assert_true(e.shape() == Shape.of(2, 2))
+        assert_true(e.shape() == Shape(2, 2))
         assert_true(e.to_cpu().all_close(a))
         es = e.sum()
         es.backward()
@@ -127,7 +125,7 @@ def test_gpu_expand_3d_first_dim() raises:
         var a = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True)
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(5, 2, 2)
-        assert_true(e.shape() == Shape.of(5, 2, 2))
+        assert_true(e.shape() == Shape(5, 2, 2))
         var s = e.sum(axes=[0]).to_cpu()
         assert_true(s.all_close(Tensor[dtype].d2([[5.0, 10.0], [15.0, 20.0]])))
         es = e.sum()
@@ -146,7 +144,7 @@ def test_gpu_expand_3d_last_dim() raises:
         )
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(2, 2, 6)
-        assert_true(e.shape() == Shape.of(2, 2, 6))
+        assert_true(e.shape() == Shape(2, 2, 6))
         var s = e.sum(axes=[-1]).to_cpu()
         assert_true(s.all_close(Tensor[dtype].d2([[6.0, 12.0], [18.0, 24.0]])))
         es = e.sum()
@@ -167,7 +165,7 @@ def test_gpu_expand_3d_middle_dim() raises:
         )
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(2, 5, 2)
-        assert_true(e.shape() == Shape.of(2, 5, 2))
+        assert_true(e.shape() == Shape(2, 5, 2))
         var s = e.sum(axes=[1]).to_cpu()
         assert_true(s.all_close(Tensor[dtype].d2([[5.0, 10.0], [15.0, 20.0]])))
         es = e.sum()
@@ -184,7 +182,7 @@ def test_gpu_expand_3d_two_dims_broadcast() raises:
         var a = Tensor[dtype].d3([[[1.0, 2.0]]], requires_grad=True)
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(3, 4, 2)
-        assert_true(e.shape() == Shape.of(3, 4, 2))
+        assert_true(e.shape() == Shape(3, 4, 2))
         var s = e.sum(axes=[0, 1]).to_cpu()
         assert_true(s.all_close(Tensor[dtype].d1([12.0, 24.0])))
         es = e.sum()
@@ -199,9 +197,9 @@ def test_gpu_expand_3d_all_dims_size1() raises:
         var a = Tensor[dtype].d3([[[7.0]]], requires_grad=True)
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(2, 3, 4)
-        assert_true(e.shape() == Shape.of(2, 3, 4))
+        assert_true(e.shape() == Shape(2, 3, 4))
         assert_true(
-            e.to_cpu().all_close(Tensor[dtype].full(Shape.of(2, 3, 4), 7.0))
+            e.to_cpu().all_close(Tensor[dtype].full(Shape(2, 3, 4), 7.0))
         )
         es = e.sum()
         es.backward()
@@ -219,8 +217,8 @@ def test_gpu_expand_shape_api_overload() raises:
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
-        var e = a_gpu.expand(Shape.of(3, 2))
-        assert_true(e.shape() == Shape.of(3, 2))
+        var e = a_gpu.expand(Shape(3, 2))
+        assert_true(e.shape() == Shape(3, 2))
         var expected = Tensor[dtype].d2([[1.0, 2.0], [1.0, 2.0], [1.0, 2.0]])
         assert_true(e.to_cpu().all_close(expected))
         es = e.sum()
@@ -241,7 +239,7 @@ def test_gpu_expand_grad_non_uniform_values() raises:
         var a_unsqueezed = a.unsqueeze(0)  # (1,2,2) — no grad
         var a_gpu = a_unsqueezed.to_gpu()
         var e = a_gpu.expand(3, 2, 2)
-        assert_true(e.shape() == Shape.of(3, 2, 2))
+        assert_true(e.shape() == Shape(3, 2, 2))
         es = e.sum()
         es.backward()
         assert_true(
@@ -315,7 +313,7 @@ def test_gpu_expand_bias_broadcast_pattern() raises:
         var bias = Tensor[dtype].d2([[0.5, 1.0, 1.5]], requires_grad=True)
         var bias_gpu = bias.to_gpu()
         var e = bias_gpu.expand(6, 3)
-        assert_true(e.shape() == Shape.of(6, 3))
+        assert_true(e.shape() == Shape(6, 3))
         var row_sum = e.sum(axes=[0]).to_cpu()
         assert_true(row_sum.all_close(Tensor[dtype].d1([3.0, 6.0, 9.0])))
         es = e.sum()
@@ -352,7 +350,7 @@ def test_gpu_expand_no_grad_tracking() raises:
         var a = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand[track_grad=False](4, 2)
-        assert_true(e.shape() == Shape.of(4, 2))
+        assert_true(e.shape() == Shape(4, 2))
         assert_true(not e.requires_grad)
 
 
@@ -371,7 +369,7 @@ def test_gpu_expand_4d_first_two_dims() raises:
         a_ref.requires_grad_(True)
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(2, 5, 3, 4)
-        assert_true(e.shape() == Shape.of(2, 5, 3, 4))
+        assert_true(e.shape() == Shape(2, 5, 3, 4))
         # Cross-validate forward against CPU
         var e_cpu_ref = a_ref.expand(2, 5, 3, 4)
         assert_true(e.to_cpu().all_close(e_cpu_ref.to_cpu()))
@@ -390,11 +388,11 @@ def test_gpu_expand_4d_last_dim_only() raises:
         a.requires_grad_(True)
         var a_gpu = a.to_gpu()
         var e = a_gpu.expand(2, 3, 4, 7)
-        assert_true(e.shape() == Shape.of(2, 3, 4, 7))
+        assert_true(e.shape() == Shape(2, 3, 4, 7))
         es = e.sum()
         es.backward()
         assert_true(
-            a.grad().all_close(Tensor[dtype].full(Shape.of(2, 3, 4, 1), 7.0))
+            a.grad().all_close(Tensor[dtype].full(Shape(2, 3, 4, 1), 7.0))
         )
 
 

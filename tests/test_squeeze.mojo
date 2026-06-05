@@ -8,7 +8,7 @@ def test_squeeze_scalar() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(42.0, requires_grad=True)
     var s = a.squeeze()
-    assert_true(s.shape() == Shape.of())
+    assert_true(s.shape() == Shape())
     assert_true(s.item() == 42.0)
     s.backward()
     assert_true(a.grad().item() == 1.0)
@@ -18,7 +18,7 @@ def test_squeeze_1d_no_effect() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var s = a.squeeze()
-    assert_true(s.shape() == Shape.of(3))
+    assert_true(s.shape() == Shape(3))
     assert_true((s == a))
     s = s.sum()
     s.backward()
@@ -31,7 +31,7 @@ def test_squeeze_2d_singleton_row() raises:
         [[1.0, 2.0, 3.0]], requires_grad=True
     )  # shape (1,3)
     var s = a.squeeze()
-    assert_true(s.shape() == Shape.of(3))
+    assert_true(s.shape() == Shape(3))
     assert_true(s.all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
     s = s.sum()
     s.backward()
@@ -44,7 +44,7 @@ def test_squeeze_3d_multiple_singletons() raises:
         [[[10.0, 20.0]]], requires_grad=True
     )  # shape (1,1,2)
     var s = a.squeeze()
-    assert_true(s.shape() == Shape.of(2))
+    assert_true(s.shape() == Shape(2))
     assert_true(s.all_close(Tensor[dtype].d1([10.0, 20.0])))
     s = s.sum()
     s.backward()
@@ -58,7 +58,7 @@ def test_squeeze_with_specific_dim() raises:
         [[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True  # shape (1,2,2)
     )
     var s = a.squeeze([0])
-    assert_true(s.shape() == Shape.of(2, 2))
+    assert_true(s.shape() == Shape(2, 2))
     assert_true(s.all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])))
     s = s.sum()
     s.backward()
@@ -72,7 +72,7 @@ def test_squeeze_with_non_singleton_dim() raises:
         [[[1.0, 2.0]], [[3.0, 4.0]]], requires_grad=True  # shape (2,1,2)
     )
     var s = a.squeeze([1])  # valid because dim=1 has size 1
-    assert_true(s.shape() == Shape.of(2, 2))
+    assert_true(s.shape() == Shape(2, 2))
     expected = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     assert_true(s.all_close(expected))
     s = s.sum()
@@ -106,7 +106,7 @@ def test_squz_cpu_single_axis_dim0() raises:
         [[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True  # (1,2,2)
     )
     var s = a.squeeze([0])
-    assert_true(s.shape() == Shape.of(2, 2))
+    assert_true(s.shape() == Shape(2, 2))
     assert_true(s.all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])))
     var loss = s.sum()
     loss.backward()
@@ -119,7 +119,7 @@ def test_squz_cpu_single_axis_dim1() raises:
         [[[1.0, 2.0]], [[3.0, 4.0]]], requires_grad=True  # (2,1,2)
     )
     var s = a.squeeze([1])
-    assert_true(s.shape() == Shape.of(2, 2))
+    assert_true(s.shape() == Shape(2, 2))
     assert_true(s.all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])))
     var loss = s.sum()
     loss.backward()
@@ -134,7 +134,7 @@ def test_squz_cpu_single_axis_last() raises:
         [[[1.0], [2.0]], [[3.0], [4.0]]], requires_grad=True  # (2,2,1)
     )
     var s = a.squeeze([2])
-    assert_true(s.shape() == Shape.of(2, 2))
+    assert_true(s.shape() == Shape(2, 2))
     assert_true(s.all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])))
     var loss = s.sum()
     loss.backward()
@@ -147,7 +147,7 @@ def test_squz_cpu_all_size1_dims() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3([[[5.0]]], requires_grad=True)  # (1,1,1)
     var s = a.squeeze([])  # squeeze all
-    assert_true(s.shape() == Shape.of())  # scalar
+    assert_true(s.shape() == Shape())  # scalar
     assert_true(s.all_close(Tensor[dtype].scalar(5.0)))
     s.backward()
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -157,7 +157,7 @@ def test_squz_cpu_multiple_axes() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]], requires_grad=True)  # (1,3)
     var s = a.squeeze([0])
-    assert_true(s.shape() == Shape.of(3))
+    assert_true(s.shape() == Shape(3))
     assert_true(s.all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
     var loss = s.sum()
     loss.backward()
@@ -170,7 +170,7 @@ def test_squz_cpu_negative_axis() raises:
         [[[1.0, 2.0]], [[3.0, 4.0]]], requires_grad=True  # (2,1,2)
     )
     var s = a.squeeze([-2])  # same as axis=1
-    assert_true(s.shape() == Shape.of(2, 2))
+    assert_true(s.shape() == Shape(2, 2))
     assert_true(s.all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])))
     var loss = s.sum()
     loss.backward()
@@ -184,7 +184,7 @@ def test_squz_cpu_no_op_no_size1() raises:
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var s = a.squeeze([])
     # No size-1 dims → returns tensor unchanged
-    assert_true(s.shape() == Shape.of(2, 2))
+    assert_true(s.shape() == Shape(2, 2))
     assert_true(s.all_close(a))
 
 
@@ -193,7 +193,7 @@ def test_squz_cpu_4d_middle_axes() raises:
     var a_leaf = Tensor[dtype].randn(2, 1, 1, 3)
     a_leaf.requires_grad_(True)
     var s = a_leaf.squeeze([1, 2])  # (2,3)
-    assert_true(s.shape() == Shape.of(2, 3))
+    assert_true(s.shape() == Shape(2, 3))
     var loss = s.sum()
     loss.backward()
     assert_true(a_leaf.grad().all_close(Tensor.ones_like(a_leaf)))
@@ -216,7 +216,7 @@ def test_squz_cpu_track_grad_false() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0]], requires_grad=True)
     var s = a.squeeze[track_grad=False]([0])
-    assert_true(s.shape() == Shape.of(1))
+    assert_true(s.shape() == Shape(1))
     assert_true(not s.requires_grad)
 
 
@@ -225,7 +225,7 @@ def test_squz_cpu_view_shares_storage() raises:
     var a = Tensor[dtype].randn(1, 4, 1, 6)
     a.requires_grad_(True)
     var s = a.squeeze([0, 2])  # (4,6)
-    assert_true(s.shape() == Shape.of(4, 6))
+    assert_true(s.shape() == Shape(4, 6))
     var loss = s.sum()
     loss.backward()
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -252,7 +252,7 @@ def test_unsquz_cpu_single_axis_front() raises:
         [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
     )  # (2,2)
     var u = a.unsqueeze(0)  # (1,2,2)
-    assert_true(u.shape() == Shape.of(1, 2, 2))
+    assert_true(u.shape() == Shape(1, 2, 2))
     assert_true(u.all_close(Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]])))
     var loss = u.sum()
     loss.backward()
@@ -265,7 +265,7 @@ def test_unsquz_cpu_single_axis_middle() raises:
         [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
     )  # (2,2)
     var u = a.unsqueeze(1)  # (2,1,2)
-    assert_true(u.shape() == Shape.of(2, 1, 2))
+    assert_true(u.shape() == Shape(2, 1, 2))
     assert_true(u.all_close(Tensor[dtype].d3([[[1.0, 2.0]], [[3.0, 4.0]]])))
     var loss = u.sum()
     loss.backward()
@@ -278,7 +278,7 @@ def test_unsquz_cpu_single_axis_end() raises:
         [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
     )  # (2,2)
     var u = a.unsqueeze(2)  # (2,2,1)
-    assert_true(u.shape() == Shape.of(2, 2, 1))
+    assert_true(u.shape() == Shape(2, 2, 1))
     var loss = u.sum()
     loss.backward()
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -288,7 +288,7 @@ def test_unsquz_cpu_negative_axis() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var u = a.unsqueeze(-1)  # same as axis=2 → (2,2,1)
-    assert_true(u.shape() == Shape.of(2, 2, 1))
+    assert_true(u.shape() == Shape(2, 2, 1))
     var loss = u.sum()
     loss.backward()
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -298,7 +298,7 @@ def test_unsquz_cpu_multiple_axes() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)  # (3,)
     var u = a.unsqueeze(0, 2)  # (1,3,1)
-    assert_true(u.shape() == Shape.of(1, 3, 1))
+    assert_true(u.shape() == Shape(1, 3, 1))
     var loss = u.sum()
     loss.backward()
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -308,7 +308,7 @@ def test_unsquz_cpu_1d_to_4d() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var u = a.unsqueeze(0, 1, 2)  # (1,1,1,2)
-    assert_true(u.shape() == Shape.of(1, 1, 1, 2))
+    assert_true(u.shape() == Shape(1, 1, 1, 2))
     var loss = u.sum()
     loss.backward()
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -319,7 +319,7 @@ def test_unsquz_cpu_scalar_to_1d() raises:
     var a = Tensor[dtype].scalar(7.0)
     a.requires_grad_(True)
     var u = a.unsqueeze(0)  # (1,)
-    assert_true(u.shape() == Shape.of(1))
+    assert_true(u.shape() == Shape(1))
     var loss = u.sum()
     loss.backward()
     assert_true(a.grad().all_close(Tensor[dtype].scalar(1.0)))
@@ -341,7 +341,7 @@ def test_unsquz_cpu_track_grad_false() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var u = a.unsqueeze[track_grad=False](0)
-    assert_true(u.shape() == Shape.of(1, 2))
+    assert_true(u.shape() == Shape(1, 2))
     assert_true(not u.requires_grad)
 
 
@@ -361,7 +361,7 @@ def test_unsquz_cpu_view_shares_storage() raises:
     a.requires_grad_(True)
     var u_orig = a.unsqueeze(0)
     var u = u_orig.unsqueeze(2)  # (1,3,1,4)
-    assert_true(u.shape() == Shape.of(1, 3, 1, 4))
+    assert_true(u.shape() == Shape(1, 3, 1, 4))
     var loss = u.sum()
     loss.backward()
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -409,7 +409,7 @@ def test_squz_gpu_single_axis_dim0() raises:
         )
         var a_gpu = a.to_gpu()
         var s = a_gpu.squeeze([0])
-        assert_true(s.shape() == Shape.of(2, 2))
+        assert_true(s.shape() == Shape(2, 2))
         assert_true(
             s.to_cpu().all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]))
         )
@@ -427,7 +427,7 @@ def test_squz_gpu_single_axis_dim1() raises:
         )
         var a_gpu = a.to_gpu()
         var s = a_gpu.squeeze([1])
-        assert_true(s.shape() == Shape.of(2, 2))
+        assert_true(s.shape() == Shape(2, 2))
         assert_true(
             s.to_cpu().all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]))
         )
@@ -446,7 +446,7 @@ def test_squz_gpu_single_axis_last() raises:
         )
         var a_gpu = a.to_gpu()
         var s = a_gpu.squeeze([2])
-        assert_true(s.shape() == Shape.of(2, 2))
+        assert_true(s.shape() == Shape(2, 2))
         assert_true(
             s.to_cpu().all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]))
         )
@@ -465,7 +465,7 @@ def test_squz_gpu_all_size1_dims() raises:
         var a = Tensor[dtype].d3([[[5.0]]], requires_grad=True)  # (1,1,1)
         var a_gpu = a.to_gpu()
         var s = a_gpu.squeeze([])
-        assert_true(s.shape() == Shape.of())
+        assert_true(s.shape() == Shape())
         assert_true(s.to_cpu().all_close(Tensor[dtype].scalar(5.0)))
         s.backward()
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -479,7 +479,7 @@ def test_squz_gpu_negative_axis() raises:
         )
         var a_gpu = a.to_gpu()
         var s = a_gpu.squeeze([-2])
-        assert_true(s.shape() == Shape.of(2, 2))
+        assert_true(s.shape() == Shape(2, 2))
         var loss = s.sum()
         loss.backward()
         assert_true(
@@ -494,7 +494,7 @@ def test_squz_gpu_multiple_axes() raises:
         a.requires_grad_(True)
         var a_gpu = a.to_gpu()
         var s = a_gpu.squeeze([0, 2])
-        assert_true(s.shape() == Shape.of(4, 6))
+        assert_true(s.shape() == Shape(4, 6))
         var loss = s.sum()
         loss.backward()
         assert_true(not a.grad().is_on_gpu())
@@ -569,7 +569,7 @@ def test_unsquz_gpu_single_axis_front() raises:
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
         var u = a_gpu.unsqueeze(0)
-        assert_true(u.shape() == Shape.of(1, 2, 2))
+        assert_true(u.shape() == Shape(1, 2, 2))
         assert_true(
             u.to_cpu().all_close(Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]]))
         )
@@ -585,7 +585,7 @@ def test_unsquz_gpu_single_axis_middle() raises:
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
         var u = a_gpu.unsqueeze(1)
-        assert_true(u.shape() == Shape.of(2, 1, 2))
+        assert_true(u.shape() == Shape(2, 1, 2))
         assert_true(
             u.to_cpu().all_close(Tensor[dtype].d3([[[1.0, 2.0]], [[3.0, 4.0]]]))
         )
@@ -600,7 +600,7 @@ def test_unsquz_gpu_single_axis_end() raises:
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
         var u = a_gpu.unsqueeze(2)
-        assert_true(u.shape() == Shape.of(2, 2, 1))
+        assert_true(u.shape() == Shape(2, 2, 1))
         var loss = u.sum()
         loss.backward()
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -612,7 +612,7 @@ def test_unsquz_gpu_negative_axis() raises:
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
         var u = a_gpu.unsqueeze(-1)
-        assert_true(u.shape() == Shape.of(2, 2, 1))
+        assert_true(u.shape() == Shape(2, 2, 1))
         var loss = u.sum()
         loss.backward()
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -624,7 +624,7 @@ def test_unsquz_gpu_multiple_axes() raises:
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
         var a_gpu = a.to_gpu()
         var u = a_gpu.unsqueeze(0, 2)  # (1,3,1)
-        assert_true(u.shape() == Shape.of(1, 3, 1))
+        assert_true(u.shape() == Shape(1, 3, 1))
         var loss = u.sum()
         loss.backward()
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
@@ -636,7 +636,7 @@ def test_unsquz_gpu_1d_to_4d() raises:
         var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
         var a_gpu = a.to_gpu()
         var u = a_gpu.unsqueeze(0, 1, 2)  # (1,1,1,2)
-        assert_true(u.shape() == Shape.of(1, 1, 1, 2))
+        assert_true(u.shape() == Shape(1, 1, 1, 2))
         var loss = u.sum()
         loss.backward()
         assert_true(a.grad().all_close(Tensor.ones_like(a)))

@@ -673,7 +673,7 @@ def test_mcpy_cpu_2d_no_grad_flows_to_source() raises:
     var result = a.gather(idx, axis=0)
     var loss = result.sum()
     loss.backward()
-    var grad = a.grad().detach()
+    var grad = a.grad()
     assert_true(grad[i(0), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
     assert_true(grad[i(1), s()].all_close(Tensor[dtype].d1([0.0, 0.0])))
     assert_true(grad[i(2), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
@@ -702,7 +702,7 @@ def test_mcpy_cpu_2d_grad_through_downstream_op() raises:
     var loss = out.sum()
     loss.backward()
     assert_true(b.grad().all_close(Tensor[dtype].ones_like(b)))
-    var grad = a.grad().detach()
+    var grad = a.grad()
     assert_true(grad[i(0), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
     assert_true(grad[i(1), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
     assert_true(grad[i(2), s()].all_close(Tensor[dtype].d1([0.0, 0.0])))
@@ -765,7 +765,7 @@ def test_mcpy_cpu_2d_fuse_sum_no_grad_flows() raises:
     var result = a.gather(idx, axis=0, reduction=Reduction(1))
     var loss = result.sum()
     loss.backward()
-    var grad = a.grad().detach()
+    var grad = a.grad()
     assert_true(grad[i(0), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
     assert_true(grad[i(1), s()].all_close(Tensor[dtype].d1([0.0, 0.0])))
     assert_true(grad[i(2), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
@@ -837,7 +837,7 @@ def test_mcpy_cpu_2d_fuse_mean_grad() raises:
     var result = a.gather(idx, axis=0, reduction=Reduction(0))
     var loss = result.sum()
     loss.backward()
-    var grad = a.grad().detach()
+    var grad = a.grad()
     # MEAN backward: grad = upstream / n_indices = 1.0 / 2 = 0.5
     assert_true(grad[i(0), s()].all_close(Tensor[dtype].d1([0.5, 0.5])))
     assert_true(grad[i(1), s()].all_close(Tensor[dtype].d1([0.0, 0.0])))
@@ -946,7 +946,7 @@ def test_mcpy_gpu_2d_no_grad_flows_to_source() raises:
         var result = a_gpu.gather(idx, axis=0)
         var loss = result.sum()
         loss.backward()
-        var grad = a.grad().detach()
+        var grad = a.grad()
         assert_true(grad[i(0), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
         assert_true(grad[i(1), s()].all_close(Tensor[dtype].d1([0.0, 0.0])))
         assert_true(grad[i(2), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
@@ -980,7 +980,7 @@ def test_mcpy_gpu_2d_grad_through_downstream_op() raises:
         var loss = out.sum()
         loss.backward()
         assert_true(b.grad().all_close(Tensor[dtype].ones_like(b)))
-        var grad = a.grad().detach()
+        var grad = a.grad()
         assert_true(grad[i(0), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
         assert_true(grad[i(1), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
         assert_true(grad[i(2), s()].all_close(Tensor[dtype].d1([0.0, 0.0])))
@@ -1031,7 +1031,7 @@ def test_mcpy_gpu_2d_fuse_sum_no_grad_flows() raises:
         var result = a_gpu.gather(idx, axis=0, reduction=Reduction(1))
         var loss = result.sum()
         loss.backward()
-        var grad = a.grad().detach()
+        var grad = a.grad()
         assert_true(grad[i(0), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
         assert_true(grad[i(1), s()].all_close(Tensor[dtype].d1([0.0, 0.0])))
         assert_true(grad[i(2), s()].all_close(Tensor[dtype].d1([1.0, 1.0])))
@@ -1102,7 +1102,7 @@ def test_mcpy_gpu_2d_fuse_mean_grad() raises:
         var result = a_gpu.gather(idx, axis=0, reduction=Reduction(0))
         var loss = result.sum()
         loss.backward()
-        var grad = a.grad().detach()
+        var grad = a.grad()
         assert_true(grad[i(0), s()].all_close(Tensor[dtype].d1([0.5, 0.5])))
         assert_true(grad[i(1), s()].all_close(Tensor[dtype].d1([0.0, 0.0])))
         assert_true(grad[i(2), s()].all_close(Tensor[dtype].d1([0.5, 0.5])))
@@ -1298,7 +1298,7 @@ def test_mcpy_cpu_3d_axis0_sum_general_grad() raises:
     var result = a.gather(idx, axis=0, reduction=Reduction(1))
     var loss = result.sum()
     loss.backward()
-    var grad = a.grad().detach()
+    var grad = a.grad()
     # SUM backward: each gathered row gets d_output
     # d_output = ones(2,2), scattered to rows 0 and 2
     var _tmp0 = Tensor[dtype].d1(
@@ -1327,7 +1327,7 @@ def test_mcpy_cpu_3d_axis0_mean_general_grad() raises:
     var result = a.gather(idx, axis=0, reduction=Reduction(0))
     var loss = result.sum()
     loss.backward()
-    var grad = a.grad().detach()
+    var grad = a.grad()
     # MEAN backward: gradient scaled by 1/n_indices = 1/2
     var _tmp1 = Tensor[dtype].d1(
         [0.5, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5]
@@ -1350,7 +1350,7 @@ def test_mcpy_cpu_2d_axis1_sum_general_grad() raises:
     var result = a.gather(idx, axis=1, reduction=Reduction(1))
     var loss = result.sum()
     loss.backward()
-    var grad = a.grad().detach()
+    var grad = a.grad()
     # SUM backward: each gathered column gets d_output[row]
     # d_output = [1, 1]; cols 0 and 2 get 1.0
     assert_true(grad[i(0), s()].all_close(Tensor[dtype].d1([1.0, 0.0, 1.0])))
@@ -1371,7 +1371,7 @@ def test_mcpy_cpu_2d_axis1_mean_general_grad() raises:
     var result = a.gather(idx, axis=1, reduction=Reduction(0))
     var loss = result.sum()
     loss.backward()
-    var grad = a.grad().detach()
+    var grad = a.grad()
     # MEAN backward: gradient scaled by 1/2
     assert_true(grad[i(0), s()].all_close(Tensor[dtype].d1([0.5, 0.0, 0.5])))
     assert_true(grad[i(1), s()].all_close(Tensor[dtype].d1([0.5, 0.0, 0.5])))
@@ -1457,7 +1457,7 @@ def test_mcpy_gpu_3d_axis0_sum_general_grad() raises:
         var result = a.gather(idx, axis=0, reduction=Reduction(1))
         var loss = result.sum()
         loss.backward()
-        var grad = a.grad().detach()
+        var grad = a.grad()
         var _tmp2 = Tensor[dtype].d1(
             [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0]
         )
@@ -1479,7 +1479,7 @@ def test_mcpy_gpu_2d_axis1_sum_general_grad() raises:
         var result = a.gather(idx, axis=1, reduction=Reduction(1))
         var loss = result.sum()
         loss.backward()
-        var grad = a.grad().detach()
+        var grad = a.grad()
         assert_true(
             grad[i(0), s()].all_close(Tensor[dtype].d1([1.0, 0.0, 1.0]))
         )
@@ -1506,7 +1506,7 @@ def test_mcpy_gpu_3d_axis0_mean_general_grad() raises:
         var result = a.gather(idx, axis=0, reduction=Reduction(0))
         var loss = result.sum()
         loss.backward()
-        var grad = a.grad().detach()
+        var grad = a.grad()
         var _tmp2 = Tensor[dtype].d1(
             [0.5, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5]
         )
@@ -1528,7 +1528,7 @@ def test_mcpy_gpu_2d_axis1_mean_general_grad() raises:
         var result = a.gather(idx, axis=1, reduction=Reduction(0))
         var loss = result.sum()
         loss.backward()
-        var grad = a.grad().detach()
+        var grad = a.grad()
         assert_true(
             grad[i(0), s()].all_close(Tensor[dtype].d1([0.5, 0.0, 0.5]))
         )
