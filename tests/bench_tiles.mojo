@@ -318,9 +318,9 @@ def bench_one[
     tm: Int, tn: Int, tp: Int
 ](A: NDBuffer[dtype], B: NDBuffer[dtype], iters: Int) -> Float64:
     for warm in range(3):
-        _ = MmCpu2d[dtype, tm, tn, tp].matmul_2d_cpu(A, B)
+        _ = MmCpu2d[dtype, tm, tn, tp].matmul(A, B)
     var start = perf_counter()
     for iter_idx in range(iters):
-        _ = MmCpu2d[dtype, tm, tn, tp].matmul_2d_cpu(A, B)
+        _ = MmCpu2d[dtype, tm, tn, tp].matmul(A, B)
     var end = perf_counter()
     return (end - start) * 1000.0 / Float64(iters)

@@ -83,7 +83,12 @@ trait Dataset(Sized & Copyable & Movable):
         ...
 
     def into_loader(
-        ref self, batch_size: Int, shuffle: Bool = True, drop_last: Bool = False
+        ref self,
+        batch_size: Int,
+        shuffle: Bool = True,
+        drop_last: Bool = False,
+        normalize_mean: Optional[Scalar[Self._feature_dtype]] = None,
+        normalize_std: Optional[Scalar[Self._feature_dtype]] = None,
     ) -> DataLoader[Self, origin_of(self)]:
         ...
 
@@ -124,6 +129,10 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
     ]
     var _last_batch_size: Int
 
+    # Optional normalization (mean/std applied after batch fill)
+    var _normalize_mean: Optional[Scalar[Self.DatasetSource._feature_dtype]]
+    var _normalize_std: Optional[Scalar[Self.DatasetSource._feature_dtype]]
+
     def __init__(out self, *, copy: Self):
         self.dataset = copy.dataset
         self.batch_size = copy.batch_size
@@ -139,6 +148,8 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
         self._batch = copy._batch
         self._last_batch = copy._last_batch
         self._last_batch_size = copy._last_batch_size
+        self._normalize_mean = copy._normalize_mean
+        self._normalize_std = copy._normalize_std
 
     def __init__(
         out self,
@@ -146,12 +157,16 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
         batch_size: Int,
         shuffle: Bool = False,
         drop_last: Bool = False,
+        normalize_mean: Optional[Scalar[Self.DatasetSource._feature_dtype]] = None,
+        normalize_std: Optional[Scalar[Self.DatasetSource._feature_dtype]] = None,
     ):
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle_data = shuffle
         self.drop_last = drop_last
         self._current_idx = 0
+        self._normalize_mean = normalize_mean
+        self._normalize_std = normalize_std
 
         var total_samples = len(self.dataset[])
         self._indices = List[Int](capacity=total_samples)
@@ -316,6 +331,9 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
             .unsafe_origin_cast[MutAnyOrigin]()
         )
 
+        var total_feature_elements = actual_batch_size * self._features_per_sample
+        var total_label_elements = actual_batch_size * self._labels_per_sample
+
         # OPTIMIZATION: Bulk copy if not shuffled
         if not self.shuffle_data:
             var first_sample_idx = self._indices[start_idx]
@@ -323,9 +341,6 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
             # Copy features in bulk
             var src_features_offset = (
                 first_sample_idx * self._features_per_sample
-            )
-            var total_feature_elements = (
-                actual_batch_size * self._features_per_sample
             )
             memcpy(
                 dest=batch_features_ptr,
@@ -335,9 +350,6 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
 
             # Copy labels in bulk
             var src_labels_offset = first_sample_idx * self._labels_per_sample
-            var total_label_elements = (
-                actual_batch_size * self._labels_per_sample
-            )
             memcpy(
                 dest=batch_labels_ptr,
                 src=dataset_labels_ptr + src_labels_offset,
@@ -365,6 +377,25 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
                     src=dataset_labels_ptr + src_label_offset,
                     count=self._labels_per_sample,
                 )
+
+        # Apply normalization after fill (SIMD)
+        if self._normalize_mean and self._normalize_std:
+            var mean = self._normalize_mean.value()
+            var inv_std = Scalar[Self.DatasetSource._feature_dtype](1) / self._normalize_std.value()
+
+            comptime simd_width = simd_width_of[
+                Scalar[Self.DatasetSource._feature_dtype]
+            ]()
+            var i = 0
+            for i in range(0, total_feature_elements - simd_width + 1, simd_width):
+                var vec = batch_features_ptr.load[width=simd_width](i)
+                vec = (vec - mean) * inv_std
+                batch_features_ptr.store[width=simd_width](i, vec)
+            for i in range(
+                total_feature_elements - simd_width + 1,
+                total_feature_elements,
+            ):
+                batch_features_ptr[i] = (batch_features_ptr[i] - mean) * inv_std
 
     def __has_next__(self) -> Bool:
         if self.drop_last:
@@ -533,9 +564,21 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
         return (sample_feature^, sample_label^)
 
     def into_loader(
-        ref self, batch_size: Int, shuffle: Bool = True, drop_last: Bool = False
+        ref self,
+        batch_size: Int,
+        shuffle: Bool = True,
+        drop_last: Bool = False,
+        normalize_mean: Optional[Scalar[Self._feature_dtype]] = None,
+        normalize_std: Optional[Scalar[Self._feature_dtype]] = None,
     ) -> DataLoader[Self, origin_of(self)]:
-        return DataLoader(Pointer(to=self), batch_size, shuffle, drop_last)
+        return DataLoader(
+            Pointer(to=self),
+            batch_size,
+            shuffle,
+            drop_last,
+            normalize_mean=normalize_mean,
+            normalize_std=normalize_std,
+        )
 
 
 # """
@@ -704,6 +747,18 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
         return (sample_feature^, sample_label^)
 
     def into_loader(
-        ref self, batch_size: Int, shuffle: Bool = True, drop_last: Bool = False
+        ref self,
+        batch_size: Int,
+        shuffle: Bool = True,
+        drop_last: Bool = False,
+        normalize_mean: Optional[Scalar[Self._feature_dtype]] = None,
+        normalize_std: Optional[Scalar[Self._feature_dtype]] = None,
     ) -> DataLoader[Self, origin_of(self)]:
-        return DataLoader(Pointer(to=self), batch_size, shuffle, drop_last)
+        return DataLoader(
+            Pointer(to=self),
+            batch_size,
+            shuffle,
+            drop_last,
+            normalize_mean=normalize_mean,
+            normalize_std=normalize_std,
+        )

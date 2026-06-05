@@ -442,9 +442,9 @@ def test_3d_broadcast_mul() raises:
     s = c.sum()
     s.backward()
 
-    assert_true(c.shape() == Shape.of(2, 2, 2))
-    assert_true(a.grad().shape() == Shape.of(2, 2, 1))
-    assert_true(b.grad().shape() == Shape.of(1, 1, 2))
+    assert_true(c.shape() == Shape(2, 2, 2))
+    assert_true(a.grad().shape() == Shape(2, 2, 1))
+    assert_true(b.grad().shape() == Shape(1, 1, 2))
 
 
 def test_mul_one_requires_grad() raises:
@@ -609,7 +609,7 @@ def test_transpose_gradients() raises:
     # Case 2: Transpose + reshape with non-square
     a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)  # (2, 3)
     b = a.transpose()
-    r = b.reshape(Shape.of(2, 3))  # (3, 2) → (2, 3)
+    r = b.reshape(Shape(2, 3))  # (3, 2) → (2, 3)
     s = r.sum()
     s.backward()
     assert_true((a.grad() == Tensor[dtype].d2([[1, 1, 1], [1, 1, 1]])))
@@ -631,7 +631,7 @@ def test_reshape_grad_flow() raises:
     # Case 1: Simple 1D → 1D reshape
     var a = Tensor[dtype].d1([1, 2, 3, 4], requires_grad=True)
     var b = a.reshape(
-        Shape.of(
+        Shape(
             4,
         )
     )
@@ -641,7 +641,7 @@ def test_reshape_grad_flow() raises:
 
     # Case 2: 1D → 2D reshape
     a = Tensor[dtype].d1([1, 2, 3, 4], requires_grad=True)
-    b = a.reshape(Shape.of(2, 2))
+    b = a.reshape(Shape(2, 2))
     s = (b * 2).sum()
     s.backward()
     assert_true((a.grad() == Tensor[dtype].d1([2, 2, 2, 2])))
@@ -649,7 +649,7 @@ def test_reshape_grad_flow() raises:
     # === 2D Tensor Cases ===
     # Case 3: 2D → 2D reshape (contiguous)
     a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
-    b = a.reshape(Shape.of(4, 1))
+    b = a.reshape(Shape(4, 1))
     s = b**2
     ss = s.sum()
     ss.backward()
@@ -658,7 +658,7 @@ def test_reshape_grad_flow() raises:
     # Case 4: 2D → 1D reshape
     a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
     b = a.reshape(
-        Shape.of(
+        Shape(
             4,
         )
     )
@@ -670,21 +670,21 @@ def test_reshape_grad_flow() raises:
     # === 3D Tensor Cases ===
     # Case 5: 3D → 2D reshape
     _ = """a64 = Tensor[DType.float64].d3([[[1.0, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True)
-    b = a.reshape(Shape.of(2, 4))
+    b = a.reshape(Shape(2, 4))
     b.mean().backward()
     assert_true((a64.grad() == Tensor[DType.float64].full(a64.shape(), 0.125)))
 
     # === Edge Cases ===
     # Case 6: Empty tensor reshape
     a = Tensor[dtype].d1([], requires_grad=True)
-    b = a.reshape(Shape.of(0,))
+    b = a.reshape(Shape(0,))
     b.sum().backward()  # Should not crash
-    assert_true(a.grad().shape() == Shape.of(0,))"""
+    assert_true(a.grad().shape() == Shape(0,))"""
 
     # Case 7: Non-contiguous reshape
     a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
     b = a.transpose()
-    r = b.reshape(Shape.of(2, 3))  # Tests view tracking
+    r = b.reshape(Shape(2, 3))  # Tests view tracking
     s = r.sum()
     s.backward()
     assert_true((a.grad() == Tensor[dtype].d2([[1, 1, 1], [1, 1, 1]])))
@@ -692,9 +692,9 @@ def test_reshape_grad_flow() raises:
     # === Advanced Cases ===
     # Case 8: Chained reshapes
     a = Tensor[dtype].d1([1, 2, 3, 4], requires_grad=True)
-    b = a.reshape(Shape.of(2, 2))
+    b = a.reshape(Shape(2, 2))
     r = b.reshape(
-        Shape.of(
+        Shape(
             4,
         )
     )
@@ -707,14 +707,14 @@ def test_reshape_grad_flow() raises:
     a = Tensor[dtype].d1([1, 2], requires_grad=True)
     s = (a * 2).sum()
     s.backward()  # a.grad = [2.0, 2.0]
-    b = a.reshape(Shape.of(2, 1))
+    b = a.reshape(Shape(2, 1))
     s = b.sum()
     s.backward()  # Gradient accumulation
     assert_true((a.grad() == Tensor[dtype].d1([3, 3])))  # 2 + 1
 
     # Case 10: Reshape after detach
     _ = """a = Tensor[dtype].d1([1, 2], requires_grad=True)
-    b = a.detach().reshape(Shape.of(2, 1))  # Should break grad flow
+    b = a.detach().reshape(Shape(2, 1))  # Should break grad flow
     b.sum().backward()  # Should NOT affect a.grad
     assert_true(a.grad() is None)  # Because of detach()"""
 
@@ -723,16 +723,16 @@ def test_reshape_gradient() raises:
     # 1. Reshape scalar to (1,) and back
     comptime dtype = DType.float32
     a = Tensor[dtype].scalar(42, requires_grad=True)
-    b = a.reshape(Shape.of(1))
-    c = b.reshape(Shape.of(1))  # back to scalar
+    b = a.reshape(Shape(1))
+    c = b.reshape(Shape(1))  # back to scalar
     d = c * Tensor[dtype].scalar(2)
     d.backward()
     assert_grad(a, Tensor[dtype].scalar(2), "scalar reshape chain → a")
     # 2. Reshape 1D → 2D → back to 1D
     a = Tensor[dtype].d1([1, 2, 3, 4], requires_grad=True)
-    b = a.reshape(Shape.of(2, 2))
+    b = a.reshape(Shape(2, 2))
     c = b.reshape(
-        Shape.of(
+        Shape(
             4,
         )
     )
@@ -743,7 +743,7 @@ def test_reshape_gradient() raises:
     # 3. Reshape 2D to 1D and multiply
     a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)  # shape (2,2)
     b = a.reshape(
-        Shape.of(
+        Shape(
             4,
         )
     )
@@ -756,11 +756,11 @@ def test_reshape_gradient() raises:
         [[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True
     )  # shape (2,2,2)
     b = a.reshape(
-        Shape.of(
+        Shape(
             8,
         )
     )
-    c = b.reshape(Shape.of(2, 2, 2))
+    c = b.reshape(Shape(2, 2, 2))
     d = c * Tensor[dtype].d3(
         [
             [[10, 20], [30, 40]],
@@ -780,15 +780,15 @@ def test_reshape_gradient() raises:
     )
     # 5. Reshape + sum + broadcast backward
     a = Tensor[dtype].d1([1, 2, 3, 4], requires_grad=True)  # shape (4,)
-    b = a.reshape(Shape.of(2, 2))
+    b = a.reshape(Shape(2, 2))
     c = b.sum()  # scalar
     c.backward()
     assert_grad(a, Tensor[dtype].d1([1, 1, 1, 1]), "reshape → sum → backward")
     # 6. Reshape with degenerate axis: (4,) → (1, 4) → (4,)
     a = Tensor[dtype].d1([5, 6, 7, 8], requires_grad=True)
-    b = a.reshape(Shape.of(1, 4))
+    b = a.reshape(Shape(1, 4))
     c = b.reshape(
-        Shape.of(
+        Shape(
             4,
         )
     )
@@ -803,7 +803,7 @@ def test_reshape_gradient() raises:
     )
     # 7. Reshape then broadcast in op
     a = Tensor[dtype].d1([1, 2, 3, 4], requires_grad=True)
-    b = a.reshape(Shape.of(2, 2))
+    b = a.reshape(Shape(2, 2))
     c = b + Tensor[dtype].scalar(10)  # broadcast add
     d = c.sum()
     d.backward()
@@ -1405,16 +1405,16 @@ def test_power() raises:
 
 def test_grad_flow_through_reshape() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].of(1.0, 2.0, 3.0, requires_grad=True)
+    a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
 
     # First operation using 'a'
     b = a + 1.0
     s = b.sum()
     s.backward()
-    assert_true((a.grad() == Tensor[dtype].of(1.0, 1.0, 1.0)))
+    assert_true((a.grad() == Tensor[dtype].d1([1.0, 1.0, 1.0])))
 
     # Reshape should not clone or copy gradients
-    reshaped = a.reshape(Shape.of(3))
+    reshaped = a.reshape(Shape(3))
 
     # reshaped.grad() should not exist on its own — we assert that it refers to the same grad storage
     # assert_true((reshaped.grad() == Tensor[dtype].of(1.0, 1.0, 1.0)))
@@ -1424,20 +1424,20 @@ def test_grad_flow_through_reshape() raises:
     s.backward()
 
     # Original 'a' should now have accumulated gradient
-    assert_true((a.grad() == Tensor[dtype].of(3.0, 3.0, 3.0)))
+    assert_true((a.grad() == Tensor[dtype].d1([3.0, 3.0, 3.0])))
 
 
 def test_reshape_preserves_grad_accumulation() raises:
     # Chained reshape should still accumulate gradients
     comptime dtype = DType.float32
-    a = Tensor[dtype].of(1.0, 2.0, 3.0, requires_grad=True)
-    b = a.reshape(Shape.of(3))
-    c = b.reshape(Shape.of(1, 3))
+    a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    b = a.reshape(Shape(3))
+    c = b.reshape(Shape(1, 3))
 
     d = c.sum()
     d.backward()
 
-    assert_true((a.grad() == Tensor[dtype].of(1.0, 1, 1)))
+    assert_true((a.grad() == Tensor[dtype].d1([1.0, 1, 1])))
 
 
 def test_multi_dimensional_reshape() raises:
@@ -1446,9 +1446,9 @@ def test_multi_dimensional_reshape() raises:
     a1 = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
     )
-    b1 = a1.reshape(Shape.of(3, 2))
+    b1 = a1.reshape(Shape(3, 2))
 
-    assert_true(b1.shape() == Shape.of(3, 2))
+    assert_true(b1.shape() == Shape(3, 2))
     d1 = b1.sum()
     d1.backward()
     assert_true(
@@ -1461,7 +1461,7 @@ def test_multi_dimensional_reshape() raises:
 def test_reshape_tensor_to_scalar() raises:
     # (1,) → reshape to scalar
     comptime dtype = DType.float32
-    a = Tensor[dtype].of(42.0, requires_grad=True)
+    a = Tensor[dtype].d1([42.0], requires_grad=True)
     b = a.reshape(Shape())
 
     assert_true(b.is_scalar())
@@ -1475,7 +1475,7 @@ def test_reshape_scalar_to_tensor() raises:
     # Scalar → reshape to (1,)
     comptime dtype = DType.float32
     a = Tensor[dtype].scalar(42.0, requires_grad=True)
-    b = a.reshape(Shape.of(1))  # should share data and allow backprop
+    b = a.reshape(Shape(1))  # should share data and allow backprop
 
     assert_true(b[0] == Scalar[dtype](42.0))
     c = b * 3
@@ -1485,13 +1485,13 @@ def test_reshape_scalar_to_tensor() raises:
 
 def test_miscellaneous() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].of(1.0, 2.0, 3.0, requires_grad=True)
+    a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     b = Tensor[dtype].scalar(5.0)
     c = a + b
     s = c.sum()
     s.backward()
     # should be [1, 1, 1]
-    assert_true((a.grad() == Tensor[dtype].of(1.0, 1, 1)))
+    assert_true((a.grad() == Tensor[dtype].d1([1.0, 1, 1])))
     m = (a + b).mean()
     reshaped = m.reshape()
     ss = Tensor[dtype].scalar(42, requires_grad=True).sum()
@@ -1548,19 +1548,19 @@ def test_mean() raises:
 def test_sum() raises:
     # 1. Basic Value Tests
     comptime dtype = DType.float32
-    a = Tensor[dtype].of(1, 2, 3)
+    a = Tensor[dtype].d1([1, 2, 3])
     b = Tensor[dtype].d1([1, 2, 3])
-    c = Tensor[dtype].of([1, 2, 3])
+    c = Tensor[dtype].d1([1, 2, 3])
     assert_true((a.sum([0]) == Tensor[dtype].scalar(6)))
     assert_true((b.sum([0]) == Tensor[dtype].scalar(6)))
     assert_true((c.sum([0]) == Tensor[dtype].scalar(6)))
-    assert_true((a.sum([0], keepdims=True) == Tensor[dtype].of(6)))
-    assert_true((a.sum([0], keepdims=True) == Tensor[dtype].of([6])))
+    assert_true((a.sum([0], keepdims=True) == Tensor[dtype].d1([6])))
+    assert_true((a.sum([0], keepdims=True) == Tensor[dtype].d1([6])))
 
     # 2. Multi-Dimensional Tensor Tests
     a = Tensor[dtype].d2([[1, 2], [3, 4]])  # Shape (2, 2)
-    assert_true((a.sum([0]) == Tensor[dtype].of([4, 6])))
-    assert_true((a.sum([1]) == Tensor[dtype].of([3, 7])))
+    assert_true((a.sum([0]) == Tensor[dtype].d1([4, 6])))
+    assert_true((a.sum([1]) == Tensor[dtype].d1([3, 7])))
     assert_true((a.sum([0, 1]) == Tensor[dtype].scalar(10)))
     assert_true((a.sum([0, 1], keepdims=True) == Tensor[dtype].d2([[10]])))
     # 3. Scalar Input
@@ -1571,7 +1571,7 @@ def test_sum() raises:
     a = Tensor[dtype].d2([[1, 2], [3, 4]])  # (2,2)
     out = a.sum([1], keepdims=True)  # Should be (2,1)
     assert_true(
-        (out == Tensor[dtype].d2([[3], [7]])) and out.shape() == Shape.of(2, 1)
+        (out == Tensor[dtype].d2([[3], [7]])) and out.shape() == Shape(2, 1)
     )
     # 5. Gradient Checks
     a = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
@@ -1579,7 +1579,7 @@ def test_sum() raises:
     b.backward()
     # Now a.grad should be Tensor[dtype].of([[1, 1], [1, 1]])
     assert_true(
-        (b == Tensor[dtype].of(3, 7))
+        (b == Tensor[dtype].d1([3, 7]))
         and b.requires_grad
         and (a.grad() == Tensor[dtype].d2([[1, 1], [1, 1]]))
     )
@@ -1590,15 +1590,17 @@ def test_sum() raises:
     b.backward()
     # a.grad == Tensor[dtype].of([[1, 1, 1]])
     assert_true(
-        (b == Tensor[dtype].of(1, 2, 3))
+        (b == Tensor[dtype].d1([1, 2, 3]))
         and b.requires_grad
         and (a.grad() == Tensor[dtype].d2([[1, 1, 1]]))
     )
-    tensor = Tensor[dtype].of(1, 2, 3, 4, requires_grad=True)
+    tensor = Tensor[dtype].d1([1, 2, 3, 4], requires_grad=True)
     result = tensor.sum(axes=[], keepdims=False)
     assert_true((result == Tensor[dtype].scalar(10)))
     result.backward()
-    assert_true((tensor.grad() == Tensor[DType.float32].of(1.0, 1.0, 1.0, 1.0)))
+    assert_true(
+        (tensor.grad() == Tensor[DType.float32].d1([1.0, 1.0, 1.0, 1.0]))
+    )
     tensor = Tensor[dtype].arange(24)
     r = tensor.reshape(2, 3, 4)
     result = r.sum(axes=[], keepdims=False)
@@ -1614,7 +1616,7 @@ def test_sum() raises:
     )
     ones = Tensor[dtype].ones(3, 3)
     summed = ones.sum(axes=[0])
-    expect = Tensor[dtype].of(3, 3, 3)
+    expect = Tensor[dtype].d1([3, 3, 3])
     assert_true((summed == expect), "1D sum assertion failed")
 
     tensor = Tensor[dtype].arange(1, 21)
@@ -1875,18 +1877,18 @@ def test_tensor_of_list() raises:
     )
     tensor_2d = Tensor[dtype].d2([[1.0, 2, 3], [4.0, 5, 6], [7.0, 8, 9]])
     assert_true(
-        tensor_2d.shape() == Shape.of(3, 3) and tensor_2d.numels() == 9,
+        tensor_2d.shape() == Shape(3, 3) and tensor_2d.numels() == 9,
         "Tensor from assertion 3 failed",
     )
     tensor2d = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
     assert_true(
-        tensor2d.shape() == Shape.of(3, 3) and tensor2d.numels() == 9,
+        tensor2d.shape() == Shape(3, 3) and tensor2d.numels() == 9,
         "Tensor from assertion 3 failed",
     )
 
     tensor3d = Tensor[dtype].d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
     assert_true(
-        tensor3d.shape() == Shape.of(2, 2, 2) and tensor3d.numels() == 8,
+        tensor3d.shape() == Shape(2, 2, 2) and tensor3d.numels() == 8,
         "Tensor from assertion 4 failed",
     )
 
@@ -1920,19 +1922,19 @@ def test_reshape() raises:
         "reshape __getitem__ assertion 3 failed",
     )
 
-    tensor = Tensor[dtype].of(42)
+    tensor = Tensor[dtype].d1([42])
     assert_true(
         tensor.shape() == Shape(1), "Unit tensor shape assertion failure"
     )
     reshaped = tensor.reshape(1, 1)
     assert_true(
-        reshaped.shape() == Shape.of(1, 1) and reshaped[0, 0] == tensor[0],
+        reshaped.shape() == Shape(1, 1) and reshaped[0, 0] == tensor[0],
         "post reshape shape and get assertion failed",
     )
     tensor = Tensor[dtype].scalar(42)
     reshaped = tensor.reshape(1, 1)
     assert_true(
-        reshaped.shape() == Shape.of(1, 1) and reshaped[0, 0] == tensor.item(),
+        reshaped.shape() == Shape(1, 1) and reshaped[0, 0] == tensor.item(),
         "post reshape shape and get assertion failed for scalar tensor",
     )
     reshaped = tensor.reshape(1)
@@ -2463,7 +2465,7 @@ def test_mean_multiple_axes() raises:
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
     var m = a.mean(axes=[0, 2])
-    assert_true(m.shape() == Shape.of(2), "Shape after reducing [0, 2]")
+    assert_true(m.shape() == Shape(2), "Shape after reducing [0, 2]")
     m.backward()
     assert_true(
         a.grad().sum().item() == 2.0,
@@ -2524,7 +2526,7 @@ def test_scalar_sum_custom_grad() raises:
 def test_reshape_reused_twice_correct_grad() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
-    var r = x.reshape(Shape.of(2, 2))
+    var r = x.reshape(Shape(2, 2))
     var y = r + r  # <-- r used twice
     y.backward()
 
@@ -2574,7 +2576,7 @@ def test_sum_all_axes_keepdims() raises:
     var s = a.sum(axes=[0, 1], keepdims=True)
     s.backward(Tensor[dtype].d2([[100]]))
 
-    assert_true(s.shape() == Shape.of(1, 1), "keepdims should preserve (1,1)")
+    assert_true(s.shape() == Shape(1, 1), "keepdims should preserve (1,1)")
     assert_true(a.grad().all_close(Tensor[dtype].d2([[100, 100], [100, 100]])))
 
 
@@ -2634,7 +2636,7 @@ def test_sum_axis0() raises:
     s.backward(
         Tensor[dtype].d1([10, 20])
     )  # incoming grad shape must match output
-    assert_true(s.shape() == Shape.of(2), "Sum axis=0 → shape (2,)")
+    assert_true(s.shape() == Shape(2), "Sum axis=0 → shape (2,)")
 
     # ∂s/∂a = [[10, 20], [10, 20]]
     assert_true(
@@ -2658,7 +2660,7 @@ def test_sum_all_elements() raises:
 def test_reshape_gradient_2d() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
-    var b = a.reshape(Shape.of(4))  # Flatten
+    var b = a.reshape(Shape(4))  # Flatten
     b.backward()
     assert_true(
         a.grad().all_close(Tensor[dtype].d2([[1.0, 1.0], [1.0, 1.0]])),
@@ -2669,7 +2671,7 @@ def test_reshape_gradient_2d() raises:
 def test_reshape_gradient_flatten() raises:
     comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
-    var y = x.reshape(Shape.of(2, 2))  # Reshape to 2x2
+    var y = x.reshape(Shape(2, 2))  # Reshape to 2x2
     var z = y * 2.0
     z.backward()
     assert_true(
@@ -2681,8 +2683,8 @@ def test_reshape_gradient_flatten() raises:
 def test_multiple_reshapes() raises:
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([10.0, 20.0, 30.0, 40.0], requires_grad=True)
-    var t2 = t.reshape(Shape.of(2, 2))
-    var t3 = t2.reshape(Shape.of(4))
+    var t2 = t.reshape(Shape(2, 2))
+    var t3 = t2.reshape(Shape(4))
     var y = t3 * 3.0
     y.backward()
     assert_true(
@@ -2694,7 +2696,7 @@ def test_multiple_reshapes() raises:
 def test_reshape_noop() raises:
     comptime dtype = DType.float32
     var m = Tensor[dtype].d2([[5.0, 6.0]], requires_grad=True)
-    var reshaped = m.reshape(Shape.of(1, 2))  # No shape change
+    var reshaped = m.reshape(Shape(1, 2))  # No shape change
     reshaped.backward()
     assert_true(
         m.grad().all_close(Tensor[dtype].d2([[1.0, 1.0]])),
@@ -2869,7 +2871,7 @@ def test_flat_view_chain_backprop() raises:
     var v3 = v2.view([8])
     v3.backward()
     # assert_eq(a.grad[], Tensor[dtype].ones_like(a).slice(2, 10).pad_left(2))
-    assert_true((a.grad() == Tensor[dtype].of(0, 0, 1, 1, 1, 1, 1, 1, 0, 0)))
+    assert_true((a.grad() == Tensor[dtype].d1([0, 0, 1, 1, 1, 1, 1, 1, 0, 0])))
 
 
 def test_reshape_backward() raises:
@@ -2939,33 +2941,33 @@ def test_reshape_backward_scalar() raises:
 
 def test_add_tensor_and_view() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].full(Shape.of(3, 3), 2)
+    a = Tensor[dtype].full(Shape(3, 3), 2)
     av = a.into_view()
-    expected = Tensor[dtype].full(Shape.of(3, 3), 4)
+    expected = Tensor[dtype].full(Shape(3, 3), 4)
     assert_true(
         (a + av == expected),
         "add tensor and view assertion 1 failed",
     )
 
-    expected = Tensor[dtype].full(Shape.of(3, 3), 84)
+    expected = Tensor[dtype].full(Shape(3, 3), 84)
 
-    c = Tensor[dtype].full(Shape.of(3, 1), 42)
+    c = Tensor[dtype].full(Shape(3, 1), 42)
     cv = c.into_view()
-    d = Tensor[dtype].full(Shape.of(1, 3), 42)
+    d = Tensor[dtype].full(Shape(1, 3), 42)
     dv = d.into_view()
     cvdv = cv + dv
     assert_true((cvdv == expected), "add views assertion 1 failed")
-    expected = Tensor[dtype].full(Shape.of(3, 3), 44)
+    expected = Tensor[dtype].full(Shape(3, 3), 44)
     assert_true(
         (a + cv == expected),
         "add tensor and view assertion 2 failed",
     )
 
-    a = Tensor[dtype].full(Shape.of(2, 1, 3), 2)
+    a = Tensor[dtype].full(Shape(2, 1, 3), 2)
     av = a.into_view()
-    b = Tensor[dtype].full(Shape.of(3, 1), 2)
+    b = Tensor[dtype].full(Shape(3, 1), 2)
     bv = b.into_view()
-    expected = Tensor[dtype].full(Shape.of(2, 3, 3), 4)
+    expected = Tensor[dtype].full(Shape(2, 3, 3), 4)
     assert_true((av + bv == expected), "add views assertion 2 failed")
     assert_true((bv + av == expected), "add views assertion 3 failed")
     assert_true(
@@ -2980,73 +2982,71 @@ def test_add_tensor_and_view() raises:
 
 def test_add_tensors() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].full(Shape.of(3, 3), 2)
-    b = Tensor[dtype].full(Shape.of(3, 3), 42)
-    expected = Tensor[dtype].full(Shape.of(3, 3), 44)
+    a = Tensor[dtype].full(Shape(3, 3), 2)
+    b = Tensor[dtype].full(Shape(3, 3), 42)
+    expected = Tensor[dtype].full(Shape(3, 3), 44)
     assert_true((a + b == expected), "add tensors assertion 1 failed")
 
-    c = Tensor[dtype].full(Shape.of(3, 1), 42)
+    c = Tensor[dtype].full(Shape(3, 1), 42)
     assert_true((a + c == expected), "add tensors assertion 2 failed")
-    d = Tensor[dtype].full(Shape.of(1, 3), 42)
+    d = Tensor[dtype].full(Shape(1, 3), 42)
     assert_true((a + d == expected), "add tensors assertion 3 failed")
 
-    expected = Tensor[dtype].full(Shape.of(3, 3), 84)
+    expected = Tensor[dtype].full(Shape(3, 3), 84)
     assert_true((c + d == expected), "add tensors assertion 4 failed")
 
-    expected = Tensor[dtype].full(Shape.of(3, 3), 4)
+    expected = Tensor[dtype].full(Shape(3, 3), 4)
     assert_true((a + a == expected), "add tensors assertion 5 failed")
 
-    a = Tensor[dtype].full(Shape.of(2, 1, 3), 2)
-    b = Tensor[dtype].full(Shape.of(3, 1), 2)
-    expected = Tensor[dtype].full(Shape.of(2, 3, 3), 4)
+    a = Tensor[dtype].full(Shape(2, 1, 3), 2)
+    b = Tensor[dtype].full(Shape(3, 1), 2)
+    expected = Tensor[dtype].full(Shape(2, 3, 3), 4)
     assert_true((a + b == expected), "add tensors assertion 5 failed")
     assert_true((b + a == expected), "add tensors assertion 5 failed")
 
 
 def test_add_scalar() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].full(Shape.of(3, 3), 2)
+    a = Tensor[dtype].full(Shape(3, 3), 2)
     b = a + 3
     c = 3 + a
-    expected = Tensor[dtype].full(Shape.of(3, 3), 5)
+    expected = Tensor[dtype].full(Shape(3, 3), 5)
     assert_true((b == expected), "add scalar assertion failed")
     assert_true((c == expected), "__radd__ scalar assertion failed")
 
 
 def test_subtract_scalar() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].full(Shape.of(3, 3), 5)
+    a = Tensor[dtype].full(Shape(3, 3), 5)
     b = a - 3
     c = 7 - a
-    expected = Tensor[dtype].full(Shape.of(3, 3), 2)
+    expected = Tensor[dtype].full(Shape(3, 3), 2)
     assert_true((b == expected), "subtract scalar assertion failed")
     assert_true((c == expected), "__rsub__ scalar assertion failed")
 
 
 def test_powering() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].full(Shape.of(3, 3), 2)
+    a = Tensor[dtype].full(Shape(3, 3), 2)
     b = a**3
-    expected = Tensor[dtype].full(Shape.of(3, 3), 8)
+    expected = Tensor[dtype].full(Shape(3, 3), 8)
     assert_true((b == expected), "pow assertion failed")
 
 
 def test_invert() raises:
     comptime dtype = DType.int32
-    a = Tensor[DType.bool].full(Shape.of(3, 3), Scalar[DType.bool](True))
+    a = Tensor[DType.bool].full(Shape(3, 3), Scalar[DType.bool](True))
     b = ~a
-    expected = Tensor[DType.bool].full(
-        Shape.of(3, 3), Scalar[DType.bool](False)
-    )
+    expected = Tensor[DType.bool].full(Shape(3, 3), Scalar[DType.bool](False))
     assert_true((b == expected), "invertion assertion failed")
     assert_true((~b == a), "invertion assertion 2 failed")
 
 
 def test_negate_absolute() raises:
     comptime dtype = DType.float32
-    a = Tensor[DType.float32].full(Shape.of(3, 3), 42)
+    a = Tensor[DType.float32].full(Shape(3, 3), 42)
     negated = -a
-    expected = Tensor[dtype].full(Shape.of(3, 3), -42)
+    expected = Tensor[dtype].full(Shape(3, 3), -42)
     assert_true((negated == expected), "negation assertion failed")
     assert_true((negated.__abs__() == a), "__abs__ assertion failed")
     assert_true((abs(negated) == a), "abs assertion failed")
@@ -3055,15 +3055,15 @@ def test_negate_absolute() raises:
 def test_inplace_update() raises:
     comptime dtype = DType.float32
     a = Tensor[dtype].zeros(3, 3)
-    b = Tensor[dtype].full(Shape.of(3, 3), 42)
+    b = Tensor[dtype].full(Shape(3, 3), 42)
     a += b
     assert_true((a == b), "inplace tensor update assertion failed")
 
 
 def test_exponentiation() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].full(Shape.of(3, 3), 2)
-    expected = Tensor[dtype].full(Shape.of(3, 3), 7.389056).float()
+    a = Tensor[dtype].full(Shape(3, 3), 2)
+    expected = Tensor[dtype].full(Shape(3, 3), 7.389056).float()
     b = a.exp()
     assert_true(b.all_close(expected), "exponentiation assertion failed")
 
@@ -3073,7 +3073,7 @@ def test_grad_update() raises:
     a = Tensor[dtype].rand([3, 4], requires_grad=True)
     v = a.into_view()
     v.init_gradbox()
-    grad = Gradbox[dtype].full(Shape.of(3, 4), 42)
+    grad = Gradbox[dtype].full(Shape(3, 4), 42)
     v.update_grad[AddTensor](grad)
     assert_true(
         (v.gradients() == grad),
@@ -3085,7 +3085,7 @@ def test_sum_all() raises:
     comptime dtype = DType.float32
     a = Tensor[dtype].arange(3 * 4 * 5)
     r = a.reshape(3, 4, 5)
-    v = r.view(shape=Shape.of(2, 5, 5), offset=5)
+    v = r.view(shape=Shape(2, 5, 5), offset=5)
     v2 = r.view(shape=[3, 5, 4], strides=[20, 1, 5], offset=0)
     v3 = r.view(shape=[3, 5, 3], strides=[15, 1, 3], offset=15)
     v4 = v3.view(shape=[5, 3], offset=15)

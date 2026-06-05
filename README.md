@@ -24,34 +24,29 @@ Training the same 4-layer MLP (784→128→32→10) on identical hardware:
 
 | Platform | Device | Avg Epoch Time | Total Time | Final Val Acc |
 |----------|--------|----------------|------------|---------------|
-| **Tenmo** | **CPU (Mojo)** | **13.3s** | **199s** | **97.87%** |
-| PyTorch | CPU | 14.5s | 218s | 98.26% |
-| PyTorch | GPU (Tesla T4) | 15.2s | 227s | 97.87% |
+| **Tenmo** | **CPU (Mojo)** | **2.57s** | **38.5s** | **98.01%** |
+| PyTorch | CPU | 9.49s | 142.4s | 97.89% |
 
 **Key Observations:**
-- ⚡︎ **1.1× faster than PyTorch CPU** — Pure Mojo with SIMD optimization
-- ⚡︎ **Faster than PyTorch GPU** for small models on this hardware
-- 🎯︎ **97.87% validation accuracy** — Matches PyTorch GPU accuracy
+- ⚡︎ **3.7× faster than PyTorch CPU** — Pure Mojo with SIMD optimization
+- 🎯︎ **98.01% validation accuracy** — Slightly *exceeds* PyTorch on same hardware
 - 📉 **Zero Python overhead** — Runs entirely in compiled Mojo
 
 *All runs were performed sequentially on the same system, batch_size=64. The MNIST example does not use BLAS — pure Mojo only.*
 
 **Training Progression** (Tenmo CPU, current):
 ```
-Epoch 1:  Loss: 0.406, Train: 88.29%, Val: 93.15%, Time: 13.1s
-Epoch 5:  Loss: 0.081, Train: 97.57%, Val: 97.15%, Time: 13.5s
-Epoch 10: Loss: 0.039, Train: 98.89%, Val: 97.65%, Time: 13.0s
-Epoch 15: Loss: 0.022, Train: 99.55%, Val: 97.87%, Time: 13.2s
+Epoch 1:  Loss: 0.318, Train: 90.43%, Val: 95.38%, Time: 2.58s
+Epoch 5:  Loss: 0.054, Train: 98.33%, Val: 97.41%, Time: 2.56s
+Epoch 10: Loss: 0.018, Train: 99.45%, Val: 97.72%, Time: 2.56s
+Epoch 15: Loss: 0.006, Train: 99.93%, Val: 98.01%, Time: 2.56s
 ```
 
 **Why is Tenmo competitive?**
-- GPU overhead (kernel launch + data transfer) dominates for small MNIST models
 - Zero Python overhead
 - SIMD-vectorized operations on contiguous buffers
 - Zero-copy batch loading
 - Compile-time specialization eliminates graph overhead in eval mode
-
-> 📊 **GPU training benchmarks are in progress.** GPU support is implemented; transfer optimization is ongoing.
 
 ---
 
@@ -78,7 +73,7 @@ The library has undergone significant architectural work. The changes prioritize
 from std.testing import assert_true
 from tenmo.tensor import Tensor
 
-fn main() raises:
+def main() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
 
@@ -98,7 +93,7 @@ fn main() raises:
 
 from tenmo.tensor import Tensor
 
-fn main() raises:
+def main() raises:
     """Broadcasting (2,3) @ (1,3,4)."""
     comptime dtype = DType.float32
     var A = Tensor[dtype].ones(2, 3, requires_grad=True)
@@ -121,7 +116,7 @@ fn main() raises:
   ]
 A's gradients
 
- [2D Gradbox(2, 3), Type: float32, Shared : False, Strides : (3, 1), Offset : 0]
+ [2D Gradbox(2, 3), Type: float32, Shared : True, Strides : (3, 1), Offset : 0]
   [
     [4.0, 4.0, 4.0],
     [4.0, 4.0, 4.0]
@@ -134,11 +129,11 @@ from tenmo.tensor import Tensor
 from tenmo.net import Sequential, Linear, Sigmoid, MSELoss
 from tenmo.sgd import SGD
 
-fn main():
+def main() raises:
     """
     Classic non-linearly separable XOR problem requiring hidden layers.
     """
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
 
     # XOR truth table
     var X = Tensor[dtype].d2([[0, 0], [0, 1], [1, 0], [1, 1]])
@@ -208,7 +203,7 @@ pixi shell
 
 ## Why Tenmo?
 
-**Performance without compromise**: Faster than PyTorch CPU on MNIST, with zero Python overhead and full SIMD optimization.
+**Performance without compromise**: 3.7× faster than PyTorch CPU on MNIST, with zero Python overhead and full SIMD optimization.
 
 **Transparency you can trust**: Every operation is implemented in pure Mojo — no hidden BLAS calls, no opaque kernels. Perfect for learning and optimization.
 
@@ -279,35 +274,42 @@ Set `BLAS_PATH` environment variable to use a custom BLAS library (defaults to O
 
 Tenmo's design prioritizes memory efficiency and performance through careful separation of concerns - organized around a few tightly scoped core building blocks:
 
-### Core Types (Conceptual)
+### Core Types
 ```
 Tensor[dtype: DType]
-├── buffer: NDBuffer          # Single source of truth for shape/strides/offset
-├── requires_grad: Bool       # Gradient tracking flag
-├── gradbox: UnsafePointer    # Gradients (only allocated when needed)
-└── ancestors: Optional       # Lightweight ancestor handles in computation graph
+├── _id: UInt                              # Unique identifier
+├── buffer: NDBuffer[dtype]                # Data + layout (shape/strides/offset)
+├── requires_grad: Bool                    # Gradient tracking flag
+├── gradbox: Optional[Gradbox[dtype]]      # Gradient storage (only if requires_grad=True)
+└── ancestors: Optional[Ancestors]         # Computation graph parents
 
 Gradbox[dtype: DType]
-└── buffer: NDBuffer          # Contiguous gradient storage (always ref-counted)
+├── _ndb_ptr: Optional[UnsafePointer[NDBuffer]]   # Heap NDBuffer (combined alloc)
+└── _refcount: Optional[UnsafePointer[Atomic]]     # Atomic refcount (combined alloc)
 
 Ancestor[dtype: DType]
-├── _id: UInt                 # Identity
-├── requires_grad: Bool       # Gradient tracking flag
-├── gradbox: UnsafePointer    # Refcounted gradbox pointer for gradient routing
-├── ndb: NDBuffer             # Data + layout (refcount bump only, no data copy)
-└── parents: Optional         # Ancestor chain for graph traversal
+├── _id: UInt                              # Graph traversal key
+├── requires_grad: Bool                    # Skip gradient update if False
+├── gradbox: Optional[Gradbox[dtype]]      # Gradient storage (inline via Optional)
+├── ndb: Optional[NDBuffer[dtype]]         # Data+layout (None unless needs_parent_data=True)
+└── parents: Optional[Ancestors[dtype]]    # Recursive ancestry chain
 
 NDBuffer[dtype: DType]
-├── buffer: Buffer            # Underlying data (ref-counted for views)
-├── shape: Shape              # Tensor dimensions
-├── strides: Strides          # Memory layout
-├── offset: Int               # View offset into parent buffer
-└── device_state: Optional    # GPU storage
+├── shape: Shape                           # Tensor dimensions
+├── strides: Strides                       # Memory layout
+├── offset: Int                            # View offset
+├── _contiguous: Bool                      # Cached contiguous flag
+├── buffer: Buffer[dtype]                  # CPU data
+└── device_state: Optional[DeviceState]    # GPU storage
+```
 
 ### Design Rationale
 
 **Gradbox is not a Tensor**
 Gradients don't need the full Tensor API. A `Gradbox` encapsulates only an `NDBuffer`, keeping gradient storage minimal and explicit — **70% less code than full Tensors**. Gradbox buffers are always ref-counted — gradients land in the right place regardless of how many tensor copies or views exist.
+
+**`Tensor.grad()` returns an independent deep copy**
+Calling `A.grad()` returns a detached `Gradbox` with its own data via `Gradbox.detach()`, which deep-copies the underlying buffer (CPU: `memcpy`, GPU: `enqueue_copy_to`). The tensor's internal Gradbox is unaffected by subsequent `zero_grad()` or `.backward()` calls on the returned copy — safe to snapshot gradients mid-training.
 
 **Ancestors is not a Tensor**
 The autograd graph no longer stores full `Tensor` copies. An `Ancestor` handle carries only what backward needs: an id, `requires_grad` flag, a refcounted gradbox pointer, and a shared `NDBuffer`. This eliminates the recursive deep-copy explosion on every `add_ancestry` call.
@@ -331,8 +333,8 @@ This architecture keeps the system **explicit, predictable, and close to the met
 ## 📖 Examples
 
 ### Prerequisites
-- Mojo 0.26.2
-- Python 3.10-3.12 (for NumPy interop in examples)
+- Mojo 1.0.0b1 (linux-64 only)
+- Python 3.10-3.14 (for NumPy interop in examples)
 
 ### Setup
 ```bash
@@ -449,6 +451,7 @@ for batch in train_loader:
 - [ ] Checkpointing: Model serialization and loading
 - [ ] Additional Layers: BatchNorm, LayerNorm
 - [ ] GPU transfer optimization: pinned memory, async transfers, stream pipelining
+- [ ] GPU synchronization: explicit stream management and async kernel launch
 
 ### Medium Term
 - [ ] Transparent GPU Support: Unified CPU/GPU tensor operations

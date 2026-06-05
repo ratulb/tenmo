@@ -579,21 +579,6 @@ struct Shape(
             reduced_axes.append(self[axes[i]])
         return Shape(reduced_axes)
 
-    @staticmethod
-    def of(*dims: Int) -> Shape:
-        """Create a shape from variadic integers (factory method).
-
-        Args:
-            *dims: Variable number of integers representing dimension sizes
-
-        Returns:
-            Shape instance with the specified dimensions
-
-        Example:
-            Shape.of(2, 3, 4) creates a shape with dimensions (2, 3, 4)
-        """
-        return Shape(dims)
-
     @always_inline
     def product(self) -> Int:
         """Get the total number of elements (alias for num_elements()).

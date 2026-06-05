@@ -21,7 +21,7 @@ def rref(A: NDBuffer[dtype], B: NDBuffer[dtype]) -> NDBuffer[dtype]:
 
 
 def trial(A: NDBuffer[dtype], B: NDBuffer[dtype]) -> NDBuffer[dtype]:
-    return MmCpu2d[dtype].pick_cpu(A, B)
+    return MmCpu2d[dtype].tiled_matmul(A, B)
 
 
 def check(M: Int, K: Int, N: Int, label: String) raises:
@@ -257,7 +257,9 @@ def test_v2_non_contiguous_A() raises:
         Shape(M, K), A_wide.buffer.strides, A_wide.buffer.offset
     )
     var B = Tensor[dtype].randn(K, N)
-    var B_strided = B.buffer.share(B.buffer.shape, B.buffer.strides, B.buffer.offset)
+    var B_strided = B.buffer.share(
+        B.buffer.shape, B.buffer.strides, B.buffer.offset
+    )
     var A_contig = Tensor[dtype].zeros(M, K)
     for i in range(M):
         for j in range(K):

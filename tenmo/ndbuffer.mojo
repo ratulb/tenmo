@@ -21,7 +21,7 @@ from tenmo.kernels.binary_ops_kernel import BinaryOperations
 from tenmo.kernels.binary_inplace_ops_kernel import BinaryInplaceOperations
 from tenmo.kernels.unary_ops_kernel import UnaryOpsKernel
 from tenmo.kernels.matmul_kernel import MatmulNdGpu
-from tenmo.matmul_cpu2d import MmCpu2d
+from tenmo.matmul_cpu import MmCpu2d, MmCpuNd
 from tenmo.cpu_broadcast import CpuBroadcast
 from tenmo.shared.scalar_ops import ScalarOps
 from tenmo.kernels.compare_kernel import AllClose, Compare, CompareScalar
@@ -949,6 +949,61 @@ struct NDBuffer[dtype: DType](
         )
         ndb.device_state = self.device_state.copy()
         return ndb^
+
+    def __getitem__(mut self, *slices: Slice) -> NDBuffer[Self.dtype]:
+        var (
+            shape,
+            strides,
+            offset,
+        ) = Validator.validate_and_compute_view_metadata(
+            self.shape, self.strides, slices
+        )
+        return self.share(shape, strides, self.offset + offset)
+
+    def __getitem__(mut self, *indices: Idx) -> NDBuffer[Self.dtype]:
+        var (
+            view_shape,
+            view_strides,
+            offset,
+        ) = Validator.validate_and_compute_advanced_indexing_metadata(
+            self.shape, self.strides, indices
+        )
+        var is_scalar = len(view_shape) == 0
+        return self.share(
+            Shape() if is_scalar else view_shape,
+            Strides() if is_scalar else view_strides,
+            self.offset + offset,
+        )
+
+    def chunk(self, *indices: Idx) -> NDBuffer[Self.dtype]:
+        var (
+            shape,
+            strides,
+            offset,
+        ) = Validator.validate_and_compute_advanced_indexing_metadata(
+            self.shape, self.strides, indices
+        )
+        var result = NDBuffer[Self.dtype](shape)
+        var absolute_offset = self.offset + offset
+        if strides.is_contiguous(shape):
+            memcpy(
+                dest=result.data_ptr(),
+                src=self.data_ptr() + absolute_offset,
+                count=shape.num_elements(),
+            )
+        else:
+            var index = 0
+            var index_iterator = IndexIterator(
+                shape=Pointer(to=shape),
+                strides=Pointer(to=strides),
+                start_offset=absolute_offset,
+            )
+            ref result_buffer = result.data_buffer()
+            ref src_buffer = self.data_buffer()
+            for idx in index_iterator:
+                result_buffer[index] = src_buffer[idx]
+                index += 1
+        return result^
 
     def transpose(
         mut self,
@@ -2465,9 +2520,7 @@ struct NDBuffer[dtype: DType](
                     ](other.contiguous_buffer())
                 except e:
                     print(e)
-                    panic(
-                        "NDBuffer all_close → to_cpu failed: " + String(e)
-                    )
+                    panic("NDBuffer all_close → to_cpu failed: " + String(e))
                     result = False
             elif self.is_on_cpu() and other.is_on_gpu():
                 try:
@@ -2477,9 +2530,7 @@ struct NDBuffer[dtype: DType](
                     ](cpu_other.contiguous_buffer())
                 except e:
                     print(e)
-                    panic(
-                        "NDBuffer all_close → to_cpu failed: " + String(e)
-                    )
+                    panic("NDBuffer all_close → to_cpu failed: " + String(e))
                     result = False
             else:
                 result = self.contiguous_buffer().all_close[
@@ -2576,9 +2627,45 @@ struct NDBuffer[dtype: DType](
         return False
 
     def matmul_2d(
-        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = True
     ) -> NDBuffer[Self.dtype]:
-        return MmCpu2d[Self.dtype].matmul_2d(A, B)
+        ref A_shape = A.shape
+        ref B_shape = B.shape
+        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
+
+        var C: NDBuffer[Self.dtype]
+
+        comptime if has_accelerator():
+            if A.is_on_gpu() and B.is_on_gpu():
+                try:
+                    C = MatmulNdGpu[Self.dtype].launch[tile_size=TILE_SIZE](
+                        A, B, sync=sync
+                    )
+                except e:
+                    print(e)
+                    panic("NDBuffer matmul_2d → GPU operation failed")
+                    C = NDBuffer[Self.dtype](Shape())  # unreachable
+            elif (A.is_on_gpu() and B.is_on_cpu()) or (
+                A.is_on_cpu() and B.is_on_gpu()
+            ):
+                panic(
+                    (
+                        "NDBuffer matmul_2d → both buffers must be on same"
+                        " device. A on gpu? "
+                    ),
+                    String(A.is_on_gpu()),
+                    ", B on gpu? ",
+                    String(B.is_on_gpu()),
+                )
+                C = NDBuffer[Self.dtype](Shape())  # unreachable
+            else:
+                # CPU path — sync parameter irrelevant, CPU is always synchronous
+                C = MmCpu2d[Self.dtype].tiled_matmul(A, B)
+        else:
+            # No accelerator — CPU path always. sync parameter ignored.
+            C = MmCpu2d[Self.dtype].tiled_matmul(A, B)
+
+        return C^
 
     def matmul_nd(
         A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = True
@@ -2632,209 +2719,8 @@ struct NDBuffer[dtype: DType](
                 C = NDBuffer[Self.dtype](Shape())
 
             else:
-                C = A.matmul_nd_cpu(B)
+                C = MmCpuNd[Self.dtype].tiled_matmul(A, B)
         else:
-            C = A.matmul_nd_cpu(B)
+            C = MmCpuNd[Self.dtype].tiled_matmul(A, B)
 
         return C^
-
-    def matmul_nd_cpu(
-        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
-    ) -> NDBuffer[Self.dtype]:
-        var A_shape = A.shape
-        var B_shape = B.shape
-
-        # ── Validate inner dims ───────────────────────────────────────────────────
-        var A_rank = A_shape.rank()
-        var B_rank = B_shape.rank()
-
-        var m = A_shape[A_rank - 2]
-        var k_A = A_shape[A_rank - 1]
-        var k_B = B_shape[B_rank - 2]
-        var p = B_shape[B_rank - 1]
-
-        if k_A != k_B:
-            panic(
-                "NDBuffer → matmul_nd: inner dims must match, got "
-                + String(k_A)
-                + " and "
-                + String(k_B)
-            )
-
-        comptime tile_size = TILE_SIZE
-        comptime simdwidth = simd_width_of[Self.dtype]()
-
-        var k = k_A
-
-        # ── Batch shapes and broadcasting ─────────────────────────────────────────
-        var A_batch_shape = A_shape[:-2]
-        var B_batch_shape = B_shape[:-2]
-
-        if not ShapeBroadcaster.broadcastable(A_batch_shape, B_batch_shape):
-            panic(
-                "NDBuffer → matmul_nd: batch shapes not broadcastable: "
-                + String(A_batch_shape)
-                + " vs "
-                + String(B_batch_shape)
-            )
-
-        var batch_shape = ShapeBroadcaster.broadcast_shape(
-            A_batch_shape, B_batch_shape
-        )
-        var total_batch = batch_shape.product()
-        if total_batch == 0:
-            total_batch = 1
-
-        # ── Output ────────────────────────────────────────────────────────────────
-        var out_shape = batch_shape + Shape(m, p)
-        var C = NDBuffer[Self.dtype].zeros(out_shape)
-
-        # ── Hoist metadata ────────────────────────────────────────────────────────
-        var A_batch_rank = A_batch_shape.rank()
-        var B_batch_rank = B_batch_shape.rank()
-        var batch_rank = batch_shape.rank()
-
-        var A_batch_strides = A.strides[:-2]
-        var B_batch_strides = B.strides[:-2]
-
-        var A_row_stride = A.strides[A_rank - 2]
-        var A_col_stride = A.strides[A_rank - 1]
-        var B_row_stride = B.strides[B_rank - 2]
-        var B_col_stride = B.strides[B_rank - 1]
-
-        var A_offset = A.offset
-        var B_offset = B.offset
-
-        var A_data = A.data_ptr()
-        var B_data = B.data_ptr()
-        var C_data = C.data_ptr()
-        # C is always contiguous, offset 0
-        # C strides: batch dims row-major, then (p, 1) for inner dims
-
-        var B_contiguous = B.is_contiguous()
-
-        # ── Parallelise over batch × m tiles ──────────────────────────────────────
-        var num_tiles_i = (m + tile_size - 1) // tile_size
-        var total_tiles = total_batch * num_tiles_i
-
-        @parameter
-        def process_tile(flat_idx: Int):
-            var batch = flat_idx // num_tiles_i
-            var tile_idx = flat_idx % num_tiles_i
-
-            # ── Recover batch coords and compute A/B base offsets ─────────────────
-            var A_base_off = A_offset
-            var B_base_off = B_offset
-
-            if batch_rank > 0:
-                var coords = List[Int](capacity=batch_rank)
-                for _ in range(batch_rank):
-                    coords.append(0)
-                var remaining = batch
-                for dim in reversed(range(batch_rank)):
-                    coords[dim] = remaining % batch_shape[dim]
-                    remaining //= batch_shape[dim]
-
-                # Right-aligned broadcast clamping for A
-                var A_rank_off = batch_rank - A_batch_rank
-                for i in range(A_batch_rank):
-                    var coord = (
-                        coords[A_rank_off + i] if A_batch_shape[i] > 1 else 0
-                    )
-                    A_base_off += coord * A_batch_strides[i]
-
-                # Right-aligned broadcast clamping for B
-                var B_rank_off = batch_rank - B_batch_rank
-                for i in range(B_batch_rank):
-                    var coord = (
-                        coords[B_rank_off + i] if B_batch_shape[i] > 1 else 0
-                    )
-                    B_base_off += coord * B_batch_strides[i]
-
-            # C base offset for this batch — C is contiguous row-major
-            var C_base_off = batch * m * p
-
-            # ── Tiled matmul for this batch slice ─────────────────────────────────
-            var i_tile = tile_idx * tile_size
-            var i_end = min(i_tile + tile_size, m)
-
-            if B_contiguous:
-                for j_tile in range(0, p, tile_size):
-                    for k_tile in range(0, k, tile_size):
-                        var j_end = min(j_tile + tile_size, p)
-                        var k_end = min(k_tile + tile_size, k)
-
-                        for i in range(i_tile, i_end):
-                            var a_row_base = A_base_off + i * A_row_stride
-                            var c_row_base = C_base_off + i * p
-
-                            var j = j_tile
-
-                            # Vectorised loop
-                            while j + simdwidth <= j_end:
-                                var c_addr = c_row_base + j
-                                var accumulator = C_data.load[width=simdwidth](
-                                    c_addr
-                                )
-
-                                for kk in range(k_tile, k_end):
-                                    var a_addr = a_row_base + kk * A_col_stride
-                                    var a_ik = A_data[a_addr]
-                                    var b_addr = (
-                                        B_base_off
-                                        + kk * B_row_stride
-                                        + j * B_col_stride
-                                    )
-                                    var b_vec = B_data.load[width=simdwidth](
-                                        b_addr
-                                    )
-                                    accumulator += a_ik * b_vec
-
-                                C_data.store[width=simdwidth](
-                                    c_addr, accumulator
-                                )
-                                j += simdwidth
-
-                            # Tail
-                            while j < j_end:
-                                var c_addr = c_row_base + j
-                                var accumulator = C_data[c_addr]
-
-                                for kk in range(k_tile, k_end):
-                                    var a_addr = a_row_base + kk * A_col_stride
-                                    var b_addr = (
-                                        B_base_off
-                                        + kk * B_row_stride
-                                        + j * B_col_stride
-                                    )
-                                    accumulator += (
-                                        A_data[a_addr] * B_data[b_addr]
-                                    )
-
-                                C_data[c_addr] = accumulator
-                                j += 1
-
-            else:
-                # Non-contiguous B — scalar path
-                for i in range(i_tile, i_end):
-                    var a_row_base = A_base_off + i * A_row_stride
-                    var c_row_base = C_base_off + i * p
-
-                    for j in range(p):
-                        var accumulator = Scalar[Self.dtype](0)
-
-                        for kk in range(k):
-                            var a_addr = a_row_base + kk * A_col_stride
-                            var b_addr = (
-                                B_base_off
-                                + kk * B_row_stride
-                                + j * B_col_stride
-                            )
-                            accumulator += A_data[a_addr] * B_data[b_addr]
-
-                        C_data[c_row_base + j] = accumulator
-
-        parallelize[process_tile](total_tiles, num_physical_cores())
-
-        return C^
-

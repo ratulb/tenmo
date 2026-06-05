@@ -16,7 +16,7 @@ def test_expand_1d_to_2d_new_batch_dim() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)  # shape (3,)
     var e = a.expand(4, 3)  # shape (4,3)
-    assert_true(e.shape() == Shape.of(4, 3))
+    assert_true(e.shape() == Shape(4, 3))
     # Every row is [1, 2, 3]
     var expected = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]
@@ -32,7 +32,7 @@ def test_expand_1d_to_3d() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)  # shape (2,)
     var e = a.expand(3, 4, 2)  # shape (3,4,2)
-    assert_true(e.shape() == Shape.of(3, 4, 2))
+    assert_true(e.shape() == Shape(3, 4, 2))
     # All slices identical
     var e_cpu = e.sum(axes=[0, 1])  # shape (2,)
     assert_true(e_cpu.all_close(Tensor[dtype].d1([12.0, 24.0])))
@@ -53,7 +53,7 @@ def test_expand_2d_row_vector_to_matrix() raises:
         [[1.0, 2.0, 3.0]], requires_grad=True
     )  # shape (1,3)
     var e = a.expand(4, 3)  # shape (4,3)
-    assert_true(e.shape() == Shape.of(4, 3))
+    assert_true(e.shape() == Shape(4, 3))
     var expected = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]
     )
@@ -70,7 +70,7 @@ def test_expand_2d_col_vector_to_matrix() raises:
         [[1.0], [2.0], [3.0]], requires_grad=True
     )  # shape (3,1)
     var e = a.expand(3, 4)  # shape (3,4)
-    assert_true(e.shape() == Shape.of(3, 4))
+    assert_true(e.shape() == Shape(3, 4))
     var expected = Tensor[dtype].d2(
         [[1.0, 1.0, 1.0, 1.0], [2.0, 2.0, 2.0, 2.0], [3.0, 3.0, 3.0, 3.0]]
     )
@@ -85,9 +85,9 @@ def test_expand_2d_both_dims_size1() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[5.0]], requires_grad=True)  # shape (1,1)
     var e = a.expand(3, 4)  # shape (3,4)
-    assert_true(e.shape() == Shape.of(3, 4))
+    assert_true(e.shape() == Shape(3, 4))
     # All 12 elements equal 5.0
-    assert_true(e.all_close(Tensor[dtype].full(Shape.of(3, 4), 5.0)))
+    assert_true(e.all_close(Tensor[dtype].full(Shape(3, 4), 5.0)))
     es = e.sum()
     es.backward()
     # broadcast count = 12
@@ -100,7 +100,7 @@ def test_expand_2d_no_op_same_shape() raises:
         [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
     )  # (2,2)
     var e = a.expand(2, 2)  # no-op
-    assert_true(e.shape() == Shape.of(2, 2))
+    assert_true(e.shape() == Shape(2, 2))
     assert_true(e.all_close(a))
     es = e.sum()
     es.backward()
@@ -119,7 +119,7 @@ def test_expand_3d_first_dim() raises:
         [[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True
     )  # (1,2,2)
     var e = a.expand(5, 2, 2)  # (5,2,2)
-    assert_true(e.shape() == Shape.of(5, 2, 2))
+    assert_true(e.shape() == Shape(5, 2, 2))
     # Sum over expanded dim should give 5x original values
     var s = e.sum(axes=[0])  # (2,2)
     assert_true(s.all_close(Tensor[dtype].d2([[5.0, 10.0], [15.0, 20.0]])))
@@ -137,7 +137,7 @@ def test_expand_3d_last_dim() raises:
         [[[1.0], [2.0]], [[3.0], [4.0]]], requires_grad=True
     )  # (2,2,1)
     var e = a.expand(2, 2, 6)  # (2,2,6)
-    assert_true(e.shape() == Shape.of(2, 2, 6))
+    assert_true(e.shape() == Shape(2, 2, 6))
     # Each slice should repeat 6 times
     var s = e.sum(axes=[-1])  # (2,2)
     assert_true(s.all_close(Tensor[dtype].d2([[6.0, 12.0], [18.0, 24.0]])))
@@ -154,7 +154,7 @@ def test_expand_3d_middle_dim() raises:
         [[[1.0, 2.0]], [[3.0, 4.0]]], requires_grad=True
     )  # (2,1,2)
     var e = a.expand(2, 5, 2)  # (2,5,2)
-    assert_true(e.shape() == Shape.of(2, 5, 2))
+    assert_true(e.shape() == Shape(2, 5, 2))
     var s = e.sum(axes=[1])  # (2,2)
     assert_true(s.all_close(Tensor[dtype].d2([[5.0, 10.0], [15.0, 20.0]])))
     es = e.sum()
@@ -168,7 +168,7 @@ def test_expand_3d_two_dims_broadcast() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3([[[1.0, 2.0]]], requires_grad=True)  # (1,1,2)
     var e = a.expand(3, 4, 2)  # (3,4,2)
-    assert_true(e.shape() == Shape.of(3, 4, 2))
+    assert_true(e.shape() == Shape(3, 4, 2))
     # col sums: 1*12=12, 2*12=24
     var s = e.sum(axes=[0, 1])  # (2,)
     assert_true(s.all_close(Tensor[dtype].d1([12.0, 24.0])))
@@ -182,8 +182,8 @@ def test_expand_3d_all_dims_size1() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3([[[7.0]]], requires_grad=True)  # (1,1,1)
     var e = a.expand(2, 3, 4)  # (2,3,4)
-    assert_true(e.shape() == Shape.of(2, 3, 4))
-    assert_true(e.all_close(Tensor[dtype].full(Shape.of(2, 3, 4), 7.0)))
+    assert_true(e.shape() == Shape(2, 3, 4))
+    assert_true(e.all_close(Tensor[dtype].full(Shape(2, 3, 4), 7.0)))
     es = e.sum()
     es.backward()
     assert_true(a.grad().all_close(Tensor[dtype].d3([[[24.0]]])))
@@ -197,8 +197,8 @@ def test_expand_3d_all_dims_size1() raises:
 def test_expand_shape_api_overload() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)  # (1,2)
-    var e = a.expand(Shape.of(3, 2))  # (3,2)
-    assert_true(e.shape() == Shape.of(3, 2))
+    var e = a.expand(Shape(3, 2))  # (3,2)
+    assert_true(e.shape() == Shape(3, 2))
     var expected = Tensor[dtype].d2([[1.0, 2.0], [1.0, 2.0], [1.0, 2.0]])
     assert_true(e.all_close(expected))
     es = e.sum()
@@ -219,7 +219,7 @@ def test_expand_grad_non_uniform_values() raises:
     # Expand to (2,3,2): prepend batch of 3, no size-1 dim needed — use unsqueeze pattern
     var a_unsqueezed = a.unsqueeze(0)  # (1,2,2) — no grad
     var e = a_unsqueezed.expand(3, 2, 2)  # (3,2,2)
-    assert_true(e.shape() == Shape.of(3, 2, 2))
+    assert_true(e.shape() == Shape(3, 2, 2))
     es = e.sum()
     es.backward()
     # a_unsqueezed was broadcast 3 times, grad flows to a
@@ -285,7 +285,7 @@ def test_expand_bias_broadcast_pattern() raises:
     # Common pattern: bias (1, out) expanded to match batch output (B, out)
     var bias = Tensor[dtype].d2([[0.5, 1.0, 1.5]], requires_grad=True)  # (1,3)
     var e = bias.expand(6, 3)  # (6,3)
-    assert_true(e.shape() == Shape.of(6, 3))
+    assert_true(e.shape() == Shape(6, 3))
     # All rows should equal bias
     var row_sum = e.sum(axes=[0])  # (3,) each col summed = 6 * bias_val
     assert_true(row_sum.all_close(Tensor[dtype].d1([3.0, 6.0, 9.0])))
@@ -321,7 +321,7 @@ def test_expand_no_grad_tracking() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)
     var e = a.expand[track_grad=False](4, 2)
-    assert_true(e.shape() == Shape.of(4, 2))
+    assert_true(e.shape() == Shape(4, 2))
     assert_true(not e.requires_grad)
 
 
@@ -337,7 +337,7 @@ def test_expand_4d_first_two_dims() raises:
     a.requires_grad_(True)
     var a_ref = a.copy()
     var e = a.expand(2, 5, 3, 4)
-    assert_true(e.shape() == Shape.of(2, 5, 3, 4))
+    assert_true(e.shape() == Shape(2, 5, 3, 4))
     # sum over broadcast dims should equal 10 * original
     var s = e.sum(axes=[0, 1])  # (3,4)
     var s_ref1 = a_ref.squeeze([0])
@@ -347,9 +347,7 @@ def test_expand_4d_first_two_dims() raises:
     es = e.sum()
     es.backward()
     # broadcast count = 2*5 = 10
-    assert_true(
-        a.grad().all_close(Tensor[dtype].full(Shape.of(1, 1, 3, 4), 10.0))
-    )
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(1, 1, 3, 4), 10.0)))
 
 
 def test_expand_4d_last_dim_only() raises:
@@ -358,13 +356,11 @@ def test_expand_4d_last_dim_only() raises:
     var a = Tensor[dtype].randn(2, 3, 4, 1)
     a.requires_grad_(True)
     var e = a.expand(2, 3, 4, 7)
-    assert_true(e.shape() == Shape.of(2, 3, 4, 7))
+    assert_true(e.shape() == Shape(2, 3, 4, 7))
     es = e.sum()
     es.backward()
     # each element broadcast 7 times
-    assert_true(
-        a.grad().all_close(Tensor[dtype].full(Shape.of(2, 3, 4, 1), 7.0))
-    )
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 3, 4, 1), 7.0)))
 
 
 # ------------------------------------------------------------

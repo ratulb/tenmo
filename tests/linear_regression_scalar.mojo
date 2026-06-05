@@ -1,10 +1,10 @@
-from tensors import Tensor
+from tenmo.tensor import Tensor
 
 
 def main() raises:
     # Training data (x: inputs, y: targets)
-    var x = Tensor.of(1.0, 2.0, 3.0, 4.0)
-    var y = Tensor.of(5.0, 7.0, 9.0, 11.0)  # y = 2x + 3
+    var x = Tensor[DType.float64].d1([1.0, 2.0, 3.0, 4.0])
+    var y = Tensor[DType.float64].d1([5.0, 7.0, 9.0, 11.0])  # y = 2x + 3
 
     # Parameters to learn (initialized arbitrarily)
     var w = Tensor.scalar(0.955, requires_grad=True)

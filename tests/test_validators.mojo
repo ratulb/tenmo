@@ -221,7 +221,7 @@ def test_validate_new_shape() raises:
         curr_dims, new_dims
     )
     assert_true(
-        concrete_shape == Shape.of(2, 3, 10),
+        concrete_shape == Shape(2, 3, 10),
         "validate_new_shape assertion 1 failed",
     )
     new_dims = IntArray([-1])
@@ -229,7 +229,7 @@ def test_validate_new_shape() raises:
         curr_dims, new_dims
     )
     assert_true(
-        concrete_shape == Shape.of(60), "validate_new_shape assertion 2 failed"
+        concrete_shape == Shape(60), "validate_new_shape assertion 2 failed"
     )
 
 

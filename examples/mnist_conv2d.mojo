@@ -10,7 +10,7 @@ from tenmo.forwards import MaxPool2d
 from tenmo.crossentropy import CrossEntropyLoss
 from std.python import Python
 from tenmo.numpy_interop import from_ndarray, numpy_dtype
-from tenmo.dataloader import NumpyDataset
+from tenmo.dataloader import NumpyDataset, MNIST_MEAN, MNIST_STD
 from tenmo.forwards import Padding
 from tenmo.common_utils import now
 
@@ -69,10 +69,18 @@ def train_mnist() raises:
     var test_dataset = NumpyDataset[dtype, label_dtype](X_test, y_test)
 
     var train_loader = train_dataset.into_loader(
-        batch_size=train_batch_size, shuffle=True, drop_last=False
+        batch_size=train_batch_size,
+        shuffle=True,
+        drop_last=False,
+        normalize_mean=Float32(MNIST_MEAN),
+        normalize_std=Float32(MNIST_STD),
     )
     var test_loader = test_dataset.into_loader(
-        batch_size=test_batch_size, shuffle=False, drop_last=False
+        batch_size=test_batch_size,
+        shuffle=False,
+        drop_last=False,
+        normalize_mean=Float32(MNIST_MEAN),
+        normalize_std=Float32(MNIST_STD),
     )
 
     print("DataLoaders:")

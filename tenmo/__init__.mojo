@@ -34,7 +34,7 @@ from tenmo.shapes import Shape
 def main() raises:
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var a_gpu = a.to_gpu()
-    var b_gpu = Tensor.full(Shape.of(2, 2), 2.0).to_gpu()
+    var b_gpu = Tensor.full(Shape(2, 2), 2.0).to_gpu()
     var c_gpu = a_gpu * b_gpu
     var loss = c_gpu.sum()
     loss.backward()
@@ -105,7 +105,7 @@ from .indexhelper import *
 
 from .logarithm import *
 from .matmul import *
-from .matmul_cpu2d import MmCpu2d
+from .matmul_cpu import MmCpu2d, MmCpuNd
 from .kernels.matmul_kernel import *
 from .matrixshapevalidator import *
 from .matrixvector import *
