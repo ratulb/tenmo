@@ -56,7 +56,7 @@ struct Exponentiator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         self: Tensor[Self.dtype],
         exponent: Scalar[Self.dtype],
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         """
         Element-wise x ** exponent.

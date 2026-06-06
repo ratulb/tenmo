@@ -23,7 +23,7 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         A: NDBuffer[Self.dtype],
         axis: Int,
         keepdims: Bool = False,
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[DType.int32]:
         var shape = A.shape
         var rank = shape.rank()

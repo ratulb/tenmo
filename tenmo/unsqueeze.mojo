@@ -36,7 +36,7 @@ struct Unsqueeze[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         mut tensor: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         if len(axes) == 0:
             return tensor.copy()

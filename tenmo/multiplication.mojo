@@ -95,7 +95,7 @@ struct MultiplyScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], factor: Scalar[Self.dtype], sync: Bool = True) -> Tensor[
+    ](self: Tensor[Self.dtype], factor: Scalar[Self.dtype], sync: Bool = False) -> Tensor[
         Self.dtype
     ]:
         var out: Tensor[Self.dtype] = Tensor[Self.dtype](
@@ -119,7 +119,7 @@ struct Multiplicator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype], sync: Bool = True) -> Tensor[
+    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype], sync: Bool = False) -> Tensor[
         Self.dtype
     ]:
         if not self.broadcastable(other):
@@ -162,7 +162,7 @@ struct Multiplicator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     def forward(
-        self: Tensor[Self.dtype], other: Gradbox[Self.dtype], sync: Bool = True
+        self: Tensor[Self.dtype], other: Gradbox[Self.dtype], sync: Bool = False
     ) -> Gradbox[Self.dtype]:
         var nd_buffer = self.buffer.arithmetic_ops[Multiply](other.buffer(), sync=sync)
         return Gradbox[Self.dtype](nd_buffer^)

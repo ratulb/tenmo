@@ -116,7 +116,7 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         keepdims: Bool = False,
         unbiased: Bool = True,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         # Normalize negative axis — but never touch the -100 sentinel
         var normalized_axis = axis
@@ -177,7 +177,7 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         x: NDBuffer[Self.dtype],
         mean: NDBuffer[Self.dtype],
         scale: Scalar[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> NDBuffer[Self.dtype]:
         comptime if has_accelerator():
             if x.is_on_gpu():
@@ -222,7 +222,7 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         x: NDBuffer[Self.dtype],
         mean: NDBuffer[Self.dtype],
         denom: NDBuffer[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> NDBuffer[Self.dtype]:
         comptime if has_accelerator():
             if x.is_on_gpu():

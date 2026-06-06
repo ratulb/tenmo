@@ -37,7 +37,7 @@ struct Transpose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         mut self: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         var transposed_ndb = self.buffer.transpose(axes, shared=True)
         var out = Tensor[Self.dtype](transposed_ndb^, requires_grad=False)

@@ -49,7 +49,7 @@ struct Contiguous[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ](
         self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         var ndb = self.buffer.contiguous()
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)

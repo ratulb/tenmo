@@ -45,7 +45,7 @@ struct SoftmaxNdBuffer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ndb: NDBuffer[Self.dtype],
         normalized_axes: IntArray,
         keepdims: Bool = False,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         comptime if has_accelerator():
             if ndb.is_on_gpu():
@@ -184,7 +184,7 @@ struct Softmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         this: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var shape = this.shape()
 
@@ -228,7 +228,7 @@ struct LogSoftmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         this: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var shape = this.shape()
 

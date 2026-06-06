@@ -50,7 +50,7 @@ struct Permute[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         mut self: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         # NDBuffer.permute(shared=True) handles validation + view creation
         # GPU safe — just reorders shape/strides metadata, no data movement

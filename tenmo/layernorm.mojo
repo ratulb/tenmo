@@ -58,7 +58,7 @@ struct LayerNormCpu[dtype: DType](ImplicitlyCopyable & Movable):
         gamma: NDBuffer[Self.dtype],
         beta: NDBuffer[Self.dtype],
         eps: Scalar[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ]:

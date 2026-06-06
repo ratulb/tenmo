@@ -43,7 +43,7 @@ struct Logarithm[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ](
         self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var result_ndb = self.buffer.log[epsilon]()
         var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)

@@ -38,7 +38,7 @@ struct Expand[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         mut tensor: Tensor[Self.dtype],
         target_shape: Shape,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         curr_shape = tensor.shape()
         shape_expanded = ShapeBroadcaster.broadcast_shape(

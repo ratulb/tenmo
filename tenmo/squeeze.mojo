@@ -45,7 +45,7 @@ struct Squeeze[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         mut tensor: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         var shape = tensor.shape()
         if shape.count_axes_of_size(1) == 0:

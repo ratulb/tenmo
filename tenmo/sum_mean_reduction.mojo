@@ -32,7 +32,7 @@ struct SumMeanReduction[dtype: DType]:
         ndb: NDBuffer[Self.dtype],
         normalized_axes: IntArray,
         keepdims: Bool = False,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> NDBuffer[Self.dtype]:
         """Sum / mean reduction. Axes must be already normalized.
         op_code: SUM or MEAN."""

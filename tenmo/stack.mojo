@@ -99,7 +99,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         tensors: List[Tensor[Self.dtype]],
         axis: Int = 0,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         """
         Stack tensors along a new axis.
@@ -176,7 +176,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ](
         tensors: List[Tensor[Self.dtype]],
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         """
         Stack tensors vertically (row-wise).
@@ -247,7 +247,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ](
         tensors: List[Tensor[Self.dtype]],
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         """
         Stack tensors horizontally (column-wise).

@@ -68,7 +68,7 @@ struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         normalized_axes = Validator.validate_and_normalize_axes(
             tensor.shape(), axes

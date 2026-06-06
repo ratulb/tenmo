@@ -18,7 +18,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
-        sync: Bool = True,
+        sync: Bool = False,
     ):
         ref bwd_fn_arg = output.ancestry().backward_fn_arg().get[ShuffleArg]()
         var axis = bwd_fn_arg.axis
@@ -75,7 +75,7 @@ struct Shuffle[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         perm: List[Int],  # permutation, length == axis length/span/spread
         axis: Int = 0,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         var shape = self.shape()
         var axis_length = shape[axis]

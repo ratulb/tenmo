@@ -155,7 +155,7 @@ struct Broadcast[dtype: DType](Copyable, RegisterPassable):
         self: Tensor[Self.dtype],
         target_shape: Shape,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         var broadcasted_buffer = self.buffer.broadcast_to(target_shape)
         var out = Tensor[Self.dtype](broadcasted_buffer^, requires_grad=False)

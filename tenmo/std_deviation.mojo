@@ -130,7 +130,7 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         keepdims: Bool = False,
         unbiased: Bool = True,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         # Normalize negative axis — sentinel -100 flows through unchanged
         var normalized_axis = axis

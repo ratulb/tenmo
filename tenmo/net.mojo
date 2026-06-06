@@ -628,9 +628,9 @@ struct ReLU[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
     def __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         if self.training:
-            return x.relu[track_grad=True]()
+            return x.relu[track_grad=True](sync=False)
         else:
-            return x.relu[track_grad=False]()
+            return x.relu[track_grad=False](sync=False)
 
     def parameters(
         ref self,
@@ -677,9 +677,9 @@ struct Sigmoid[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self, x: Tensor[Self.dtype]
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
-            return x.sigmoid[track_grad=True]()
+            return x.sigmoid[track_grad=True](sync=False)
         else:
-            return x.sigmoid[track_grad=False]()
+            return x.sigmoid[track_grad=False](sync=False)
 
     def parameters(
         ref self,
@@ -726,9 +726,9 @@ struct Tanh[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self, x: Tensor[Self.dtype]
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
-            return x.tanh[track_grad=True]()
+            return x.tanh[track_grad=True](sync=False)
         else:
-            return x.tanh[track_grad=False]()
+            return x.tanh[track_grad=False](sync=False)
 
     def parameters(
         ref self,

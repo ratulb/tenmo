@@ -303,7 +303,7 @@ struct Product[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         """Compute product reduction along axes.
 
