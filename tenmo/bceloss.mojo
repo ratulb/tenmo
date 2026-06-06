@@ -561,7 +561,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         logits: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -638,7 +638,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
         is_mean: Bool,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -724,7 +724,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         pred: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -799,7 +799,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
         is_mean: Bool,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -880,7 +880,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         sigmoid: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         grad_output: NDBuffer[Self.dtype],
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Fused BCEWithLogits backward. Returns gradient for logits.
 
@@ -954,7 +954,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         sigmoid: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         scalar_grad: Scalar[Self.dtype],
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Fused BCEWithLogits backward with scalar gradient.
 
@@ -1019,7 +1019,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         safe: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         grad_output: NDBuffer[Self.dtype],
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Fused BCELoss backward. Returns gradient for pred.
 
@@ -1086,7 +1086,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         safe: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         scalar_grad: Scalar[Self.dtype],
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         """Fused BCELoss backward with scalar gradient.
 
@@ -1172,7 +1172,7 @@ struct BCEWithLogitsLoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
         target: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
         reduction: Reduction = Reduction("mean"),
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
 
         var numels = logits.numels()
@@ -1244,7 +1244,7 @@ struct BCELoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
         target: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
         reduction: Reduction = Reduction("mean"),
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var numels = pred.numels()
         var out: Tensor[Self.dtype]

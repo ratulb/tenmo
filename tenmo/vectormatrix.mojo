@@ -340,7 +340,7 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
-    ](v: Tensor[Self.dtype], M: Tensor[Self.dtype], sync: Bool = False) -> Tensor[Self.dtype]:
+    ](v: Tensor[Self.dtype], M: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         var out: NDBuffer[Self.dtype]
 
         comptime if has_accelerator():

@@ -483,7 +483,7 @@ struct CEClassIndicesForward[dtype: DType](
         ignore_index: Int,
         label_smoothing: Scalar[Self.dtype],
         validate: Bool,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var logits_shape = logits.shape()
         var C = logits_shape[1]
@@ -685,7 +685,7 @@ struct CEProbabilitiesForward[dtype: DType](
         ignore_index: Int,
         label_smoothing: Scalar[Self.dtype],
         validate: Bool,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var logits_shape = logits.shape()
 
@@ -828,7 +828,7 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         logits: Tensor[Self.dtype],
         target: Tensor[DType.int32],
         validate: Bool = True,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """Class index targets."""
         if self.training:
@@ -857,7 +857,7 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         logits: Tensor[Self.dtype],
         target: Tensor[Self.dtype],
         validate: Bool = True,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """Probability targets."""
         if self.training:

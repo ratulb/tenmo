@@ -68,7 +68,7 @@ struct SubtractScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = False) -> Tensor[
+    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) -> Tensor[
         Self.dtype
     ]:
         var out = Tensor[Self.dtype](
@@ -91,7 +91,7 @@ struct SubtractFromScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = False) -> Tensor[
+    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) -> Tensor[
         Self.dtype
     ]:
         var out = Tensor[Self.dtype](
@@ -114,7 +114,7 @@ struct Subtractor[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype], sync: Bool = False) -> Tensor[
+    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype], sync: Bool = True) -> Tensor[
         Self.dtype
     ]:
         if not self.broadcastable(other):
@@ -172,7 +172,7 @@ struct Subtractor[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     def forward(
-        self: Tensor[Self.dtype], other: Gradbox[Self.dtype], sync: Bool = False
+        self: Tensor[Self.dtype], other: Gradbox[Self.dtype], sync: Bool = True
     ) -> Tensor[Self.dtype]:
         if self.shape() != other.shape():
             panic(

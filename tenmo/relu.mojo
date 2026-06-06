@@ -54,7 +54,7 @@ struct ReLU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ](
         self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Apply ReLU activation: max(0, x).
 

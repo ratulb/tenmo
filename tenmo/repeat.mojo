@@ -13,7 +13,7 @@ struct Repeat[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         mut self: Tensor[Self.dtype],
         repeat: IntArray,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         if len(repeat) < self.rank():
             panic(

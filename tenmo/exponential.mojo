@@ -36,7 +36,7 @@ struct Exponential[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ](
         tensor: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var ndb = tensor.buffer.exp()
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)

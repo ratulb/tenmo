@@ -67,7 +67,7 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var shape = self.shape()
         var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
@@ -101,7 +101,7 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         axes: IntArray,
         keepdims: Bool = False,
         paired: Bool = False,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         ref shape = ndb.shape
         var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)

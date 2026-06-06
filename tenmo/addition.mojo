@@ -48,7 +48,7 @@ struct AddScalar[dtype: DType](Copyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = False) -> Tensor[
+    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) -> Tensor[
         Self.dtype
     ]:
         var out = Tensor[Self.dtype](
@@ -72,7 +72,7 @@ struct Adder[dtype: DType](Copyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype], sync: Bool = False) -> Tensor[
+    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype], sync: Bool = True) -> Tensor[
         Self.dtype
     ]:
         if not self.broadcastable(other):

@@ -110,7 +110,7 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self.seed = copy.seed
         self.fixed_seed = copy.fixed_seed
 
-    def __call__(self, x: Tensor[Self.dtype], sync: Bool = False) -> Tensor[Self.dtype]:
+    def __call__(self, x: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         # ── Eval / no-op paths ────────────────────────────────────────────────
         if not self.training or self.p == Scalar[Self.dtype](0.0):
             return x

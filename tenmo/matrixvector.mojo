@@ -288,7 +288,7 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
-    ](M: Tensor[Self.dtype], v: Tensor[Self.dtype], sync: Bool = False) -> Tensor[Self.dtype]:
+    ](M: Tensor[Self.dtype], v: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         _ = """var M_shape = M.shape()
         var v_shape = v.shape()
 

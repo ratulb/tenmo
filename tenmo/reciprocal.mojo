@@ -16,7 +16,7 @@ struct Reciprocal[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ](
         self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         # out = 1/x
         var out_ndb = self.buffer.scalar_ops[ReverseDivide](

@@ -80,7 +80,7 @@ struct Clip[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         min_val: Scalar[Self.dtype],
         max_val: Scalar[Self.dtype],
         requires_grad: Optional[Bool] = None,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Clip values: y = clamp(x, min, max)."""
         var shape = self.shape()

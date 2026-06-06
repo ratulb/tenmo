@@ -116,7 +116,7 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         reduction: Reduction = Reduction(2),
         padding_idx: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Gather slices along `axis` at the given indices.
 
@@ -251,7 +251,7 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         reduction: Reduction = Reduction(2),
         padding_idx: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Gather with multi-dimensional indices.
         Output shape: (*indices.shape(), *self.shape()[1:]) for axis=0.
@@ -391,7 +391,7 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         normalized: IntArray,
         reduction: Reduction,
         indices_shape: IntArray = IntArray(),
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Gather + optional reduce, single dispatch.
 

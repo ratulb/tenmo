@@ -146,7 +146,7 @@ struct DivNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         grad_output: NDBuffer[Self.dtype],
         divisor: NDBuffer[Self.dtype],
         scalar: Scalar[Self.dtype],
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype]:
         """Fused backward for s / x. Returns gradient for divisor.
         Device-aware: GPU → DivisionKernel.launch_rdiv_scalar_backward.
@@ -208,7 +208,7 @@ struct DivNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         grad_output: NDBuffer[Self.dtype],
         x: NDBuffer[Self.dtype],
         y: NDBuffer[Self.dtype],
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         """Fused backward for x / y. Returns (grad_x, grad_y).
         Device-aware: GPU → DivisionKernel.launch_divide_backward.
@@ -389,7 +389,7 @@ struct DivideScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = False) -> Tensor[
+    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) -> Tensor[
         Self.dtype
     ]:
         comptime assert (
@@ -417,7 +417,7 @@ struct DivideByScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = False) -> Tensor[
+    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) -> Tensor[
         Self.dtype
     ]:
         comptime assert (
@@ -448,7 +448,7 @@ struct Divider[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype], sync: Bool = False) -> Tensor[
+    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype], sync: Bool = True) -> Tensor[
         Self.dtype
     ]:
         if not self.broadcastable(other):

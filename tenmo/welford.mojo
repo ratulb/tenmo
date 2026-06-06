@@ -33,7 +33,7 @@ struct Welford[dtype: DType]:
         axes: IntArray,
         unbiased: Bool,
         keepdims: Bool,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         comptime if has_accelerator():
             if ndb.is_on_gpu():
@@ -56,7 +56,7 @@ struct Welford[dtype: DType]:
         axes: IntArray,
         unbiased: Bool,
         keepdims: Bool,
-        sync: Bool = False,
+        sync: Bool = True,
     ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         var (mean_ndb, M2_ndb) = Reduction[Self.dtype].launch_welford(
             ndb, axes, keepdims, sync=False

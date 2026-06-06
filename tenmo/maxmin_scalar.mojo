@@ -109,7 +109,7 @@ struct MaxScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         self: Tensor[Self.dtype],
         scalar: Scalar[Self.dtype],
         requires_grad: Optional[Bool] = None,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var out = Tensor[Self.dtype](
             self.buffer.scalar_ops[MAX](scalar), requires_grad=False
@@ -137,7 +137,7 @@ struct MinScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         self: Tensor[Self.dtype],
         scalar: Scalar[Self.dtype],
         requires_grad: Optional[Bool] = None,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var out = Tensor[Self.dtype](
             self.buffer.scalar_ops[MIN](scalar), requires_grad=False

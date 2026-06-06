@@ -57,7 +57,7 @@ struct Dot[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](lhs: Tensor[Self.dtype], rhs: Tensor[Self.dtype], sync: Bool = False) -> Tensor[Self.dtype]:
+    ](lhs: Tensor[Self.dtype], rhs: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         # ── Broadcast scalar → vector if needed ──────────────────────────────
         # A scalar tensor (rank=0 or numels=1) is broadcast to match the other.
         # broadcast_to wires grad correctly so chain rule is preserved.

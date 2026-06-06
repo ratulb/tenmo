@@ -40,7 +40,7 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         target: NDBuffer[Self.dtype],
         value: Scalar[Self.dtype],
         indices: VariadicList[Idx, _],
-        sync: Bool = False,
+        sync: Bool = True,
     ):
         try:
             var (
@@ -75,7 +75,7 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         target: NDBuffer[Self.dtype],
         source: NDBuffer[Self.dtype],
         indices: VariadicList[Idx, _],
-        sync: Bool = False,
+        sync: Bool = True,
     ):
         try:
             var (
@@ -117,7 +117,7 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         source: NDBuffer[Self.dtype],  # incoming grad
         indices: IntArray,
         axis: Int = 0,
-        sync: Bool = False,
+        sync: Bool = True,
     ):
         """Scatter-add source into target at given indices along axis.
 

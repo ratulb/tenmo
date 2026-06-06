@@ -279,7 +279,7 @@ struct View[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var abs_offset: Int
         var abs_strides: Strides
@@ -315,7 +315,7 @@ struct View[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         mut tensor: Tensor[Self.dtype],
         *slices: Slice,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var ndb = tensor.buffer.__getitem__(*slices)
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
@@ -341,7 +341,7 @@ struct View[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         mut tensor: Tensor[Self.dtype],
         *indices: Idx,
         requires_grad: Optional[Bool] = None,
-        sync: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var ndb = tensor.buffer.__getitem__(*indices)
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
