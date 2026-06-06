@@ -893,11 +893,11 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                 try:
                     var gpu_target = (
                         target if target.is_on_gpu() else target.to_device(
-                            sigmoid.device()
+                            sigmoid.device(), sync=False
                         )[1]
                     )
                     var gpu_grad = grad_output if grad_output.is_on_gpu() else grad_output.to_device(
-                        sigmoid.device()
+                        sigmoid.device(), sync=False
                     )[
                         1
                     ]
@@ -1032,11 +1032,11 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                 try:
                     var gpu_target = (
                         target if target.is_on_gpu() else target.to_device(
-                            safe.device()
+                            safe.device(), sync=False
                         )[1]
                     )
                     var gpu_grad = grad_output if grad_output.is_on_gpu() else grad_output.to_device(
-                        safe.device()
+                        safe.device(), sync=False
                     )[
                         1
                     ]
@@ -1311,7 +1311,7 @@ struct BCEWithLogitsBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         if bwd_arg.reduction.is_none():
             var grad_ndb = BceNdBuffer[Self.dtype].backward_with_logits(
-                sigmoid, target, gradbox.buffer()
+                sigmoid, target, gradbox.buffer(), sync=False
             )
             var grad_parent = Gradbox[Self.dtype](grad_ndb^)
             parent.update_grad(grad_parent^, AddTensor, None)
@@ -1320,7 +1320,7 @@ struct BCEWithLogitsBackward[dtype: DType](ImplicitlyCopyable & Movable):
             if bwd_arg.reduction.is_mean():
                 multiplier /= Scalar[Self.dtype](bwd_arg.numels)
             var grad_ndb = BceNdBuffer[Self.dtype].backward_with_logits_scaled(
-                sigmoid, target, multiplier
+                sigmoid, target, multiplier, sync=False
             )
             var grad_parent = Gradbox[Self.dtype](grad_ndb^)
             parent.update_grad(grad_parent^, AddTensor, None)
@@ -1347,7 +1347,7 @@ struct BCELossBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         if bwd_arg.reduction.is_none():
             var grad_ndb = BceNdBuffer[Self.dtype].backward(
-                safe, target, gradbox.buffer()
+                safe, target, gradbox.buffer(), sync=False
             )
             var grad_parent = Gradbox[Self.dtype](grad_ndb^)
             parent.update_grad(grad_parent^, AddTensor, None)
@@ -1356,7 +1356,7 @@ struct BCELossBackward[dtype: DType](ImplicitlyCopyable & Movable):
             if bwd_arg.reduction.is_mean():
                 multiplier /= Scalar[Self.dtype](bwd_arg.numels)
             var grad_ndb = BceNdBuffer[Self.dtype].backward_scaled(
-                safe, target, multiplier
+                safe, target, multiplier, sync=False
             )
             var grad_parent = Gradbox[Self.dtype](grad_ndb^)
             parent.update_grad(grad_parent^, AddTensor, None)

@@ -1,5 +1,7 @@
 # AGENTS.md — Tenmo
 
+## ⛔ CRITICAL: NEVER launch multiple tests in parallel — Mojo compilation is memory-bound and will crash the machine. Run ONE `./execute.sh` or `./fire.sh` at a time, wait for it to complete, then run the next.
+
 Tenmo is a tensor library and neural network framework built in **Mojo**. Autograd, GPU support, SIMD-optimized kernels, and a minimal NN module system (Sequential, Linear, Conv2d, etc.) — all pure Mojo, no BLAS by default.
 
 ## Quick Commands
@@ -8,7 +10,7 @@ Tenmo is a tensor library and neural network framework built in **Mojo**. Autogr
 pixi shell                # enter dev environment (Mojo 0.26.2, linux-64 only)
 pixi install              # install deps
 ./execute.sh all          # run all tests sequentially
-# ⚠️ Only run ONE test at a time — parallel tests overwhelm the machine
+# ⛔ CRITICAL: NEVER launch multiple tests in parallel — Mojo compilation is memory-bound and will crash the machine. Run ONE `./execute.sh` or `./fire.sh` at a time, wait for it to complete, then run the next.
 ./execute.sh <name>       # run single test (e.g. tensors, matmul, softmax)
 ./execute.sh quick        # fast sanity: tensors + shapes + strides + summean
 ./execute.sh gpu          # run all GPU-guarded tests
@@ -27,6 +29,8 @@ pixi install              # install deps
 ./example.sh <name> d     # example with debug logging
 ./fire.sh                 # quick-run scratchpad.mojo (or pass another file)
 ```
+
+## ⛔ CRITICAL: NEVER launch multiple tests in parallel — Mojo compilation is memory-bound and will crash the machine. Run ONE `./execute.sh` or `./fire.sh` at a time, wait for it to complete, then run the next.
 
 ## Test Runner Details (`execute.sh`)
 
@@ -62,6 +66,8 @@ pixi install              # install deps
 - `libopenblas-dev` is installed as a system dependency
 - Tests retry up to `MAX_RETRIES=2` on failure
 - GPU job exists but is disabled (`if: false`) — needs a self-hosted runner
+
+## ⛔ CRITICAL: NEVER launch multiple tests in parallel — Mojo compilation is memory-bound and will crash the machine. Run ONE `./execute.sh` or `./fire.sh` at a time, wait for it to complete, then run the next.
 
 ## Architecture
 
@@ -229,6 +235,34 @@ NDBuffer[dtype]
 - `DeviceState` comptime `datatype = DType.uint8 if dtype == DType.bool else dtype`
 - All GPU fills, loads, stores cast between bool ↔ uint8
 - `DeviceState.into()` converts uint8 0/1 back to bool on CPU path
+
+## GPU Lazy Evaluation (`sync` Conventions)
+
+GPU operations queue asynchronously. A `sync: Bool` parameter controls when the CPU waits for GPU completion. Three tiers of defaults:
+
+| Tier | Default | Rationale |
+|---|---|---|
+| **Tensor dunders** (`+`, `+=`, `*`, etc.) | `sync=True` | User-facing operations should be safe by default. Every op waits. |
+| **Forward structs** (`Adder.forward`, etc.) | sync threaded from caller | Tensor dunders → `sync=True`, Gradbox dunders → `sync=False`. |
+| **Gradbox dunders** (`gradbox += x`) | `sync=False` | Backward accumulation queues ops without blocking. Final sync at `backward()` entry. |
+| **`backward()` entry point** | `sync=True` (fence before `seed_grad`) | Option A: fences GPU before forward→backward transition. CPU graph traversal overlaps with GPU seed copy. |
+| **`to_gpu()` / `to_cpu()`** | `sync=True` | Data transfer and readback are sync points by default. Pass `sync=False` for async batch transfer. |
+| **NDBuffer dispatch methods** (`arithmetic_ops`, `scalar_ops`, etc.) | `sync=False` | Called from forward structs which manage sync themselves. |
+| **Backward handlers** (jump table functions) | hardcoded `sync=False` | Called after backward entry fence — no further sync needed. |
+
+**Key pattern:** User code uses Tensor dunders (safe sync). Autograd backward uses Gradbox dunders (no sync). `backward(sync=True)` ensures forward GPU work completes before backward starts.
+
+**Training loop with lazy GPU:**
+```mojo
+var features_gpu = batch.features.to_gpu(gpu, sync=False)  # async queue copy
+var labels_gpu = batch.labels.to_gpu(gpu, sync=False)
+var pred = model(features_gpu)                               # queues on GPU
+var loss = criterion(pred, labels_gpu)
+loss.backward()                                              # sync before backward
+optimizer.step()                                             # GPU-side param update
+loss.item()                                                  # sync: read scalar
+pred.to_cpu()                                                # sync: bring to CPU
+```
 
 ## Forward & Backward Pass (Autograd)
 
@@ -448,9 +482,13 @@ BackwardFnArg[dtype]
 ### Backward Pass (`tensor.mojo:3073`)
 
 ```mojo
-fn backward[graph_size: Int = 50](mut output, start_grad: Scalar = 1.0)
-fn backward[graph_size: Int = 50](mut output, seed_tensor: Tensor)
+def backward[graph_size: Int = 50](mut output, start_grad: Scalar = 1.0, sync: Bool = True)
+def backward[graph_size: Int = 50](mut output, seed_tensor: Tensor, sync: Bool = True)
 ```
+
+`sync=True` (default): GPU sync fence before `seed_grad()` — all forward GPU work completes before backward starts (Option A). CPU graph traversal overlaps with GPU seed copy.
+
+`sync=False`: no fence — caller must ensure GPU forward ops are complete before backward. Use only when managing sync externally.
 
 **Phase 1: Seed gradients**
 - `output.seed_grad(seed_tensor)` — copies seed values into output's gradbox
@@ -736,6 +774,8 @@ None of these affect correctness — only throughput. See `tests/bench_broadcast
 
 Handled separately at `ndbuffer.mojo:2556` — SIMD via `buffer.arithmetic_ops_scalar`. Not affected by `broadcast_nd_buffer` changes.
 
+## ⛔ CRITICAL: NEVER launch multiple tests in parallel — Mojo compilation is memory-bound and will crash the machine. Run ONE `./execute.sh` or `./fire.sh` at a time, wait for it to complete, then run the next.
+
 ## Running Selective Tests
 
 **`./execute.sh <name>`** — runs a single test alias from the test runner (e.g. `./execute.sh gather`)
@@ -775,4 +815,6 @@ GPU kernels `scatter_add_rows_kernel` and `scatter_add_broadcast_kernel` (`tenmo
 The unused `scatter_add_rows_strided_kernel` (line 72) already accepts strides and offset — it just needs an `axis` parameter to swap which factor uses `indices[row]`. Then wire it into `_scatter_add_gpu`'s dispatch.
 
 Not urgent — all production callers (embedding backward, gather axis=0) use axis=0.
+
+## ⛔ CRITICAL: NEVER launch multiple tests in parallel — Mojo compilation is memory-bound and will crash the machine. Run ONE `./execute.sh` or `./fire.sh` at a time, wait for it to complete, then run the next.
 

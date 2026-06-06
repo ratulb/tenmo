@@ -146,7 +146,6 @@ def train_mnist() raises:
 
     print("=" * 80)
     var training_start = perf_counter_ns()
-    var data_transfer_time = Float64(0)
 
     # ========== Training Loop ==========
     for epoch in range(num_epochs):
@@ -169,16 +168,10 @@ def train_mnist() raises:
         while train_loader.__has_next__():
             ref batch = train_loader.__next__()
 
-            # Transfer batch to GPU each iteration — stop_grad=False so
-            # grad flows back through the batch if needed, but since
-            # batch tensors are not leaves we care about, this is fine.
-            # Get an estimate of data transfer time and measure it for only first epoch
-            var transfer_start = Float64(perf_counter_ns())
-
-            var features_gpu = batch.features.to_gpu(gpu)
-            var labels_gpu = batch.labels.to_gpu(gpu)
-            if epoch == 0:
-                data_transfer_time += Float64(perf_counter_ns()) - transfer_start
+            # Async data transfer — GPU queues the copy, returns immediately.
+            # Forward ops queue after the copy on the GPU execution stream.
+            var features_gpu = batch.features.to_gpu(gpu, sync=False)
+            var labels_gpu = batch.labels.to_gpu(gpu, sync=False)
 
             var pred = model(features_gpu)
             var loss = criterion(pred, labels_gpu)
@@ -187,7 +180,10 @@ def train_mnist() raises:
             loss.backward()
             optimizer.step()
 
-            # Pull scalar loss back to CPU for logging only
+            # loss.item() syncs GPU (reads scalar value back)
+            # pred.to_cpu() syncs GPU (moves prediction back to CPU)
+            # These syncs are the lazy evaluation checkpoints —
+            # all queued GPU work must complete before we read results
             train_loss += loss.item() * Float32(batch.batch_size)
             train_correct += compute_accuracy(pred.to_cpu(), batch.labels)
             train_total += batch.batch_size
@@ -203,8 +199,8 @@ def train_mnist() raises:
         while test_loader.__has_next__():
             ref batch = test_loader.__next__()
 
-            var features_gpu = batch.features.to_gpu(gpu)
-            var labels_gpu = batch.labels.to_gpu(gpu)
+            var features_gpu = batch.features.to_gpu(gpu, sync=False)
+            var labels_gpu = batch.labels.to_gpu(gpu, sync=False)
 
             var pred = model(features_gpu)
             var loss = criterion(pred, labels_gpu)
@@ -239,8 +235,6 @@ def train_mnist() raises:
             val_acc,
             "%",
         )
-        if epoch == 0:
-            print("CPU to GPU data transfer time: ", data_transfer_time / 1e9, "s")
 
     var total_time = Float64(perf_counter_ns() - training_start) / 1e9
     print("=" * 80)

@@ -70,7 +70,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
                 if flow == Flow.Cpu2Gpu:
                     try:
                         var cpu_grad = Gradbox[Self.dtype](
-                            gradbox.buffer().to_cpu()
+                            gradbox.buffer().to_cpu(sync=False)
                         )
                         ancestor_ref.update_grad(cpu_grad, AddTensor, None)
                     except e:
@@ -167,10 +167,17 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         device: Device,
         requires_grad: Optional[Bool] = None,
         stop_grad: Bool = False,
+        sync: Bool = True,
     ) raises -> Tensor[Self.dtype]:
-        var (code, ndb) = self.buffer.to_device(device)
+        var (code, ndb) = self.buffer.to_device(device, sync=sync)
         # Either CPU->CPU or GPU->GPU on same device — no transfer needed
         if code == -1:
+            if sync:
+                var out = self.copy()
+                comptime if has_accelerator():
+                    if out.is_on_gpu():
+                        out.buffer.sync()
+                return out
             return self.copy()
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
@@ -208,7 +215,7 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         self: Gradbox[Self.dtype],
         device: Device,
     ) raises -> Gradbox[Self.dtype]:
-        var (code, ndb) = self.buffer().to_device(device)
+        var (code, ndb) = self.buffer().to_device(device, sync=False)
         # Either CPU->CPU or GPU->GPU on same device — no transfer needed
         if code == -1:
             return self

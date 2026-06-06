@@ -268,8 +268,8 @@ struct NDBuffer[dtype: DType](
                 " accelerator"
             )
 
-    def to_cpu(self) raises -> Self:
-        var _, nd_buffer = self.to_device(CPU().into())
+    def to_cpu(self, sync: Bool = True) raises -> Self:
+        var _, nd_buffer = self.to_device(CPU().into(), sync=sync)
         return nd_buffer^
 
     def to_gpu(self, gpu: GPU) raises -> Self:
@@ -296,7 +296,7 @@ struct NDBuffer[dtype: DType](
         raise "Not on any device"
 
     def to_device(
-        self, device: Device
+        self, device: Device, sync: Bool = True
     ) raises -> Tuple[Int, NDBuffer[Self.dtype]]:
         """
         Materialize this buffer onto another device.
@@ -318,7 +318,7 @@ struct NDBuffer[dtype: DType](
             # Allocate device storage
             var new_device_state = DeviceState[Self.dtype](self.numels(), gpu)
             # Fill from tenmo.ogical view (handles offset/strides)
-            new_device_state.fill(self)
+            new_device_state.fill(self, sync=sync)
             # Create new NDBuffer:
             #   - contiguous
             #   - offset = 0
@@ -344,11 +344,11 @@ struct NDBuffer[dtype: DType](
             # We materialize through CPU
 
             # First bring to CPU
-            var ndb_buffer = curr_state.into(self.shape)
+            var ndb_buffer = curr_state.into(self.shape, sync=sync)
 
             # Then move CPU -> new GPU
             # This would return 0, NDBuffer
-            return ndb_buffer.to_device(device)
+            return ndb_buffer.to_device(device, sync=sync)
 
         # ---------------------------------------
         # 3) GPU -> CPU
@@ -356,11 +356,11 @@ struct NDBuffer[dtype: DType](
         # Materialize contiguous CPU buffer
         # New NDBuffer alltogether!
         if self.is_contiguous() and self.offset == 0:
-            return 0, curr_state.into(self.shape)
+            return 0, curr_state.into(self.shape, sync=sync)
         else:
             # Materialise respecting strides
             # Step 1: bring raw flat device buffer to CPU
-            var flat_cpu = curr_state.into(Shape(len(curr_state)))
+            var flat_cpu = curr_state.into(Shape(len(curr_state)), sync=sync)
             # Step 2: create view with correct shape/strides/offset over flat data
             var viewed = flat_cpu.share(self.shape, self.strides, self.offset)
             # Step 3: materialise into contiguous CPU buffer
@@ -384,7 +384,10 @@ struct NDBuffer[dtype: DType](
     @staticmethod
     @always_inline
     def full(
-        shape: Shape, scalar: Scalar[Self.dtype], device: Device = CPU().into()
+        shape: Shape,
+        scalar: Scalar[Self.dtype],
+        device: Device = CPU().into(),
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype]:
         var buffer = Buffer[Self.dtype].full(scalar, shape.num_elements())
         var ndb = NDBuffer[Self.dtype](buffer^, shape)
@@ -394,7 +397,7 @@ struct NDBuffer[dtype: DType](
         else:
             comptime if has_accelerator():
                 try:
-                    var (_, result) = ndb^.to_device(device)
+                    var (_, result) = ndb^.to_device(device, sync=sync)
                     return result^
                 except e:
                     print(e)

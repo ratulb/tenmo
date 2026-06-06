@@ -893,7 +893,7 @@ struct Gradbox[dtype: DType](
             Error if system has no accelerator.
         """
         comptime if has_accelerator():
-            var (code, ndb) = self.buffer().to_device(CPU().into())
+            var (code, ndb) = self.buffer().to_device(CPU().into(), sync=False)
             if code == -1:
                 return self
             return Gradbox[Self.dtype](ndb^)
@@ -916,7 +916,7 @@ struct Gradbox[dtype: DType](
         """
         comptime if has_accelerator():
             var target = gpu.value().into() if gpu else GPU().into()
-            var (code, ndb) = self.buffer().to_device(target)
+            var (code, ndb) = self.buffer().to_device(target, sync=False)
             if code == -1:
                 return self
             return Gradbox[Self.dtype](ndb^)

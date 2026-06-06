@@ -723,6 +723,7 @@ struct Tensor[dtype: DType](
         gpu: Optional[GPU] = None,
         requires_grad: Optional[Bool] = None,
         stop_grad: Bool = False,
+        sync: Bool = True,
     ) raises -> Tensor[Self.dtype]:
         """Transfer tensor to GPU.
 
@@ -732,6 +733,7 @@ struct Tensor[dtype: DType](
                        no DeviceTransferBackward registered. Use for
                        permanent GPU residents (model weights).
                        Default False preserves existing grad flow behaviour.
+            sync: If True, synchronize GPU after transfer.
         """
         comptime if has_accelerator():
             var target_gpu = gpu.or_else(GPU())
@@ -739,6 +741,7 @@ struct Tensor[dtype: DType](
                 self,
                 target_gpu.into(),
                 stop_grad=stop_grad,
+                sync=sync,
             )
         else:
             raise Error(
@@ -750,6 +753,7 @@ struct Tensor[dtype: DType](
         self,
         requires_grad: Optional[Bool] = None,
         stop_grad: Bool = False,
+        sync: Bool = True,
     ) raises -> Tensor[Self.dtype]:
         """Transfer tensor to CPU.
 
@@ -759,6 +763,7 @@ struct Tensor[dtype: DType](
             stop_grad: If True, gradient stops at this CPU tensor —
                        no DeviceTransferBackward registered.
                        Default False preserves existing grad flow behaviour.
+            sync: If True, synchronize GPU before transfer.
         Returns:
             A new tensor on CPU, with data copied over.
 
@@ -771,6 +776,7 @@ struct Tensor[dtype: DType](
                 CPU().into(),
                 requires_grad=requires_grad,
                 stop_grad=stop_grad,
+                sync=sync,
             )
 
         raise Error("System does not have any accelerator")
@@ -1188,6 +1194,7 @@ struct Tensor[dtype: DType](
         value: Scalar[Self.dtype],
         requires_grad: Bool = False,
         device: Optional[Device] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Create a tensor filled with a scalar value.
 
@@ -1196,11 +1203,12 @@ struct Tensor[dtype: DType](
             value: Scalar value to fill with.
             requires_grad: Whether to track gradients.
             device: Target device. Defaults to CPU.
+            sync: If True, synchronize GPU after creation.
 
         Returns:
             A tensor of given shape filled with value.
         """
-        return Self.full(Shape(shape), value, requires_grad, device=device)
+        return Self.full(Shape(shape), value, requires_grad, device=device, sync=sync)
 
     @staticmethod
     def full(
@@ -1208,6 +1216,7 @@ struct Tensor[dtype: DType](
         scalar: Scalar[Self.dtype],
         requires_grad: Bool = False,
         device: Optional[Device] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Create a tensor filled with a scalar value.
 
@@ -1216,13 +1225,14 @@ struct Tensor[dtype: DType](
             scalar: Scalar value to fill with.
             requires_grad: Whether to track gradients.
             device: Target device. Defaults to CPU.
+            sync: If True, synchronize GPU after creation.
 
         Returns:
             A tensor of given shape filled with scalar.
         """
         var target_device = device.or_else(CPU().into())
         return Tensor[Self.dtype](
-            NDBuffer[Self.dtype].full(shape, scalar, target_device),
+            NDBuffer[Self.dtype].full(shape, scalar, target_device, sync=sync),
             requires_grad=requires_grad,
         )
 
