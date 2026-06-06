@@ -736,12 +736,76 @@ Consolidated itemized action items in recommended execution order:
 **Execution order rationale:** 1 is audit-only — do it first to confirm the scope and viability of Option B. Blockers 2→3→4 fix the fundamental dunder sync gap using Option B (replace forward-path dunder calls with explicit ops, then add comptime sync to Tensor/Gradbox dunders). 5→6→7→8 is bottom-up (dependencies first). 9 is independent. 10 is last (needs all changes in place). 11 runs at each step to catch regressions early.
 
 | Phase | Syncs removed | Speedup | Complexity |
-|---|---|---|---|---|
+|---|---|---|---|---|---|
 | 0 | 1 per `into()` | <1% | Trivial |
 | 1 | 0 (behavioral no-op) | 0% | Trivial (mechanical) |
 | 2 | ~2 per compound op | <1% | Trivial |
 | 3 | N per print/to_ndarray call | ~N× per call (N elem) | Low |
 | 4 | ~N per training step | **2–5×** | High |
+
+### §9f. Empirical Findings — Async Data Transfer Alone Doesn't Improve Performance
+
+**Test setup:** MNIST GPU training, 784→128→32→10, batch_size=64, 15 epochs.
+- **Version A:** `to_gpu(sync=True)` — per-batch sync
+- **Version B:** `to_gpu(sync=False)` — async batch transfer, only sync at `backward(sync=True)`
+
+**Result:** Both ~29.5s/epoch. No measurable difference.
+
+**Root cause:** Tensor dunders (`+`, `*`, `@`, etc.) default `sync=True`. The very first forward operation (`matmul`) forces a GPU pipeline drain — by which time the async data copy (microseconds for ~200KB) has long completed. Every subsequent `__add__`, `__sub__`, `relu()`, etc. adds another sync. The `backward(sync=True)` fence is irrelevant — the per-op syncs during forward are the bottleneck.
+
+```
+to_gpu(sync=False)      → queued (0µs CPU)
+matmul[track_grad]      → enqueue kernel → SYNC → drain all prior work
+__add__[sync=True]      → enqueue kernel → SYNC
+relu[sync=True]         → enqueue kernel → SYNC
+...                     → N syncs for N ops
+```
+
+**Key insight:** You must eliminate syncs from the forward path. Async data transfer alone is meaningless when every operation immediately syncs.
+
+**How to fix — three options considered:**
+
+| Option | Approach | Ergonomics | Complexity |
+|---|---|---|---|
+| A — Manual per-op | `x.__add__[sync=False](b1)` everywhere | Fragile — one missed sync stalls pipeline | None |
+| B — Default `sync=False` on dunders | Change all 16 dunder defaults | Breaks safety contract — silent stale reads | Trivial |
+| C — Comptime threading through Sequential | `model[sync=False](x)` threads through all layers | Ergonomically clean, but requires every layer to accept `[sync]` | High |
+
+**Option C design (chosen for implementation):**
+
+```
+Sequential.__call__[sync: Bool = True](xs)
+  → m[sync](out)                                          # Module dispatch
+    → Module.__call__[sync: Bool = True](xs)
+      → self.layer[Linear[...]]()[sync](xs^)              # Variant extract + call
+        → Linear.__call__[sync: Bool = True](xs)
+          → Matmul.forward[track_grad, sync=sync](xs, weight)
+          → Adder.forward[track_grad, sync=sync](matmul_out, bias)
+```
+
+Every internal op uses `ForwardStruct.forward[..., sync=sync](...)` — never dunders. This guarantees every kernel in the forward path receives `sync` from the top-level caller.
+
+**Variant dispatch nuance:** `self.layer[ConcreteType]()` extracts the concrete layer from the `Variant`. Then `[sync](xs)` calls `__call__[sync]` on the extracted value. All 10 layer types must accept `[sync: Bool = True]` on their `__call__`.
+
+**Risk:** Any layer that internally uses a dunder (`x + y` instead of `Adder.forward[sync=sync](x, y)`) silently defaults to `sync=True`, creating an unexpected sync point. All internal arithmetic across all layers must be converted to explicit forward struct calls.
+
+**Training loop with Option C:**
+```mojo
+var pred = model[sync=False](features_gpu)   # whole forward async
+var loss = criterion(pred, labels_gpu)        # loss must also accept [sync]
+loss.backward(sync=True)                       # single sync point
+```
+
+**What's needed:**
+
+| Component | Change |
+|---|---|
+| `Sequential.__call__` | Add `[sync: Bool = True]`, thread to `m[sync](out)` |
+| `Module.__call__` | Add `[sync: Bool = True]`, dispatch with `[sync]` |
+| All 10 layer `__call__` | Add `[sync: Bool = True]`, thread to forward structs |
+| Forward struct calls in layers | Replace all dunders with `Forward.forward[..., sync=sync]()` |
+| Criterion/loss functions | Add `[sync]` param |
+| `SequentialBLAS.__call__` | Same threading |
 
 ---
 

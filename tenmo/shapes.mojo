@@ -205,7 +205,7 @@ struct Shape(
         return self.dims[idx]
 
     @always_inline
-    def __getitem__(self, slice: Slice) -> Self:
+    def __getitem__(ref self, slice: Slice) -> Self:
         """Get a slice of the shape dimensions.
 
         Args:
@@ -214,7 +214,7 @@ struct Shape(
         Returns:
             New Shape with the sliced dimensions
         """
-        s = self.dims[slice]
+        s = self.dims[slice].owned_copy()
         return Self(s)
 
     @always_inline("nodebug")

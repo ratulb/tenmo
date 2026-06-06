@@ -761,7 +761,7 @@ def test_emb_gpu_bwd_fuse_sum() raises:
         # Both looked-up rows receive same grad = [1,1,1]
         var shared_grad = emb.weight.grad()
         assert_true(
-            emb.weight.grad()[i(0), s()]
+            shared_grad[i(0), s()]
             .to_cpu()
             .all_close(Tensor[dtype].d1([1.0, 1.0, 1.0]))
         )
@@ -830,7 +830,7 @@ def test_emb_gpu_bwd_fuse_mean() raises:
         loss.backward()
         var shared_grad = emb.weight.grad()
         assert_true(
-            emb.weight.grad()[i(0), s()]
+            shared_grad[i(0), s()]
             .to_cpu()
             .all_close(Tensor[dtype].d1([0.5, 0.5, 0.5]))
         )

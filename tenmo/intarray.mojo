@@ -316,7 +316,7 @@ struct IntArray(
         (self._data.unsafe_value() + index)[] = value
 
     @always_inline("nodebug")
-    def __getitem__(self, slice: Slice) -> Self:
+    def __getitem__(ref self, slice: Slice) -> Self:
         """Slice into a view (step==1) or deep copy (step != 1).
 
         Contiguous slices return a view — zero-alloc, just a borrowed pointer.

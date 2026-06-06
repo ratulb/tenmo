@@ -125,7 +125,7 @@ struct Strides(
         self.data[i] = value
 
     @always_inline("nodebug")
-    def __getitem__(self, slice: Slice) -> Self:
+    def __getitem__(ref self, slice: Slice) -> Self:
         """Get a slice of strides.
 
         Args:
@@ -134,7 +134,7 @@ struct Strides(
         Returns:
             New Strides instance containing the sliced elements
         """
-        return Strides(self.data[slice])
+        return Strides(self.data[slice].owned_copy())
 
     def __eq__(self, other: Self) -> Bool:
         """Check if two strides instances are equal.

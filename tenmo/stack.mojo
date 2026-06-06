@@ -174,7 +174,9 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def vstack[
         track_grad: Bool = True
     ](
-        tensors: List[Tensor[Self.dtype]], requires_grad: Optional[Bool] = None
+        tensors: List[Tensor[Self.dtype]],
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """
         Stack tensors vertically (row-wise).
@@ -185,6 +187,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         Args:
             tensors: List of tensors to stack vertically.
             requires_grad: Whether to track gradients.
+            sync: Whether to sync GPU after operation.
 
         Returns:
             Vertically stacked tensor.
@@ -214,7 +217,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 reshaped.append(reshaped_tensor^)
 
             return Concate[Self.dtype].forward[track_grad](
-                reshaped, axis=0, requires_grad=requires_grad
+                reshaped, axis=0, requires_grad=requires_grad, sync=sync
             )
 
         # For 2D+: use CONCATENATION along axis 0, not STACKING
@@ -234,7 +237,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     )
 
         return Concate[Self.dtype].forward[track_grad](
-            tensors, axis=0, requires_grad=requires_grad
+            tensors, axis=0, requires_grad=requires_grad, sync=sync
         )
 
     @always_inline
@@ -242,7 +245,9 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def hstack[
         track_grad: Bool = True
     ](
-        tensors: List[Tensor[Self.dtype]], requires_grad: Optional[Bool] = None
+        tensors: List[Tensor[Self.dtype]],
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """
         Stack tensors horizontally (column-wise).
@@ -253,6 +258,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         Args:
             tensors: List of tensors to stack horizontally.
             requires_grad: Whether to track gradients.
+            sync: Whether to sync GPU after operation.
 
         Returns:
             Horizontally stacked tensor.
@@ -273,7 +279,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # For 1D: concatenate along axis 0
         if first_ndim == 1:
             return Concate.forward[track_grad](
-                tensors, axis=0, requires_grad=requires_grad
+                tensors, axis=0, requires_grad=requires_grad, sync=sync
             )
 
         # For 2D+: concatenate along axis 1
@@ -294,5 +300,5 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                         )
 
         return Concate.forward[track_grad](
-            tensors, axis=1, requires_grad=requires_grad
+            tensors, axis=1, requires_grad=requires_grad, sync=sync
         )
