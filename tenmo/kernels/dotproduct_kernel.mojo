@@ -116,7 +116,7 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
         num_blocks: Int = 1,
         threads_per_block: Int = 512,
         suppress_validation: Bool = False,
-    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True) raises -> Tensor[
+    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = False) raises -> Tensor[
         Self.dtype
     ]:
         comptime assert (

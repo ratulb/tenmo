@@ -116,6 +116,7 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         keepdims: Bool = False,
         unbiased: Bool = True,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         # Normalize negative axis — but never touch the -100 sentinel
         var normalized_axis = axis

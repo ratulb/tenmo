@@ -34,6 +34,7 @@ struct FlattenForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         start_dim: Int = 0,
         end_dim: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         flattened_buffer = self.buffer.flatten(start_dim, end_dim)
         out = Tensor[Self.dtype](flattened_buffer^, requires_grad=False)

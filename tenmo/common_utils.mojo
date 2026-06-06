@@ -545,7 +545,12 @@ def print_buffer[
     level: Int,
     num_first: Int = 10,
     num_last: Int = 10,
-):
+) raises:
+    comptime if has_accelerator():
+        if buffer.is_on_gpu():
+            var cpu_buffer = buffer.to_cpu()
+            print_buffer(cpu_buffer, indices, level, num_first, num_last)
+            return
     if buffer.buffer.size == 0 and buffer.device_state == None:
         # if buffer.numels() == 0:
         print("  Empty")

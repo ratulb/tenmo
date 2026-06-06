@@ -184,7 +184,7 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         axis: Int,
         indices: IntArray,
         reduction: Reduction = Reduction(0),
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         comptime datatype = DType.uint8 if Self.dtype == DType.bool else Self.dtype
 

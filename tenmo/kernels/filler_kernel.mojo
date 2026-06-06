@@ -131,7 +131,7 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         shape: Shape,
         strides: Strides,
         absolute_offset: Int,
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises:
         comptime if has_accelerator():
             ref device_state = target.device_state.value()
@@ -170,7 +170,7 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         shape: Shape,
         strides: Strides,
         absolute_offset: Int,
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises:
         comptime if has_accelerator():
             ref t_state = target.device_state.value()
@@ -242,7 +242,7 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         indices: IntArray,
         n_indices: Int,
         row_width: Int,
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises:
         comptime if has_accelerator():
             ref t_state = target.device_state.value()

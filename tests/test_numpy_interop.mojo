@@ -2,6 +2,7 @@ from tenmo.tensor import Tensor
 from tenmo.numpy_interop import to_ndarray, from_ndarray
 
 from std.testing import assert_true, TestSuite
+from std.sys import has_accelerator
 
 
 def main() raises:
@@ -172,3 +173,52 @@ def test_copy_vs_zero_copy_behavior() raises:
     # Zero-copy: requires user to keep ndarray alive
     var a_zero = from_ndarray[DType.float32](nd_a_copy, copy=False)
     assert_true((a_zero == a))
+
+
+def test_gpu_tensor_to_numpy_contiguous() raises:
+    """GPU contiguous tensor → to_ndarray must not read empty CPU buffer."""
+    print("test_gpu_tensor_to_numpy_contiguous")
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var cpu_t = Tensor[dtype].arange(120)
+        var gpu_t = cpu_t.to_gpu()
+        var nd = to_ndarray(gpu_t)
+        var back = from_ndarray[dtype](nd)
+        assert_true(back.all_close(cpu_t))
+
+
+def test_gpu_tensor_to_numpy_view() raises:
+    """GPU non-contiguous view (offset/strides) → to_ndarray."""
+    print("test_gpu_tensor_to_numpy_view")
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var cpu_t = Tensor[dtype].arange(32)
+        var cpu_t_2d = cpu_t.reshape(4, 8)
+        var cpu_v = cpu_t_2d.view([2, 3], offset=5)
+        var gpu_v = cpu_v.to_gpu()
+        var nd = to_ndarray(gpu_v)
+        var back = from_ndarray[dtype](nd)
+        assert_true(back.all_close(cpu_v))
+
+
+def test_gpu_bool_tensor_to_numpy() raises:
+    """GPU bool tensor (uint8 internal) → to_ndarray."""
+    print("test_gpu_bool_tensor_to_numpy")
+    comptime if has_accelerator():
+        var cpu_t = Tensor[DType.bool].full([3, 4], True)
+        var gpu_t = cpu_t.to_gpu()
+        var nd = to_ndarray(gpu_t)
+        var back = from_ndarray[DType.bool](nd)
+        assert_true(back.all_close(cpu_t))
+
+
+def test_gpu_tensor_print() raises:
+    """GPU tensor .print() must not crash."""
+    print("test_gpu_tensor_print")
+    comptime dtype = DType.float32
+    var cpu_t = Tensor[dtype].arange(16)
+    var cpu_t_2d = cpu_t.reshape(4, 4)
+    cpu_t_2d.print()
+    comptime if has_accelerator():
+        var gpu_t = cpu_t.to_gpu()
+        gpu_t.print()

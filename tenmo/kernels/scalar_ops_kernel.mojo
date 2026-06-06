@@ -192,7 +192,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) raises -> NDBuffer[
+    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = False) raises -> NDBuffer[
         Self.dtype
     ]:
         var numels = A.numels()
@@ -244,7 +244,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
 
     @staticmethod
     def launch_pow(
-        A: NDBuffer[Self.dtype], exponent: Scalar[Self.dtype], sync: Bool = True
+        A: NDBuffer[Self.dtype], exponent: Scalar[Self.dtype], sync: Bool = False
     ) raises -> NDBuffer[Self.dtype]:
         """
         Dedicated POW launcher — dispatches to typed f32/f64 kernels.

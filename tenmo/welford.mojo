@@ -33,12 +33,13 @@ struct Welford[dtype: DType]:
         axes: IntArray,
         unbiased: Bool,
         keepdims: Bool,
+        sync: Bool = True,
     ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         comptime if has_accelerator():
             if ndb.is_on_gpu():
                 try:
                     return Welford[Self.dtype].forward_gpu(
-                        ndb, axes, unbiased, keepdims
+                        ndb, axes, unbiased, keepdims, sync=sync
                     )
                 except e:
                     print(e)
@@ -55,13 +56,17 @@ struct Welford[dtype: DType]:
         axes: IntArray,
         unbiased: Bool,
         keepdims: Bool,
+        sync: Bool = True,
     ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         var (mean_ndb, M2_ndb) = Reduction[Self.dtype].launch_welford(
-            ndb, axes, keepdims
+            ndb, axes, keepdims, sync=False
         )
         var n = ndb.shape.reduced_shape(axes).product()
         var divisor = Scalar[Self.dtype](n - 1 if unbiased and n > 1 else n)
-        var var_ndb = M2_ndb.scalar_ops[Divide](divisor)
+        var var_ndb = M2_ndb.scalar_ops[Divide](divisor, sync=False)
+        comptime if has_accelerator():
+            if sync and var_ndb.is_on_gpu():
+                var_ndb.sync()
         return (mean_ndb^, var_ndb^)
 
     @staticmethod

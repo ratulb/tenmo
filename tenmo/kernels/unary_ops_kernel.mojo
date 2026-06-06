@@ -306,7 +306,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def launch[
         op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
-    ](A: NDBuffer[Self.dtype], sync: Bool = True) raises -> NDBuffer[Self.dtype]:
+    ](A: NDBuffer[Self.dtype], sync: Bool = False) raises -> NDBuffer[Self.dtype]:
         comptime epsilon_rebinded = rebind[Scalar[Self.datatype]](epsilon)
         comptime if op_code == INVERT:
             comptime assert (
@@ -405,7 +405,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def launch_with_mask[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], sync: Bool = True) raises -> Tuple[
+    ](A: NDBuffer[Self.dtype], sync: Bool = False) raises -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ]:
         """Launch unary op + mask kernel. Returns (output, mask) as GPU NDBuffers.

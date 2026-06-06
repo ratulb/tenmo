@@ -231,7 +231,7 @@ struct ReductionMinMax[dtype: DType = DType.float32](
         A: NDBuffer[Self.dtype],
         normalized_axes: IntArray,
         keepdims: Bool,
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         """
         Returns (result, mask) both on GPU.

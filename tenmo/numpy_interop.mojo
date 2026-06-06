@@ -7,6 +7,7 @@ from .ndbuffer import NDBuffer
 from .gradbox import Gradbox
 from .net import Sequential
 from .named_parameter import NamedParameter
+from std.sys import has_accelerator
 
 
 def numpy_dtype(dtype: DType) raises -> PythonObject:
@@ -58,15 +59,31 @@ def to_ndarray[
 
 def to_ndarray[dtype: DType, //](ndb: NDBuffer[dtype]) raises -> PythonObject:
     np = Python.import_module("numpy")
-    shape_tuple = list_to_tuple(ndb.shape.tolist())
-    ndarray = np.zeros(shape_tuple, dtype=numpy_dtype(ndb.dtype))
+    comptime if has_accelerator():
+        if ndb.is_on_gpu():
+            var cpu_ndb = ndb.to_cpu()
+            var shape_tuple = list_to_tuple(cpu_ndb.shape.tolist())
+            var ndarray = np.zeros(shape_tuple, dtype=numpy_dtype(cpu_ndb.dtype))
+            if cpu_ndb.is_contiguous():
+                var dst_ptr = ndarray_ptr[dtype](ndarray)
+                var buffer_ptr = cpu_ndb.data_ptr() + cpu_ndb.offset
+                memcpy(dest=dst_ptr, src=buffer_ptr, count=cpu_ndb.numels())
+            else:
+                var flat = ndarray.flat
+                var idx = 0
+                for coord in cpu_ndb.shape:
+                    flat[idx] = cpu_ndb[coord]
+                    idx += 1
+            return ndarray
+    var shape_tuple = list_to_tuple(ndb.shape.tolist())
+    var ndarray = np.zeros(shape_tuple, dtype=numpy_dtype(ndb.dtype))
     if ndb.is_contiguous():
-        dst_ptr = ndarray_ptr[dtype](ndarray)
-        buffer_ptr = ndb.data_ptr() + ndb.offset
+        var dst_ptr = ndarray_ptr[dtype](ndarray)
+        var buffer_ptr = ndb.data_ptr() + ndb.offset
         memcpy(dest=dst_ptr, src=buffer_ptr, count=ndb.numels())
     else:
-        flat = ndarray.flat
-        idx = 0
+        var flat = ndarray.flat
+        var idx = 0
         for coord in ndb.shape:
             flat[idx] = ndb[coord]
             idx += 1

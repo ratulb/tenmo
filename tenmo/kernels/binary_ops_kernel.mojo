@@ -479,7 +479,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
         A: NDBuffer[Self.dtype],
         B: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         comptime simdwidth = simd_width_of[Self.dtype]()
         var A_shape = A.shape

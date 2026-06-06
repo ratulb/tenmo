@@ -115,7 +115,7 @@ struct ArgMinMaxGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         out_shape: Shape,
         total_output: Int,
         reduced_volume: Int,
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[DType.int32]:
         ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()

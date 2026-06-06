@@ -30,13 +30,13 @@ struct ExponentiationBackward[dtype: DType](
         var ancestor = output.ancestry().get(0)
 
         # Step 1: x ** (n-1) — NDBuffer.pow, GPU safe
-        var base_pow = ancestor.buffer() ** (exponent - Scalar[Self.dtype](1))
+        var base_pow = ancestor.buffer().scalar_ops[POW](exponent - Scalar[Self.dtype](1))
 
         # Step 2: n * x**(n-1) — scalar_ops[Multiply], GPU safe
         var local_grad = base_pow.scalar_ops[Multiply](exponent)
 
         # Step 3: local_grad * upstream_grad — arithmetic_ops[Multiply], GPU safe
-        var grad_result = local_grad * gradbox.buffer()
+        var grad_result = local_grad.arithmetic_ops[Multiply](gradbox.buffer())
 
         var parent_gradbox = Gradbox[Self.dtype](grad_result^)
 
@@ -56,12 +56,13 @@ struct Exponentiator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         self: Tensor[Self.dtype],
         exponent: Scalar[Self.dtype],
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """
         Element-wise x ** exponent.
         Delegates to NDBuffer.pow — handles GPU and CPU paths.
         """
-        var result_ndb = self.buffer**exponent
+        var result_ndb = self.buffer.scalar_ops[POW](exponent, sync=sync)
         var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
 
         comptime if track_grad:

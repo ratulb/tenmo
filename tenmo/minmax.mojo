@@ -67,6 +67,7 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var shape = self.shape()
         var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)

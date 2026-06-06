@@ -297,7 +297,7 @@ struct StdVarianceBackwardKernel[dtype: DType](
         x: NDBuffer[Self.dtype],
         mean: NDBuffer[Self.dtype],
         scale: Scalar[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         """Launch fused variance backward normalize kernel.
 
@@ -372,7 +372,7 @@ struct StdVarianceBackwardKernel[dtype: DType](
         x: NDBuffer[Self.dtype],
         mean: NDBuffer[Self.dtype],
         denom: NDBuffer[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         """Launch fused std backward normalize kernel.
 

@@ -263,14 +263,19 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             IntArray(self.rank() - 1),
             unbiased=False,
             keepdims=True,
+            sync=False,
         )
 
         # ── Pass 2: fused normalize — rstd + x_hat + out in single pass ──
         # rstd = rsqrt(var + eps) computed inside kernel — saved for backward
         # x_hat saved for backward — written in pass 2 anyway, zero extra cost
         var (out_ndb, x_hat_ndb, rstd_ndb) = LayerNormCpu[Self.dtype].normalize(
-            self.buffer, mean_ndb, var_ndb, gamma.buffer, beta.buffer, eps
+            self.buffer, mean_ndb, var_ndb, gamma.buffer, beta.buffer, eps, sync=False
         )
+
+        comptime if has_accelerator():
+            if out_ndb.is_on_gpu():
+                out_ndb.sync()
         # Make them shared so that BackwardFnArg is lighter
         x_hat_ndb.buffer.shared()
         rstd_ndb.buffer.shared()

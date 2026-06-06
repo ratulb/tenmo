@@ -389,7 +389,7 @@ struct DivideScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
+    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) -> Tensor[
         Self.dtype
     ]:
         comptime assert (
@@ -397,7 +397,7 @@ struct DivideScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ), "Tensor → __rtruediv__ is for numeric data types only"
 
         var out = Tensor[Self.dtype](
-            self.buffer.scalar_ops[ReverseDivide](scalar), requires_grad=False
+            self.buffer.scalar_ops[ReverseDivide](scalar, sync=sync), requires_grad=False
         )
 
         comptime if track_grad:
@@ -417,7 +417,7 @@ struct DivideByScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
+    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) -> Tensor[
         Self.dtype
     ]:
         comptime assert (
@@ -428,7 +428,7 @@ struct DivideByScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             panic("Tensor → __truediv__ : canot divide by " + String(scalar))
 
         var out = Tensor[Self.dtype](
-            self.buffer.scalar_ops[Divide](scalar), requires_grad=False
+            self.buffer.scalar_ops[Divide](scalar, sync=sync), requires_grad=False
         )
 
         comptime if track_grad:
@@ -448,7 +448,7 @@ struct Divider[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[
+    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype], sync: Bool = True) -> Tensor[
         Self.dtype
     ]:
         if not self.broadcastable(other):
@@ -461,7 +461,7 @@ struct Divider[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
 
         var out = Tensor[Self.dtype](
-            self.buffer.arithmetic_ops[Divide](other.buffer),
+            self.buffer.arithmetic_ops[Divide](other.buffer, sync=sync),
             requires_grad=False,
         )
 

@@ -115,7 +115,7 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
         grad_output: NDBuffer[Self.dtype],
         divisor: NDBuffer[Self.dtype],
         scalar: Scalar[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         """Fused rdiv_scalar_backward GPU kernel. Returns gradient for divisor.
         """
@@ -181,7 +181,7 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
         grad_output: NDBuffer[Self.dtype],
         x: NDBuffer[Self.dtype],
         y: NDBuffer[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         """Fused divide_backward GPU kernel. Returns (grad_x, grad_y).
 

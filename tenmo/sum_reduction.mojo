@@ -63,6 +63,7 @@ struct Summer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var shape = tensor.shape()
         var reduction_axes = Validator.normalize_reduction_axes(shape, axes)

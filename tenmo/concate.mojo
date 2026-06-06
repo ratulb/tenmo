@@ -91,6 +91,7 @@ struct Concate[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         tensors: List[Tensor[Self.dtype]],
         axis: Int = 0,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Concatenate tensors along specified axis."""
 

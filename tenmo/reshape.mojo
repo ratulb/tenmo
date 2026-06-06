@@ -36,6 +36,7 @@ struct Reshape[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         new_shape: Shape,
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var shape = new_shape if validated else Validator.validate_and_construct_new_shape(
             tensor.shape(), new_shape.intarray()

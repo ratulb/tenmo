@@ -303,6 +303,7 @@ struct Product[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Compute product reduction along axes.
 
@@ -406,7 +407,7 @@ struct ProductBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
 
         # ── Step 3: grad_input = grad_broadcast * excl_product ─────────────
-        var grad_input = grad_broadcast.buffer() * excl_ndb
+        var grad_input = grad_broadcast.buffer().arithmetic_ops[Multiply](excl_ndb)
 
         var gradbox_ancestor = Gradbox[Self.dtype](grad_input^)
         ancestor.update_grad(gradbox_ancestor^, AddTensor, None)

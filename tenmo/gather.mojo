@@ -116,6 +116,7 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         reduction: Reduction = Reduction(2),
         padding_idx: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Gather slices along `axis` at the given indices.
 
@@ -250,6 +251,7 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         reduction: Reduction = Reduction(2),
         padding_idx: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Gather with multi-dimensional indices.
         Output shape: (*indices.shape(), *self.shape()[1:]) for axis=0.
@@ -454,8 +456,12 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         comptime if has_accelerator():
             if self.is_on_gpu() and not use_nd:
                 try:
+                    # Batch sync: if a follow-up sum/mean handles sync, skip
+                    # gather_gpu's internal sync.
+                    var has_followup = reduction.is_sum() or reduction.is_mean()
                     var ndb = GatherGpu[Self.dtype].gather_gpu(
-                        self.buffer, ax, normalized, Reduction(2), sync=sync
+                        self.buffer, ax, normalized, Reduction(2),
+                        sync=sync and not has_followup
                     )
                     var gathered = Tensor[Self.dtype](ndb^, requires_grad=False)
                     if reduction.is_sum():

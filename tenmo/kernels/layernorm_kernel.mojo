@@ -120,7 +120,7 @@ struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         gamma: NDBuffer[Self.dtype],  # (D,)
         beta: NDBuffer[Self.dtype],  # (D,)
         eps: Scalar[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ]:

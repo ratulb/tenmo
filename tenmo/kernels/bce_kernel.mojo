@@ -512,7 +512,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         A: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -587,7 +587,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
         is_mean: Bool,
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -672,7 +672,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         A: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -746,7 +746,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         target: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
         is_mean: Bool,
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> Tuple[
         NDBuffer[Self.dtype], NDBuffer[Self.dtype]
     ] where Self.dtype.is_floating_point():
@@ -829,7 +829,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         sigmoid: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         grad_output: NDBuffer[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         """Fused BCEWithLogits backward. Returns gradient for logits."""
         debug_assert(sigmoid.is_on_gpu())
@@ -895,7 +895,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         sigmoid: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         scalar_grad: Scalar[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         """Fused BCEWithLogits backward with scalar gradient. Returns gradient for logits.
         """
@@ -960,7 +960,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         safe: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         grad_output: NDBuffer[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         """Fused BCELoss backward. Returns gradient for pred."""
         debug_assert(safe.is_on_gpu())
@@ -1026,7 +1026,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
         safe: NDBuffer[Self.dtype],
         target: NDBuffer[Self.dtype],
         scalar_grad: Scalar[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         """Fused BCELoss backward with scalar gradient. Returns gradient for pred.
         """

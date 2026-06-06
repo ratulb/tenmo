@@ -6,6 +6,7 @@ from .ancestry import Ancestor
 from tenmo.common_utils import Epsilon
 from .variance import Variance
 from .welford import Welford
+from std.sys import has_accelerator
 
 # =============================================================================
 # Updated StdBwdArg — goes in std.mojo
@@ -129,6 +130,7 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         keepdims: Bool = False,
         unbiased: Bool = True,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         # Normalize negative axis — sentinel -100 flows through unchanged
         var normalized_axis = axis
@@ -145,11 +147,15 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             0, self.rank()
         ) if normalized_axis == -100 else IntArray(normalized_axis)
         var (mean_ndb, var_ndb) = Welford[Self.dtype].forward(
-            self.buffer, axes, unbiased, keepdims=True
+            self.buffer, axes, unbiased, keepdims=True, sync=False
         )
 
         # std from var — keepdims=True shape preserved
-        var std_ndb_keepdims = var_ndb.unary_ops[SQRT]()
+        var std_ndb_keepdims = var_ndb.unary_ops[SQRT](sync=False)
+
+        comptime if has_accelerator():
+            if std_ndb_keepdims.is_on_gpu():
+                std_ndb_keepdims.sync()
 
         # Output: squeeze if user requested keepdims=False
         var result_ndb = std_ndb_keepdims

@@ -153,7 +153,7 @@ struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         treat_nan_equal: Bool = True,
         simd_width: Int = simd_width_of[Self.dtype](),
         simd_vectors_per_thread: Int = 2,
-    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = True) raises -> Bool:
+    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = False) raises -> Bool:
         comptime simdwidth = simd_width_of[Self.dtype]()
 
         var (threads_per_block, num_blocks) = Self.launch_config(A.numels())
@@ -312,7 +312,7 @@ struct Compare[dtype: DType = DType.float32](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = True) raises -> NDBuffer[
+    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = False) raises -> NDBuffer[
         DType.bool
     ]:
         comptime simdwidth = simd_width_of[Self.datatype]()
@@ -457,7 +457,7 @@ struct CompareScalar[dtype: DType = DType.float32](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) raises -> NDBuffer[
+    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = False) raises -> NDBuffer[
         DType.bool
     ]:
         var numels = A.numels()

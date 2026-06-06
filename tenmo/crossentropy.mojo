@@ -311,13 +311,13 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var ug_expanded = ug_flat.unsqueeze(IntArray(-1)).broadcast_to(
                 Shape(M, C)
             )
-            return grad * ug_expanded
+            return grad.arithmetic_ops[Multiply](ug_expanded)
         else:
             var ug_scalar = SumMeanReduction[Self.dtype].sum(upstream.buffer(), IntArray()).item()
             var scale = Scalar[Self.dtype](
                 valid_count if reduction.is_mean() and valid_count > 0 else 1
             )
-            return grad * (ug_scalar / scale)
+            return grad.scalar_ops[Multiply](ug_scalar / scale)
 
 
 # CEClassIndicesBackward
@@ -386,9 +386,9 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var ls = label_smoothing
         if ls > Scalar[Self.dtype](0):
             var ls_uniform = ls / Scalar[Self.dtype](C)
-            grad = grad - onehot * (Scalar[Self.dtype](1) - ls) - ls_uniform
+            grad = grad.arithmetic_ops[Subtract](onehot.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls)).scalar_ops[Subtract](ls_uniform)
         else:
-            grad = grad - onehot
+            grad = grad.arithmetic_ops[Subtract](onehot)
 
         # Step 4: Zero out ignored positions via ignore mask
         # ignore_mask: 1=valid, 0=ignored — built from ORIGINAL target
@@ -398,7 +398,7 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var ignore_mask_2d = ignore_mask.unsqueeze(IntArray(-1)).broadcast_to(
             Shape(M, C)
         )
-        grad = grad * ignore_mask_2d
+        grad = grad.arithmetic_ops[Multiply](ignore_mask_2d)
 
         # Step 5: Scale by upstream grad and reduction
         var scaled = CECommon[Self.dtype].scale_grad_by_upstream(
@@ -483,6 +483,7 @@ struct CEClassIndicesForward[dtype: DType](
         ignore_index: Int,
         label_smoothing: Scalar[Self.dtype],
         validate: Bool,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var logits_shape = logits.shape()
         var C = logits_shape[1]
@@ -538,14 +539,14 @@ struct CEClassIndicesForward[dtype: DType](
 
         if ls > Scalar[Self.dtype](0):
             # loss = -(1-ls)*log_p[target] - ls * mean(log_p)
-            var nll = -SumMeanReduction[Self.dtype].sum(onehot_mask * log_probs_ndb, normalized_axes=IntArray(1))
-            var mean_log_p = SumMeanReduction[Self.dtype].sum(log_probs_ndb, normalized_axes=IntArray(1)) / Scalar[Self.dtype](C2)
-            losses = (Scalar[Self.dtype](1) - ls) * nll - ls * mean_log_p
+            var nll = SumMeanReduction[Self.dtype].sum(onehot_mask.arithmetic_ops[Multiply](log_probs_ndb), normalized_axes=IntArray(1)).unary_ops[NEGATE]()
+            var mean_log_p = SumMeanReduction[Self.dtype].sum(log_probs_ndb, normalized_axes=IntArray(1)).scalar_ops[Divide](Scalar[Self.dtype](C2))
+            losses = nll.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls).arithmetic_ops[Subtract](mean_log_p.scalar_ops[Multiply](ls))
         else:
-            losses = -SumMeanReduction[Self.dtype].sum(onehot_mask * log_probs_ndb, normalized_axes=IntArray(1))
+            losses = SumMeanReduction[Self.dtype].sum(onehot_mask.arithmetic_ops[Multiply](log_probs_ndb), normalized_axes=IntArray(1)).unary_ops[NEGATE]()
 
         # Zero ignored positions
-        losses = losses * ignore_mask_ndb
+        losses = losses.arithmetic_ops[Multiply](ignore_mask_ndb)
 
         # Apply reduction
         var out = CECommon[Self.dtype].apply_reduction(
@@ -570,6 +571,10 @@ struct CEClassIndicesForward[dtype: DType](
                     ),
                 )
                 out.add_ancestry(backwardFnArg^, logits)
+
+        comptime if has_accelerator():
+            if sync and out.is_on_gpu():
+                out.buffer.sync()
 
         return out^
 
@@ -619,7 +624,7 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var logits = output.ancestry().get(0)
 
         # grad = softmax - smoothed_target
-        var grad = softmax_probs - smoothed_target
+        var grad = softmax_probs.arithmetic_ops[Subtract](smoothed_target)
 
         # Scale by upstream and reduction
         var scaled = CECommon[Self.dtype].scale_grad_by_upstream(
@@ -680,6 +685,7 @@ struct CEProbabilitiesForward[dtype: DType](
         ignore_index: Int,
         label_smoothing: Scalar[Self.dtype],
         validate: Bool,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var logits_shape = logits.shape()
 
@@ -711,14 +717,12 @@ struct CEProbabilitiesForward[dtype: DType](
         var smoothed_target_ndb: NDBuffer[Self.dtype]
         if ls > Scalar[Self.dtype](0):
             var uniform = Scalar[Self.dtype](1) / Scalar[Self.dtype](C)
-            smoothed_target_ndb = (
-                Scalar[Self.dtype](1) - ls
-            ) * target_2d_ndb + ls * uniform
+            smoothed_target_ndb = target_2d_ndb.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls).scalar_ops[Add](ls * uniform)
         else:
             smoothed_target_ndb = target_2d_ndb
 
         # loss = -sum(smoothed_target * log_probs, axis=1)
-        var losses = -SumMeanReduction[Self.dtype].sum(smoothed_target_ndb * log_probs_ndb, IntArray(1))
+        var losses = SumMeanReduction[Self.dtype].sum(smoothed_target_ndb.arithmetic_ops[Multiply](log_probs_ndb), IntArray(1)).unary_ops[NEGATE]()
 
         # M = valid_count (no ignore_index for probabilities)
         var out = CECommon[Self.dtype].apply_reduction(
@@ -741,6 +745,10 @@ struct CEProbabilitiesForward[dtype: DType](
                     ),
                 )
                 out.add_ancestry(backwardFnArg^, logits)
+
+        comptime if has_accelerator():
+            if sync and out.is_on_gpu():
+                out.buffer.sync()
 
         return out^
 
@@ -820,6 +828,7 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         logits: Tensor[Self.dtype],
         target: Tensor[DType.int32],
         validate: Bool = True,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """Class index targets."""
         if self.training:
@@ -830,6 +839,7 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 self.ignore_index,
                 self.label_smoothing,
                 validate,
+                sync=sync,
             )
         else:
             return CEClassIndicesForward[Self.dtype].forward[track_grad=False](
@@ -839,6 +849,7 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 self.ignore_index,
                 self.label_smoothing,
                 validate,
+                sync=sync,
             )
 
     def __call__(
@@ -846,6 +857,7 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         logits: Tensor[Self.dtype],
         target: Tensor[Self.dtype],
         validate: Bool = True,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """Probability targets."""
         if self.training:
@@ -856,6 +868,7 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 self.ignore_index,
                 self.label_smoothing,
                 validate,
+                sync=sync,
             )
         else:
             return CEProbabilitiesForward[Self.dtype].forward[track_grad=False](
@@ -865,4 +878,5 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 self.ignore_index,
                 self.label_smoothing,
                 validate,
+                sync=sync,
             )

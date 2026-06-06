@@ -38,7 +38,7 @@ struct SoftmaxNdBuffer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var exp_sum = SumMeanReduction[Self.dtype].sum(
             stable_exp, normalized_axes, keepdims=True
         )
-        return stable_exp / exp_sum
+        return stable_exp.arithmetic_ops[Divide](exp_sum)
 
     @staticmethod
     def log_sum(
@@ -113,7 +113,7 @@ struct SoftmaxNdBuffer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var exp_sum = SumMeanReduction[Self.dtype].sum(
             stable_exp, normalized_axes, keepdims=True
         )
-        return stable - log_sum_exp, stable_exp / exp_sum
+        return stable.arithmetic_ops[Subtract](log_sum_exp), stable_exp.arithmetic_ops[Divide](exp_sum)
 
     @staticmethod
     def _softmax_components(
@@ -125,7 +125,7 @@ struct SoftmaxNdBuffer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var (max_values, _) = MinMax[Self.dtype].minmax[is_max=True](
             ndb, normalized_axes, keepdims=True
         )
-        var stable = ndb - max_values
+        var stable = ndb.arithmetic_ops[Subtract](max_values)
         var stable_exp = stable.exp()
         return stable, stable_exp
 
@@ -157,16 +157,16 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
             var sum_grad = SumMeanReduction[Self.dtype].sum(
                 gradbox.buffer(), axes, keepdims=True
             )
-            var softmax_sum = softmax_out * sum_grad
-            local_grad_ndb = gradbox.buffer() - softmax_sum
+            var softmax_sum = softmax_out.arithmetic_ops[Multiply](sum_grad)
+            local_grad_ndb = gradbox.buffer().arithmetic_ops[Subtract](softmax_sum)
         else:
             # y * (g - sum(g * y, axes, keepdims=True))
-            var gy = gradbox.buffer() * softmax_out
+            var gy = gradbox.buffer().arithmetic_ops[Multiply](softmax_out)
             var gy_sum = SumMeanReduction[Self.dtype].sum(
                 gy, axes, keepdims=True
             )
-            var grad_diff = gradbox.buffer() - gy_sum
-            local_grad_ndb = softmax_out * grad_diff
+            var grad_diff = gradbox.buffer().arithmetic_ops[Subtract](gy_sum)
+            local_grad_ndb = softmax_out.arithmetic_ops[Multiply](grad_diff)
 
         var local_grad = Gradbox[Self.dtype](local_grad_ndb^)
         ancestor.update_grad(local_grad^, AddTensor, None)
@@ -184,6 +184,7 @@ struct Softmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         this: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var shape = this.shape()
 
@@ -211,6 +212,10 @@ struct Softmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
                 out.add_ancestry(backwardFnArg^, this)
 
+        comptime if has_accelerator():
+            if sync and out.is_on_gpu():
+                out.buffer.sync()
+
         return out^
 
 
@@ -223,6 +228,7 @@ struct LogSoftmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         this: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var shape = this.shape()
 
@@ -247,5 +253,9 @@ struct LogSoftmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 )
 
                 out.add_ancestry(backwardFnArg^, this)
+
+        comptime if has_accelerator():
+            if sync and out.is_on_gpu():
+                out.buffer.sync()
 
         return out^

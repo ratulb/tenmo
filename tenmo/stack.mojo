@@ -99,6 +99,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         tensors: List[Tensor[Self.dtype]],
         axis: Int = 0,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """
         Stack tensors along a new axis.

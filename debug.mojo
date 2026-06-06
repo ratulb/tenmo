@@ -13,9 +13,45 @@ from std import math
 
 comptime dtype = DType.float32
 
+@fieldwise_init
+struct IntAdder(ImplicitlyCopyable & Absable):
+    var value: Int
+
+    def __getitem__(self, index: Int, sync: Bool= True) -> Int:
+        print("Sync in get: ", sync, "index: ", index)
+        return self.value
+
+    def __setitem__(mut self, index: Int, v: Int, sync: Bool= False):
+        print("Sync in set: ", sync, "index: ", index)
+        self.value = v
+
+
+
+    def __add__[sync: Bool = True](self, other: Self) -> IntAdder:
+        print("sync: ", sync)
+        return IntAdder(self.value + other.value)
+
+    def __abs__(self) -> Self:
+        return Self(abs(self.value))
+
+    def __iadd__[sync: Bool = True](mut self, other: Self):
+        print("sync: ", sync)
+        self.value += other.value
+
+
+
 
 def main() raises:
-    test_sgd_gpu_backward_integration()
+    #test_sgd_gpu_backward_integration()
+    var x = IntAdder(100)
+    var y = IntAdder(200)
+    var r = x.__add__[False](y)
+    print(r.value)
+    print(r[99, False])
+    x.__setitem__(100,-800)
+    print(x[88888])
+    x += r
+    print(x.value, abs(x).value)
 
 def test_sgd_gpu_backward_integration() raises:
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)

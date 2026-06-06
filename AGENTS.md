@@ -702,6 +702,10 @@ See [`PERFORMANCE_BOTTLENECKS.md`](PERFORMANCE_BOTTLENECKS.md) for a ranked
 list of all performance bottlenecks across GPU kernels, autograd, memory
 management, and SIMD paths — with root causes and fix suggestions for each.
 
+See [`GPU_SYNCHRONIZATION.md`](GPU_SYNCHRONIZATION.md) for a complete map of
+all GPU sync call sites, the kernel launch pipeline, compound operations, CPU-
+GPU transfer sync, correctness model, and a phased optimization plan.
+
 ## Broadcast Optimization (`broadcast_nd_buffer`)
 
 `broadcast_nd_buffer` at `tenmo/ndbuffer.mojo:2712` handles ND-broadcast arithmetic (both operands non-scalar, different shapes). Three-tier dispatch:

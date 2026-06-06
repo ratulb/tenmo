@@ -385,7 +385,7 @@ struct BinaryInplaceOperations[dtype: DType](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = True) raises:
+    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = False) raises:
         comptime simdwidth = simd_width_of[Self.dtype]()
         var A_shape = A.shape
         var B_shape = B.shape

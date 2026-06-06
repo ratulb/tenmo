@@ -188,7 +188,7 @@ struct Gradbox[dtype: DType](
         Returns:
             A new Gradbox with absolute values.
         """
-        return Gradbox[Self.dtype](self.buffer().__abs__())
+        return Gradbox[Self.dtype](self.buffer().unary_ops[ABS]())
 
     def sqrt(
         self,
@@ -1067,7 +1067,7 @@ struct Gradbox[dtype: DType](
         """
         return Gradbox[Self.dtype](self.buffer().scalar_ops[MIN](scalar))
 
-    def __mul__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+    def __mul__[sync: Bool = False](self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
         """Multiply by a scalar.
 
         Args:
@@ -1076,9 +1076,9 @@ struct Gradbox[dtype: DType](
         Returns:
             A new Gradbox with the result.
         """
-        return Gradbox[Self.dtype](self.buffer().scalar_ops[Multiply](scalar))
+        return Gradbox[Self.dtype](self.buffer().scalar_ops[Multiply](scalar, sync=sync))
 
-    def __rmul__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+    def __rmul__[sync: Bool = False](self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
         """Right multiply by a scalar.
 
         Args:
@@ -1087,9 +1087,9 @@ struct Gradbox[dtype: DType](
         Returns:
             A new Gradbox with the result.
         """
-        return self.__mul__(scalar)
+        return self.__mul__[sync=sync](scalar)
 
-    def __add__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+    def __add__[sync: Bool = False](self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
         """Add a scalar.
 
         Args:
@@ -1098,9 +1098,9 @@ struct Gradbox[dtype: DType](
         Returns:
             A new Gradbox with the result.
         """
-        return Gradbox[Self.dtype](self.buffer().scalar_ops[Add](scalar))
+        return Gradbox[Self.dtype](self.buffer().scalar_ops[Add](scalar, sync=sync))
 
-    def __radd__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+    def __radd__[sync: Bool = False](self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
         """Right add a scalar.
 
         Args:
@@ -1109,9 +1109,9 @@ struct Gradbox[dtype: DType](
         Returns:
             A new Gradbox with the result.
         """
-        return self.__add__(scalar)
+        return self.__add__[sync=sync](scalar)
 
-    def __sub__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+    def __sub__[sync: Bool = False](self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
         """Subtract a scalar.
 
         Args:
@@ -1120,9 +1120,9 @@ struct Gradbox[dtype: DType](
         Returns:
             A new Gradbox with the result.
         """
-        return Gradbox[Self.dtype](self.buffer().scalar_ops[Subtract](scalar))
+        return Gradbox[Self.dtype](self.buffer().scalar_ops[Subtract](scalar, sync=sync))
 
-    def __rsub__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+    def __rsub__[sync: Bool = False](self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
         """Right subtract (scalar - self).
 
         Args:
@@ -1132,10 +1132,10 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer().scalar_ops[ReverseSubtract](scalar)
+            self.buffer().scalar_ops[ReverseSubtract](scalar, sync=sync)
         )
 
-    def __truediv__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+    def __truediv__[sync: Bool = False](self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
         """Divide by a scalar.
 
         Args:
@@ -1149,9 +1149,9 @@ struct Gradbox[dtype: DType](
         """
         if scalar == Scalar[Self.dtype](0):
             panic("Gradbox → __truediv__(scalar): can not divide by zero")
-        return Gradbox[Self.dtype](self.buffer().scalar_ops[Divide](scalar))
+        return Gradbox[Self.dtype](self.buffer().scalar_ops[Divide](scalar, sync=sync))
 
-    def __rtruediv__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+    def __rtruediv__[sync: Bool = False](self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
         """Right divide (scalar / self).
 
         Args:
@@ -1161,10 +1161,10 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer().scalar_ops[ReverseDivide](scalar)
+            self.buffer().scalar_ops[ReverseDivide](scalar, sync=sync)
         )
 
-    def __mul__(self, other: Self) -> Gradbox[Self.dtype]:
+    def __mul__[sync: Bool = False](self, other: Self) -> Gradbox[Self.dtype]:
         """Element-wise multiply with another Gradbox.
 
         Args:
@@ -1174,10 +1174,10 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer().arithmetic_ops[Multiply](other.buffer())
+            self.buffer().arithmetic_ops[Multiply](other.buffer(), sync=sync)
         )
 
-    def __mul__(self, other: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
+    def __mul__[sync: Bool = False](self, other: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
         """Element-wise multiply with a Tensor.
 
         Args:
@@ -1187,7 +1187,7 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer().arithmetic_ops[Multiply](other.buffer)
+            self.buffer().arithmetic_ops[Multiply](other.buffer, sync=sync)
         )
 
     def matmul(
@@ -1205,7 +1205,7 @@ struct Gradbox[dtype: DType](
         var ndb = NDBuffer[Self.dtype].matmul_nd(A.buffer(), B.buffer)
         return Gradbox[Self.dtype](ndb^)
 
-    def __add__(self, other: Self) -> Gradbox[Self.dtype]:
+    def __add__[sync: Bool = False](self, other: Self) -> Gradbox[Self.dtype]:
         """Element-wise add another Gradbox.
 
         Args:
@@ -1215,10 +1215,10 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer().arithmetic_ops[Add](other.buffer())
+            self.buffer().arithmetic_ops[Add](other.buffer(), sync=sync)
         )
 
-    def __add__(self, other: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
+    def __add__[sync: Bool = False](self, other: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
         """Element-wise add a Tensor.
 
         Args:
@@ -1228,10 +1228,10 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer().arithmetic_ops[Add](other.buffer)
+            self.buffer().arithmetic_ops[Add](other.buffer, sync=sync)
         )
 
-    def __sub__(self, other: Self) -> Gradbox[Self.dtype]:
+    def __sub__[sync: Bool = False](self, other: Self) -> Gradbox[Self.dtype]:
         """Element-wise subtract another Gradbox.
 
         Args:
@@ -1241,10 +1241,10 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer().arithmetic_ops[Subtract](other.buffer())
+            self.buffer().arithmetic_ops[Subtract](other.buffer(), sync=sync)
         )
 
-    def __sub__(self, other: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
+    def __sub__[sync: Bool = False](self, other: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
         """Element-wise subtract a Tensor.
 
         Args:
@@ -1254,10 +1254,10 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer().arithmetic_ops[Subtract](other.buffer)
+            self.buffer().arithmetic_ops[Subtract](other.buffer, sync=sync)
         )
 
-    def __truediv__(self, other: Self) -> Gradbox[Self.dtype]:
+    def __truediv__[sync: Bool = False](self, other: Self) -> Gradbox[Self.dtype]:
         """Element-wise divide by another Gradbox.
 
         Args:
@@ -1267,76 +1267,76 @@ struct Gradbox[dtype: DType](
             A new Gradbox with the result.
         """
         return Gradbox[Self.dtype](
-            self.buffer().arithmetic_ops[Divide](other.buffer())
+            self.buffer().arithmetic_ops[Divide](other.buffer(), sync=sync)
         )
 
-    def __imul__(self, scalar: Scalar[Self.dtype]):
+    def __imul__[sync: Bool = False](self, scalar: Scalar[Self.dtype]):
         """In-place multiply by a scalar.
 
         Args:
             scalar: The scalar to multiply by.
         """
-        self.buffer().inplace_scalar_ops[Multiply](scalar)
+        self.buffer().inplace_scalar_ops[Multiply](scalar, sync=sync)
 
-    def __iadd__(self, scalar: Scalar[Self.dtype]):
+    def __iadd__[sync: Bool = False](self, scalar: Scalar[Self.dtype]):
         """In-place add a scalar.
 
         Args:
             scalar: The scalar to add.
         """
-        self.buffer().inplace_scalar_ops[Add](scalar)
+        self.buffer().inplace_scalar_ops[Add](scalar, sync=sync)
 
-    def __isub__(self, scalar: Scalar[Self.dtype]):
+    def __isub__[sync: Bool = False](self, scalar: Scalar[Self.dtype]):
         """In-place subtract a scalar.
 
         Args:
             scalar: The scalar to subtract.
         """
-        self.buffer().inplace_scalar_ops[Subtract](scalar)
+        self.buffer().inplace_scalar_ops[Subtract](scalar, sync=sync)
 
-    def __itruediv__(self, scalar: Scalar[Self.dtype]):
+    def __itruediv__[sync: Bool = False](self, scalar: Scalar[Self.dtype]):
         """In-place divide by a scalar.
 
         Args:
             scalar: The scalar to divide by.
         """
-        self.buffer().inplace_scalar_ops[Divide](scalar)
+        self.buffer().inplace_scalar_ops[Divide](scalar, sync=sync)
 
     @always_inline
-    def __imul__(self, incoming: Gradbox[Self.dtype]):
+    def __imul__[sync: Bool = False](self, incoming: Gradbox[Self.dtype]):
         """In-place element-wise multiply.
 
         Args:
             incoming: The Gradbox to multiply by.
         """
-        self.buffer().inplace_ops[Multiply](incoming.buffer())
+        self.buffer().inplace_ops[Multiply](incoming.buffer(), sync=sync)
 
     @always_inline
-    def __iadd__(self, incoming: Gradbox[Self.dtype]):
+    def __iadd__[sync: Bool = False](self, incoming: Gradbox[Self.dtype]):
         """In-place element-wise add.
 
         Args:
             incoming: The Gradbox to add.
         """
-        self.buffer().inplace_ops[Add](incoming.buffer())
+        self.buffer().inplace_ops[Add](incoming.buffer(), sync=sync)
 
     @always_inline
-    def __isub__(self, incoming: Gradbox[Self.dtype]):
+    def __isub__[sync: Bool = False](self, incoming: Gradbox[Self.dtype]):
         """In-place element-wise subtract.
 
         Args:
             incoming: The Gradbox to subtract.
         """
-        self.buffer().inplace_ops[Subtract](incoming.buffer())
+        self.buffer().inplace_ops[Subtract](incoming.buffer(), sync=sync)
 
     @always_inline
-    def __itruediv__(self, incoming: Gradbox[Self.dtype]):
+    def __itruediv__[sync: Bool = False](self, incoming: Gradbox[Self.dtype]):
         """In-place element-wise divide.
 
         Args:
             incoming: The Gradbox to divide by.
         """
-        self.buffer().inplace_ops[Divide](incoming.buffer())
+        self.buffer().inplace_ops[Divide](incoming.buffer(), sync=sync)
 
     def all_close[
         rtol: Scalar[Self.dtype] = 1e-5,
@@ -1453,7 +1453,7 @@ struct Gradbox[dtype: DType](
             )
         return self.buffer().compare[Equal](tensor.buffer).buffer.all_true()
 
-    def print(self, num_first: Int = 10, num_last: Int = 10):
+    def print(self, num_first: Int = 10, num_last: Int = 10) raises:
         """Print the Gradbox contents.
 
         Args:

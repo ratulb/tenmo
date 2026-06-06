@@ -752,7 +752,7 @@ struct NDBuffer[dtype: DType](
         s += "]"
         return s
 
-    def print(self, num_first: Int = 10, num_last: Int = 10):
+    def print(self, num_first: Int = 10, num_last: Int = 10) raises:
         print(
             "\n",
             String(self),
@@ -1703,7 +1703,7 @@ struct NDBuffer[dtype: DType](
     ](
         self: NDBuffer[Self.dtype],
         other: NDBuffer[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ):
         # Broadcast validation
         if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
@@ -1816,7 +1816,7 @@ struct NDBuffer[dtype: DType](
     ](
         self: NDBuffer[Self.dtype],
         scalar: Scalar[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ):
         comptime if op_code == Divide:
             if scalar == Scalar[Self.dtype](0):
@@ -1924,7 +1924,7 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     def __rmul__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
-        return self.__mul__(scalar)
+        return self.scalar_ops[Multiply](scalar)
 
     @always_inline
     def __sub__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
@@ -1949,7 +1949,7 @@ struct NDBuffer[dtype: DType](
         self: NDBuffer[Self.dtype],
         other: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> NDBuffer[Self.dtype]:
         # Broadcast validation
         if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
@@ -2114,7 +2114,7 @@ struct NDBuffer[dtype: DType](
     ](
         self: NDBuffer[Self.dtype],
         scalar: Scalar[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> NDBuffer[Self.dtype]:
         comptime if op_code == Divide:
             if scalar == Scalar[Self.dtype](0):
@@ -2185,7 +2185,7 @@ struct NDBuffer[dtype: DType](
     @always_inline
     def unary_ops[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], sync: Bool = True) -> NDBuffer[Self.dtype]:
+    ](self: NDBuffer[Self.dtype], sync: Bool = False) -> NDBuffer[Self.dtype]:
         var out: NDBuffer[Self.dtype]
 
         comptime if has_accelerator():
@@ -2239,7 +2239,7 @@ struct NDBuffer[dtype: DType](
     def float_unary_ops[
         op_code: Int,
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
-    ](self: NDBuffer[Self.dtype], sync: Bool = True) -> NDBuffer[
+    ](self: NDBuffer[Self.dtype], sync: Bool = False) -> NDBuffer[
         Self.dtype
     ] where Self.dtype.is_floating_point():
         """For LOG/EXP/SIGMOID/TANH."""
@@ -2354,7 +2354,7 @@ struct NDBuffer[dtype: DType](
     ](
         self: NDBuffer[Self.dtype],
         other: NDBuffer[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> NDBuffer[DType.bool]:
         if not self.shape == other.shape:
             panic(
@@ -2434,7 +2434,7 @@ struct NDBuffer[dtype: DType](
     ](
         self: NDBuffer[Self.dtype],
         scalar: Scalar[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) -> NDBuffer[DType.bool]:
         var result: NDBuffer[DType.bool]
 
@@ -2488,7 +2488,7 @@ struct NDBuffer[dtype: DType](
     def all_close[
         rtol: Scalar[Self.dtype] = 1e-5,
         atol: Scalar[Self.dtype] = 1e-8,
-    ](self, other: Self, sync: Bool = True) -> Bool:
+    ](self, other: Self, sync: Bool = False) -> Bool:
         comptime assert (
             Self.dtype.is_floating_point()
         ), "NDBuffer → all_close is for floating point data types only"
@@ -2627,7 +2627,7 @@ struct NDBuffer[dtype: DType](
         return False
 
     def matmul_2d(
-        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = True
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = False
     ) -> NDBuffer[Self.dtype]:
         ref A_shape = A.shape
         ref B_shape = B.shape
@@ -2668,7 +2668,7 @@ struct NDBuffer[dtype: DType](
         return C^
 
     def matmul_nd(
-        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = True
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = False
     ) -> NDBuffer[Self.dtype]:
         var A_shape = A.shape
         var B_shape = B.shape

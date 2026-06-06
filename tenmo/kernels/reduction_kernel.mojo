@@ -963,7 +963,7 @@ struct Reduction[dtype: DType = DType.float32](
         op_code: Int = SUM,
         max_block_width: Int = 512,
     ](
-        A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool, sync: Bool = True
+        A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool, sync: Bool = False
     ) raises -> NDBuffer[Self.dtype]:
         """Launch sum or mean reduction.
 
@@ -1044,7 +1044,7 @@ struct Reduction[dtype: DType = DType.float32](
         store_excl_product: Bool = True,
         max_block_width: Int = 512,
     ](
-        A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool, sync: Bool = True
+        A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool, sync: Bool = False
     ) raises -> Tuple[NDBuffer[Self.dtype], ProductArg[Self.dtype]]:
         """Launch product reduction.
 
@@ -1199,7 +1199,7 @@ struct Reduction[dtype: DType = DType.float32](
         A: NDBuffer[Self.dtype],
         normalized_axes: IntArray,
         keepdims: Bool,
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         var shape_A = A.shape
         var strides_A = A.strides
@@ -1264,7 +1264,7 @@ struct Reduction[dtype: DType = DType.float32](
         max_block_width: Int = 512,
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](
-            A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool, sync: Bool = True,
+            A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool, sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         var shape_A = A.shape
         var strides_A = A.strides
@@ -1361,7 +1361,7 @@ struct Reduction[dtype: DType = DType.float32](
         A: NDBuffer[Self.dtype],
         normalized_axes: IntArray,
         keepdims: Bool,
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         """Launch Welford mean + M2 reduction on GPU.
 

@@ -77,6 +77,7 @@ struct Tile[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         mut self: Tensor[Self.dtype],
         repeat: IntArray,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """
         Tile — GPU-safe implementation using reshape + expand + reshape.

@@ -128,7 +128,7 @@ struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
         p: Scalar[Self.dtype],
         scale: Scalar[Self.dtype],
         rng_seed: UInt64,
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
         """Launch dropout forward kernel. Returns (output, mask) on GPU.
 

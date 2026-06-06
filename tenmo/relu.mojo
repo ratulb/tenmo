@@ -32,7 +32,7 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         if gradbox.is_on_gpu():
             var mask_ndb = arg.get[NDBufferArg[Self.dtype]]().ndb
-            result_ndb = gradbox.buffer() * mask_ndb
+            result_ndb = gradbox.buffer().arithmetic_ops[Multiply](mask_ndb)
         else:
             var mask_buf = arg.get[BufferArg[Self.dtype]]().buffer
             var result_buf = gradbox.buffer().data_buffer() * mask_buf
@@ -54,6 +54,7 @@ struct ReLU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ](
         self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Apply ReLU activation: max(0, x).
 

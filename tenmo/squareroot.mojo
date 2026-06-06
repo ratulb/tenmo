@@ -46,6 +46,7 @@ struct Sqrt[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         self: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var ndb = self.buffer.unary_ops[SQRT]()
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)

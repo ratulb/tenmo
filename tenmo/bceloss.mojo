@@ -1172,7 +1172,9 @@ struct BCEWithLogitsLoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
         target: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
         reduction: Reduction = Reduction("mean"),
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+
         var numels = logits.numels()
         var out: Tensor[Self.dtype]
         var sigmoid_ndb: NDBuffer[Self.dtype]
@@ -1242,6 +1244,7 @@ struct BCELoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
         target: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
         reduction: Reduction = Reduction("mean"),
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var numels = pred.numels()
         var out: Tensor[Self.dtype]

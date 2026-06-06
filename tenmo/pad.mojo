@@ -323,6 +323,7 @@ struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         mode: String = "constant",
         value: Scalar[Self.dtype] = 0.0,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Pad tensor along specified dimensions."""
         var x_shape = x.shape()

@@ -60,7 +60,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     def forward[
         track_grad: Bool = True,
-    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         var ndb = A.buffer.matmul_2d(B.buffer)
         var C = Tensor[Self.dtype](ndb^, requires_grad=False)
 
@@ -143,7 +143,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         ref A_shape = A.shape()
         ref B_shape = B.shape()
 
@@ -204,7 +204,7 @@ struct Matmul[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True, mode: Int = mm
-    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         comptime if mode == mm:
             # Step 1: Pure analysis - get the opcode
             var opcode = classify_matmul(A.shape(), B.shape())

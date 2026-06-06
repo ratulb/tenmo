@@ -91,7 +91,7 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) raises:
+    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = False) raises:
         var numels = A.numels()
 
         comptime simdwidth = simd_width_of[Self.dtype]()

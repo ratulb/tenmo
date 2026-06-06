@@ -86,7 +86,7 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         A: NDBuffer[Self.dtype],
         permutation: List[Int],
         axis: Int,
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         var shape = A.shape
         var total_elements = shape.num_elements()
@@ -137,7 +137,7 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         grad: NDBuffer[Self.dtype],
         permutation: List[Int],
         axis: Int,
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         var shape = grad.shape
         var total_elements = shape.num_elements()

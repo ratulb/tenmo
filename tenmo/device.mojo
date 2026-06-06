@@ -190,7 +190,7 @@ struct DeviceState[dtype: DType](
         self,
         size: Int,
         value: Scalar[Self.dtype] = Scalar[Self.dtype](0),
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> DeviceState[Self.dtype]:
         var device_state = DeviceState[Self.dtype](size, self.gpu)
 
@@ -212,7 +212,7 @@ struct DeviceState[dtype: DType](
         ref ndb: NDBuffer[Self.dtype],
         pred: def(Scalar[Self.dtype]) thin -> Bool,
         value: Scalar[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> DeviceState[Self.dtype]:
         ref src_device_state = ndb.device_state.value()
         var dst_device_state = DeviceState[Self.dtype](len(ndb), ndb.get_gpu())
@@ -226,7 +226,7 @@ struct DeviceState[dtype: DType](
 
         return dst_device_state
 
-    def fill(self, value: Scalar[Self.dtype], sync: Bool = True) raises:
+    def fill(self, value: Scalar[Self.dtype], sync: Bool = False) raises:
         with self.buffer.map_to_host() as host_buffer:
             comptime if Self.dtype == DType.bool:
                 var storage_val = UInt8(1) if value.cast[
@@ -240,7 +240,7 @@ struct DeviceState[dtype: DType](
         if sync:
             self.sync()
 
-    def fill(self, ref source: NDBuffer[Self.dtype], sync: Bool = True) raises:
+    def fill(self, ref source: NDBuffer[Self.dtype], sync: Bool = False) raises:
         """Fill the DeviceBuffer from the source NDBuffer."""
         if source.is_on_gpu():
             if source.is_contiguous():
@@ -304,7 +304,7 @@ struct DeviceState[dtype: DType](
             self.sync()
 
     def into(
-        self, shape: Shape, *, sync: Bool = True
+        self, shape: Shape
     ) raises -> NDBuffer[Self.dtype]:
         """
         Copy DeviceState content to a contiguous CPU NDBuffer with 0 offset.
@@ -317,8 +317,6 @@ struct DeviceState[dtype: DType](
             with self.buffer.map_to_host() as host_buffer:
                 for i in range(numels):
                     cpu_buf[i] = host_buffer[i].cast[DType.uint8]() == UInt8(1)
-            if sync:
-                self.sync()
             var casted_to_dtype = cpu_buf.to_dtype[Self.dtype]()
             return NDBuffer[Self.dtype](casted_to_dtype^, shape)
         else:
@@ -332,8 +330,6 @@ struct DeviceState[dtype: DType](
                     src=src_ptr.bitcast[Scalar[Self.dtype]](),
                     count=len(self),
                 )
-            if sync:
-                self.sync()
             return NDBuffer[Self.dtype](cpu_buf^, shape)
 
     def device_buffer(

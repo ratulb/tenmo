@@ -87,7 +87,7 @@ struct VectorMatmulNdGpu[dtype: DType = DType.float32](
     ](
         v: NDBuffer[Self.dtype],
         M: NDBuffer[Self.dtype],
-        sync: Bool = True,
+        sync: Bool = False,
     ) raises -> NDBuffer[
         Self.dtype
     ]:
