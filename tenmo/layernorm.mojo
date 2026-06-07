@@ -251,6 +251,7 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         beta: Tensor[Self.dtype],
         eps: Scalar[Self.dtype] = Scalar[Self.dtype](1e-5),
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var D = self.shape()[-1]
 
@@ -274,7 +275,7 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         )
 
         comptime if has_accelerator():
-            if out_ndb.is_on_gpu():
+            if out_ndb.is_on_gpu() and sync:
                 out_ndb.sync()
         # Make them shared so that BackwardFnArg is lighter
         x_hat_ndb.buffer.shared()
@@ -339,14 +340,14 @@ struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
             Shape(normalized_shape), requires_grad=True
         )
 
-    def __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(self, x: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         if self.training:
             return LayerNormForward[Self.dtype].forward[track_grad=True](
-                x, self.gamma, self.beta, self.eps
+                x, self.gamma, self.beta, self.eps, sync=sync
             )
         else:
             return LayerNormForward[Self.dtype].forward[track_grad=False](
-                x, self.gamma, self.beta, self.eps
+                x, self.gamma, self.beta, self.eps, sync=sync
             )
 
     def parameters(

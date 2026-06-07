@@ -136,7 +136,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self.stride = stride.or_else(kernel_size)
         self.padding = padding
 
-    def __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(self, x: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         if self.training:
             return Self.forward[track_grad=True](
                 x,
@@ -144,6 +144,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                 self.stride,
                 self.padding,
                 requires_grad=True,
+                sync=sync,
             )
         else:
             return Self.forward[track_grad=False](
@@ -152,6 +153,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                 self.stride,
                 self.padding,
                 requires_grad=False,
+                sync=sync,
             )
 
     @staticmethod
@@ -163,6 +165,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         stride: Optional[Int] = None,
         padding: Int = 0,
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         ref input_shape = input_tensor.shape()
         if input_shape.rank() != 4:

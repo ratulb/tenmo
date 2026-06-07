@@ -158,7 +158,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         if self.weight.requires_grad:
             self.weight.buffer.buffer.shared()
 
-    def __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(mut self, mut xs: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         ref xs_shape = xs.shape()
         ref weight_shape = self.weight.shape()
 
@@ -174,17 +174,17 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         if self.training:
             var matmul_out = Matmul[Self.dtype].forward[
                 track_grad=True, mode=Self.mode
-            ](xs, self.weight)
+            ](xs, self.weight, sync=sync)
             result = Adder[Self.dtype].forward[track_grad=True](
-                matmul_out^, self.bias
+                matmul_out^, self.bias, sync=sync
             )
 
         else:
             var matmul_out = Matmul[Self.dtype].forward[
                 track_grad=False, mode=Self.mode
-            ](xs, self.weight)
+            ](xs, self.weight, sync=sync)
             result = Adder[Self.dtype].forward[track_grad=False](
-                matmul_out^, self.bias
+                matmul_out^, self.bias, sync=sync
             )
 
         return result^
@@ -405,7 +405,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         self.weight.buffer.buffer.shared()
         self.bias.buffer.buffer.shared()
 
-    def __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(mut self, mut xs: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         ref xs_shape = xs.shape()
         ref weight_shape = self.weight.shape()
 
@@ -422,9 +422,9 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         )
         if profile.profiled:
             if profile.use_blas:
-                return self.matmul_blas(xs)
+                return self.matmul_blas(xs, sync=sync)
             else:
-                return self.matmul(xs)
+                return self.matmul(xs, sync=sync)
 
         else:  # We are still in profiling phase
             var curr_profile = profile.copy()
@@ -446,13 +446,13 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 else:
                     self.validation_profile = curr_profile^
 
-                return self.matmul(xs)
+                return self.matmul(xs, sync=sync)
 
             # Perform profiling
             elif curr_profile.call_count < curr_profile.profile_samples:
                 # First Profile -> profile_samples: measure native matmul
                 var start = now()
-                var result = self.matmul(xs)
+                var result = self.matmul(xs, sync=sync)
                 curr_profile.time_native += now() - start
                 curr_profile.call_count += 1
 
@@ -466,7 +466,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
             else:  # curr_profile.call_count < curr_profile.profile_samples * 2:
                 # Next 'profile_samples' calls: measure BLAS matmul
                 var start = now()
-                var result = self.matmul_blas(xs)
+                var result = self.matmul_blas(xs, sync=sync)
                 curr_profile.time_blas += now() - start
                 curr_profile.call_count += 1
 
@@ -533,29 +533,29 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         return self  # unreachable
 
     @always_inline
-    def matmul(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def matmul(mut self, mut xs: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         var result: Tensor[Self.dtype]
 
         if self.training:
             var matmul_out = Matmul[Self.dtype].forward[
                 track_grad=True, mode=Self.mode
-            ](xs, self.weight)
+            ](xs, self.weight, sync=sync)
             result = Adder[Self.dtype].forward[track_grad=True](
-                matmul_out^, self.bias
+                matmul_out^, self.bias, sync=sync
             )
 
         else:
             var matmul_out = Matmul[Self.dtype].forward[
                 track_grad=False, mode=Self.mode
-            ](xs, self.weight)
+            ](xs, self.weight, sync=sync)
             result = Adder[Self.dtype].forward[track_grad=False](
-                matmul_out^, self.bias
+                matmul_out^, self.bias, sync=sync
             )
 
         return result^
 
     @always_inline
-    def matmul_blas(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def matmul_blas(mut self, mut xs: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         var result: Tensor[Self.dtype]
 
         if self.training:
@@ -563,7 +563,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 xs, self.weight, transpose_A=False, transpose_B=False
             )
             result = Adder[Self.dtype].forward[track_grad=True](
-                matmul_out^, self.bias
+                matmul_out^, self.bias, sync=sync
             )
 
         else:
@@ -571,7 +571,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 xs, self.weight, transpose_A=False, transpose_B=False
             )
             result = Adder[Self.dtype].forward[track_grad=False](
-                matmul_out^, self.bias
+                matmul_out^, self.bias, sync=sync
             )
 
         return result^
@@ -626,11 +626,11 @@ struct ReLU[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     def __init__(out self, *, copy: Self):
         self.training = copy.training
 
-    def __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(self, x: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         if self.training:
-            return x.relu[track_grad=True]()
+            return x.relu[track_grad=True](sync=sync)
         else:
-            return x.relu[track_grad=False]()
+            return x.relu[track_grad=False](sync=sync)
 
     def parameters(
         ref self,
@@ -674,12 +674,12 @@ struct Sigmoid[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self.training = copy.training
 
     def __call__(
-        self, x: Tensor[Self.dtype]
+        self, x: Tensor[Self.dtype], sync: Bool = True
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
-            return x.sigmoid[track_grad=True]()
+            return x.sigmoid[track_grad=True](sync=sync)
         else:
-            return x.sigmoid[track_grad=False]()
+            return x.sigmoid[track_grad=False](sync=sync)
 
     def parameters(
         ref self,
@@ -723,12 +723,12 @@ struct Tanh[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self.training = copy.training
 
     def __call__(
-        self, x: Tensor[Self.dtype]
+        self, x: Tensor[Self.dtype], sync: Bool = True
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
-            return x.tanh[track_grad=True]()
+            return x.tanh[track_grad=True](sync=sync)
         else:
-            return x.tanh[track_grad=False]()
+            return x.tanh[track_grad=False](sync=sync)
 
     def parameters(
         ref self,
@@ -790,30 +790,30 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
     var tag: Int
 
     def __call__(
-        mut self, mut xs: Tensor[Self.dtype]
+        mut self, mut xs: Tensor[Self.dtype], sync: Bool = True
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.tag == LINEAR:
-            return self.layer[Linear[Self.dtype, mm]](xs)
+            return self.layer[Linear[Self.dtype, mm]](xs, sync=sync)
         if self.tag == LINEAR_BLAS:
-            return self.layer[LinearBLAS[Self.dtype, mm]](xs)
+            return self.layer[LinearBLAS[Self.dtype, mm]](xs, sync=sync)
         elif self.tag == RELU:
-            return self.layer[ReLU[Self.dtype]](xs)
+            return self.layer[ReLU[Self.dtype]](xs, sync=sync)
         elif self.tag == SIGMOID:
-            return self.layer[Sigmoid[Self.dtype]](xs)
+            return self.layer[Sigmoid[Self.dtype]](xs, sync=sync)
         elif self.tag == TANH:
-            return self.layer[Tanh[Self.dtype]](xs)
+            return self.layer[Tanh[Self.dtype]](xs, sync=sync)
         elif self.tag == DROPOUT:
-            return self.layer[Dropout[Self.dtype]](xs)
+            return self.layer[Dropout[Self.dtype]](xs, sync=sync)
         elif self.tag == CONV2D:
-            return self.layer[Conv2D[Self.dtype]](xs)
+            return self.layer[Conv2D[Self.dtype]](xs, sync=sync)
         elif self.tag == FLATTEN:
-            return self.layer[Flatten[Self.dtype]](xs)
+            return self.layer[Flatten[Self.dtype]](xs, sync=sync)
         elif self.tag == EMBEDDING:
-            return self.layer[Embedding[Self.dtype]](xs)
+            return self.layer[Embedding[Self.dtype]](xs, sync=sync)
         elif self.tag == MAXPOOL2D:
-            return self.layer[MaxPool2d[Self.dtype]](xs)
+            return self.layer[MaxPool2d[Self.dtype]](xs, sync=sync)
         elif self.tag == LAYER_NORM:
-            return self.layer[LayerNorm[Self.dtype]](xs)
+            return self.layer[LayerNorm[Self.dtype]](xs, sync=sync)
 
         else:
             panic("Unknown module type")
@@ -1018,12 +1018,12 @@ struct Sequential[dtype: DType](Copyable & Movable):
             self.modules.append(m)
 
     def __call__(
-        mut self, xs: Tensor[Self.dtype]
+        mut self, xs: Tensor[Self.dtype], sync: Bool = True
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var out = xs
         for i in range(len(self.modules)):
-            ref m = self.modules[i]
-            out = m(out)
+            var m = self.modules[i]
+            out = m(out, sync=sync)
         return out
 
     def parameters(
@@ -1145,12 +1145,12 @@ struct SequentialBLAS[dtype: DType](Copyable & Movable):
             self.modules.append(m)
 
     def __call__(
-        mut self, xs: Tensor[Self.dtype]
+        mut self, xs: Tensor[Self.dtype], sync: Bool = True
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var out = xs
         for i in range(len(self.modules)):
-            ref m = self.modules[i]
-            out = m(out)
+            var m = self.modules[i]
+            out = m(out, sync=sync)
         return out
 
     def parameters(
@@ -1198,12 +1198,12 @@ struct MSELoss[dtype: DType = DType.float32](RegisterPassable):
         self.training = True
 
     def __call__(
-        self, preds: Tensor[Self.dtype], target: Tensor[Self.dtype]
+        self, preds: Tensor[Self.dtype], target: Tensor[Self.dtype], sync: Bool = True
     ) -> Tensor[Self.dtype]:
         if self.training:
-            return preds.mse[track_grad=True](target)
+            return preds.mse[track_grad=True](target, sync=sync)
         else:
-            return preds.mse[track_grad=False](target)
+            return preds.mse[track_grad=False](target, sync=sync)
 
     def train(mut self):
         self.training = True
@@ -1372,7 +1372,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         self.training = take.training
         self.delegate = take.delegate^
 
-    def __call__(mut self, image: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(mut self, image: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         """
         Forward pass.
 
@@ -1409,6 +1409,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
                 dilation=self.dilation,
                 padding=self.padding,
                 requires_grad=True,
+                sync=sync,
             )
         else:
             return self.delegate[track_grad=False](
@@ -1419,6 +1420,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
                 dilation=self.dilation,
                 padding=self.padding,
                 requires_grad=False,
+                sync=sync,
             )
 
     def parameters(
@@ -1520,7 +1522,7 @@ struct Flatten[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     def __init__(out self, *, copy: Self):
         self.training = copy.training
 
-    def __call__(self, mut x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    def __call__(self, mut x: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
         ref shape = x.shape()
 
         _ = """if shape.rank() != 4:

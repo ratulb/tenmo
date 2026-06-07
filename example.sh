@@ -3,7 +3,7 @@ clear
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No example specified"
-    echo "Usage: $0 [imdb|imdb_v1|binary_mnist|mnist|mnist_gpu|xor|spiral|cifar_10|mnist_conv2d]"
+    echo "Usage: $0 [imdb|imdb_v1|binary_mnist|mnist|mnist_gpu|mnist_gpu_prof|xor|spiral|cifar_10|mnist_conv2d]"
     exit 1
 fi
 
@@ -51,10 +51,14 @@ case $1 in
         echo "Running mojo mnist_conv2d.mojo training loop"
         mojo -I . $DEBUG_MODE examples/mnist_conv2d.mojo
         ;;
+    mnist_gpu_prof)
+        echo "Running mnist gpu profiled training loop"
+        mojo -I . $DEBUG_MODE examples/mnist_gpu_prof.mojo
+        ;;
 
     *)
        echo "Error: Unknown test '$1'"
-       echo "Available training loops: imdb, imdb_v1, binary_mnist, mnist, xor, spiral, cifar_10, mnist_conv2d"
+       echo "Available training loops: imdb, imdb_v1, binary_mnist, mnist, mnist_gpu, mnist_gpu_prof, xor, spiral, cifar_10, mnist_conv2d"
        exit 1
     ;;
 esac

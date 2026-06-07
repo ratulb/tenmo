@@ -1157,12 +1157,12 @@ struct BCEWithLogitsLoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
         self.epsilon = epsilon
 
     def __call__(
-        self, logits: Tensor[Self.dtype], target: Tensor[Self.dtype]
+        self, logits: Tensor[Self.dtype], target: Tensor[Self.dtype], sync: Bool = True
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
-            return Self.forward[track_grad=True](logits, target, self.epsilon)
+            return Self.forward[track_grad=True](logits, target, self.epsilon, sync=sync)
         else:
-            return Self.forward[track_grad=False](logits, target, self.epsilon)
+            return Self.forward[track_grad=False](logits, target, self.epsilon, sync=sync)
 
     @staticmethod
     def forward[
@@ -1229,12 +1229,12 @@ struct BCELoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
         self.epsilon = epsilon
 
     def __call__(
-        self, pred: Tensor[Self.dtype], target: Tensor[Self.dtype]
+        self, pred: Tensor[Self.dtype], target: Tensor[Self.dtype], sync: Bool = True
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
-            return Self.forward[track_grad=True](pred, target, self.epsilon)
+            return Self.forward[track_grad=True](pred, target, self.epsilon, sync=sync)
         else:
-            return Self.forward[track_grad=False](pred, target, self.epsilon)
+            return Self.forward[track_grad=False](pred, target, self.epsilon, sync=sync)
 
     @staticmethod
     def forward[

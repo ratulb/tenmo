@@ -51,6 +51,7 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
         dilation: Int = 1,
         padding: Padding = Padding("valid"),
         requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var out: Tensor[Self.dtype]
         if self.initialized:

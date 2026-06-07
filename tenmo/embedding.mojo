@@ -131,19 +131,22 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
     def __call__(
         mut self,
         xs: Tensor[Self.dtype],
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var xs_casted = xs.to_dtype[DType.int64]()
-        return self.__call__(xs_casted)
+        return self.__call__(xs_casted, sync=sync)
 
     def __call__(
         mut self,
         indices: List[Int],
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
-        return self.__call__(IntArray(indices))
+        return self.__call__(IntArray(indices), sync=sync)
 
     def __call__(
         mut self,
         indices: IntArray,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Lookup embeddings for given indices.
 
@@ -167,10 +170,12 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
                 axis=0,
                 reduction=self.reduction,
                 padding_idx=self.padding_idx,
+                sync=sync,
             )
         else:
             result = Gather[Self.dtype].forward[track_grad=False](
-                self.weight, indices, axis=0, reduction=self.reduction
+                self.weight, indices, axis=0, reduction=self.reduction,
+                sync=sync,
             )
 
         # Apply max_norm renormalisation if set (in-place on result)
@@ -182,6 +187,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
     def __call__(
         mut self,
         indices: Tensor[DType.int64],
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Lookup embeddings for indices given as an int64 Tensor.
         Enables batched transformer-style usage:
@@ -193,10 +199,12 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
             result = Gather[Self.dtype].forward[track_grad=True](
                 self.weight, indices, axis=0, reduction=self.reduction,
                 padding_idx=self.padding_idx,
+                sync=sync,
             )
         else:
             result = Gather[Self.dtype].forward[track_grad=False](
                 self.weight, indices, axis=0, reduction=self.reduction,
+                sync=sync,
             )
         if self.max_norm:
             self._apply_max_norm(result)
