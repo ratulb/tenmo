@@ -550,13 +550,13 @@ struct BinaryOperations[dtype: DType = DType.float32](
         )
 
         # ================================================================
-        # PATH 2: A contiguous and not broadcast-expanded, B strided/broadcast
-        # FIX: guard A_shape == broadcast_shape so A's linear index is valid
+        # PATH 2: A contiguous and not broadcast-expanded, B broadcast
+        # A loads via linear index (contiguous), B via broadcast strides
         # ================================================================
         if (
             A_is_contiguous
             and A_shape == broadcast_shape
-            and not B_is_contiguous
+            and B_shape != broadcast_shape
         ):
             var compiled_func = device_context.compile_function[
                 arithmetic_ops_A_contiguous[
@@ -587,12 +587,12 @@ struct BinaryOperations[dtype: DType = DType.float32](
 
         # ================================================================
         # PATH 3: B contiguous and not broadcast-expanded, A strided/broadcast
-        # FIX: guard B_shape == broadcast_shape so B's linear index is valid
+        # B loads via linear index (contiguous), A via broadcast strides
         # ================================================================
         if (
             B_is_contiguous
             and B_shape == broadcast_shape
-            and not A_is_contiguous
+            and A_shape != broadcast_shape
         ):
             var compiled_func = device_context.compile_function[
                 arithmetic_ops_B_contiguous[

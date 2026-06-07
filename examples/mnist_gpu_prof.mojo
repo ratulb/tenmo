@@ -3,8 +3,8 @@ MNIST Training with Mojo — GPU Profiling Build.
 Times every phase and individual forward kernels to identify bottlenecks.
 
 All forward ops use sync=False. Phase timers track where every ms goes.
-Batch 0 of epoch 1 runs a per-op forward breakdown (sync=True on each kernel)
-to measure individual kernel execution times independently.
+First and last batch of epoch 1 run per-op breakdowns (sync=True on each
+kernel) to compare warm-up/compilation vs steady-state.
 """
 
 from tenmo.tensor import Tensor
@@ -64,7 +64,6 @@ def train_mnist() raises:
     var X_test = from_ndarray[FEATURE_DTYPE](test_images, copy=True)
     var y_test = from_ndarray[LABEL_DTYPE](test_labels, copy=True)
 
-    # Normalize to [0, 1]
     X_train = X_train / 255.0
     X_test = X_test / 255.0
 
@@ -84,7 +83,7 @@ def train_mnist() raises:
     )
     var test_dataset = NumpyDataset[FEATURE_DTYPE, LABEL_DTYPE](X_test, y_test)
 
-    var train_loader = train_dataset.into_loader(
+    var train_loader = test_dataset.into_loader(
         batch_size=train_batch_size,
         shuffle=True,
         drop_last=False,
@@ -137,7 +136,6 @@ def train_mnist() raises:
     print("  Model is now resident on GPU")
     print()
 
-    # Extract individual layer weights for per-op profiling
     var w1 = model.modules[0].layer[Linear[FEATURE_DTYPE, mm]].weight
     var b1 = model.modules[0].layer[Linear[FEATURE_DTYPE, mm]].bias
     var w2 = model.modules[2].layer[Linear[FEATURE_DTYPE, mm]].weight
@@ -161,13 +159,34 @@ def train_mnist() raises:
     print("  Momentum:", momentum)
     print()
     print("  Forward sync mode: sync=False (all queued async)")
-    print("  Kernel profiling: batch 0 epoch 0 with sync=True")
+    print("  Kernel profiling: first and last batch of epoch 1")
 
     print("=" * 80)
     var training_start = perf_counter_ns()
-    var per_op_printed = False
+    var profile_epoch = 0
+    var profile_first_done = False
+    var profile_last_done = False
 
-    # ========== Training Loop ==========
+    # Per-op timing storage (first and last batch of profile_epoch)
+    var f_mm1: Float64 = 0.0
+    var f_b1: Float64 = 0.0
+    var f_r1: Float64 = 0.0
+    var f_mm2: Float64 = 0.0
+    var f_b2: Float64 = 0.0
+    var f_r2: Float64 = 0.0
+    var f_mm3: Float64 = 0.0
+    var f_b3: Float64 = 0.0
+    var f_loss: Float64 = 0.0
+    var l_mm1: Float64 = 0.0
+    var l_b1: Float64 = 0.0
+    var l_r1: Float64 = 0.0
+    var l_mm2: Float64 = 0.0
+    var l_b2: Float64 = 0.0
+    var l_r2: Float64 = 0.0
+    var l_mm3: Float64 = 0.0
+    var l_b3: Float64 = 0.0
+    var l_loss: Float64 = 0.0
+
     for epoch in range(num_epochs):
         var epoch_start = perf_counter_ns()
 
@@ -192,6 +211,8 @@ def train_mnist() raises:
 
         train_loader.reset()
         var batch_idx = 0
+        var total_batches = len(train_loader)
+
         while train_loader.__has_next__():
             ref batch = train_loader.__next__()
 
@@ -203,7 +224,13 @@ def train_mnist() raises:
             var pred: Tensor[FEATURE_DTYPE]
             var loss: Tensor[FEATURE_DTYPE]
 
-            if not per_op_printed:
+            # Per-op profiling block: run with sync=True, record individual times
+            var do_profile = epoch == profile_epoch and (
+                (not profile_first_done and batch_idx == 0) or
+                (not profile_last_done and batch_idx == total_batches - 1)
+            )
+
+            if do_profile:
                 var t = perf_counter_ns()
 
                 var h = features_gpu.matmul[track_grad=True](w1, sync=True)
@@ -240,9 +267,15 @@ def train_mnist() raises:
                 loss = criterion(pred, labels_gpu)
                 var t_loss = Float64(perf_counter_ns() - t) / 1e6
 
-                var k_sum = t_mm1 + t_b1 + t_r1 + t_mm2 + t_b2 + t_r2 + t_mm3 + t_b3
-                print()
-                print("-- Forward kernel breakdown (batch 0, sync=True) ---")
+                var k_sum = t_mm1 + t_b1 + t_r1 + t_mm2 + t_b2 + t_r2 + t_mm3 + t_b3 + t_loss
+
+                if not profile_first_done:
+                    profile_first_done = True
+                    print("-- Forward kernel breakdown (first batch, sync=True) ---")
+                else:
+                    profile_last_done = True
+                    print("-- Forward kernel breakdown (last batch, sync=True) ---")
+
                 print("  matmul 784x128:       ", t_mm1, "ms")
                 print("  bias_add 128:         ", t_b1, "ms")
                 print("  relu 128:             ", t_r1, "ms")
@@ -254,9 +287,29 @@ def train_mnist() raises:
                 print("  crossentropy:         ", t_loss, "ms")
                 print("  --------------------------------")
                 print("  Sum:                  ", k_sum, "ms")
-                print("  Forward kernels:      9")
                 print()
-                per_op_printed = True
+
+                # Store for later comparison
+                if batch_idx == 0:
+                    f_mm1 = t_mm1
+                    f_b1 = t_b1
+                    f_r1 = t_r1
+                    f_mm2 = t_mm2
+                    f_b2 = t_b2
+                    f_r2 = t_r2
+                    f_mm3 = t_mm3
+                    f_b3 = t_b3
+                    f_loss = t_loss
+                elif batch_idx == total_batches - 1:
+                    l_mm1 = t_mm1
+                    l_b1 = t_b1
+                    l_r1 = t_r1
+                    l_mm2 = t_mm2
+                    l_b2 = t_b2
+                    l_r2 = t_r2
+                    l_mm3 = t_mm3
+                    l_b3 = t_b3
+                    l_loss = t_loss
             else:
                 pred = model(features_gpu, sync=False)
                 loss = criterion(pred, labels_gpu, sync=False)
@@ -277,7 +330,8 @@ def train_mnist() raises:
             train_total += batch.batch_size
             var t6 = perf_counter_ns()
 
-            if not (batch_idx == 0 and epoch == 0):
+            var exclude = epoch == profile_epoch and batch_idx == 0
+            if not exclude:
                 phase_data_ns += Int(t1 - t0)
                 phase_forward_ns += Int(t2 - t1)
                 phase_zerograd_ns += Int(t3 - t2)
@@ -288,7 +342,20 @@ def train_mnist() raises:
 
             batch_idx += 1
 
-        # --- Validation Phase ---
+        # After profile epoch, print comparison
+        if epoch == profile_epoch and profile_last_done:
+            print("-- First vs last batch comparison ---")
+            print("  matmul 784x128:     ", f_mm1, "ms ->", l_mm1, "ms")
+            print("  bias_add 128:       ", f_b1, "ms ->", l_b1, "ms")
+            print("  relu 128:           ", f_r1, "ms ->", l_r1, "ms")
+            print("  matmul 128x32:      ", f_mm2, "ms ->", l_mm2, "ms")
+            print("  bias_add 32:        ", f_b2, "ms ->", l_b2, "ms")
+            print("  relu 32:            ", f_r2, "ms ->", l_r2, "ms")
+            print("  matmul 32x10:       ", f_mm3, "ms ->", l_mm3, "ms")
+            print("  bias_add 10:        ", f_b3, "ms ->", l_b3, "ms")
+            print("  crossentropy:       ", f_loss, "ms ->", l_loss, "ms")
+            print()
+
         model.eval()
         criterion.eval()
         var val_loss = Scalar[FEATURE_DTYPE](0.0)
@@ -309,7 +376,6 @@ def train_mnist() raises:
             val_correct += compute_accuracy(pred.to_cpu(), batch.labels)
             val_total += batch.batch_size
 
-        # --- Phase Summary ---
         var epoch_time = Float64(perf_counter_ns() - epoch_start) / 1e9
         var avg_train_loss = train_loss / Float32(train_total)
         var train_acc = 100.0 * Float64(train_correct) / Float64(train_total)
