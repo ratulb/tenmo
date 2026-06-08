@@ -81,6 +81,7 @@ run_parallel() {
 
 # Define the complete ordered list of tests
 declare -a ALL_TESTS_IN_ORDER=(
+    "ndb_oop_arith|tests/test_ndbuffer_arithmetic_gpu.mojo"
     "reshape|tests/test_reshape.mojo"
     "embedding|tests/test_embedding.mojo"
     "dot|tests/test_dot.mojo"
@@ -170,6 +171,7 @@ declare -a ALL_TESTS_IN_ORDER=(
 )
 
 declare -a GPU_TESTS=(
+    "ndb_oop_arith|tests/test_ndbuffer_arithmetic_gpu.mojo"
     "reshape|tests/test_reshape.mojo"
     "embedding|tests/test_embedding.mojo"
     "division|tests/test_division.mojo"
@@ -252,7 +254,7 @@ if [ $# -eq 0 ]; then
     echo "  $0 select softmax test_softmax_1d   - Isolate and run a single test function"
     echo ""
     print_colored "$CYAN" "Available tests:"
-    echo "  reshape, dot, division, embedding, layer_norm, reciprocal, product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
+    echo "  reshape, ndb_oop_arith, dot, division, embedding, layer_norm, reciprocal, product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
     echo "  allany, compare, count_unique, transmute, exp, summean, sigmoid"
     echo "  gpusummean, broadcast, scalar, inplace, expand, gpu_expand, gpu_cpu"
     echo "  sgd, sparse_sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout, dev_transfer"
@@ -317,6 +319,7 @@ run_test_by_name() {
     local exit_code=0
 
     case $test_name in
+        ndb_oop_arith)  run_test "reshape" "tests/test_ndbuffer_arithmetic_gpu.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         reshape)        run_test "reshape" "tests/test_reshape.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         embedding)      run_test "embedding" "tests/test_embedding.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         dot)            run_test "dot" "tests/test_dot.mojo" "$DEBUG_MODE"; exit_code=$? ;;

@@ -83,7 +83,7 @@ def train_mnist() raises:
     )
     var test_dataset = NumpyDataset[FEATURE_DTYPE, LABEL_DTYPE](X_test, y_test)
 
-    var train_loader = test_dataset.into_loader(
+    var train_loader = train_dataset.into_loader(
         batch_size=train_batch_size,
         shuffle=True,
         drop_last=False,

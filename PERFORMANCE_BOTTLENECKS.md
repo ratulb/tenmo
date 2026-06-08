@@ -443,6 +443,25 @@ B strided, both strided) is ~120 lines duplicated across 3 functions.
 
 ---
 
+### 26. Fused CrossEntropy kernel computes softmax even for ignored rows
+
+**File:** `tenmo/kernels/crossentropy_fused_kernel.mojo` (lines 87–148)
+
+**Problem:** The fused kernel unconditionally computes exp, log-sum-exp, and
+normalized softmax for ALL rows, even when `ignore_index` makes the target
+invalid. Thread 0 skips the atomic accumulation for ignored rows, but all
+threads in the block still run the shared-memory tree reduction (max, sum_exp,
+sum_logits) and write back normalized softmax. On datasets with many ignored
+positions (e.g. padded sequences), this wastes GPU cycles.
+
+**Fix:** Add a warp-level or block-level early exit at the top of Phase 2 when
+`target[row] == ignore_index`. The block can skip the softmax computation and
+directly write 0 to `per_sample_loss[row]` and 0-filled softmax to
+`softmax_out[row * C : (row+1) * C]`. The `scalar_loss` and `valid_count`
+atomics are already correctly guarded by the `is_valid` check.
+
+---
+
 ## Top 4 Highest-ROI Fixes
 
 1. **Layer structs proactively share buffers** → eliminates `add_ancestry`
