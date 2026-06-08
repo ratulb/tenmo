@@ -696,10 +696,10 @@ struct BinaryOperations[dtype: DType = DType.float32](
         # ones silently reads incorrect memory locations.
         # ----------------------------------------------------------------
         var A_broadcast_strides = ShapeBroadcaster.broadcast_strides(
-            A_shape, A.strides, broadcast_shape  # FIX: actual strides
+            A_shape, A.strides, broadcast_shape
         )
         var B_broadcast_strides = ShapeBroadcaster.broadcast_strides(
-            B_shape, B.strides, broadcast_shape  # FIX: actual strides
+            B_shape, B.strides, broadcast_shape
         )
 
         # ================================================================
@@ -803,12 +803,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
         # ================================================================
         if A_is_contiguous and B_is_contiguous:
             # Both contiguous → safe to use Strides.default() for broadcast strides.
-            _="""var A_broadcast_strides = ShapeBroadcaster.broadcast_strides(
-                A_shape, Strides.default(A_shape), broadcast_shape
-            )
-            var B_broadcast_strides = ShapeBroadcaster.broadcast_strides(
-                B_shape, Strides.default(B_shape), broadcast_shape
-            )"""
             var compiled_func = device_context.compile_function[
                 arithmetic_ops_both_contiguous_broadcast[
                     op_code, Self.dtype, simdwidth, 2 * simdwidth
