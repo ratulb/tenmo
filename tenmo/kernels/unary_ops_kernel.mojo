@@ -30,8 +30,8 @@ def invert_bool[
     size: Int,
 ):
     """Logical NOT for bool stored as uint8. 0 -> 1, 1 -> 0."""
-    var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = thread_idx.x + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
@@ -74,8 +74,8 @@ def unary_ops[
     RELU = max(x, 0) — pure arithmetic, safe for any dtype.
     """
     var tid = thread_idx.x
-    var gtid = Int(tid + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = tid + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
@@ -157,8 +157,8 @@ def float_unary_ops[
     Requires dtype.is_floating_point() — supported in Mojo 0.26.2+.
     """
     var tid = thread_idx.x
-    var gtid = Int(tid + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = tid + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
@@ -242,8 +242,8 @@ def unary_ops_with_mask[
         size:   Total number of elements.
     """
     var tid = thread_idx.x
-    var gtid = Int(tid + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = tid + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
@@ -375,14 +375,12 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     dtype=Self.datatype,
                     simd_width=simdwidth,
                     simd_vectors_per_thread=2 * simdwidth,
-                    # epsilon=epsilon_rebinded,
                 ],
                 unary_ops[
                     op_code=op_code,
                     dtype=Self.datatype,
                     simd_width=simdwidth,
                     simd_vectors_per_thread=2 * simdwidth,
-                    # epsilon=epsilon_rebinded,
                 ],
             ]()
             device_context.enqueue_function(

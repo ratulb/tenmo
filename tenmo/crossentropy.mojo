@@ -18,6 +18,7 @@ from tenmo.softmax import SoftmaxNdBuffer
 from tenmo.sum_mean_reduction import SumMeanReduction
 
 
+
 # Validation
 @fieldwise_init
 struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -369,19 +370,37 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         ref upstream = output.gradients()
         var logits = output.ancestry().get(0)
 
-        var device = upstream.device()
-
         # Step 1: grad = softmax — (M, C)
         var grad = softmax_probs
 
-        # Step 2: Build onehot from target — ignore_index rows → all zeros
-        # onehot with ignore_index: those rows stay zero (no subtraction needed)
-        var onehot = NDBuffer[Self.dtype].onehot(
-            target_1d.to_dtype[Self.dtype](),
-            C,
-            device,
-            ignore_index=ignore_index,
-        )
+        # Step 2: Build onehot on the correct device — GPU kernel when available
+        var onehot = NDBuffer[Self.dtype]()
+        comptime if has_accelerator():
+            from tenmo.kernels.crossentropy_fused_kernel import CrossEntropyFusedKernel
+            if softmax_probs.is_on_gpu():
+                try:
+                    onehot = CrossEntropyFusedKernel[Self.dtype].launch_onehot(
+                        target_1d, C, ignore_index,
+                    )
+                except e:
+                    panic(
+                        "CrossEntropyFusedKernel.launch_onehot failed: "
+                        + String(e)
+                    )
+            else:
+                onehot = NDBuffer[Self.dtype].onehot(
+                    target_1d.to_dtype[Self.dtype](),
+                    C,
+                    softmax_probs.device(),
+                    ignore_index=ignore_index,
+                )
+        else:
+            onehot = NDBuffer[Self.dtype].onehot(
+                target_1d.to_dtype[Self.dtype](),
+                C,
+                softmax_probs.device(),
+                ignore_index=ignore_index,
+            )
         # Step 3: Apply smoothing
         var ls = label_smoothing
         if ls > Scalar[Self.dtype](0):
@@ -455,6 +474,84 @@ struct ClassIndicesBwdArg[dtype: DType](ArgumentType):
     var C: Int
 
 
+def _forward_cpu_impl[
+    dtype: DType,
+](
+    logits_2d_ndb: NDBuffer[dtype],
+    target_1d_ndb: NDBuffer[DType.int32],
+    reduction: Reduction,
+    ignore_index: Int,
+    label_smoothing: Scalar[dtype],
+    spatial_shape: Shape,
+    N: Int,
+    C: Int,
+) -> Tuple[NDBuffer[dtype], Int, Tensor[dtype]] where dtype.is_floating_point():
+    """CPU decomposed forward path. Returns (softmax_probs, valid_count, out)."""
+    var log_probs_ndb: NDBuffer[dtype]
+    var softmax_probs_ndb: NDBuffer[dtype]
+    log_probs_ndb, softmax_probs_ndb = CECommon[
+        dtype
+    ].compute_log_softmax_and_softmax(logits_2d_ndb)
+
+    var ignore_mask_ndb = CECommon[dtype].build_ignore_mask(
+        target_1d_ndb, ignore_index
+    )
+    var valid_count = (
+        SumMeanReduction[dtype]
+        .sum(ignore_mask_ndb, normalized_axes=IntArray())
+        .item()
+        .__int__()
+    )
+    var device = logits_2d_ndb.device()
+    var onehot_mask = NDBuffer[dtype].onehot(
+        target_1d_ndb.to_dtype[dtype](),
+        C,
+        device,
+        ignore_index=ignore_index,
+    )
+
+    var losses: NDBuffer[dtype]
+    if label_smoothing > Scalar[dtype](0):
+        var nll = (
+            SumMeanReduction[dtype]
+            .sum(
+                onehot_mask.arithmetic_ops[Multiply](log_probs_ndb),
+                normalized_axes=IntArray(1),
+            )
+            .unary_ops[NEGATE]()
+        )
+        var mean_log_p = (
+            SumMeanReduction[dtype]
+            .sum(log_probs_ndb, normalized_axes=IntArray(1))
+            .scalar_ops[Divide](Scalar[dtype](C))
+        )
+        losses = (
+            nll.scalar_ops[Multiply](
+                Scalar[dtype](1) - label_smoothing
+            )
+            .arithmetic_ops[Subtract](
+                mean_log_p.scalar_ops[Multiply](label_smoothing)
+            )
+        )
+    else:
+        losses = (
+            SumMeanReduction[dtype]
+            .sum(
+                onehot_mask.arithmetic_ops[Multiply](log_probs_ndb),
+                normalized_axes=IntArray(1),
+            )
+            .unary_ops[NEGATE]()
+        )
+
+    losses = losses.arithmetic_ops[Multiply](ignore_mask_ndb)
+
+    var out = CECommon[dtype].apply_reduction(
+        losses, reduction, N, spatial_shape, valid_count
+    )
+
+    return softmax_probs_ndb, valid_count, out
+
+
 @fieldwise_init
 struct CEClassIndicesForward[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
@@ -510,48 +607,76 @@ struct CEClassIndicesForward[dtype: DType](
             Self.dtype
         ].flatten_spatial_class_indices(logits, target)
 
-        # log_softmax + softmax
-        var log_probs_ndb: NDBuffer[Self.dtype]
-        var softmax_probs_ndb: NDBuffer[Self.dtype]
-        log_probs_ndb, softmax_probs_ndb = CECommon[
-            Self.dtype
-        ].compute_log_softmax_and_softmax(logits_2d_ndb)
+        # ── Compute softmax + loss: GPU fused vs CPU decomposed ──
+        var softmax_probs_ndb = NDBuffer[Self.dtype]()
+        var valid_count = 0
+        var out: Tensor[Self.dtype]
 
-        # ignore_mask: 1=valid, 0=ignored — from ORIGINAL target
-        var ignore_mask_ndb = CECommon[Self.dtype].build_ignore_mask(
-            target_1d_ndb, ignore_index
-        )
-        var valid_count = (
-            SumMeanReduction[Self.dtype].sum(ignore_mask_ndb, normalized_axes=IntArray()).item().__int__()
-        )
-        # onehot — ignore_index rows become all zeros
-        var device = logits.device()
-        var onehot_mask = NDBuffer[Self.dtype].onehot(
-            target_1d_ndb.to_dtype[Self.dtype](),
-            C2,
-            device,
-            ignore_index=ignore_index,
-        )
+        comptime if has_accelerator():
+            from tenmo.kernels.crossentropy_fused_kernel import CrossEntropyFusedKernel
+            if logits_2d_ndb.is_on_gpu():
+                # GPU fused path
+                var losses_ndb = NDBuffer[Self.dtype]()
+                var scalar_loss_val = Scalar[Self.dtype](0)
+                try:
+                    (softmax_probs_ndb, losses_ndb, scalar_loss_val, valid_count) = (
+                        CrossEntropyFusedKernel[Self.dtype].launch(
+                            logits_2d_ndb,
+                            target_1d_ndb,
+                            reduction,
+                            ignore_index,
+                            label_smoothing,
+                        )
+                    )
+                except e:
+                    panic(
+                        "CrossEntropyFusedKernel.launch failed: " + String(e)
+                    )
 
-        # NLL with optional label smoothing
-        var ls = label_smoothing
-        var losses: NDBuffer[Self.dtype]
-
-        if ls > Scalar[Self.dtype](0):
-            # loss = -(1-ls)*log_p[target] - ls * mean(log_p)
-            var nll = SumMeanReduction[Self.dtype].sum(onehot_mask.arithmetic_ops[Multiply](log_probs_ndb), normalized_axes=IntArray(1)).unary_ops[NEGATE]()
-            var mean_log_p = SumMeanReduction[Self.dtype].sum(log_probs_ndb, normalized_axes=IntArray(1)).scalar_ops[Divide](Scalar[Self.dtype](C2))
-            losses = nll.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls).arithmetic_ops[Subtract](mean_log_p.scalar_ops[Multiply](ls))
+                if reduction.is_none():
+                    var spatial_rank = spatial_shape.rank()
+                    if spatial_rank == 0:
+                        out = Tensor[Self.dtype](
+                            losses_ndb.reshape(Shape(N)),
+                            requires_grad=False,
+                        )
+                    else:
+                        var out_dims = IntArray()
+                        out_dims.append(N)
+                        for i in range(spatial_rank):
+                            out_dims.append(spatial_shape[i])
+                        out = Tensor[Self.dtype](
+                            losses_ndb.reshape(Shape(out_dims)),
+                            requires_grad=False,
+                        )
+                else:
+                    if reduction.is_mean() and valid_count > 0:
+                        scalar_loss_val /= Scalar[Self.dtype](valid_count)
+                    out = Tensor[Self.dtype].scalar(
+                        scalar_loss_val, requires_grad=False
+                    )
+            else:
+                softmax_probs_ndb, valid_count, out = _forward_cpu_impl[Self.dtype](
+                    logits_2d_ndb,
+                    target_1d_ndb,
+                    reduction,
+                    ignore_index,
+                    label_smoothing,
+                    spatial_shape,
+                    N,
+                    C2,
+                )
         else:
-            losses = SumMeanReduction[Self.dtype].sum(onehot_mask.arithmetic_ops[Multiply](log_probs_ndb), normalized_axes=IntArray(1)).unary_ops[NEGATE]()
-
-        # Zero ignored positions
-        losses = losses.arithmetic_ops[Multiply](ignore_mask_ndb)
-
-        # Apply reduction
-        var out = CECommon[Self.dtype].apply_reduction(
-            losses, reduction, N, spatial_shape, valid_count
-        )
+            softmax_probs_ndb, valid_count, out = _forward_cpu_impl[Self.dtype](
+                logits_2d_ndb,
+                target_1d_ndb,
+                reduction,
+                ignore_index,
+                label_smoothing,
+                spatial_shape,
+                N,
+                C2,
+            )
 
         comptime if track_grad:
             if logits.requires_grad:
@@ -564,7 +689,7 @@ struct CEClassIndicesForward[dtype: DType](
                         logits_shape^,
                         reduction,
                         ignore_index,
-                        ls,
+                        label_smoothing,
                         valid_count,
                         M,
                         C2,

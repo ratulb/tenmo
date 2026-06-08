@@ -6,6 +6,7 @@ from tenmo.broadcasthelper import ShapeBroadcaster
 from tenmo.device import DeviceState
 from tenmo.array import Array
 from tenmo.ndbuffer import NDBuffer
+from tenmo.kernels.kernel_helpers import simd_op, scalar_op
 
 
 # =============================================================================
@@ -91,17 +92,7 @@ def arithmetic_ops_both_contiguous[
             if i + simd_width <= size:
                 var vec_a = A.load[width=simd_width](i)
                 var vec_b = B.load[width=simd_width](i)
-                var vec_result: SIMD[dtype, simd_width]
-
-                comptime if op_code == Add:
-                    vec_result = vec_a + vec_b
-                elif op_code == Subtract:
-                    vec_result = vec_a - vec_b
-                elif op_code == Multiply:
-                    vec_result = vec_a * vec_b
-                else:  # Divide
-                    vec_result = vec_a / vec_b
-
+                var vec_result = simd_op[op_code, dtype, simd_width](vec_a, vec_b, Scalar[dtype](0))
                 A.store[width=simd_width](i, vec_result)
 
             else:
@@ -109,16 +100,7 @@ def arithmetic_ops_both_contiguous[
                     var idx = i + j
                     var a = A[idx]
                     var b = B[idx]
-                    var res: Scalar[dtype]
-
-                    comptime if op_code == Add:
-                        res = a + b
-                    elif op_code == Subtract:
-                        res = a - b
-                    elif op_code == Multiply:
-                        res = a * b
-                    else:  # Divide
-                        res = a / b
+                    var res = scalar_op[op_code, dtype](a, b, Scalar[dtype](0))
 
                     A[idx] = res
 
@@ -178,14 +160,8 @@ def arithmetic_ops_A_contiguous[
                         b_idx += coord * B_strides[dim]
                         remaining //= result_shape[dim]
 
-                    comptime if op_code == Add:
-                        vec_result[lane] = vec_a[lane] + B[b_idx]
-                    elif op_code == Subtract:
-                        vec_result[lane] = vec_a[lane] - B[b_idx]
-                    elif op_code == Multiply:
-                        vec_result[lane] = vec_a[lane] * B[b_idx]
-                    else:  # Divide
-                        vec_result[lane] = vec_a[lane] / B[b_idx]
+                    vec_result[lane] = scalar_op[op_code, dtype](vec_a[lane], B[b_idx], Scalar[dtype](0))
+
 
                 # A is contiguous: write back at linear index i.
                 A.store[width=simd_width](i, vec_result)
@@ -201,16 +177,7 @@ def arithmetic_ops_A_contiguous[
                         b_idx += coord * B_strides[dim]
                         remaining //= result_shape[dim]
 
-                    var res: Scalar[dtype]
-
-                    comptime if op_code == Add:
-                        res = A[linear_idx] + B[b_idx]
-                    elif op_code == Subtract:
-                        res = A[linear_idx] - B[b_idx]
-                    elif op_code == Multiply:
-                        res = A[linear_idx] * B[b_idx]
-                    else:  # Divide
-                        res = A[linear_idx] / B[b_idx]
+                    var res = scalar_op[op_code, dtype](A[linear_idx], B[b_idx], Scalar[dtype](0))
 
                     A[linear_idx] = res
 
@@ -272,16 +239,7 @@ def arithmetic_ops_B_contiguous[
                         a_idx += coord * A_strides[dim]
                         remaining //= result_shape[dim]
 
-                    var res: Scalar[dtype]
-
-                    comptime if op_code == Add:
-                        res = A[a_idx] + vec_b[lane]
-                    elif op_code == Subtract:
-                        res = A[a_idx] - vec_b[lane]
-                    elif op_code == Multiply:
-                        res = A[a_idx] * vec_b[lane]
-                    else:  # Divide
-                        res = A[a_idx] / vec_b[lane]
+                    var res = scalar_op[op_code, dtype](A[a_idx], vec_b[lane], Scalar[dtype](0))
 
                     # A is strided: write back at a_idx, not at
                     # the linear index.
@@ -298,16 +256,7 @@ def arithmetic_ops_B_contiguous[
                         a_idx += coord * A_strides[dim]
                         remaining //= result_shape[dim]
 
-                    var res: Scalar[dtype]
-
-                    comptime if op_code == Add:
-                        res = A[a_idx] + B[linear_idx]
-                    elif op_code == Subtract:
-                        res = A[a_idx] - B[linear_idx]
-                    elif op_code == Multiply:
-                        res = A[a_idx] * B[linear_idx]
-                    else:  # Divide
-                        res = A[a_idx] / B[linear_idx]
+                    var res = scalar_op[op_code, dtype](A[a_idx], B[linear_idx], Scalar[dtype](0))
 
                     A[a_idx] = res
 
@@ -365,16 +314,7 @@ def arithmetic_ops_both_strided[
                         b_idx += coord * B_strides[dim]
                         remaining //= result_shape[dim]
 
-                    var res: Scalar[dtype]
-
-                    comptime if op_code == Add:
-                        res = A[a_idx] + B[b_idx]
-                    elif op_code == Subtract:
-                        res = A[a_idx] - B[b_idx]
-                    elif op_code == Multiply:
-                        res = A[a_idx] * B[b_idx]
-                    else:  # Divide
-                        res = A[a_idx] / B[b_idx]
+                    var res = scalar_op[op_code, dtype](A[a_idx], B[b_idx], Scalar[dtype](0))
 
                     A[a_idx] = res
 
@@ -391,16 +331,7 @@ def arithmetic_ops_both_strided[
                         b_idx += coord * B_strides[dim]
                         remaining //= result_shape[dim]
 
-                    var res: Scalar[dtype]
-
-                    comptime if op_code == Add:
-                        res = A[a_idx] + B[b_idx]
-                    elif op_code == Subtract:
-                        res = A[a_idx] - B[b_idx]
-                    elif op_code == Multiply:
-                        res = A[a_idx] * B[b_idx]
-                    else:  # Divide
-                        res = A[a_idx] / B[b_idx]
+                    var res = scalar_op[op_code, dtype](A[a_idx], B[b_idx], Scalar[dtype](0))
 
                     A[a_idx] = res
 
@@ -622,14 +553,6 @@ struct BinaryInplaceOperations[dtype: DType](
 
     @staticmethod
     def launch_config(output_size: Int) -> Tuple[Int, Int]:
-        # FIX (tuple order): Returns (threads_per_block, num_blocks) — matching
-        # the caller's destructuring:
-        #   var (threads_per_block, num_blocks) = Self.launch_config(output_size)
-        # The original code returned (num_blocks, threads_per_block), which caused
-        # threads_per_block to receive the block count (potentially thousands) and
-        # num_blocks to receive the thread count (128–512). This produced completely
-        # wrong GPU dispatch dimensions and is a hard correctness bug.
-        #
         # FIX (CHUNK_SIZE): The original computed num_blocks as:
         #   ceil(output_size / threads_per_block)
         # ignoring that each thread processes CHUNK_SIZE elements, not 1.
@@ -670,6 +593,4 @@ struct BinaryInplaceOperations[dtype: DType](
                 512,
             )
 
-        # Return order matches caller destructuring:
-        #   var (threads_per_block, num_blocks) = Self.launch_config(...)
         return threads_per_block, num_blocks

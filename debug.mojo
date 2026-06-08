@@ -1,4 +1,4 @@
-from tenmo import Tensor, NDBuffer, Shape, SGD, Buffer, Strides
+from tenmo import Tensor, NDBuffer, Shape, SGD, Buffer, Strides, IntArray
 from std.testing import assert_true, TestSuite
 from tenmo.common_utils import s, i, panic
 from std.sys.defines import get_defined_string
@@ -59,6 +59,39 @@ def test_ndb_addition_1d() raises:
 
         assert_true(c_gpu.to_cpu().all_close[atol=1e-5](a + b))
 
+def test_ndb_inplace_addition_1d() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var gpu = GPU()
+        var a = NDBuffer[dtype](1, 2, 3, 4)
+        var a_gpu = a.to_gpu(gpu)
+        var b = NDBuffer[dtype](1, 2, 3, 4)
+        var b_gpu = b.to_gpu(gpu)
+        a_gpu.inplace_ops[Add](b_gpu)
+        a.inplace_ops[Add](b)
+        assert_true(a_gpu.to_cpu().all_close[atol=1e-5](a))
+        print("Num devices: ", gpu[].number_of_devices())
+
+def test_ndb_inter_gpu_copy_and_opeartion() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var gpu = GPU()
+        var a = NDBuffer[dtype](1, 2, 3, 4)
+        var a_gpu = a.to_gpu(gpu)
+        var b = NDBuffer[dtype](1, 2, 3, 4)
+        var b_gpu = b.to_gpu(gpu)
+        a_gpu.inplace_ops[Add](b_gpu)
+        a.inplace_ops[Add](b)
+        assert_true(a_gpu.to_cpu().all_close[atol=1e-5](a))
+        if gpu[].number_of_devices() > 1:
+            var gpu_other = GPU(1)
+            var a_in_other_gpu = a.to_gpu(gpu_other)
+            var a_other = a_in_other_gpu.scalar_ops[Multiply](42)
+            assert_true((a_gpu.to_gpu(gpu_other).scalar_ops[Multiply](42)) == a_other, "Inter gpu ndn operation failed")
+            print("Inter gpu ndb op passed")
+        print("Num devices: ", gpu[].number_of_devices())
+
+
 
 def main() raises:
     #test_sgd_gpu_backward_integration()
@@ -72,7 +105,7 @@ def main() raises:
     x += r
     print(x.value, abs(x).value)"""
     comptime dtype = DType.float32
-    var ndb = NDBuffer[dtype](1, 2, 3, 4)
+    _="""var ndb = NDBuffer[dtype](1, 2, 3, 4)
     ndb.print()
     ndb = NDBuffer[DType.float32].arange(5, 30)
     ndb = ndb.reshape(Shape(5, 5)) # Reshape takes 'mut' self
@@ -90,9 +123,16 @@ def main() raises:
 
     ndb = NDBuffer[dtype].arange(1, 25)
     var shared = ndb.share(Shape(2, 2, 5), Strides(2, 1, 3), offset=4)
-    shared.print()
+    shared.print()"""
     test_ndb_addition_1d()
-
+    test_ndb_inplace_addition_1d()
+    test_ndb_inter_gpu_copy_and_opeartion()
+    #var a = NDBuffer[dtype].arange(1, 49).reshape(Shape(2, 4, 6))
+    _="""var b_base = NDBuffer[dtype].arange(1, 49).reshape(Shape(2, 6, 4))
+    var b = b_base.transpose()  # non-contiguous (2,4,6)
+    b.print()
+    var c = b_base.transpose(IntArray(-1, -2))
+    c.print()"""
 
 
 def test_sgd_gpu_backward_integration() raises:
