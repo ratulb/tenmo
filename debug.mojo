@@ -1,5 +1,5 @@
-from tenmo import Tensor, NDBuffer, Shape, SGD
-from std.testing import assert_true
+from tenmo import Tensor, NDBuffer, Shape, SGD, Buffer, Strides
+from std.testing import assert_true, TestSuite
 from tenmo.common_utils import s, i, panic
 from std.sys.defines import get_defined_string
 from tenmo.matrixshapevalidator import MatrixShapeValidator
@@ -10,6 +10,14 @@ from std.sys.intrinsics import PrefetchLocality
 from tenmo.kernels.matmul_kernel import MatmulNdGpu
 from std.sys import prefetch, PrefetchOptions
 from std import math
+from tenmo.device import GPU
+from tenmo.mnemonics import (
+    Multiply,
+    Add,
+    Subtract,
+    ReverseSubtract,
+    Divide,
+)
 
 comptime dtype = DType.float32
 
@@ -39,11 +47,22 @@ struct IntAdder(ImplicitlyCopyable & Absable):
         self.value += other.value
 
 
+def test_ndb_addition_1d() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var gpu = GPU()
+        var a = NDBuffer[dtype](1, 2, 3, 4)
+        var a_gpu = a.to_gpu(gpu)
+        var b = NDBuffer[dtype](1, 2, 3, 4)
+        var b_gpu = b.to_gpu(gpu)
+        var c_gpu = a_gpu.arithmetic_ops[Add](b_gpu)
+
+        assert_true(c_gpu.to_cpu().all_close[atol=1e-5](a + b))
 
 
 def main() raises:
     #test_sgd_gpu_backward_integration()
-    var x = IntAdder(100)
+    _="""var x = IntAdder(100)
     var y = IntAdder(200)
     var r = x.__add__[False](y)
     print(r.value)
@@ -51,7 +70,30 @@ def main() raises:
     x.__setitem__(100,-800)
     print(x[88888])
     x += r
-    print(x.value, abs(x).value)
+    print(x.value, abs(x).value)"""
+    comptime dtype = DType.float32
+    var ndb = NDBuffer[dtype](1, 2, 3, 4)
+    ndb.print()
+    ndb = NDBuffer[DType.float32].arange(5, 30)
+    ndb = ndb.reshape(Shape(5, 5)) # Reshape takes 'mut' self
+    ndb.print()
+    ndb.transpose().print() # Transpose takes 'mut' self
+
+    var buffer = Buffer[dtype].arange(1, 13)
+    ndb = NDBuffer[dtype](buffer, Shape(3, 4))
+    ndb.print()
+    ndb = NDBuffer[dtype](buffer^, Shape(4, 2), Strides(1, 2), offset=4)
+    ndb.print()
+
+    ndb = NDBuffer[dtype].full(Shape(2, 3), 42.0)
+    ndb.print()
+
+    ndb = NDBuffer[dtype].arange(1, 25)
+    var shared = ndb.share(Shape(2, 2, 5), Strides(2, 1, 3), offset=4)
+    shared.print()
+    test_ndb_addition_1d()
+
+
 
 def test_sgd_gpu_backward_integration() raises:
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)

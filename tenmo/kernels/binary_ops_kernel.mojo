@@ -687,58 +687,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
                 device_state^, broadcast_shape
             )
 
-        # ================================================================
-        # PATH 2: Both contiguous, shapes differ — broadcast expansion needed.
-        #
-        # Both buffers are flat in memory. Use Strides.default() for broadcast
-        # strides — correct and cheap because both ARE contiguous.
-        # Example: [B,T,C] + [C]    (bias add)
-        #          [N,1]   + [1,M]  (outer product)
-        #          [B,1,H,W] + [B,C,H,W]
-        #
-        # FIX vs original: the original had no PATH 2; these cases fell through
-        # to PATH 4 (both_strided) which then used A.strides / B.strides —
-        # also Strides.default for contiguous, so correctness was accidental —
-        # but the code was conflated with the genuinely-strided case and could
-        # not be independently optimized or audited.
-        # ================================================================
-        if A_is_contiguous and B_is_contiguous:
-            # Both contiguous → safe to use Strides.default() for broadcast strides.
-            var A_broadcast_strides = ShapeBroadcaster.broadcast_strides(
-                A_shape, Strides.default(A_shape), broadcast_shape
-            )
-            var B_broadcast_strides = ShapeBroadcaster.broadcast_strides(
-                B_shape, Strides.default(B_shape), broadcast_shape
-            )
-            var compiled_func = device_context.compile_function[
-                arithmetic_ops_both_contiguous_broadcast[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
-                arithmetic_ops_both_contiguous_broadcast[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
-            ]()
-            device_context.enqueue_function(
-                compiled_func,
-                result_buffer,
-                A_buffer,
-                B_buffer,
-                broadcast_shape.array(),
-                A_broadcast_strides.array(),
-                B_broadcast_strides.array(),
-                output_size,
-                rank,
-                epsilon,
-                grid_dim=num_blocks,
-                block_dim=threads_per_block,
-            )
-            if sync:
-                device_context.synchronize()
-            var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
-            return NDBuffer[Self.dtype].with_device_state(
-                device_state^, broadcast_shape
-            )
-
         # ----------------------------------------------------------------
         # Broadcast strides for the remaining mixed and fully-strided paths.
         #
@@ -834,6 +782,63 @@ struct BinaryOperations[dtype: DType = DType.float32](
             return NDBuffer[Self.dtype].with_device_state(
                 device_state^, broadcast_shape
             )
+
+        # Issue  — Path 2 Should Not Exist for bias_add 🔴
+        # bias_add is (64,128) + (128,) — this is exactly Path 3's use case:
+        #
+        # ================================================================
+        # PATH 2: Both contiguous, shapes differ — broadcast expansion needed.
+        #
+        # Both buffers are flat in memory. Use Strides.default() for broadcast
+        # strides — correct and cheap because both ARE contiguous.
+        # Example: [B,T,C] + [C]    (bias add)
+        #          [N,1]   + [1,M]  (outer product)
+        #          [B,1,H,W] + [B,C,H,W]
+        #
+        # FIX vs original: the original had no PATH 2; these cases fell through
+        # to PATH 4 (both_strided) which then used A.strides / B.strides —
+        # also Strides.default for contiguous, so correctness was accidental —
+        # but the code was conflated with the genuinely-strided case and could
+        # not be independently optimized or audited.
+        # ================================================================
+        if A_is_contiguous and B_is_contiguous:
+            # Both contiguous → safe to use Strides.default() for broadcast strides.
+            _="""var A_broadcast_strides = ShapeBroadcaster.broadcast_strides(
+                A_shape, Strides.default(A_shape), broadcast_shape
+            )
+            var B_broadcast_strides = ShapeBroadcaster.broadcast_strides(
+                B_shape, Strides.default(B_shape), broadcast_shape
+            )"""
+            var compiled_func = device_context.compile_function[
+                arithmetic_ops_both_contiguous_broadcast[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
+                arithmetic_ops_both_contiguous_broadcast[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
+            ]()
+            device_context.enqueue_function(
+                compiled_func,
+                result_buffer,
+                A_buffer,
+                B_buffer,
+                broadcast_shape.array(),
+                A_broadcast_strides.array(),
+                B_broadcast_strides.array(),
+                output_size,
+                rank,
+                epsilon,
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
+            if sync:
+                device_context.synchronize()
+            var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+            return NDBuffer[Self.dtype].with_device_state(
+                device_state^, broadcast_shape
+            )
+
+
 
         # ================================================================
         # PATH 5: General fallback — at least one non-contiguous tensor,

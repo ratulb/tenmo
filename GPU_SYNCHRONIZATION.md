@@ -166,6 +166,7 @@ All default `sync=False` (Phase 1). Every function calls `synchronize()` when
 | `layernorm_kernel.mojo` | `LayerNormGpu.launch` | 116 |
 | `std_variance_backward_kernel.mojo` | `launch_variance_backward`, `launch_std_backward` | 296, 371 |
 | `bce_kernel.mojo` | `launch_forward_with_logits`, `launch_forward_with_logits_reduce`, `launch_forward`, `launch_forward_reduce`, `launch_bce_with_logits_backward`, `launch_bce_with_logits_backward_scaled`, `launch_bce_backward`, `launch_bce_backward_scaled` | 511, 585, 671, 744, 828, 894, 959, 1025 |
+| `ndbuffer.mojo` onehot | 411 | **No GPU kernel** — CPU-fallback per-element DeviceState access. Fused into crossentropy kernel. |
 
 ### 4b. DeviceState Methods — 4 default `sync=False`, `into()` no sync param
 
@@ -257,6 +258,38 @@ Two paths:
 - **General path:** `gather_gpu` (sync=False) + `.sum()/.mean()` (sync) → 2
   kernels, 1 sync. Batched: gather's internal sync suppressed since sum/mean
   handles the synchronize.
+
+### 5e. CrossEntropyLoss Forward — Pre-Fusion (~18 kernels → 1)
+
+**Pre-fusion state:** `CEClassIndicesForward.forward` decomposes into ~18
+kernel launches + 1 CPU-fallback onehot loop for a (64, 10) GPU tensor:
+
+| Decomposition step | GPU ops | Source |
+|---|---|---|
+| `_softmax_components` (max stability) | minmax + fill(0) + mask + sub + exp | `softmax.mojo:119` |
+| log-sum-exp + softmax | `log_sum` + sum + sub + div | `softmax.mojo:95` |
+| ignore_mask | `compare_scalar` + `to_dtype` | `crossentropy.mojo:246` |
+| valid_count | `sum` + **`.item()` sync** | `crossentropy.mojo:525` |
+| onehot | **CPU fallback** — per-element DeviceState round trips | `ndbuffer.mojo:411` |
+| NLL | `onehot * log_probs` + sum + negate | `crossentropy.mojo:546` |
+| zero_ignored | `losses * ignore_mask` | `crossentropy.mojo:549` |
+| reduction (mean) | sum + scalar divide | `crossentropy.mojo:274` |
+
+**Root cause:** 29ms measured for (64, 10) on T4 — dominated by kernel launch
+overhead (~5µs each × ~18 = ~90µs dispatch) + CPU-fallback onehot (64
+per-element DeviceState round trips) + avoidable syncs.
+
+**Fusion plan:** Single kernel replaces all ~18 launches + CPU onehot:
+- 1 block per row (M blocks), shared-memory tree reduction for max and sum_exp
+- `Atomic.fetch_add` for scalar_loss and valid_count (avoids `.item()` sync)
+- Label smoothing and ignore_index handled in-kernel
+- Outputs: softmax (M,C) + per_sample_loss (M,) + scalar_loss (1,) + valid_count (1,)
+
+**Est. sync reduction:** 2 per forward call (valid_count `.item()` + final
+`.sync()`) → 1 (mean divisor readback, batched with final sync).
+
+The backward pass stays **unchanged** — reads stored `softmax_probs` from
+payload, does 4 GPU arithmetic ops. No fusion needed.
 
 ---
 
@@ -816,7 +849,7 @@ loss.backward(sync=True)                       # single sync point
 | GPU kernel launchers | 41 |
 | DeviceState methods with sync param | 5 (into() sync param removed in Phase 0) |
 | NDBuffer GPU dispatch methods | 12 |
-| Compound multi-kernel ops (batched) | 4 (Welford, StdDev, LayerNorm, Gather) |
+| Compound multi-kernel ops (batched) | 5 (Welford, StdDev, LayerNorm, Gather, CrossEntropy) |
 | Total sync call sites | ~50 |
 | Sync-default functions (kernel + DeviceState) | 0 — all `False` after Phase 1 |
 | Sync-default functions (NDBuffer layer) | 12 — currently `True`, target `False` in Phase 4 |

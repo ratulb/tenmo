@@ -804,6 +804,48 @@ To run specific test functions within a file, the `TestSuite` discovers all `fn 
 
 ## Known Issues / Future Work
 
+### Broadcast Dispatch Bug Fix
+
+**Location:** `tenmo/kernels/binary_ops_kernel.mojo:556,592`
+
+**Bug:** PATH 2 and PATH 3 in the broadcast arithmetic dispatch checked
+`not B_is_contiguous` / `not A_is_contiguous` instead of
+`B_shape != broadcast_shape` / `A_shape != broadcast_shape`. Every broadcast
+operation (bias_add, all crossentropy sub-ops, layer norm, etc.) fell through
+to the general `both_strided` fallback PATH 4.
+
+**Impact:** 3 bias_add operations in MNIST MLP (784→128→32→10, batch=64) went
+from expected ~0.05ms each to ~6.5ms, ~1.2ms, ~1.2ms. ~9ms/batch waste on GPU.
+
+**Fix applied:** Two-line change. After fix, bias_add dispatches through PATH 2
+(one operand unit-stride, one broadcasts) using SIMD-splat for the scalar side.
+
+### CrossEntropy GPU Path — Planned Fused Kernel
+
+**Problem:** `CEClassIndicesForward.forward` on GPU triggers ~18 separate
+kernel launches + 1 CPU-fallback onehot loop for a single crossentropy call.
+Profiling shows 29ms per (64, 10) call — dominated by kernel launch overhead
+and CPU-fallback onehot (64 per-element DeviceState round trips).
+
+**Fix (planned):** Write a fused forward kernel at
+`tenmo/kernels/crossentropy_fused_kernel.mojo` that computes max, exp,
+sum_exp, softmax, log_softmax_target, and per-sample loss in 1 launch:
+- Thread-block-per-row pattern (M blocks)
+- Shared-memory tree reduction for max and sum_exp
+- `Atomic.fetch_add` for scalar_loss and valid_count
+- Handles ignore_index and label_smoothing in-kernel
+- Replaces the existing ~18 kernel decomposition + CPU onehot entirely
+
+Backward stays unchanged — 4 GPU arithmetic ops using stored softmax.
+
+### Onehot Missing GPU Kernel
+
+`NDBuffer.onehot` at `ndbuffer.mojo:411` has no GPU path. For GPU-resident
+tensors, it iterates coordinates on CPU and writes elements via per-element
+`DeviceState.__setitem__()` — each a `map_to_host()` round trip. The fused
+crossentropy kernel eliminates this bottleneck by computing NLL in-kernel
+instead of via onehot masking.
+
 ### GPU `scatter_add` only supports axis=0
 
 GPU kernels `scatter_add_rows_kernel` and `scatter_add_broadcast_kernel` (`tenmo/kernels/filler_kernel.mojo`) compute target flat indices assuming row-major layout where `indices` pick rows (axis=0). For axis != 0, `Filler.scatter_add` (`tenmo/filler.mojo:138`) falls back to `_scatter_add_cpu`, which accesses GPU memory element-by-element via `device_state[idx]` — correct but very slow.
