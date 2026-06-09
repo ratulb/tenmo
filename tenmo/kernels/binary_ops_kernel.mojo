@@ -164,7 +164,7 @@ def arithmetic_ops_both_contiguous_broadcast[
                 # are consecutive in memory (A is contiguous, A_strides[rank-1]=1).
                 # B elements may be consecutive (B_strides[rank-1]==1) or
                 # broadcast (B_strides[rank-1]==0).
-                _="""if inner_offset + simd_width <= inner_dim:
+                _ = """if inner_offset + simd_width <= inner_dim:
                     var vec_a = A.load[width=simd_width](a_base + inner_offset)
                     var vec_result: SIMD[dtype, simd_width]
 
@@ -196,14 +196,19 @@ def arithmetic_ops_both_contiguous_broadcast[
 
                     var vec_result: SIMD[dtype, simd_width]
                     if B_strides[rank - 1] == 1:
-                        var vec_b = B.load[width=simd_width](b_base + inner_offset)
-                        vec_result = simd_op[op_code, dtype, simd_width](vec_a, vec_b, epsilon)
+                        var vec_b = B.load[width=simd_width](
+                            b_base + inner_offset
+                        )
+                        vec_result = simd_op[op_code, dtype, simd_width](
+                            vec_a, vec_b, epsilon
+                        )
                     else:
                         var vec_b = SIMD[dtype, simd_width](B[b_base])
-                        vec_result = simd_op[op_code, dtype, simd_width](vec_a, vec_b, epsilon)
+                        vec_result = simd_op[op_code, dtype, simd_width](
+                            vec_a, vec_b, epsilon
+                        )
 
                     result.store[width=simd_width](i, vec_result)
-
 
                 else:
                     # ── Slow path: crosses row boundary ───────────────────
@@ -689,7 +694,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
         # Example: [256, 512] + [256, 512]
         # ================================================================
         if A_shape == B_shape and A_is_contiguous and B_is_contiguous:
-            print("[DISPATCH] PATH 1: both_contiguous same_shape | A=", String(A_shape), " B=", String(B_shape))
             var compiled_func = device_context.compile_function[
                 arithmetic_ops_both_contiguous[
                     op_code, Self.dtype, simdwidth, 2 * simdwidth
@@ -744,7 +748,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
                         is_lastdim_b = False
                         break
             if is_lastdim_b:
-                print("[DISPATCH] PATH 3B: A_contiguous lastdim_B | A=", String(A_shape), " B=", String(B_shape), " broadcast=", String(broadcast_shape))
                 var compiled_func = device_context.compile_function[
                     arithmetic_ops_A_contiguous_lastdim_contiguous_B[
                         op_code, Self.dtype, simdwidth, 2 * simdwidth
@@ -765,7 +768,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
                     block_dim=threads_per_block,
                 )
             else:
-                print("[DISPATCH] PATH 3: A_contiguous fills shape | A=", String(A_shape), " B=", String(B_shape), " broadcast=", String(broadcast_shape))
                 var compiled_func = device_context.compile_function[
                     arithmetic_ops_A_contiguous[
                         op_code, Self.dtype, simdwidth, 2 * simdwidth
@@ -798,7 +800,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
         # PATH 4: B contiguous and fills broadcast shape; A strided/broadcast.
         # ================================================================
         if B_is_contiguous and B_shape == broadcast_shape:
-            print("[DISPATCH] PATH 4: B_contiguous fills shape | A=", String(A_shape), " B=", String(B_shape), " broadcast=", String(broadcast_shape))
             var compiled_func = device_context.compile_function[
                 arithmetic_ops_B_contiguous[
                     op_code, Self.dtype, simdwidth, 2 * simdwidth
@@ -831,7 +832,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
         # PATH 2: Both contiguous, shapes differ — broadcast expansion.
         # ================================================================
         if A_is_contiguous and B_is_contiguous:
-            print("[DISPATCH] PATH 2: both_contiguous broadcast | A=", String(A_shape), " B=", String(B_shape), " broadcast=", String(broadcast_shape))
             var compiled_func = device_context.compile_function[
                 arithmetic_ops_both_contiguous_broadcast[
                     op_code, Self.dtype, simdwidth, 2 * simdwidth
@@ -864,7 +864,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
         # ================================================================
         # PATH 5: General fallback — both strided or complex broadcast.
         # ================================================================
-        print("[DISPATCH] PATH 5: both_strided fallback | A=", String(A_shape), " B=", String(B_shape), " broadcast=", String(broadcast_shape), " A_contig=", A_is_contiguous, " B_contig=", B_is_contiguous)
         var compiled_func = device_context.compile_function[
             arithmetic_ops_both_strided[
                 op_code, Self.dtype, simdwidth, 2 * simdwidth
@@ -936,4 +935,3 @@ struct BinaryOperations[dtype: DType = DType.float32](
             )
 
         return num_blocks, threads_per_block
-

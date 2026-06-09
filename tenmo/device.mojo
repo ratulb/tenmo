@@ -304,15 +304,16 @@ struct DeviceState[dtype: DType](
             self.sync()
 
     def into(
-        self, shape: Shape, sync: Bool = True
+        self, shape: Shape, sync: Bool = False
     ) raises -> NDBuffer[Self.dtype]:
         """
         Copy DeviceState content to a contiguous CPU NDBuffer with 0 offset.
         bool: converts uint8 0/1 back to bool.
         """
-        comptime if has_accelerator():
-            if sync:
-                self.gpu[].synchronize()
+        # comptime if has_accelerator():
+        #     if sync:
+        #         self.gpu[].synchronize()
+        # map_to_host() below is always synchronous — this sync was redundant.
 
         comptime if Self.dtype == DType.bool:
             var numels = len(self)

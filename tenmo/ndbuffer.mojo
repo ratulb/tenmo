@@ -296,7 +296,7 @@ struct NDBuffer[dtype: DType](
         raise "Not on any device"
 
     def to_device(
-        self, device: Device, sync: Bool = True
+        self, device: Device, sync: Bool = False
     ) raises -> Tuple[Int, NDBuffer[Self.dtype]]:
         """
         Materialize this buffer onto another device.
