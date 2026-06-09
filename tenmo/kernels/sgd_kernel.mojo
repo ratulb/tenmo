@@ -59,11 +59,11 @@ def sgd_step_momentum_kernel[
 struct SGDStep[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def launch_no_momentum(
-        param_ndb: NDBuffer[dtype],
-        grad_ndb: NDBuffer[dtype],
+        param_ndb: NDBuffer[Self.dtype],
+        grad_ndb: NDBuffer[Self.dtype],
         num_elements: Int,
-        lr: Scalar[dtype],
-        weight_decay: Scalar[dtype],
+        lr: Scalar[Self.dtype],
+        weight_decay: Scalar[Self.dtype],
         sync: Bool = False,
     ) raises:
         var (tpb, blocks) = _sgd_launch_config(num_elements)
@@ -74,8 +74,8 @@ struct SGDStep[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref grad_ds = grad_ndb.device_state.value()
         ref grad_buf = grad_ds.device_buffer()
         var compiled = ctx.compile_function[
-            sgd_step_no_momentum_kernel[dtype],
-            sgd_step_no_momentum_kernel[dtype],
+            sgd_step_no_momentum_kernel[Self.dtype],
+            sgd_step_no_momentum_kernel[Self.dtype],
         ]()
         ctx.enqueue_function(
             compiled,
@@ -92,13 +92,13 @@ struct SGDStep[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     def launch_momentum(
-        param_ndb: NDBuffer[dtype],
-        grad_ndb: NDBuffer[dtype],
-        vel_ndb: NDBuffer[dtype],
+        param_ndb: NDBuffer[Self.dtype],
+        grad_ndb: NDBuffer[Self.dtype],
+        vel_ndb: NDBuffer[Self.dtype],
         num_elements: Int,
-        lr: Scalar[dtype],
-        momentum: Scalar[dtype],
-        weight_decay: Scalar[dtype],
+        lr: Scalar[Self.dtype],
+        momentum: Scalar[Self.dtype],
+        weight_decay: Scalar[Self.dtype],
         sync: Bool = False,
     ) raises:
         var (tpb, blocks) = _sgd_launch_config(num_elements)
@@ -111,8 +111,8 @@ struct SGDStep[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref vel_ds = vel_ndb.device_state.value()
         ref vel_buf = vel_ds.device_buffer()
         var compiled = ctx.compile_function[
-            sgd_step_momentum_kernel[dtype],
-            sgd_step_momentum_kernel[dtype],
+            sgd_step_momentum_kernel[Self.dtype],
+            sgd_step_momentum_kernel[Self.dtype],
         ]()
         ctx.enqueue_function(
             compiled,
