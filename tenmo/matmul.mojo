@@ -149,7 +149,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # Short-circuit for pure 2D case
         if A_shape.rank() == 2 and B_shape.rank() == 2:
-            return Matmul2d[Self.dtype].forward[track_grad](A, B)
+            return Matmul2d[Self.dtype].forward[track_grad](A, B, sync=sync)
 
         var ndb = A.buffer.matmul_nd(B.buffer)
         var C = Tensor[Self.dtype](ndb^, requires_grad=False)
@@ -212,29 +212,29 @@ struct Matmul[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             # Step 2: Simple dispatch based on opcode
 
             if dot == opcode:
-                return A.dot[track_grad](B)
+                return A.dot[track_grad](B, sync=sync)
 
             if vm == opcode:
-                return VectorMatmulNd[Self.dtype].forward[track_grad](A, B)
+                return VectorMatmulNd[Self.dtype].forward[track_grad](A, B, sync=sync)
 
             if mv == opcode:
-                return MatrixVectorMulNd[Self.dtype].forward[track_grad](A, B)
+                return MatrixVectorMulNd[Self.dtype].forward[track_grad](A, B, sync=sync)
 
             if mm == opcode:
-                return MatmulNd[Self.dtype].forward[track_grad](A, B)
+                return MatmulNd[Self.dtype].forward[track_grad](A, B, sync=sync)
 
             # Invalid case
             panic("Matmul: incompatible shapes")
             return Tensor[Self.dtype].scalar(0)
 
         elif mode == dot:
-            return A.dot[track_grad](B)
+            return A.dot[track_grad](B, sync=sync)
 
         elif mode == vm:
-            return VectorMatmulNd[Self.dtype].forward[track_grad](A, B)
+            return VectorMatmulNd[Self.dtype].forward[track_grad](A, B, sync=sync)
 
         elif mode == mv:
-            return MatrixVectorMulNd[Self.dtype].forward[track_grad](A, B)
+            return MatrixVectorMulNd[Self.dtype].forward[track_grad](A, B, sync=sync)
         else:
             # Invalid case
             panic("Matmul: incompatible shapes")

@@ -512,30 +512,42 @@ def main():
         for hname, _ in data["helpers"]:
             all_helper_names.add(hname)
 
-    # ── Distribute across chunks (balanced by test count) ─────────────────
-    # Greedy bin-packing: sort files descending by test count, assign each
-    # to the chunk with the fewest tests so far.
+    # ── Distribute across chunks (balanced by individual test function) ────
+    # Round-robin assign individual test functions across chunks, not whole
+    # files. This prevents a single file with 200 tests from filling one chunk.
+    # Imports/helpers from a source file are included in every chunk that
+    # contains any function from that file.
 
     if num_chunks > 1:
-        file_counts = sorted(
-            [(f, len(d["functions"])) for f, d in file_data.items()],
-            key=lambda x: x[1],
-            reverse=True,
-        )
+        # Collect every (function, source_file) pair
+        all_functions = []
+        for fname, data in file_data.items():
+            for func_name, func_text in data["functions"]:
+                all_functions.append((func_name, func_text, fname))
 
+        # Round-robin assign functions to chunks
         bins = [[] for _ in range(num_chunks)]
-        bin_counts = [0] * num_chunks
-
-        for fname, count in file_counts:
-            best = min(range(num_chunks), key=lambda i: bin_counts[i])
-            bins[best].append(fname)
-            bin_counts[best] += count
+        for i, (func_name, func_text, fname) in enumerate(all_functions):
+            bins[i % num_chunks].append((func_name, func_text, fname))
 
         for chunk_id in range(1, num_chunks + 1):
-            chunk_files = bins[chunk_id - 1]
-            chunk_data = OrderedDict((f, file_data[f]) for f in chunk_files)
+            chunk_funcs = bins[chunk_id - 1]
+            # Group assigned functions back by source file
+            chunk_file_data = OrderedDict()
+            for func_name, func_text, fname in chunk_funcs:
+                if fname not in chunk_file_data:
+                    chunk_file_data[fname] = {
+                        "imports": file_data[fname]["imports"],
+                        "aliases": file_data[fname]["aliases"],
+                        "helpers": file_data[fname]["helpers"],
+                        "functions": [],
+                    }
+                chunk_file_data[fname]["functions"].append(
+                    (func_name, func_text)
+                )
+
             chunk_imports = OrderedDict()
-            for data in chunk_data.values():
+            for data in chunk_file_data.values():
                 for imp in data["imports"]:
                     chunk_imports[imp] = None
             output_path = os.path.join(
@@ -544,12 +556,15 @@ def main():
             write_chunk(
                 output_path=output_path,
                 chunk_label=f"chunk {chunk_id}/{num_chunks}",
-                chunk_file_data=chunk_data,
+                chunk_file_data=chunk_file_data,
                 chunk_imports=chunk_imports,
             )
 
-        for i, count in enumerate(bin_counts):
+        chunk_counts = [len(b) for b in bins]
+        for i, count in enumerate(chunk_counts):
             print(f"  Chunk {i+1}: {count} tests, {len(bins[i])} files")
+        print(f"  Min: {min(chunk_counts)}, Max: {max(chunk_counts)}, "
+              f"Diff: {max(chunk_counts) - min(chunk_counts)}")
     else:
         all_imports = OrderedDict()
         for data in file_data.values():

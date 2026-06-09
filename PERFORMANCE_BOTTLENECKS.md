@@ -9,54 +9,41 @@ memory management, SIMD paths, and system-level issues.
 
 ### 1. GPU `device_context.synchronize()` after every kernel launch
 
-**Files:** All GPU launchers (`reduction_kernel.mojo`, `matmul_kernel.mojo`,
-`bce_kernel.mojo`, `unary_ops_kernel.mojo`, `binary_ops_kernel.mojo`,
-`binary_inplace_ops_kernel.mojo`, `compare_kernel.mojo`, `dropout_kernel.mojo`,
-`division_kernel.mojo`, `scalar_ops_kernel.mojo`, `layernorm_kernel.mojo`,
-`minmax_kernel.mojo`, `std_variance_backward_kernel.mojo`,
-`matrixvector_kernel.mojo`, `vectormatrix_kernel.mojo`)
+**Status: 🟢 FIXED — Phase 1 complete.**
 
-**Problem:** Every GPU launcher calls `device_context.synchronize()` before
-returning to the host. This serializes all GPU work — the host blocks until the
-kernel completes. For any multi-operation pipeline (e.g. forward → loss →
-backward → step), each step round-trips through PCIe. No CUDA stream
-concurrency is possible.
+All 41 kernel launchers now default `sync=False`. Sync is only triggered
+when callers explicitly pass `sync=True`. NDBuffer dispatch methods all default
+`sync=False`. Tensor dunders default `sync=True` and thread it to forward
+structs, but most forward structs don't actually pass sync to NDBuffer calls,
+so the effective behavior is async at the kernel level.
 
-**Root cause:** `synchronize()` is called unconditionally at the end of every
-`launch_*` method. The `DeviceState` API supports a `sync: Bool` parameter but
-callers never pass `False`.
+**Current per-batch sync profile in MNIST GPU training:**
+- `backward(sync=True)`: 1 sync fence at entry (drains forward queue)
+- `optimizer.step()`: **async GPU kernel** — no sync (SGD GPU kernel)
+- `loss.item()`: 1 sync via `map_to_host()` (pipeline already drained)
+- `compute_accuracy_gpu()`: 1 sync via `map_to_host()` (reads 1 Int back)
+- **Total: ~2 sync barriers per batch** (down from ~1 barrier + N parameter syncs)
 
-**Fix:** Remove `synchronize()` from individual launchers and batch into a
-stream-enqueue pattern. Let the host enqueue multiple kernels, then
-synchronize once at a natural barrier (e.g. before reading results or at
-`loss.item()`). Use separate streams for independent work.
+The per-op sync concern in the original analysis does not apply in practice —
+most forward structs accept `sync` but don't thread it to NDBuffer, which
+defaults to `sync=False`. The pipeline runs async by default.
 
 ---
 
 ### 2. `add_ancestry` deep copy of parent tensors
 
+**Status: 🟢 FIXED** — Layer structs (Linear, Embedding, Conv2d) call
+`self.weight.buffer.buffer.shared()` at init time. `add_ancestry` hits the
+`else` branch (zero-cost refcount bump) for all weight tensors.
+
 **File:** `tenmo/tensor.mojo:1106`
 
-**Problem:** `add_ancestry()` deep-copies every parent tensor that is not
-already shared. For a 100MB Embedding weight, this copies 100MB on every
-forward operation (e.g. every `gather()` call). This is the single biggest
-training bottleneck for any model with large weights.
+**Original problem:** `add_ancestry()` deep-copied every parent tensor that
+was not already shared. For a 100MB Embedding weight, this meant 100MB copy
+per forward call.
 
-**Root cause:**
-```mojo
-if not parent.buffer.shared():
-    var parent_copy = parent.copy()        # full data deep copy
-    parent_copy.buffer.buffer.shared()
-    ancestors.append(parent_copy^)
-```
-The copy exists because silently converting the user's tensor to shared
-ownership would violate the principle of least surprise.
-
-**Fix:** Layer structs (Embedding, Linear, Conv2d) that "take over" weights
-from the user at init time should call
-`self.weight.buffer.buffer.shared()` internally — the user handed off
-ownership, so sharing is fine. Then `add_ancestry` hits the `else` branch
-(zero-cost refcount bump).
+**Fix:** Layer init calls `.share()` on weight buffers so `add_ancestry`
+never hits the copy path for parameters.
 
 ---
 
@@ -462,13 +449,513 @@ atomics are already correctly guarded by the `is_valid` check.
 
 ---
 
-## Top 4 Highest-ROI Fixes
+## Top 3 Highest-ROI Fixes
 
-1. **Layer structs proactively share buffers** → eliminates `add_ancestry`
-   deep copy (biggest win for training throughput, especially with large
-   weights)
-2. **Remove `synchronize()` from GPU launchers** → replace with
-   stream-enqueue pattern and synchronize at natural barriers
-3. ~~Add SIMD fast path to CPU `reduce_cpu`~~ **🟢 DONE** — ~840× speedup
-   for contiguous suffix-axis reductions. Next: apply same pattern to
-   `welford_cpu` and `product_cpu`.
+### 1. `compute_accuracy` CPU round-trip — write GPU kernel
+
+**Status: 🟡 IN PROGRESS**
+
+**Problem:** The training loop calls `pred.to_cpu()` every batch (line 188 of
+`examples/mnist_gpu.mojo`) just to compute argmax in a scalar CPU loop.
+This transfers 640 floats (64×10) from GPU→CPU and runs a per-element Python-
+style loop. The sync from `map_to_host()` is cheap (pipeline already drained
+by `backward(sync=True)` + `step()`), but the unnecessary data transfer is
+wasteful.
+
+**Fix:** Single GPU kernel: one thread per sample computes argmax, compares
+with label, atomically increments counter. Single `Int` read-back instead of
+full 640-element transfer. Eliminates `pred.to_cpu()` from the training loop.
+
+**Design:**
+- Kernel file: `tenmo/kernels/accuracy_kernel.mojo`
+- Launcher: `Accuracy[dtype].launch(pred_ndb, labels_ndb)` → returns `Int`
+- Launch config: 1 block, `batch_size` threads
+- Each thread: argmax over row → compare with label → `Atomic.add` to result
+- Single `Int` read back via `map_to_host`
+- Also remove `pred.to_cpu()` from training loop in `examples/mnist_gpu.mojo`
+
+**ROI:** Eliminates 1 `to_cpu()` per batch × 938 batches/epoch = 938 unnecessary
+GPU→CPU transfers. Net impact on epoch time: small for MNIST (640 elements is
+tiny), but critical for larger models with more classes or wider outputs.
+
+---
+
+### 2. `SGD.step()` CPU read-modify-write — GPU kernel
+
+**Status: 🟢 FIXED**
+
+**Problem:** `SGD.step()` (`tenmo/sgd.mojo:403`) mapped all GPU parameters and
+gradients to CPU via `map_to_host()`, applied momentum, weight decay, and
+gradient updates on the CPU, then wrote back to GPU via `param_ds.sync()`.
+This round-tripped every parameter across PCIe on every batch.
+
+**Fix (`tenmo/kernels/sgd_kernel.mojo`):** Two GPU kernels — `sgd_step_no_momentum_kernel`
+and `sgd_step_momentum_kernel` — apply updates in-place on GPU with a grid-stride
+loop (256 threads/block). The launcher `SGDStep[dtype].launch_no_momentum()` /
+`.launch_momentum()` takes NDBuffer copies (cheap refcount bump) and enqueues
+async (`sync=False`). Replaces 6 `map_to_host()` round-trips per batch for the
+3-layer MNIST model (104K params) with 6 async GPU kernel launches.
+
+**Remaining:** `clip_gradients()` still uses `map_to_host()` on GPU — low priority
+since MNIST doesn't use clipping (both values default to 0).
+
+---
+
+### 3. Matmul forward sync-threading bug
+
+**Status: 🟢 FIXED**
+
+**Problem:** `Matmul.forward` (`tenmo/matmul.mojo:205`) accepted `sync` but
+did not pass it to any sub-dispatch: `MatmulNd.forward` (line 224),
+`Matmul2d.forward` (line 152 via MatmulNd short-circuit),
+`VectorMatmulNd.forward` (line 218), `MatrixVectorMulNd.forward` (line 221),
+or `A.dot` (line 215). All dispatch targets accept `sync` and some use it
+(e.g. GPU matmul launchers).
+
+**Fix:** Thread `sync` through every dispatch point. Six `sync=sync` keyword
+additions across `Matmul.forward` (dot/vm/mv/mm) and `MatmulNd.forward`
+(short-circuit to `Matmul2d`).
+
+No functional impact — NDBuffer dispatch methods (including matmul) all
+default `sync=False`, so the pipeline was already async. Correctness fix
+for any future caller that explicitly passes `sync=True`.
+
+---
+
+### Additional completed work
+
+- ~~Remove `synchronize()` from GPU launchers~~ **🟢 DONE** — All 41 launchers
+  default `sync=False` (Phase 1)
+- ~~Layer structs proactively share buffers~~ **🟢 DONE** — `add_ancestry` no
+  longer deep-copies weights that are already shared
+- ~~Add SIMD fast path to CPU `reduce_cpu`~~ **🟢 DONE** — ~840× speedup for
+  contiguous suffix-axis reductions
+- ~~Fused crossentropy backward kernel~~ **🟢 DONE** — op=9 reduced from
+  ~15.5ms to ~0.5ms
+- ~~`NDBuffer.to_device()` default `sync=True`→`False`~~ **🟢 DONE**
+- ~~Redundant `synchronize()` in `DeviceState.into()`~~ **🟢 DONE** — removed
+- ~~SGD GPU kernel (dense no-momentum + momentum)~~ **🟢 DONE** — replaces
+  `map_to_host()` round-trips with async GPU kernel launches per parameter
+- ~~Matmul forward sync-threading~~ **🟢 DONE** — `sync` threaded through
+  `Matmul.forward` → all 4 dispatch paths (dot/vm/mv/mm)
+
+### Remaining work (low priority / not blocking MNIST GPU)
+
+| Item | Priority | Why left |
+|---|---|---|
+| `clip_gradients()` GPU kernel (`sgd.mojo:291-400`) | Low | Not used by MNIST (both clip_norm/clip_value default 0). Still uses `map_to_host()`. |
+| Sparse SGD GPU kernel (sgd.mojo:440-479) | Low | Only needed for embedding/word2vec sparse training. Not used by MLP. |
+| `backward(sync=True)` redundant sync in same-stream execution | Very low | Kept as safety fence. Removal is 0.5µs savings. Not measurable. |
+| Tensor dunders `sync=True` default → not threaded to NDBuffer | Very low | No functional impact (NDBuffer defaults `sync=False`). Pipeline runs async regardless. |
+
+---
+
+## CPU Optimization Opportunities
+
+Ranked by estimated performance impact. Covers all CPU-only code paths found during codebase audit.
+
+### CPU-1 [H1] 1. Fuse crossentropy CPU path — 10-20× speedup
+
+**File:** `tenmo/crossentropy.mojo`, `_forward_cpu_impl` (L472-547)
+
+**Current:** CPU crossentropy goes through `compute_log_softmax_and_softmax()` → `onehot()` → NLL via `arithmetic_ops[Multiply]` + `SumMeanReduction.sum` + `unary_ops[NEGATE]` — ~18 separate NDBuffer operations (each allocating, dispatching, looping) for a single loss computation.
+
+**Fix:** Write a fused `_forward_cpu_fused()` that computes softmax (max subtraction, exp, sum, divide), target NLL (or class-index lookup), and optional label smoothing in a single CPU pass over the (M, C) logits and (M,) targets. Mirror the already-written GPU fused kernel (`crossentropy_fused_kernel.mojo`).
+
+**Also:** `_forward_cpu_impl` (L472) is duplicated between `track_grad=True` and `track_grad=False` paths in `CEClassIndicesForward.forward` (L654 and L665) — factor out.
+
+**Estimated impact:** 10-20× faster CPU crossentropy during training. Each call replaces ~18 full NDBuffer passes with 2-3 fused passes.
+
+**Effort:** Medium. Need to write the fused loop, handle ignore_index and label_smoothing, keep the decomposed path as fallback.
+
+---
+
+### CPU-2 [H2] 2. Unify reduction CPU loops — 2-5× compile-time, 1.5× runtime
+
+**Files:**
+- `tenmo/sum_mean_reduction.mojo` → `reduce_cpu` (L69-145): SUM/MEAN
+- `tenmo/welford.mojo` → `forward_cpu` (L73-122): Welford mean+variance
+- `tenmo/softmax.mojo` → `_log_sum_cpu` (L64-92): log-sum-exp
+- `tenmo/minmax.mojo` → (inferred): min/max reduction
+
+**Current:** All four implement the same double-nested coord-by-coord reduction pattern independently:
+```
+for out_coord in out_shape:
+    var accum = 0  # or max, or min, or Pair
+    for red_coord in reduction_axes_shape:
+        var self_coord = out_coord.replace/insert(axes, red_coord)
+        accum += ndb[self_coord]  # or accum = max(accum, ...)
+    out[out_coord] = fn(accum)
+```
+
+~30 lines each, 4+ copies. The index arithmetic (`out_coord.replace/insert`) and the double-nested coordinate iteration are identical across all.
+
+**Fix:** Create a shared `_reduce_cpu_loop[op_code](ndb, axes, keepdims, out_shape)` that takes a comptime op_code for the reduction operation (SUM, MEAN, MAX, MIN, LOG_SUM_EXP, WELFORD). This eliminates duplication and makes optimizations (SIMD suffix fast path, parallelization) apply to all reductions at once.
+
+**Estimated impact:** ~30% compile-time reduction from eliminating duplicated comptime reduction code. Runtime benefits when suffix fast path is enhanced.
+
+**Effort:** Medium. Need to design the shared interface, migrate all callers, handle differing accumulator types (Scalar vs Pair for Welford).
+
+---
+
+### CPU-3 [H3] 3. Share `simd_op` helper in CPU broadcast dispatch
+
+**Files:**
+- `tenmo/cpu_broadcast.mojo` → `apply_nd` (L167-476): CPU broadcast (3 tiers)
+- `tenmo/kernels/binary_ops_kernel.mojo` → 6 GPU kernels (L28-937): GPU broadcast (4 paths)
+
+**Current:** `cpu_broadcast.mojo` has its own inline comptime op_code dispatch (ADD, SUB, MUL, DIV, MAX, MIN, ReverseSubtract, ReverseDivide — 8 opcodes) in:
+- Tier 1 SIMD path (L249-276): 8 comptime branches
+- Tier 2 SIMD path (L354-408): 8 comptime branches × 2 operands
+- Tier 3 scalar path (L459-460): calls `scalar_fn`
+
+Meanwhile, `kernel_helpers.mojo` has `simd_op[op_code]()` and `scalar_op[op_code]()` that handle the same 8 opcodes. `cpu_broadcast.mojo` does not use them — it duplicates the dispatch logic inline.
+
+**Fix:** Replace the inline comptime branches in `cpu_broadcast.mojo` Tier 1 and Tier 2 with calls to the shared `simd_op` / `scalar_op` helpers. This eliminates ~200 lines of duplicated comptime conditionals and ensures consistent op-code handling across CPU and GPU paths.
+
+**Bug note:** The current code hands uncommon ops (SIGMOID_BACKWARD, TANH_BACKWARD, POW) to per-element `ScalarOps.scalar_fn` in Tier 1 (L264-275) and Tier 2 (L393-408) instead of the more efficient `simd_op` — a missed optimization.
+
+**Effort:** Low-Medium. Mechanical replacement of comptime branches with helper calls.
+
+---
+
+### CPU-4 [H4] 4. Factor binary ops GPU kernel vs inplace kernel — ~400 lines duplicated
+
+**Files:**
+- `tenmo/kernels/binary_ops_kernel.mojo` (937 lines): 6 out-of-place kernels
+- `tenmo/kernels/binary_inplace_ops_kernel.mojo` (723 lines): 6 in-place kernels
+
+**Current:** Two files, each with 6 kernel variants that share 100% identical coordinate decomposition logic (i % inner_dim, outer_remaining, row-boundary handling, per-lane scalar fallback). The only difference: out-of-place stores to `result`, in-place stores back to `A`.
+
+- `arithmetic_ops_both_contiguous`: binary L28 vs inplace L20 — identical except store target
+- `arithmetic_ops_A_contiguous_lastdim_contiguous_B`: binary L287 vs inplace L84 — identical coord decomp
+- `arithmetic_ops_A_contiguous`: binary L350 vs inplace L144 — identical
+- `arithmetic_ops_B_contiguous`: binary L453 vs inplace L223 — identical
+- `both_strided`: binary L556 vs inplace L302 — identical
+- `both_strided_inner_path`: binary L687 vs inplace L424 — identical
+
+**Fix:** Factor the coordinate decomposition and inner loop body into a shared comptime helper parameterized by inplace: Bool. The helper handles the SIMD loop, stride computation, and remainder — the caller just specifies which buffer receives the result.
+
+**Alternatively:** Generate one file from the other via a comptime parameter (`mode: Int = 0 for out-of-place, 1 for in-place`).
+
+**Effort:** Medium. Requires careful refactoring of ~400 lines. High maintenance value — the in-place variants were recently bug-fixed independently of out-of-place.
+
+---
+
+### CPU-5 [H5] 5. Factor scalar ops GPU kernel vs inplace kernel — ~100 lines duplicated
+
+**Files:**
+- `tenmo/kernels/scalar_ops_kernel.mojo` (336 lines): `scalar_ops`, `pow_op_f32/f64`, `ScalarOperations.launch`
+- `tenmo/kernels/scalar_inplace_ops_kernel.mojo` (158 lines): `inplace_scalar_ops`, `InplaceScalarOperations.launch`
+
+**Current:** The inner loop is identical (SIMD with 2×simd_width chunking, comptime op dispatch, tail handling). The launch method (L92-137 vs L193-250) is identical — same launch_config, same compile+enqueue pattern. Inplace supports 4 opcodes (Add/Sub/Mul/Div) vs out-of-place's 6 (Add/Sub/RevSub/Mul/Div/MAX/MIN).
+
+**Fix:** Factor into a shared `scalar_ops_launch[inplace: Bool](...)`. Also check if the missing `ReverseSubtract`/`MAX`/`MIN` in inplace is a correctness gap (likely unused, but inconsistent).
+
+**Effort:** Low.
+
+---
+
+### CPU-6 [H6] 6. Template contiguous-check pattern in `ndbuffer.mojo` — 6× duplication
+
+**File:** `tenmo/ndbuffer.mojo`
+
+**Current:** The same `if is_contiguous(): Buffer-level SIMD else: index_iterator scalar` pattern appears at least 6 times:
+- `arithmetic_ops_cpu` (L2001-2064)
+- `scalar_ops_cpu` (L2158-2186)
+- `unary_ops_cpu` (L2219-2239)
+- `float_unary_ops_cpu` (L2276-2298)
+- `clamp` (L2300-2325)
+- `clamp_fixed_minmax` (L2327-2340)
+
+Each has ~30 lines of: check contiguity, call Buffer method, or iterate via index_iterator with per-element scalar operations.
+
+**Fix:** Create a shared `_cpu_map[op_code](self, args...) -> NDBuffer` template:
+```mojo
+if self.is_contiguous():
+    return contig_path  # Buffer-level SIMD
+else:
+    return noncontig_path  # index_iterator loop
+```
+
+Eliminates ~180 lines of duplicated pattern.
+
+**Effort:** Low.
+
+---
+
+### CPU-7 [H7] 7. Share comptime op dispatch between `Buffer.arithmetic_ops` and `Buffer.arithmetic_ops_scalar`
+
+**File:** `tenmo/buffers.mojo`
+
+**Current:** Two methods (L656-788 and L791-875) both have:
+- SIMD loop: load → comptime op dispatch → store
+- Scalar tail: comptime op dispatch
+
+The op dispatch chains (Multiply, Add, Subtract, Divide, plus backward ops) are independent but near-identical. Difference: binary (two input buffers) vs scalar (one buffer + scalar value).
+
+**Fix:** Factor the comptime op dispatch into a shared helper that works for both `SIMD + SIMD` and `SIMD + Scalar` forms. 8 opcodes × 2 (SIMD + scalar tail) × 2 (binary + scalar) = 32 comptime branches to maintain.
+
+**Effort:** Low.
+
+---
+
+### CPU-8 [H8] 8. Eliminate unnecessary Buffer copy in broadcast scalar path — 1.5-2× speedup
+
+**File:** `tenmo/cpu_broadcast.mojo`, `apply_scalar` (L88-144)
+
+**Current:**
+```mojo
+if is_contiguous:
+    buffer = (
+        b.buffer.copied(offset, offset + numels)  # <-- ALWAYS COPIES
+    ).arithmetic_ops_scalar[op_code](item)
+```
+
+Calls `copied()` which allocates a new Buffer and memcpy's the data, then applies the scalar op to produce another Buffer. This is **two allocations + one full memcpy + one SIMD pass** for every scalar broadcast operation.
+
+**Fix:** Pass offset directly to `arithmetic_ops_scalar`:
+```mojo
+buffer = b.buffer.arithmetic_ops_scalar[op_code](item, offset, offset + numels)
+```
+
+`arithmetic_ops_scalar` already accepts `start`/`end` parameters (L796). This avoids the intermediate copy entirely.
+
+**Estimated impact:** 1.5-2× speedup for every scalar broadcast operation (bias_add, scalar arithmetic on non-contiguous tensors, etc.). Low effort — 3 lines to change.
+
+**Effort:** Low.
+
+---
+
+### CPU-9 [H9] 9. Parallelize CPU reduction suffix-axis fast path — 2-4× speedup
+
+**File:** `tenmo/sum_mean_reduction.mojo`, `reduce_cpu` (L114-128)
+
+**Current:** The suffix-axis fast path calls `Buffer.sum()` per output element sequentially:
+```mojo
+for oi in range(num_out):
+    var base = ndb.offset + oi * reduced_numels
+    out.buffer[oi] = ndb.buffer.sum(base, base + reduced_numels)
+```
+
+Each output element's reduction is independent — the outer loop is purely serial.
+
+**Fix:** Use `parallelize` to process output rows in parallel across CPU cores — identical to matmul's tile processing pattern. Each thread handles a subset of output elements.
+
+```mojo
+parallelize[reduce_row_fn](num_out, num_physical_cores())
+```
+
+**Estimated impact:** 2-4× for reductions over large innermost dimensions (e.g., softmax over 252K vocab in word2vec, or large classifier heads). The SIMD suffix path already runs at ~0.09ms for 512×1024 sum — parallelization would help for much larger tensors.
+
+**Effort:** Low.
+
+---
+
+### CPU-10 [M10] 10. Factor matmul inner j-loop — remove ~600 lines duplication
+
+**File:** `tenmo/matmul_cpu.mojo`
+
+**Current:** The inner j-loop (SIMD unrolled + SIMD single + scalar tail with k_tile==0 branching) is written 4 times:
+- MmCpu2d Path 1a (L275-351): A contiguous
+- MmCpu2d Path 1b (L401-468): A non-contiguous
+- MmCpuNd Path 1a (L761-828): A contiguous
+- MmCpuNd Path 1b (L859-925): A non-contiguous
+
+Each is ~75 lines, total ~300 lines of nearly-identical SIMD code. The only difference is how A elements are loaded:
+- Contiguous: `A_data[a_row_base + k]`
+- Non-contiguous: `A_data[a_row_base + k * A_stride1]`
+
+Factor into a single comptime-parameterized function:
+```mojo
+def _matmul_inner_loop[A_contiguous: Bool](params...):
+    # SIMD unrolled over n-dim
+    for j in range(0, n_tile_minus_last, simdwidth):
+        if A_contiguous:
+            A_elements = A_data.load[width=simdwidth](a_row_base + k)
+        else:
+            for lane in range(simdwidth):
+                A_elements[lane] = A_data[a_row_base + (k + lane) * A_stride1]
+        ...
+```
+
+Also: the 18-combination tile dispatch (`tile_m → tile_n → tile_p`) in `MmCpu2d.tiled_matmul` (L80-135) and `MmCpuNd.tiled_matmul` (L568-625) is identical — factor into a shared function.
+
+**Estimated impact:** Significant compile-time reduction (currently 36 nearly-identical comptime instantiations). Maintenance: one copy of the SIMD inner loop to tune and bug-fix.
+
+**Effort:** Medium.
+
+---
+
+### CPU-11 [L11] 11. Gather embedding-bag: avoid duplicate index re-reads
+
+**File:** `tenmo/gather.mojo`, `_gather_copy` embedding-bag path (L438-451)
+
+**Current:**
+```mojo
+var sorted = normalized.sorted()
+for row in sorted:
+    var row_offset = base_offset + row * cols
+    res_buffer += self_buffer[row_offset : row_offset + cols]
+```
+
+Sorts indices (O(K log K)) then does K Buffer `+=` operations. If indices have duplicates, duplicates re-read the same row multiple times.
+
+**Fix:** Use a row-count accumulator: first pass builds `Dict[Int, Int]` (index → count), second pass iterates unique indices with `res_buffer += count * embedding_row`. Eliminates duplicate reads + Buffer `+=` overhead for repeated indices.
+
+**Estimated impact:** Meaningful when embedding-bag has many repeated indices (common in NLP bag-of-words). 1.5× for datasets with average duplicate rate.
+
+**Effort:** Low.
+
+---
+
+### CPU-12 [L12] 12. Dropout CPU: replace scalar-per-lane RNG with SIMD Philox — 1.2-2× speedup
+
+**File:** `tenmo/dropout.mojo`, CPU path (L186-205)
+
+**Current:**
+```mojo
+for lane in range(simd_w):
+    rand_vec[lane] = random_float64(0.0, 1.0).cast[Self.dtype]()
+```
+
+The RNG call is scalar per lane — `random_float64` returns one value, called simd_width times per SIMD iteration. On AVX2 (simd_width=8), 7 of 8 RNG calls are wasted overhead.
+
+**Fix:** Use `PhiloxRandom` from `std.random.philox` which supports SIMD-width generation via `.rand()`:
+```mojo
+var philox = PhiloxRandom(seed, increment)
+var rand_vec = philox.rand[simd_w]()
+```
+
+**Estimated impact:** 1.2-2× for dropout layers during training. Critical for models using dropout regularization (common in MLP, Transformer).
+
+**Effort:** Low.
+
+---
+
+### CPU-13 [L13] 13. Noncontiguous element-wise SIMD: partial SIMD when one operand is contiguous
+
+**File:** `tenmo/ndbuffer.mojo`, `arithmetic_ops_cpu` (L2001-2064) and 3 other methods
+
+**Current:** When `is_contiguous()` is false, ALL element-wise ops fall back to scalar `index_iterator` loop with per-element function calls. No SIMD is used even when one of the two operands IS contiguous.
+
+**Fix:** For `arithmetic_ops_cpu` when one operand is contiguous, use SIMD for the contiguous side with per-element index computation for the non-contiguous side:
+```mojo
+if self.is_contiguous() and not other.is_contiguous():
+    # SIMD load from self, scalar index-lookup from other
+elif other.is_contiguous() and not self.is_contiguous():
+    # scalar index-lookup from self, SIMD load from other
+```
+
+**Estimated impact:** Low — noncontiguous views are rare in hot paths. But `broadcast_to()` followed by element-wise ops creates strided views, which is common. Relevant for broadcasting edge cases.
+
+**Effort:** Medium.
+
+---
+
+### CPU-14 [L14] 14. LayerNorm CPU: parallelize outer row loop — 2-4× speedup
+
+**File:** `tenmo/layernorm.mojo`, `normalize_cpu` (L118-134)
+
+**Current:**
+```mojo
+for row in range(outer_size):
+    for i in range(D):
+        var x_i = x.buffer[x.offset + row_base + i]
+```
+
+The outer `row` loop is serial. For large batch sizes (B=1024, D=768) this is 1024 serial iterations of a D=768 inner loop. Each row is fully independent.
+
+**Fix:** Use `parallelize[process_row](outer_size, num_physical_cores())` — same pattern as matmul's tile processing. Each thread handles a subset of rows. Inner loop over D can also use SIMD via `float_unary_ops` on row slices.
+
+**Estimated impact:** 2-4× for LayerNorm at scale. Important for Transformer training on CPU.
+
+**Effort:** Low.
+
+---
+
+### CPU-15 [L15] 15. Filler scalar fill: use SIMD store instead of scalar loop — 2-3× speedup
+
+**File:** `tenmo/filler.mojo`, `_fill_scalar_cpu` (L162-167)
+
+**Current:**
+```mojo
+if strides.is_contiguous(shape):
+    ref buffer = target.data_buffer()
+    var end = absolute_offset + shape.num_elements()
+    for idx in range(absolute_offset, end):
+        buffer[idx] = value
+```
+
+Scalar loop filling contiguous memory with a constant value. No SIMD.
+
+**Fix:** Use SIMD store:
+```mojo
+var vec = SIMD[Self.dtype, simd_width](value)
+for idx in range(0, num_elements, simd_width):
+    buffer.store[width=simd_width](absolute_offset + idx, vec)
+```
+
+Same fix applies to the non-contiguous `IndexIterator` path (L170-176).
+
+**Estimated impact:** 2-3× for buffer initialization / fill operations. Memory-bound — speedup depends on memory bandwidth.
+
+**Effort:** Low.
+
+---
+
+### CPU-16 [L16] 16. Matmul: eliminate `k_tile==0` branch from inner loop — 5-10% inner loop speedup
+
+**File:** `tenmo/matmul_cpu.mojo`, inner j-loop in all 4 paths (e.g., L280, L406, L766, L864)
+
+**Current:**
+```mojo
+if k_tile == 0:
+    acc0 = SIMD[Self.dtype, simdwidth](0)    # first tile: no C to load
+else:
+    acc0 = C_data.load[width=simdwidth](cj)  # subsequent tiles: accumulate
+```
+
+The `k_tile == 0` check is evaluated every SIMD vector iteration of the inner loop. It's a runtime check for the first k-tile only.
+
+**Fix:** Split the inner loop into two phases:
+1. First k-tile (k_tile == 0): pure accumulate from zero — no C load, no C store
+2. Remaining k-tiles: load C, accumulate, store back
+
+A comment in `matmul_cpu.mojo` (L159-160) already acknowledges this as a known optimization. Same pattern appears 6 times (2 paths × 2D/ND × 2 sub-loops).
+
+**Estimated impact:** 5-10% inner loop speedup for small matrices or many k-tiles. Negligible for large contiguous matmuls.
+
+**Effort:** Low.
+
+---
+
+### CPU-17 [L17] 17. `all_close` CPU fallback: missing SIMD path
+
+**Files:** `tenmo/kernels/compare_kernel.mojo` (L39-220), `tenmo/buffers.mojo`, `tenmo/ndbuffer.mojo`
+
+**Current:** `all_close` GPU kernel (L39) is a device function using `thread_idx.x`, `block_dim.x`, etc. — can't run on CPU. The `AllClose.launch()` method only has a GPU launch path. On CPU, the Tensor-level `.all_close()` may fall through to a slow decomposed path.
+
+**Fix:** Add a CPU SIMD `all_close` function in `buffers.mojo` that:
+1. Vector-compares element pairs with `SIMD.gt(atol_mask)` / `SIMD.lt(atol_mask)`
+2. Accumulates mismatches via `reduce_add`
+3. Short-circuits when mismatch count exceeds `max_mismatches`
+4. Handles NaN (NaN != NaN per IEEE 754)
+
+**Estimated impact:** 3-5× for test assertions. Test-only, not hot-path training.
+
+**Effort:** Low.
+
+---
+
+### CPU-18 [L18] 18. Pooling/CNN CPU: parallelize outer loops — 2-4× speedup
+
+**Files:** `tenmo/pooling.mojo`, `tenmo/cnn.mojo`
+
+**Current:** Conv2d, MaxPool2d, AvgPool2d CPU forward/backward use raw `data_ptr()` loops with nested for loops over batch, input channels, output channels, spatial dimensions (e.g., `cnn.mojo` L375-378, L748-749, L844-846). All loops are serial.
+
+**Fix:** Use `parallelize` over batch or output-channel dimensions. Each batch element or output channel is independent.
+
+**Estimated impact:** 2-4× for CPU Conv2d/MaxPool2d at scale. Rarely trained on CPU at scale, but useful for small models and inference.
+
+**Effort:** Medium.

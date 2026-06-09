@@ -3,6 +3,7 @@ from .gradbox import Gradbox
 from std.math import sqrt
 from std.sys import simd_width_of, has_accelerator
 from .common_utils import panic
+from .kernels import SGDStep
 
 
 @fieldwise_init
@@ -496,42 +497,30 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                     )
                 continue
 
-            # Dense path (existing behavior)
+            # Dense GPU path — in-place kernel, no CPU round-trip
             comptime if has_accelerator():
                 if parameter.is_on_gpu():
                     try:
-                        var param_ds = parameter.buffer.device_state.value()
-                        var grad_ds = grad.buffer().device_state.value()
-
                         if self.use_momentum:
                             ref velocity = self.velocities[i]
-                            var vel_ds = velocity.buffer().device_state.value()
-                            with param_ds.buffer.map_to_host() as param_host, grad_ds.buffer.map_to_host() as grad_host, vel_ds.buffer.map_to_host() as vel_host:
-                                self._apply_momentum[simd_w](
-                                    param_host.unsafe_ptr().bitcast[
-                                        Scalar[Self.dtype]
-                                    ](),
-                                    grad_host.unsafe_ptr().bitcast[
-                                        Scalar[Self.dtype]
-                                    ](),
-                                    vel_host.unsafe_ptr().bitcast[
-                                        Scalar[Self.dtype]
-                                    ](),
-                                    num_elements,
-                                )
+                            var param_ndb = parameter.buffer.copy()
+                            var grad_ndb = grad.buffer().copy()
+                            var vel_ndb = velocity.buffer().copy()
+                            SGDStep[Self.dtype].launch_momentum(
+                                param_ndb^, grad_ndb^, vel_ndb^,
+                                num_elements,
+                                self.lr, self.momentum, self.weight_decay,
+                                sync=False,
+                            )
                         else:
-                            with param_ds.buffer.map_to_host() as param_host, grad_ds.buffer.map_to_host() as grad_host:
-                                self._step_no_momentum[simd_w](
-                                    param_host.unsafe_ptr().bitcast[
-                                        Scalar[Self.dtype]
-                                    ](),
-                                    grad_host.unsafe_ptr().bitcast[
-                                        Scalar[Self.dtype]
-                                    ](),
-                                    num_elements,
-                                )
-
-                        param_ds.sync()
+                            var param_ndb = parameter.buffer.copy()
+                            var grad_ndb = grad.buffer().copy()
+                            SGDStep[Self.dtype].launch_no_momentum(
+                                param_ndb^, grad_ndb^,
+                                num_elements,
+                                self.lr, self.weight_decay,
+                                sync=False,
+                            )
                     except e:
                         panic("SGD.step GPU failed: " + String(e))
                     continue

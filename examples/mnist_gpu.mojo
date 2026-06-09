@@ -181,11 +181,9 @@ def train_mnist() raises:
             optimizer.step()
 
             # loss.item() syncs GPU (reads scalar value back)
-            # pred.to_cpu() syncs GPU (moves prediction back to CPU)
-            # These syncs are the lazy evaluation checkpoints —
-            # all queued GPU work must complete before we read results
+            # compute_accuracy_gpu runs argmax on GPU, reads single Int back
             train_loss += loss.item() * Float32(batch.batch_size)
-            train_correct += compute_accuracy(pred.to_cpu(), batch.labels)
+            train_correct += compute_accuracy_gpu(pred, labels_gpu)
             train_total += batch.batch_size
 
         # --- Validation Phase ---
@@ -206,7 +204,7 @@ def train_mnist() raises:
             var loss = criterion(pred, labels_gpu)
 
             val_loss += loss.item() * Float32(batch.batch_size)
-            val_correct += compute_accuracy(pred.to_cpu(), batch.labels)
+            val_correct += compute_accuracy_gpu(pred, labels_gpu)
             val_total += batch.batch_size
 
         # --- Epoch Report ---
@@ -249,26 +247,20 @@ def train_mnist() raises:
     print("=" * 80)
 
 
-def compute_accuracy[
+def compute_accuracy_gpu[
     dtype: DType
-](pred: Tensor[dtype], target: Tensor[DType.int32]) -> Int:
-    """Compute classification accuracy by comparing argmax predictions to targets."""
-    var correct = 0
-    var batch_size = pred.shape()[0]
-    var num_classes = pred.shape()[1]
+](pred: Tensor[dtype], target: Tensor[DType.int32]) raises -> Int:
+    """GPU-accelerated classification accuracy.
 
-    for i in range(batch_size):
-        var max_idx = 0
-        var max_val = pred[i, 0]
-        for j in range(1, num_classes):
-            if pred[i, j] > max_val:
-                max_val = pred[i, j]
-                max_idx = j
+    Args:
+        pred: (batch_size, num_classes) tensor on GPU.
+        target: (batch_size,) label tensor on GPU (int32).
 
-        if max_idx == Int(target[i]):
-            correct += 1
-
-    return correct
+    Returns:
+        Number of correct predictions.
+    """
+    from tenmo.kernels import Accuracy
+    return Accuracy[dtype].launch(pred.buffer, target.buffer, sync=True)
 
 
 def main() raises:

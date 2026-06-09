@@ -20,6 +20,8 @@ from .dotproduct_kernel import DotproductKernel
 from .argminmax_kernel import ArgMinMaxGpu
 from .filler_kernel import FillerGpu
 from .gather_kernel import GatherGpu
+from .accuracy_kernel import Accuracy
+from .sgd_kernel import SGDStep
 
 
 # output_to_input_base and rank_to_reduced_offset now live in
