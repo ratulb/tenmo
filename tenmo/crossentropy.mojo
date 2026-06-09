@@ -370,64 +370,59 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         ref upstream = output.gradients()
         var logits = output.ancestry().get(0)
 
-        # Step 1: grad = softmax — (M, C)
-        var grad = softmax_probs
-
-        # Step 2: Build onehot on the correct device — GPU kernel when available
-        var onehot = NDBuffer[Self.dtype]()
+        # Steps 2-5 fused: onehot + smoothing + ignore_mask + scaling in one GPU kernel
+        # Falls back to decomposed CPU path when no GPU.
+        var scaled = NDBuffer[Self.dtype]()
         comptime if has_accelerator():
             from tenmo.kernels.crossentropy_fused_kernel import CrossEntropyFusedKernel
             if softmax_probs.is_on_gpu():
                 try:
-                    onehot = CrossEntropyFusedKernel[Self.dtype].launch_onehot(
-                        target_1d, C, ignore_index,
+                    scaled = CrossEntropyFusedKernel[Self.dtype].launch_backward(
+                        softmax_probs, target_1d,
+                        upstream.buffer(), reduction, valid_count,
+                        M, C, ignore_index, label_smoothing,
                     )
                 except e:
                     panic(
-                        "CrossEntropyFusedKernel.launch_onehot failed: "
+                        "CrossEntropyFusedKernel.launch_backward failed: "
                         + String(e)
                     )
             else:
-                onehot = NDBuffer[Self.dtype].onehot(
+                # CPU fallback — decomposed path
+                var onehot = NDBuffer[Self.dtype].onehot(
                     target_1d.to_dtype[Self.dtype](),
-                    C,
-                    softmax_probs.device(),
+                    C, softmax_probs.device(),
                     ignore_index=ignore_index,
                 )
+                var grad = softmax_probs
+                var ls = label_smoothing
+                if ls > Scalar[Self.dtype](0):
+                    var ls_uniform = ls / Scalar[Self.dtype](C)
+                    grad = grad.arithmetic_ops[Subtract](onehot.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls)).scalar_ops[Subtract](ls_uniform)
+                else:
+                    grad = grad.arithmetic_ops[Subtract](onehot)
+                var ignore_mask = CECommon[Self.dtype].build_ignore_mask(target_1d, ignore_index)
+                var ignore_mask_2d = ignore_mask.unsqueeze(IntArray(-1)).broadcast_to(Shape(M, C))
+                grad = grad.arithmetic_ops[Multiply](ignore_mask_2d)
+                scaled = CECommon[Self.dtype].scale_grad_by_upstream(grad, upstream, reduction, valid_count, M, C)
         else:
-            onehot = NDBuffer[Self.dtype].onehot(
+            # No accelerator — CPU decomposed path
+            var onehot = NDBuffer[Self.dtype].onehot(
                 target_1d.to_dtype[Self.dtype](),
-                C,
-                softmax_probs.device(),
+                C, softmax_probs.device(),
                 ignore_index=ignore_index,
             )
-        # Step 3: Apply smoothing
-        var ls = label_smoothing
-        if ls > Scalar[Self.dtype](0):
-            var ls_uniform = ls / Scalar[Self.dtype](C)
-            grad = grad.arithmetic_ops[Subtract](onehot.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls)).scalar_ops[Subtract](ls_uniform)
-        else:
-            grad = grad.arithmetic_ops[Subtract](onehot)
-
-        # Step 4: Zero out ignored positions via ignore mask
-        # ignore_mask: 1=valid, 0=ignored — built from ORIGINAL target
-        var ignore_mask = CECommon[Self.dtype].build_ignore_mask(
-            target_1d, ignore_index
-        )
-        var ignore_mask_2d = ignore_mask.unsqueeze(IntArray(-1)).broadcast_to(
-            Shape(M, C)
-        )
-        grad = grad.arithmetic_ops[Multiply](ignore_mask_2d)
-
-        # Step 5: Scale by upstream grad and reduction
-        var scaled = CECommon[Self.dtype].scale_grad_by_upstream(
-            grad,
-            upstream,
-            reduction,
-            valid_count,
-            M,
-            C,
-        )
+            var grad = softmax_probs
+            var ls = label_smoothing
+            if ls > Scalar[Self.dtype](0):
+                var ls_uniform = ls / Scalar[Self.dtype](C)
+                grad = grad.arithmetic_ops[Subtract](onehot.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls)).scalar_ops[Subtract](ls_uniform)
+            else:
+                grad = grad.arithmetic_ops[Subtract](onehot)
+            var ignore_mask = CECommon[Self.dtype].build_ignore_mask(target_1d, ignore_index)
+            var ignore_mask_2d = ignore_mask.unsqueeze(IntArray(-1)).broadcast_to(Shape(M, C))
+            grad = grad.arithmetic_ops[Multiply](ignore_mask_2d)
+            scaled = CECommon[Self.dtype].scale_grad_by_upstream(grad, upstream, reduction, valid_count, M, C)
         # Step 6: Reshape back to original logits shape
         var _tmp0 = Gradbox[Self.dtype](scaled^)
         var grad_final = _tmp0.reshape(logits_shape)

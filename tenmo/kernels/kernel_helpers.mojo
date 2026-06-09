@@ -21,7 +21,7 @@ def simd_op[
 ](
     a: SIMD[dtype, simd_width],
     b: SIMD[dtype, simd_width],
-    epsilon: Scalar[dtype],
+    epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ) -> SIMD[dtype, simd_width]:
     var one = SIMD[dtype, simd_width](One[dtype].value())
     var eps = SIMD[dtype, simd_width](epsilon)
@@ -33,7 +33,7 @@ def simd_op[
     elif op_code == Multiply:
         return a * b
     elif op_code == Divide:
-        return a / b
+        return a / (b + epsilon)
     elif op_code == SIGMOID_BACKWARD:
         return b * a * (one - a)
     elif op_code == TANH_BACKWARD:
@@ -48,7 +48,7 @@ def simd_op[
 def scalar_op[
     op_code: Int,
     dtype: DType,
-](a: Scalar[dtype], b: Scalar[dtype], epsilon: Scalar[dtype],) -> Scalar[dtype]:
+](a: Scalar[dtype], b: Scalar[dtype], epsilon: Scalar[dtype] = Epsilon[dtype].value(),) -> Scalar[dtype]:
     var one = One[dtype].value()
 
     comptime if op_code == Add:
@@ -58,7 +58,7 @@ def scalar_op[
     elif op_code == Multiply:
         return a * b
     elif op_code == Divide:
-        return a / b
+        return a / (b + epsilon)
     elif op_code == SIGMOID_BACKWARD:
         return b * a * (one - a)
     elif op_code == TANH_BACKWARD:

@@ -183,6 +183,94 @@ def onehot_fill_kernel[
         result[row * C + c] = Scalar[dtype](1)
 
 
+# ── Fused Backward Kernel ──────────────────────────────────────────────────────
+
+
+def fused_ce_class_indices_backward_kernel[
+    dtype: DType,
+    max_block_size: Int = MAX_BLOCK_SIZE,
+](
+    softmax: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    target: UnsafePointer[Scalar[DType.int32], ImmutAnyOrigin],
+    upstream: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    grad_out: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    M: Int,
+    C: Int,
+    ignore_index: Int,
+    label_smoothing: Scalar[dtype],
+    reduction: Int,
+    valid_count: Int,
+) where dtype.is_floating_point():
+    """One block per row. Computes the full CE class-indices backward in one pass.
+
+    Formula:
+      grad[m,c] = (softmax[m,c] - onehot[m,c] - ls_adjustment)
+                  * ignore_mask[m] * upstream_scaled[m]
+
+    reduction: 0=none, 1=sum, 2=mean
+    - none: upstream is (M,) — each row reads its own upstream[row]
+    - sum/mean: upstream is scalar — all rows read upstream[0]
+      mean further divides by valid_count
+    """
+    var row = block_idx.x
+    if row >= M:
+        return
+
+    var tid = thread_idx.x
+    var block = block_dim.x
+    var base = row * C
+
+    # Get upstream value for this row
+    var up_val: Scalar[dtype]
+    if reduction == 0:  # none
+        up_val = upstream[row]
+    else:
+        up_val = upstream[0]
+
+    # Apply reduction scaling
+    var scale: Scalar[dtype]
+    if reduction == 2:  # mean
+        var safe_count = valid_count if valid_count > 0 else 1
+        scale = up_val / Scalar[dtype](safe_count)
+    else:
+        scale = up_val
+
+    # Determine target class and validity for this row
+    var tgt_scalar = target[row]
+    var is_valid = tgt_scalar != Scalar[DType.int32](ignore_index)
+    var tgt_class: Int
+    if is_valid:
+        tgt_class = tgt_scalar.__int__()
+    else:
+        tgt_class = -1
+
+    var has_ls = label_smoothing > Scalar[dtype](0)
+    var inv_C = Scalar[dtype](1) / Scalar[dtype](C)
+    var ls_uniform = label_smoothing * inv_C
+
+    if tid < C:
+        for c in range(tid, C, block):
+            var idx = base + c
+            var g: Scalar[dtype]
+
+            if is_valid:
+                g = softmax[idx]
+                if c == tgt_class:
+                    # Subtract onehot
+                    g = g - Scalar[dtype](1)
+                    if has_ls:
+                        # Restore ls (we subtracted 1 instead of 1-ls)
+                        g = g + label_smoothing
+
+                if has_ls:
+                    # Subtract uniform smoothing term ls/C
+                    g = g - ls_uniform
+            else:
+                g = Scalar[dtype](0)
+
+            grad_out[idx] = g * scale
+
+
 # ── Launcher ──────────────────────────────────────────────────────────────────
 
 
@@ -328,6 +416,102 @@ struct CrossEntropyFusedKernel[dtype: DType](ImplicitlyCopyable & Movable):
             ignore_index,
             grid_dim=M,
             block_dim=1,
+        )
+
+        var result_state = DeviceState[Self.dtype](
+            result_buffer^, device_state.gpu
+        )
+        return NDBuffer[Self.dtype].with_device_state(result_state^, Shape(M, C))
+
+    @staticmethod
+    def launch_backward(
+        softmax_ndb: NDBuffer[Self.dtype],
+        target_ndb: NDBuffer[DType.int32],
+        upstream_ndb: NDBuffer[Self.dtype],
+        reduction: Reduction,
+        valid_count: Int,
+        M: Int,
+        C: Int,
+        ignore_index: Int,
+        label_smoothing: Scalar[Self.dtype],
+    ) raises -> NDBuffer[Self.dtype]:
+        """Fused backward: onehot + smoothing + ignore_mask + scaling in one launch.
+
+        Args:
+            softmax_ndb: (M, C) — softmax probabilities on GPU
+            target_ndb:  (M,) — class indices on GPU
+            upstream_ndb: upstream gradient buffer
+                For none reduction: shape (M,) — must be on GPU
+                For sum/mean reduction: shape () — can be CPU, auto-transferred
+            reduction: none/sum/mean enum
+            valid_count: number of non-ignored rows (for mean scaling)
+
+        Returns:
+            (M, C) NDBuffer with the full gradient w.r.t. logits
+        """
+        debug_assert(softmax_ndb.is_on_gpu())
+        debug_assert(target_ndb.is_on_gpu())
+
+        ref device_state = softmax_ndb.device_state.value()
+        var ctx = device_state.gpu[]
+
+        # Ensure upstream is on GPU (mean/sum upstream is a CPU scalar)
+        var upstream_gpu: NDBuffer[Self.dtype]
+        if upstream_ndb.is_on_gpu():
+            upstream_gpu = upstream_ndb
+        else:
+            # Transfer CPU scalar to GPU — single-element buffer
+            var cpu_val = upstream_ndb.buffer[0]
+            var ubuf = ctx.enqueue_create_buffer[Self.dtype](1)
+            ubuf.enqueue_fill(cpu_val)
+            var ust = DeviceState[Self.dtype](ubuf^, device_state.gpu)
+            upstream_gpu = NDBuffer[Self.dtype].with_device_state(ust^, Shape())
+
+        var numels = M * C
+        var result_buffer = ctx.enqueue_create_buffer[Self.dtype](numels)
+
+        # Launch config: power-of-2 block size, one block per row
+        var block_size = min(C, MAX_BLOCK_SIZE)
+        var block_pow2 = 1
+        while block_pow2 * 2 <= block_size:
+            block_pow2 *= 2
+        block_size = block_pow2
+        var num_blocks = M
+
+        var compiled = ctx.compile_function[
+            fused_ce_class_indices_backward_kernel[
+                dtype=Self.dtype,
+                max_block_size=MAX_BLOCK_SIZE,
+            ],
+            fused_ce_class_indices_backward_kernel[
+                dtype=Self.dtype,
+                max_block_size=MAX_BLOCK_SIZE,
+            ],
+        ]()
+
+        # Convert reduction to integer for kernel dispatch
+        var reduction_int: Int
+        if reduction.is_none():
+            reduction_int = 0
+        elif reduction.is_sum():
+            reduction_int = 1
+        else:
+            reduction_int = 2
+
+        ctx.enqueue_function(
+            compiled,
+            softmax_ndb.contiguous_device_state().device_buffer(),
+            target_ndb.contiguous_device_state().device_buffer(),
+            upstream_gpu.contiguous_device_state().device_buffer(),
+            result_buffer,
+            M,
+            C,
+            ignore_index,
+            label_smoothing,
+            reduction_int,
+            valid_count,
+            grid_dim=num_blocks,
+            block_dim=block_size,
         )
 
         var result_state = DeviceState[Self.dtype](

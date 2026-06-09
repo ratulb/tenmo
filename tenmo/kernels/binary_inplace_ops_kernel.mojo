@@ -6,65 +6,16 @@ from tenmo.broadcasthelper import ShapeBroadcaster
 from tenmo.device import DeviceState
 from tenmo.array import Array
 from tenmo.ndbuffer import NDBuffer
+from std.math import rsqrt
 from tenmo.kernels.kernel_helpers import simd_op, scalar_op
+from tenmo.common_utils import Epsilon
 
 
 # =============================================================================
-# SEMANTIC CONTRACT (in-place operations: A op= B)
+# KERNEL for PATH 1 — Both contiguous, same shape, no broadcasting.
 #
-#   - A is the in-place accumulator. Its shape NEVER changes.
-#   - broadcast_shape is always == A.shape.
-#     B is the one that broadcasts to match A. A never
-#     broadcasts to match B — that would require reallocation,
-#     which is illegal for in-place ops.
-#   - A_broadcast_strides == A's natural strides (since
-#     A_shape == broadcast_shape, no axis is ever stride-0).
-#   - B_broadcast_strides may have stride-0 axes wherever B
-#     is smaller than A and needs broadcasting.
-#   - "A is strided" means A.is_contiguous() is False, i.e.
-#     A is a non-contiguous view (transposed, sliced, etc.).
-#     Its physical size is still >= output_size in every axis.
-#
-# The four paths are chosen by (A_is_contiguous,
-# B_is_contiguous, needs_broadcasting):
-#
-#   PATH 1  A contiguous, B contiguous, no broadcasting
-#           — fastest: purely linear indexing, full SIMD
-#   PATH 2  A contiguous, B strided OR B needs broadcasting
-#           — A at linear i; B via stride decomposition.
-#             NOTE: when B is contiguous but needs broadcasting,
-#             we still land here and still need stride decomp for B
-#             (broadcast stride-0 axes encode which B element to read).
-#             No separate "both_contiguous_broadcast" kernel is needed
-#             here unlike the out-of-place version, because A is always
-#             the full broadcast_shape — A is always linearly indexable
-#             when contiguous, and B always needs decomp when broadcasting.
-#   PATH 3  A strided, B contiguous, NO broadcasting
-#           — A via stride decomposition; B at linear i.
-#             REQUIRES not needs_broadcasting (otherwise B's physical
-#             buffer is smaller than output_size, making linear reads OOB).
-#   PATH 4  Everything else (both strided, or A strided + B broadcasting,
-#             or any other unhandled combination).
-#             Universal fallback — both via stride decomposition.
-#
-# Full case table:
-#   A_cont  B_cont  needs_bcast  →  Path
-#   true    true    false        →  1  (pure linear)
-#   true    true    true         →  2  (A linear, B decomposed)
-#   true    false   false        →  2  (A linear, B decomposed)
-#   true    false   true         →  2  (A linear, B decomposed)
-#   false   true    false        →  3  (A decomposed, B linear)
-#   false   true    true         →  4  (both decomposed — B too small for linear read)
-#   false   false   false        →  4  (both decomposed)
-#   false   false   true         →  4  (both decomposed)
-# =============================================================================
-
-
-# =============================================================================
-# KERNEL for PATH 1: Both contiguous, same shape, no broadcasting.
-#
-# Linear index maps directly to both A and B.
-# A is read, op is applied, result is written back to A at the same index.
+# Pure linear indexing. Already optimal — no changes needed.
+# A read, op applied, result written back to A at the same linear index.
 # =============================================================================
 def arithmetic_ops_both_contiguous[
     op_code: Int,
@@ -92,7 +43,9 @@ def arithmetic_ops_both_contiguous[
             if i + simd_width <= size:
                 var vec_a = A.load[width=simd_width](i)
                 var vec_b = B.load[width=simd_width](i)
-                var vec_result = simd_op[op_code, dtype, simd_width](vec_a, vec_b, Scalar[dtype](0))
+                var vec_result = simd_op[op_code, dtype, simd_width](
+                    vec_a, vec_b, Epsilon[dtype].value()
+                )
                 A.store[width=simd_width](i, vec_result)
 
             else:
@@ -100,25 +53,33 @@ def arithmetic_ops_both_contiguous[
                     var idx = i + j
                     var a = A[idx]
                     var b = B[idx]
-                    var res = scalar_op[op_code, dtype](a, b, Scalar[dtype](0))
-
+                    var res = scalar_op[op_code, dtype](
+                        a, b, Epsilon[dtype].value()
+                    )
                     A[idx] = res
 
         base_idx += grid_stride * CHUNK_SIZE
 
 
 # =============================================================================
-# KERNEL for PATH 2: A contiguous; B strided or broadcast-expanded.
+# KERNEL for PATH 2 — A contiguous (fills broadcast_shape); B strided/broadcast.
 #
-# A is indexed at its linear position i (contiguous, safe for both read
-# and write-back).
-# B is stride-decomposed through B_strides, which carry stride-0 on any
-# axis where B is broadcast-replicated.
+# OPTIMIZATION vs original scalar-per-lane version:
+#   A fills broadcast_shape contiguously → A.load[width=simd_width](i) always
+#   valid. A.store[width=simd_width](i, vec_result) always valid. Full SIMD
+#   on both A read and write-back.
 #
-# This also covers the sub-case where B IS contiguous but needs broadcasting:
-# even a flat contiguous B still requires coordinate decomposition to apply
-# the stride-0 broadcast axes correctly — linear access to B would read past
-# B's physical allocation on broadcast dims.
+#   B outer base computed ONCE per vector using i // inner_dim / i % inner_dim
+#   split (prevents double-counting the innermost coordinate). Per vector:
+#     - B_strides[rank-1] == 1 → single SIMD load from B
+#     - B_strides[rank-1] == 0 → scalar splat (B broadcasts inner dim)
+#   Slow path (vector crosses row boundary): per-lane B decomposition, but
+#   A elements still loaded from vec_a[lane] — no extra A decomposition.
+#
+# Index math saving vs original:
+#   Original: rank modulos + rank divides per lane × simd_width lanes = rank×sw ops
+#   New fast path: 1 outer decomp (rank-1 ops) + 0 per-lane inner ops = rank-1 ops
+#   For bias_add (2,4,6)+=(6,), simd_width=8: 16 ops → 2 ops per vector.
 # =============================================================================
 def arithmetic_ops_A_contiguous[
     op_code: Int,
@@ -137,6 +98,7 @@ def arithmetic_ops_A_contiguous[
     var grid_stride = block_dim.x * grid_dim.x
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var inner_dim = result_shape[rank - 1]
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
@@ -147,56 +109,119 @@ def arithmetic_ops_A_contiguous[
                 break
 
             if i + simd_width <= size:
+                # A fills broadcast_shape contiguously — always valid SIMD load.
                 var vec_a = A.load[width=simd_width](i)
-                var vec_result: SIMD[dtype, simd_width] = 0
 
-                comptime for lane in range(simd_width):
-                    var linear_idx = i + lane
-                    var remaining = linear_idx
-                    var b_idx = 0
+                # Compute B outer base once for this vector.
+                # Strip innermost coord first to avoid double-counting.
+                var inner_offset = i % inner_dim
+                var outer_remaining = i // inner_dim
+                var b_base = 0
 
-                    for dim in range(rank - 1, -1, -1):
-                        var coord = remaining % result_shape[dim]
-                        b_idx += coord * B_strides[dim]
-                        remaining //= result_shape[dim]
+                for dim in range(rank - 2, -1, -1):
+                    var coord = outer_remaining % result_shape[dim]
+                    b_base += coord * B_strides[dim]
+                    outer_remaining //= result_shape[dim]
 
-                    vec_result[lane] = scalar_op[op_code, dtype](vec_a[lane], B[b_idx], Scalar[dtype](0))
+                var vec_result: SIMD[dtype, simd_width]
 
+                if inner_offset + simd_width <= inner_dim:
+                    # ── Fast path: vector fits within one row ─────────────
+                    if B_strides[rank - 1] == 1:
+                        # B has real inner dim → consecutive SIMD load.
+                        var vec_b = B.load[width=simd_width](
+                            b_base + inner_offset
+                        )
 
-                # A is contiguous: write back at linear index i.
+                        vec_result = simd_op[op_code, dtype, simd_width](
+                            vec_a, vec_b, Epsilon[dtype].value()
+                        )
+                    else:
+                        # B broadcasts inner dim → scalar splat.
+                        # b_base already points to the correct outer element;
+                        # inner coord contributes inner_offset * 0 = 0.
+                        var vec_b = SIMD[dtype, simd_width](B[b_base])
+                        vec_result = simd_op[op_code, dtype, simd_width](
+                            vec_a, vec_b, Epsilon[dtype].value()
+                        )
+                else:
+                    # ── Slow path: B crosses row boundary ─────────────────
+                    # A elements still come from vec_a[lane] — no extra decomp.
+                    # B needs per-lane full decomposition.
+                    vec_result = SIMD[dtype, simd_width](0)
+
+                    comptime for lane in range(simd_width):
+                        var linear_idx = i + lane
+                        var rem = linear_idx
+                        var b_idx = 0
+
+                        for dim in range(rank - 1, -1, -1):
+                            var coord = rem % result_shape[dim]
+                            b_idx += coord * B_strides[dim]
+                            rem //= result_shape[dim]
+
+                        var a = vec_a[lane]
+                        var b = B[b_idx]
+                        vec_result[lane] = scalar_op[op_code, dtype](
+                            a, b, Epsilon[dtype].value()
+                        )
+
+                # A is contiguous → SIMD store always valid.
                 A.store[width=simd_width](i, vec_result)
 
             else:
+                # ── Tail: fewer than simd_width elements remain ───────────
                 for j in range(size - i):
                     var linear_idx = i + j
-                    var remaining = linear_idx
+                    var rem = linear_idx
                     var b_idx = 0
 
                     for dim in range(rank - 1, -1, -1):
-                        var coord = remaining % result_shape[dim]
+                        var coord = rem % result_shape[dim]
                         b_idx += coord * B_strides[dim]
-                        remaining //= result_shape[dim]
-
-                    var res = scalar_op[op_code, dtype](A[linear_idx], B[b_idx], Scalar[dtype](0))
-
+                        rem //= result_shape[dim]
+                    var a = A[linear_idx]
+                    var b = B[b_idx]
+                    var res = scalar_op[op_code, dtype](
+                        a, b, Epsilon[dtype].value()
+                    )
                     A[linear_idx] = res
 
         base_idx += grid_stride * CHUNK_SIZE
 
 
 # =============================================================================
-# KERNEL for PATH 3: A strided, B contiguous, NO broadcasting.
+# KERNEL for PATH 3 — A strided; B contiguous, no broadcasting.
 #
-# Precondition (enforced by dispatcher): B_shape == A_shape and
-# needs_broadcasting == False, so B's physical buffer is exactly
-# output_size elements. Linear reads of B at index i are in bounds.
+# OPTIMIZATION vs original scalar-per-lane version:
+#   B is contiguous and same shape as A → B.load[width=simd_width](i) is
+#   already a single SIMD load — unchanged from original.
 #
-# A is stride-decomposed to find its physical address a_idx for both
-# reading AND writing back. B is loaded linearly.
+#   A outer base computed ONCE per vector (rank-1 modulo/divide ops total).
+#   Per lane, only ONE multiply is needed for the innermost dimension:
+#     a_idx = a_base + (inner_offset + lane) * A_strides[rank-1]
+#   vs the original which did a full rank-level decomposition per lane
+#   (rank modulos + rank divides × simd_width lanes).
 #
-# CRITICAL: This kernel MUST NOT be called when needs_broadcasting is True.
-# In that case B's physical buffer is smaller than output_size and
-# B.load[width](i) would read out of bounds. Such cases must go to PATH 4.
+#   A write-back remains per-lane scalar (A is strided — consecutive logical
+#   elements are not consecutive in physical memory, so SIMD store is unsafe).
+#
+#   Fast path (vector within one row, A_strides[rank-1]==1):
+#     A read: SIMD load at a_base + inner_offset (consecutive in memory).
+#     A write: still per-lane at a_base + lane (stride==1 means consecutive,
+#              so we CAN do SIMD store here too).
+#
+#   Fast path (vector within one row, A_strides[rank-1] != 1):
+#     A read: per-lane scalar at a_base + (inner_offset+lane)*A_strides[rank-1].
+#     A write: per-lane scalar at same address.
+#     Saving: outer decomp done once, only 1 multiply per lane for inner dim.
+#
+#   Slow path (crosses row boundary):
+#     Full per-lane decomposition as before — correctness over performance.
+#
+# Index math saving vs original (rank=3, simd_width=8):
+#   Original: 3 mod + 3 div per lane × 8 lanes = 48 ops per vector
+#   New fast path: 2 mod + 2 div once + 1 mul per lane × 8 = 4 + 8 = 12 ops
 # =============================================================================
 def arithmetic_ops_B_contiguous[
     op_code: Int,
@@ -215,6 +240,7 @@ def arithmetic_ops_B_contiguous[
     var grid_stride = block_dim.x * grid_dim.x
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var inner_dim = result_shape[rank - 1]
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
@@ -225,38 +251,90 @@ def arithmetic_ops_B_contiguous[
                 break
 
             if i + simd_width <= size:
-                # B is contiguous and same size as output: safe to
-                # do a vectorised load at position i.
+                # B is contiguous, same shape → always valid SIMD load.
                 var vec_b = B.load[width=simd_width](i)
 
-                comptime for lane in range(simd_width):
-                    var linear_idx = i + lane
-                    var remaining = linear_idx
-                    var a_idx = 0
+                # Compute A outer base once for this vector.
+                # Strip innermost coord first to avoid double-counting.
+                var inner_offset = i % inner_dim
+                var outer_remaining = i // inner_dim
+                var a_base = 0
+                var a_inner_stride = A_strides[rank - 1]
 
-                    for dim in range(rank - 1, -1, -1):
-                        var coord = remaining % result_shape[dim]
-                        a_idx += coord * A_strides[dim]
-                        remaining //= result_shape[dim]
+                for dim in range(rank - 2, -1, -1):
+                    var coord = outer_remaining % result_shape[dim]
+                    a_base += coord * A_strides[dim]
+                    outer_remaining //= result_shape[dim]
 
-                    var res = scalar_op[op_code, dtype](A[a_idx], vec_b[lane], Scalar[dtype](0))
+                if inner_offset + simd_width <= inner_dim:
+                    # ── Fast path: vector fits within one row ─────────────
+                    if a_inner_stride == 1:
+                        # A elements are consecutive in memory →
+                        # SIMD load AND SIMD store both safe.
+                        var vec_a = A.load[width=simd_width](
+                            a_base + inner_offset
+                        )
+                        var vec_result = simd_op[op_code, dtype, simd_width](
+                            vec_a, vec_b, Epsilon[dtype].value()
+                        )
+                        # A elements are stride-1 consecutive → SIMD store safe.
+                        A.store[width=simd_width](
+                            a_base + inner_offset, vec_result
+                        )
 
-                    # A is strided: write back at a_idx, not at
-                    # the linear index.
-                    A[a_idx] = res
+                    else:
+                        # A elements are strided (a_inner_stride != 1).
+                        # Per-lane read and write, but outer base computed once.
+                        # Each lane: a_idx = a_base + (inner_offset + lane) * a_inner_stride
+                        comptime for lane in range(simd_width):
+                            var a_idx = (
+                                a_base + (inner_offset + lane) * a_inner_stride
+                            )
+                            var a = A[a_idx]
+                            var b = vec_b[lane]
+                            var res = scalar_op[op_code, dtype](
+                                a, b, Epsilon[dtype].value()
+                            )
+                            A[a_idx] = res
+
+                else:
+                    # ── Slow path: crosses row boundary ───────────────────
+                    # Full per-lane decomposition for A.
+                    # vec_b[lane] still valid — B is contiguous.
+                    comptime for lane in range(simd_width):
+                        var linear_idx = i + lane
+                        var rem = linear_idx
+                        var a_idx = 0
+
+                        for dim in range(rank - 1, -1, -1):
+                            var coord = rem % result_shape[dim]
+                            a_idx += coord * A_strides[dim]
+                            rem //= result_shape[dim]
+
+                        var a = A[a_idx]
+                        var b = vec_b[lane]
+                        var res = scalar_op[op_code, dtype](
+                            a, b, Epsilon[dtype].value()
+                        )
+                        A[a_idx] = res
 
             else:
+                # ── Tail: fewer than simd_width elements remain ───────────
                 for j in range(size - i):
                     var linear_idx = i + j
-                    var remaining = linear_idx
+                    var rem = linear_idx
                     var a_idx = 0
 
                     for dim in range(rank - 1, -1, -1):
-                        var coord = remaining % result_shape[dim]
+                        var coord = rem % result_shape[dim]
                         a_idx += coord * A_strides[dim]
-                        remaining //= result_shape[dim]
+                        rem //= result_shape[dim]
 
-                    var res = scalar_op[op_code, dtype](A[a_idx], B[linear_idx], Scalar[dtype](0))
+                    var a = A[a_idx]
+                    var b = B[linear_idx]
+                    var res = scalar_op[op_code, dtype](
+                        a, b, Epsilon[dtype].value()
+                    )
 
                     A[a_idx] = res
 
@@ -264,15 +342,27 @@ def arithmetic_ops_B_contiguous[
 
 
 # =============================================================================
-# KERNEL for PATH 4: Universal fallback.
+# KERNEL for PATH 4 — Both strided / A strided + B needs broadcasting.
 #
-# Both A and B are stride-decomposed independently.
-# Result is written back at a_idx (A's physical address).
+# OPTIMIZATION vs original scalar-per-lane version:
+#   Both A and B outer bases computed ONCE per vector.
+#   Per lane, only ONE multiply per operand for the innermost dimension:
+#     a_idx = a_base + (inner_offset + lane) * A_strides[rank-1]
+#     b_idx = b_base + (inner_offset + lane) * B_strides[rank-1]
+#   vs original: full rank-level decomposition per lane for both.
 #
-# Covers all remaining cases:
-#   • A strided, B strided (no broadcasting)
-#   • A strided, B contiguous but needs broadcasting (B buffer too small for linear read)
-#   • A strided, B strided and needs broadcasting
+#   A write-back always per-lane scalar (A is strided — cannot SIMD store).
+#
+#   No fast/slow path split needed here: since A is always strided in PATH 4,
+#   there is never a safe SIMD store regardless of row boundary. The per-lane
+#   write is always required. We keep the structure simple.
+#
+#   Slow path (crosses row boundary): full per-lane decomposition as before.
+#
+# Index math saving vs original (rank=3, simd_width=8):
+#   Original: (3 mod + 3 div) × 2 operands × 8 lanes = 96 ops per vector
+#   New:      (2 mod + 2 div) × 2 operands once
+#             + (1 mul × 2 operands) × 8 lanes = 8 + 16 = 24 ops per vector
 # =============================================================================
 def arithmetic_ops_both_strided[
     op_code: Int,
@@ -292,6 +382,7 @@ def arithmetic_ops_both_strided[
     var grid_stride = block_dim.x * grid_dim.x
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var inner_dim = result_shape[rank - 1]
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
@@ -302,36 +393,82 @@ def arithmetic_ops_both_strided[
                 break
 
             if i + simd_width <= size:
-                comptime for lane in range(simd_width):
-                    var linear_idx = i + lane
-                    var remaining = linear_idx
-                    var a_idx = 0
-                    var b_idx = 0
+                # Compute outer bases for both A and B once per vector.
+                # Strip innermost coord first — prevents double-counting.
+                var inner_offset = i % inner_dim
+                var outer_remaining = i // inner_dim
+                var a_base = 0
+                var b_base = 0
+                var a_inner_stride = A_strides[rank - 1]
+                var b_inner_stride = B_strides[rank - 1]
 
-                    for dim in range(rank - 1, -1, -1):
-                        var coord = remaining % result_shape[dim]
-                        a_idx += coord * A_strides[dim]
-                        b_idx += coord * B_strides[dim]
-                        remaining //= result_shape[dim]
+                for dim in range(rank - 2, -1, -1):
+                    var coord = outer_remaining % result_shape[dim]
+                    a_base += coord * A_strides[dim]
+                    b_base += coord * B_strides[dim]
+                    outer_remaining //= result_shape[dim]
 
-                    var res = scalar_op[op_code, dtype](A[a_idx], B[b_idx], Scalar[dtype](0))
+                if inner_offset + simd_width <= inner_dim:
+                    # ── Fast path: vector fits within one row ─────────────
+                    # Per lane: one multiply each for innermost dim.
+                    # A write-back always per-lane (A is strided).
+                    comptime for lane in range(simd_width):
+                        var a_idx = (
+                            a_base + (inner_offset + lane) * a_inner_stride
+                        )
+                        var b_idx = (
+                            b_base + (inner_offset + lane) * b_inner_stride
+                        )
+                        var a = A[a_idx]
+                        var b = B[b_idx]
+                        var res = scalar_op[op_code, dtype](
+                            a, b, Epsilon[dtype].value()
+                        )
 
-                    A[a_idx] = res
+                        A[a_idx] = res
+
+                else:
+                    # ── Slow path: crosses row boundary ───────────────────
+                    # Full per-lane decomposition for both A and B.
+                    comptime for lane in range(simd_width):
+                        var linear_idx = i + lane
+                        var rem = linear_idx
+                        var a_idx = 0
+                        var b_idx = 0
+
+                        for dim in range(rank - 1, -1, -1):
+                            var coord = rem % result_shape[dim]
+                            a_idx += coord * A_strides[dim]
+                            b_idx += coord * B_strides[dim]
+                            rem //= result_shape[dim]
+
+                        var a = A[a_idx]
+                        var b = B[b_idx]
+                        var res = scalar_op[op_code, dtype](
+                            a, b, Epsilon[dtype].value()
+                        )
+
+                        A[a_idx] = res
 
             else:
+                # ── Tail: fewer than simd_width elements remain ───────────
                 for j in range(size - i):
                     var linear_idx = i + j
-                    var remaining = linear_idx
+                    var rem = linear_idx
                     var a_idx = 0
                     var b_idx = 0
 
                     for dim in range(rank - 1, -1, -1):
-                        var coord = remaining % result_shape[dim]
+                        var coord = rem % result_shape[dim]
                         a_idx += coord * A_strides[dim]
                         b_idx += coord * B_strides[dim]
-                        remaining //= result_shape[dim]
+                        rem //= result_shape[dim]
 
-                    var res = scalar_op[op_code, dtype](A[a_idx], B[b_idx], Scalar[dtype](0))
+                    var a = A[a_idx]
+                    var b = B[b_idx]
+                    var res = scalar_op[op_code, dtype](
+                        a, b, Epsilon[dtype].value()
+                    )
 
                     A[a_idx] = res
 
@@ -345,7 +482,9 @@ struct BinaryInplaceOperations[dtype: DType](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = False) raises:
+    ](
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = False
+    ) raises:
         comptime simdwidth = simd_width_of[Self.dtype]()
         var A_shape = A.shape
         var B_shape = B.shape
@@ -374,12 +513,6 @@ struct BinaryInplaceOperations[dtype: DType](
         # axes and its physical buffer is smaller than output_size.
         var needs_broadcasting = B_shape != broadcast_shape
 
-        # FIX (tuple order): launch_config returns (threads_per_block, num_blocks).
-        # The original code had the return order swapped, so threads_per_block
-        # received the num_blocks value (potentially in the thousands) and
-        # num_blocks received threads_per_block (128–512), producing entirely
-        # wrong GPU dispatch dimensions. The destructuring here and the return
-        # order in launch_config are now consistent.
         var (threads_per_block, num_blocks) = Self.launch_config(output_size)
 
         ref A_device_state = A.device_state.value()
@@ -417,12 +550,13 @@ struct BinaryInplaceOperations[dtype: DType](
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
-            if sync: device_context.synchronize()
+            if sync:
+                device_context.synchronize()
             return
 
         # Broadcast strides needed for paths 2–4.
         #
-        # Strides used correctly here: A.strides and B.strides are the
+        # A.strides and B.strides are the
         # actual physical strides of each tensor. For contiguous tensors
         # these equal Strides.default(shape); for non-contiguous views
         # (transposed, sliced) they differ. Using actual strides is the
@@ -474,7 +608,8 @@ struct BinaryInplaceOperations[dtype: DType](
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
-            if sync: device_context.synchronize()
+            if sync:
+                device_context.synchronize()
             return
 
         # ================================================================
@@ -513,7 +648,8 @@ struct BinaryInplaceOperations[dtype: DType](
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
-            if sync: device_context.synchronize()
+            if sync:
+                device_context.synchronize()
             return
 
         # ================================================================
@@ -549,20 +685,11 @@ struct BinaryInplaceOperations[dtype: DType](
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
     @staticmethod
     def launch_config(output_size: Int) -> Tuple[Int, Int]:
-        # FIX (CHUNK_SIZE): The original computed num_blocks as:
-        #   ceil(output_size / threads_per_block)
-        # ignoring that each thread processes CHUNK_SIZE elements, not 1.
-        # CHUNK_SIZE = simd_vectors_per_thread * simd_width (default 2*sw*sw).
-        # For fp32 with simd_width=8: CHUNK_SIZE = 128. The original over-launched
-        # num_blocks by a factor of 128, wasting GPU occupancy and launch overhead.
-        # Surplus blocks are not a correctness bug (they exit the while loop
-        # immediately via the `base_idx < size` guard), but the waste is severe
-        # for small/medium tensors — the most common in-place shapes.
-        #
         # We use a conservative APPROX_CHUNK_SIZE = 32 (= 2 * 16, the maximum
         # simd_width for fp16/bf16 on modern GPUs). For wider types this slightly
         # over-launches, but never under-subscribes — a safe conservative bound.

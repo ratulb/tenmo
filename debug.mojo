@@ -1,6 +1,6 @@
 from tenmo import Tensor, NDBuffer, Shape, SGD, Buffer, Strides, IntArray
 from std.testing import assert_true, TestSuite
-from tenmo.common_utils import s, i, panic
+from tenmo.common_utils import s, i, panic, Epsilon
 from std.sys.defines import get_defined_string
 from tenmo.matrixshapevalidator import MatrixShapeValidator
 from std.sys import has_accelerator, simd_width_of
@@ -124,16 +124,19 @@ def main() raises:
     ndb = NDBuffer[dtype].arange(1, 25)
     var shared = ndb.share(Shape(2, 2, 5), Strides(2, 1, 3), offset=4)
     shared.print()"""
-    test_ndb_addition_1d()
-    test_ndb_inplace_addition_1d()
-    test_ndb_inter_gpu_copy_and_opeartion()
+    #test_ndb_addition_1d()
+    #test_ndb_inplace_addition_1d()
+    #test_ndb_inter_gpu_copy_and_opeartion()
     #var a = NDBuffer[dtype].arange(1, 49).reshape(Shape(2, 4, 6))
     _="""var b_base = NDBuffer[dtype].arange(1, 49).reshape(Shape(2, 6, 4))
     var b = b_base.transpose()  # non-contiguous (2,4,6)
     b.print()
     var c = b_base.transpose(IntArray(-1, -2))
     c.print()"""
-
+    var a = SIMD[dtype, 4](1, 2, 3, 4)
+    var b = SIMD[dtype, 4](0, 3, 9, 10)
+    var r = a / (b + Epsilon[dtype].value())
+    print(r)
 
 def test_sgd_gpu_backward_integration() raises:
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)

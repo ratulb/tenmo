@@ -3813,6 +3813,54 @@ struct Tensor[dtype: DType](
             logits, target, epsilon, reduction, sync
         )
 
+    @staticmethod
+    def add[A: DType, track_grad: Bool = True](a: Tensor[A], b: Tensor[A], sync: Bool = True) -> Tensor[A]:
+        """Element-wise addition."""
+        return Adder[A].forward[track_grad](a, b, sync=sync)
+
+    @staticmethod
+    def sub[A: DType, track_grad: Bool = True](a: Tensor[A], b: Tensor[A], sync: Bool = True) -> Tensor[A]:
+        """Element-wise subtraction."""
+        return Subtractor[A].forward[track_grad](a, b, sync=sync)
+
+    @staticmethod
+    def mul[A: DType, track_grad: Bool = True](a: Tensor[A], b: Tensor[A], sync: Bool = True) -> Tensor[A]:
+        """Element-wise multiplication."""
+        return Multiplicator[A].forward[track_grad](a, b, sync=sync)
+
+    @staticmethod
+    def truediv[A: DType, track_grad: Bool = True](a: Tensor[A], b: Tensor[A], sync: Bool = True) -> Tensor[A]:
+        """Element-wise division."""
+        return Divider[A].forward[track_grad](a, b, sync=sync)
+
+    @staticmethod
+    def iadd[A: DType](a: Tensor[A], b: Tensor[A], sync: Bool = True):
+        """In-place addition."""
+        if a.is_leaf():
+            panic("Tensor.iadd: can not perform in-place operation on a leaf tensor requiring grad.")
+        a.buffer.inplace_ops[Add](b.buffer, sync=sync)
+
+    @staticmethod
+    def isub[A: DType](a: Tensor[A], b: Tensor[A], sync: Bool = True):
+        """In-place subtraction."""
+        if a.is_leaf():
+            panic("Tensor.isub: can not perform in-place operation on a leaf tensor requiring grad.")
+        a.buffer.inplace_ops[Subtract](b.buffer, sync=sync)
+
+    @staticmethod
+    def imul[A: DType](a: Tensor[A], b: Tensor[A], sync: Bool = True):
+        """In-place multiplication."""
+        if a.is_leaf():
+            panic("Tensor.imul: can not perform in-place operation on a leaf tensor requiring grad.")
+        a.buffer.inplace_ops[Multiply](b.buffer, sync=sync)
+
+    @staticmethod
+    def itruediv[A: DType](a: Tensor[A], b: Tensor[A], sync: Bool = True):
+        """In-place division."""
+        if a.is_leaf():
+            panic("Tensor.itruediv: can not perform in-place operation on a leaf tensor requiring grad.")
+        a.buffer.inplace_ops[Divide](b.buffer, sync=sync)
+
     def matmul[
         track_grad: Bool = True, mode: Int = mnemonics.mm
     ](A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
