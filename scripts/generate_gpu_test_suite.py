@@ -425,6 +425,18 @@ def write_chunk(
         seen_helpers = set()
         seen_aliases = set()
         dup_count = 0
+
+        # Collect all names imported via the merged import list — helpers
+        # whose names appear here would cause "invalid redefinition" errors
+        # (Mojo cannot overload a `def` against an import statement).
+        global_imported_names = set()
+        for imp in chunk_imports:
+            if "import " in imp:
+                after = imp.split("import ", 1)[-1]
+                for n in re.findall(r'\b\w+\b', after):
+                    if n not in ("from",):
+                        global_imported_names.add(n)
+
         for bname, data in chunk_file_data.items():
             f.write(f"# === From {bname} ===\n\n")
 
@@ -440,6 +452,8 @@ def write_chunk(
 
             for hname, htext in data["helpers"]:
                 if hname in SKIP_HELPERS:
+                    continue
+                if hname in global_imported_names:
                     continue
                 if hname not in seen_helpers:
                     seen_helpers.add(hname)
