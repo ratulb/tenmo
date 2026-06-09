@@ -542,12 +542,20 @@ struct Tensor[dtype: DType](
         """
 
         return Gather[Self.dtype].forward[track_grad=track_grad](
-            self, indices, axis, reduction, padding_idx, requires_grad, sync=sync
+            self,
+            indices,
+            axis,
+            reduction,
+            padding_idx,
+            requires_grad,
+            sync=sync,
         )
 
     def outer[
         track_grad: Bool = True,
-    ](mut self, mut other: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
+    ](mut self, mut other: Tensor[Self.dtype], sync: Bool = True) -> Tensor[
+        Self.dtype
+    ]:
         """Compute the outer product of two tensors.
 
         Both tensors are flattened to 1-D before the product is computed.
@@ -564,8 +572,12 @@ struct Tensor[dtype: DType](
             2-D tensor of shape (self.numels(), other.numels()).
         """
         # Flatten both to 1-D — reshape tracks grad if input does
-        var a = self.reshape[track_grad](Shape(self.numels()), sync=sync)  # (m,)
-        var b = other.reshape[track_grad](Shape(other.numels()), sync=sync)  # (n,)
+        var a = self.reshape[track_grad](
+            Shape(self.numels()), sync=sync
+        )  # (m,)
+        var b = other.reshape[track_grad](
+            Shape(other.numels()), sync=sync
+        )  # (n,)
 
         # Unsqueeze a → column vector (m, 1)
         var col_axes = IntArray()
@@ -574,7 +586,9 @@ struct Tensor[dtype: DType](
 
         # Broadcast multiply (m, 1) * (n,) → (m, n)
         # This is a broadcast multiply — BroadcastBackward handles grad
-        return Multiplicator[Self.dtype].forward[track_grad](a_col, b, sync=sync)  # (m, n)
+        return Multiplicator[Self.dtype].forward[track_grad](
+            a_col, b, sync=sync
+        )  # (m, n)
 
     @always_inline
     def __setitem__(self, *indices: Int, value: Scalar[Self.dtype]):
@@ -1208,7 +1222,9 @@ struct Tensor[dtype: DType](
         Returns:
             A tensor of given shape filled with value.
         """
-        return Self.full(Shape(shape), value, requires_grad, device=device, sync=sync)
+        return Self.full(
+            Shape(shape), value, requires_grad, device=device, sync=sync
+        )
 
     @staticmethod
     def full(
@@ -1844,7 +1860,10 @@ struct Tensor[dtype: DType](
     def broadcast_to[
         track_grad: Bool = True,
     ](
-        self, target_shape: Shape, requires_grad: Optional[Bool] = None, sync: Bool = True
+        self,
+        target_shape: Shape,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Broadcast tensor to a target shape.
 
@@ -1866,7 +1885,9 @@ struct Tensor[dtype: DType](
                 + String(target_shape)
             )
 
-        return Broadcast[Self.dtype].forward[track_grad](self, target_shape, sync=sync)
+        return Broadcast[Self.dtype].forward[track_grad](
+            self, target_shape, sync=sync
+        )
 
     @always_inline
     def load[
@@ -1920,7 +1941,10 @@ struct Tensor[dtype: DType](
     def repeat[
         track_grad: Bool = True,
     ](
-        mut self, repeat: List[Int], requires_grad: Optional[Bool] = None, sync: Bool = True
+        mut self,
+        repeat: List[Int],
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Repeat tensor along each axis.
 
@@ -1937,9 +1961,12 @@ struct Tensor[dtype: DType](
 
     def repeat[
         track_grad: Bool = True,
-    ](mut self, *repeat: Int, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[
-        Self.dtype
-    ]:
+    ](
+        mut self,
+        *repeat: Int,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype]:
         """Repeat tensor along each axis.
 
         Args:
@@ -1956,7 +1983,10 @@ struct Tensor[dtype: DType](
     def tile[
         track_grad: Bool = True,
     ](
-        mut self, repeat: List[Int], requires_grad: Optional[Bool] = None, sync: Bool = True
+        mut self,
+        repeat: List[Int],
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Tile the tensor by repeating it along each axis.
 
@@ -1973,9 +2003,12 @@ struct Tensor[dtype: DType](
 
     def tile[
         track_grad: Bool = True,
-    ](mut self, *repeat: Int, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[
-        Self.dtype
-    ]:
+    ](
+        mut self,
+        *repeat: Int,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype]:
         """Tile the tensor by repeating it along each axis.
 
         Args:
@@ -1991,7 +2024,9 @@ struct Tensor[dtype: DType](
 
     def contiguous[
         track_grad: Bool = True,
-    ](self, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[Self.dtype]:
+    ](self, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[
+        Self.dtype
+    ]:
         """Return a contiguous copy of the tensor.
 
         Args:
@@ -2000,11 +2035,15 @@ struct Tensor[dtype: DType](
         Returns:
             A contiguous tensor with the same data.
         """
-        return Contiguous[Self.dtype].forward[track_grad](self, requires_grad, sync=sync)
+        return Contiguous[Self.dtype].forward[track_grad](
+            self, requires_grad, sync=sync
+        )
 
     def reshape[
         track_grad: Bool = True,
-    ](mut self, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[Self.dtype]:
+    ](
+        mut self, requires_grad: Optional[Bool] = None, sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         if self.numels() != 1:
             panic(
                 "Tensor → reshape: only tensor with single element can be"
@@ -2016,11 +2055,16 @@ struct Tensor[dtype: DType](
 
     def reshape[
         track_grad: Bool = True,
-    ](mut self, *newdims: Int, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[
-        Self.dtype
-    ]:
+    ](
+        mut self,
+        *newdims: Int,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype]:
         if len(newdims) == 1 and newdims[0] == 0:
-            return self.reshape[track_grad](requires_grad=requires_grad, sync=sync)
+            return self.reshape[track_grad](
+                requires_grad=requires_grad, sync=sync
+            )
         shape = Validator.validate_and_construct_new_shape(
             self.shape(), IntArray(newdims)
         )
@@ -2115,7 +2159,9 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with summed values along the specified axes.
         """
-        return self.sum[track_grad](IntArray(axes), keepdims, requires_grad, sync)
+        return self.sum[track_grad](
+            IntArray(axes), keepdims, requires_grad, sync
+        )
 
     def sum[
         track_grad: Bool = True,
@@ -2229,7 +2275,9 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with mean values along the specified axes.
         """
-        return self.mean[track_grad](IntArray(axes), keepdims, requires_grad, sync)
+        return self.mean[track_grad](
+            IntArray(axes), keepdims, requires_grad, sync
+        )
 
     def mean[
         track_grad: Bool = True,
@@ -2269,7 +2317,9 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with reciprocal values of the elements.
         """
-        return Reciprocal[Self.dtype].forward[track_grad](self, requires_grad, sync)
+        return Reciprocal[Self.dtype].forward[track_grad](
+            self, requires_grad, sync
+        )
 
     def variance[
         track_grad: Bool = True,
@@ -2350,20 +2400,21 @@ struct Tensor[dtype: DType](
             return Tensor[Self.dtype].scalar(0)
 
     def __rtruediv__[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
-        return DivideScalar[Self.dtype].forward[track_grad](self, scalar, sync=sync)
+        return DivideScalar[Self.dtype].forward[track_grad](
+            self, scalar, sync=sync
+        )
 
     def __truediv__[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
-        return DivideByScalar[Self.dtype].forward[track_grad](self, scalar, sync=sync)
+        return DivideByScalar[Self.dtype].forward[track_grad](
+            self, scalar, sync=sync
+        )
 
     def __truediv__[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](self, other: Self) -> Tensor[Self.dtype]:
         return Divider[Self.dtype].forward[track_grad](self, other, sync=sync)
 
@@ -2502,8 +2553,7 @@ struct Tensor[dtype: DType](
         )
 
     def __neg__[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](self) -> Tensor[Self.dtype]:
         """Negate all elements.
 
@@ -2544,11 +2594,12 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with absolute values.
         """
-        return Tensor[Self.dtype](self.buffer.unary_ops[ABS](), requires_grad=False)
+        return Tensor[Self.dtype](
+            self.buffer.unary_ops[ABS](), requires_grad=False
+        )
 
     def __radd__[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
         """Right-side addition (scalar + tensor).
 
@@ -2562,8 +2613,7 @@ struct Tensor[dtype: DType](
         return self.__add__[track_grad, sync=sync](scalar)
 
     def __add__[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
         """Add a scalar to all elements.
 
@@ -2574,11 +2624,12 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with scalar added to all elements.
         """
-        return AddScalar[Self.dtype].forward[track_grad](self, scalar, sync=sync)
+        return AddScalar[Self.dtype].forward[track_grad](
+            self, scalar, sync=sync
+        )
 
     def max[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](
         self, scalar: Scalar[Self.dtype], requires_grad: Optional[Bool] = None
     ) -> Tensor[Self.dtype]:
@@ -2596,8 +2647,7 @@ struct Tensor[dtype: DType](
         )
 
     def min[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](
         self, scalar: Scalar[Self.dtype], requires_grad: Optional[Bool] = None
     ) -> Tensor[Self.dtype]:
@@ -2615,8 +2665,7 @@ struct Tensor[dtype: DType](
         )
 
     def __add__[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](self, other: Self) -> Tensor[Self.dtype]:
         """Element-wise addition of two tensors.
 
@@ -2630,8 +2679,7 @@ struct Tensor[dtype: DType](
         return Adder[Self.dtype].forward[track_grad](self, other, sync=sync)
 
     def __rsub__[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
         """Right-side subtraction (scalar - tensor).
 
@@ -2642,11 +2690,12 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with scalar minus each element.
         """
-        return SubtractFromScalar[Self.dtype].forward[track_grad](self, scalar, sync=sync)
+        return SubtractFromScalar[Self.dtype].forward[track_grad](
+            self, scalar, sync=sync
+        )
 
     def __sub__[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
         """Subtract a scalar from all elements.
 
@@ -2657,11 +2706,12 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with scalar subtracted from each element.
         """
-        return SubtractScalar[Self.dtype].forward[track_grad](self, scalar, sync=sync)
+        return SubtractScalar[Self.dtype].forward[track_grad](
+            self, scalar, sync=sync
+        )
 
     def __sub__[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](self, other: Self) -> Tensor[Self.dtype]:
         """Element-wise subtraction of two tensors.
 
@@ -2672,9 +2722,13 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with element-wise difference.
         """
-        return Subtractor[Self.dtype].forward[track_grad](self, other, sync=sync)
+        return Subtractor[Self.dtype].forward[track_grad](
+            self, other, sync=sync
+        )
 
-    def __sub__[sync: Bool = True](self, other: Gradbox[Self.dtype]) -> Tensor[Self.dtype]:
+    def __sub__[
+        sync: Bool = True
+    ](self, other: Gradbox[Self.dtype]) -> Tensor[Self.dtype]:
         """Element-wise subtraction of two tensors.
 
         Args:
@@ -2686,8 +2740,7 @@ struct Tensor[dtype: DType](
         return Subtractor[Self.dtype].forward(self, other, sync=sync)
 
     def __rmul__[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
         """Right-side multiplication (scalar * tensor).
 
@@ -2701,8 +2754,7 @@ struct Tensor[dtype: DType](
         return self.__mul__[track_grad, sync=sync](scalar)
 
     def __mul__[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](self, factor: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
         """Multiply all elements by a scalar.
 
@@ -2713,11 +2765,12 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with each element multiplied by factor.
         """
-        return MultiplyScalar[Self.dtype].forward[track_grad](self, factor, sync=sync)
+        return MultiplyScalar[Self.dtype].forward[track_grad](
+            self, factor, sync=sync
+        )
 
     def __mul__[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](self, other: Self) -> Tensor[Self.dtype]:
         """Element-wise multiplication of two tensors.
 
@@ -2728,9 +2781,13 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with element-wise product.
         """
-        return Multiplicator[Self.dtype].forward[track_grad](self, other, sync=sync)
+        return Multiplicator[Self.dtype].forward[track_grad](
+            self, other, sync=sync
+        )
 
-    def __mul__[sync: Bool = True](self, other: Gradbox[Self.dtype]) -> Gradbox[Self.dtype]:
+    def __mul__[
+        sync: Bool = True
+    ](self, other: Gradbox[Self.dtype]) -> Gradbox[Self.dtype]:
         """Element-wise multiplication with a Gradbox.
 
         Args:
@@ -2742,10 +2799,11 @@ struct Tensor[dtype: DType](
         return Multiplicator[Self.dtype].forward(self, other, sync=sync)
 
     def __pow__[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](
-        self, exponent: Scalar[Self.dtype], requires_grad: Optional[Bool] = None,
+        self,
+        exponent: Scalar[Self.dtype],
+        requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
         """Element-wise power: self^exponent.
 
@@ -2764,20 +2822,26 @@ struct Tensor[dtype: DType](
             self, exponent, requires_grad, sync=sync
         )
 
-    def dot[track_grad: Bool = True](self, other: Self, sync: Bool = True) -> Tensor[Self.dtype]:
+    def dot[
+        track_grad: Bool = True
+    ](self, other: Self, sync: Bool = True) -> Tensor[Self.dtype]:
         """Dot product between two tensors. Either may be a scalar tensor."""
         return Dot[Self.dtype].forward[track_grad](self, other, sync)
 
     def dot[
         track_grad: Bool = True,
-    ](self, scalar: Scalar[Self.dtype], sync: Bool = True) raises -> Tensor[Self.dtype]:
+    ](self, scalar: Scalar[Self.dtype], sync: Bool = True) raises -> Tensor[
+        Self.dtype
+    ]:
         """Dot product: tensor · scalar (scalar is broadcast to self's shape).
         """
         var other = Tensor[Self.dtype].scalar(scalar, requires_grad=False)
         comptime if has_accelerator():
             if self.is_on_gpu():
                 var other_gpu = other.to_gpu()
-                return Dot[Self.dtype].forward[track_grad](self, other_gpu, sync)
+                return Dot[Self.dtype].forward[track_grad](
+                    self, other_gpu, sync
+                )
         return Dot[Self.dtype].forward[track_grad](self, other, sync)
 
     def __iadd__[sync: Bool = True](self, scalar: Scalar[Self.dtype]):
@@ -2871,7 +2935,9 @@ struct Tensor[dtype: DType](
 
     def mse[
         track_grad: Bool = True,
-    ](self, target: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
+    ](self, target: Tensor[Self.dtype], sync: Bool = True) -> Tensor[
+        Self.dtype
+    ]:
         """Mean squared error loss.
 
         Args:
@@ -2881,8 +2947,12 @@ struct Tensor[dtype: DType](
         Returns:
             Scalar tensor with the MSE loss value.
         """
-        var diff = Subtractor[Self.dtype].forward[track_grad](self, target, sync)
-        var squared = Multiplicator[Self.dtype].forward[track_grad](diff, diff, sync)
+        var diff = Subtractor[Self.dtype].forward[track_grad](
+            self, target, sync
+        )
+        var squared = Multiplicator[Self.dtype].forward[track_grad](
+            diff, diff, sync
+        )
         return squared.mean[track_grad]()
 
     def requires_grad_(mut self, requires_grad: Bool = True):
@@ -3102,7 +3172,13 @@ struct Tensor[dtype: DType](
         """
         view_shape, view_strides = Shape(shape), Strides(strides)
         return View[Self.dtype].forward[track_grad](
-            self, view_shape, view_strides, offset, requires_grad, False, sync=sync
+            self,
+            view_shape,
+            view_strides,
+            offset,
+            requires_grad,
+            False,
+            sync=sync,
         )
 
     def view[
@@ -3175,12 +3251,17 @@ struct Tensor[dtype: DType](
             A contiguous view tensor.
         """
         return View[Self.dtype].forward[track_grad](
-            self, shape, Strides.default(shape), offset, requires_grad, False, sync=sync
+            self,
+            shape,
+            Strides.default(shape),
+            offset,
+            requires_grad,
+            False,
+            sync=sync,
         )
 
     def into_view[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](mut self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
         """Convert this tensor into a shared view.
 
@@ -3201,9 +3282,12 @@ struct Tensor[dtype: DType](
 
     def transpose[
         track_grad: Bool = True,
-    ](mut self, *axes: Int, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[
-        Self.dtype
-    ]:
+    ](
+        mut self,
+        *axes: Int,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype]:
         """Transpose tensor by reversing or permuting axes.
 
         Args:
@@ -3213,12 +3297,17 @@ struct Tensor[dtype: DType](
         Returns:
             A transposed view tensor.
         """
-        return self.transpose[track_grad](IntArray(axes), requires_grad, sync=sync)
+        return self.transpose[track_grad](
+            IntArray(axes), requires_grad, sync=sync
+        )
 
     def transpose[
         track_grad: Bool = True,
     ](
-        mut self, axes: List[Int] = [], requires_grad: Optional[Bool] = None, sync: Bool = True
+        mut self,
+        axes: List[Int] = [],
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Transpose tensor by reversing or permuting axes.
 
@@ -3229,13 +3318,18 @@ struct Tensor[dtype: DType](
         Returns:
             A transposed view tensor.
         """
-        return self.transpose[track_grad](IntArray(axes), requires_grad, sync=sync)
+        return self.transpose[track_grad](
+            IntArray(axes), requires_grad, sync=sync
+        )
 
     def transpose[
         track_grad: Bool = True,
-    ](mut self, axes: IntArray, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[
-        Self.dtype
-    ]:
+    ](
+        mut self,
+        axes: IntArray,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype]:
         """Transpose tensor by reversing or permuting axes.
 
         Args:
@@ -3245,11 +3339,12 @@ struct Tensor[dtype: DType](
         Returns:
             A transposed view tensor.
         """
-        return Transpose.forward[track_grad](self, axes, requires_grad, sync=sync)
+        return Transpose.forward[track_grad](
+            self, axes, requires_grad, sync=sync
+        )
 
     def slice[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](mut self, start: Int, end: Int, step: Int = 1, axis: Int = 0) -> Tensor[
         Self.dtype
     ]:
@@ -3281,8 +3376,7 @@ struct Tensor[dtype: DType](
         )
 
     def slice[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](
         mut self,
         axes: List[Int],
@@ -3396,9 +3490,7 @@ struct Tensor[dtype: DType](
         *axes: Int,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
-    ) -> Tensor[
-        Self.dtype
-    ]:
+    ) -> Tensor[Self.dtype]:
         """Remove axes of size 1.
 
         Args:
@@ -3414,9 +3506,12 @@ struct Tensor[dtype: DType](
 
     def unsqueeze[
         track_grad: Bool = True,
-    ](mut self, *axes: Int, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[
-        Self.dtype
-    ]:
+    ](
+        mut self,
+        *axes: Int,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype]:
         """Insert axes of size 1.
 
         Args:
@@ -3433,7 +3528,10 @@ struct Tensor[dtype: DType](
     def unsqueeze[
         track_grad: Bool = True,
     ](
-        mut self, axes: List[Int] = [], requires_grad: Optional[Bool] = None, sync: Bool = True
+        mut self,
+        axes: List[Int] = [],
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Insert axes of size 1.
 
@@ -3450,9 +3548,12 @@ struct Tensor[dtype: DType](
 
     def unsqueeze[
         track_grad: Bool = True,
-    ](mut self, axes: IntArray, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[
-        Self.dtype
-    ]:
+    ](
+        mut self,
+        axes: IntArray,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype]:
         """Insert axes of size 1.
 
         Args:
@@ -3469,7 +3570,10 @@ struct Tensor[dtype: DType](
     def permute[
         track_grad: Bool = True,
     ](
-        mut self, axes: List[Int], requires_grad: Optional[Bool] = None, sync: Bool = True
+        mut self,
+        axes: List[Int],
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Permute axes according to a given ordering.
 
@@ -3486,9 +3590,12 @@ struct Tensor[dtype: DType](
 
     def permute[
         track_grad: Bool = True,
-    ](mut self, axes: IntArray, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[
-        Self.dtype
-    ]:
+    ](
+        mut self,
+        axes: IntArray,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype]:
         """Permute axes according to a given ordering.
 
         Args:
@@ -3639,7 +3746,9 @@ struct Tensor[dtype: DType](
 
     def relu[
         track_grad: Bool = True,
-    ](self, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[Self.dtype]:
+    ](self, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[
+        Self.dtype
+    ]:
         """Rectified Linear Unit: max(0, x).
 
         Args:
@@ -3709,7 +3818,9 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with sigmoid applied element-wise.
         """
-        return Sigmoid[Self.dtype].forward[track_grad](self, requires_grad, sync)
+        return Sigmoid[Self.dtype].forward[track_grad](
+            self, requires_grad, sync
+        )
 
     def softmax[
         track_grad: Bool = True, log: Bool = False
@@ -3744,9 +3855,7 @@ struct Tensor[dtype: DType](
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
-    ) -> Tensor[
-        Self.dtype
-    ] where Self.dtype.is_floating_point():
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """Softmax activation along given axes.
 
         Args:
@@ -3814,22 +3923,30 @@ struct Tensor[dtype: DType](
         )
 
     @staticmethod
-    def add[A: DType, track_grad: Bool = True](a: Tensor[A], b: Tensor[A], sync: Bool = True) -> Tensor[A]:
+    def add[
+        A: DType, track_grad: Bool = True
+    ](a: Tensor[A], b: Tensor[A], sync: Bool = True) -> Tensor[A]:
         """Element-wise addition."""
         return Adder[A].forward[track_grad](a, b, sync=sync)
 
     @staticmethod
-    def sub[A: DType, track_grad: Bool = True](a: Tensor[A], b: Tensor[A], sync: Bool = True) -> Tensor[A]:
+    def sub[
+        A: DType, track_grad: Bool = True
+    ](a: Tensor[A], b: Tensor[A], sync: Bool = True) -> Tensor[A]:
         """Element-wise subtraction."""
         return Subtractor[A].forward[track_grad](a, b, sync=sync)
 
     @staticmethod
-    def mul[A: DType, track_grad: Bool = True](a: Tensor[A], b: Tensor[A], sync: Bool = True) -> Tensor[A]:
+    def mul[
+        A: DType, track_grad: Bool = True
+    ](a: Tensor[A], b: Tensor[A], sync: Bool = True) -> Tensor[A]:
         """Element-wise multiplication."""
         return Multiplicator[A].forward[track_grad](a, b, sync=sync)
 
     @staticmethod
-    def truediv[A: DType, track_grad: Bool = True](a: Tensor[A], b: Tensor[A], sync: Bool = True) -> Tensor[A]:
+    def truediv[
+        A: DType, track_grad: Bool = True
+    ](a: Tensor[A], b: Tensor[A], sync: Bool = True) -> Tensor[A]:
         """Element-wise division."""
         return Divider[A].forward[track_grad](a, b, sync=sync)
 
@@ -3837,33 +3954,47 @@ struct Tensor[dtype: DType](
     def iadd[A: DType](a: Tensor[A], b: Tensor[A], sync: Bool = True):
         """In-place addition."""
         if a.is_leaf():
-            panic("Tensor.iadd: can not perform in-place operation on a leaf tensor requiring grad.")
+            panic(
+                "Tensor.iadd: can not perform in-place operation on a leaf"
+                " tensor requiring grad."
+            )
         a.buffer.inplace_ops[Add](b.buffer, sync=sync)
 
     @staticmethod
     def isub[A: DType](a: Tensor[A], b: Tensor[A], sync: Bool = True):
         """In-place subtraction."""
         if a.is_leaf():
-            panic("Tensor.isub: can not perform in-place operation on a leaf tensor requiring grad.")
+            panic(
+                "Tensor.isub: can not perform in-place operation on a leaf"
+                " tensor requiring grad."
+            )
         a.buffer.inplace_ops[Subtract](b.buffer, sync=sync)
 
     @staticmethod
     def imul[A: DType](a: Tensor[A], b: Tensor[A], sync: Bool = True):
         """In-place multiplication."""
         if a.is_leaf():
-            panic("Tensor.imul: can not perform in-place operation on a leaf tensor requiring grad.")
+            panic(
+                "Tensor.imul: can not perform in-place operation on a leaf"
+                " tensor requiring grad."
+            )
         a.buffer.inplace_ops[Multiply](b.buffer, sync=sync)
 
     @staticmethod
     def itruediv[A: DType](a: Tensor[A], b: Tensor[A], sync: Bool = True):
         """In-place division."""
         if a.is_leaf():
-            panic("Tensor.itruediv: can not perform in-place operation on a leaf tensor requiring grad.")
+            panic(
+                "Tensor.itruediv: can not perform in-place operation on a leaf"
+                " tensor requiring grad."
+            )
         a.buffer.inplace_ops[Divide](b.buffer, sync=sync)
 
     def matmul[
         track_grad: Bool = True, mode: Int = mnemonics.mm
-    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
+    ](
+        A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         """Matrix multiplication of two tensors.
 
         Args:
@@ -3956,7 +4087,9 @@ struct Tensor[dtype: DType](
         Returns:
             Stacked tensor.
         """
-        return Stack[Self.dtype].vstack[track_grad](tensors, requires_grad, sync)
+        return Stack[Self.dtype].vstack[track_grad](
+            tensors, requires_grad, sync
+        )
 
     @staticmethod
     def hstack[
@@ -3975,7 +4108,9 @@ struct Tensor[dtype: DType](
         Returns:
             Stacked tensor.
         """
-        return Stack[Self.dtype].hstack[track_grad](tensors, requires_grad, sync)
+        return Stack[Self.dtype].hstack[track_grad](
+            tensors, requires_grad, sync
+        )
 
     @staticmethod
     def pad[
@@ -4067,8 +4202,7 @@ struct Tensor[dtype: DType](
 
     @staticmethod
     def pad_for_conv[
-        track_grad: Bool = True,
-        sync: Bool = True
+        track_grad: Bool = True, sync: Bool = True
     ](
         x: Tensor[Self.dtype],
         pad: Int,
