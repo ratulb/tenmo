@@ -20,33 +20,37 @@ Tenmo brings modern, ergonomic ML abstractions to Mojo with automatic differenti
 
 ### MNIST Training Benchmark (15 Epochs, 105K Parameters)
 
-Training the same 4-layer MLP (784→128→32→10) on identical hardware:
+Training the same 4-layer MLP (784→128→32→10) on identical hardware, all runs sequential:
 
 | Platform | Device | Avg Epoch Time | Total Time | Final Val Acc |
 |----------|--------|----------------|------------|---------------|
-| **Tenmo** | **CPU (Mojo)** | **2.57s** | **38.5s** | **98.01%** |
-| PyTorch | CPU | 9.49s | 142.4s | 97.89% |
+| **Tenmo** | **CPU (Mojo)** | **5.5s** | **82.3s** | **98.14%** |
+| **Tenmo** | **GPU (Mojo)** | **6.0s** | **90.1s** | **98.00%** |
+| PyTorch | GPU (CUDA) | 14.5s | 217.2s | 98.18% |
+| PyTorch | CPU | 15.4s | 231.5s | 98.12% |
 
 **Key Observations:**
-- ⚡︎ **3.7× faster than PyTorch CPU** — Pure Mojo with SIMD optimization
-- 🎯︎ **98.01% validation accuracy** — Slightly *exceeds* PyTorch on same hardware
+- ⚡︎ **2.8× faster than PyTorch CPU** & **2.4× faster than PyTorch GPU** — Pure Mojo SIMD on CPU, native kernel compilation on GPU
+- 🎯︎ **98.14% validation accuracy** — Matches PyTorch precision on identical hardware
+- 💡 **CPU beats GPU for this model** — At 104K params the SIMD CPU kernels saturate the machine before GPU launch overhead pays off
 - 📉 **Zero Python overhead** — Runs entirely in compiled Mojo
 
-*All runs were performed sequentially on the same system, batch_size=64. The MNIST example does not use BLAS — pure Mojo only.*
+*Batch_size=64. The MNIST example does not use BLAS — pure Mojo end-to-end.*
 
-**Training Progression** (Tenmo CPU, current):
+**Training Progression** (Tenmo CPU):
 ```
-Epoch 1:  Loss: 0.318, Train: 90.43%, Val: 95.38%, Time: 2.58s
-Epoch 5:  Loss: 0.054, Train: 98.33%, Val: 97.41%, Time: 2.56s
-Epoch 10: Loss: 0.018, Train: 99.45%, Val: 97.72%, Time: 2.56s
-Epoch 15: Loss: 0.006, Train: 99.93%, Val: 98.01%, Time: 2.56s
+Epoch 1:  Loss: 0.323, Train: 90.18%, Val: 95.19%, Time: 5.40s
+Epoch 5:  Loss: 0.051, Train: 98.46%, Val: 97.28%, Time: 5.49s
+Epoch 10: Loss: 0.018, Train: 99.48%, Val: 97.60%, Time: 5.49s
+Epoch 15: Loss: 0.006, Train: 99.93%, Val: 98.14%, Time: 5.47s
 ```
 
 **Why is Tenmo competitive?**
-- Zero Python overhead
+- Zero Python overhead — no interpreter, no dispatch
 - SIMD-vectorized operations on contiguous buffers
 - Zero-copy batch loading
 - Compile-time specialization eliminates graph overhead in eval mode
+- GPU kernels compile directly from the same Mojo source — no CUDA/C++ bridge
 
 ---
 
@@ -203,11 +207,11 @@ pixi shell
 
 ## Why Tenmo?
 
-**Performance without compromise**: 3.7× faster than PyTorch CPU on MNIST, with zero Python overhead and full SIMD optimization.
+**Performance without compromise**: 2.8× faster than PyTorch CPU and 2.4× faster than PyTorch GPU on MNIST, with zero Python overhead and full SIMD optimization.
 
 **Transparency you can trust**: Every operation is implemented in pure Mojo — no hidden BLAS calls, no opaque kernels. Perfect for learning and optimization.
 
-**Forward-looking design**: Competitive with PyTorch CPU today; GPU support implemented and being optimized.
+**Forward-looking design**: Competitive with PyTorch today; GPU support already benchmarks faster than PyTorch GPU on the same hardware.
 
 **Mojo-native**: Leverages compile-time metaprogramming, zero-cost abstractions, and systems-level control that Python-based frameworks can't match.
 
@@ -385,20 +389,15 @@ Average time per epoch: 206.83883746066667 ms
 
 Full training pipeline with data loading, batching, and validation:
 ```bash
-./example.sh mnist
+./example.sh mnist          # CPU
+./example.sh mnist_gpu      # GPU (requires CUDA-capable device)
 ```
 
 **Architecture**: 784 → 128 → 32 → 10
 **Training**: 15 epochs, batch_size=64, lr=0.01, momentum=0.9
-**Results**: 97.87% validation accuracy in 199 seconds
+**Results**: 98.14% validation accuracy in **82 seconds** (CPU) / **90 seconds** (GPU)
 
-**Training Progression** (Tenmo on CPU):
-```
-Epoch 1:  Loss: 0.406, Train: 88.29%, Val: 93.15%, Time: 13.1s
-Epoch 5:  Loss: 0.081, Train: 97.57%, Val: 97.15%, Time: 13.5s
-Epoch 10: Loss: 0.039, Train: 98.89%, Val: 97.65%, Time: 13.0s
-Epoch 15: Loss: 0.022, Train: 99.55%, Val: 97.87%, Time: 13.2s
-```
+See the [Performance section](#-performance) for full CPU & GPU benchmarks vs PyTorch.
 All core tensor operations are in pure Mojo with no external dependencies. NumPy is only used for loading MNIST data in the examples.
 
 ---
