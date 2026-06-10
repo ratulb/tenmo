@@ -1,77 +1,15 @@
 # =============================================================================
-# Shared kernel helpers — index computation and op dispatch.
+# Shared kernel helpers — index computation + launch configuration.
 #
 # - output_to_input_base / rank_to_reduced_offset: reduction index helpers
 #   (used by reduction_kernel.mojo, minmax_kernel.mojo,
 #    std_variance_backward_kernel.mojo)
-# - simd_op / scalar_op: binary operation dispatch helpers
-#   (used by binary_ops_kernel.mojo)
+# - elementwise_launch_config: unified launch config for element-wise GPU
+#   kernels (used by scalar, binary, unary, bce, dropout, division,
+#   compare, sgd, gather, filler kernels)
 # =============================================================================
 
-from tenmo.common_utils import One, Epsilon
 from tenmo.array import Array
-from std.math import rsqrt
-
-
-@always_inline
-def simd_op[
-    op_code: Int,
-    dtype: DType,
-    simd_width: Int,
-](
-    a: SIMD[dtype, simd_width],
-    b: SIMD[dtype, simd_width],
-    epsilon: Scalar[dtype] = Epsilon[dtype].value(),
-) -> SIMD[dtype, simd_width]:
-    var one = SIMD[dtype, simd_width](One[dtype].value())
-    var eps = SIMD[dtype, simd_width](epsilon)
-
-    comptime if op_code == Add:
-        return a + b
-    elif op_code == Subtract:
-        return a - b
-    elif op_code == Multiply:
-        return a * b
-    elif op_code == Divide:
-        return a / (b + epsilon)
-    elif op_code == SIGMOID_BACKWARD:
-        return b * a * (one - a)
-    elif op_code == TANH_BACKWARD:
-        return b * (one - a * a)
-    elif op_code == SQRT_BACKWARD:
-        return b * (SIMD[dtype, simd_width](0.5) * rsqrt(max(a, eps)))
-    else:  # LOG_BACKWARD
-        return b / max(a, eps)
-
-
-@always_inline
-def scalar_op[
-    op_code: Int,
-    dtype: DType,
-](a: Scalar[dtype], b: Scalar[dtype], epsilon: Scalar[dtype] = Epsilon[dtype].value(),) -> Scalar[dtype]:
-    var one = One[dtype].value()
-
-    comptime if op_code == Add:
-        return a + b
-    elif op_code == Subtract:
-        return a - b
-    elif op_code == Multiply:
-        return a * b
-    elif op_code == Divide:
-        return a / (b + epsilon)
-    elif op_code == SIGMOID_BACKWARD:
-        return b * a * (one - a)
-    elif op_code == TANH_BACKWARD:
-        return b * (one - a * a)
-    elif op_code == SQRT_BACKWARD:
-        return b * (Scalar[dtype](0.5) * rsqrt(max(a, epsilon)))
-    else:  # LOG_BACKWARD
-        return b / max(a, epsilon)
-
-
-# =============================================================================
-# Shared index helpers — used by reduction_kernel and std_variance_backward_kernel
-# =============================================================================
 
 @always_inline
 def output_to_input_base(
@@ -110,3 +48,28 @@ def rank_to_reduced_offset(
             offset += coord * in_strides[k]
 
     return offset
+
+
+@always_inline
+def elementwise_launch_config(
+    numels: Int,
+    simd_width: Int,
+) -> Tuple[Int, Int]:
+    """Returns (num_blocks, threads_per_block).
+
+    Each thread processes 2 * simd_width² elements per grid-stride
+    iteration. Launches enough blocks for ~1 iteration on most tensors,
+    caps at 512 blocks.  Three tiers:
+      ≤128 chunks  → 128 threads,  1 block per chunk
+      ≤512 chunks  → 256 threads,  1 block per chunk
+      >512 chunks  → 256 threads,  ceil(chunks/256) blocks capped at 512
+    """
+    var CHUNK_SIZE = 2 * simd_width * simd_width
+    var total_chunks = (numels + CHUNK_SIZE - 1) // CHUNK_SIZE
+
+    if total_chunks <= 128:
+        return (max(1, total_chunks), 128)
+    elif total_chunks <= 512:
+        return (total_chunks, 256)
+    else:
+        return (min((total_chunks + 255) // 256, 512), 256)

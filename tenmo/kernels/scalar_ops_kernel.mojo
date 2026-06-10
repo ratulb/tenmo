@@ -1,24 +1,22 @@
 from std.gpu import thread_idx, block_dim, grid_dim, block_idx
-from std.sys import simd_width_of
+from std.sys import simd_width_of, has_accelerator
 
 from tenmo.tensor import Tensor
-from tenmo.common_utils import panic
+from tenmo.common_utils import panic, Epsilon
 from tenmo.shapes import Shape
-from tenmo.mnemonics import (
-    Multiply,
-    Add,
-    Subtract,
-    Divide,
-    ReverseSubtract,
-    MAX,
-    MIN,
-    POW,
-)
+from tenmo.shared.scalar_ops import simd_op, scalar_op
 from tenmo.device import DeviceState
 from tenmo.ndbuffer import NDBuffer
+from tenmo.array import Array
+from . import elementwise_launch_config
 
-# Kernel template for various arithmetic ops involving ND Tensor and a single scalar
-# Simplification - views becomes contiguous when copied to device and offset becomes 0
+# =============================================================================
+# KERNEL for contiguous A (flat linear indexing).
+#
+# Used when scalar_ops is called on a GPU buffer that IS contiguous.
+# Each thread processes CHUNK_SIZE elements with SIMD vectorization.
+# The A input and result output are both flat-contiguous.
+# =============================================================================
 
 
 def scalar_ops[
@@ -44,8 +42,8 @@ def scalar_ops[
     """
 
     var tid = thread_idx.x
-    var gtid = Int(tid + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = tid + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
 
@@ -63,54 +61,143 @@ def scalar_ops[
             if i + simd_width <= size:
                 # Full vector load
                 var vec_a = A.load[width=simd_width](i)
-                var vec_result: SIMD[dtype, simd_width]
-
-                comptime if op_code == Add:
-                    vec_result = vec_a + scalar
-                elif op_code == Subtract:
-                    vec_result = vec_a - scalar
-                elif op_code == ReverseSubtract:
-                    vec_result = scalar - vec_a
-                elif op_code == Multiply:
-                    vec_result = vec_a * scalar
-                elif op_code == Divide:
-                    vec_result = vec_a / scalar
-                elif op_code == MAX:
-                    vec_result = max(vec_a, SIMD[dtype, simd_width](scalar))
-                elif op_code == MIN:
-                    vec_result = min(vec_a, SIMD[dtype, simd_width](scalar))
-
-                else:
-                    vec_result = scalar / vec_a
-
+                var vec_result = simd_op[op_code, dtype, simd_width](
+                    vec_a, SIMD[dtype, simd_width](scalar), Epsilon[dtype].value()
+                )
                 result.store[width=simd_width](i, vec_result)
             elif i < size:
                 # Partial vector (tail handling)
                 for j in range(size - i):
                     var val = A[i + j]
-                    var res: Scalar[dtype]
-
-                    comptime if op_code == Add:
-                        res = val + scalar
-                    elif op_code == Subtract:
-                        res = val - scalar
-                    elif op_code == ReverseSubtract:
-                        res = scalar - val
-                    elif op_code == Multiply:
-                        res = val * scalar
-                    elif op_code == Divide:
-                        res = val / scalar
-                    elif op_code == MAX:
-                        res = val if val > scalar else scalar
-                    elif op_code == MIN:
-                        res = val if val < scalar else scalar
-
-                    else:
-                        res = scalar / val
-
+                    var res = scalar_op[op_code, dtype](
+                        val, scalar, Epsilon[dtype].value()
+                    )
                     result[i + j] = res
 
         base_idx += stride * CHUNK_SIZE
+
+
+# =============================================================================
+# KERNEL for non-contiguous A (strided view).
+#
+# Used when scalar_ops is called on a GPU view that is NOT contiguous
+# (e.g., transposed, sliced). The kernel decomposes each logical index into
+# coordinates via shape, then computes the physical address via strides.
+# The result buffer is always contiguous (fresh allocation).
+#
+# Structure mirrors inplace_scalar_ops_strided but writes to a separate
+# contiguous result buffer instead of modifying A in-place.
+# =============================================================================
+
+
+def scalar_ops_strided[
+    op_code: Int,
+    dtype: DType,
+    simd_width: Int = simd_width_of[dtype](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    scalar: Scalar[dtype],
+    shape: Array,
+    strides: Array,
+    numels: Int,
+    rank: Int,
+):
+    var gtid = thread_idx.x + block_dim.x * block_idx.x
+    var grid_stride = block_dim.x * grid_dim.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var inner_dim = shape[rank - 1]
+    var base_idx = gtid * CHUNK_SIZE
+
+    while base_idx < numels:
+        comptime for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+
+            if i >= numels:
+                break
+
+            if i + simd_width <= numels:
+                # Compute A outer base once for this vector.
+                # Strip innermost coord first — prevents double-counting.
+                var inner_offset = i % inner_dim
+                var outer_remaining = i // inner_dim
+                var a_base = 0
+                var a_inner_stride = strides[rank - 1]
+
+                for dim in range(rank - 2, -1, -1):
+                    var coord = outer_remaining % shape[dim]
+                    a_base += coord * strides[dim]
+                    outer_remaining //= shape[dim]
+
+                if inner_offset + simd_width <= inner_dim:
+                    # ── Fast path: vector fits within one row ─────────────
+                    if a_inner_stride == 1:
+                        # A elements are consecutive in memory →
+                        # SIMD load from strided A, SIMD store to result.
+                        var vec_a = A.load[width=simd_width](
+                            a_base + inner_offset
+                        )
+                        var vec_result = simd_op[op_code, dtype, simd_width](
+                            vec_a,
+                            SIMD[dtype, simd_width](scalar),
+                            Epsilon[dtype].value(),
+                        )
+                        result.store[width=simd_width](i, vec_result)
+
+                    else:
+                        # A elements are strided (a_inner_stride != 1).
+                        # Per-lane read from A, write to contiguous result.
+                        comptime for lane in range(simd_width):
+                            var a_idx = (
+                                a_base
+                                + (inner_offset + lane) * a_inner_stride
+                            )
+                            var a = A[a_idx]
+                            var res = scalar_op[op_code, dtype](
+                                a, scalar, Epsilon[dtype].value()
+                            )
+                            result[i + lane] = res
+
+                else:
+                    # ── Slow path: crosses row boundary ───────────────────
+                    # Full per-lane decomposition for A.
+                    comptime for lane in range(simd_width):
+                        var linear_idx = i + lane
+                        var rem = linear_idx
+                        var a_idx = 0
+
+                        for dim in range(rank - 1, -1, -1):
+                            var coord = rem % shape[dim]
+                            a_idx += coord * strides[dim]
+                            rem //= shape[dim]
+
+                        var a = A[a_idx]
+                        var res = scalar_op[op_code, dtype](
+                            a, scalar, Epsilon[dtype].value()
+                        )
+                        result[linear_idx] = res
+
+            else:
+                # ── Tail: fewer than simd_width elements remain ───────────
+                for j in range(numels - i):
+                    var linear_idx = i + j
+                    var rem = linear_idx
+                    var a_idx = 0
+
+                    for dim in range(rank - 1, -1, -1):
+                        var coord = rem % shape[dim]
+                        a_idx += coord * strides[dim]
+                        rem //= shape[dim]
+
+                    var a = A[a_idx]
+                    var res = scalar_op[op_code, dtype](
+                        a, scalar, Epsilon[dtype].value()
+                    )
+                    result[linear_idx] = res
+
+        base_idx += grid_stride * CHUNK_SIZE
 
 
 # ── Dedicated pow kernels ─────────────────────────────────────────────────────
@@ -131,8 +218,8 @@ def pow_op_f32[
 ):
     """Dedicated float32 pow kernel — x ** exponent elementwise."""
     var tid = thread_idx.x
-    var gtid = Int(tid + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = tid + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
@@ -164,8 +251,8 @@ def pow_op_f64[
 ):
     """Dedicated float64 pow kernel — x ** exponent elementwise."""
     var tid = thread_idx.x
-    var gtid = Int(tid + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
+    var gtid = tid + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
@@ -196,45 +283,78 @@ struct ScalarOperations[dtype: DType = DType.float32](
         Self.dtype
     ]:
         var numels = A.numels()
+        var rank = A.shape.rank()
 
         comptime simdwidth = simd_width_of[Self.dtype]()
 
-        var (threads_per_block, num_blocks) = Self.launch_config(
+        var (num_blocks, threads_per_block) = Self.launch_config(
             numels, simdwidth
         )
         ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu[]
-
-        var compiled_func = device_context.compile_function[
-            scalar_ops[
-                op_code=op_code,
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
-            scalar_ops[
-                op_code=op_code,
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
-        ]()
-
         ref A_buffer = A_device_state.device_buffer()
+
         var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
             numels
         )
 
-        device_context.enqueue_function(
-            compiled_func,
-            result_buffer,
-            A_buffer,
-            scalar,
-            numels,
-            grid_dim=num_blocks,
-            block_dim=threads_per_block,
-        )
+        # Dispatch on contiguity — same pattern as InplaceScalarOperations.launch.
+        if A.is_contiguous():
+            # PATH 1: Contiguous A → flat linear indexing (fast SIMD).
+            var compiled_func = device_context.compile_function[
+                scalar_ops[
+                    op_code=op_code,
+                    dtype=Self.dtype,
+                    simd_width=simdwidth,
+                    simd_vectors_per_thread=2 * simdwidth,
+                ],
+                scalar_ops[
+                    op_code=op_code,
+                    dtype=Self.dtype,
+                    simd_width=simdwidth,
+                    simd_vectors_per_thread=2 * simdwidth,
+                ],
+            ]()
+
+            device_context.enqueue_function(
+                compiled_func,
+                result_buffer,
+                A_buffer,
+                scalar,
+                numels,
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
+        else:
+            # PATH 2: Strided A → stride-decomposed indexing.
+            var compiled_func = device_context.compile_function[
+                scalar_ops_strided[
+                    op_code=op_code,
+                    dtype=Self.dtype,
+                    simd_width=simdwidth,
+                    simd_vectors_per_thread=2 * simdwidth,
+                ],
+                scalar_ops_strided[
+                    op_code=op_code,
+                    dtype=Self.dtype,
+                    simd_width=simdwidth,
+                    simd_vectors_per_thread=2 * simdwidth,
+                ],
+            ]()
+
+            device_context.enqueue_function(
+                compiled_func,
+                result_buffer,
+                A_buffer,
+                scalar,
+                A.shape.array(),
+                A.strides.array(),
+                numels,
+                rank,
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
 
         if sync: device_context.synchronize()
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
@@ -252,7 +372,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
         """
         var numels = A.numels()
         comptime simdwidth = simd_width_of[Self.dtype]()
-        var (threads_per_block, num_blocks) = Self.launch_config(
+        var (num_blocks, threads_per_block) = Self.launch_config(
             numels, simdwidth
         )
         ref A_device_state = A.device_state.value()
@@ -316,21 +436,4 @@ struct ScalarOperations[dtype: DType = DType.float32](
 
     @staticmethod
     def launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
-        threads_per_block: Int
-        num_blocks: Int
-
-        if numels < 4096:
-            threads_per_block = 128
-            num_blocks = (numels + 127) // 128
-        elif numels < 65536:
-            threads_per_block = 256
-            num_blocks = (numels + 255) // 256
-        else:
-            threads_per_block = 256
-            var total_chunks = (numels + (simdwidth * 2 * simdwidth - 1)) // (
-                simdwidth * 2 * simdwidth
-            )
-            num_blocks = min(
-                (total_chunks + 255) // 256, 512
-            )  # Cap at 512 blocks
-        return threads_per_block, num_blocks
+        return elementwise_launch_config(numels, simdwidth)

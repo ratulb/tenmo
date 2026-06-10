@@ -202,6 +202,7 @@ declare -a GPU_TESTS=(
     "gpusummean|tests/test_gpu_sum_mean.mojo"
     "broadcast|tests/test_broadcast.mojo"
     "scalar|tests/test_scalar_tensors.mojo"
+    "scalar_gpu|tests/test_scalar_gpu.mojo"
     "inplace|tests/test_inplace.mojo"
     "gpu_expand|tests/test_gpu_expand.mojo"
     "sgd|tests/test_sgd.mojo"
@@ -369,6 +370,7 @@ run_test_by_name() {
         gpusummean)     run_test "gpusummean" "tests/test_gpu_sum_mean.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         broadcast)      run_test "broadcast" "tests/test_broadcast.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         scalar)         run_test "scalar" "tests/test_scalar_tensors.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        scalar_gpu)     run_test "scalar_gpu" "tests/test_scalar_gpu.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         inplace)        run_test "inplace" "tests/test_inplace.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         expand)         run_test "expand" "tests/test_expand.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         gpu_expand)     run_test "gpu_expand" "tests/test_gpu_expand.mojo" "$DEBUG_MODE"; exit_code=$? ;;

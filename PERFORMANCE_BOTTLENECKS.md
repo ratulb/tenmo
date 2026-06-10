@@ -430,22 +430,43 @@ B strided, both strided) is ~120 lines duplicated across 3 functions.
 
 ---
 
-### 26. Fused CrossEntropy kernel computes softmax even for ignored rows
+### 26. Fused CrossEntropy GPU kernel: class indices only — probabilities path has no fused kernel
 
-**File:** `tenmo/kernels/crossentropy_fused_kernel.mojo` (lines 87–148)
+**Files:**
+- `tenmo/kernels/crossentropy_fused_kernel.mojo` — fused kernel (class indices only)
+- `tenmo/crossentropy.mojo`, `CEProbabilitiesForward.forward` (L798-873)
 
-**Problem:** The fused kernel unconditionally computes exp, log-sum-exp, and
-normalized softmax for ALL rows, even when `ignore_index` makes the target
-invalid. Thread 0 skips the atomic accumulation for ignored rows, but all
-threads in the block still run the shared-memory tree reduction (max, sum_exp,
-sum_logits) and write back normalized softmax. On datasets with many ignored
-positions (e.g. padded sequences), this wastes GPU cycles.
+**Problem (class indices, existing):** The fused kernel unconditionally computes
+exp, log-sum-exp, and normalized softmax for ALL rows, even when `ignore_index`
+makes the target invalid. Thread 0 skips the atomic accumulation for ignored
+rows, but all threads in the block still run the shared-memory tree reduction
+(max, sum_exp, sum_logits) and write back normalized softmax. On datasets with
+many ignored positions (e.g. padded sequences), this wastes GPU cycles.
 
-**Fix:** Add a warp-level or block-level early exit at the top of Phase 2 when
-`target[row] == ignore_index`. The block can skip the softmax computation and
-directly write 0 to `per_sample_loss[row]` and 0-filled softmax to
-`softmax_out[row * C : (row+1) * C]`. The `scalar_loss` and `valid_count`
+**Fix (class indices):** Add a warp-level or block-level early exit at the top
+of Phase 2 when `target[row] == ignore_index`. The block can skip the softmax
+computation and directly write 0 to `per_sample_loss[row]` and 0-filled softmax
+to `softmax_out[row * C : (row+1) * C]`. The `scalar_loss` and `valid_count`
 atomics are already correctly guarded by the `is_valid` check.
+
+**Problem (probabilities, NEW):** `CEProbabilitiesForward.forward` (L798-873)
+has **no** fused GPU kernel at all. It always runs the decomposed path:
+`compute_log_softmax_and_softmax()` (~7 GPU kernel launches) → label smooth
+target (2) → `arithmetic_ops[Multiply]` (1) → `SumMeanReduction.sum` (1) →
+`unary_ops[NEGATE]` (1) = **~12 separate GPU kernel launches** per loss call.
+Each launch has overhead (~3-10µs) plus full allocation + dispatch. Unlike
+`CEClassIndicesForward.forward` (L610) which dispatches to
+`CrossEntropyFusedKernel.launch()` on GPU, the probabilities path has no
+`comptime if has_accelerator()` guard.
+
+**Fix (probabilities):** Write `CEProbabilitiesFusedKernel` — a fused GPU
+forward kernel at `tenmo/kernels/crossentropy_fused_kernel.mojo` that computes
+softmax, inline label-smoothed target (`target * (1-ls) + ls/C`), and
+`-sum(smoothed_target * log_softmax, axis=1)` in a single GPU pass per row.
+Design mirrors the class-indices kernel: M blocks, C threads, shared-memory
+tree reduction for max/sum_exp. Returns (softmax_probs, per_sample_loss,
+scalar_loss). Wire into `CEProbabilitiesForward.forward` with the same
+`comptime if has_accelerator()` + `is_on_gpu()` pattern.
 
 ---
 
@@ -530,7 +551,7 @@ for any future caller that explicitly passes `sync=True`.
   longer deep-copies weights that are already shared
 - ~~Add SIMD fast path to CPU `reduce_cpu`~~ **🟢 DONE** — ~840× speedup for
   contiguous suffix-axis reductions
-- ~~Fused crossentropy backward kernel~~ **🟢 DONE** — op=9 reduced from
+- ~~Fused crossentropy backward kernel (class indices)~~ **🟢 DONE** — op=9 reduced from
   ~15.5ms to ~0.5ms
 - ~~`NDBuffer.to_device()` default `sync=True`→`False`~~ **🟢 DONE**
 - ~~Redundant `synchronize()` in `DeviceState.into()`~~ **🟢 DONE** — removed
@@ -542,9 +563,10 @@ for any future caller that explicitly passes `sync=True`.
 ### Remaining work (low priority / not blocking MNIST GPU)
 
 | Item | Priority | Why left |
-|---|---|---|
+|---|---|---|---|
 | `clip_gradients()` GPU kernel (`sgd.mojo:291-400`) | Low | Not used by MNIST (both clip_norm/clip_value default 0). Still uses `map_to_host()`. |
 | Sparse SGD GPU kernel (sgd.mojo:440-479) | Low | Only needed for embedding/word2vec sparse training. Not used by MLP. |
+| Fused GPU forward kernel for CEProbabilities (`crossentropy.mojo:829-845`) | Medium | Not used by MNIST (uses class-indices CE). ~12 GPU launches per loss call on probabilities path. |
 | `backward(sync=True)` redundant sync in same-stream execution | Very low | Kept as safety fence. Removal is 0.5µs savings. Not measurable. |
 | Tensor dunders `sync=True` default → not threaded to NDBuffer | Very low | No functional impact (NDBuffer defaults `sync=False`). Pipeline runs async regardless. |
 
@@ -554,201 +576,320 @@ for any future caller that explicitly passes `sync=True`.
 
 Ranked by estimated performance impact. Covers all CPU-only code paths found during codebase audit.
 
-### CPU-1 [H1] 1. Fuse crossentropy CPU path — 10-20× speedup
+| Item | Priority | Status |
+|---|---|---|
+| **CPU-1** Fuse crossentropy CPU paths | H1 | ✅ **DONE** |
+| **CPU-2** Add SIMD suffix-contiguous fast paths (softmax, welford) | H2 | ✅ **DONE** |
+| **CPU-3** Share `simd_op` helper in CPU broadcast dispatch | H3 | ✅ **DONE** |
+| **CPU-4** Factor binary ops GPU kernel vs inplace | H4 | ❌ **CANCELLED** — opted for targeted porting between files instead |
+| **—** Port outer-base decomposition to out-of-place `both_strided` | H4 | ✅ **DONE** (same session as CPU-4 cancellation) |
+| **—** Fix scalar-splat bug in out-of-place `B_contiguous` | H4 | ✅ **DONE** (same session) |
+| **—** Add bias_add kernel to in-place `A_contiguous` launcher | H4 | ✅ **DONE** (same session) |
+| **CPU-5** Factor scalar ops — single source of truth for op dispatch (5a ✅ 5b🟡 5c🟡 5d✅) | H5 | 🔶 5a ✅ / 5b 🟡 / 5c 🟡 / 5d ✅ |
+| **CPU-6** Phase 3 — Template contiguous-check pattern in ndbuffer (18 methods) | H6 | 🟡 Pending |
+| **CPU-7** Phase 1 — Replace buffer comptime op dispatch with simd_op/scalar_op (12→0 copies) | H7 | 🟡 Pending |
+| **CPU-8** Eliminate Buffer copy in broadcast scalar path | H8 | ✅ **FIXED** |
+| **CPU-9** Parallelize CPU reduction suffix-axis fast path | H9 | ✅ **DONE** |
+| **CPU-10** Factor matmul inner j-loop | M10 | ❌ Pending |
+| **CPU-11** Gather embedding-bag duplicate reads | L11 | ❌ Pending |
+| **CPU-12** Dropout CPU: SIMD Philox RNG | L12 | ❌ Pending |
+| **CPU-13** Noncontiguous element-wise SIMD (partial) | L13 | ❌ Pending |
+| **CPU-14** LayerNorm CPU: parallelize outer row loop | L14 | ❌ Pending |
+| **CPU-15** Filler scalar fill: SIMD store | L15 | ❌ Pending |
+| **CPU-16** Matmul: eliminate k_tile==0 branch | L16 | ❌ Pending |
+| **CPU-17** all_close CPU SIMD path | L17 | ✅ **FIXED** (already in place) |
+| **CPU-18** Pooling/CNN CPU: parallelize outer loops | L18 | ❌ Pending |
 
-**File:** `tenmo/crossentropy.mojo`, `_forward_cpu_impl` (L472-547)
+### CPU-1 [H1] 1. Fuse crossentropy CPU paths (class indices + probabilities) — 10-20× speedup
 
-**Current:** CPU crossentropy goes through `compute_log_softmax_and_softmax()` → `onehot()` → NLL via `arithmetic_ops[Multiply]` + `SumMeanReduction.sum` + `unary_ops[NEGATE]` — ~18 separate NDBuffer operations (each allocating, dispatching, looping) for a single loss computation.
+**Files:** `tenmo/crossentropy.mojo` — two distinct paths:
+- **Class indices** `_forward_cpu_impl` (L472-547): ~18 NDBuffer ops
+- **Probabilities** `CEProbabilitiesForward.forward` (L798-873): ~10-14 NDBuffer ops
 
-**Fix:** Write a fused `_forward_cpu_fused()` that computes softmax (max subtraction, exp, sum, divide), target NLL (or class-index lookup), and optional label smoothing in a single CPU pass over the (M, C) logits and (M,) targets. Mirror the already-written GPU fused kernel (`crossentropy_fused_kernel.mojo`).
+**Current (class indices):** `compute_log_softmax_and_softmax()` (7 ops: minmax, subtract, exp, log_sum, sum, subtract, divide) → `onehot()` (1) → `build_ignore_mask` (2) → `SumMeanReduction.sum` (1) → `arithmetic_ops[Multiply]` (1) → `SumMeanReduction.sum` (1) → `unary_ops[NEGATE]` (1) → optional label smoothing multiply/subtract (2-3) → `losses * ignore_mask` (1) → `apply_reduction` (1-2) = ~18 ops.
 
-**Also:** `_forward_cpu_impl` (L472) is duplicated between `track_grad=True` and `track_grad=False` paths in `CEClassIndicesForward.forward` (L654 and L665) — factor out.
+**Current (probabilities):** `compute_log_softmax_and_softmax()` (7 ops) → label smooth target (2) → `arithmetic_ops[Multiply]` (1) → `SumMeanReduction.sum` (1) → `unary_ops[NEGATE]` (1) → `apply_reduction` (1-2) = ~14 ops.
 
-**Estimated impact:** 10-20× faster CPU crossentropy during training. Each call replaces ~18 full NDBuffer passes with 2-3 fused passes.
-
-**Effort:** Medium. Need to write the fused loop, handle ignore_index and label_smoothing, keep the decomposed path as fallback.
-
----
-
-### CPU-2 [H2] 2. Unify reduction CPU loops — 2-5× compile-time, 1.5× runtime
-
-**Files:**
-- `tenmo/sum_mean_reduction.mojo` → `reduce_cpu` (L69-145): SUM/MEAN
-- `tenmo/welford.mojo` → `forward_cpu` (L73-122): Welford mean+variance
-- `tenmo/softmax.mojo` → `_log_sum_cpu` (L64-92): log-sum-exp
-- `tenmo/minmax.mojo` → (inferred): min/max reduction
-
-**Current:** All four implement the same double-nested coord-by-coord reduction pattern independently:
-```
-for out_coord in out_shape:
-    var accum = 0  # or max, or min, or Pair
-    for red_coord in reduction_axes_shape:
-        var self_coord = out_coord.replace/insert(axes, red_coord)
-        accum += ndb[self_coord]  # or accum = max(accum, ...)
-    out[out_coord] = fn(accum)
-```
-
-~30 lines each, 4+ copies. The index arithmetic (`out_coord.replace/insert`) and the double-nested coordinate iteration are identical across all.
-
-**Fix:** Create a shared `_reduce_cpu_loop[op_code](ndb, axes, keepdims, out_shape)` that takes a comptime op_code for the reduction operation (SUM, MEAN, MAX, MIN, LOG_SUM_EXP, WELFORD). This eliminates duplication and makes optimizations (SIMD suffix fast path, parallelization) apply to all reductions at once.
-
-**Estimated impact:** ~30% compile-time reduction from eliminating duplicated comptime reduction code. Runtime benefits when suffix fast path is enhanced.
-
-**Effort:** Medium. Need to design the shared interface, migrate all callers, handle differing accumulator types (Scalar vs Pair for Welford).
+**Fix:** Write two fused CPU functions — one per path — that mirror the GPU fused kernel pattern (`crossentropy_fused_kernel.mojo`). Below is the full task breakdown:
 
 ---
 
-### CPU-3 [H3] 3. Share `simd_op` helper in CPU broadcast dispatch
+### CPU-1 Todo — Fused CPU CrossEntropy — ✅ DONE (Phases A-D)
+
+**Status:** All 139 CE tests pass. Both fused forward functions (`_fused_forward_class_indices` and `_fused_forward_probabilities`) are wired into their respective forward structs, replacing the decomposed `_forward_cpu_impl` and `compute_log_softmax_and_softmax`+label smoothing paths.
+
+**Phase A: Core fused loops (eliminate 15–21 allocations → 2–3 passes) — ✅ DONE**
+
+- [x] **A1. Fused class-indices forward `_fused_forward_class_indices`** (`crossentropy.mojo:283`)
+  3 passes per row: max → exp+sum+loss → softmax normalize. O(1) loss via direct target index lookup. Replaces ~18 NDBuffer ops.
+
+- [x] **A2. Fused probabilities forward `_fused_forward_probabilities`** (`crossentropy.mojo:467`)
+  3 passes per row: max → exp+sum → softmax+smoothed_target+loss. O(C) loss via element-wise multiply-accumulate. Replaces ~14 NDBuffer ops.
+
+**Phase B: Allocation eliminations — ✅ DONE**
+
+- [x] **B1. Skip onehot** — direct `logits[row, target[row]]` strided read in row loop.
+- [x] **B2. Skip `ignore_mask`** — `if target[row] != ignore_index` inline in row loop.
+- [x] **B3. Skip `valid_count` reduction** — increment `valid_count` as scalar in row loop.
+- [x] **B4. Skip redundant `log_sum` + `sum`** — compute `sum_exp` once, `log(sum_exp)` once.
+- [x] **B5. Conditional softmax** — `comptime if track_grad:` gating softmax write in both functions.
+- [x] **B6. Inline loss reduction** — accumulate `scalar_loss` or write `per_sample_loss[row]` directly in row loop.
+- [x] **B7. Inline label smoothing** — compute adjusted loss in-place using `sum_logits / C - max_val - log_sum_exp`.
+
+**Phase C: Code organization — ✅ DONE**
+
+- [x] **C1. Factor duplication** — Forward structs call the fused function once (CPU path in single call, no track_grad branching).
+- [x] **C2. Decomposed fallback** — `_forward_cpu_impl` (L779) and `compute_log_softmax_and_softmax` (L409) preserved as fallback.
+
+**Phase D: Follow-up refinements — ✅ DONE**
+
+- [x] **D1. SIMD inner loop** — Both functions use `comptime SIMD_WIDTH = simd_width_of[Self.dtype]()` with `simd_end` guard for remainder handling.
+- [x] **D2. Early exit** — `comptime if track_grad:` eliminates softmax and smoothed_target allocations in eval mode. `reduction='none'` + `track_grad=False` allocates only `per_sample_loss`.
+
+**Files:** `tenmo/crossentropy.mojo` — `_fused_forward_class_indices` (L283), `_fused_forward_probabilities` (L467). Old decomposed path preserved at L779.
+
+**Estimated impact:** ~10-20× faster CPU crossentropy (both paths) by replacing ~10-18 full NDBuffer passes with 3 fused SIMD passes per row, eliminating 15-21 heap allocations per loss call.
+
+---
+
+### CPU-2 [H2] 2. Add missing SIMD suffix-contiguous fast paths — ~1.5× runtime for affected ops
 
 **Files:**
-- `tenmo/cpu_broadcast.mojo` → `apply_nd` (L167-476): CPU broadcast (3 tiers)
-- `tenmo/kernels/binary_ops_kernel.mojo` → 6 GPU kernels (L28-937): GPU broadcast (4 paths)
+- `tenmo/softmax.mojo` → `_log_sum_cpu` (L64-103): log-sum-exp (**SIMD added**)
+- `tenmo/welford.mojo` → `forward_cpu` (L73-130): Welford mean+variance (**suffix-contiguous path added**)
+- `tenmo/sum_mean_reduction.mojo` → `reduce_cpu` (L69-145): SUM/MEAN (already had SIMD, unchanged)
+- `tenmo/minmax_reducer.mojo` → already parallelized, out of scope
 
-**Current:** `cpu_broadcast.mojo` has its own inline comptime op_code dispatch (ADD, SUB, MUL, DIV, MAX, MIN, ReverseSubtract, ReverseDivide — 8 opcodes) in:
-- Tier 1 SIMD path (L249-276): 8 comptime branches
-- Tier 2 SIMD path (L354-408): 8 comptime branches × 2 operands
-- Tier 3 scalar path (L459-460): calls `scalar_fn`
+**Changes:**
 
-Meanwhile, `kernel_helpers.mojo` has `simd_op[op_code]()` and `scalar_op[op_code]()` that handle the same 8 opcodes. `cpu_broadcast.mojo` does not use them — it duplicates the dispatch logic inline.
+| Function | Before | After |
+|---|---|---|
+| `_log_sum_cpu` | Scalar coord loop (strided index per element) | Suffix-contiguous SIMD fast path + SIMD scalar case. exp() applied to SIMD vectors, `.reduce_add()` for horizontal sum. |
+| `welford.forward_cpu` | Scalar coord loop (strided index per element) | Suffix-contiguous fast path eliminates coord index overhead. No SIMD — Welford recurrence (`mean += delta / count`) is inherently sequential. |
+| `sum_mean_reduction.reduce_cpu` | Already had suffix-contiguous SIMD via `Buffer.sum()` | Unchanged |
+| scalar case (`_log_sum_cpu`, `out_shape == Shape()`) | Element-by-element `ndb.buffer[index]` | SIMD vector loop with scalar remainder |
 
-**Fix:** Replace the inline comptime branches in `cpu_broadcast.mojo` Tier 1 and Tier 2 with calls to the shared `simd_op` / `scalar_op` helpers. This eliminates ~200 lines of duplicated comptime conditionals and ensures consistent op-code handling across CPU and GPU paths.
+**Why not a shared loop:** `comptime if` does not suppress type-checking of dead branches — Mojo still resolves `exp(int_val)` and fails. Factoring would require two separate entry points (int + float) connected via `where` constraints that cascade to all callers, multiplying complexity for ~3 lines of saved loop header code. Individual fast paths are simpler and isolate the `where` constraint to float-only functions that already have it.
 
-**Bug note:** The current code hands uncommon ops (SIGMOID_BACKWARD, TANH_BACKWARD, POW) to per-element `ScalarOps.scalar_fn` in Tier 1 (L264-275) and Tier 2 (L393-408) instead of the more efficient `simd_op` — a missed optimization.
+**Estimated impact:**
+- `_log_sum_cpu` (softmax forward): ~2-4× faster on contiguous suffix reductions (common case: last-axis reduction on post-Linear activations). exp + reduce_add dominates the original coord-index computation.
+- `welford.forward_cpu`: ~1.5-2× faster on contiguous suffix reductions (eliminates coord-index overhead). SIMD not applicable due to recurrence.
+- Scalar log-sum-exp case: SIMD acceleration for global reductions.
+
+**Effort:** Low. ~30 lines added across two files.
+
+---
+
+### CPU-3 [H3] 3. Share `simd_op` helper in CPU broadcast dispatch ✅ DONE
+
+**Files:**
+- `tenmo/cpu_broadcast.mojo` → `apply_nd` (3 tiers)
+- `tenmo/shared/scalar_ops.mojo` → `simd_op`, `scalar_op` (standalone dispatch helpers)
+- `tenmo/kernels/binary_ops_kernel.mojo`, `binary_inplace_ops_kernel.mojo` → GPU callers
+
+**What was done:**
+1. Added `ReverseSubtract`, `ReverseDivide`, `MAX`, `MIN`, `POW` to `simd_op` and `scalar_op` in `tenmo/shared/scalar_ops.mojo` (were missing).
+2. Moved `simd_op`/`scalar_op` from `tenmo/kernels/kernel_helpers.mojo` to `tenmo/shared/scalar_ops.mojo` as standalone functions (precursor). GPU kernel files already import from there.
+3. Replaced Tier 1 inline dispatch (8 comptime branches + per-element scalar fallback for uncommon ops) → single `simd_op` call.
+4. Replaced Tier 2 inline dispatch (8 comptime branches × operand-ordering + per-element scalar fallback) → two `simd_op` calls with `a_broadcasts_last` guard.
+5. Bonus: uncommon ops (SIGMOID_BACKWARD, TANH_BACKWARD, SQRT_BACKWARD, POW, LOG_BACKWARD) now get SIMD instead of per-element scalar — faster.
 
 **Effort:** Low-Medium. Mechanical replacement of comptime branches with helper calls.
 
 ---
 
-### CPU-4 [H4] 4. Factor binary ops GPU kernel vs inplace kernel — ~400 lines duplicated
+### CPU-4 [H4] 4. Factor binary ops GPU kernel vs inplace kernel — ~400 lines duplicated ❌ CANCELLED
 
-**Files:**
-- `tenmo/kernels/binary_ops_kernel.mojo` (937 lines): 6 out-of-place kernels
-- `tenmo/kernels/binary_inplace_ops_kernel.mojo` (723 lines): 6 in-place kernels
-
-**Current:** Two files, each with 6 kernel variants that share 100% identical coordinate decomposition logic (i % inner_dim, outer_remaining, row-boundary handling, per-lane scalar fallback). The only difference: out-of-place stores to `result`, in-place stores back to `A`.
-
-- `arithmetic_ops_both_contiguous`: binary L28 vs inplace L20 — identical except store target
-- `arithmetic_ops_A_contiguous_lastdim_contiguous_B`: binary L287 vs inplace L84 — identical coord decomp
-- `arithmetic_ops_A_contiguous`: binary L350 vs inplace L144 — identical
-- `arithmetic_ops_B_contiguous`: binary L453 vs inplace L223 — identical
-- `both_strided`: binary L556 vs inplace L302 — identical
-- `both_strided_inner_path`: binary L687 vs inplace L424 — identical
-
-**Fix:** Factor the coordinate decomposition and inner loop body into a shared comptime helper parameterized by inplace: Bool. The helper handles the SIMD loop, stride computation, and remainder — the caller just specifies which buffer receives the result.
-
-**Alternatively:** Generate one file from the other via a comptime parameter (`mode: Int = 0 for out-of-place, 1 for in-place`).
-
-**Effort:** Medium. Requires careful refactoring of ~400 lines. High maintenance value — the in-place variants were recently bug-fixed independently of out-of-place.
+**Reason:** In-place versions have outer-base decomposition optimizations that out-of-place versions lack (and vice versa — out-of-place has the `lastdim_contiguous_B` bias_add path that in-place lacks). Both are correct in both files; they just ended up at different optimization levels. Unifying would require either accepting the slower path in one mode or adding comptime branches that negate the savings. Not worth the complexity — focus on porting optimizations between the two files individually.
 
 ---
 
-### CPU-5 [H5] 5. Factor scalar ops GPU kernel vs inplace kernel — ~100 lines duplicated
+### CPU-5 [H5] 5. Scalar ops — single source of truth for comptime op dispatch
 
 **Files:**
-- `tenmo/kernels/scalar_ops_kernel.mojo` (336 lines): `scalar_ops`, `pow_op_f32/f64`, `ScalarOperations.launch`
-- `tenmo/kernels/scalar_inplace_ops_kernel.mojo` (158 lines): `inplace_scalar_ops`, `InplaceScalarOperations.launch`
+- `tenmo/kernels/scalar_ops_kernel.mojo` — GPU `scalar_ops` + `scalar_ops_strided` + `ScalarOperations.launch`
+- `tenmo/kernels/scalar_inplace_ops_kernel.mojo` — GPU `inplace_scalar_ops` + `inplace_scalar_ops_strided` + `InplaceScalarOperations.launch`
+- `tenmo/shared/scalar_ops.mojo` — `simd_op` / `scalar_op` standalone dispatch functions ✅ established
+- `tenmo/ndbuffer.mojo` — CPU and GPU dispatch (*_cpu methods, GPU dispatch at L1828-1842)
+- `tenmo/buffers.mojo` — CPU `arithmetic_ops`, `arithmetic_ops_scalar`, `inplace_ops`, `inplace_ops_scalar`
 
-**Current:** The inner loop is identical (SIMD with 2×simd_width chunking, comptime op dispatch, tail handling). The launch method (L92-137 vs L193-250) is identical — same launch_config, same compile+enqueue pattern. Inplace supports 4 opcodes (Add/Sub/Mul/Div) vs out-of-place's 6 (Add/Sub/RevSub/Mul/Div/MAX/MIN).
+**Overall goal:** Eliminate all duplicated comptime `op_code` dispatch chains by routing through `simd_op`/`scalar_op` from `tenmo/shared/scalar_ops.mojo`. Three phases — GPU kernel factoring (CPU-5a ✅), CPU buffer factoring (CPU-7), CPU NDBuffer strided fallback factoring (Phase 2 of CPU-5c).
 
-**Fix:** Factor into a shared `scalar_ops_launch[inplace: Bool](...)`. Also check if the missing `ReverseSubtract`/`MAX`/`MIN` in inplace is a correctness gap (likely unused, but inconsistent).
+#### CPU-5a — GPU non-contiguous strided kernel ✅ DONE
 
-**Effort:** Low.
+**Severity: correctness bug** (not triggered by current tests, but latent).
+
+**Fix applied:**
+- **Inplace path:** Added `inplace_scalar_ops_strided` kernel — outer-base decomposition per SIMD vector. `InplaceScalarOperations.launch` checks `A.is_contiguous()`: contiguous → flat linear kernel, non-contiguous → strided kernel.
+- **Out-of-place path:** Added `scalar_ops_strided` kernel (writes to separate result buffer, reads strided input). `ScalarOperations.launch` dispatches on contiguity.
+- **GPU inline dispatch replaced:** Both `scalar_ops` and `inplace_scalar_ops` comptime chains replaced with `simd_op`/`scalar_op` calls.
+- **Tests:** `tests/test_scalar_gpu.mojo` generated (222 GPU tests covering all ops, dims 1-4, contiguous/transposed/permuted/sliced layouts, f32/f64, edge cases). Registered as `scalar_gpu` in `execute.sh` + `GPU_TESTS` array.
+
+#### CPU-5b — Missing opcodes in inplace kernel (GPU)
+
+**Status:** 🟡 Pending — not blocking other work.
+
+**Inplace kernel supports:** Add, Subtract, Multiply, Divide (4 opcodes).
+**Out-of-place supports:** Add, Subtract, ReverseSubtract, Multiply, Divide, MAX, MIN, POW (8 opcodes — POW via separate f32/f64 kernels).
+
+**Missing from inplace:** ReverseSubtract, ReverseDivide, MAX, MIN, POW.
+
+**Current behavior with missing opcodes:** If `inplace_scalar_ops[ReverseSubtract]` is called on GPU, the `else` branch executes `vec_result = scalar / vec_a` — which is `ReverseDivide`, not `ReverseSubtract`. Silent correctness bug.
+
+**Fix:** Add proper comptime branches via `simd_op`/`scalar_op` (already handle all these opcodes). The inplace kernel now calls `simd_op`/`scalar_op` for all opcodes, so adding support is just a matter of wiring — no dispatch chain duplication needed.
+
+#### CPU-5c — Phase 2: Replace strided fallback dispatch in ndbuffer.mojo *cpu methods
+
+**Status:** 🟡 Pending (follows CPU-7).
+
+**Problem:** The 4 main `*_cpu` methods in `ndbuffer.mojo` delegate to `Buffer.arithmetic_ops*` for the contiguous path (which use `simd_op`/`scalar_op`), but **the strided fallback has its own per-element dispatch** in the index_iterator loop. Those fallbacks use `ScalarOps.scalar_fn` which duplicates the same comptime dispatch.
+
+**Fix:** Replace the `ScalarOps.scalar_fn` call in each strided fallback with `scalar_op[op_code, Self.dtype](...)`. Affected methods:
+- `arithmetic_ops_cpu` (contiguous path → `buffer.arithmetic_ops`, strided path uses `ScalarOps.scalar_fn`)
+- `scalar_ops_cpu` (contiguous path → `buffer.arithmetic_ops_scalar`, strided path uses `ScalarOps.scalar_fn`)
+- `inplace_ops_cpu` (contiguous path → `buffer.inplace_ops`, strided path uses `ScalarOps.scalar_fn`)
+- `inplace_scalar_ops_cpu` (contiguous path → `buffer.inplace_ops_scalar`, strided path uses `ScalarOps.scalar_fn`)
+
+**Why:** After CPU-7, `Buffer` methods already call `simd_op`/`scalar_op`, so the contiguous path is correct. The strided fallback still has a separate dispatch chain via `ScalarOps.scalar_fn` — replacing it with `scalar_op` makes every dispatch through one function.
+
+#### CPU-5d — Test coverage (scalar GPU tests)
+
+**Status:** ✅ DONE — `tests/test_scalar_gpu.mojo` generated via `scripts/gen_scalar_gpu_tests.py`. 222 tests covering all 8 ops (Add, Subtract, ReverseSubtract, Multiply, Divide, ReverseDivide, MAX, MIN), dimensions 1D-4D, contiguous + transposed + permuted + sliced layouts, f32 + f64, edge cases (negative scalars, medium/big sizes).
+
+**Remaining gaps (not high priority):**
+- **CPU scalar tests** — existing `test_ndbuffer_arithmetic_gpu.mojo` and `test_ndbuffer_inplace_gpu.mojo` test NDBuffer-level dispatch on GPU. CPU-side unit tests for `Buffer.arithmetic_ops*` are minimal.
+- **POW GPU test** — POW is handled by separate f32/f64 kernels. Not tested in `test_scalar_gpu.mojo`.
 
 ---
 
-### CPU-6 [H6] 6. Template contiguous-check pattern in `ndbuffer.mojo` — 6× duplication
+### CPU-6 [H6] Phase 3 — Template contiguous-check pattern in `ndbuffer.mojo` — 18× duplication
 
 **File:** `tenmo/ndbuffer.mojo`
 
-**Current:** The same `if is_contiguous(): Buffer-level SIMD else: index_iterator scalar` pattern appears at least 6 times:
-- `arithmetic_ops_cpu` (L2001-2064)
-- `scalar_ops_cpu` (L2158-2186)
-- `unary_ops_cpu` (L2219-2239)
-- `float_unary_ops_cpu` (L2276-2298)
-- `clamp` (L2300-2325)
-- `clamp_fixed_minmax` (L2327-2340)
+**Current:** The pattern `if is_contiguous(): SIMD (buffer method) else: index_iterator (per-element loop)` appears **18 times** across `ndbuffer.mojo` (not just the original 6 — survey expanded). Each has 20-40 lines of boilerplate with only the op-specific code differing in the middle.
 
-Each has ~30 lines of: check contiguity, call Buffer method, or iterate via index_iterator with per-element scalar operations.
+**All 18 methods with the pattern:**
 
-**Fix:** Create a shared `_cpu_map[op_code](self, args...) -> NDBuffer` template:
-```mojo
-if self.is_contiguous():
-    return contig_path  # Buffer-level SIMD
-else:
-    return noncontig_path  # index_iterator loop
+| # | Method | Line | Paths |
+|---|---|---|---|
+| 1 | `fill_cpu` | 1066 | contig: `buffer.fill` / noncontig: idx-iter assign |
+| 2 | `contiguous_buffer` | 1167 | contig: slice refcount bump / noncontig: alloc+idx-iter |
+| 3 | `contiguous_device_state` | 1186 | contig: GPU memcpy / noncontig: new_state.fill |
+| 4 | `count` | 1416 | contig: `buffer.count` / noncontig: idx-iter compare |
+| 5 | `unique` | 1494 | contig: direct buf iter / noncontig: idx-iter |
+| 6 | `copy_from_alike` | 1571 | **4-way** (self×other contiguity combos) |
+| 7 | `inplace_ops_cpu` | 1741 | **4-way** |
+| 8 | `inplace_scalar_ops_cpu` | 1850 | contig: `buffer.inplace_ops_scalar` / noncontig: idx-iter |
+| 9 | `arithmetic_ops_cpu` | 2001 | **4-way** |
+| 10 | `scalar_ops_cpu` | 2158 | contig: `buffer.arithmetic_ops_scalar` / noncontig: idx-iter |
+| 11 | `unary_ops_cpu` | 2219 | contig: `buffer.unary_ops` / noncontig: idx-iter |
+| 12 | `float_unary_ops_cpu` | 2276 | contig: `buffer.float_unary_ops` / noncontig: idx-iter |
+| 13 | `clamp` | 2300 | contig: `buffer.clamp` / noncontig: idx-iter |
+| 14 | `clamp_in_place` | 2327 | contig: `buffer.clamp_in_place` / noncontig: idx-iter |
+| 15 | `compare_cpu` | 2398 | contig: `buffer.compare_buffer_full` / noncontig: idx-iter |
+| 16 | `compare_scalar_cpu` | 2463 | contig: `buffer.compare_scalar_full` / noncontig: idx-iter |
+| 17 | `all_true` | 2578 | contig: direct buf loop / noncontig: idx-iter |
+| 18 | `any_true` | 2605 | contig: direct buf loop / noncontig: idx-iter |
+
+**The generalized skeleton** (2-operand version, e.g. `arithmetic_ops_cpu`):
+```
+if self_contig and other_contig:      → buffer.SIMD method
+elif self_contig and not other_contig: → idx-iter over other
+elif not self_contig and other_contig: → idx-iter over self
+else:                                  → dual idx-iter
 ```
 
-Eliminates ~180 lines of duplicated pattern.
+Single-operand versions (scalar, unary, clamp) have a simpler 2-way branch.
 
-**Effort:** Low.
+**Plan — Phase 3:** Create a `ContiguityDispatch` struct or comptime helper that captures the skeleton and delegates the per-element operation to a function pointer or comptime-generic method.
+
+**Approach A — `@always_inline` helper with fn pointer (preferred):**
+```mojo
+def dispatch_contiguity[op_code: Int, fn: def(Scalar[dtype]) -> Scalar[dtype] _ thin](
+    self: NDBuffer[dtype],
+    self_contiguous: Bool,
+    other_contiguous: Bool,
+    other: NDBuffer[dtype],
+    result_buffer: Buffer[dtype],
+) raises:
+    # single skeleton, calls `fn` per element
+```
+
+**Approach B — Stringify (if fn pointers can't carry comptime state):**
+Generate each method's skeleton via a comptime macro-like pattern. Mojo doesn't have macros, so this is more limited.
+
+**Approach C — Accept the duplication but centralize the per-element dispatch:**
+After CPU-5c Phase 2, all per-element operations already call `scalar_op`/`simd_op` — the dispatch is shared even if the skeleton boilerplate remains.
+
+**Effort:** Medium (Approach A is elegant but requires `def(…) thin` fn pointer support; fallback is Approach C which is mechanical but tedious).
 
 ---
 
-### CPU-7 [H7] 7. Share comptime op dispatch between `Buffer.arithmetic_ops` and `Buffer.arithmetic_ops_scalar`
+### CPU-7 [H7] Phase 1 — Replace all comptime op dispatch chains in `buffers.mojo` with `simd_op`/`scalar_op` calls
 
 **File:** `tenmo/buffers.mojo`
 
-**Current:** Two methods (L656-788 and L791-875) both have:
-- SIMD loop: load → comptime op dispatch → store
-- Scalar tail: comptime op dispatch
+**Current:** 4 core methods each have the same comptime `op_code` dispatch chain repeated in **3 blocks** (bool special-case, SIMD vector path, scalar tail) — **12 total copies** of the chain:
 
-The op dispatch chains (Multiply, Add, Subtract, Divide, plus backward ops) are independent but near-identical. Difference: binary (two input buffers) vs scalar (one buffer + scalar value).
+| Method | Line | Opcodes handled | Blocks (×3 each) |
+|---|---|---|---|
+| `inplace_ops_scalar` | 493 | Multiply, Add, Subtract, Divide | SIMD + tail + bool |
+| `inplace_ops` | 557 | Multiply, Add, Subtract, Divide, Overwrite | SIMD + tail + bool |
+| `arithmetic_ops` | 656 | Multiply, Add, Subtract, Divide, LOG_BACKWARD, SIGMOID_BACKWARD, SQRT_BACKWARD, TANH_BACKWARD | SIMD + tail + bool |
+| `arithmetic_ops_scalar` | 791 | Multiply, Add, Subtract, ReverseSubtract, Divide, MAX, MIN, ReverseDivide | SIMD + tail + bool |
 
-**Fix:** Factor the comptime op dispatch into a shared helper that works for both `SIMD + SIMD` and `SIMD + Scalar` forms. 8 opcodes × 2 (SIMD + scalar tail) × 2 (binary + scalar) = 32 comptime branches to maintain.
+**Additional methods with their own dispatch** (not fully duplicated — single SIMD block, remainder uses `ScalarOps.compare_pair`):
+| Method | Line | Opcodes |
+|---|---|---|
+| `compare_buffer_full` | 1039 | Equal, NotEqual, Ge, Gt, Le, Lt |
+| `compare_scalar_full` | 1112 | Equal, NotEqual, Ge, Gt, Le, Lt |
+| `compare_scalar` (Bool) | 1608 | Equal, NotEqual, Ge, Gt, Le, Lt |
+| `compare_buffer` (Bool) | 1776 | Equal, NotEqual, Ge, Gt, Le, Lt |
 
-**Effort:** Low.
+**Phase 1 plan — Replace 12 copies with 0 copies:**
+
+For each of the 4 core methods, replace the entire SIMD block and scalar tail block with a call to `simd_op` / `scalar_op`.
+
+**Per-method change:**
+
+| Method | SIMD block replace | Scalar tail replace | Bool path |
+|---|---|---|---|
+| `arithmetic_ops` | `simd_op[op_code, Self.dtype, simd_width](a,b,eps)` | `scalar_op[op_code, Self.dtype](a,b,eps)` | Keep (Multiply-only, panic rest) |
+| `arithmetic_ops_scalar` | `simd_op[op_code, Self.dtype, simd_width](a,scalar,eps)` | `scalar_op[op_code, Self.dtype](a,scalar,eps)` | Same |
+| `inplace_ops` | `simd_op[op_code, Self.dtype, simd_width](a,b,eps)` | `scalar_op[op_code, Self.dtype](a,b,eps)` | Same (Overwrite handled separately) |
+| `inplace_ops_scalar` | `simd_op[op_code, Self.dtype, simd_width](a,scalar,eps)` | `scalar_op[op_code, Self.dtype](a,scalar,eps)` | Same |
+
+**Why this works:** `simd_op` and `scalar_op` in `tenmo/shared/scalar_ops.mojo` already handle ALL opcodes used by these 4 methods:
+- `arithmetic_ops` ops: Multiply, Add, Subtract, Divide → all in `simd_op`. LOG_BACKWARD, SIGMOID_BACKWARD, SQRT_BACKWARD, TANH_BACKWARD → all in `simd_op`.
+- `arithmetic_ops_scalar` ops: Multiply, Add, Subtract, ReverseSubtract, Divide, ReverseDivide, MAX, MIN → all in `simd_op`/`scalar_op`.
+- `inplace_ops` ops: Multiply, Add, Subtract, Divide, Overwrite → Overwrite handled separately (not in `simd_op`, but it's a trivial `a = b` copy).
+- `inplace_ops_scalar` ops: Same as `arithmetic_ops_scalar` minus ReverseSubtract/ReverseDivide/MAX/MIN.
+
+**No `is_floating_point()` issue:** The `simd_op` Divide path uses `b + epsilon` for div-by-zero protection. `Epsilon[integer_dtype]` is 0 (from `common_utils.mojo`), so `b + 0 == b` — identical to current behavior. All ops in these methods work on any numeric dtype.
+
+**After Phase 1:** 12 copies → 0 copies. Single source of truth in `shared/scalar_ops.mojo`. Compare methods (compare_*) remain as-is — they use `ScalarOps.compare_pair` already.
 
 ---
 
-### CPU-8 [H8] 8. Eliminate unnecessary Buffer copy in broadcast scalar path — 1.5-2× speedup
+### CPU-8 [H8] 8. Eliminate unnecessary Buffer copy in broadcast scalar path — 1.5-2× speedup ✅ FIXED
 
-**File:** `tenmo/cpu_broadcast.mojo`, `apply_scalar` (L88-144)
+**File:** `tenmo/cpu_broadcast.mojo`, `apply_scalar` (L89-116)
 
-**Current:**
-```mojo
-if is_contiguous:
-    buffer = (
-        b.buffer.copied(offset, offset + numels)  # <-- ALWAYS COPIES
-    ).arithmetic_ops_scalar[op_code](item)
-```
+**Problem:** `apply_scalar` called `copied(offset, offset+numels).arithmetic_ops_scalar[op_code](item)` — two allocations + one full memcpy + one SIMD pass per scalar broadcast.
 
-Calls `copied()` which allocates a new Buffer and memcpy's the data, then applies the scalar op to produce another Buffer. This is **two allocations + one full memcpy + one SIMD pass** for every scalar broadcast operation.
+**Fix:** `arithmetic_ops_scalar` already accepts `(item, start, end)`. Changed to `arithmetic_ops_scalar[op_code](item, offset, offset + numels)` directly, eliminating the intermediate `copied()` allocation and memcpy.
 
-**Fix:** Pass offset directly to `arithmetic_ops_scalar`:
-```mojo
-buffer = b.buffer.arithmetic_ops_scalar[op_code](item, offset, offset + numels)
-```
-
-`arithmetic_ops_scalar` already accepts `start`/`end` parameters (L796). This avoids the intermediate copy entirely.
-
-**Estimated impact:** 1.5-2× speedup for every scalar broadcast operation (bias_add, scalar arithmetic on non-contiguous tensors, etc.). Low effort — 3 lines to change.
-
-**Effort:** Low.
+**Impact:** 1.5-2× speedup for every scalar broadcast operation (bias_add, scalar arithmetic, etc.). Ordering for ReverseSubtract/ReverseDivide is preserved — `arithmetic_ops_scalar` reads from the ND tensor's buffer as `self[i]` and applies the scalar, exactly as the old `.copied()` path did.
 
 ---
 
-### CPU-9 [H9] 9. Parallelize CPU reduction suffix-axis fast path — 2-4× speedup
+### CPU-9 [H9] 9. Parallelize CPU reduction suffix-axis fast path — 2-4× speedup ✅ DONE
 
 **File:** `tenmo/sum_mean_reduction.mojo`, `reduce_cpu` (L114-128)
 
-**Current:** The suffix-axis fast path calls `Buffer.sum()` per output element sequentially:
-```mojo
-for oi in range(num_out):
-    var base = ndb.offset + oi * reduced_numels
-    out.buffer[oi] = ndb.buffer.sum(base, base + reduced_numels)
-```
+**Fix:** Replaced `for oi in range(num_out)` with `parallelize[reduce_row_fn](num_out, num_physical_cores())` using `@parameter def reduce_row_fn`. Each output element's `Buffer.sum()` is independent — 2-4× speedup for large reductions.
 
-Each output element's reduction is independent — the outer loop is purely serial.
-
-**Fix:** Use `parallelize` to process output rows in parallel across CPU cores — identical to matmul's tile processing pattern. Each thread handles a subset of output elements.
-
-```mojo
-parallelize[reduce_row_fn](num_out, num_physical_cores())
-```
-
-**Estimated impact:** 2-4× for reductions over large innermost dimensions (e.g., softmax over 252K vocab in word2vec, or large classifier heads). The SIMD suffix path already runs at ~0.09ms for 512×1024 sum — parallelization would help for much larger tensors.
-
-**Effort:** Low.
+**Verified:** `./execute.sh summean` passes all tests.
 
 ---
 
@@ -930,21 +1071,13 @@ A comment in `matmul_cpu.mojo` (L159-160) already acknowledges this as a known o
 
 ---
 
-### CPU-17 [L17] 17. `all_close` CPU fallback: missing SIMD path
+### CPU-17 [L17] 17. `all_close` CPU fallback: missing SIMD path ✅ FIXED
 
-**Files:** `tenmo/kernels/compare_kernel.mojo` (L39-220), `tenmo/buffers.mojo`, `tenmo/ndbuffer.mojo`
+**Files:** `tenmo/buffers.mojo` → `all_close` (L2046-2083)
 
-**Current:** `all_close` GPU kernel (L39) is a device function using `thread_idx.x`, `block_dim.x`, etc. — can't run on CPU. The `AllClose.launch()` method only has a GPU launch path. On CPU, the Tensor-level `.all_close()` may fall through to a slow decomposed path.
+**Problem:** `AllClose.launch()` only had a GPU path. CPU path fell through to slow decomposed operation.
 
-**Fix:** Add a CPU SIMD `all_close` function in `buffers.mojo` that:
-1. Vector-compares element pairs with `SIMD.gt(atol_mask)` / `SIMD.lt(atol_mask)`
-2. Accumulates mismatches via `reduce_add`
-3. Short-circuits when mismatch count exceeds `max_mismatches`
-4. Handles NaN (NaN != NaN per IEEE 754)
-
-**Estimated impact:** 3-5× for test assertions. Test-only, not hot-path training.
-
-**Effort:** Low.
+**Fix:** `Buffer.all_close` already uses SIMD via `load[simdwidth]` → `le(tolerance).reduce_and()` with `@parameter` dispatch. Short-circuits on first mismatch, handles NaN correctly (NaN != NaN). No changes needed — the SIMD path was already in place.
 
 ---
 

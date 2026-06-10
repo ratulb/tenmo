@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
-from tenmo.common_utils import panic
+from tenmo.common_utils import panic, Epsilon
 from tenmo.subtraction import Subtractor
 from tenmo.backpropagation import (
     BackwardFnArg,
@@ -16,7 +16,9 @@ from tenmo.ancestry import Ancestor
 from tenmo.shared import Reduction
 from tenmo.softmax import SoftmaxNdBuffer
 from tenmo.sum_mean_reduction import SumMeanReduction
-
+from std.math import exp, log, max
+from std.sys import simd_width_of
+from std.utils.numerics import min_finite
 
 
 # Validation
@@ -277,6 +279,148 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 transformed /= Scalar[Self.dtype](valid_count)
         return Tensor[Self.dtype](transformed^, requires_grad=False)
 
+    @staticmethod
+    def _fused_forward_class_indices[
+        track_grad: Bool
+    ](
+        logits_2d: NDBuffer[Self.dtype],
+        target_1d: NDBuffer[DType.int32],
+        reduction: Reduction,
+        ignore_index: Int,
+        label_smoothing: Scalar[Self.dtype],
+        spatial_shape: Shape,
+        N: Int,
+        C: Int,
+        M: Int,
+    ) -> Tuple[NDBuffer[Self.dtype], Int, Tensor[Self.dtype]] where Self.dtype.is_floating_point():
+        """Fused CPU forward for class indices CE.
+
+        3 passes per row:
+        1. Find max_val across C
+        2. Compute exp, sum_exp, loss (O(1) target lookup), raw-exp write
+        3. Normalize softmax in-place (only if track_grad)
+
+        Replaces 8 allocated ops with 1 softmax buffer.
+        """
+        comptime SIMD_WIDTH = simd_width_of[Self.dtype]()
+        var stride0 = logits_2d.strides[0]
+        var stride1 = logits_2d.strides[1]
+        var logits_ptr = logits_2d.data_ptr()
+        var has_ls = label_smoothing > Scalar[Self.dtype](0)
+        var reduction_is_none = reduction.is_none()
+        var simd_end = C - (C % SIMD_WIDTH)
+
+        # Allocate softmax (only when track_grad=True — compiled out otherwise)
+        var softmax_ndb = NDBuffer[Self.dtype]()
+        comptime if track_grad:
+            softmax_ndb = NDBuffer[Self.dtype].zeros(logits_2d.shape)
+
+        var per_sample_loss = NDBuffer[Self.dtype]()
+        if reduction_is_none:
+            per_sample_loss = NDBuffer[Self.dtype].zeros(Shape(M))
+
+        var scalar_loss = Scalar[Self.dtype](0)
+        var valid_count = 0
+
+        for row in range(M):
+            var row_base = row * stride0
+
+            # ── Pass 1: Find max ──
+            var max_val = min_finite[Self.dtype]()
+            for c in range(0, simd_end, SIMD_WIDTH):
+                var ptr = logits_ptr + (row_base + c * stride1)
+                var vec = ptr.load[width=SIMD_WIDTH]()
+                for i in range(SIMD_WIDTH):
+                    max_val = max(max_val, vec[i])
+            for c in range(simd_end, C):
+                max_val = max(max_val, logits_ptr[row_base + c * stride1])
+
+            # ── Pass 2: exp + sum_exp + loss ──
+            var sum_exp = Scalar[Self.dtype](0)
+            var sum_logits = Scalar[Self.dtype](0)
+
+            for c in range(0, simd_end, SIMD_WIDTH):
+                var ptr = logits_ptr + (row_base + c * stride1)
+                var vec = ptr.load[width=SIMD_WIDTH]()
+                var e_vec = exp(vec - max_val)
+                for i in range(SIMD_WIDTH):
+                    sum_exp += e_vec[i]
+                if has_ls:
+                    for i in range(SIMD_WIDTH):
+                        sum_logits += vec[i]
+                comptime if track_grad:
+                    var sp = softmax_ndb.data_ptr()
+                    (sp + (row * C + c)).store[width=SIMD_WIDTH](e_vec)
+            for c in range(simd_end, C):
+                var val = logits_ptr[row_base + c * stride1]
+                var e = exp(val - max_val)
+                sum_exp += e
+                if has_ls:
+                    sum_logits += val
+                comptime if track_grad:
+                    var sp = softmax_ndb.data_ptr()
+                    sp[row * C + c] = e
+
+            var safe_sum_exp = max(sum_exp, Epsilon[Self.dtype].value())
+            var log_sum_exp = log(safe_sum_exp)
+
+            # ── Loss (O(1) per row — target lookup) ──
+            var is_valid = target_1d.get(row) != Scalar[DType.int32](ignore_index)
+            var loss = Scalar[Self.dtype](0)
+            if is_valid:
+                var tgt_idx = target_1d.get(row).__int__()
+                var logit_tgt = logits_ptr[row_base + tgt_idx * stride1]
+                var log_softmax_tgt = logit_tgt - max_val - log_sum_exp
+                loss = -log_softmax_tgt
+                if has_ls:
+                    var inv_C = Scalar[Self.dtype](1) / Scalar[Self.dtype](C)
+                    var mean_log_softmax = sum_logits * inv_C - max_val - log_sum_exp
+                    loss = (Scalar[Self.dtype](1) - label_smoothing) * loss - label_smoothing * mean_log_softmax
+                valid_count += 1
+
+            if reduction_is_none:
+                per_sample_loss.set(row, loss)
+            else:
+                scalar_loss += loss
+
+            # ── Pass 3: Normalize softmax in-place (only if track_grad) ──
+            comptime if track_grad:
+                var sp = softmax_ndb.data_ptr()
+                var inv_sum_exp_val = Scalar[Self.dtype](1) / sum_exp
+                var sm_base = sp + (row * C)
+                for c in range(0, simd_end, SIMD_WIDTH):
+                    var raw = (sm_base + c).load[width=SIMD_WIDTH]()
+                    (sm_base + c).store[width=SIMD_WIDTH](raw * inv_sum_exp_val)
+                for c in range(simd_end, C):
+                    sm_base[c] = sm_base[c] * inv_sum_exp_val
+
+        # ── Apply reduction ──
+        var out: Tensor[Self.dtype]
+        if reduction_is_none:
+            var spatial_rank = spatial_shape.rank()
+            if spatial_rank == 0:
+                out = Tensor[Self.dtype](
+                    per_sample_loss.reshape(Shape(N)),
+                    requires_grad=False,
+                )
+            else:
+                var out_dims = IntArray()
+                out_dims.append(N)
+                for i in range(spatial_rank):
+                    out_dims.append(spatial_shape[i])
+                out = Tensor[Self.dtype](
+                    per_sample_loss.reshape(Shape(out_dims)),
+                    requires_grad=False,
+                )
+        elif reduction.is_mean():
+            if valid_count > 0:
+                scalar_loss /= Scalar[Self.dtype](valid_count)
+            out = Tensor[Self.dtype].scalar(scalar_loss, requires_grad=False)
+        else:
+            out = Tensor[Self.dtype].scalar(scalar_loss, requires_grad=False)
+
+        return softmax_ndb^, valid_count, out^
+
     @always_inline
     @staticmethod
     def compute_log_softmax_and_softmax(
@@ -319,6 +463,169 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 valid_count if reduction.is_mean() and valid_count > 0 else 1
             )
             return grad.scalar_ops[Multiply](ug_scalar / scale)
+
+    @staticmethod
+    def _fused_forward_probabilities[
+        track_grad: Bool
+    ](
+        logits_2d: NDBuffer[Self.dtype],
+        target_2d: NDBuffer[Self.dtype],
+        reduction: Reduction,
+        label_smoothing: Scalar[Self.dtype],
+        spatial_shape: Shape,
+        N: Int,
+        C: Int,
+        M: Int,
+    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype], Tensor[Self.dtype]] where Self.dtype.is_floating_point():
+        """Fused CPU forward for probability-target CE.
+
+        3 passes per row:
+        1. Find max_val across C
+        2. Compute exp, sum_exp, write raw exp
+        3. Normalize softmax + compute smoothed_target + compute loss
+
+        Returns (softmax, smoothed_target, out).
+        smoothed_target is needed by backward: grad = softmax - smoothed.
+        """
+        comptime SIMD_WIDTH = simd_width_of[Self.dtype]()
+        var stride0 = logits_2d.strides[0]
+        var stride1 = logits_2d.strides[1]
+        var logits_ptr = logits_2d.data_ptr()
+        var target_ptr = target_2d.data_ptr()
+        var has_ls = label_smoothing > Scalar[Self.dtype](0)
+        var reduction_is_none = reduction.is_none()
+        var inv_C = Scalar[Self.dtype](1) / Scalar[Self.dtype](C)
+        var simd_end = C - (C % SIMD_WIDTH)
+
+        var softmax_ndb = NDBuffer[Self.dtype]()
+        var smoothed_target_ndb = NDBuffer[Self.dtype]()
+        comptime if track_grad:
+            softmax_ndb = NDBuffer[Self.dtype].zeros(logits_2d.shape)
+            smoothed_target_ndb = NDBuffer[Self.dtype].zeros(logits_2d.shape)
+
+        var per_sample_loss = NDBuffer[Self.dtype]()
+        if reduction_is_none:
+            per_sample_loss = NDBuffer[Self.dtype].zeros(Shape(M))
+
+        var scalar_loss = Scalar[Self.dtype](0)
+
+        for row in range(M):
+            var row_base = row * stride0
+
+            # ── Pass 1: Find max ──
+            var max_val = min_finite[Self.dtype]()
+            for c in range(0, simd_end, SIMD_WIDTH):
+                var ptr = logits_ptr + (row_base + c * stride1)
+                var vec = ptr.load[width=SIMD_WIDTH]()
+                for i in range(SIMD_WIDTH):
+                    max_val = max(max_val, vec[i])
+            for c in range(simd_end, C):
+                max_val = max(max_val, logits_ptr[row_base + c * stride1])
+
+            # ── Pass 2: exp + sum_exp + write raw exp ──
+            var sum_exp = Scalar[Self.dtype](0)
+            for c in range(0, simd_end, SIMD_WIDTH):
+                var ptr = logits_ptr + (row_base + c * stride1)
+                var vec = ptr.load[width=SIMD_WIDTH]()
+                var e_vec = exp(vec - max_val)
+                for i in range(SIMD_WIDTH):
+                    sum_exp += e_vec[i]
+                comptime if track_grad:
+                    var sp = softmax_ndb.data_ptr()
+                    (sp + (row * C + c)).store[width=SIMD_WIDTH](e_vec)
+            for c in range(simd_end, C):
+                var val = logits_ptr[row_base + c * stride1]
+                var e = exp(val - max_val)
+                sum_exp += e
+                comptime if track_grad:
+                    var sp = softmax_ndb.data_ptr()
+                    sp[row * C + c] = e
+
+            var safe_sum_exp = max(sum_exp, Epsilon[Self.dtype].value())
+            var log_sum_exp = log(safe_sum_exp)
+            var inv_sum_exp = Scalar[Self.dtype](1) / safe_sum_exp
+
+            # ── Pass 3: normalize softmax + write smoothed_target + compute loss ──
+            var loss = Scalar[Self.dtype](0)
+            for c in range(0, simd_end, SIMD_WIDTH):
+                var t_vec = (target_ptr + (row_base + c * stride1)).load[width=SIMD_WIDTH]()
+                var l_vec = (logits_ptr + (row_base + c * stride1)).load[width=SIMD_WIDTH]()
+
+                # smoothed_target[c] = target[c] * (1-ls) + ls/C
+                var smoothed: SIMD[Self.dtype, SIMD_WIDTH]
+                if has_ls:
+                    smoothed = t_vec * (Scalar[Self.dtype](1) - label_smoothing) + label_smoothing * inv_C
+                else:
+                    smoothed = t_vec
+                comptime if track_grad:
+                    var st_ptr = smoothed_target_ndb.data_ptr()
+                    (st_ptr + (row * C + c)).store[width=SIMD_WIDTH](smoothed)
+
+                # normalized softmax
+                comptime if track_grad:
+                    var sp = softmax_ndb.data_ptr()
+                    var sm_vec = (sp + (row * C + c)).load[width=SIMD_WIDTH]() * inv_sum_exp
+                    (sp + (row * C + c)).store[width=SIMD_WIDTH](sm_vec)
+
+                # log_softmax[c] = logits[c] - max_val - log_sum_exp
+                var log_sm_vec = (l_vec - max_val) - log_sum_exp
+
+                # loss -= sum(smoothed * log_sm)
+                for i in range(SIMD_WIDTH):
+                    loss -= smoothed[i] * log_sm_vec[i]
+
+            # Flush remainder
+            for c in range(simd_end, C):
+                var t_val = target_ptr[row_base + c * stride1]
+                var l_val = logits_ptr[row_base + c * stride1]
+
+                var smoothed_val: Scalar[Self.dtype]
+                if has_ls:
+                    smoothed_val = t_val * (Scalar[Self.dtype](1) - label_smoothing) + label_smoothing * inv_C
+                else:
+                    smoothed_val = t_val
+                comptime if track_grad:
+                    var st_ptr = smoothed_target_ndb.data_ptr()
+                    st_ptr[row * C + c] = smoothed_val
+
+                var sm = exp(l_val - max_val) * inv_sum_exp
+                comptime if track_grad:
+                    var sp = softmax_ndb.data_ptr()
+                    sp[row * C + c] = sm
+
+                var log_sm = l_val - max_val - log_sum_exp
+                loss -= smoothed_val * log_sm
+
+            if reduction_is_none:
+                per_sample_loss.set(row, loss)
+            else:
+                scalar_loss += loss
+
+        # ── Apply reduction ──
+        var out: Tensor[Self.dtype]
+        if reduction_is_none:
+            var spatial_rank = spatial_shape.rank()
+            if spatial_rank == 0:
+                out = Tensor[Self.dtype](
+                    per_sample_loss.reshape(Shape(N)),
+                    requires_grad=False,
+                )
+            else:
+                var out_dims = IntArray()
+                out_dims.append(N)
+                for i in range(spatial_rank):
+                    out_dims.append(spatial_shape[i])
+                out = Tensor[Self.dtype](
+                    per_sample_loss.reshape(Shape(out_dims)),
+                    requires_grad=False,
+                )
+        elif reduction.is_mean():
+            scalar_loss /= Scalar[Self.dtype](M)
+            out = Tensor[Self.dtype].scalar(scalar_loss, requires_grad=False)
+        else:
+            out = Tensor[Self.dtype].scalar(scalar_loss, requires_grad=False)
+
+        return softmax_ndb^, smoothed_target_ndb^, out^
 
 
 # CEClassIndicesBackward
@@ -651,7 +958,9 @@ struct CEClassIndicesForward[dtype: DType](
                         scalar_loss_val, requires_grad=False
                     )
             else:
-                softmax_probs_ndb, valid_count, out = _forward_cpu_impl[Self.dtype](
+                softmax_probs_ndb, valid_count, out = CECommon[
+                    Self.dtype
+                ]._fused_forward_class_indices[track_grad](
                     logits_2d_ndb,
                     target_1d_ndb,
                     reduction,
@@ -660,9 +969,12 @@ struct CEClassIndicesForward[dtype: DType](
                     spatial_shape,
                     N,
                     C2,
+                    M,
                 )
         else:
-            softmax_probs_ndb, valid_count, out = _forward_cpu_impl[Self.dtype](
+            softmax_probs_ndb, valid_count, out = CECommon[
+                Self.dtype
+            ]._fused_forward_class_indices[track_grad](
                 logits_2d_ndb,
                 target_1d_ndb,
                 reduction,
@@ -671,6 +983,7 @@ struct CEClassIndicesForward[dtype: DType](
                 spatial_shape,
                 N,
                 C2,
+                M,
             )
 
         comptime if track_grad:
@@ -697,7 +1010,6 @@ struct CEClassIndicesForward[dtype: DType](
                 out.buffer.sync()
 
         return out^
-
 
 # CEProbabilitiesBackward
 
@@ -826,27 +1138,20 @@ struct CEProbabilitiesForward[dtype: DType](
             Self.dtype
         ].flatten_spatial_probabilities(logits, target)
 
-        var log_probs_ndb: NDBuffer[Self.dtype]
         var softmax_probs_ndb: NDBuffer[Self.dtype]
-        log_probs_ndb, softmax_probs_ndb = CECommon[
-            Self.dtype
-        ].compute_log_softmax_and_softmax(logits_2d_ndb)
-
-        # Apply label smoothing to target
-        var ls = label_smoothing
         var smoothed_target_ndb: NDBuffer[Self.dtype]
-        if ls > Scalar[Self.dtype](0):
-            var uniform = Scalar[Self.dtype](1) / Scalar[Self.dtype](C)
-            smoothed_target_ndb = target_2d_ndb.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls).scalar_ops[Add](ls * uniform)
-        else:
-            smoothed_target_ndb = target_2d_ndb
-
-        # loss = -sum(smoothed_target * log_probs, axis=1)
-        var losses = SumMeanReduction[Self.dtype].sum(smoothed_target_ndb.arithmetic_ops[Multiply](log_probs_ndb), IntArray(1)).unary_ops[NEGATE]()
-
-        # M = valid_count (no ignore_index for probabilities)
-        var out = CECommon[Self.dtype].apply_reduction(
-            losses, reduction, N, spatial_shape, M
+        var out: Tensor[Self.dtype]
+        softmax_probs_ndb, smoothed_target_ndb, out = CECommon[
+            Self.dtype
+        ]._fused_forward_probabilities[track_grad](
+            logits_2d_ndb,
+            target_2d_ndb,
+            reduction,
+            label_smoothing,
+            spatial_shape,
+            N,
+            C,
+            M,
         )
 
         comptime if track_grad:

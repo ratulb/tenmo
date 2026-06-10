@@ -100,8 +100,41 @@ struct Welford[dtype: DType]:
             mean_out[IntArray()] = local_mean
             var_out[IntArray()] = local_M2 / divisor
         else:
-            # Multi-axis reduction — mirrors reduce_cpu coord pattern exactly
             var reduction_axes_shape = ndb.shape.reduced_shape(axes)
+
+            # Fast path: suffix-contiguous reduction (eliminates coord index overhead)
+            if ndb.is_contiguous():
+                var rank = ndb.shape.ndim()
+                var num_axes = axes.size()
+                var is_suffix = (
+                    num_axes > 0 and axes[num_axes - 1] == rank - 1
+                )
+                var idx = 0
+                while is_suffix and idx < num_axes - 1:
+                    if axes[idx] != rank - num_axes + idx:
+                        is_suffix = False
+                        break
+                    idx += 1
+                if is_suffix:
+                    var reduced_numels = reduction_axes_shape.product()
+                    var num_out = mean_out.numels()
+                    for oi in range(num_out):
+                        var base = ndb.offset + oi * reduced_numels
+                        var local_mean = Scalar[Self.dtype](0)
+                        var local_M2 = Scalar[Self.dtype](0)
+                        var count = 0
+                        for ri in range(reduced_numels):
+                            var x = ndb.buffer[base + ri]
+                            count += 1
+                            var delta = x - local_mean
+                            local_mean += delta / Scalar[Self.dtype](count)
+                            var delta2 = x - local_mean
+                            local_M2 += delta * delta2
+                        mean_out.buffer[oi] = local_mean
+                        var_out.buffer[oi] = local_M2 / divisor
+                    return (mean_out^, var_out^)
+
+            # Fallback: coord-by-coord
             for out_coord in out_shape:
                 var local_mean = Scalar[Self.dtype](0)
                 var local_M2 = Scalar[Self.dtype](0)

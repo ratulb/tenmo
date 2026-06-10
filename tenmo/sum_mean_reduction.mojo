@@ -13,6 +13,8 @@ from .intarray import IntArray
 from .shapes import Shape
 from tenmo.kernels.reduction_kernel import Reduction
 from .common_utils import Epsilon
+from std.algorithm import parallelize
+from std.sys.info import num_physical_cores
 from .mnemonics import SUM, MEAN
 from std.sys import has_accelerator
 
@@ -114,7 +116,9 @@ struct SumMeanReduction[dtype: DType]:
                 if is_suffix:
                     var reduced_numels = reduction_axes_shape.product()
                     var num_out = out.numels()
-                    for oi in range(num_out):
+
+                    @parameter
+                    def reduce_row(oi: Int):
                         var base = ndb.offset + oi * reduced_numels
                         comptime if op_code == MEAN:
                             out.buffer[oi] = (
@@ -125,6 +129,8 @@ struct SumMeanReduction[dtype: DType]:
                             out.buffer[oi] = ndb.buffer.sum(
                                 base, base + reduced_numels
                             )
+
+                    parallelize[reduce_row](num_out, num_physical_cores())
                     return out^
 
             # Fallback: coord-by-coord (works for any layout / any axes)

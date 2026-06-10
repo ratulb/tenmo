@@ -16,7 +16,8 @@ from tenmo.broadcasthelper import ShapeBroadcaster
 from tenmo.device import DeviceState
 from tenmo.array import Array
 from tenmo.ndbuffer import NDBuffer
-from tenmo.kernels.kernel_helpers import simd_op, scalar_op
+from tenmo.shared.scalar_ops import simd_op, scalar_op
+from . import elementwise_launch_config
 
 
 # =============================================================================
@@ -531,11 +532,16 @@ def arithmetic_ops_B_contiguous[
                             vec_a, vec_b, epsilon
                         )
                     else:
-                        # A broadcasts inner dim — scalar splat
-                        var vec_a = SIMD[dtype, simd_width](A[a_base])
-                        vec_result = simd_op[op_code, dtype, simd_width](
-                            vec_a, vec_b, epsilon
-                        )
+                        # A elements are strided — per-lane read, outer base computed once
+                        vec_result = SIMD[dtype, simd_width](0)
+                        comptime for lane in range(simd_width):
+                            var a_idx = (
+                                a_base
+                                + (inner_offset + lane) * A_strides[rank - 1]
+                            )
+                            vec_result[lane] = scalar_op[op_code, dtype](
+                                A[a_idx], vec_b[lane], epsilon
+                            )
                 else:
                     # ── Slow path: A crosses row boundary ─────────────────
                     vec_result = SIMD[dtype, simd_width](0)
@@ -578,8 +584,8 @@ def arithmetic_ops_B_contiguous[
 # =============================================================================
 # KERNEL 5 — General fallback: both tensors non-contiguous and/or strided.
 #
-# Unchanged from original — no fast path attempted, no base+inner_offset bug.
-# Full per-lane coordinate decomposition for both A and B. Correct as-is.
+# Outer-base decomposition computed once per vector; fast path uses
+# per-lane inner multiply when vector fits within one row.
 # =============================================================================
 def arithmetic_ops_both_strided[
     op_code: Int,
@@ -600,6 +606,7 @@ def arithmetic_ops_both_strided[
     var gtid = thread_idx.x + block_dim.x * block_idx.x
     var grid_stride = block_dim.x * grid_dim.x
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var inner_dim = result_shape[rank - 1]
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
@@ -610,38 +617,69 @@ def arithmetic_ops_both_strided[
                 break
 
             if i + simd_width <= size:
-                var vec_result: SIMD[dtype, simd_width] = 0
+                # Compute outer bases for both A and B once per vector.
+                var inner_offset = i % inner_dim
+                var outer_remaining = i // inner_dim
+                var a_base = 0
+                var b_base = 0
+                var a_inner_stride = A_strides[rank - 1]
+                var b_inner_stride = B_strides[rank - 1]
 
-                comptime for lane in range(simd_width):
-                    var linear_idx = i + lane
-                    var remaining = linear_idx
-                    var a_idx = 0
-                    var b_idx = 0
+                for dim in range(rank - 2, -1, -1):
+                    var coord = outer_remaining % result_shape[dim]
+                    a_base += coord * A_strides[dim]
+                    b_base += coord * B_strides[dim]
+                    outer_remaining //= result_shape[dim]
 
-                    for dim in range(rank - 1, -1, -1):
-                        var coord = remaining % result_shape[dim]
-                        a_idx += coord * A_strides[dim]
-                        b_idx += coord * B_strides[dim]
-                        remaining //= result_shape[dim]
+                var vec_result: SIMD[dtype, simd_width]
 
-                    vec_result[lane] = scalar_op[op_code, dtype](
-                        A[a_idx], B[b_idx], epsilon
-                    )
+                if inner_offset + simd_width <= inner_dim:
+                    # Fast path: vector fits within one row.
+                    # Per lane: one multiply each for innermost dim.
+                    vec_result = SIMD[dtype, simd_width](0)
+                    comptime for lane in range(simd_width):
+                        var a_idx = (
+                            a_base + (inner_offset + lane) * a_inner_stride
+                        )
+                        var b_idx = (
+                            b_base + (inner_offset + lane) * b_inner_stride
+                        )
+                        vec_result[lane] = scalar_op[op_code, dtype](
+                            A[a_idx], B[b_idx], epsilon
+                        )
+                else:
+                    # Slow path: crosses row boundary — full decomposition.
+                    vec_result = SIMD[dtype, simd_width](0)
+                    comptime for lane in range(simd_width):
+                        var linear_idx = i + lane
+                        var rem = linear_idx
+                        var a_idx = 0
+                        var b_idx = 0
+
+                        for dim in range(rank - 1, -1, -1):
+                            var coord = rem % result_shape[dim]
+                            a_idx += coord * A_strides[dim]
+                            b_idx += coord * B_strides[dim]
+                            rem //= result_shape[dim]
+
+                        vec_result[lane] = scalar_op[op_code, dtype](
+                            A[a_idx], B[b_idx], epsilon
+                        )
 
                 result.store[width=simd_width](i, vec_result)
 
             else:
                 for j in range(size - i):
                     var linear_idx = i + j
-                    var remaining = linear_idx
+                    var rem = linear_idx
                     var a_idx = 0
                     var b_idx = 0
 
                     for dim in range(rank - 1, -1, -1):
-                        var coord = remaining % result_shape[dim]
+                        var coord = rem % result_shape[dim]
                         a_idx += coord * A_strides[dim]
                         b_idx += coord * B_strides[dim]
-                        remaining //= result_shape[dim]
+                        rem //= result_shape[dim]
 
                     result[linear_idx] = scalar_op[op_code, dtype](
                         A[a_idx], B[b_idx], epsilon
@@ -671,7 +709,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
         var output_size = broadcast_shape.product()
         var rank = broadcast_shape.rank()
 
-        var (num_blocks, threads_per_block) = Self.launch_config(output_size)
+        var (num_blocks, threads_per_block) = Self.launch_config(output_size, simdwidth)
 
         ref A_device_state = A.device_state.value()
         ref B_device_state = B.device_state.value()
@@ -894,44 +932,5 @@ struct BinaryOperations[dtype: DType = DType.float32](
         )
 
     @staticmethod
-    def launch_config(output_size: Int) -> Tuple[Int, Int]:
-        # FIX: The original computed num_blocks = ceil(output_size / threads_per_block),
-        # completely ignoring CHUNK_SIZE. Each thread processes CHUNK_SIZE =
-        # simd_vectors_per_thread * simd_width elements (default: 2*sw*sw).
-        # For fp32 with simd_width=8: CHUNK_SIZE = 128. The original over-launched
-        # blocks by 128×, with all surplus blocks immediately exiting the while loop.
-        # Not a correctness bug but a serious waste of GPU occupancy and launch overhead
-        # for small/medium tensors.
-        #
-        # We use a conservative APPROX_CHUNK_SIZE = 32 (= 2 * 16, the maximum
-        # simd_width for fp16/bf16). For fp32 (simd_width=8, CHUNK_SIZE=128) this
-        # still slightly over-launches, but safely so — never under-subscribes.
-        # If exact launch sizing is needed, pass CHUNK_SIZE as a parameter.
-        comptime APPROX_CHUNK_SIZE = 32
-
-        var threads_per_block: Int
-        var num_blocks: Int
-
-        if output_size < 4096:
-            threads_per_block = 128
-            num_blocks = max(
-                1,
-                (output_size + threads_per_block * APPROX_CHUNK_SIZE - 1)
-                // (threads_per_block * APPROX_CHUNK_SIZE),
-            )
-        elif output_size < 65536:
-            threads_per_block = 256
-            num_blocks = min(
-                (output_size + threads_per_block * APPROX_CHUNK_SIZE - 1)
-                // (threads_per_block * APPROX_CHUNK_SIZE),
-                128,
-            )
-        else:
-            threads_per_block = 512
-            num_blocks = min(
-                (output_size + threads_per_block * APPROX_CHUNK_SIZE - 1)
-                // (threads_per_block * APPROX_CHUNK_SIZE),
-                512,
-            )
-
-        return num_blocks, threads_per_block
+    def launch_config(output_size: Int, simdwidth: Int) -> Tuple[Int, Int]:
+        return elementwise_launch_config(output_size, simdwidth)

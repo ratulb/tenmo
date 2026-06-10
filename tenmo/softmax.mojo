@@ -17,6 +17,7 @@ from .sum_mean_reduction import SumMeanReduction
 from .common_utils import Epsilon
 from std.sys import has_accelerator
 from std.math import log, exp, max
+from std.sys import simd_width_of
 
 
 @fieldwise_init
@@ -73,11 +74,48 @@ struct SoftmaxNdBuffer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         if out_shape == Shape():
             var accum = Scalar[Self.dtype](0)
-            for index in ndb.index_iterator():
-                accum += exp(ndb.buffer[index])
+            comptime SIMD_WIDTH = simd_width_of[Self.dtype]()
+            var numels = ndb.numels()
+            var simd_end = numels - (numels % SIMD_WIDTH)
+            for si in range(0, simd_end, SIMD_WIDTH):
+                var vec = ndb.buffer.load[simdwidth=SIMD_WIDTH](si)
+                accum += exp(vec).reduce_add()
+            for ri in range(simd_end, numels):
+                accum += exp(ndb.buffer[ri])
             out[IntArray()] = log(max(accum, Epsilon[Self.dtype].value()))
         else:
             var reduction_axes_shape = ndb.shape.reduced_shape(normalized_axes)
+
+            # Fast path: contiguous suffix reduction with SIMD
+            if ndb.is_contiguous():
+                var rank = ndb.shape.ndim()
+                var num_axes = normalized_axes.size()
+                var is_suffix = (
+                    num_axes > 0 and normalized_axes[num_axes - 1] == rank - 1
+                )
+                var idx = 0
+                while is_suffix and idx < num_axes - 1:
+                    if normalized_axes[idx] != rank - num_axes + idx:
+                        is_suffix = False
+                        break
+                    idx += 1
+                if is_suffix:
+                    var reduced_numels = reduction_axes_shape.product()
+                    var num_out = out.numels()
+                    comptime SIMD_WIDTH = simd_width_of[Self.dtype]()
+                    for oi in range(num_out):
+                        var base = ndb.offset + oi * reduced_numels
+                        var simd_end = reduced_numels - (reduced_numels % SIMD_WIDTH)
+                        var accum = Scalar[Self.dtype](0)
+                        for si in range(0, simd_end, SIMD_WIDTH):
+                            var vec = ndb.buffer.load[simdwidth=SIMD_WIDTH](base + si)
+                            accum += exp(vec).reduce_add()
+                        for ri in range(simd_end, reduced_numels):
+                            accum += exp(ndb.buffer[base + ri])
+                        out.buffer[oi] = log(max(accum, Epsilon[Self.dtype].value()))
+                    return out^
+
+            # Fallback: coord-by-coord
             for out_coord in out_shape:
                 var accum = Scalar[Self.dtype](0)
                 for red_coord in reduction_axes_shape:

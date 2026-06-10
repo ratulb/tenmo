@@ -4,8 +4,9 @@
 
 from std.gpu import thread_idx, block_dim, grid_dim, block_idx
 from std.gpu.host import DeviceBuffer, DeviceContext
-from std.sys import has_accelerator
+from std.sys import simd_width_of, has_accelerator
 from tenmo.ndbuffer import NDBuffer
+from .kernel_helpers import elementwise_launch_config
 from tenmo.device import DeviceState
 from tenmo.shapes import Shape
 from tenmo.strides import Strides
@@ -119,10 +120,7 @@ def embedding_bag_kernel[
         c += col_stride
 
 
-def _gather_launch_config(total_elements: Int) -> Tuple[Int, Int]:
-    var tpb = 256 if total_elements >= 128 else 128
-    var blocks = min((total_elements + tpb - 1) // tpb, 4096)
-    return (tpb, blocks)
+
 
 
 def _gather_2d_block_cols(in_cols: Int) -> Int:
@@ -153,7 +151,8 @@ def _launch_gather_generic[
     out_strides: Array,
     total_output: Int,
 ) raises:
-    var (tpb, blocks) = _gather_launch_config(total_output)
+    comptime simdwidth = simd_width_of[dtype]()
+    var (blocks, tpb) = elementwise_launch_config(total_output, simdwidth)
     var compiled = ctx.compile_function[
         gather_gpu_kernel[dtype, rank],
         gather_gpu_kernel[dtype, rank],

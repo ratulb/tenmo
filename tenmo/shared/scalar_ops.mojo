@@ -33,8 +33,9 @@ from tenmo.mnemonics import (
     GreaterThan,
     LessThanEqual,
     LessThan,
+    LOG_BACKWARD,
 )
-from std.math import sqrt, log, exp, tanh
+from std.math import sqrt, log, exp, tanh, rsqrt
 
 
 struct ScalarOps[dtype: DType](
@@ -194,3 +195,89 @@ struct ScalarOps[dtype: DType](
             return left <= right
         else:  # op_code == LessThan
             return left < right
+
+
+# =============================================================================
+# Standalone SIMD and scalar op dispatch — shared by CPU broadcast and GPU
+# kernel paths.  Avoids duplicating the comptime op dispatch logic.
+# =============================================================================
+
+
+@always_inline
+def simd_op[
+    op_code: Int,
+    dtype: DType,
+    simd_width: Int,
+](
+    a: SIMD[dtype, simd_width],
+    b: SIMD[dtype, simd_width],
+    epsilon: Scalar[dtype] = Epsilon[dtype].value(),
+) -> SIMD[dtype, simd_width]:
+    var one = SIMD[dtype, simd_width](One[dtype].value())
+    var eps = SIMD[dtype, simd_width](epsilon)
+
+    comptime if op_code == Add:
+        return a + b
+    elif op_code == Subtract:
+        return a - b
+    elif op_code == ReverseSubtract:
+        return b - a
+    elif op_code == Multiply:
+        return a * b
+    elif op_code == Divide:
+        return a / (b + epsilon)
+    elif op_code == ReverseDivide:
+        return b / (a + epsilon)
+    elif op_code == SIGMOID_BACKWARD:
+        return b * a * (one - a)
+    elif op_code == TANH_BACKWARD:
+        return b * (one - a * a)
+    elif op_code == SQRT_BACKWARD:
+        return b * (SIMD[dtype, simd_width](0.5) * rsqrt(max(a, eps)))
+    elif op_code == MAX:
+        return max(a, b)
+    elif op_code == MIN:
+        return min(a, b)
+    elif op_code == POW:
+        return a ** b
+    else:  # LOG_BACKWARD
+        return b / max(a, eps)
+
+
+@always_inline
+def scalar_op[
+    op_code: Int,
+    dtype: DType,
+](
+    a: Scalar[dtype],
+    b: Scalar[dtype],
+    epsilon: Scalar[dtype] = Epsilon[dtype].value(),
+) -> Scalar[dtype]:
+    var one = One[dtype].value()
+
+    comptime if op_code == Add:
+        return a + b
+    elif op_code == Subtract:
+        return a - b
+    elif op_code == ReverseSubtract:
+        return b - a
+    elif op_code == Multiply:
+        return a * b
+    elif op_code == Divide:
+        return a / (b + epsilon)
+    elif op_code == ReverseDivide:
+        return b / (a + epsilon)
+    elif op_code == SIGMOID_BACKWARD:
+        return b * a * (one - a)
+    elif op_code == TANH_BACKWARD:
+        return b * (one - a * a)
+    elif op_code == SQRT_BACKWARD:
+        return b * (Scalar[dtype](0.5) * rsqrt(max(a, epsilon)))
+    elif op_code == MAX:
+        return max(a, b)
+    elif op_code == MIN:
+        return min(a, b)
+    elif op_code == POW:
+        return a ** b
+    else:  # LOG_BACKWARD
+        return b / max(a, epsilon)

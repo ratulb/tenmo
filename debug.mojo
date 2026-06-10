@@ -11,6 +11,7 @@ from tenmo.kernels.matmul_kernel import MatmulNdGpu
 from std.sys import prefetch, PrefetchOptions
 from std import math
 from tenmo.device import GPU
+from std.utils.numerics import max_finite, min_finite
 from tenmo.mnemonics import (
     Multiply,
     Add,
@@ -133,10 +134,11 @@ def main() raises:
     b.print()
     var c = b_base.transpose(IntArray(-1, -2))
     c.print()"""
-    var a = SIMD[dtype, 4](1, 2, 3, 4)
+    _="""var a = SIMD[dtype, 4](1, 2, 3, 4)
     var b = SIMD[dtype, 4](0, 3, 9, 10)
     var r = a / (b + Epsilon[dtype].value())
-    print(r)
+    print(r)"""
+    print(max_finite[dtype](), min_finite[dtype]())
 
 def test_sgd_gpu_backward_integration() raises:
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)

@@ -1,4 +1,8 @@
-from .kernel_helpers import simd_op, scalar_op, output_to_input_base, rank_to_reduced_offset
+from .kernel_helpers import (
+    output_to_input_base,
+    rank_to_reduced_offset,
+    elementwise_launch_config,
+)
 from .scalar_ops_kernel import ScalarOperations
 from .scalar_inplace_ops_kernel import InplaceScalarOperations
 from .binary_ops_kernel import BinaryOperations

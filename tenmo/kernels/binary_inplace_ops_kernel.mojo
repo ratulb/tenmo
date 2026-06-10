@@ -7,8 +7,9 @@ from tenmo.device import DeviceState
 from tenmo.array import Array
 from tenmo.ndbuffer import NDBuffer
 from std.math import rsqrt
-from tenmo.kernels.kernel_helpers import simd_op, scalar_op
+from tenmo.shared.scalar_ops import simd_op, scalar_op
 from tenmo.common_utils import Epsilon
+from . import elementwise_launch_config
 
 
 # =============================================================================
@@ -475,6 +476,72 @@ def arithmetic_ops_both_strided[
         base_idx += grid_stride * CHUNK_SIZE
 
 
+# =============================================================================
+# KERNEL for bias_add pattern — A contiguous, B contiguous only in last dim.
+#
+# Preconditions (enforced by launcher):
+#   A.is_contiguous() and A_shape == broadcast_shape
+#   B_broadcast_strides == [0, ..., 0, 1]  (B contiguous only in last dim)
+#
+# B is accessed via b_idx = linear_idx % last_dim — a single modulo
+# per SIMD group start, then increment with wrap per lane.
+# Avoids the dimension loop in the general A_contiguous kernel.
+# Critical for small last_dim (< simd_width) where every SIMD group
+# crosses a row boundary.
+# =============================================================================
+def arithmetic_ops_A_contiguous_lastdim_contiguous_B[
+    op_code: Int,
+    dtype: DType,
+    simd_width: Int = simd_width_of[dtype](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    A: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    last_dim: Int,
+    size: Int,
+):
+    var gtid = thread_idx.x + block_dim.x * block_idx.x
+    var grid_stride = block_dim.x * grid_dim.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    while base_idx < size:
+        comptime for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+
+            if i >= size:
+                break
+
+            if i + simd_width <= size:
+                var vec_a = A.load[width=simd_width](i)
+                var vec_result: SIMD[dtype, simd_width] = 0
+
+                var b_idx = i % last_dim
+
+                comptime for lane in range(simd_width):
+                    vec_result[lane] = scalar_op[op_code, dtype](
+                        vec_a[lane], B[b_idx], Epsilon[dtype].value()
+                    )
+
+                    b_idx += 1
+                    if b_idx >= last_dim:
+                        b_idx = 0
+
+                A.store[width=simd_width](i, vec_result)
+
+            else:
+                for j in range(size - i):
+                    var linear_idx = i + j
+                    A[linear_idx] = scalar_op[op_code, dtype](
+                        A[linear_idx],
+                        B[linear_idx % last_dim],
+                        Epsilon[dtype].value(),
+                    )
+
+        base_idx += grid_stride * CHUNK_SIZE
+
+
 @fieldwise_init
 struct BinaryInplaceOperations[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
@@ -513,7 +580,7 @@ struct BinaryInplaceOperations[dtype: DType](
         # axes and its physical buffer is smaller than output_size.
         var needs_broadcasting = B_shape != broadcast_shape
 
-        var (threads_per_block, num_blocks) = Self.launch_config(output_size)
+        var (num_blocks, threads_per_block) = Self.launch_config(output_size, simdwidth)
 
         ref A_device_state = A.device_state.value()
         ref B_device_state = B.device_state.value()
@@ -589,25 +656,52 @@ struct BinaryInplaceOperations[dtype: DType](
         # contiguous, and B's stride-0 broadcast always requires decomp.
         # ================================================================
         if A_is_contiguous and (not B_is_contiguous or needs_broadcasting):
-            var compiled_func = device_context.compile_function[
-                arithmetic_ops_A_contiguous[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
-                arithmetic_ops_A_contiguous[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
-            ]()
-            device_context.enqueue_function(
-                compiled_func,
-                A_buffer,
-                B_buffer,
-                broadcast_shape.array(),
-                B_broadcast_strides.array(),
-                output_size,
-                rank,
-                grid_dim=num_blocks,
-                block_dim=threads_per_block,
-            )
+            # Check for optimized bias_add path:
+            # B_broadcast_strides == [0, ..., 0, 1] — B contiguous in last dim only.
+            var is_lastdim_b = B_broadcast_strides[rank - 1] == 1
+            if is_lastdim_b and rank >= 2:
+                for dim in range(rank - 1):
+                    if B_broadcast_strides[dim] != 0:
+                        is_lastdim_b = False
+                        break
+            if is_lastdim_b:
+                var compiled_func = device_context.compile_function[
+                    arithmetic_ops_A_contiguous_lastdim_contiguous_B[
+                        op_code, Self.dtype, simdwidth, 2 * simdwidth
+                    ],
+                    arithmetic_ops_A_contiguous_lastdim_contiguous_B[
+                        op_code, Self.dtype, simdwidth, 2 * simdwidth
+                    ],
+                ]()
+                device_context.enqueue_function(
+                    compiled_func,
+                    A_buffer,
+                    B_buffer,
+                    broadcast_shape[rank - 1],
+                    output_size,
+                    grid_dim=num_blocks,
+                    block_dim=threads_per_block,
+                )
+            else:
+                var compiled_func = device_context.compile_function[
+                    arithmetic_ops_A_contiguous[
+                        op_code, Self.dtype, simdwidth, 2 * simdwidth
+                    ],
+                    arithmetic_ops_A_contiguous[
+                        op_code, Self.dtype, simdwidth, 2 * simdwidth
+                    ],
+                ]()
+                device_context.enqueue_function(
+                    compiled_func,
+                    A_buffer,
+                    B_buffer,
+                    broadcast_shape.array(),
+                    B_broadcast_strides.array(),
+                    output_size,
+                    rank,
+                    grid_dim=num_blocks,
+                    block_dim=threads_per_block,
+                )
             if sync:
                 device_context.synchronize()
             return
@@ -689,35 +783,5 @@ struct BinaryInplaceOperations[dtype: DType](
             device_context.synchronize()
 
     @staticmethod
-    def launch_config(output_size: Int) -> Tuple[Int, Int]:
-        # We use a conservative APPROX_CHUNK_SIZE = 32 (= 2 * 16, the maximum
-        # simd_width for fp16/bf16 on modern GPUs). For wider types this slightly
-        # over-launches, but never under-subscribes — a safe conservative bound.
-        comptime APPROX_CHUNK_SIZE = 32
-
-        var threads_per_block: Int
-        var num_blocks: Int
-
-        if output_size < 4096:
-            threads_per_block = 128
-            num_blocks = max(
-                1,
-                (output_size + threads_per_block * APPROX_CHUNK_SIZE - 1)
-                // (threads_per_block * APPROX_CHUNK_SIZE),
-            )
-        elif output_size < 65536:
-            threads_per_block = 256
-            num_blocks = min(
-                (output_size + threads_per_block * APPROX_CHUNK_SIZE - 1)
-                // (threads_per_block * APPROX_CHUNK_SIZE),
-                128,
-            )
-        else:
-            threads_per_block = 512
-            num_blocks = min(
-                (output_size + threads_per_block * APPROX_CHUNK_SIZE - 1)
-                // (threads_per_block * APPROX_CHUNK_SIZE),
-                512,
-            )
-
-        return threads_per_block, num_blocks
+    def launch_config(output_size: Int, simdwidth: Int) -> Tuple[Int, Int]:
+        return elementwise_launch_config(output_size, simdwidth)

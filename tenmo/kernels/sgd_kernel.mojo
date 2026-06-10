@@ -1,11 +1,7 @@
 from std.gpu import thread_idx, block_idx, block_dim, grid_dim
+from std.sys import simd_width_of
 from tenmo.ndbuffer import NDBuffer
-
-
-def _sgd_launch_config(num_elements: Int) -> Tuple[Int, Int]:
-    var tpb = 256 if num_elements >= 256 else num_elements
-    var blocks = (num_elements + tpb - 1) // tpb
-    return (tpb, blocks)
+from .kernel_helpers import elementwise_launch_config
 
 
 def sgd_step_no_momentum_kernel[
@@ -66,7 +62,8 @@ struct SGDStep[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         weight_decay: Scalar[Self.dtype],
         sync: Bool = False,
     ) raises:
-        var (tpb, blocks) = _sgd_launch_config(num_elements)
+        comptime simdwidth = simd_width_of[Self.dtype]()
+        var (blocks, tpb) = elementwise_launch_config(num_elements, simdwidth)
         ref param_ds = param_ndb.device_state.value()
         ref gpu = param_ds.get_gpu()
         var ctx = gpu[]
@@ -101,7 +98,8 @@ struct SGDStep[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         weight_decay: Scalar[Self.dtype],
         sync: Bool = False,
     ) raises:
-        var (tpb, blocks) = _sgd_launch_config(num_elements)
+        comptime simdwidth = simd_width_of[Self.dtype]()
+        var (blocks, tpb) = elementwise_launch_config(num_elements, simdwidth)
         ref param_ds = param_ndb.device_state.value()
         ref gpu = param_ds.get_gpu()
         var ctx = gpu[]

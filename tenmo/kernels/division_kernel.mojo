@@ -10,6 +10,7 @@ from std.gpu import thread_idx, block_dim, grid_dim, block_idx
 from std.sys import simd_width_of
 
 from tenmo.ndbuffer import NDBuffer
+from . import elementwise_launch_config
 from tenmo.device import DeviceState
 
 
@@ -125,7 +126,7 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
         var numels = grad_output.numels()
         comptime simdwidth = simd_width_of[Self.dtype]()
 
-        var (threads_per_block, num_blocks) = Self.launch_config(
+        var (num_blocks, threads_per_block) = Self.launch_config(
             numels, simdwidth
         )
 
@@ -195,7 +196,7 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
         var numels = grad_output.numels()
         comptime simdwidth = simd_width_of[Self.dtype]()
 
-        var (threads_per_block, num_blocks) = Self.launch_config(
+        var (num_blocks, threads_per_block) = Self.launch_config(
             numels, simdwidth
         )
 
@@ -264,19 +265,4 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
     def launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
-        threads_per_block: Int
-        num_blocks: Int
-
-        if numels < 4096:
-            threads_per_block = 128
-            num_blocks = (numels + 127) // 128
-        elif numels < 65536:
-            threads_per_block = 256
-            num_blocks = (numels + 255) // 256
-        else:
-            threads_per_block = 256
-            var total_chunks = (numels + (simdwidth * 2 * simdwidth - 1)) // (
-                simdwidth * 2 * simdwidth
-            )
-            num_blocks = min((total_chunks + 255) // 256, 512)
-        return threads_per_block, num_blocks
+        return elementwise_launch_config(numels, simdwidth)

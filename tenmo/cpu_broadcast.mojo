@@ -25,16 +25,12 @@ from tenmo.buffers import Buffer
 from tenmo.strides import Strides
 from tenmo.intarray import IntArray
 from tenmo.broadcasthelper import ShapeBroadcaster
-from tenmo.shared.scalar_ops import ScalarOps
+from tenmo.shared.scalar_ops import ScalarOps, simd_op
 from tenmo.common_utils import Epsilon, One
 from tenmo.mnemonics import (
-    Multiply,
-    Add,
     Subtract,
     ReverseSubtract,
     Divide,
-    MAX,
-    MIN,
     ReverseDivide,
 )
 from std.sys import simd_width_of
@@ -102,18 +98,19 @@ struct CpuBroadcast[dtype: DType](
         var item = a.item() if a_is_scalar else b.item()
         var buffer: Buffer[Self.dtype]
         if is_contiguous:
-            # Fast contiguous path: extract the non‑scalar operand's data
-            # range as a fresh Buffer and apply the SIMD‑vectorised
-            # scalar op in one shot.  No per‑element dispatch.
+            # Fast contiguous path: apply the SIMD‑vectorised scalar op
+            # directly on the non‑scalar operand's data range via
+            # arithmetic_ops_scalar(start, end).  This reads the range in
+            # one SIMD pass and writes a fresh contiguous result Buffer —
+            # avoids an unnecessary alloc+memcpy that the old
+            # .copied().arithmetic_ops_scalar() incurred.
             var offset = b.offset if a_is_scalar else a.offset
             var numels = b.numels() if a_is_scalar else a.numels()
-            buffer = (
-                b.buffer.copied(
-                    offset, offset + numels
-                ) if a_is_scalar else a.buffer.copied(
-                    offset, offset + numels
-                )
-            ).arithmetic_ops_scalar[op_code](item)
+            buffer = b.buffer.arithmetic_ops_scalar[op_code](
+                item, offset, offset + numels
+            ) if a_is_scalar else a.buffer.arithmetic_ops_scalar[op_code](
+                item, offset, offset + numels
+            )
 
         else:
             # Slow non‑contiguous path: walk the non‑scalar operand's
@@ -246,33 +243,10 @@ struct CpuBroadcast[dtype: DType](
                     )
                     var op_result: SIMD[Self.dtype, simd_width]
 
-                    comptime if op_code == Add:
-                        op_result = a_v + b_v
-                    elif op_code == Subtract:
-                        op_result = a_v - b_v
-                    elif op_code == ReverseSubtract:
-                        op_result = b_v - a_v
-                    elif op_code == Multiply:
-                        op_result = a_v * b_v
-                    elif op_code == Divide:
-                        op_result = a_v / b_v
-                    elif op_code == MAX:
-                        op_result = max(a_v, b_v)
-                    elif op_code == MIN:
-                        op_result = min(a_v, b_v)
-                    else:
-                        # Uncommon opcodes (SIGMOID_BACKWARD, POW, etc.)
-                        # fall back to per‑element scalar_fn within the
-                        # SIMD tile — less efficient but still correct.
-                        for k in range(j, j + simd_width):
-                            buffer[out_base + k] = ScalarOps[Self.dtype].scalar_fn[
-                                op_code
-                            ](
-                                a.buffer[a_off + k],
-                                b.buffer[b_off + k],
-                            )
-                        j += simd_width
-                        continue
+                    # --- Path 3b: SIMD vector op via shared helper ---
+                    op_result = simd_op[op_code, Self.dtype, simd_width](
+                        a_v, b_v
+                    )
 
                     buffer.store[simdwidth=simd_width](out_base + j, op_result)
                     j += simd_width
@@ -351,62 +325,14 @@ struct CpuBroadcast[dtype: DType](
                     # The scalar is always the *first* operand in the
                     # comptime branch; the flag controls which side is
                     # the scalar and which is the vector.
-                    comptime if op_code == Add:
-                        op_result = (
-                            scalar_vec
-                            + vec if a_broadcasts_last else vec
-                            + scalar_vec
-                        )
-                    elif op_code == Subtract:
-                        op_result = (
-                            scalar_vec
-                            - vec if a_broadcasts_last else vec
-                            - scalar_vec
-                        )
-                    elif op_code == ReverseSubtract:
-                        op_result = (
-                            vec
-                            - scalar_vec if a_broadcasts_last else scalar_vec
-                            - vec
-                        )
-                    elif op_code == Multiply:
-                        op_result = (
-                            scalar_vec
-                            * vec if a_broadcasts_last else vec
-                            * scalar_vec
-                        )
-                    elif op_code == Divide:
-                        op_result = (
-                            scalar_vec
-                            / vec if a_broadcasts_last else vec
-                            / scalar_vec
-                        )
-                    elif op_code == MAX:
-                        op_result = max(
+                    if a_broadcasts_last:
+                        op_result = simd_op[op_code, Self.dtype, simd_width](
                             scalar_vec, vec
-                        ) if a_broadcasts_last else max(vec, scalar_vec)
-                    elif op_code == MIN:
-                        op_result = min(
-                            scalar_vec, vec
-                        ) if a_broadcasts_last else min(vec, scalar_vec)
+                        )
                     else:
-                        # Uncommon opcodes — per‑element fallback
-                        for k in range(j, j + simd_width):
-                            var a_i = a_off if a_broadcasts_last else (
-                                a_off + k
-                            )
-                            var b_i = (
-                                b_off
-                                + k if a_broadcasts_last else b_off
-                            )
-                            buffer[out_base + k] = ScalarOps[Self.dtype].scalar_fn[
-                                op_code
-                            ](
-                                a.buffer[a_i],
-                                b.buffer[b_i],
-                            )
-                        j += simd_width
-                        continue
+                        op_result = simd_op[op_code, Self.dtype, simd_width](
+                            vec, scalar_vec
+                        )
 
                     buffer.store[simdwidth=simd_width](out_base + j, op_result)
                     j += simd_width

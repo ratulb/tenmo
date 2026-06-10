@@ -13,6 +13,7 @@ from tenmo.mnemonics import (
     GreaterThanEqual,
 )
 from tenmo.device import DeviceState
+from . import elementwise_launch_config
 from tenmo.ndbuffer import NDBuffer
 
 
@@ -156,7 +157,7 @@ struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = False) raises -> Bool:
         comptime simdwidth = simd_width_of[Self.dtype]()
 
-        var (threads_per_block, num_blocks) = Self.launch_config(A.numels())
+        var (num_blocks, threads_per_block) = Self.launch_config(A.numels(), simdwidth)
 
         ref A_device_state = A.device_state.value()
         ref B_device_state = B.device_state.value()
@@ -204,21 +205,8 @@ struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return all_close_result
 
     @staticmethod
-    def launch_config(output_size: Int) -> Tuple[Int, Int]:
-        var threads_per_block: Int
-        var num_blocks: Int
-
-        if output_size < 4096:
-            threads_per_block = 128
-            num_blocks = (output_size + 127) // 128
-        elif output_size < 65536:
-            threads_per_block = 256
-            num_blocks = min((output_size + 255) // 256, 128)
-        else:
-            threads_per_block = 512
-            num_blocks = min((output_size + 511) // 512, 512)
-
-        return num_blocks, threads_per_block
+    def launch_config(output_size: Int, simdwidth: Int) -> Tuple[Int, Int]:
+        return elementwise_launch_config(output_size, simdwidth)
 
 
 # compare kernel
@@ -319,7 +307,7 @@ struct Compare[dtype: DType = DType.float32](
         var output_shape = A.shape
         var output_size = output_shape.num_elements()
 
-        var (threads_per_block, num_blocks) = Self.launch_config(output_size)
+        var (num_blocks, threads_per_block) = Self.launch_config(output_size, simdwidth)
 
         ref A_device_state = A.device_state.value()
         ref B_device_state = B.device_state.value()
@@ -360,21 +348,8 @@ struct Compare[dtype: DType = DType.float32](
         )
 
     @staticmethod
-    def launch_config(output_size: Int) -> Tuple[Int, Int]:
-        var threads_per_block: Int
-        var num_blocks: Int
-
-        if output_size < 4096:
-            threads_per_block = 128
-            num_blocks = (output_size + 127) // 128
-        elif output_size < 65536:
-            threads_per_block = 256
-            num_blocks = min((output_size + 255) // 256, 128)
-        else:
-            threads_per_block = 512
-            num_blocks = min((output_size + 511) // 512, 512)
-
-        return num_blocks, threads_per_block
+    def launch_config(output_size: Int, simdwidth: Int) -> Tuple[Int, Int]:
+        return elementwise_launch_config(output_size, simdwidth)
 
 
 # compare_scalar kernel
@@ -463,7 +438,7 @@ struct CompareScalar[dtype: DType = DType.float32](
         var numels = A.numels()
         comptime simdwidth = simd_width_of[Self.datatype]()
 
-        var (threads_per_block, num_blocks) = Self.launch_config(
+        var (num_blocks, threads_per_block) = Self.launch_config(
             numels, simdwidth
         )
         ref A_device_state = A.device_state.value()
@@ -524,21 +499,4 @@ struct CompareScalar[dtype: DType = DType.float32](
 
     @staticmethod
     def launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
-        threads_per_block: Int
-        num_blocks: Int
-
-        if numels < 4096:
-            threads_per_block = 128
-            num_blocks = (numels + 127) // 128
-        elif numels < 65536:
-            threads_per_block = 256
-            num_blocks = (numels + 255) // 256
-        else:
-            threads_per_block = 256
-            var total_chunks = (numels + (simdwidth * 2 * simdwidth - 1)) // (
-                simdwidth * 2 * simdwidth
-            )
-            num_blocks = min(
-                (total_chunks + 255) // 256, 512
-            )  # Cap at 512 blocks
-        return threads_per_block, num_blocks
+        return elementwise_launch_config(numels, simdwidth)

@@ -12,7 +12,8 @@ from tenmo.intarray import IntArray
 from tenmo.broadcasthelper import ShapeBroadcaster
 from tenmo.indexhelper import IndexIterator
 from tenmo.common_utils import panic
-from std.sys import has_accelerator
+from std.sys import simd_width_of, has_accelerator
+from .kernel_helpers import elementwise_launch_config
 
 
 def fill_scalar_kernel[
@@ -116,12 +117,6 @@ def scatter_add_broadcast_kernel[
     _ = Atomic.fetch_add(target + target_row * row_width + col, source[col])
 
 
-def _gpu_launch_config(size: Int) -> Tuple[Int, Int]:
-    var tpb = 256 if size >= 256 else size
-    var blocks = (size + tpb - 1) // tpb
-    return (tpb, blocks)
-
-
 @fieldwise_init
 struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     @staticmethod
@@ -140,7 +135,8 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             var size = shape.num_elements()
 
             if strides.is_contiguous(shape):
-                var (tpb, blocks) = _gpu_launch_config(size)
+                comptime simdwidth = simd_width_of[Self.dtype]()
+                var (blocks, tpb) = elementwise_launch_config(size, simdwidth)
                 var compiled = ctx.compile_function[
                     fill_scalar_kernel[Self.dtype],
                     fill_scalar_kernel[Self.dtype],
@@ -183,7 +179,8 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                 and source.is_contiguous()
                 and strides.is_contiguous(shape)
             ):
-                var (tpb, blocks) = _gpu_launch_config(size)
+                comptime simdwidth = simd_width_of[Self.dtype]()
+                var (blocks, tpb) = elementwise_launch_config(size, simdwidth)
                 ref s_state = source.device_state.value()
                 var compiled = ctx.compile_function[
                     fill_from_buffer_kernel[Self.dtype],
