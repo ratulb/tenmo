@@ -220,18 +220,12 @@ struct Epsilon[dtype: DType](RegisterPassable):
             return Scalar[Self.dtype](1e-12)
         elif Self.dtype == DType.float16:
             return rebind[Scalar[Self.dtype]](min_finite[DType.float16]())
-        elif Self.dtype == DType.int32:
-            return rebind[Scalar[Self.dtype]](min_finite[DType.int32]())
-        elif Self.dtype == DType.int64:
-            return rebind[Scalar[Self.dtype]](min_finite[DType.int64]())
-        elif Self.dtype == DType.int8:
-            return rebind[Scalar[Self.dtype]](min_finite[DType.int8]())
-        elif Self.dtype == DType.uint8:
-            return rebind[Scalar[Self.dtype]](min_finite[DType.uint8]())
-        elif Self.dtype == DType.int16:
-            return rebind[Scalar[Self.dtype]](min_finite[DType.int16]())
         elif Self.dtype == DType.bool:
-            return Scalar[Self.dtype](False)  #!
+            return Scalar[Self.dtype](False)
+        elif Self.dtype.is_integral():
+            # Integer types have no "epsilon" concept — use 0 so that
+            # b + epsilon == b (preserves integer division, no overflow).
+            return Scalar[Self.dtype](0)
         else:
             panic("Epsilon value not supported for: ", String(Self.dtype))
             return Scalar[Self.dtype](0)

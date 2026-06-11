@@ -23,29 +23,32 @@ from tenmo.mnemonics import (
 comptime dtype = DType.float32
 
 @fieldwise_init
-struct IntAdder(ImplicitlyCopyable & Absable):
+#struct IntAdder(ImplicitlyCopyable & Absable):
+struct IntAdder(ImplicitlyCopyable):
     var value: Int
-
-    def __getitem__(self, index: Int, sync: Bool= True) -> Int:
-        print("Sync in get: ", sync, "index: ", index)
-        return self.value
-
-    def __setitem__(mut self, index: Int, v: Int, sync: Bool= False):
-        print("Sync in set: ", sync, "index: ", index)
-        self.value = v
+    def __call__[op_code: Int](self, other: Self) -> Self:
+        print("op_code: ", op_code)
+        return IntAdder(self.value * other.value)
 
 
-
-    def __add__[sync: Bool = True](self, other: Self) -> IntAdder:
-        print("sync: ", sync)
-        return IntAdder(self.value + other.value)
-
-    def __abs__(self) -> Self:
-        return Self(abs(self.value))
-
-    def __iadd__[sync: Bool = True](mut self, other: Self):
-        print("sync: ", sync)
-        self.value += other.value
+#    def __getitem__(self, index: Int, sync: Bool= True) -> Int:
+#        print("Sync in get: ", sync, "index: ", index)
+#        return self.value
+#
+#    def __setitem__(mut self, index: Int, v: Int, sync: Bool= False):
+#        print("Sync in set: ", sync, "index: ", index)
+#        self.value = v
+#
+#    def __add__[sync: Bool = True](self, other: Self) -> IntAdder:
+#        print("sync: ", sync)
+#        return IntAdder(self.value + other.value)
+#
+#    def __abs__(self) -> Self:
+#        return Self(abs(self.value))
+#
+#    def __iadd__[sync: Bool = True](mut self, other: Self):
+#        print("sync: ", sync)
+#        self.value += other.value
 
 
 def test_ndb_addition_1d() raises:
@@ -92,7 +95,17 @@ def test_ndb_inter_gpu_copy_and_opeartion() raises:
             print("Inter gpu ndb op passed")
         print("Num devices: ", gpu[].number_of_devices())
 
-
+def test_logarithm_log_cpu_backward_custom_epsilon() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([0.0, 1.0, 4.0], requires_grad=True)
+    var result = a.log[epsilon=Scalar[dtype](1e-6)]()
+    var loss = result.sum()
+    loss.backward()
+    a.grad().print()
+    print(Float32(1.0) / Float32(1e-6))
+    assert_true(a.grad()[[0]] == Float32(1.0) / Float32(1e-6))
+    assert_true(a.grad()[[1]] == Float32(1.0))
+    assert_true(a.grad()[[2]] == Float32(0.25))
 
 def main() raises:
     #test_sgd_gpu_backward_integration()
@@ -138,7 +151,39 @@ def main() raises:
     var b = SIMD[dtype, 4](0, 3, 9, 10)
     var r = a / (b + Epsilon[dtype].value())
     print(r)"""
-    print(max_finite[dtype](), min_finite[dtype]())
+    #print(max_finite[dtype](), min_finite[dtype]())
+    #test_mmrev_gpu_min_3d_axis2_backward()
+    _="""var x = IntAdder(100)
+    var y = IntAdder(200)
+    var z = x[8](y)
+    print("z.value: ", z.value)"""
+    #test_logarithm_log_cpu_backward_custom_epsilon()
+
+    var ndb = NDBuffer[dtype](1, 2, 3, 4)
+
+    var ndb2 = NDBuffer[dtype](1, 2, 3, 4)
+    ndb.print()
+    ndb += ndb2
+    ndb += 42
+    ndb.print()
+
+def test_mmrev_gpu_min_3d_axis2_backward() raises:
+    comptime if has_accelerator():
+        print("test_mmrev_gpu_min_3d_axis2_backward")
+        comptime dtype = DType.float32
+        var _tmp0 = Tensor[dtype].arange(0.0, 24.0)
+        var a = _tmp0.reshape(Shape(2, 3, 4))
+        a.requires_grad_(True)
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.min([2])
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        var expected = Tensor[dtype].zeros(Shape(2, 3, 4))
+        for i in range(2):
+            for j in range(3):
+                expected[i, j, 0] = 1.0
+        assert_true(a.grad().all_close(expected))
 
 def test_sgd_gpu_backward_integration() raises:
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)

@@ -22,8 +22,8 @@ from tenmo.kernels.binary_inplace_ops_kernel import BinaryInplaceOperations
 from tenmo.kernels.unary_ops_kernel import UnaryOpsKernel
 from tenmo.kernels.matmul_kernel import MatmulNdGpu
 from tenmo.matmul_cpu import MmCpu2d, MmCpuNd
-from tenmo.cpu_broadcast import CpuBroadcast
-from tenmo.shared.scalar_ops import ScalarOps
+from tenmo.cpu_arithmetics import CpuArithmeticOps
+from tenmo.shared.scalar_ops import compare_op
 from tenmo.kernels.compare_kernel import AllClose, Compare, CompareScalar
 
 from std.math import sqrt, log, exp, tanh
@@ -1693,7 +1693,7 @@ struct NDBuffer[dtype: DType](
             # self.shape -> Target shape
             # other.shape -> Source shape
 
-            mask = ShapeBroadcaster.broadcast_mask(other.shape, self.shape)
+            var mask = ShapeBroadcaster.broadcast_mask(other.shape, self.shape)
             for coord in self.shape:
                 src_coord = ShapeBroadcaster.translate_index(
                     other.shape, coord, mask, self.shape
@@ -1733,85 +1733,9 @@ struct NDBuffer[dtype: DType](
                         String(op_code),
                     )
             else:
-                self.inplace_ops_cpu[op_code](other)
+                CpuArithmeticOps[Self.dtype].inplace_ops[op_code](self, other)
         else:
-            self.inplace_ops_cpu[op_code](other)
-
-    @always_inline
-    def inplace_ops_cpu[
-        op_code: Int,
-    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]):
-        # Broadcast validation
-        if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
-            panic(
-                "NDBuffer → inplace_ops: dimension mismatch: "
-                + String(self.shape)
-                + ", "
-                + String(other.shape)
-            )
-
-        # Handle broadcasting case
-        if self.shape != other.shape:
-            broadcast_shape = ShapeBroadcaster.broadcast_shape(
-                self.shape, other.shape
-            )
-
-            # PyTorch's rule: broadcasted shape must match receiver shape
-            if broadcast_shape != self.shape:
-                panic(
-                    "NDBuffer → inplace_ops: broadcasted shape "
-                    + String(broadcast_shape)
-                    + " must match receiver shape "
-                    + String(self.shape)
-                )
-
-            # Get the broadcasted result which is now of self's shape
-            var broadcast_result = CpuBroadcast[Self.dtype].apply[op_code](
-                self, other
-            )
-            self.copy_from_alike[overwrite=True, validate=False](
-                broadcast_result^
-            )
-
-        else:
-            # Same shape case
-            if self.is_contiguous() and other.is_contiguous():
-                self_start = self.offset
-                self_end = self_start + self.numels()
-                other_start = other.offset
-                other_end = other_start + other.numels()
-                self.buffer.inplace_ops[op_code](
-                    other.buffer, self_start, self_end, other_start, other_end
-                )
-
-            elif self.is_contiguous() and not other.is_contiguous():
-                var index = self.offset
-                for idx in other.index_iterator():
-                    self.buffer[index] = ScalarOps[Self.dtype].scalar_fn[
-                        op_code
-                    ](self.buffer[index], other.buffer[idx])
-                    index += 1
-
-            elif not self.is_contiguous() and other.is_contiguous():
-                var index = other.offset
-                for idx in self.index_iterator():
-                    self.buffer[idx] = ScalarOps[Self.dtype].scalar_fn[op_code](
-                        self.buffer[idx], other.buffer[index]
-                    )
-                    index += 1
-            else:
-                var iterator = other.index_iterator()
-                for index in self.index_iterator():
-                    var next_index = -1
-                    try:
-                        next_index = iterator.__next__()
-                    except e:
-                        print(e)
-                        panic("Raised StopIteration in NDBuffer → inplace_ops")
-
-                    self.buffer[index] = ScalarOps[Self.dtype].scalar_fn[
-                        op_code
-                    ](self.buffer[index], other.buffer[next_index])
+            CpuArithmeticOps[Self.dtype].inplace_ops[op_code](self, other)
 
     @always_inline
     def inplace_scalar_ops[
@@ -1828,9 +1752,14 @@ struct NDBuffer[dtype: DType](
         comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
-                    InplaceScalarOperations[Self.dtype].launch[op_code](
-                        self, scalar, sync=sync
-                    )
+                    comptime if op_code == POW:
+                        InplaceScalarOperations[Self.dtype].launch_inplace_pow(
+                            self, scalar, sync=sync
+                        )
+                    else:
+                        InplaceScalarOperations[Self.dtype].launch[op_code](
+                            self, scalar, sync=sync
+                        )
                 except e:
                     print(e)
                     panic(
@@ -1840,30 +1769,14 @@ struct NDBuffer[dtype: DType](
                         ),
                         String(op_code),
                     )
-                    # Unreacahble
             else:
-                self.inplace_scalar_ops_cpu[op_code](scalar)
-        else:
-            self.inplace_scalar_ops_cpu[op_code](scalar)
-
-    @always_inline
-    def inplace_scalar_ops_cpu[
-        op_code: Int,
-    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]):
-        comptime if op_code == Divide:
-            if scalar == Scalar[Self.dtype](0):
-                panic("NDBuffer → inplace_scalar_ops: cannot divide by zero")
-
-        if self.is_contiguous():
-            start = self.offset
-            end = start + self.numels()
-            self.buffer.inplace_ops_scalar[op_code](scalar, start, end)
-
-        else:
-            for index in self.index_iterator():
-                self.buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
-                    self.buffer[index], scalar
+                CpuArithmeticOps[Self.dtype].inplace_scalar_ops[op_code](
+                    self, scalar
                 )
+        else:
+            CpuArithmeticOps[Self.dtype].inplace_scalar_ops[op_code](
+                self, scalar
+            )
 
     @always_inline
     def __add__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
@@ -1991,77 +1904,15 @@ struct NDBuffer[dtype: DType](
                 )
                 out = NDBuffer[Self.dtype].Empty()
             else:
-                out = self.arithmetic_ops_cpu[op_code](other, epsilon)
+                out = CpuArithmeticOps[Self.dtype].compute[op_code](
+                    self, other, epsilon
+                )
         else:
-            out = self.arithmetic_ops_cpu[op_code](other, epsilon)
+            out = CpuArithmeticOps[Self.dtype].compute[op_code](
+                self, other, epsilon
+            )
 
         return out^
-
-    @always_inline
-    def arithmetic_ops_cpu[
-        op_code: Int,
-    ](
-        self: NDBuffer[Self.dtype],
-        other: NDBuffer[Self.dtype],
-        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
-    ) -> NDBuffer[Self.dtype]:
-        # Handle broadcasting case
-        if self.shape != other.shape:
-            return CpuBroadcast[Self.dtype].apply[op_code](self, other)
-
-        if self.is_contiguous() and other.is_contiguous():
-            self_start = self.offset
-            self_end = self_start + self.numels()
-            other_start = other.offset
-            other_end = other_start + other.numels()
-            var result_buffer = self.buffer.arithmetic_ops[op_code=op_code](
-                other.buffer,
-                self_start,
-                self_end,
-                other_start,
-                other_end,
-                epsilon=epsilon,
-            )
-            return NDBuffer[Self.dtype](result_buffer^, self.shape)
-
-        else:
-            var result_buffer = Buffer[Self.dtype](self.numels())
-            var index = 0
-
-            if self.is_contiguous() and not other.is_contiguous():
-                var offset = self.offset
-                for idx in other.index_iterator():
-                    result_buffer[index] = ScalarOps[Self.dtype].scalar_fn[
-                        op_code
-                    ](self.buffer[offset + index], other.buffer[idx], epsilon)
-                    index += 1
-
-            elif not self.is_contiguous() and other.is_contiguous():
-                var offset = other.offset
-                for idx in self.index_iterator():
-                    result_buffer[index] = ScalarOps[Self.dtype].scalar_fn[
-                        op_code
-                    ](self.buffer[idx], other.buffer[offset + index], epsilon)
-                    index += 1
-
-            else:
-                var iterator = other.index_iterator()
-                for idx in self.index_iterator():
-                    var next_index = -1
-                    try:
-                        next_index = iterator.__next__()
-                    except e:
-                        print(e)
-                        panic(
-                            "Raised StopIteration in NDBuffer → arithmetic_ops"
-                        )
-
-                    result_buffer[index] = ScalarOps[Self.dtype].scalar_fn[
-                        op_code
-                    ](self.buffer[idx], other.buffer[next_index], epsilon)
-                    index += 1
-
-            return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
     def broadcast_to(self, target_shape: Shape) -> NDBuffer[Self.dtype]:
         """
@@ -2113,7 +1964,7 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     def scalar_ops[
-        op_code: Int,
+        op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ](
         self: NDBuffer[Self.dtype],
         scalar: Scalar[Self.dtype],
@@ -2148,42 +1999,15 @@ struct NDBuffer[dtype: DType](
                     # Unreacahble
                     out = Self.Empty()
             else:
-                out = self.scalar_ops_cpu[op_code](scalar)
+                out = CpuArithmeticOps[Self.dtype].compute[op_code, epsilon](
+                    self, scalar
+                )
         else:
-            out = self.scalar_ops_cpu[op_code](scalar)
+            out = CpuArithmeticOps[Self.dtype].compute[op_code, epsilon](
+                self, scalar
+            )
 
         return out^
-
-    @always_inline
-    def scalar_ops_cpu[
-        op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
-    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
-        Self.dtype
-    ]:
-        if self.is_contiguous():
-            var start = self.offset
-            var end = start + self.numels()
-            var result_buffer: Buffer[Self.dtype]
-
-            comptime if op_code == POW:
-                result_buffer = self.buffer[start:end] ** scalar
-            else:
-                result_buffer = self.buffer.arithmetic_ops_scalar[op_code](
-                    scalar, start, end
-                )
-            return NDBuffer[Self.dtype](result_buffer^, self.shape)
-
-        else:
-            var index = 0
-            var result_buffer = Buffer[Self.dtype](self.numels())
-
-            for idx in self.index_iterator():
-                result_buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
-                    self.buffer[idx], scalar, epsilon
-                )
-                index += 1
-
-            return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
     @always_inline
     def unary_ops[
@@ -2209,34 +2033,11 @@ struct NDBuffer[dtype: DType](
                     # Unreacahble
                     out = Self.Empty()
             else:
-                out = self.unary_ops_cpu[op_code]()
+                out = CpuArithmeticOps[Self.dtype].unary_ops[op_code](self)
         else:
-            out = self.unary_ops_cpu[op_code]()
+            out = CpuArithmeticOps[Self.dtype].unary_ops[op_code](self)
 
         return out^
-
-    @always_inline
-    def unary_ops_cpu[
-        op_code: Int,
-    ](self: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
-        if self.is_contiguous():
-            var start = self.offset
-            var end = start + self.numels()
-            var result_buffer = self.buffer.unary_ops[op_code](start, end)
-
-            return NDBuffer[Self.dtype](result_buffer^, self.shape)
-
-        else:
-            var index = 0
-            var result_buffer = Buffer[Self.dtype](self.numels())
-
-            for idx in self.index_iterator():
-                result_buffer[index] = ScalarOps[Self.dtype].unary_fn_helper[
-                    op_code
-                ](self.buffer[idx])
-                index += 1
-
-            return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
     @always_inline
     def float_unary_ops[
@@ -2266,36 +2067,15 @@ struct NDBuffer[dtype: DType](
                     # Unreacahble
                     out = Self.Empty()
             else:
-                out = self.float_unary_ops_cpu[op_code, epsilon]()
+                out = CpuArithmeticOps[Self.dtype].unary_ops_constrained[
+                    op_code, epsilon
+                ](self)
         else:
-            out = self.float_unary_ops_cpu[op_code, epsilon]()
+            out = CpuArithmeticOps[Self.dtype].unary_ops_constrained[
+                op_code, epsilon
+            ](self)
 
         return out^
-
-    @always_inline
-    def float_unary_ops_cpu[
-        op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
-    ](self: NDBuffer[Self.dtype]) -> NDBuffer[
-        Self.dtype
-    ] where Self.dtype.is_floating_point():
-        if self.is_contiguous():
-            var start = self.offset
-            var end = start + self.numels()
-            var result_buffer = self.buffer.float_unary_ops[op_code, epsilon](
-                start, end
-            )
-            return NDBuffer[Self.dtype](result_buffer^, self.shape)
-        else:
-            var index = 0
-            var result_buffer = Buffer[Self.dtype](self.numels())
-
-            for idx in self.index_iterator():
-                result_buffer[index] = ScalarOps[
-                    Self.dtype
-                ].float_unary_fn_helper[op_code, epsilon](self.buffer[idx])
-                index += 1
-
-            return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
     def clamp(
         self: NDBuffer[Self.dtype],
@@ -2423,7 +2203,7 @@ struct NDBuffer[dtype: DType](
 
                 var other_val = other.buffer[next_index]
 
-                buffer[index] = ScalarOps[Self.dtype].compare_pair[op_code](
+                buffer[index] = compare_op[op_code, Self.dtype](
                     self_val, other_val
                 )
 
@@ -2479,9 +2259,7 @@ struct NDBuffer[dtype: DType](
             for idx in self.index_iterator():
                 var value = self.buffer[idx]
 
-                buffer[index] = ScalarOps[Self.dtype].compare_pair[op_code](
-                    value, scalar
-                )
+                buffer[index] = compare_op[op_code, Self.dtype](value, scalar)
 
                 index += 1
 

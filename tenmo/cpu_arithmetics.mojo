@@ -6,9 +6,9 @@
 #
 # Three dispatch tiers, each optimised for a different memory‑layout pattern:
 #
-#   apply()                  ← public entry point
-#    ├── apply_scalar()      ← one operand is effectively a scalar
-#    └── apply_nd()          ← general ND broadcast
+#   broadcast()                  ← public entry point
+#    ├── broadcast_scalar()      ← one operand is effectively a scalar
+#    └── broadcast_nd()          ← general ND broadcast
 #         ├── Tier 1: both operands have unit stride in last dim
 #         ├── Tier 2: one operand has unit stride, the other broadcasts (stride 0)
 #         └── Tier 3: neither has unit stride — scalar odometer
@@ -25,18 +25,19 @@ from tenmo.buffers import Buffer
 from tenmo.strides import Strides
 from tenmo.intarray import IntArray
 from tenmo.broadcasthelper import ShapeBroadcaster
-from tenmo.shared.scalar_ops import ScalarOps, simd_op
-from tenmo.common_utils import Epsilon, One
+from tenmo.shared.scalar_ops import simd_op, scalar_op, unary_op, float_unary_op
+from tenmo.common_utils import Epsilon
 from tenmo.mnemonics import (
     Subtract,
     ReverseSubtract,
     Divide,
     ReverseDivide,
+    POW,
 )
 from std.sys import simd_width_of
 
 
-struct CpuBroadcast[dtype: DType](
+struct CpuArithmeticOps[dtype: DType](
     ImplicitlyCopyable & Movable & Equatable & Writable
 ):
     # ------------------------------------------------------------------
@@ -48,9 +49,13 @@ struct CpuBroadcast[dtype: DType](
 
     @staticmethod
     @always_inline
-    def apply[
+    def broadcast[
         op_code: Int,
-    ](a: NDBuffer[Self.dtype], b: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
+    ](
+        a: NDBuffer[Self.dtype],
+        b: NDBuffer[Self.dtype],
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
+    ) -> NDBuffer[Self.dtype]:
         var a_is_scalar = a.shape.rank() <= 1 and a.numels() == 1
         var b_is_scalar = b.shape.rank() <= 1 and b.numels() == 1
         if a_is_scalar or b_is_scalar:
@@ -61,17 +66,19 @@ struct CpuBroadcast[dtype: DType](
                 #   scalar / tensor  →  ReverseDivide
                 comptime if op_code == Subtract or op_code == Divide:
                     if op_code == Subtract:
-                        return CpuBroadcast.apply_scalar[
+                        return CpuArithmeticOps.broadcast_scalar[
                             ReverseSubtract
-                        ](a, b, a_is_scalar)
+                        ](a, b, a_is_scalar, epsilon)
                     else:
-                        return CpuBroadcast.apply_scalar[
-                            ReverseDivide
-                        ](a, b, a_is_scalar)
+                        return CpuArithmeticOps.broadcast_scalar[ReverseDivide](
+                            a, b, a_is_scalar, epsilon
+                        )
 
-            return CpuBroadcast.apply_scalar[op_code](a, b, a_is_scalar)
+            return CpuArithmeticOps.broadcast_scalar[op_code](
+                a, b, a_is_scalar, epsilon
+            )
         else:
-            return CpuBroadcast.apply_nd[op_code](a, b)
+            return CpuArithmeticOps.broadcast_nd[op_code](a, b, epsilon)
 
     # ------------------------------------------------------------------
     # Scalar path  —  one operand is scalar‑like
@@ -82,23 +89,22 @@ struct CpuBroadcast[dtype: DType](
 
     @staticmethod
     @always_inline
-    def apply_scalar[
+    def broadcast_scalar[
         op_code: Int
     ](
         a: NDBuffer[Self.dtype],
         b: NDBuffer[Self.dtype],
         a_is_scalar: Bool,
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ) -> NDBuffer[Self.dtype]:
-        var result_shape = ShapeBroadcaster.broadcast_shape(
-            a.shape, b.shape
-        )
+        var result_shape = ShapeBroadcaster.broadcast_shape(a.shape, b.shape)
         var is_contiguous = (
             b.is_contiguous() if a_is_scalar else a.is_contiguous()
         )
         var item = a.item() if a_is_scalar else b.item()
         var buffer: Buffer[Self.dtype]
         if is_contiguous:
-            # Fast contiguous path: apply the SIMD‑vectorised scalar op
+            # Fast contiguous path: broadcast the SIMD‑vectorised scalar op
             # directly on the non‑scalar operand's data range via
             # arithmetic_ops_scalar(start, end).  This reads the range in
             # one SIMD pass and writes a fresh contiguous result Buffer —
@@ -114,7 +120,7 @@ struct CpuBroadcast[dtype: DType](
 
         else:
             # Slow non‑contiguous path: walk the non‑scalar operand's
-            # logical elements via its index_iterator and apply the
+            # logical elements via its index_iterator and broadcast the
             # scalar function element‑by‑element.  ReverseSubtract and
             # ReverseDivide swap the argument order.
             buffer = Buffer[Self.dtype](result_shape.num_elements())
@@ -123,17 +129,17 @@ struct CpuBroadcast[dtype: DType](
             if a_is_scalar:
                 for idx in b.index_iterator():
                     comptime if op_code == ReverseSubtract or op_code == ReverseDivide:
-                        buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
+                        buffer[index] = scalar_op[op_code, Self.dtype](
                             b.buffer[idx], item
                         )
                     else:
-                        buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
+                        buffer[index] = scalar_op[op_code, Self.dtype](
                             item, b.buffer[idx]
                         )
                     index += 1
             else:
                 for idx in a.index_iterator():
-                    buffer[index] = ScalarOps[Self.dtype].scalar_fn[op_code](
+                    buffer[index] = scalar_op[op_code, Self.dtype](
                         a.buffer[idx], item
                     )
                     index += 1
@@ -161,12 +167,14 @@ struct CpuBroadcast[dtype: DType](
 
     @staticmethod
     @always_inline
-    def apply_nd[
+    def broadcast_nd[
         op_code: Int
-    ](a: NDBuffer[Self.dtype], b: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
-        var result_shape = ShapeBroadcaster.broadcast_shape(
-            a.shape, b.shape
-        )
+    ](
+        a: NDBuffer[Self.dtype],
+        b: NDBuffer[Self.dtype],
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
+    ) -> NDBuffer[Self.dtype]:
+        var result_shape = ShapeBroadcaster.broadcast_shape(a.shape, b.shape)
 
         # ---- 1. Compute effective strides  --------------------------
         var rank = result_shape.rank()
@@ -235,17 +243,13 @@ struct CpuBroadcast[dtype: DType](
                 # --- SIMD tile the last dimension ---
                 var j = 0
                 while j + simd_width <= last_dim:
-                    var a_v = a.buffer.load[simdwidth=simd_width](
-                        a_off + j
-                    )
-                    var b_v = b.buffer.load[simdwidth=simd_width](
-                        b_off + j
-                    )
+                    var a_v = a.buffer.load[simdwidth=simd_width](a_off + j)
+                    var b_v = b.buffer.load[simdwidth=simd_width](b_off + j)
                     var op_result: SIMD[Self.dtype, simd_width]
 
                     # --- Path 3b: SIMD vector op via shared helper ---
                     op_result = simd_op[op_code, Self.dtype, simd_width](
-                        a_v, b_v
+                        a_v, b_v, epsilon
                     )
 
                     buffer.store[simdwidth=simd_width](out_base + j, op_result)
@@ -253,9 +257,10 @@ struct CpuBroadcast[dtype: DType](
 
                 # Scalar remainder (last_dim not a multiple of simd_width)
                 for k in range(j, last_dim):
-                    buffer[out_base + k] = ScalarOps[Self.dtype].scalar_fn[op_code](
+                    buffer[out_base + k] = scalar_op[op_code, Self.dtype](
                         a.buffer[a_off + k],
                         b.buffer[b_off + k],
+                        epsilon,
                     )
 
                 # --- Advance outer dims (odometer) ---
@@ -327,11 +332,11 @@ struct CpuBroadcast[dtype: DType](
                     # the scalar and which is the vector.
                     if a_broadcasts_last:
                         op_result = simd_op[op_code, Self.dtype, simd_width](
-                            scalar_vec, vec
+                            scalar_vec, vec, epsilon
                         )
                     else:
                         op_result = simd_op[op_code, Self.dtype, simd_width](
-                            vec, scalar_vec
+                            vec, scalar_vec, epsilon
                         )
 
                     buffer.store[simdwidth=simd_width](out_base + j, op_result)
@@ -339,15 +344,12 @@ struct CpuBroadcast[dtype: DType](
 
                 # Scalar remainder
                 for k in range(j, last_dim):
-                    var a_i = a_off if a_broadcasts_last else (
-                        a_off + k
-                    )
-                    var b_i = (
-                        b_off + k if a_broadcasts_last else b_off
-                    )
-                    buffer[out_base + k] = ScalarOps[Self.dtype].scalar_fn[op_code](
+                    var a_i = a_off if a_broadcasts_last else (a_off + k)
+                    var b_i = b_off + k if a_broadcasts_last else b_off
+                    buffer[out_base + k] = scalar_op[op_code, Self.dtype](
                         a.buffer[a_i],
                         b.buffer[b_i],
+                        epsilon,
                     )
 
                 # Advance outer dims (same odometer as Tier 1)
@@ -382,8 +384,8 @@ struct CpuBroadcast[dtype: DType](
             var coords = IntArray.filled(rank, 0)
 
             for i in range(total):
-                buffer[i] = ScalarOps[Self.dtype].scalar_fn[op_code](
-                    a.buffer[a_off], b.buffer[b_off]
+                buffer[i] = scalar_op[op_code, Self.dtype](
+                    a.buffer[a_off], b.buffer[b_off], epsilon
                 )
 
                 # Odometer: least‑significant dimension (index rank‑1)
@@ -400,3 +402,248 @@ struct CpuBroadcast[dtype: DType](
                         coords[d] = 0
 
         return NDBuffer[Self.dtype](buffer^, result_shape)
+
+    @staticmethod
+    @always_inline
+    def compute[
+        op_code: Int,
+    ](
+        self: NDBuffer[Self.dtype],
+        other: NDBuffer[Self.dtype],
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
+    ) -> NDBuffer[Self.dtype]:
+        # Handle broadcasting case
+        if self.shape != other.shape:
+            return Self.broadcast[op_code](self, other, epsilon)
+        # Same shape
+        if self.is_contiguous() and other.is_contiguous():
+            self_start = self.offset
+            self_end = self_start + self.numels()
+            other_start = other.offset
+            other_end = other_start + other.numels()
+            var result_buffer = self.buffer.arithmetic_ops[op_code=op_code](
+                other.buffer,
+                self_start,
+                self_end,
+                other_start,
+                other_end,
+                epsilon=epsilon,
+            )
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+        else:
+            var result_buffer = Buffer[Self.dtype](self.numels())
+            var index = 0
+
+            if self.is_contiguous() and not other.is_contiguous():
+                var offset = self.offset
+                for idx in other.index_iterator():
+                    result_buffer[index] = scalar_op[op_code, Self.dtype](
+                        self.buffer[offset + index], other.buffer[idx], epsilon
+                    )
+                    index += 1
+
+            elif not self.is_contiguous() and other.is_contiguous():
+                var offset = other.offset
+                for idx in self.index_iterator():
+                    result_buffer[index] = scalar_op[op_code, Self.dtype](
+                        self.buffer[idx], other.buffer[offset + index], epsilon
+                    )
+                    index += 1
+
+            else:
+                var iterator = other.index_iterator()
+                for idx in self.index_iterator():
+                    var next_index = -1
+                    try:
+                        next_index = iterator.__next__()
+                    except e:
+                        print(e)
+                        panic(
+                            "Raised StopIteration in NDBuffer → arithmetic_ops"
+                        )
+
+                    result_buffer[index] = scalar_op[op_code, Self.dtype](
+                        self.buffer[idx], other.buffer[next_index], epsilon
+                    )
+                    index += 1
+
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+    @staticmethod
+    @always_inline
+    def compute[
+        op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
+    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
+        Self.dtype
+    ]:
+        if self.is_contiguous():
+            var start = self.offset
+            var end = start + self.numels()
+            var result_buffer: Buffer[Self.dtype]
+
+            comptime if op_code == POW:
+                result_buffer = self.buffer[start:end] ** scalar
+            else:
+                result_buffer = self.buffer.arithmetic_ops_scalar[op_code](
+                    scalar, start, end
+                )
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+        else:
+            var index = 0
+            var result_buffer = Buffer[Self.dtype](self.numels())
+
+            for idx in self.index_iterator():
+                result_buffer[index] = scalar_op[op_code, Self.dtype](
+                    self.buffer[idx], scalar, epsilon
+                )
+                index += 1
+
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+    @staticmethod
+    @always_inline
+    def unary_ops[
+        op_code: Int,
+    ](self: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
+        if self.is_contiguous():
+            var start = self.offset
+            var end = start + self.numels()
+            var result_buffer = self.buffer.unary_ops[op_code](start, end)
+
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+        else:
+            var index = 0
+            var result_buffer = Buffer[Self.dtype](self.numels())
+
+            for idx in self.index_iterator():
+                result_buffer[index] = unary_op[op_code, Self.dtype](
+                    self.buffer[idx]
+                )
+                index += 1
+
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+    @staticmethod
+    @always_inline
+    def unary_ops_constrained[
+        op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
+    ](self: NDBuffer[Self.dtype]) -> NDBuffer[
+        Self.dtype
+    ] where Self.dtype.is_floating_point():
+        if self.is_contiguous():
+            var start = self.offset
+            var end = start + self.numels()
+            var result_buffer = self.buffer.float_unary_ops[op_code, epsilon](
+                start, end
+            )
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
+        else:
+            var index = 0
+            var result_buffer = Buffer[Self.dtype](self.numels())
+
+            for idx in self.index_iterator():
+                result_buffer[index] = float_unary_op[
+                    op_code, Self.dtype, epsilon
+                ](self.buffer[idx])
+                index += 1
+
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+    @staticmethod
+    @always_inline
+    def inplace_ops[
+        op_code: Int,
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]):
+        _ = """# Broadcast validation
+        if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
+            panic(
+                "NDBuffer → inplace_ops: dimension mismatch: "
+                + String(self.shape)
+                + ", "
+                + String(other.shape)
+            )"""
+
+        # Handle broadcasting case
+        if self.shape != other.shape:
+            var broadcast_shape = ShapeBroadcaster.broadcast_shape(
+                self.shape, other.shape
+            )
+
+            # PyTorch's rule: broadcasted shape must match receiver shape
+            if broadcast_shape != self.shape:
+                panic(
+                    "NDBuffer → inplace_ops: broadcasted shape "
+                    + String(broadcast_shape)
+                    + " must match receiver shape "
+                    + String(self.shape)
+                )
+
+            var broadcast_result = CpuArithmeticOps[Self.dtype].broadcast[
+                op_code
+            ](self, other)
+            self.copy_from_alike[overwrite=True, validate=False](
+                broadcast_result^
+            )
+
+        else:
+            # Same shape case
+            if self.is_contiguous() and other.is_contiguous():
+                self_start = self.offset
+                self_end = self_start + self.numels()
+                other_start = other.offset
+                other_end = other_start + other.numels()
+                self.buffer.inplace_ops[op_code](
+                    other.buffer, self_start, self_end, other_start, other_end
+                )
+
+            elif self.is_contiguous() and not other.is_contiguous():
+                var index = self.offset
+                for idx in other.index_iterator():
+                    self.buffer[index] = scalar_op[op_code, Self.dtype](
+                        self.buffer[index], other.buffer[idx]
+                    )
+                    index += 1
+
+            elif not self.is_contiguous() and other.is_contiguous():
+                var index = other.offset
+                for idx in self.index_iterator():
+                    self.buffer[idx] = scalar_op[op_code, Self.dtype](
+                        self.buffer[idx], other.buffer[index]
+                    )
+                    index += 1
+            else:
+                var iterator = other.index_iterator()
+                for index in self.index_iterator():
+                    var next_index = -1
+                    try:
+                        next_index = iterator.__next__()
+                    except e:
+                        print(e)
+                        panic("Raised StopIteration in NDBuffer → inplace_ops")
+
+                    self.buffer[index] = scalar_op[op_code, Self.dtype](
+                        self.buffer[index], other.buffer[next_index]
+                    )
+
+    @staticmethod
+    @always_inline
+    def inplace_scalar_ops[
+        op_code: Int,
+    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]):
+        comptime if op_code == Divide:
+            if scalar == Scalar[Self.dtype](0):
+                panic("NDBuffer → inplace_scalar_ops: cannot divide by zero")
+
+        if self.is_contiguous():
+            start = self.offset
+            end = start + self.numels()
+            self.buffer.inplace_ops_scalar[op_code](scalar, start, end)
+
+        else:
+            for index in self.index_iterator():
+                self.buffer[index] = scalar_op[op_code, Self.dtype](
+                    self.buffer[index], scalar
+                )

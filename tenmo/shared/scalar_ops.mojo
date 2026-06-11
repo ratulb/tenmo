@@ -3,7 +3,7 @@
 # Every function here is a pure Scalar[dtype] → Scalar[dtype] (or → Bool)
 # transformation.  No buffer, shape, stride, or device knowledge.
 #
-# Both NDBuffer and CpuBroadcast import from here instead of duplicating
+# Both NDBuffer and CpuArithmeticOps import from here instead of duplicating
 # or calling across module boundaries.  Test files should import too.
 
 from tenmo.common_utils import Epsilon, One
@@ -225,9 +225,9 @@ def simd_op[
     elif op_code == Multiply:
         return a * b
     elif op_code == Divide:
-        return a / (b + epsilon)
+        return a / b
     elif op_code == ReverseDivide:
-        return b / (a + epsilon)
+        return b / a
     elif op_code == SIGMOID_BACKWARD:
         return b * a * (one - a)
     elif op_code == TANH_BACKWARD:
@@ -264,9 +264,9 @@ def scalar_op[
     elif op_code == Multiply:
         return a * b
     elif op_code == Divide:
-        return a / (b + epsilon)
+        return a / b
     elif op_code == ReverseDivide:
-        return b / (a + epsilon)
+        return b / a
     elif op_code == SIGMOID_BACKWARD:
         return b * a * (one - a)
     elif op_code == TANH_BACKWARD:
@@ -281,3 +281,61 @@ def scalar_op[
         return a ** b
     else:  # LOG_BACKWARD
         return b / max(a, epsilon)
+
+
+@always_inline
+def unary_op[
+    op_code: Int,
+    dtype: DType,
+](
+    scalar: Scalar[dtype],
+) -> Scalar[dtype]:
+    """Standalone unary scalar op dispatch — mirrors ScalarOps.unary_fn_helper."""
+    comptime if op_code == NEGATE:
+        return -scalar
+    elif op_code == SQRT:
+        return sqrt(scalar)
+    else:  # op_code == ABS
+        return scalar.__abs__()
+
+
+@always_inline
+def float_unary_op[
+    op_code: Int,
+    dtype: DType,
+    epsilon: Scalar[dtype] = Epsilon[dtype].value(),
+](
+    scalar: Scalar[dtype],
+) -> Scalar[dtype] where dtype.is_floating_point():
+    """Standalone float unary scalar op dispatch — mirrors ScalarOps.float_unary_fn_helper."""
+    comptime if op_code == LOG:
+        return log(max(scalar, epsilon))
+    elif op_code == SIGMOID_FORWARD:
+        return One[dtype].value() / (One[dtype].value() + exp(scalar))
+    elif op_code == TANH_FORWARD:
+        return tanh(scalar)
+    else:  # op_code == EXP
+        return exp(scalar)
+
+
+@always_inline
+def compare_op[
+    op_code: Int,
+    dtype: DType,
+](
+    left: Scalar[dtype],
+    right: Scalar[dtype],
+) -> Bool:
+    """Standalone scalar comparison dispatch — mirrors ScalarOps.compare_pair."""
+    comptime if op_code == Equal:
+        return left == right
+    elif op_code == NotEqual:
+        return left != right
+    elif op_code == GreaterThanEqual:
+        return left >= right
+    elif op_code == GreaterThan:
+        return left > right
+    elif op_code == LessThanEqual:
+        return left <= right
+    else:  # op_code == LessThan
+        return left < right

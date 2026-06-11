@@ -72,6 +72,82 @@ def inplace_scalar_ops[
 
 
 # =============================================================================
+# POW KERNELS for inplace — dedicated f32/f64 kernels using pow() intrinsic.
+#
+# The generic inplace_scalar_ops kernel uses simd_op[op_code] which relies on
+# the `**` operator. GPU backends do not reliably support `**` for all dtypes
+# (especially integers), so POW uses separate typed kernels with the GPU math
+# library's pow() intrinsic — matching the out-of-place ScalarOperations.launch_pow.
+#
+# Strided variants handle non-contiguous GPU views (transposed, sliced).
+# =============================================================================
+
+
+def inplace_pow_op_f32[
+    simd_width: Int = simd_width_of[DType.float32](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    A: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    exponent: Scalar[DType.float32],
+    size: Int,
+):
+    """Inplace float32 pow — A[i] = pow(A[i], exponent). Contiguous only."""
+    var tid = thread_idx.x
+    var gtid = tid + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    while base_idx < size:
+        comptime for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+
+            if i + simd_width <= size:
+                var vec_a = A.load[width=simd_width](i)
+                var vec_exp = SIMD[DType.float32, simd_width](exponent)
+                A.store[width=simd_width](i, pow(vec_a, vec_exp))
+
+            elif i < size:
+                for j in range(size - i):
+                    A[i + j] = pow(A[i + j], exponent)
+
+        base_idx += stride * CHUNK_SIZE
+
+
+def inplace_pow_op_f64[
+    simd_width: Int = simd_width_of[DType.float64](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    A: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
+    exponent: Scalar[DType.float64],
+    size: Int,
+):
+    """Inplace float64 pow — A[i] = pow(A[i], exponent). Contiguous only."""
+    var tid = thread_idx.x
+    var gtid = tid + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    while base_idx < size:
+        comptime for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+
+            if i + simd_width <= size:
+                var vec_a = A.load[width=simd_width](i)
+                var vec_exp = SIMD[DType.float64, simd_width](exponent)
+                A.store[width=simd_width](i, pow(vec_a, vec_exp))
+
+            elif i < size:
+                for j in range(size - i):
+                    A[i + j] = pow(A[i + j], exponent)
+
+        base_idx += stride * CHUNK_SIZE
+
+
+# =============================================================================
 # KERNEL for non-contiguous A (strided view).
 #
 # Used when inplace_scalar_ops is called on a GPU view that is NOT contiguous
@@ -206,6 +282,178 @@ def inplace_scalar_ops_strided[
         base_idx += grid_stride * CHUNK_SIZE
 
 
+# =============================================================================
+# POW KERNELS for non-contiguous inplace (strided views).
+#
+# Mirrors inplace_scalar_ops_strided but uses pow() intrinsic instead of
+# simd_op/scalar_op. Three paths per SIMD vector:
+#   1. Fast path: vector within one row, inner stride == 1  → SIMD load/store
+#   2. Fast path: vector within one row, inner stride != 1  → per-lane strided
+#   3. Slow path: crosses row boundary                      → full decomposition
+# Plus tail handling for leftover elements.
+# =============================================================================
+
+
+def inplace_pow_op_f32_strided[
+    simd_width: Int = simd_width_of[DType.float32](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    A: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    exponent: Scalar[DType.float32],
+    shape: Array,
+    strides: Array,
+    numels: Int,
+    rank: Int,
+):
+    var gtid = thread_idx.x + block_dim.x * block_idx.x
+    var grid_stride = block_dim.x * grid_dim.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var inner_dim = shape[rank - 1]
+    var base_idx = gtid * CHUNK_SIZE
+
+    while base_idx < numels:
+        comptime for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+
+            if i >= numels:
+                break
+
+            if i + simd_width <= numels:
+                var inner_offset = i % inner_dim
+                var outer_remaining = i // inner_dim
+                var a_base = 0
+                var a_inner_stride = strides[rank - 1]
+
+                for dim in range(rank - 2, -1, -1):
+                    var coord = outer_remaining % shape[dim]
+                    a_base += coord * strides[dim]
+                    outer_remaining //= shape[dim]
+
+                if inner_offset + simd_width <= inner_dim:
+                    if a_inner_stride == 1:
+                        var vec_a = A.load[width=simd_width](
+                            a_base + inner_offset
+                        )
+                        var vec_exp = SIMD[DType.float32, simd_width](exponent)
+                        A.store[width=simd_width](
+                            a_base + inner_offset, pow(vec_a, vec_exp)
+                        )
+                    else:
+                        comptime for lane in range(simd_width):
+                            var a_idx = (
+                                a_base
+                                + (inner_offset + lane) * a_inner_stride
+                            )
+                            A[a_idx] = pow(A[a_idx], exponent)
+                else:
+                    comptime for lane in range(simd_width):
+                        var linear_idx = i + lane
+                        var rem = linear_idx
+                        var a_idx = 0
+
+                        for dim in range(rank - 1, -1, -1):
+                            var coord = rem % shape[dim]
+                            a_idx += coord * strides[dim]
+                            rem //= shape[dim]
+
+                        A[a_idx] = pow(A[a_idx], exponent)
+            else:
+                for j in range(numels - i):
+                    var linear_idx = i + j
+                    var rem = linear_idx
+                    var a_idx = 0
+
+                    for dim in range(rank - 1, -1, -1):
+                        var coord = rem % shape[dim]
+                        a_idx += coord * strides[dim]
+                        rem //= shape[dim]
+
+                    A[a_idx] = pow(A[a_idx], exponent)
+
+        base_idx += grid_stride * CHUNK_SIZE
+
+
+def inplace_pow_op_f64_strided[
+    simd_width: Int = simd_width_of[DType.float64](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    A: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
+    exponent: Scalar[DType.float64],
+    shape: Array,
+    strides: Array,
+    numels: Int,
+    rank: Int,
+):
+    var gtid = thread_idx.x + block_dim.x * block_idx.x
+    var grid_stride = block_dim.x * grid_dim.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var inner_dim = shape[rank - 1]
+    var base_idx = gtid * CHUNK_SIZE
+
+    while base_idx < numels:
+        comptime for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+
+            if i >= numels:
+                break
+
+            if i + simd_width <= numels:
+                var inner_offset = i % inner_dim
+                var outer_remaining = i // inner_dim
+                var a_base = 0
+                var a_inner_stride = strides[rank - 1]
+
+                for dim in range(rank - 2, -1, -1):
+                    var coord = outer_remaining % shape[dim]
+                    a_base += coord * strides[dim]
+                    outer_remaining //= shape[dim]
+
+                if inner_offset + simd_width <= inner_dim:
+                    if a_inner_stride == 1:
+                        var vec_a = A.load[width=simd_width](
+                            a_base + inner_offset
+                        )
+                        var vec_exp = SIMD[DType.float64, simd_width](exponent)
+                        A.store[width=simd_width](
+                            a_base + inner_offset, pow(vec_a, vec_exp)
+                        )
+                    else:
+                        comptime for lane in range(simd_width):
+                            var a_idx = (
+                                a_base
+                                + (inner_offset + lane) * a_inner_stride
+                            )
+                            A[a_idx] = pow(A[a_idx], exponent)
+                else:
+                    comptime for lane in range(simd_width):
+                        var linear_idx = i + lane
+                        var rem = linear_idx
+                        var a_idx = 0
+
+                        for dim in range(rank - 1, -1, -1):
+                            var coord = rem % shape[dim]
+                            a_idx += coord * strides[dim]
+                            rem //= shape[dim]
+
+                        A[a_idx] = pow(A[a_idx], exponent)
+            else:
+                for j in range(numels - i):
+                    var linear_idx = i + j
+                    var rem = linear_idx
+                    var a_idx = 0
+
+                    for dim in range(rank - 1, -1, -1):
+                        var coord = rem % shape[dim]
+                        a_idx += coord * strides[dim]
+                        rem //= shape[dim]
+
+                    A[a_idx] = pow(A[a_idx], exponent)
+
+        base_idx += grid_stride * CHUNK_SIZE
+
+
 struct InplaceScalarOperations[dtype: DType = DType.float32](
     ImplicitlyCopyable & Movable
 ):
@@ -280,6 +528,121 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
                 rank,
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
+            )
+
+        if sync: device_context.synchronize()
+
+    @staticmethod
+    def launch_inplace_pow(
+        A: NDBuffer[Self.dtype],
+        exponent: Scalar[Self.dtype],
+        sync: Bool = False,
+    ) raises:
+        """
+        Dedicated inplace POW launcher — dispatches to typed f32/f64 kernels.
+        Handles both contiguous and strided GPU views.
+        POW only supported for float32 and float64.
+        """
+        var numels = A.numels()
+        comptime simdwidth = simd_width_of[Self.dtype]()
+
+        var (num_blocks, threads_per_block) = Self.launch_config(
+            numels, simdwidth
+        )
+        ref A_device_state = A.device_state.value()
+        ref gpu = A_device_state.get_gpu()
+        var device_context = gpu[]
+        ref A_buffer = A_device_state.device_buffer()
+
+        comptime if Self.dtype == DType.float32:
+            if A.is_contiguous():
+                var compiled = device_context.compile_function[
+                    inplace_pow_op_f32[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread=2 * simdwidth,
+                    ],
+                    inplace_pow_op_f32[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread=2 * simdwidth,
+                    ],
+                ]()
+                device_context.enqueue_function(
+                    compiled,
+                    A_buffer,
+                    exponent.cast[DType.float32](),
+                    numels,
+                    grid_dim=num_blocks,
+                    block_dim=threads_per_block,
+                )
+            else:
+                var rank = A.shape.rank()
+                var compiled = device_context.compile_function[
+                    inplace_pow_op_f32_strided[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread=2 * simdwidth,
+                    ],
+                    inplace_pow_op_f32_strided[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread=2 * simdwidth,
+                    ],
+                ]()
+                device_context.enqueue_function(
+                    compiled,
+                    A_buffer,
+                    exponent.cast[DType.float32](),
+                    A.shape.array(),
+                    A.strides.array(),
+                    numels,
+                    rank,
+                    grid_dim=num_blocks,
+                    block_dim=threads_per_block,
+                )
+        elif Self.dtype == DType.float64:
+            if A.is_contiguous():
+                var compiled = device_context.compile_function[
+                    inplace_pow_op_f64[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread=2 * simdwidth,
+                    ],
+                    inplace_pow_op_f64[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread=2 * simdwidth,
+                    ],
+                ]()
+                device_context.enqueue_function(
+                    compiled,
+                    A_buffer,
+                    exponent.cast[DType.float64](),
+                    numels,
+                    grid_dim=num_blocks,
+                    block_dim=threads_per_block,
+                )
+            else:
+                var rank = A.shape.rank()
+                var compiled = device_context.compile_function[
+                    inplace_pow_op_f64_strided[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread=2 * simdwidth,
+                    ],
+                    inplace_pow_op_f64_strided[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread=2 * simdwidth,
+                    ],
+                ]()
+                device_context.enqueue_function(
+                    compiled,
+                    A_buffer,
+                    exponent.cast[DType.float64](),
+                    A.shape.array(),
+                    A.strides.array(),
+                    numels,
+                    rank,
+                    grid_dim=num_blocks,
+                    block_dim=threads_per_block,
+                )
+        else:
+            panic(
+                "InplaceScalarOperations: POW only supported for float32 and float64"
             )
 
         if sync: device_context.synchronize()

@@ -31,7 +31,7 @@ from .mnemonics import (
     GreaterThan,
     GreaterThanEqual,
 )
-from .shared.scalar_ops import ScalarOps
+from .shared.scalar_ops import ScalarOps, simd_op, scalar_op
 
 
 struct Buffer[dtype: DType = DType.float32](
@@ -526,32 +526,14 @@ struct Buffer[dtype: DType = DType.float32](
         # Process full SIMD chunks
         while remaining >= simd_width:
             var block = self.load[simdwidth=simd_width](idx)
-            var op_result: SIMD[Self.dtype, simd_width]
-
-            comptime if op_code == Multiply:
-                op_result = block * scalar
-            elif op_code == Add:
-                op_result = block + scalar
-            elif op_code == Subtract:
-                op_result = block - scalar
-            else:  # Divide
-                op_result = block / scalar
-
+            var op_result = simd_op[op_code, Self.dtype, simd_width](block, scalar)
             self.store[simdwidth=simd_width](idx, op_result)
-
             idx += simd_width
             remaining -= simd_width
 
         # Process remaining elements (scalar tail)
         for i in range(idx, actual_end):
-            comptime if op_code == Multiply:
-                self[i] = self[i] * scalar
-            elif op_code == Add:
-                self[i] = self[i] + scalar
-            elif op_code == Subtract:
-                self[i] = self[i] - scalar
-            else:  # Divide
-                self[i] = self[i] / scalar
+            self[i] = scalar_op[op_code, Self.dtype](self[i], scalar)
 
     @always_inline
     def inplace_ops[
@@ -604,52 +586,26 @@ struct Buffer[dtype: DType = DType.float32](
             # Calculate loop bounds
             var vectorized_end = (self_extent // simd_width) * simd_width
 
-            # Vectorized loop (manual unrolling)
+            # Vectorized loop — SIMD via simd_op; Overwrite handled separately
             for idx in range(0, vectorized_end, simd_width):
+                var a = self.load[simdwidth=simd_width](self_start + idx)
+                var b = other.load[simdwidth=simd_width](other_start + idx)
                 var op_result: SIMD[Self.dtype, simd_width]
-
-                comptime if op_code == Multiply:
-                    op_result = self.load[simdwidth=simd_width](
-                        self_start + idx
-                    ) * other.load[simdwidth=simd_width](other_start + idx)
-
-                elif op_code == Add:
-                    op_result = self.load[simdwidth=simd_width](
-                        self_start + idx
-                    ) + other.load[simdwidth=simd_width](other_start + idx)
-
-                elif op_code == Subtract:
-                    op_result = self.load[simdwidth=simd_width](
-                        self_start + idx
-                    ) - other.load[simdwidth=simd_width](other_start + idx)
-
-                elif op_code == Divide:
-                    op_result = self.load[simdwidth=simd_width](
-                        self_start + idx
-                    ) / other.load[simdwidth=simd_width](other_start + idx)
-
-                else:  # Overwrite
-                    op_result = other.load[simdwidth=simd_width](
-                        other_start + idx
-                    )
-
+                comptime if op_code == Overwrite:
+                    op_result = b
+                else:
+                    op_result = simd_op[op_code, Self.dtype, simd_width](a, b)
                 self.store[simdwidth=simd_width](self_start + idx, op_result)
 
             # Scalar tail loop for remaining elements
             for idx in range(vectorized_end, self_extent):
+                var a = self[self_start + idx]
+                var b = other[other_start + idx]
                 var result: Scalar[Self.dtype]
-
-                comptime if op_code == Multiply:
-                    result = self[self_start + idx] * other[other_start + idx]
-                elif op_code == Add:
-                    result = self[self_start + idx] + other[other_start + idx]
-                elif op_code == Subtract:
-                    result = self[self_start + idx] - other[other_start + idx]
-                elif op_code == Divide:
-                    result = self[self_start + idx] / other[other_start + idx]
-                else:  # Overwrite
-                    result = other[other_start + idx]
-
+                comptime if op_code == Overwrite:
+                    result = b
+                else:
+                    result = scalar_op[op_code, Self.dtype](a, b)
                 self[self_start + idx] = result
 
     @always_inline
@@ -709,42 +665,9 @@ struct Buffer[dtype: DType = DType.float32](
             var other_block = other.load[simdwidth=simd_width](
                 other_start + idx
             )
-            var op_result: SIMD[Self.dtype, simd_width]
-
-            comptime if op_code == Multiply:
-                op_result = self_block * other_block
-            elif op_code == Add:
-                op_result = self_block + other_block
-            elif op_code == Subtract:
-                op_result = self_block - other_block
-            elif op_code == Divide:
-                op_result = self_block / other_block
-            elif op_code == LOG_BACKWARD:
-                op_result = other_block / max(self_block, epsilon)
-            elif op_code == SIGMOID_BACKWARD:
-                # Fused sigmoid backward pass.
-                # self = sigmoid output (already computed in forward).
-                # other = upstream gradient buffer.
-                # Returns: grad * self * (1 - self) in a single pass.
-                op_result = (
-                    other_block
-                    * self_block
-                    * (One[Self.dtype].value() - self_block)
-                )
-            elif op_code == SQRT_BACKWARD:
-                op_result = other_block * (
-                    One[Self.dtype].value()
-                    / (epsilon + Scalar[Self.dtype](2) * sqrt(self_block))
-                )
-            else:  # Tanh backward
-                # fused tanh backward pass.
-                # self = tanh output (already computed in forward).
-                # other = upstream gradient buffer.
-                # returns: grad * (1 - t²) in a single pass.
-                op_result = other_block * (
-                    One[Self.dtype].value() - self_block * self_block
-                )
-
+            var op_result = simd_op[op_code, Self.dtype, simd_width](
+                self_block, other_block, epsilon
+            )
             out.store[simdwidth=simd_width](idx, op_result)
 
             idx += simd_width
@@ -752,38 +675,9 @@ struct Buffer[dtype: DType = DType.float32](
 
         # Process remaining elements (scalar tail)
         for i in range(idx, self_extent):
-            comptime if op_code == Multiply:
-                out[i] = self[self_start + i] * other[other_start + i]
-            elif op_code == Add:
-                out[i] = self[self_start + i] + other[other_start + i]
-            elif op_code == Subtract:
-                out[i] = self[self_start + i] - other[other_start + i]
-            elif op_code == Divide:
-                out[i] = self[self_start + i] / other[other_start + i]
-            elif op_code == LOG_BACKWARD:
-                out[i] = other[other_start + i] / max(
-                    self[self_start + i], epsilon
-                )
-            elif op_code == SIGMOID_BACKWARD:
-                out[i] = (
-                    other[other_start + i]
-                    * self[self_start + i]
-                    * (One[Self.dtype].value() - self[self_start + i])
-                )
-            elif op_code == SQRT_BACKWARD:
-                out[i] = other[other_start + i] * (
-                    One[Self.dtype].value()
-                    / (
-                        epsilon
-                        + Scalar[Self.dtype](2) * sqrt(self[self_start + i])
-                    )
-                )
-
-            else:  # Tanh backward
-                out[i] = other[other_start + i] * (
-                    One[Self.dtype].value()
-                    - self[self_start + i] * self[self_start + i]
-                )
+            out[i] = scalar_op[op_code, Self.dtype](
+                self[self_start + i], other[other_start + i], epsilon
+            )
 
         return out^
 
@@ -827,26 +721,9 @@ struct Buffer[dtype: DType = DType.float32](
         # Process full SIMD chunks
         while remaining >= simd_width:
             var block = self.load[simdwidth=simd_width](start_index + idx)
-            var op_result: SIMD[Self.dtype, simd_width]
-
-            comptime if op_code == Multiply:
-                op_result = block * scalar
-            elif op_code == Add:
-                op_result = block + scalar
-            elif op_code == Subtract:
-                op_result = block - scalar
-            elif op_code == ReverseSubtract:
-                op_result = scalar - block
-            elif op_code == Divide:
-                op_result = block / scalar
-            elif op_code == MAX:
-                op_result = max(block, scalar)
-            elif op_code == MIN:
-                op_result = min(block, scalar)
-
-            else:  # ReverseDivide
-                op_result = block.__rtruediv__(scalar)
-
+            var op_result = simd_op[op_code, Self.dtype, simd_width](
+                block, scalar
+            )
             out.store[simdwidth=simd_width](idx, op_result)
 
             idx += simd_width
@@ -854,23 +731,9 @@ struct Buffer[dtype: DType = DType.float32](
 
         # Process remaining elements (scalar tail)
         for i in range(idx, extent):
-            comptime if op_code == Multiply:
-                out[i] = self[start_index + i] * scalar
-            elif op_code == Add:
-                out[i] = self[start_index + i] + scalar
-            elif op_code == Subtract:
-                out[i] = self[start_index + i] - scalar
-            elif op_code == ReverseSubtract:
-                out[i] = scalar - self[start_index + i]
-            elif op_code == Divide:
-                out[i] = self[start_index + i] / scalar
-            elif op_code == MAX:
-                out[i] = max(self[start_index + i], scalar)
-            elif op_code == MIN:
-                out[i] = min(self[start_index + i], scalar)
-
-            else:  # ReverseDivide
-                out[i] = self[start_index + i].__rtruediv__(scalar)
+            out[i] = scalar_op[op_code, Self.dtype](
+                self[start_index + i], scalar
+            )
 
         return out^
 

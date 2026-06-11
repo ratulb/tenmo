@@ -744,35 +744,50 @@ See [`GPU_SYNCHRONIZATION.md`](GPU_SYNCHRONIZATION.md) for a complete map of
 all GPU sync call sites, the kernel launch pipeline, compound operations, CPU-
 GPU transfer sync, correctness model, and a phased optimization plan.
 
-## Broadcast Optimization (`broadcast_nd_buffer`)
+## CpuArithmeticOps — CPU Arithmetic Dispatch
 
-`broadcast_nd_buffer` at `tenmo/ndbuffer.mojo:2712` handles ND-broadcast arithmetic (both operands non-scalar, different shapes). Three-tier dispatch:
+All CPU per-element arithmetic is centralized in `CpuArithmeticOps[dtype]` at `tenmo/cpu_arithmetics.mojo:40`. It supersedes the old `CpuBroadcast` struct and handles three categories:
 
-1. **Both unit-stride in last dim** (`self_eff[-1]==1 AND other_eff[-1]==1`) — SIMD-SIMD tile inner dimension. Reads `simd_width` consecutive elements from both buffers, vector op, vector store. Outer dims iterate via odometer.
-2. **One broadcasts, one unit-stride** (`self_eff[-1]==1 AND other_eff[-1]==0`, or vice versa) — splat scalar from broadcasting side, SIMD-load from contiguous side, vector op, vector store.
+| Method | Line | Description |
+|---|---|---|
+| `compute[op_code](a, b, epsilon?)` | 408 | Element-wise binary op, same-shape or scalar-broadcast |
+| `broadcast[op_code](a, b, epsilon?)` | 52 | Entry point: dispatches to `broadcast_scalar` or `broadcast_nd` |
+| `broadcast_scalar[op_code](a, b, epsilon?)` | 92 | SIMD-splat for scalar-size operands |
+| `broadcast_nd[op_code](a, b, epsilon?)` | 170 | ND broadcast with three-tier dispatch |
+| `unary_ops[op_code](a)` | 507 | Element-wise unary ops |
+| `unary_ops_constrained[op_code](a, low, high)` | 531 | Clamp/clip unary ops |
+
+`epsilon` (for divide stability) is threaded through all broadcast/compute paths — see `tenmo/ndbuffer.mojo` callers for usage.
+
+### `broadcast_nd` — Three-Tier Dispatch
+
+`CpuArithmeticOps.broadcast_nd` (`cpu_arithmetics.mojo:170`) handles ND-broadcast arithmetic (both operands non-scalar, different shapes):
+
+1. **Both unit-stride in last dim** (`a_eff[-1]==1 AND b_eff[-1]==1`) — SIMD-SIMD tile inner dimension. Reads `simd_width` consecutive elements from both buffers, vector op, vector store. Outer dims iterate via odometer.
+2. **One broadcasts, one unit-stride** (`a_eff[-1]==1 AND b_eff[-1]==0`, or vice versa) — splat scalar from broadcasting side, SIMD-load from contiguous side, vector op, vector store.
 3. **Scalar odometer** — per-element loop with incremental offset updates via effective strides. No `translate_index`/`flatten_index` overhead.
 
-### Correctness guarantees (generically proven by effective strides)
+#### Correctness guarantees (generically proven by effective strides)
 
 For any valid broadcast pair `(shape_a, shape_b)` producing `result_shape`:
 - Each output coordinate maps to `base_a + Σ coord[d] × eff_stride_a[d]` in operand A, where `eff_stride[d] = 0` if dim `d` is broadcast, else original stride.
 - All three tiers evaluate the same mapping — only iteration strategy differs.
 - Result is allocated contiguous; output offset is always the flat linear index.
 
-### Performance boundaries (where Path 3 applies)
+#### Performance boundaries (where Path 3 applies)
 
 | Condition | Cause |
 |---|---|
-| `self_eff[-1] != 1 AND other_eff[-1] != 1` | Neither operand has unit stride in last dim (e.g. transposed views, both broadcast in last dim) |
+| `a_eff[-1] != 1 AND b_eff[-1] != 1` | Neither operand has unit stride in last dim (e.g. transposed views, both broadcast in last dim) |
 | `dtype == DType.bool` | `simd_width` forced to 1 |
 | `last_dim < simd_width` | Remainder loop — implicit, correct |
 | Uncommon op codes (SIGMOID_BACKWARD, POW, etc.) | Fall through to scalar-per-tile in inner SIMD loop |
 
 None of these affect correctness — only throughput. See `tests/bench_broadcast.mojo` for benchmark patterns.
 
-### `broadcast_scalar_buffer` (scalar-size operand)
+### In‑place Operations
 
-Handled separately at `ndbuffer.mojo:2556` — SIMD via `buffer.arithmetic_ops_scalar`. Not affected by `broadcast_nd_buffer` changes.
+In‑place CPU ops (`+=`, `*=` etc.) live on **`CpuArithmeticOps`** as `inplace_ops` / `inplace_scalar_ops` at `cpu_arithmetics.mojo:557/633`. The `@staticmethod` parameter `self: NDBuffer[Self.dtype]` is a value copy, but `Buffer` owns its data through a refcounted pointer — writing to `self.buffer[index]` mutates the shared memory. `NDBuffer.inplace_ops` in `ndbuffer.mojo:1704` dispatches GPU paths and falls back to `CpuArithmeticOps.inplace_ops` for CPU. The broadcast sub-path within inplace reuses `CpuArithmeticOps.broadcast` (returns a new buffer), then writes the result via `copy_from_alike`.
 
 ## ⛔ CRITICAL: NEVER launch multiple tests in parallel — Mojo compilation is memory-bound and will crash the machine. Run ONE `./execute.sh` or `./fire.sh` at a time, wait for it to complete, then run the next.
 

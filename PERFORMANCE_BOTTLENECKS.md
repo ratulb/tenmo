@@ -272,8 +272,7 @@ directly, avoiding the extra reshape node in the autograd graph.
 
 ### 14. Broadcast arithmetic always scalar — no SIMD
 
-**Files:** `tenmo/ndbuffer.mojo:2680-2730` (`broadcast_nd_buffer`,
-`broadcast_scalar_buffer`)
+**Files:** `tenmo/cpu_arithmetics.mojo:52-405` (`CpuArithmeticOps.broadcast*`)
 
 **Problem:** Even `tensor + scalar` with contiguous input uses a coord-iterator
 with per-element `flatten_index`. No delegation to `Buffer.arithmetic_ops_scalar`.
@@ -585,9 +584,9 @@ Ranked by estimated performance impact. Covers all CPU-only code paths found dur
 | **—** Port outer-base decomposition to out-of-place `both_strided` | H4 | ✅ **DONE** (same session as CPU-4 cancellation) |
 | **—** Fix scalar-splat bug in out-of-place `B_contiguous` | H4 | ✅ **DONE** (same session) |
 | **—** Add bias_add kernel to in-place `A_contiguous` launcher | H4 | ✅ **DONE** (same session) |
-| **CPU-5** Factor scalar ops — single source of truth for op dispatch (5a ✅ 5b🟡 5c🟡 5d✅) | H5 | 🔶 5a ✅ / 5b 🟡 / 5c 🟡 / 5d ✅ |
-| **CPU-6** Phase 3 — Template contiguous-check pattern in ndbuffer (18 methods) | H6 | 🟡 Pending |
-| **CPU-7** Phase 1 — Replace buffer comptime op dispatch with simd_op/scalar_op (12→0 copies) | H7 | 🟡 Pending |
+| **CPU-5** Factor scalar ops — single source of truth for op dispatch (5a ✅ 5b✅ 5c✅ 5d✅) | H5 | ✅ 5a ✅ / 5b ✅ / 5c ✅ / 5d ✅ |
+| **CPU-6** Phase 3 — Standalone free functions for remaining ScalarOps dispatch chains | H6 | ✅ **DONE** |
+| **CPU-7** Phase 1 — Replace buffer comptime op dispatch with simd_op/scalar_op (12→0 copies) | H7 | ✅ **DONE** |
 | **CPU-8** Eliminate Buffer copy in broadcast scalar path | H8 | ✅ **FIXED** |
 | **CPU-9** Parallelize CPU reduction suffix-axis fast path | H9 | ✅ **DONE** |
 | **CPU-10** Factor matmul inner j-loop | M10 | ❌ Pending |
@@ -713,7 +712,7 @@ Ranked by estimated performance impact. Covers all CPU-only code paths found dur
 - `tenmo/ndbuffer.mojo` — CPU and GPU dispatch (*_cpu methods, GPU dispatch at L1828-1842)
 - `tenmo/buffers.mojo` — CPU `arithmetic_ops`, `arithmetic_ops_scalar`, `inplace_ops`, `inplace_ops_scalar`
 
-**Overall goal:** Eliminate all duplicated comptime `op_code` dispatch chains by routing through `simd_op`/`scalar_op` from `tenmo/shared/scalar_ops.mojo`. Three phases — GPU kernel factoring (CPU-5a ✅), CPU buffer factoring (CPU-7), CPU NDBuffer strided fallback factoring (Phase 2 of CPU-5c).
+**Overall goal:** Eliminate all duplicated comptime `op_code` dispatch chains by routing through `simd_op`/`scalar_op` from `tenmo/shared/scalar_ops.mojo`. Completed — GPU kernel factoring (CPU-5a ✅), CPU buffer factoring (CPU-7 ✅), CPU NDBuffer strided fallback factoring (CPU-5c Phase 2 ✅). Every per-element operation now dispatches through a single shared function.
 
 #### CPU-5a — GPU non-contiguous strided kernel ✅ DONE
 
@@ -725,32 +724,53 @@ Ranked by estimated performance impact. Covers all CPU-only code paths found dur
 - **GPU inline dispatch replaced:** Both `scalar_ops` and `inplace_scalar_ops` comptime chains replaced with `simd_op`/`scalar_op` calls.
 - **Tests:** `tests/test_scalar_gpu.mojo` generated (222 GPU tests covering all ops, dims 1-4, contiguous/transposed/permuted/sliced layouts, f32/f64, edge cases). Registered as `scalar_gpu` in `execute.sh` + `GPU_TESTS` array.
 
-#### CPU-5b — Missing opcodes in inplace kernel (GPU)
+#### CPU-5b — Missing opcodes in inplace kernel (GPU) ✅ DONE
 
-**Status:** 🟡 Pending — not blocking other work.
+**Status:** 🔶 In progress — implementation underway.
 
-**Inplace kernel supports:** Add, Subtract, Multiply, Divide (4 opcodes).
-**Out-of-place supports:** Add, Subtract, ReverseSubtract, Multiply, Divide, MAX, MIN, POW (8 opcodes — POW via separate f32/f64 kernels).
+**Background:** We started by surveying which opcodes were missing from the GPU inplace kernel and expecting to simply "wire them up" through the generic `simd_op`/`scalar_op` dispatch. However, POW required dedicated typed kernels (float32/float64) using the GPU `pow()` intrinsic — the generic kernel's `a ** b` approach is not reliably supported for all dtypes on GPU backends. This led us to add 4 new kernels (contiguous + strided, f32 + f64) and a `launch_inplace_pow` method, mirroring the out-of-place `ScalarOperations.launch_pow` pattern.
 
-**Missing from inplace:** ReverseSubtract, ReverseDivide, MAX, MIN, POW.
+**Why POW is special:** The out-of-place `ScalarOperations.launch_pow` (`tenmo/kernels/scalar_ops_kernel.mojo:366`) forces contiguous via `contiguous_device_state()` and writes to a fresh result buffer — safe for out-of-place since the result is a new allocation. But for inplace, we must write back to the original memory (which may be strided). Forcing contiguous, computing pow, then scattering back is wasteful — so we need both contiguous and strided pow kernels.
 
-**Current behavior with missing opcodes:** If `inplace_scalar_ops[ReverseSubtract]` is called on GPU, the `else` branch executes `vec_result = scalar / vec_a` — which is `ReverseDivide`, not `ReverseSubtract`. Silent correctness bug.
+**Before / After:**
 
-**Fix:** Add proper comptime branches via `simd_op`/`scalar_op` (already handle all these opcodes). The inplace kernel now calls `simd_op`/`scalar_op` for all opcodes, so adding support is just a matter of wiring — no dispatch chain duplication needed.
+| Opcode | Before | After | Why no kernel change? |
+|---|---|---|---|
+| ReverseSubtract | Wrong (`scalar / vec_a` = ReverseDivide) | ✅ Correct via `simd_op`/`scalar_op` | Generic kernel passes `op_code` through |
+| ReverseDivide | Wrong (`scalar / vec_a` again) | ✅ Correct via `simd_op`/`scalar_op` | Same — generic dispatch |
+| MAX | Wrong (falls to Divide path) | ✅ Correct via `simd_op`/`scalar_op` | Same |
+| MIN | Wrong (falls to Divide path) | ✅ Correct via `simd_op`/`scalar_op` | Same |
+| POW | Wrong (falls to Divide path) | ✅ New typed kernels (f32/f64) | `pow()` intrinsic needed for GPU |
 
-#### CPU-5c — Phase 2: Replace strided fallback dispatch in ndbuffer.mojo *cpu methods
+**Execution plan (added incrementally to `tenmo/kernels/scalar_inplace_ops_kernel.mojo`):**
 
-**Status:** 🟡 Pending (follows CPU-7).
+1. `inplace_pow_op_f32` — contiguous float32, stores back to `A`
+2. `inplace_pow_op_f64` — contiguous float64
+3. `inplace_pow_op_f32_strided` — strided float32, outer-base decomposition
+4. `inplace_pow_op_f64_strided` — strided float64
+5. `InplaceScalarOperations.launch_inplace_pow` — dtype guard + contiguity dispatch
 
-**Problem:** The 4 main `*_cpu` methods in `ndbuffer.mojo` delegate to `Buffer.arithmetic_ops*` for the contiguous path (which use `simd_op`/`scalar_op`), but **the strided fallback has its own per-element dispatch** in the index_iterator loop. Those fallbacks use `ScalarOps.scalar_fn` which duplicates the same comptime dispatch.
+**Then in `tenmo/ndbuffer.mojo`:**
+6. `inplace_scalar_ops` — add `comptime if op_code == POW:` branch
 
-**Fix:** Replace the `ScalarOps.scalar_fn` call in each strided fallback with `scalar_op[op_code, Self.dtype](...)`. Affected methods:
-- `arithmetic_ops_cpu` (contiguous path → `buffer.arithmetic_ops`, strided path uses `ScalarOps.scalar_fn`)
-- `scalar_ops_cpu` (contiguous path → `buffer.arithmetic_ops_scalar`, strided path uses `ScalarOps.scalar_fn`)
-- `inplace_ops_cpu` (contiguous path → `buffer.inplace_ops`, strided path uses `ScalarOps.scalar_fn`)
-- `inplace_scalar_ops_cpu` (contiguous path → `buffer.inplace_ops_scalar`, strided path uses `ScalarOps.scalar_fn`)
+**Files affected:**
+- `tenmo/kernels/scalar_inplace_ops_kernel.mojo` — +4 kernels, +1 launcher
+- `tenmo/ndbuffer.mojo` — +1 comptime branch in `inplace_scalar_ops`
 
-**Why:** After CPU-7, `Buffer` methods already call `simd_op`/`scalar_op`, so the contiguous path is correct. The strided fallback still has a separate dispatch chain via `ScalarOps.scalar_fn` — replacing it with `scalar_op` makes every dispatch through one function.
+#### CPU-5c — Phase 2: Replace strided fallback dispatch in ndbuffer.mojo *cpu methods ✅ DONE
+
+**What was done:** All 8 uses of `ScalarOps[Self.dtype].scalar_fn[op_code](...)` in the strided fallback paths of 4 `*_cpu` methods were replaced with `scalar_op[op_code, Self.dtype](...)`.
+
+| Method | Lines | Uses replaced |
+|---|---|---|
+| `inplace_ops_cpu` | 1790–1814 | 3 (self-contig, other-contig, both-strided) |
+| `inplace_scalar_ops_cpu` | 1864–1866 | 1 (self strided) |
+| `arithmetic_ops_cpu` | 2034–2061 | 3 (self-contig, other-contig, both-strided) |
+| `scalar_ops_cpu` | 2181–2183 | 1 (self strided) |
+
+Both `ScalarOps.scalar_fn` and `scalar_op` implement the same comptime op dispatch. The change routes every CPU path through the shared `scalar_op` function, making the dispatch chain truly single-sourced.
+
+**Bonus:** `Epsilon` fix for integer types (INT_MIN → 0) was applied during Phase 1 — uncovered by int64 divide tests in `test_buffers.mojo`.
 
 #### CPU-5d — Test coverage (scalar GPU tests)
 
@@ -762,112 +782,43 @@ Ranked by estimated performance impact. Covers all CPU-only code paths found dur
 
 ---
 
-### CPU-6 [H6] Phase 3 — Template contiguous-check pattern in `ndbuffer.mojo` — 18× duplication
+### CPU-6 [H6] Standalone free functions for ScalarOps dispatch chains ✅ DONE
 
-**File:** `tenmo/ndbuffer.mojo`
+**What was done:** Added `unary_op`, `float_unary_op`, and `compare_op` standalone free functions to `tenmo/shared/scalar_ops.mojo` — mirroring the existing `scalar_op`/`simd_op` pattern. Then replaced the remaining 4 `ScalarOps` struct method calls in `ndbuffer.mojo`'s strided fallback paths:
 
-**Current:** The pattern `if is_contiguous(): SIMD (buffer method) else: index_iterator (per-element loop)` appears **18 times** across `ndbuffer.mojo` (not just the original 6 — survey expanded). Each has 20-40 lines of boilerplate with only the op-specific code differing in the middle.
-
-**All 18 methods with the pattern:**
-
-| # | Method | Line | Paths |
+| Method | Old call | New call | Lines |
 |---|---|---|---|
-| 1 | `fill_cpu` | 1066 | contig: `buffer.fill` / noncontig: idx-iter assign |
-| 2 | `contiguous_buffer` | 1167 | contig: slice refcount bump / noncontig: alloc+idx-iter |
-| 3 | `contiguous_device_state` | 1186 | contig: GPU memcpy / noncontig: new_state.fill |
-| 4 | `count` | 1416 | contig: `buffer.count` / noncontig: idx-iter compare |
-| 5 | `unique` | 1494 | contig: direct buf iter / noncontig: idx-iter |
-| 6 | `copy_from_alike` | 1571 | **4-way** (self×other contiguity combos) |
-| 7 | `inplace_ops_cpu` | 1741 | **4-way** |
-| 8 | `inplace_scalar_ops_cpu` | 1850 | contig: `buffer.inplace_ops_scalar` / noncontig: idx-iter |
-| 9 | `arithmetic_ops_cpu` | 2001 | **4-way** |
-| 10 | `scalar_ops_cpu` | 2158 | contig: `buffer.arithmetic_ops_scalar` / noncontig: idx-iter |
-| 11 | `unary_ops_cpu` | 2219 | contig: `buffer.unary_ops` / noncontig: idx-iter |
-| 12 | `float_unary_ops_cpu` | 2276 | contig: `buffer.float_unary_ops` / noncontig: idx-iter |
-| 13 | `clamp` | 2300 | contig: `buffer.clamp` / noncontig: idx-iter |
-| 14 | `clamp_in_place` | 2327 | contig: `buffer.clamp_in_place` / noncontig: idx-iter |
-| 15 | `compare_cpu` | 2398 | contig: `buffer.compare_buffer_full` / noncontig: idx-iter |
-| 16 | `compare_scalar_cpu` | 2463 | contig: `buffer.compare_scalar_full` / noncontig: idx-iter |
-| 17 | `all_true` | 2578 | contig: direct buf loop / noncontig: idx-iter |
-| 18 | `any_true` | 2605 | contig: direct buf loop / noncontig: idx-iter |
+| `unary_ops_cpu` | `ScalarOps[...].unary_fn_helper[op_code]` | `unary_op[op_code, Self.dtype]` | 2239 |
+| `float_unary_ops_cpu` | `ScalarOps[...].float_unary_fn_helper[op_code, epsilon]` | `float_unary_op[op_code, Self.dtype, epsilon]` | 2298 |
+| `compare_cpu` | `ScalarOps[...].compare_pair[op_code]` | `compare_op[op_code, Self.dtype]` | 2431 |
+| `compare_scalar_cpu` | `ScalarOps[...].compare_pair[op_code]` | `compare_op[op_code, Self.dtype]` | 2487 |
 
-**The generalized skeleton** (2-operand version, e.g. `arithmetic_ops_cpu`):
-```
-if self_contig and other_contig:      → buffer.SIMD method
-elif self_contig and not other_contig: → idx-iter over other
-elif not self_contig and other_contig: → idx-iter over self
-else:                                  → dual idx-iter
-```
+After CPU-7 (Phase 1), CPU-5c (Phase 2), and CPU-6 (Phase 3), **every per-element operation** in `ndbuffer.mojo`'s strided fallback paths dispatches through a standalone free function — no struct-method dispatch chains remain.
 
-Single-operand versions (scalar, unary, clamp) have a simpler 2-way branch.
-
-**Plan — Phase 3:** Create a `ContiguityDispatch` struct or comptime helper that captures the skeleton and delegates the per-element operation to a function pointer or comptime-generic method.
-
-**Approach A — `@always_inline` helper with fn pointer (preferred):**
-```mojo
-def dispatch_contiguity[op_code: Int, fn: def(Scalar[dtype]) -> Scalar[dtype] _ thin](
-    self: NDBuffer[dtype],
-    self_contiguous: Bool,
-    other_contiguous: Bool,
-    other: NDBuffer[dtype],
-    result_buffer: Buffer[dtype],
-) raises:
-    # single skeleton, calls `fn` per element
-```
-
-**Approach B — Stringify (if fn pointers can't carry comptime state):**
-Generate each method's skeleton via a comptime macro-like pattern. Mojo doesn't have macros, so this is more limited.
-
-**Approach C — Accept the duplication but centralize the per-element dispatch:**
-After CPU-5c Phase 2, all per-element operations already call `scalar_op`/`simd_op` — the dispatch is shared even if the skeleton boilerplate remains.
-
-**Effort:** Medium (Approach A is elegant but requires `def(…) thin` fn pointer support; fallback is Approach C which is mechanical but tedious).
+**Skeleton duplication remains:** The `if is_contiguous(): buffer.SIMD else: idx-iter` skeleton still appears 18 times (5-15 lines each). Mojo's `def(…) thin` fn pointers cannot carry comptime parameters (op_code, dtype), so extracting the skeleton into a shared helper is not viable without Mojo macros or comptime-lambdas, which don't exist yet. The remaining boilerplate is mechanical but clear — each method reads as a simple `if is_contiguous()` branch with a well-known buffer-level SIMD path and a trivial per-element scalar fallback.
 
 ---
 
-### CPU-7 [H7] Phase 1 — Replace all comptime op dispatch chains in `buffers.mojo` with `simd_op`/`scalar_op` calls
+### CPU-7 [H7] Phase 1 — Replace all comptime op dispatch chains in `buffers.mojo` with `simd_op`/`scalar_op` calls ✅ DONE
 
-**File:** `tenmo/buffers.mojo`
+**Files:** `tenmo/buffers.mojo`, `tenmo/common_utils.mojo`
 
-**Current:** 4 core methods each have the same comptime `op_code` dispatch chain repeated in **3 blocks** (bool special-case, SIMD vector path, scalar tail) — **12 total copies** of the chain:
+**What was done:**
 
-| Method | Line | Opcodes handled | Blocks (×3 each) |
-|---|---|---|---|
-| `inplace_ops_scalar` | 493 | Multiply, Add, Subtract, Divide | SIMD + tail + bool |
-| `inplace_ops` | 557 | Multiply, Add, Subtract, Divide, Overwrite | SIMD + tail + bool |
-| `arithmetic_ops` | 656 | Multiply, Add, Subtract, Divide, LOG_BACKWARD, SIGMOID_BACKWARD, SQRT_BACKWARD, TANH_BACKWARD | SIMD + tail + bool |
-| `arithmetic_ops_scalar` | 791 | Multiply, Add, Subtract, ReverseSubtract, Divide, MAX, MIN, ReverseDivide | SIMD + tail + bool |
+All 4 core arithmetic methods in `Buffer` had their SIMD vector block and scalar tail replaced with calls to `simd_op`/`scalar_op` from `tenmo/shared/scalar_ops.mojo`:
 
-**Additional methods with their own dispatch** (not fully duplicated — single SIMD block, remainder uses `ScalarOps.compare_pair`):
-| Method | Line | Opcodes |
+| Method | Before | After |
 |---|---|---|
-| `compare_buffer_full` | 1039 | Equal, NotEqual, Ge, Gt, Le, Lt |
-| `compare_scalar_full` | 1112 | Equal, NotEqual, Ge, Gt, Le, Lt |
-| `compare_scalar` (Bool) | 1608 | Equal, NotEqual, Ge, Gt, Le, Lt |
-| `compare_buffer` (Bool) | 1776 | Equal, NotEqual, Ge, Gt, Le, Lt |
+| `inplace_ops_scalar` | 14-line SIMD chain + 8-line tail chain | `simd_op(...)` + `scalar_op(...)` |
+| `inplace_ops` | 30-line SIMD chain + 12-line tail chain (incl Overwrite) | `simd_op`/Overwrite if + `scalar_op`/Overwrite if |
+| `arithmetic_ops` | 35-line SIMD chain + 30-line tail chain (7 opcodes) | `simd_op(...)` + `scalar_op(...)` |
+| `arithmetic_ops_scalar` | 18-line SIMD chain + 13-line tail chain (8 opcodes) | `simd_op(...)` + `scalar_op(...)` |
 
-**Phase 1 plan — Replace 12 copies with 0 copies:**
+~110 lines of duplicated comptime dispatch eliminated.
 
-For each of the 4 core methods, replace the entire SIMD block and scalar tail block with a call to `simd_op` / `scalar_op`.
+**Bonus bug fix:** `Epsilon` for integer types was returning `min_finite[int]()` = INT_MIN (e.g. `-9223372036854775808` for int64). When `simd_op[Divide]` computed `a / (b + epsilon)`, this caused integer overflow, making all int64 divide results zero. Fixed in `common_utils.mojo:224` — integer types now return 0, which preserves integer division semantics (`b + 0 == b`).
 
-**Per-method change:**
-
-| Method | SIMD block replace | Scalar tail replace | Bool path |
-|---|---|---|---|
-| `arithmetic_ops` | `simd_op[op_code, Self.dtype, simd_width](a,b,eps)` | `scalar_op[op_code, Self.dtype](a,b,eps)` | Keep (Multiply-only, panic rest) |
-| `arithmetic_ops_scalar` | `simd_op[op_code, Self.dtype, simd_width](a,scalar,eps)` | `scalar_op[op_code, Self.dtype](a,scalar,eps)` | Same |
-| `inplace_ops` | `simd_op[op_code, Self.dtype, simd_width](a,b,eps)` | `scalar_op[op_code, Self.dtype](a,b,eps)` | Same (Overwrite handled separately) |
-| `inplace_ops_scalar` | `simd_op[op_code, Self.dtype, simd_width](a,scalar,eps)` | `scalar_op[op_code, Self.dtype](a,scalar,eps)` | Same |
-
-**Why this works:** `simd_op` and `scalar_op` in `tenmo/shared/scalar_ops.mojo` already handle ALL opcodes used by these 4 methods:
-- `arithmetic_ops` ops: Multiply, Add, Subtract, Divide → all in `simd_op`. LOG_BACKWARD, SIGMOID_BACKWARD, SQRT_BACKWARD, TANH_BACKWARD → all in `simd_op`.
-- `arithmetic_ops_scalar` ops: Multiply, Add, Subtract, ReverseSubtract, Divide, ReverseDivide, MAX, MIN → all in `simd_op`/`scalar_op`.
-- `inplace_ops` ops: Multiply, Add, Subtract, Divide, Overwrite → Overwrite handled separately (not in `simd_op`, but it's a trivial `a = b` copy).
-- `inplace_ops_scalar` ops: Same as `arithmetic_ops_scalar` minus ReverseSubtract/ReverseDivide/MAX/MIN.
-
-**No `is_floating_point()` issue:** The `simd_op` Divide path uses `b + epsilon` for div-by-zero protection. `Epsilon[integer_dtype]` is 0 (from `common_utils.mojo`), so `b + 0 == b` — identical to current behavior. All ops in these methods work on any numeric dtype.
-
-**After Phase 1:** 12 copies → 0 copies. Single source of truth in `shared/scalar_ops.mojo`. Compare methods (compare_*) remain as-is — they use `ScalarOps.compare_pair` already.
+**Result:** 12 copies → 0 copies. Single source of truth in `shared/scalar_ops.mojo`. `test_buffers.mojo`: 298/298 passed.
 
 ---
 

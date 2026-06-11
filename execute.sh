@@ -84,6 +84,7 @@ declare -a ALL_TESTS_IN_ORDER=(
     "ndb_oop_arith|tests/test_ndbuffer_arithmetic_gpu.mojo"
     "ndb_inp_arith|tests/test_ndbuffer_inplace_gpu.mojo"
     "reshape|tests/test_reshape.mojo"
+    "scalar_ops_gpu|tests/test_scalar_gpu.mojo"
     "embedding|tests/test_embedding.mojo"
     "dot|tests/test_dot.mojo"
     "division|tests/test_division.mojo"
@@ -175,6 +176,7 @@ declare -a GPU_TESTS=(
     "ndb_oop_arith|tests/test_ndbuffer_arithmetic_gpu.mojo"
     "ndb_inp_arith|tests/test_ndbuffer_inplace_gpu.mojo"
     "reshape|tests/test_reshape.mojo"
+    "scalar_ops_gpu|tests/test_scalar_gpu.mojo"
     "embedding|tests/test_embedding.mojo"
     "division|tests/test_division.mojo"
     "dot|tests/test_dot.mojo"
@@ -257,7 +259,7 @@ if [ $# -eq 0 ]; then
     echo "  $0 select softmax test_softmax_1d   - Isolate and run a single test function"
     echo ""
     print_colored "$CYAN" "Available tests:"
-    echo "  reshape, ndb_inp_arith, ndb_oop_arith, dot, division, embedding, layer_norm, reciprocal, product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
+    echo "  scalar_ops_gpu, reshape, ndb_inp_arith, ndb_oop_arith, dot, division, embedding, layer_norm, reciprocal, product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
     echo "  allany, compare, count_unique, transmute, exp, summean, sigmoid"
     echo "  gpusummean, broadcast, scalar, inplace, expand, gpu_expand, gpu_cpu"
     echo "  sgd, sparse_sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout, dev_transfer"
@@ -325,6 +327,7 @@ run_test_by_name() {
         ndb_oop_arith)  run_test "ndb_oop_arith" "tests/test_ndbuffer_arithmetic_gpu.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         ndb_inp_arith)  run_test "ndb_inp_arith" "tests/test_ndbuffer_inplace_gpu.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         reshape)        run_test "reshape" "tests/test_reshape.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        scalar_ops_gpu) run_test "scalar_ops_gpu" "tests/test_scalar_gpu.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         embedding)      run_test "embedding" "tests/test_embedding.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         dot)            run_test "dot" "tests/test_dot.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         division)       run_test "division" "tests/test_division.mojo" "$DEBUG_MODE"; exit_code=$? ;;
