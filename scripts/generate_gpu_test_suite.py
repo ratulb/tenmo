@@ -526,40 +526,56 @@ def main():
         for hname, _ in data["helpers"]:
             all_helper_names.add(hname)
 
-    # ── Distribute across chunks (balanced by individual test function) ────
-    # Round-robin assign individual test functions across chunks, not whole
-    # files. This prevents a single file with 200 tests from filling one chunk.
-    # Imports/helpers from a source file are included in every chunk that
-    # contains any function from that file.
+    # ── Distribute across chunks (hybrid) ─────────────────────────────────────
+    # Small files (≤SPLIT_THRESHOLD tests) stay whole in one chunk — helpers and
+    # imports are contained.  Large files get their tests round-robined so no
+    # single chunk bears all the GPU template instantiation from one file.
+    SPLIT_THRESHOLD = 50
 
     if num_chunks > 1:
-        # Collect every (function, source_file) pair
-        all_functions = []
-        for fname, data in file_data.items():
-            for func_name, func_text in data["functions"]:
-                all_functions.append((func_name, func_text, fname))
+        _fdata = file_data  # local ref for closures below
 
-        # Round-robin assign functions to chunks
-        bins = [[] for _ in range(num_chunks)]
-        for i, (func_name, func_text, fname) in enumerate(all_functions):
-            bins[i % num_chunks].append((func_name, func_text, fname))
+        def _test_count(fname: str) -> int:
+            return len(_fdata[fname]["functions"])
 
-        for chunk_id in range(1, num_chunks + 1):
-            chunk_funcs = bins[chunk_id - 1]
-            # Group assigned functions back by source file
-            chunk_file_data = OrderedDict()
-            for func_name, func_text, fname in chunk_funcs:
-                if fname not in chunk_file_data:
-                    chunk_file_data[fname] = {
-                        "imports": file_data[fname]["imports"],
-                        "aliases": file_data[fname]["aliases"],
-                        "helpers": file_data[fname]["helpers"],
+        # Separate small and large files
+        small_files = [f for f in _fdata if _test_count(f) <= SPLIT_THRESHOLD]
+        large_files = [f for f in _fdata if _test_count(f) > SPLIT_THRESHOLD]
+
+        bins = [OrderedDict() for _ in range(num_chunks)]
+        bin_sizes = [0] * num_chunks
+
+        # 1. Assign small files as whole units to least-loaded chunk
+        small_files.sort(key=_test_count, reverse=True)
+        for fname in small_files:
+            n = _test_count(fname)
+            min_idx = min(range(num_chunks), key=lambda i: bin_sizes[i])
+            bins[min_idx][fname] = _fdata[fname]
+            bin_sizes[min_idx] += n
+
+        # 2. Split large files: round-robin their individual tests across chunks
+        for fname in large_files:
+            data = _fdata[fname]
+            funcs = data["functions"]
+            # Note: if the file lands in a chunk, its helpers/imports/aliases
+            # must be available in that chunk too. Round-robin functions but
+            # include the per-file metadata in every chunk that gets a function.
+            for i, (func_name, func_text) in enumerate(funcs):
+                chunk_id = i % num_chunks
+                if fname not in bins[chunk_id]:
+                    bins[chunk_id][fname] = {
+                        "imports": list(data["imports"]),
+                        "aliases": list(data["aliases"]),
+                        "helpers": list(data["helpers"]),
                         "functions": [],
                     }
-                chunk_file_data[fname]["functions"].append(
+                bins[chunk_id][fname]["functions"].append(
                     (func_name, func_text)
                 )
+                bin_sizes[chunk_id] += 1
 
+        for chunk_id in range(1, num_chunks + 1):
+            chunk_file_data = bins[chunk_id - 1]
             chunk_imports = OrderedDict()
             for data in chunk_file_data.values():
                 for imp in data["imports"]:
@@ -574,11 +590,9 @@ def main():
                 chunk_imports=chunk_imports,
             )
 
-        chunk_counts = [len(b) for b in bins]
-        for i, count in enumerate(chunk_counts):
-            print(f"  Chunk {i+1}: {count} tests, {len(bins[i])} files")
-        print(f"  Min: {min(chunk_counts)}, Max: {max(chunk_counts)}, "
-              f"Diff: {max(chunk_counts) - min(chunk_counts)}")
+        for i, cdata in enumerate(bins):
+            total = sum(len(d["functions"]) for d in cdata.values())
+            print(f"  Chunk {i+1}: {total} tests, {len(cdata)} files")
     else:
         all_imports = OrderedDict()
         for data in file_data.values():

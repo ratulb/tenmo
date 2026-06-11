@@ -14,11 +14,11 @@ pixi install              # install deps
 ./execute.sh <name>       # run single test (e.g. tensors, matmul, softmax)
 ./execute.sh quick        # fast sanity: tensors + shapes + strides + summean
 ./execute.sh gpu          # run all GPU-guarded tests
-./execute.sh cpu_all      # run all CPU tests (monolithic or all chunks)
+./execute.sh cpu_all      # run all CPU tests (all chunks sequentially)
 ./execute.sh cpu_all N    # run chunk N (e.g. cpu_all 2)
 ./execute.sh cpu_all M..N # run chunks M through N (e.g. cpu_all 2..4)
 ./execute.sh cpu_all M N  # run specific chunks (e.g. cpu_all 1 4)
-./execute.sh gpu_all      # run all GPU tests (monolithic or all chunks)
+./execute.sh gpu_all      # run all GPU tests (all chunks sequentially)
 ./execute.sh gpu_all N    # run chunk N (e.g. gpu_all 2)
 ./execute.sh gpu_all M..N # run chunks M through N (e.g. gpu_all 2..4)
 ./execute.sh gpu_all M N  # run specific chunks (e.g. gpu_all 1 4)
@@ -41,20 +41,19 @@ pixi install              # install deps
 - Use the test **name** (not filename) as the argument to `execute.sh`
 - `synth_mnist` is commented out in the test list
 - The `gpu` test suite is a defined subset of tests that have GPU guards — not all tests run on GPU
-- The `gpu_all` test alias in `execute.sh` runs `tests/test_gpu_all.mojo` (1138 GPU tests, 49 files, ~3.5 min)
-- `./execute.sh gpu_all` — monolithic file if exists, otherwise all chunks
+- The `gpu_all` test alias runs all GPU-guarded tests via chunked files (`tests/test_gpu_all_{1..N}.mojo`)
+- `./execute.sh gpu_all` — run all chunks sequentially
 - `./execute.sh gpu_all N` — run chunk N only
 - `./execute.sh gpu_all M..N` — run chunks M through N (inclusive)
 - `./execute.sh gpu_all M N O` — run specific chunks
-- Chunked files (`test_gpu_all_{1..N}.mojo`) are generated via `python3 scripts/generate_gpu_test_suite.py --chunks N`
-- Default chunk count for GPU: 4 (~12 files / ~280 tests per chunk)
-- The `cpu_all` test alias in `execute.sh` runs `tests/test_cpu_all.mojo` (3047 CPU tests, 81 files, ~54K lines, ~10-15 min compile vs 4-5 hours sequentially)
-- `./execute.sh cpu_all` — monolithic file if exists, otherwise all chunks
+- Chunked files are generated via `python3 scripts/generate_gpu_test_suite.py --chunks N`
+- The monolithic `test_gpu_all.mojo` has been removed — compiling all 1138 GPU tests as one unit consumes 20GB+ RAM and takes >1hr. Use chunks instead.
+- The `cpu_all` test alias runs all CPU tests via chunked files (`tests/test_cpu_all_{1..N}.mojo`)
+- `./execute.sh cpu_all` — run all chunks sequentially
 - `./execute.sh cpu_all N` — run chunk N only
 - `./execute.sh cpu_all M..N` — run chunks M through N (inclusive)
 - `./execute.sh cpu_all M N O` — run specific chunks
-- Chunked files (`test_cpu_all_{1..N}.mojo`) are generated via `python3 scripts/generate_cpu_test_suite.py --chunks N`
-- Default chunk count: 4 (~20 files / ~760 tests per chunk). Chunk 2 is smallest at 541 tests.
+- Chunked files are generated via `python3 scripts/generate_cpu_test_suite.py --chunks N`
 - Generating chunks requires much less RAM than the monolithic file: ch2 compiled in 433s with ~8GB peak
 - `--only` flag for filtering individual tests is **not supported** in Mojo's TestSuite — run individual test files via `./execute.sh <name>` instead
 - **Always use ≥12 min timeout** (720s) when launching tests via `mojo` or `./execute.sh`. Mojo compiles the entire library from scratch each time — single-test suites take ~5 min to compile, `tensors` takes ~8 min.

@@ -443,9 +443,16 @@ run_test_by_name() {
                     print_colored "$RED" "Error: chunk file $chunk_file does not exist"
                     return 1
                 fi
-            else
+            elif [ -f "tests/test_gpu_all.mojo" ]; then
                 print_colored "$BLUE" "Running all GPU tests from single file..."
                 run_test "gpu_all" "tests/test_gpu_all.mojo" "$DEBUG_MODE"
+            else
+                print_colored "$BLUE" "Running all GPU test chunks sequentially..."
+                for cf in tests/test_gpu_all_*.mojo; do
+                    local cname="${cf#tests/test_gpu_all_}"
+                    cname="${cname%.mojo}"
+                    run_test "gpu_all_${cname}" "$cf" "$DEBUG_MODE" || true
+                done
             fi
             exit_code=$? ;;
         cpu_all)
@@ -458,9 +465,16 @@ run_test_by_name() {
                     print_colored "$RED" "Error: chunk file $chunk_file does not exist"
                     return 1
                 fi
-            else
+            elif [ -f "tests/test_cpu_all.mojo" ]; then
                 print_colored "$BLUE" "Running all CPU tests from single file..."
                 run_test "cpu_all" "tests/test_cpu_all.mojo" "$DEBUG_MODE"
+            else
+                print_colored "$BLUE" "Running all CPU test chunks sequentially..."
+                for cf in tests/test_cpu_all_*.mojo; do
+                    local cname="${cf#tests/test_cpu_all_}"
+                    cname="${cname%.mojo}"
+                    run_test "cpu_all_${cname}" "$cf" "$DEBUG_MODE" || true
+                done
             fi
             exit_code=$? ;;
         quick)
