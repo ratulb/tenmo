@@ -195,7 +195,7 @@ def copy[
 def is_null[
     type: AnyType, //
 ](ptr: Optional[UnsafePointer[type, ImmutAnyOrigin]]) -> Bool:
-    return ptr.is_none()
+    return ptr == None
 
 
 struct IDGen(RegisterPassable):

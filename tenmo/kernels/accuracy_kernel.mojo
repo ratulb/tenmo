@@ -33,19 +33,19 @@ def accuracy_kernel[
             max_idx = j
 
     if max_idx == Int(labels[tid]):
-        Atomic.add[Ordering.RELAXED](result, 1)
+        _ = Atomic.fetch_add[ordering=Ordering.RELAXED](result, 1)
 
 
 @fieldwise_init
 struct Accuracy[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def launch(
-        pred: NDBuffer[dtype],
+        pred: NDBuffer[Self.dtype],
         labels: NDBuffer[DType.int32],
         sync: Bool = False,
     ) raises -> Int:
-        var batch_size = pred.shape()[0]
-        var num_classes = pred.shape()[1]
+        var batch_size = pred.shape[0]
+        var num_classes = pred.shape[1]
 
         ref pred_dev = pred.device_state.value()
         ref gpu = pred_dev.get_gpu()
@@ -58,8 +58,8 @@ struct Accuracy[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref labels_buf = labels_dev.device_buffer()
 
         var compiled = ctx.compile_function[
-            accuracy_kernel[dtype],
-            accuracy_kernel[dtype],
+            accuracy_kernel[Self.dtype],
+            accuracy_kernel[Self.dtype],
         ]()
 
         ctx.enqueue_function(

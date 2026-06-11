@@ -991,7 +991,7 @@ struct ZipIterator[
     origin_this: ImmutOrigin,
     origin_that: ImmutOrigin,
     forward: Bool = True,
-](Sized & Copyable):
+](Sized & ImplicitlyCopyable):
     var index: Int
     var offset: Int
     var src_this: Pointer[IntArray, Self.origin_this]
@@ -1007,13 +1007,6 @@ struct ZipIterator[
         self.src_that = src_that
         self.index = idx
         self.offset = abs(len(src_this[]) - len(src_that[]))
-
-    @always_inline("nodebug")
-    def __copyinit__(out self, copy: Self):
-        self.index = copy.index
-        self.offset = copy.offset
-        self.src_this = copy.src_this
-        self.src_that = copy.src_that
 
     def __iter__(self) -> Self:
         return self.copy()

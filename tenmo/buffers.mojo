@@ -1966,10 +1966,15 @@ struct Buffer[dtype: DType = DType.float32](
         return True
 
     @always_inline
-    def map_to_bool(
-        self: Buffer[Self.dtype], pred: def(Scalar[Self.dtype]) thin -> Bool
+    fn map_to_bool(
+        self: Buffer[Self.dtype],
+        pred: fn(Scalar[Self.dtype]) thin -> Bool,
     ) -> Buffer[DType.bool]:
         """Apply predicate to each element, returning a boolean buffer."""
+        var out = Buffer[DType.bool](self.size)
+        for i in range(self.size):
+            out[i] = pred(self[i])
+        return out^
 
     @always_inline
     def map_where(

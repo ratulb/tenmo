@@ -1122,7 +1122,7 @@ struct Tensor[dtype: DType](
         return self.buffer.any_true()
 
     def unsafe_ptr(ref self) -> UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]:
-        return UnsafePointer(to=self)
+        return UnsafePointer(to=self).unsafe_mut_cast[True]()
 
     def data_ptr(ref self) -> UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]:
         return self.buffer.data_ptr()
@@ -2999,7 +2999,6 @@ struct Tensor[dtype: DType](
 
         Args:
             seed_tensor: Tensor containing initial gradients - if None, assumed to be already seeded.
-            graph_size: Maximum graph size for traversal.
             retain_graph: If True, intermediate gradients are preserved.
             sync: If True, synchronize GPU before backward.
         """
