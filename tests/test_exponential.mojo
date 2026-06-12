@@ -150,14 +150,12 @@ def test_exp_cpu_no_requires_grad() raises:
     var t = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var out = t.exp[track_grad=False]()
     assert_true(not out.requires_grad)
-    # assert_true(not out.has_backward_fn())
 
 
 def test_exp_cpu_requires_grad_propagates() raises:
     var t = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var out = t.exp()
     assert_true(out.requires_grad)
-    # assert_true(out.has_backward_fn())
     assert_true(out.has_ancestry())
 
 
@@ -360,7 +358,6 @@ def test_exp_gpu_no_requires_grad() raises:
         var t = Tensor[dtype].d1([1.0, 2.0]).to_gpu()
         var out = t.exp[track_grad=False]()
         assert_true(not out.requires_grad)
-        # assert_true(not out.has_backward_fn())
 
 
 def test_exp_gpu_requires_grad_propagates() raises:
@@ -369,7 +366,6 @@ def test_exp_gpu_requires_grad_propagates() raises:
         var out = t.exp()
         assert_true(out.is_on_gpu())
         assert_true(out.requires_grad)
-        # assert_true(out.has_backward_fn())
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
