@@ -39,11 +39,29 @@ for file in "$SCRIPT_DIR"/tests/test_*.mojo; do
     echo -e "${BOLD}[$(date '+%H:%M:%S')] Running ${name} ...${NC}"
 
     logfile="$LOG_DIR/${name}.log"
+
+    # ── Minute ticker ──────────────────────────────────────────────────
+    # Prints a running elapsed-minute counter while the test compiles/runs
+    test_start=$(date +%s)
+    (
+        while true; do
+            sleep 60
+            now=$(date +%s)
+            elapsed=$(( (now - test_start) / 60 ))
+            echo -ne "\r  [${elapsed}m elapsed]"
+        done
+    ) &
+    ticker_pid=$!
+
     if time mojo "$file" > "$logfile" 2>&1; then
-        echo -e "  ${GREEN}PASS${NC}"
+        kill "$ticker_pid" 2>/dev/null
+        wait "$ticker_pid" 2>/dev/null
+        echo -e "\r  ${GREEN}PASS${NC}  "
         passed=$((passed + 1))
     else
-        echo -e "  ${RED}FAIL${NC} — see $logfile"
+        kill "$ticker_pid" 2>/dev/null
+        wait "$ticker_pid" 2>/dev/null
+        echo -e "\r  ${RED}FAIL${NC}  — see $logfile"
         failed_files+=("$name")
         failed=$((failed + 1))
     fi
