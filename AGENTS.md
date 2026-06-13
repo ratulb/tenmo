@@ -872,5 +872,34 @@ The unused `scatter_add_rows_strided_kernel` (line 72) already accepts strides a
 
 Not urgent — all production callers (embedding backward, gather axis=0) use axis=0.
 
+### GPU Multiply Broadcast Backward — Async Ordering Suspect
+
+**Location:** `tenmo/broadcast.mojo:90-113` (`upstream_grad_share`), `tenmo/multiplication.mojo:85-90` (`MultiplyBroadcastBackward`)
+
+**Symptom:** 7 GPU multiply broadcast backward tests fail — RHS gradient reads wrong data (e.g. `col_times_matrix` test reads b's raw data `[1,2,3,4]` instead of the broadcast product `[[1,1,1,1],[2,2,2,2],[3,3,3,3]]`). The wrong device buffer appears to be accessed, suggesting the multiply GPU kernel has not completed before the result is consumed.
+
+**Root cause hypothesis:** Async GPU operation ordering. `upstream_grad * other` launches a GPU multiply kernel async (`sync=False` default in NDBuffer dispatch methods). The expression `Gradbox[Self.dtype](upstream_grad * other)` then wraps the result and may immediately call `.sum()` which enqueues a reduction kernel — which reads the multiply output buffer before the multiply kernel completed.
+
+**Step 1 result (compilation only — no local GPU):** Replaced the one-liner with `Gradbox[Self.dtype](upstream_grad.arithmetic_ops[Multiply](other, sync=True))` — forces `sync=True` on the multiply kernel. Code compiles and all CPU tests pass, but GPU tests cannot run on this machine. Needs Kaggle verification: if all 7 GPU multiply broadcast backward tests pass with `sync=True` and no intermediate variable, the async hypothesis is confirmed.
+
+**Why only Multiply fails:**
+- **Add/Sub** use `augment=False` (parameterized on `BroadcastBackward` at `addition.mojo:40`, `subtraction.mojo:60`) — their `upstream_grad_shape_only` passes the incoming gradient through with zero GPU arithmetic. No GPU kernel is launched in the backward path.
+- **Divide** has a fully custom `DivideBackward` (`division.mojo:342-384`) that uses `DivNdBuffer.divide_backward` — it never calls `BroadcastBackward` at all.
+- **Multiply** is the sole op whose broadcast backward uses `BroadcastBackward[augment=True]` (`multiplication.mojo:85-90`), which calls `upstream_grad_share` at `broadcast.mojo:90-113`. This is the only place in the codebase where a broadcast backward launches a GPU arithmetic kernel (`upstream_grad * other`).
+
+**Key observation about DeviceTransfer sync changes:** Commit `4892739` (`print removal, redundant syn in device, NDBuffer to_device sync False`) changed `NDBuffer.to_device` sync from `True` to `False` around the time the issue was introduced. With async `to_gpu`, the pipeline becomes: async copy → async multiply → async sum, where no sync point exists between the multiply and sum.
+
+**Fix applied (empirically resolves all 7 failures):** Intermediate variable pattern at `broadcast.mojo:103-104`:
+```mojo
+var product_ndb = upstream_grad * other
+grad_contrib = Gradbox[Self.dtype](product_ndb^)
+```
+This replaces the original one-liner `Gradbox[Self.dtype](upstream_grad * other)`. The mechanism by which this fixes the issue is still unexplained — `DeviceBuffer` (Mojo built-in) is confirmed properly refcounted, and the kernel code is arithmetically correct. Adding a named variable should not change async GPU behavior under normal circumstances. A possible explanation (unconfirmed): Mojo may delay the destruction of expression-level temporaries differently than named variables — the one-liner's temporary result of `upstream_grad * other` might be destroyed (freeing GPU memory via DeviceBuffer refcount) before the reduction kernel reads from it, while the named `product_ndb` variable's owned-value transfer (`^`) is genuinely destruction-free.
+
+**Steps remaining:**
+1. ❓ **Confirm async hypothesis on Kaggle**: force `sync=True` on multiply kernel in `upstream_grad_share`. If all 7 GPU tests pass without the intermediate variable, hypothesis is confirmed.
+2. ❓ Understand why the intermediate variable pattern fixes it — e.g. does Mojo's owned-value destruction timing change, or does the variable split force an implicit `synchronize`? (Low priority — fix is in place and efficient.)
+3. ✅ **Added 14 GPU broadcast backward tests** for Add/Sub/Div in `tests/test_broadcast.mojo` — covers col broadcast, 1d×2d, 3d batch, and single-parent-requires-grad cases. All 113 CPU tests pass.
+
 ## ⛔ CRITICAL: NEVER launch multiple tests in parallel — Mojo compilation is memory-bound and will crash the machine. Run ONE `./execute.sh` or `./fire.sh` at a time, wait for it to complete, then run the next.
 

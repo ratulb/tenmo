@@ -75,7 +75,8 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
                 device=upstream_grad.device(),
             )
         else:
-            grad_contrib = Gradbox[Self.dtype](upstream_grad)
+            var grad_ndb = upstream_grad
+            grad_contrib = Gradbox[Self.dtype](grad_ndb^)
             if grad_contrib.shape() != self_shape:
                 axes = ShapeBroadcaster.broadcast_mask(
                     self_shape, grad_contrib.shape()
@@ -96,14 +97,14 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
             grad_contrib = Gradbox[Self.dtype].full(
                 self.shape,
                 upstream_grad.item(),
-                
                 device=upstream_grad.device(),
             )
         else:
-            grad_contrib = Gradbox[Self.dtype](upstream_grad * other)
+            var product_ndb = upstream_grad * other
+            grad_contrib = Gradbox[Self.dtype](product_ndb^)
 
             if grad_contrib.shape() != self.shape:
-                axes = ShapeBroadcaster.broadcast_mask(
+                var axes = ShapeBroadcaster.broadcast_mask(
                     self.shape, grad_contrib.shape()
                 ).indices_of(1)
                 grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
