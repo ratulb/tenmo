@@ -1138,14 +1138,27 @@ struct CEProbabilitiesForward[dtype: DType](
             Self.dtype
         ].flatten_spatial_probabilities(logits, target)
 
+        # TODO: Write a fused GPU kernel for probability-target CE.
+        # Fall back to CPU: transfer GPU data to CPU before the CPU-only fused function.
+        # Backward handles CPU data correctly via arithmetic_ops dispatch.
+        var logits_cpu = logits_2d_ndb
+        var target_cpu = target_2d_ndb
+        comptime if has_accelerator():
+            if logits_2d_ndb.is_on_gpu():
+                try:
+                    logits_cpu = logits_2d_ndb.to_cpu(sync=True)
+                    target_cpu = target_2d_ndb.to_cpu(sync=True)
+                except e:
+                    panic("CEProbabilitiesForward: GPU-to-CPU transfer failed: " + String(e))
+
         var softmax_probs_ndb: NDBuffer[Self.dtype]
         var smoothed_target_ndb: NDBuffer[Self.dtype]
         var out: Tensor[Self.dtype]
         softmax_probs_ndb, smoothed_target_ndb, out = CECommon[
             Self.dtype
         ]._fused_forward_probabilities[track_grad](
-            logits_2d_ndb,
-            target_2d_ndb,
+            logits_cpu,
+            target_cpu,
             reduction,
             label_smoothing,
             spatial_shape,

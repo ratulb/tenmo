@@ -75,7 +75,7 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
                 device=upstream_grad.device(),
             )
         else:
-            var grad_ndb = upstream_grad
+            var grad_ndb = upstream_grad.copy()
             grad_contrib = Gradbox[Self.dtype](grad_ndb^)
             if grad_contrib.shape() != self_shape:
                 axes = ShapeBroadcaster.broadcast_mask(
