@@ -1,6 +1,8 @@
 #!/usr/bin/bash
-# Run all GPU-stripped test files from tests/gpu/
-# Usage: ./run_gpu_stripped.sh
+# Run GPU-stripped test files from tests/gpu/
+# Usage:
+#   ./run_gpu_stripped.sh                          # run all
+#   ./run_gpu_stripped.sh --ignore f1.mojo f2.mojo # skip specific files
 # Run from repo root: `mojo -I . tests/gpu/<file>.mojo`
 
 set -o pipefail
@@ -18,9 +20,41 @@ passed=0
 failed=0
 declare -a failed_files
 
+# ── Parse --ignore flag ────────────────────────────────────────────
+ignore_stems=()
+if [[ "$1" == "--ignore" ]]; then
+    shift
+    while [[ "$#" -gt 0 ]]; do
+        raw="$(basename "$1")"
+        raw="${raw%.mojo}"
+        ignore_stems+=("$raw")
+        shift
+    done
+fi
+
 ticker_pid=""
 overall_start=$(date +%s)
-file_count=$(ls "$SCRIPT_DIR"/tests/gpu/test_*.mojo 2>/dev/null | wc -l)
+file_count=0
+declare -a file_list
+for f in "$SCRIPT_DIR"/tests/gpu/test_*.mojo; do
+    [ -f "$f" ] || continue
+    stem="$(basename "$f" .mojo)"
+    skip=false
+    for ign in "${ignore_stems[@]}"; do
+        if [[ "$stem" == "$ign" ]]; then
+            skip=true
+            break
+        fi
+    done
+    $skip && continue
+    file_list+=("$f")
+done
+file_count=${#file_list[@]}
+
+if [ "${#ignore_stems[@]}" -gt 0 ]; then
+    echo -e "${BOLD}Ignoring ${#ignore_stems[@]} file(s):${NC} ${ignore_stems[*]}"
+fi
+echo -e "${BOLD}Queued ${file_count} file(s)${NC}"
 
 cleanup() {
     echo -e "\n${BOLD}Interrupted — cleaning up...${NC}"
@@ -29,8 +63,7 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM
 
-for file in "$SCRIPT_DIR"/tests/gpu/test_*.mojo; do
-    [ -f "$file" ] || continue
+for file in "${file_list[@]}"; do
     name=$(basename "$file" .mojo)
 
     echo -e "${BOLD}[$(date '+%H:%M:%S')] Running ${name} ...${NC}"
