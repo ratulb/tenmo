@@ -158,3 +158,18 @@ from .vectormatrix import *
 from .kernels.vectormatrix_kernel import *
 from .views import *
 from .walkback import *
+
+def zeros[dtype: DType=DType.float32](s: Shape) -> Tensor[dtype]:
+    return Tensor[dtype].zeros(s)
+
+def zeros[dtype: DType=DType.float32](*indices: Int) -> Tensor[dtype]:
+    return Tensor[dtype].zeros(Shape(indices))
+
+def empty[dtype: DType=DType.float32](s: Shape) -> Tensor[dtype]:
+    return Tensor[dtype].empty(s)
+
+def empty[dtype: DType=DType.float32](*indices: Int) -> Tensor[dtype]:
+    return Tensor[dtype].empty(Shape(indices))
+
+def dot[dtype: DType=DType.float32](a: Tensor[dtype], b: Tensor[dtype]) -> Tensor[dtype]:
+    return a.dot(b)
