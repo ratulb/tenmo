@@ -92,7 +92,7 @@ def test_oop_2d_add_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var gpu = GPU()
-        var a = NDBuffer[dtype].arange(1, 25).reshape(Shape(5, 5))
+        var a = NDBuffer[dtype].arange(1, 25).reshape(Shape(4, 6))
         var expected = a.scalar_ops[Add](Scalar[dtype](5.0))
         var result = a.to_gpu(gpu).scalar_ops[Add](Scalar[dtype](5.0), sync=True)
         assert_true(result.to_cpu().all_close[atol=1e-5](expected))
