@@ -1572,7 +1572,7 @@ def test_gpu_bool_tensor_to_numpy() raises:
         var gpu_t = cpu_t.to_gpu()
         var nd = to_ndarray(gpu_t)
         var back = from_ndarray[DType.bool](nd)
-        assert_true(back.all_close(cpu_t))
+        assert_true(back==cpu_t)
 
 
 def test_gpu_tensor_print() raises:
