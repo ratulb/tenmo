@@ -13,6 +13,7 @@ from tenmo.gradbox import Gradbox
 from tenmo.ndbuffer import NDBuffer
 from tenmo.intarray import IntArray
 from tenmo.ancestry import Ancestor
+from tenmo.device import Device, GPU
 from tenmo.shared import Reduction
 from tenmo.softmax import SoftmaxNdBuffer
 from tenmo.sum_mean_reduction import SumMeanReduction
@@ -292,7 +293,9 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         N: Int,
         C: Int,
         M: Int,
-    ) -> Tuple[NDBuffer[Self.dtype], Int, Tensor[Self.dtype]] where Self.dtype.is_floating_point():
+    ) -> Tuple[
+        NDBuffer[Self.dtype], Int, Tensor[Self.dtype]
+    ] where Self.dtype.is_floating_point():
         """Fused CPU forward for class indices CE.
 
         3 passes per row:
@@ -365,7 +368,9 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var log_sum_exp = log(safe_sum_exp)
 
             # ── Loss (O(1) per row — target lookup) ──
-            var is_valid = target_1d.get(row) != Scalar[DType.int32](ignore_index)
+            var is_valid = target_1d.get(row) != Scalar[DType.int32](
+                ignore_index
+            )
             var loss = Scalar[Self.dtype](0)
             if is_valid:
                 var tgt_idx = target_1d.get(row).__int__()
@@ -374,8 +379,12 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 loss = -log_softmax_tgt
                 if has_ls:
                     var inv_C = Scalar[Self.dtype](1) / Scalar[Self.dtype](C)
-                    var mean_log_softmax = sum_logits * inv_C - max_val - log_sum_exp
-                    loss = (Scalar[Self.dtype](1) - label_smoothing) * loss - label_smoothing * mean_log_softmax
+                    var mean_log_softmax = (
+                        sum_logits * inv_C - max_val - log_sum_exp
+                    )
+                    loss = (
+                        Scalar[Self.dtype](1) - label_smoothing
+                    ) * loss - label_smoothing * mean_log_softmax
                 valid_count += 1
 
             if reduction_is_none:
@@ -433,7 +442,9 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         GPU safe — log_softmax and softmax are both GPU ready.
         Returns NDBuffers — safe for backward storage.
         """
-        return SoftmaxNdBuffer[Self.dtype].log_softmax(logits_2d, IntArray([1]), validated=True)
+        return SoftmaxNdBuffer[Self.dtype].log_softmax(
+            logits_2d, IntArray([1]), validated=True
+        )
 
     @staticmethod
     def scale_grad_by_upstream(
@@ -458,7 +469,11 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
             return grad.arithmetic_ops[Multiply](ug_expanded)
         else:
-            var ug_scalar = SumMeanReduction[Self.dtype].sum(upstream.buffer(), IntArray()).item()
+            var ug_scalar = (
+                SumMeanReduction[Self.dtype]
+                .sum(upstream.buffer(), IntArray())
+                .item()
+            )
             var scale = Scalar[Self.dtype](
                 valid_count if reduction.is_mean() and valid_count > 0 else 1
             )
@@ -476,7 +491,9 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         N: Int,
         C: Int,
         M: Int,
-    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype], Tensor[Self.dtype]] where Self.dtype.is_floating_point():
+    ) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype], Tensor[Self.dtype]
+    ] where Self.dtype.is_floating_point():
         """Fused CPU forward for probability-target CE.
 
         3 passes per row:
@@ -548,13 +565,20 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             # ── Pass 3: normalize softmax + write smoothed_target + compute loss ──
             var loss = Scalar[Self.dtype](0)
             for c in range(0, simd_end, SIMD_WIDTH):
-                var t_vec = (target_ptr + (row_base + c * stride1)).load[width=SIMD_WIDTH]()
-                var l_vec = (logits_ptr + (row_base + c * stride1)).load[width=SIMD_WIDTH]()
+                var t_vec = (target_ptr + (row_base + c * stride1)).load[
+                    width=SIMD_WIDTH
+                ]()
+                var l_vec = (logits_ptr + (row_base + c * stride1)).load[
+                    width=SIMD_WIDTH
+                ]()
 
                 # smoothed_target[c] = target[c] * (1-ls) + ls/C
                 var smoothed: SIMD[Self.dtype, SIMD_WIDTH]
                 if has_ls:
-                    smoothed = t_vec * (Scalar[Self.dtype](1) - label_smoothing) + label_smoothing * inv_C
+                    smoothed = (
+                        t_vec * (Scalar[Self.dtype](1) - label_smoothing)
+                        + label_smoothing * inv_C
+                    )
                 else:
                     smoothed = t_vec
                 comptime if track_grad:
@@ -564,7 +588,9 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 # normalized softmax
                 comptime if track_grad:
                     var sp = softmax_ndb.data_ptr()
-                    var sm_vec = (sp + (row * C + c)).load[width=SIMD_WIDTH]() * inv_sum_exp
+                    var sm_vec = (sp + (row * C + c)).load[
+                        width=SIMD_WIDTH
+                    ]() * inv_sum_exp
                     (sp + (row * C + c)).store[width=SIMD_WIDTH](sm_vec)
 
                 # log_softmax[c] = logits[c] - max_val - log_sum_exp
@@ -581,7 +607,10 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
                 var smoothed_val: Scalar[Self.dtype]
                 if has_ls:
-                    smoothed_val = t_val * (Scalar[Self.dtype](1) - label_smoothing) + label_smoothing * inv_C
+                    smoothed_val = (
+                        t_val * (Scalar[Self.dtype](1) - label_smoothing)
+                        + label_smoothing * inv_C
+                    )
                 else:
                     smoothed_val = t_val
                 comptime if track_grad:
@@ -681,13 +710,24 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         # Falls back to decomposed CPU path when no GPU.
         var scaled = NDBuffer[Self.dtype]()
         comptime if has_accelerator():
-            from tenmo.kernels.crossentropy_fused_kernel import CrossEntropyFusedKernel
+            from tenmo.kernels.crossentropy_fused_kernel import (
+                CrossEntropyFusedKernel,
+            )
+
             if softmax_probs.is_on_gpu():
                 try:
-                    scaled = CrossEntropyFusedKernel[Self.dtype].launch_backward(
-                        softmax_probs, target_1d,
-                        upstream.buffer(), reduction, valid_count,
-                        M, C, ignore_index, label_smoothing,
+                    scaled = CrossEntropyFusedKernel[
+                        Self.dtype
+                    ].launch_backward(
+                        softmax_probs,
+                        target_1d,
+                        upstream.buffer(),
+                        reduction,
+                        valid_count,
+                        M,
+                        C,
+                        ignore_index,
+                        label_smoothing,
                     )
                 except e:
                     panic(
@@ -698,38 +738,56 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
                 # CPU fallback — decomposed path
                 var onehot = NDBuffer[Self.dtype].onehot(
                     target_1d.to_dtype[Self.dtype](),
-                    C, softmax_probs.device(),
+                    C,
+                    softmax_probs.device(),
                     ignore_index=ignore_index,
                 )
                 var grad = softmax_probs
                 var ls = label_smoothing
                 if ls > Scalar[Self.dtype](0):
                     var ls_uniform = ls / Scalar[Self.dtype](C)
-                    grad = grad.arithmetic_ops[Subtract](onehot.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls)).scalar_ops[Subtract](ls_uniform)
+                    grad = grad.arithmetic_ops[Subtract](
+                        onehot.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls)
+                    ).scalar_ops[Subtract](ls_uniform)
                 else:
                     grad = grad.arithmetic_ops[Subtract](onehot)
-                var ignore_mask = CECommon[Self.dtype].build_ignore_mask(target_1d, ignore_index)
-                var ignore_mask_2d = ignore_mask.unsqueeze(IntArray(-1)).broadcast_to(Shape(M, C))
+                var ignore_mask = CECommon[Self.dtype].build_ignore_mask(
+                    target_1d, ignore_index
+                )
+                var ignore_mask_2d = ignore_mask.unsqueeze(
+                    IntArray(-1)
+                ).broadcast_to(Shape(M, C))
                 grad = grad.arithmetic_ops[Multiply](ignore_mask_2d)
-                scaled = CECommon[Self.dtype].scale_grad_by_upstream(grad, upstream, reduction, valid_count, M, C)
+                scaled = CECommon[Self.dtype].scale_grad_by_upstream(
+                    grad, upstream, reduction, valid_count, M, C
+                )
         else:
             # No accelerator — CPU decomposed path
             var onehot = NDBuffer[Self.dtype].onehot(
                 target_1d.to_dtype[Self.dtype](),
-                C, softmax_probs.device(),
+                C,
+                softmax_probs.device(),
                 ignore_index=ignore_index,
             )
             var grad = softmax_probs
             var ls = label_smoothing
             if ls > Scalar[Self.dtype](0):
                 var ls_uniform = ls / Scalar[Self.dtype](C)
-                grad = grad.arithmetic_ops[Subtract](onehot.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls)).scalar_ops[Subtract](ls_uniform)
+                grad = grad.arithmetic_ops[Subtract](
+                    onehot.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls)
+                ).scalar_ops[Subtract](ls_uniform)
             else:
                 grad = grad.arithmetic_ops[Subtract](onehot)
-            var ignore_mask = CECommon[Self.dtype].build_ignore_mask(target_1d, ignore_index)
-            var ignore_mask_2d = ignore_mask.unsqueeze(IntArray(-1)).broadcast_to(Shape(M, C))
+            var ignore_mask = CECommon[Self.dtype].build_ignore_mask(
+                target_1d, ignore_index
+            )
+            var ignore_mask_2d = ignore_mask.unsqueeze(
+                IntArray(-1)
+            ).broadcast_to(Shape(M, C))
             grad = grad.arithmetic_ops[Multiply](ignore_mask_2d)
-            scaled = CECommon[Self.dtype].scale_grad_by_upstream(grad, upstream, reduction, valid_count, M, C)
+            scaled = CECommon[Self.dtype].scale_grad_by_upstream(
+                grad, upstream, reduction, valid_count, M, C
+            )
         # Step 6: Reshape back to original logits shape
         var _tmp0 = Gradbox[Self.dtype](scaled^)
         var grad_final = _tmp0.reshape(logits_shape)
@@ -788,7 +846,8 @@ def _forward_cpu_impl[
     N: Int,
     C: Int,
 ) -> Tuple[NDBuffer[dtype], Int, Tensor[dtype]] where dtype.is_floating_point():
-    """CPU decomposed forward path. Returns (softmax_probs, valid_count, out)."""
+    """CPU decomposed forward path. Returns (softmax_probs, valid_count, out).
+    """
     var log_probs_ndb: NDBuffer[dtype]
     var softmax_probs_ndb: NDBuffer[dtype]
     log_probs_ndb, softmax_probs_ndb = CECommon[
@@ -827,13 +886,10 @@ def _forward_cpu_impl[
             .sum(log_probs_ndb, normalized_axes=IntArray(1))
             .scalar_ops[Divide](Scalar[dtype](C))
         )
-        losses = (
-            nll.scalar_ops[Multiply](
-                Scalar[dtype](1) - label_smoothing
-            )
-            .arithmetic_ops[Subtract](
-                mean_log_p.scalar_ops[Multiply](label_smoothing)
-            )
+        losses = nll.scalar_ops[Multiply](
+            Scalar[dtype](1) - label_smoothing
+        ).arithmetic_ops[Subtract](
+            mean_log_p.scalar_ops[Multiply](label_smoothing)
         )
     else:
         losses = (
@@ -915,25 +971,29 @@ struct CEClassIndicesForward[dtype: DType](
         var out: Tensor[Self.dtype]
 
         comptime if has_accelerator():
-            from tenmo.kernels.crossentropy_fused_kernel import CrossEntropyFusedKernel
+            from tenmo.kernels.crossentropy_fused_kernel import (
+                CrossEntropyFusedKernel,
+            )
+
             if logits_2d_ndb.is_on_gpu():
                 # GPU fused path
                 var losses_ndb = NDBuffer[Self.dtype]()
                 var scalar_loss_val = Scalar[Self.dtype](0)
                 try:
-                    (softmax_probs_ndb, losses_ndb, scalar_loss_val, valid_count) = (
-                        CrossEntropyFusedKernel[Self.dtype].launch(
-                            logits_2d_ndb,
-                            target_1d_ndb,
-                            reduction,
-                            ignore_index,
-                            label_smoothing,
-                        )
+                    (
+                        softmax_probs_ndb,
+                        losses_ndb,
+                        scalar_loss_val,
+                        valid_count,
+                    ) = CrossEntropyFusedKernel[Self.dtype].launch(
+                        logits_2d_ndb,
+                        target_1d_ndb,
+                        reduction,
+                        ignore_index,
+                        label_smoothing,
                     )
                 except e:
-                    panic(
-                        "CrossEntropyFusedKernel.launch failed: " + String(e)
-                    )
+                    panic("CrossEntropyFusedKernel.launch failed: " + String(e))
 
                 if reduction.is_none():
                     var spatial_rank = spatial_shape.rank()
@@ -1010,6 +1070,7 @@ struct CEClassIndicesForward[dtype: DType](
                 out.buffer.sync()
 
         return out^
+
 
 # CEProbabilitiesBackward
 
@@ -1149,7 +1210,10 @@ struct CEProbabilitiesForward[dtype: DType](
                     logits_cpu = logits_2d_ndb.to_cpu(sync=True)
                     target_cpu = target_2d_ndb.to_cpu(sync=True)
                 except e:
-                    panic("CEProbabilitiesForward: GPU-to-CPU transfer failed: " + String(e))
+                    panic(
+                        "CEProbabilitiesForward: GPU-to-CPU transfer failed: "
+                        + String(e)
+                    )
 
         var softmax_probs_ndb: NDBuffer[Self.dtype]
         var smoothed_target_ndb: NDBuffer[Self.dtype]
@@ -1166,6 +1230,25 @@ struct CEProbabilitiesForward[dtype: DType](
             C,
             M,
         )
+
+        # Transfer result back to GPU if logits was on GPU
+        comptime if has_accelerator():
+            if logits.is_on_gpu():
+                try:
+                    out = out.to_gpu(stop_grad=False)
+                    comptime if track_grad:
+                        if logits.requires_grad:
+                            softmax_probs_ndb = softmax_probs_ndb.to_gpu(
+                                logits.device().kind[GPU]
+                            )
+                            smoothed_target_ndb = smoothed_target_ndb.to_gpu(
+                                logits.device().kind[GPU]
+                            )
+                except e:
+                    panic(
+                        "CEProbabilitiesForward: CPU-to-GPU transfer failed: "
+                        + String(e)
+                    )
 
         comptime if track_grad:
             if logits.requires_grad:

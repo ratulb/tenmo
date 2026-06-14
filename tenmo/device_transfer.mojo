@@ -55,11 +55,8 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
         var (flow, device) = bwd_arg.flow, bwd_arg.device
         var gradbox = output.gradients()
         var ancestor_ref = output.ancestry().get(0)
-        var ancestor = Tensor[Self.dtype](
-            ancestor_ref.buffer(), requires_grad=ancestor_ref.requires_grad
-        )
         debug_assert(
-            ancestor.shape() == gradbox.shape(),
+            ancestor_ref.shape() == gradbox.shape(),
             "DeviceTransferBackward: gradbox shape and ancestor shape mismatch",
         )
 
@@ -70,7 +67,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
                 if flow == Flow.Cpu2Gpu:
                     try:
                         var cpu_grad = Gradbox[Self.dtype](
-                            gradbox.buffer().to_cpu(sync=True)
+                            gradbox.buffer().to_cpu(sync=False)
                         )
                         ancestor_ref.update_grad(cpu_grad, AddTensor, None)
                     except e:

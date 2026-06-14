@@ -53,25 +53,25 @@ struct Gradbox[dtype: DType](
         var ndb_ptr = (alloc_base + ref_size).bitcast[NDBuffer[Self.dtype]]()
         comptime if has_accelerator():
             if buffer.is_on_gpu():
-                ndb_ptr.init_pointee_move(buffer^)
+                ndb_ptr.init_pointee_copy(buffer)
             else:
                 if buffer.is_shared():
-                    ndb_ptr.init_pointee_move(buffer^)
+                    ndb_ptr.init_pointee_copy(buffer)
                 else:
                     var shape = buffer.shape
                     var strides = buffer.strides
                     var offset = buffer.offset
-                    ndb_ptr.init_pointee_move(
+                    ndb_ptr.init_pointee_copy(
                         buffer.share(shape, strides, offset)
                     )
         else:
             if buffer.is_shared():
-                ndb_ptr.init_pointee_move(buffer^)
+                ndb_ptr.init_pointee_copy(buffer)
             else:
                 var shape = buffer.shape
                 var strides = buffer.strides
                 var offset = buffer.offset
-                ndb_ptr.init_pointee_move(buffer.share(shape, strides, offset))
+                ndb_ptr.init_pointee_copy(buffer.share(shape, strides, offset))
         self._ndb_ptr = ndb_ptr
         self._refcount = ref_ptr
 
@@ -1302,7 +1302,7 @@ struct Gradbox[dtype: DType](
             self.buffer().arithmetic_ops[Divide](other.buffer(), sync=sync)
         )
 
-    def __imul__[sync: Bool = True](self, scalar: Scalar[Self.dtype]):
+    def __imul__[sync: Bool = False](self, scalar: Scalar[Self.dtype]):
         """In-place multiply by a scalar.
 
         Args:
@@ -1310,7 +1310,7 @@ struct Gradbox[dtype: DType](
         """
         self.buffer().inplace_scalar_ops[Multiply](scalar, sync=sync)
 
-    def __iadd__[sync: Bool = True](self, scalar: Scalar[Self.dtype]):
+    def __iadd__[sync: Bool = False](self, scalar: Scalar[Self.dtype]):
         """In-place add a scalar.
 
         Args:
@@ -1318,7 +1318,7 @@ struct Gradbox[dtype: DType](
         """
         self.buffer().inplace_scalar_ops[Add](scalar, sync=sync)
 
-    def __isub__[sync: Bool = True](self, scalar: Scalar[Self.dtype]):
+    def __isub__[sync: Bool = False](self, scalar: Scalar[Self.dtype]):
         """In-place subtract a scalar.
 
         Args:
@@ -1326,7 +1326,7 @@ struct Gradbox[dtype: DType](
         """
         self.buffer().inplace_scalar_ops[Subtract](scalar, sync=sync)
 
-    def __itruediv__[sync: Bool = True](self, scalar: Scalar[Self.dtype]):
+    def __itruediv__[sync: Bool = False](self, scalar: Scalar[Self.dtype]):
         """In-place divide by a scalar.
 
         Args:
@@ -1335,7 +1335,7 @@ struct Gradbox[dtype: DType](
         self.buffer().inplace_scalar_ops[Divide](scalar, sync=sync)
 
     @always_inline
-    def __imul__[sync: Bool = True](self, incoming: Gradbox[Self.dtype]):
+    def __imul__[sync: Bool = False](self, incoming: Gradbox[Self.dtype]):
         """In-place element-wise multiply.
 
         Args:
@@ -1344,7 +1344,7 @@ struct Gradbox[dtype: DType](
         self.buffer().inplace_ops[Multiply](incoming.buffer(), sync=sync)
 
     @always_inline
-    def __iadd__[sync: Bool = True](self, incoming: Gradbox[Self.dtype]):
+    def __iadd__[sync: Bool = False](self, incoming: Gradbox[Self.dtype]):
         """In-place element-wise add.
 
         Args:
@@ -1353,7 +1353,7 @@ struct Gradbox[dtype: DType](
         self.buffer().inplace_ops[Add](incoming.buffer(), sync=sync)
 
     @always_inline
-    def __isub__[sync: Bool = True](self, incoming: Gradbox[Self.dtype]):
+    def __isub__[sync: Bool = False](self, incoming: Gradbox[Self.dtype]):
         """In-place element-wise subtract.
 
         Args:
@@ -1362,7 +1362,7 @@ struct Gradbox[dtype: DType](
         self.buffer().inplace_ops[Subtract](incoming.buffer(), sync=sync)
 
     @always_inline
-    def __itruediv__[sync: Bool = True](self, incoming: Gradbox[Self.dtype]):
+    def __itruediv__[sync: Bool = False](self, incoming: Gradbox[Self.dtype]):
         """In-place element-wise divide.
 
         Args:

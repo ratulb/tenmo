@@ -1,12 +1,12 @@
-from .tensor import Tensor
-from .gradbox import Gradbox
-from .ndbuffer import NDBuffer
-from .shapes import Shape
-from .ancestry import Ancestor
-from .broadcasthelper import ShapeBroadcaster
-from .mnemonics import AddTensor
-from .common_utils import panic
-from .backpropagation import BackwardFnArg, BACKWARD_BROADCAST_TO
+from tenmo.tensor import Tensor
+from tenmo.gradbox import Gradbox
+from tenmo.ndbuffer import NDBuffer
+from tenmo.shapes import Shape
+from tenmo.ancestry import Ancestor
+from tenmo.broadcasthelper import ShapeBroadcaster
+from tenmo.mnemonics import AddTensor
+from tenmo.common_utils import panic
+from tenmo.backpropagation import BackwardFnArg, BACKWARD_BROADCAST_TO
 
 
 @fieldwise_init
@@ -75,8 +75,9 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
                 device=upstream_grad.device(),
             )
         else:
-            var grad_ndb = upstream_grad.copy()
-            grad_contrib = Gradbox[Self.dtype](grad_ndb^)
+            # var grad_ndb = upstream_grad.copy()
+            grad_contrib = Gradbox[Self.dtype](upstream_grad)
+            # upstream_grad.sync()
             if grad_contrib.shape() != self_shape:
                 axes = ShapeBroadcaster.broadcast_mask(
                     self_shape, grad_contrib.shape()
@@ -101,7 +102,9 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
             )
         else:
             var product_ndb = upstream_grad * other
+            # grad_contrib = Gradbox[Self.dtype](product_ndb)
             grad_contrib = Gradbox[Self.dtype](product_ndb^)
+            # product_ndb.sync()
 
             if grad_contrib.shape() != self.shape:
                 var axes = ShapeBroadcaster.broadcast_mask(

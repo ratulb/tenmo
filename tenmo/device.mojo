@@ -47,6 +47,11 @@ struct Device(Equatable, ImplicitlyCopyable, Movable, Writable):
         else:
             writer.write(self.kind[GPU])
 
+    def gpu(self) -> GPU:
+        if not self.is_gpu():
+            panic("Device is not a gpu")
+        return self.kind[GPU]
+
 
 @fieldwise_init
 struct CPU(Equatable, ImplicitlyCopyable, Movable, Writable):
