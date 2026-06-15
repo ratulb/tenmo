@@ -16,7 +16,6 @@ def main() raises:
 
 
 def test_slice_every_second_row_column1() raises:
-    print("test_slice_every_second_row_column1")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(15, requires_grad=True)
     var r = a.reshape(5, 3)
@@ -32,7 +31,6 @@ def test_slice_every_second_row_column1() raises:
 
 
 def test_permute_backward() raises:
-    print("test_permute_backward")
     comptime dtype = DType.float32
 
     var a = Tensor[dtype].arange(6, requires_grad=True)
@@ -48,7 +46,6 @@ def test_permute_backward() raises:
 
 
 def test_tensor_permute_flatten_backprop() raises:
-    print("test_tensor_permute_flatten_backprop")
 
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(12, requires_grad=True)  # shape: [0..11]
@@ -63,7 +60,6 @@ def test_tensor_permute_flatten_backprop() raises:
 
 
 def test_flat_view_chain_backprop() raises:
-    print("test_flat_view_chain_backprop")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(10, requires_grad=True)
     var v1 = a.view([4, 2], offset=2)
@@ -75,7 +71,6 @@ def test_flat_view_chain_backprop() raises:
 
 
 def test_nonzero_offset_multi_view_chain() raises:
-    print("test_nonzero_offset_multi_view_chain")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(20, requires_grad=True)
     var v1 = a.view([6, 3], offset=2)  # offset=2
@@ -89,7 +84,6 @@ def test_nonzero_offset_multi_view_chain() raises:
 
 
 def test_strided_view_chain_2d_to_3d() raises:
-    print("test_strided_view_chain_2d_to_3d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(60, requires_grad=True)
     var v1 = a.view([10, 3], offset=0)
@@ -103,7 +97,6 @@ def test_strided_view_chain_2d_to_3d() raises:
 
 
 def test_nested_views_with_interleaved_strides() raises:
-    print("test_nested_views_with_interleaved_strides")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(36, requires_grad=True)
     var v1 = a.view([6, 6], offset=0)
@@ -114,7 +107,6 @@ def test_nested_views_with_interleaved_strides() raises:
 
 
 def test_view_chain_reversed_shape() raises:
-    print("test_view_chain_reversed_shape")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(24, requires_grad=True)
     var v1 = a.view([6, 4], offset=0)
@@ -125,7 +117,6 @@ def test_view_chain_reversed_shape() raises:
 
 
 def test_grad_propagation_with_offset_chain() raises:
-    print("test_grad_propagation_with_offset_chain")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(30, requires_grad=True)
     var v1 = a.view([5, 4], offset=6)
@@ -139,7 +130,6 @@ def test_grad_propagation_with_offset_chain() raises:
 
 
 def test_nested_view_backward_indexing() raises:
-    print("test_nested_view_backward_indexing")
     comptime dtype = DType.float32
 
     var a = Tensor[dtype].arange(30, requires_grad=True)  # [0, 1, ..., 29]
@@ -156,7 +146,6 @@ def test_nested_view_backward_indexing() raises:
 
 
 def _negative_offset_fails() raises:
-    print("test_negative_offset_fails")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([1, 2, 3])
     var shape = Shape(1)
@@ -166,7 +155,6 @@ def _negative_offset_fails() raises:
 
 
 def _large_stride_out_of_bounds() raises:
-    print("test_large_stride_out_of_bounds")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     var shape = Shape(2, 2)
@@ -176,7 +164,6 @@ def _large_stride_out_of_bounds() raises:
 
 
 def _invalid_offset() raises:
-    print("test_invalid_offset")
     var values: List[UInt8] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     var t = Tensor[DType.uint8].d1(values)
     var shape = Shape(2, 2)
@@ -187,7 +174,6 @@ def _invalid_offset() raises:
 
 
 def _invalid_stride_overflow() raises:
-    print("test_invalid_stride_overflow")
     comptime dtype = DType.float32
     var values: List[Float32] = List[Float32](length=10, fill=0)
     var t = Tensor[dtype].d1(values)
@@ -200,7 +186,6 @@ def _invalid_stride_overflow() raises:
 
 
 def test_valid_3d_view() raises:
-    print("test_valid_3d_view")
     comptime dtype = DType.float32
     var values: List[Float32] = List[Float32](length=24, fill=0)
     var t = Tensor[dtype].d1(values)
@@ -211,7 +196,6 @@ def test_valid_3d_view() raises:
 
 
 def test_valid_2d_view() raises:
-    print("test_valid_2d_view")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([0, 1, 2, 3, 4, 5])
     var shape = Shape(2, 3)  # 2 rows, 3 cols
@@ -223,7 +207,6 @@ def test_valid_2d_view() raises:
 
 
 def _view_offset_out_of_bounds() raises:
-    print("test_view_offset_out_of_bounds")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([0, 1, 2, 3, 4])
     var shape = Shape(1)
@@ -235,7 +218,6 @@ def _view_offset_out_of_bounds() raises:
 
 
 def test_view_offset_max_boundary() raises:
-    print("test_view_offset_max_boundary")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([0, 1, 2, 3, 4])
     var shape = Shape(1)
@@ -248,7 +230,6 @@ def test_view_offset_max_boundary() raises:
 
 
 def test_view_2d_strides_valid() raises:
-    print("test_view_2d_strides_valid")
     comptime dtype = DType.float32
     var t = Tensor[dtype].arange(12)
     r = t.reshape(Shape(3, 4))  # 3x4 tensor
@@ -263,7 +244,6 @@ def test_view_2d_strides_valid() raises:
 
 
 def _view_2d_strides_overflow() raises:
-    print("test_view_2d_strides_overflow")
     comptime dtype = DType.float32
     var t = Tensor[dtype].arange(12)
     var shape = Shape(3, 3)
@@ -275,7 +255,6 @@ def _view_2d_strides_overflow() raises:
 
 
 def test_view_3d_valid() raises:
-    print("test_view_3d_valid")
     comptime dtype = DType.float32
     var t = Tensor[dtype].arange(60)
     r = t.reshape(Shape(3, 4, 5))  # 3x4x5
@@ -288,7 +267,6 @@ def test_view_3d_valid() raises:
 
 
 def _view_3d_invalid_strides() raises:
-    print("test_view_3d_invalid_strides")
     comptime dtype = DType.float32
     var t = Tensor[dtype].arange(60)
     r = t.reshape(Shape(3, 4, 5))
@@ -305,7 +283,6 @@ def _view_3d_invalid_strides() raises:
 
 
 def test_view_default_strides() raises:
-    print("test_view_default_strides")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1, 2], [3, 4]])  # Shape: (2, 2)
     var v = t.view(Shape(4))  # Reshape to (4,)
@@ -314,7 +291,6 @@ def test_view_default_strides() raises:
 
 
 def _view_invalid_offset() raises:
-    print("test_view_invalid_offset")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1, 2], [3, 4]])
     with assert_raises():
@@ -322,7 +298,6 @@ def _view_invalid_offset() raises:
 
 
 def _view_invalid_shape() raises:
-    print("test_view_invalid_shape")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1, 2], [3, 4]])
     with assert_raises():
@@ -330,7 +305,6 @@ def _view_invalid_shape() raises:
 
 
 def _view_invalid_strides_rank() raises:
-    print("test_view_invalid_strides_rank")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1, 2], [3, 4]])
     with assert_raises():
@@ -338,7 +312,6 @@ def _view_invalid_strides_rank() raises:
 
 
 def test_view_with_strides_basic() raises:
-    print("test_view_with_strides_basic")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1, 2], [3, 4]])
     var strides = Strides(1, 2)  # Would result in skip reading
@@ -350,7 +323,6 @@ def test_view_with_strides_basic() raises:
 
 
 def _view_negative_stride_fails_safely() raises:
-    print("test_view_negative_stride_fails_safely")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1, 2], [3, 4]])
     var strides = Strides(-1, 1)
@@ -359,7 +331,6 @@ def _view_negative_stride_fails_safely() raises:
 
 
 def test_view_offset_slice() raises:
-    print("test_view_offset_slice")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([1, 2, 3, 4, 5, 6])
     var shape = Shape(2)
@@ -369,7 +340,6 @@ def test_view_offset_slice() raises:
 
 
 def test_view_reuse_data_storage() raises:
-    print("test_view_reuse_data_storage")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([1, 2, 3, 4])
     var v = t.view(Shape(2, 2))
@@ -379,7 +349,6 @@ def test_view_reuse_data_storage() raises:
 
 
 def test_view_identity() raises:
-    print("test_view_identity")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1, 2], [3, 4]])
     var s = t.shape()
@@ -389,7 +358,6 @@ def test_view_identity() raises:
 
 
 def test_view_stride_bounds_overflow() raises:
-    print("test_view_stride_bounds_overflow")
     # max_index = offset + ∑ (shape[i] - 1) * strides[i]
     # For single dimension max_index = offset + (shape[0] - 1) * strides[0]
     comptime dtype = DType.float32
@@ -402,7 +370,6 @@ def test_view_stride_bounds_overflow() raises:
 
 
 def test_getitem_list_empty_indices_returns_full_view() raises:
-    print("test_getitem_list_empty_indices_returns_full_view")
     comptime dtype = DType.float32
     a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     # v = a.__getitem__(List[Int]())
@@ -414,7 +381,6 @@ def test_getitem_list_empty_indices_returns_full_view() raises:
 
 # Following are older test cases - needs to be verified and run
 def test_into_tensor_full_view_copy() raises:
-    print("test_into_tensor_full_view_copy")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var v = t.view(Shape(2, 2))
@@ -424,7 +390,6 @@ def test_into_tensor_full_view_copy() raises:
 
 
 def test_into_tensor_transposed_view() raises:
-    print("test_into_tensor_transposed_view")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var v = t.transpose()
@@ -433,7 +398,6 @@ def test_into_tensor_transposed_view() raises:
 
 
 def test_into_tensor_offset_view() raises:
-    print("test_into_tensor_offset_view")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([0, 1, 2, 3, 4, 5])
     var v = t.view(Shape(2), offset=3)
@@ -442,7 +406,6 @@ def test_into_tensor_offset_view() raises:
 
 
 def test_into_tensor_scalar_view() raises:
-    print("test_into_tensor_scalar_view")
     comptime dtype = DType.float32
     var t = Tensor[dtype].scalar(42)
     var v = t.view(Shape())
@@ -452,7 +415,6 @@ def test_into_tensor_scalar_view() raises:
 
 
 def _into_tensor_empty_view() raises:
-    print("test_into_tensor_empty_view")
     comptime dtype = DType.float32
     var t = Tensor[DType.float32](Shape(0, 3))
     var v = t.view(Shape(0, 3))
@@ -462,7 +424,6 @@ def _into_tensor_empty_view() raises:
 
 
 def test_into_tensor_grad_flag_true() raises:
-    print("test_into_tensor_grad_flag_true")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var v = t.view(Shape(2, 2))
@@ -471,7 +432,6 @@ def test_into_tensor_grad_flag_true() raises:
 
 
 def test_into_tensor_grad_flag_false() raises:
-    print("test_into_tensor_grad_flag_false")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=False)
     var v = t.view(Shape(2, 2))
@@ -480,7 +440,6 @@ def test_into_tensor_grad_flag_false() raises:
 
 
 def test_into_tensor_large_contiguous_copy() raises:
-    print("test_into_tensor_large_contiguous_copy")
     comptime dtype = DType.float32
     N = 1024 * 1024
     var t = Tensor[dtype].zeros(Shape(N))
@@ -493,7 +452,6 @@ def test_into_tensor_large_contiguous_copy() raises:
 
 
 def test_into_tensor_isolated_memory() raises:
-    print("test_into_tensor_isolated_memory")
     comptime dtype = DType.float32
     t = Tensor[dtype].d1([1, 2, 3, 4])
     v = t[1:3]  # [2, 3]
@@ -504,14 +462,12 @@ def test_into_tensor_isolated_memory() raises:
         out.all_close(Tensor[dtype].d1([2, 3]))
     )  # Unaffected by view mutation
     _ = """def test_into_tensor_strided_view_rows() raises:
-    print("test_into_tensor_strided_view_rows")
     var t = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6], [7, 8]])
     var v = t.slice_rows(0, 4, 2)  # Should give rows [0, 2]
     var out = v.contiguous()
     assert_true(out.all_close(Tensor[dtype].d2([[1, 2], [5, 6]])))
 
 def test_into_tensor_contiguous_slice_1d() raises:
-    print("test_into_tensor_contiguous_slice_1d")
     var t = Tensor[dtype].d1([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     var v = t.slice(2, 7)
     var out = v.contiguous()
@@ -520,7 +476,6 @@ def test_into_tensor_contiguous_slice_1d() raises:
 
 
 def test_into_tensor_nested_view() raises:
-    print("test_into_tensor_nested_view")
     var t = Tensor[dtype].d1([10, 20, 30, 40, 50])
     var v1 = t.slice(1, 5)           # [20, 30, 40, 50]
     var v2 = v1.slice(1, 3)          # [30, 40]
@@ -529,7 +484,6 @@ def test_into_tensor_nested_view() raises:
 
 
 def test_backward_through_nested_views_non_contiguous() raises:
-    print("test_backward_through_nested_views_non_contiguous")
     comptime dtype = DType.float32
     a = Tensor[dtype].rand(Shape(4, 4), requires_grad=True)
     t = a.transpose(0, 1)
@@ -546,7 +500,6 @@ def test_backward_through_nested_views_non_contiguous() raises:
 
 
 def test_identity_permutation() raises:
-    print("test_identity_permutation")
     comptime dtype = DType.float32
     x3 = Tensor[dtype].rand(Shape(3, 3), requires_grad=True)
     v3 = x3.into_view()
@@ -557,7 +510,6 @@ def test_identity_permutation() raises:
 
 
 def test_reshape_slice_sum_backward() raises:
-    print("test_reshape_slice_sum_backward")
     comptime dtype = DType.float32
     a = Tensor[dtype].arange(15, requires_grad=True)
     r = a.reshape(5, 3)
@@ -593,7 +545,6 @@ def test_reshape_slice_sum_backward() raises:
 
 
 def test_backward_through_nested_views() raises:
-    print("test_backward_through_nested_views")
     comptime dtype = DType.float32
     # Test 1: Simple 2D transpose
     x1 = Tensor[dtype].rand(Shape(2, 3), requires_grad=True)
@@ -616,7 +567,6 @@ def test_backward_through_nested_views() raises:
 
 
 def _nested_views_grad_propagation_1() raises:
-    print("test_nested_views_grad_propagation")
     comptime dtype = DType.float32
 
     # Step 1: Create a base tensor
@@ -638,7 +588,6 @@ def _nested_views_grad_propagation_1() raises:
     LOSS.backward()
 
     # Validate: only the correct region of x.grad should be non-zero
-    # A.grad().print()
     var zero_count = 0
     var nonzero_count = 0
     for i in range(4):
@@ -663,7 +612,6 @@ def _nested_views_grad_propagation_1() raises:
 
 
 def test_nested_views_grad_propagation() raises:
-    print("test_nested_views_grad_propagation")
     comptime dtype = DType.float32
 
     # Step 1: Base tensor
@@ -709,7 +657,6 @@ def test_nested_views_grad_propagation() raises:
 
 
 def test_edge_case_indexing() raises:
-    print("test_edge_case_indexing")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(6)
     r = a.reshape([2, 3])
@@ -727,7 +674,6 @@ def test_edge_case_indexing() raises:
 
 
 def _mixed_indexing() raises:
-    print("test_mixed_indexing")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(12, requires_grad=True)
     r = a.reshape([3, 4])
@@ -748,7 +694,6 @@ def _mixed_indexing() raises:
 
 
 def _newaxis_dimension_insertion() raises:
-    print("test_newaxis_dimension_insertion")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1, 2, 3], requires_grad=True)
 
@@ -770,7 +715,6 @@ def _newaxis_dimension_insertion() raises:
 
 
 def test_basic_slicing() raises:
-    print("test_basic_slicing")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(6, requires_grad=True)
     r = a.reshape([2, 3])
@@ -798,7 +742,6 @@ def test_basic_slicing() raises:
 
 
 def test_integer_indexing() raises:
-    print("test_integer_indexing")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(6, requires_grad=True)
     r = a.reshape(2, 3)
@@ -817,7 +760,6 @@ def test_integer_indexing() raises:
 
 
 def _newaxis() raises:
-    print("test_newaxis")
     comptime dtype = DType.float32
     x = Tensor[dtype].d1([1, 2, 3], requires_grad=True)
     y = x[newaxis, s(), newaxis]
@@ -828,7 +770,6 @@ def _newaxis() raises:
 
 
 def test_scalar_view() raises:
-    print("test_scalar_view")
     comptime dtype = DType.float32
     a = Tensor[dtype].scalar(10, requires_grad=True)
     v = a.into_view()
