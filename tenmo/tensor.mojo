@@ -3270,9 +3270,6 @@ struct Tensor[dtype: DType](
         Returns:
             A view tensor sharing the underlying buffer.
         """
-        if self.is_shared():
-            log_warning("Tensor → into_view: already shared")
-            return self.copy()
         var shape, strides, offset = self.shape(), self.strides(), self.offset()
         grad_required = requires_grad.or_else(self.requires_grad)
         return View[Self.dtype].forward[track_grad](
