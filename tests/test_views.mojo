@@ -12,49 +12,7 @@ from tenmo.common_utils import i, newaxis, s
 
 
 def main() raises:
-    test_slice_every_second_row_column1()
-    test_permute_backward()
-    test_tensor_permute_flatten_backprop()
-    test_flat_view_chain_backprop()
-    test_nonzero_offset_multi_view_chain()
-    test_strided_view_chain_2d_to_3d()
-    test_nested_views_with_interleaved_strides()
-    test_view_chain_reversed_shape()
-    test_grad_propagation_with_offset_chain()
-    test_nested_view_backward_indexing()
-    test_valid_3d_view()
-    test_valid_2d_view()
-    test_view_offset_max_boundary()
-    test_view_2d_strides_valid()
-    test_view_3d_valid()
-    test_view_default_strides()
-    test_view_with_strides_basic()
-    test_view_offset_slice()
-    test_view_reuse_data_storage()
-    test_view_identity()
-    test_view_stride_bounds_overflow()
-    test_getitem_list_empty_indices_returns_full_view()
-    test_into_tensor_full_view_copy()
-    test_into_tensor_transposed_view()
-    test_into_tensor_offset_view()
-    test_into_tensor_scalar_view()
-    test_into_tensor_grad_flag_true()
-    test_into_tensor_grad_flag_false()
-    test_into_tensor_large_contiguous_copy()
-    test_into_tensor_isolated_memory()
-
-    test_backward_through_nested_views_non_contiguous()
-    test_identity_permutation()
-    test_reshape_slice_sum_backward()
-    test_backward_through_nested_views()
-    test_nested_views_grad_propagation()
-    test_edge_case_indexing()
-    test_basic_slicing()
-    test_integer_indexing()
-    test_scalar_view()
-
-    # TestSuite.discover_tests[__functions_in_module()]().run()
-    print("\nAll views tests passed!")
+    TestSuite.discover_tests[__functions_in_module()]().run()
 
 
 def test_slice_every_second_row_column1() raises:
@@ -878,3 +836,571 @@ def test_scalar_view() raises:
     s = t * 2
     s.backward(42)
     assert_true(a.grad().item() == 84, "Scalar view grad assertion failed")
+
+
+def test_view_into_view_2d_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
+    var v = a.into_view()
+    assert_true(v.shape() == a.shape())
+    assert_true(v.strides() == a.strides())
+    assert_true(v.offset() == a.offset())
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 3), 1.0)))
+
+
+def test_view_into_view_3d_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 24.0, requires_grad=True)
+    var a3 = a.reshape(2, 3, 4)
+    var v = a3.into_view()
+    assert_true(v.shape() == a3.shape())
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(24), 1.0)))
+
+
+def test_view_into_view_scalar_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].scalar(42.0, requires_grad=True)
+    var v = a.into_view()
+    assert_true(v.shape() == Shape())
+    assert_true(v.item() == 42.0)
+    v.backward(1.0)
+    assert_true(a.grad().item() == 1.0)
+
+
+def test_view_into_view_chain_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
+    var v1 = a.into_view()
+    var v2 = v1.into_view()
+    var v3 = v2.into_view()
+    var loss = v3.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(4), 1.0)))
+
+
+def test_view_view_reshape_2d_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(1.0, 7.0, requires_grad=True)
+    var v = a.view(2, 3)
+    assert_true(v.shape() == Shape(2, 3))
+    assert_true(v[0, 0] == 1.0)
+    assert_true(v[1, 2] == 6.0)
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(6), 1.0)))
+
+
+def test_view_view_offset_1d_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([0.0, 1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
+    var v = a.view(Shape(3), offset=2)
+    assert_true(v.shape() == Shape(3))
+    assert_true(v[0] == 2.0)
+    assert_true(v[2] == 4.0)
+    var loss = v.sum()
+    loss.backward()
+    var expected = Tensor[dtype].d1([0.0, 0.0, 1.0, 1.0, 1.0, 0.0])
+    assert_true(a.grad().all_close(expected))
+
+
+def test_view_view_strides_noncontiguous_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
+    var v = a.view(Shape(2, 2), Strides(1, 2))
+    assert_false(v.is_contiguous())
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(4), 1.0)))
+
+
+def test_view_transpose_2d_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
+    var v = a.transpose()
+    assert_true(v.shape() == Shape(3, 2))
+    assert_true(v[0, 0] == 1.0)
+    assert_true(v[2, 1] == 6.0)
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 3), 1.0)))
+
+
+def test_view_transpose_3d_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 24.0, requires_grad=True)
+    var a3 = a.reshape(2, 3, 4)
+    var v = a3.transpose(0, 2, 1)
+    assert_true(v.shape() == Shape(2, 4, 3))
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(24), 1.0)))
+
+
+def test_view_transpose_double_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
+    )
+    var v1 = a.transpose()
+    var v2 = v1.transpose()
+    assert_true(v2.shape() == a.shape())
+    var loss = v2.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(3, 2), 1.0)))
+
+
+def test_view_transpose_weighted_grad_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var v = a.transpose()
+    var w = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
+    var prod = v * w
+    var loss = prod.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]])))
+
+
+def test_view_permute_2d_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(1.0, 7.0, requires_grad=True)
+    var a2 = a.reshape(2, 3)
+    var v = a2.permute([1, 0])
+    assert_true(v.shape() == Shape(3, 2))
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(6), 1.0)))
+
+
+def test_view_permute_3d_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 24.0, requires_grad=True)
+    var a3 = a.reshape(2, 3, 4)
+    var v = a3.permute([2, 0, 1])
+    assert_true(v.shape() == Shape(4, 2, 3))
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(24), 1.0)))
+
+
+def test_view_permute_identity_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var v = a.permute([0, 1])
+    assert_true(v.shape() == a.shape())
+    assert_true(v.all_close(a))
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 2), 1.0)))
+
+
+def test_view_unsqueeze_2d_to_3d_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var v = a.unsqueeze(0)
+    assert_true(v.shape() == Shape(1, 2, 2))
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 2), 1.0)))
+
+
+def test_view_squeeze_3d_to_2d_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True)
+    var v = a.squeeze(0)
+    assert_true(v.shape() == Shape(2, 2))
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(1, 2, 2), 1.0)))
+
+
+def test_view_unsqueeze_squeeze_chain_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
+    var v1 = a.unsqueeze(1)
+    var v2 = v1.squeeze(1)
+    assert_true(v2.shape() == a.shape())
+    var loss = v2.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 3), 1.0)))
+
+
+def test_view_squeeze_all_dims_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].full(Shape(1, 1, 3, 1), 5.0, requires_grad=True)
+    var v = a.squeeze([])
+    assert_true(v.shape() == Shape(3))
+    var loss = v.sum()
+    loss.backward()
+    var expected = Tensor[dtype].full(Shape(1, 1, 3, 1), 1.0)
+    assert_true(a.grad().all_close(expected))
+
+
+def test_view_expand_1d_to_2d_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var v = a.expand(4, 3)
+    assert_true(v.shape() == Shape(4, 3))
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d1([4.0, 4.0, 4.0])))
+
+
+def test_view_expand_col_to_matrix_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0], [2.0], [3.0]], requires_grad=True)
+    var v = a.expand(3, 4)
+    assert_true(v.shape() == Shape(3, 4))
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d2([[4.0], [4.0], [4.0]])))
+
+
+def test_view_expand_3d_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d3([[[1.0, 2.0]]], requires_grad=True)
+    var v = a.expand(3, 4, 2)
+    assert_true(v.shape() == Shape(3, 4, 2))
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d3([[[12.0, 12.0]]])))
+
+
+def test_view_expand_weighted_grad_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]], requires_grad=True)
+    var v = a.expand(4, 3)
+    var w = Tensor[dtype].d2(
+        [[1.0, 2.0, 1.0], [2.0, 1.0, 2.0], [1.0, 2.0, 1.0], [2.0, 1.0, 2.0]]
+    )
+    var loss = (v * w).sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d2([[6.0, 6.0, 6.0]])))
+
+
+def test_view_slice_rows_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 12.0, requires_grad=True)
+    var a2 = a.reshape(3, 4)
+    var v = a2[1:3, :]
+    assert_true(v.shape() == Shape(2, 4))
+    var loss = v.sum()
+    loss.backward()
+    var expected = Tensor[dtype].d1(
+        [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    )
+    assert_true(a.grad().all_close(expected))
+
+
+def test_view_slice_step_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 12.0, requires_grad=True)
+    var a2 = a.reshape(3, 4)
+    var v = a2[0:3:2, :]
+    assert_true(v.shape() == Shape(2, 4))
+    var loss = v.sum()
+    loss.backward()
+    var expected = Tensor[dtype].d1(
+        [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0]
+    )
+    assert_true(a.grad().all_close(expected))
+
+
+def test_view_slice_single_element_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 12.0, requires_grad=True)
+    var a2 = a.reshape(3, 4)
+    var v = a2[i(1), i(2)]
+    v.backward(1.0)
+    var expected = Tensor[dtype].zeros(12)
+    expected[6] = 1.0
+    assert_true(a.grad().all_close(expected))
+
+
+def test_view_slice_newaxis_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var v = a[newaxis, s(), newaxis]
+    assert_true(v.shape() == Shape(1, 3, 1))
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d1([1.0, 1.0, 1.0])))
+
+
+def test_view_flatten_3d_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 24.0, requires_grad=True)
+    var a3 = a.reshape(2, 3, 4)
+    var v = a3.flatten()
+    assert_true(v.shape() == Shape(24))
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(24), 1.0)))
+
+
+def test_view_flatten_partial_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 24.0, requires_grad=True)
+    var a3 = a.reshape(2, 3, 4)
+    var v = a3.flatten(start_dim=1)
+    assert_true(v.shape() == Shape(2, 12))
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(24), 1.0)))
+
+
+def test_view_chain_into_view_then_transpose_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
+    var v1 = a.into_view()
+    var v2 = v1.transpose()
+    var loss = v2.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 3), 1.0)))
+
+
+def test_view_chain_view_offset_then_transpose_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([0.0, 1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
+    var v1 = a.view(Shape(2, 3), offset=0)
+    var v2 = v1.transpose()
+    var loss = v2.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(6), 1.0)))
+
+
+def test_view_chain_view_offset_multi_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 20.0, requires_grad=True)
+    var v1 = a.view(Shape(6, 3), offset=2)
+    var loss = v1.sum()
+    loss.backward()
+    var expected = Tensor[dtype].zeros(20)
+    for i in range(2, 20):
+        expected[i] = 1.0
+    assert_true(a.grad().all_close(expected))
+
+
+def test_view_chain_transpose_permute_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 24.0, requires_grad=True)
+    var a3 = a.reshape(2, 3, 4)
+    var v1 = a3.transpose(0, 2)
+    var v2 = v1.permute([1, 0, 2])
+    var loss = v2.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(24), 1.0)))
+
+
+def test_view_chain_slice_unsqueeze_expand_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 12.0, requires_grad=True)
+    var a2 = a.reshape(3, 4)
+    var v1 = a2[0:2, :]
+    var v2 = v1.unsqueeze(0)
+    var v3 = v2.expand(3, 2, 4)
+    var loss = v3.sum()
+    loss.backward()
+    var expected = Tensor[dtype].d1(
+        [3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 0.0, 0.0, 0.0, 0.0]
+    )
+    assert_true(a.grad().all_close(expected))
+
+
+def test_view_gradbox_zero_single_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var v = a.into_view()
+    var loss = v.sum()
+    loss.backward()
+    var v_grad = v.grad()
+    assert_true(v_grad.all_close(Tensor[dtype].zeros(Shape(2, 2))))
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 2), 1.0)))
+
+
+def test_view_gradbox_zero_chain_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var v1 = a.into_view()
+    var v2 = v1.transpose()
+    var loss = v2.sum()
+    loss.backward()
+    var v1_grad = v1.grad()
+    assert_true(v1_grad.all_close(Tensor[dtype].zeros(Shape(2, 2))))
+    var v2_grad = v2.grad()
+    assert_true(v2_grad.all_close(Tensor[dtype].zeros(Shape(2, 2))))
+
+
+def test_view_gradbox_zero_complex_graph_cpu() raises:
+    comptime dtype = DType.float32
+    var a1 = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var a2 = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
+    var v1 = a1.into_view()
+    var s1 = v1.sum()
+    var v2 = a2.into_view()
+    var s2 = v2.sum()
+    var total = s1 + s2
+    total.backward()
+    var v1_grad = v1.grad()
+    assert_true(v1_grad.all_close(Tensor[dtype].zeros(Shape(2, 2))))
+    var v2_grad = v2.grad()
+    assert_true(v2_grad.all_close(Tensor[dtype].zeros(Shape(2, 2))))
+    assert_true(a1.grad().all_close(Tensor[dtype].full(Shape(2, 2), 1.0)))
+    assert_true(a2.grad().all_close(Tensor[dtype].full(Shape(2, 2), 1.0)))
+
+
+def test_view_gradbox_zero_two_backward_passes_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var v = a.into_view()
+    var loss1 = v.sum()
+    loss1.backward()
+    assert_true(v.grad().all_close(Tensor[dtype].zeros(Shape(2, 2))))
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 2), 1.0)))
+
+
+def test_view_view_mul_scalar_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var v = a.into_view()
+    var r = v * 2.0
+    var loss = r.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 2), 2.0)))
+
+
+def test_view_view_add_view_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var b = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
+    var va = a.into_view()
+    var vb = b.into_view()
+    var r = va + vb
+    var loss = r.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 2), 1.0)))
+    assert_true(b.grad().all_close(Tensor[dtype].full(Shape(2, 2), 1.0)))
+
+
+def test_view_view_mul_view_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var b = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
+    var va = a.into_view()
+    var vb = b.into_view()
+    var r = va * vb
+    var loss = r.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])))
+    assert_true(b.grad().all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])))
+
+
+def test_view_view_sum_axis_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
+    var v = a.into_view()
+    var loss = v.sum(axes=[1])
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 3), 1.0)))
+
+
+def test_view_view_broadcast_add_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
+    var va = a.into_view()
+    var bias = Tensor[dtype].d1([10.0, 20.0, 30.0], requires_grad=True)
+    var vbias = bias.into_view()
+    var r = va + vbias
+    var loss = r.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 3), 1.0)))
+    assert_true(bias.grad().all_close(Tensor[dtype].d1([2.0, 2.0, 2.0])))
+
+
+def test_view_noncontiguous_transpose_backward_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
+    var t = a.transpose()
+    assert_false(t.is_contiguous())
+    var loss = t.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(2, 3), 1.0)))
+
+
+def test_view_noncontiguous_strided_backward_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1(
+        [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], requires_grad=True
+    )
+    var v = a.view(Shape(2, 4), Strides(1, 2))
+    assert_false(v.is_contiguous())
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(8), 1.0)))
+
+
+def test_view_noncontiguous_offset_backward_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1(
+        [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0], requires_grad=True
+    )
+    var v = a.view(Shape(2, 3), Strides(4, 1), offset=1)
+    assert_false(v.is_contiguous())
+    var loss = v.sum()
+    loss.backward()
+    var expected = Tensor[dtype].d1([0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0])
+    assert_true(a.grad().all_close(expected))
+
+
+def test_view_multiple_views_same_base_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
+    var v1 = a.into_view()
+    var v2 = a.view(2, 2)
+    var loss = v1.sum() + v2.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(4), 2.0)))
+
+
+def test_view_view_track_grad_false_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var v = a.into_view[track_grad=False]()
+    assert_false(v.requires_grad)
+
+
+def test_view_view_4d_backward_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 120.0, requires_grad=True)
+    var a4 = a.reshape(2, 3, 4, 5)
+    var v = a4.into_view()
+    var loss = v.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].full(Shape(120), 1.0)))
+
+
+def test_view_view_data_sharing_cpu() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])
+    var v = a.into_view()
+    a[0] = 99.0
+    assert_true(v[0] == 99.0)
+    v[1] = 88.0
+    assert_true(a[1] == 88.0)

@@ -285,8 +285,16 @@ struct View[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var abs_strides: Strides
 
         if not validated:
+            var storage_size: Int
+            comptime if has_accelerator():
+                if tensor.is_on_gpu():
+                    storage_size = len(tensor.buffer.device_state.value())
+                else:
+                    storage_size = tensor.buffer.size()
+            else:
+                storage_size = tensor.buffer.size()
             (abs_offset, abs_strides) = Validator.validate_view_params(
-                tensor.buffer.size(), shape, strides, offset
+                storage_size, shape, strides, offset
             )
         else:
             abs_offset = offset

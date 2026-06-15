@@ -1044,5 +1044,291 @@ struct CEProbabilityFusedKernel[dtype: DType, max_block_size: Int]:
 
 **Blocks:** None. Code compiles, all 139 CE tests pass (including the 3 GPU-guarded prob tests which now skip gracefully with the CPU fallback instead of crashing).
 
+## Bias Implementation — `Linear` / `LinearBLAS` / `Conv2D`
+
+### Status
+
+- `Conv2D` uses **runtime `Bool` + sentinel** (0-rank `Tensor.scalar(0)`) — implemented.
+- `Linear` / `LinearBLAS` — **not yet implemented** (pending decision).
+- This section documents the full design conversation so the rationale is not lost.
+
+### Problem
+
+Transformers and modern architectures often eliminate bias from linear/attention layers entirely (e.g. GPT-2, Llama, most post-2020 ViTs). When a user writes `Linear(in_features, out_features, bias=False)`, we need:
+
+1. **No bias storage** — don't allocate memory for bias weights.
+2. **No bias computation** — skip the bias-add kernel entirely.
+3. **No gradient flow** — don't allocate a gradbox for the bias.
+4. **Clean introspection** — `parameters()` returns only the weight; `num_parameters()` counts only the weight.
+
+### Three Approaches Considered
+
+#### Approach A: Runtime `Bool` + sentinel 0-rank Tensor (Conv2D's current pattern)
+
+```mojo
+def __init__(..., bias: Bool = True):
+    if bias:
+        self.bias = Tensor[Self.dtype].zeros(Shape(out_features), requires_grad=True)
+    else:
+        self.bias = Tensor[Self.dtype].scalar(0)  # 0-rank, requires_grad=False
+
+def __call__(...):
+    result = matmul_out^
+    if self.bias.shape().rank() > 0:
+        result = Adder.forward(result^, self.bias)
+```
+
+**Pros:**
+- Zero changes outside the struct — `Layer` Variant, `Module` dispatch, TAGs, `Sequential`, `SequentialBLAS` all untouched.
+- ~12 lines of changes, all in `net.mojo`.
+- Same pattern as `Conv2D` — consistent.
+
+**Cons:**
+- **Dummy allocation** — `Tensor.scalar(0)` still allocates a 1-element `Buffer`, takes a full `Tensor` slot in the struct, and participates in `to_gpu()`/`to_cpu()` transfers (1 element, negligible but inelegant).
+- **Runtime guards** — every access (forward, `parameters()`, `num_parameters()`, transfer) requires `if self.bias.shape().rank() > 0:`.
+- `num_parameters()` must subtract the 1 from the sentinel scalar: `self.weight.numels() + (self.bias.numels() if self.bias.shape().rank() > 0 else 0)`.
+
+---
+
+## ⚠️ Empirical Finding: Mojo Cannot Conditionally Declare Fields
+
+**Tested 2026-06-15.** The following was confirmed to fail at compile time:
+
+```mojo
+struct Foo[use_extra: Bool]:
+    var always: Int
+    comptime if use_extra:     # ERROR: recursive reference to declaration
+        var extra: Int
+```
+
+Both `comptime if` and `@parameter if` inside struct body fail with "attempt to resolve a recursive reference to declaration." A field always exists in the struct layout regardless of comptime parameters. Only method bodies and inline expressions support `comptime if` branching.
+
+**Implication for bias design:** No approach can eliminate the bias field at compile time. Phase 1 (runtime `Optional[Tensor]`) and Phase 2 (comptime `use_bias`) both have the field present as `Optional[Tensor]`. The comptime flag can only eliminate *guards* (the `if self.bias:` branches), never the storage itself.
+
+---
+
+#### Approach B: Runtime `Optional[Tensor]` (Phase 1)
+
+```mojo
+var bias: Optional[Tensor[Self.dtype]]
+
+def __init__(..., bias: Bool = True):
+    if bias:
+        self.bias = Optional(Tensor[Self.dtype].zeros(Shape(out_features), requires_grad=True))
+    else:
+        self.bias = None  # no allocation at all
+
+def __call__(...):
+    result = matmul_out^
+    if self.bias:   # self.bias.is_some()
+        result = Adder.forward(result^, self.bias.value())
+
+def parameters(...):
+    params.append(weight_ptr)
+    if self.bias:
+        params.append(bias_ptr)
+
+def num_parameters():
+    count = self.weight.numels()
+    if self.bias:
+        count += self.bias.value().numels()
+    return count
+```
+
+**Pros:**
+- **Zero allocation** when `bias=False` — no `Tensor`, no `Buffer`, no `gradbox`.
+- Guards are idiomatic `if self.bias:` — no `shape().rank() > 0` hack.
+- `Optional` tag byte adds ~1 byte to the struct (negligible).
+- Same changeset as Approach A — ~12 insertions.
+- No changes to `Layer`, `Module`, `Sequential`, TAGs, etc.
+- API unchanged: `Linear(in, out, bias=False)` still works.
+
+**Cons:**
+- `Optional` access via `.value()` requires an extra call vs direct field access.
+- Still requires runtime `if` branches (same as sentinel approach).
+- Bias field is always present in the struct (as `Optional[Tensor]`), not eliminated at compile time — but Mojo can't eliminate it anyway.
+
+#### Approach C: Comptime `use_bias` + `Optional[Tensor]` (Phase 2)
+
+Since Mojo cannot eliminate fields, the comptime approach controls *guards only*:
+
+```mojo
+struct Linear[dtype: DType, mode: Int = mm, use_bias: Bool = True]:
+    comptime TAG = LINEAR if use_bias else LINEAR_NO_BIAS
+
+    var weight: Tensor[Self.dtype]
+    var bias: Optional[Tensor[Self.dtype]]    # always Optional, can't eliminate
+
+    def __init__(..., bias_zero: Bool = True):
+        # No runtime `bias` param — bias is a type parameter
+        comptime if use_bias:
+            if bias_zero:
+                self.bias = Optional(Tensor[...].zeros(Shape(out_features), requires_grad=True))
+            else:
+                self.bias = Optional(Tensor[...].rand(Shape(out_features), ..., requires_grad=True))
+        else:
+            self.bias = None
+
+    def __call__(...):
+        var result = Matmul.forward(...)
+        comptime if use_bias:
+            # No `if self.bias:` needed — always Some when use_bias=True
+            result = Adder.forward(result^, self.bias.value())
+
+    def parameters(...):
+        params.append(weight_ptr)
+        comptime if use_bias:
+            params.append(bias_ptr)   # guard eliminated at compile time
+```
+
+**Pros:**
+- **Zero runtime overhead** — all bias guards are `comptime if` branches, eliminated from the binary when `use_bias=False`.
+- `Optional[Tensor]` when `use_bias=False` is always `None` and no code reads it — dead data.
+- Zero allocation + zero instruction overhead for bias=False models (Transformers).
+- Field type is always `Optional[Tensor]` — same struct shape regardless of `use_bias`.
+
+**Cons — the comptime cascade:**
+
+The type signature gains a comptime parameter: `Linear[dtype, mode]` → `Linear[dtype, mode, use_bias]`. API changes from `Linear(in, out, bias=False)` to `Linear[dtype, mode, use_bias=False](in, out)`.
+
+This cascades through every layer that references a concrete `Linear`:
+
+| Layer | Impact |
+|---|---|
+| `Layer` Variant (`net.mojo:772`) | Must list both `Linear[dtype, mm, True]` and `Linear[dtype, mm, False]`, same for `LinearBLAS` and `Conv2D`. Doubles the Variant entries for each. |
+| TAG constants (`mnemonics.mojo:33-43`) | +2 new constants per struct (`LINEAR_NO_BIAS`, `LINEAR_BLAS_NO_BIAS`, `CONV2D_NO_BIAS`). Every subsequent constant shifts — check all `mnemonics.mojo` consumers. |
+| `Module.__call__` (`net.mojo:792`) | +2 branches per struct: `elif tag == LINEAR_NO_BIAS: return self.layer[Linear[Self.dtype, mm, False]](xs)` |
+| `Module.parameters()` (`net.mojo:822`) | +2 branches |
+| `Module.named_parameters()` (`net.mojo:839`) | +2 branches |
+| `Module.num_parameters()` (`net.mojo:853`) | +2 branches |
+| `Module.train()` (`net.mojo:885`) | +2 branches |
+| `Module.eval()` (`net.mojo:910`) | +2 branches |
+| `Module.to_gpu()` (`net.mojo:935`) | +2 branches |
+| `Module.to_cpu()` (`net.mojo:981`) | +2 branches |
+| `Sequential.append()` (`net.mojo:1011`) | Guards against `LINEAR_BLAS` — must also check `LINEAR_BLAS_NO_BIAS` |
+| `SequentialBLAS.append()` (`net.mojo:1137`) | Same guard expansion |
+| Every `layer[Linear[Self.dtype]]` extraction | Must specify `layer[Linear[Self.dtype, mm, True]]` vs `layer[Linear[Self.dtype, mm, False]]` — must match TAG exactly or panic at runtime. |
+| Tests (`test_cpu_all_3.mojo`, `test_checkpoint.mojo`) | `layer[Conv2D[DType.float32]]` → `layer[Conv2D[DType.float32, True]]` (or change to `False`). |
+| Examples (`mnist_conv2d.mojo`) | Construction syntax changes: no `bias=` kwarg. |
+
+**Rough change count: ~30+ lines per struct across `net.mojo` + `mnemonics.mojo` + tests/examples.** For all three (Linear, LinearBLAS, Conv2D): ~80-100 total.
+
+The key combinatorial problem: **every comptime knob on `Linear` doubles the Variant entries and the `Module` dispatch branches.** If we later add `use_layer_norm: Bool`, `use_scale: Bool`, etc., the Variant explodes exponentially.
+
+---
+
+### Two-Phase Implementation Plan
+
+| Phase | What | Cost | Benefit | API Changes |
+|---|---|---|---|---|
+| **1** | Runtime `Optional[Tensor]` + runtime `bias: Bool` | ~11 changes per struct, all local | Zero allocation for `bias=False` | None |
+| **2** | Comptime `use_bias` on top of Phase 1 | ~30+ changes per struct + cascade | Zero runtime branches for `bias=False` | `bias=` kwarg → type param |
+
+### Decision Record (2026-06-15)
+
+| Decision | Choice |
+|---|---|
+| **Phase 1 implementation** | Approach B — `Optional[Tensor]` with runtime `bias: Bool` |
+| **Phase 2 goal** | Approach C — comptime `use_bias` controlling `Optional[Tensor]` guards |
+| **Trigger for Phase 2** | When a Transformer block is written and bias elimination matters for correctness (not just performance). At that point, approach B → C is a mechanical transform within each method. |
+
+**Justification for Phase 1 now (Approach B):**
+
+1. **Same changeset size** as the sentinel hack (~11 lines) — no extra work.
+2. **Zero allocation** — `Optional[Tensor]` stores `None` when `bias=False`. No Buffer, no gradbox.
+3. **Clean guards** — `if self.bias:` is idiomatic Mojo.
+4. **Easy Phase 2 migration** — when we write the Transformer block:
+   - Change each `if self.bias:` → `comptime if use_bias:` (same condition, just earlier binding)
+   - Add `use_bias` to type signature
+   - Absorb the TAG/Variant/Module cascade (~30 changes per struct)
+   - The internal logic per method is identical between phases.
+5. **No cascade risk** — Phase 1 touches zero files outside `net.mojo`.
+
+**Rejected approaches:**
+
+- **Sentinel 0-rank Tensor (Approach A / Conv2D current pattern):** Still allocates 1 element. Inelegant. The `shape().rank() > 0` guard is less idiomatic than `Optional`. Only reason Conv2D uses it is historical precedent — no reason to repeat it.
+- **Always-allocated bias (current state):** Wastes memory, compute, and gradient storage for `bias=False` callers. Unacceptable for modern architectures.
+
+### Phase 1 Scope (Per Struct)
+
+All changes in `net.mojo` only:
+
+| Method | Current → After |
+|---|---|
+| Field | `var bias: Tensor` → `var bias: Optional[Tensor]` |
+| `__init__` | `self.bias = Tensor.zeros/rand/scalar(...)` → `if bias: self.bias = Optional(...)` else `self.bias = None` |
+| `__call__` (forward) | `Adder.forward(..., self.bias)` → `if self.bias: result = Adder.forward(result^, self.bias.value())` |
+| `parameters()` | `params.append(self.bias)` → `if self.bias: params.append(bias_ptr)` |
+| `named_parameters()` | bias NamedParameter → `if self.bias:` |
+| `num_parameters()` | `+ self.bias.numels()` → `+ (self.bias.value().numels() if self.bias else 0)` |
+| `to_gpu()` | `self.bias.to_gpu(...)` → `if self.bias: out.bias = Optional(self.bias.value().to_gpu(...))` else `out.bias = None` |
+| `to_cpu()` | same → same guard |
+
+For `Conv2D` specifically: replaces the sentinel (`Tensor.scalar(0)`) with `None` — same Optional pattern, no more dummy allocation.
+
+### Phase 2 Scope (Per Struct)
+
+Stacked on top of Phase 1:
+
+1. Add `use_bias: Bool = True` as a comptime type parameter
+2. Change `TAG` to ternary: `LINEAR if use_bias else LINEAR_NO_BIAS`
+3. Replace all `if self.bias:` with `comptime if use_bias:` — no runtime check
+4. Remove runtime `bias: Bool` from `__init__` (replaced by type param)
+5. Add `LINEAR_NO_BIAS` (and equivalents) to `mnemonics.mojo`
+6. Add both type instantiations to `Layer` Variant
+7. Add dispatch branches to all 8 `Module` methods
+8. Update `Sequential.append()` guards
+9. Update tests/examples that construct or extract the layer from Variant
+
+API change:
+```mojo
+# Phase 1 (runtime):
+Linear[DType.float32, mm](in, out, bias=False)
+
+# Phase 2 (comptime):
+Linear[DType.float32, mm, use_bias=False](in, out)
+```
+
+### When to Move to Phase 2
+
+1. **A Transformer block (`Attention`, `TransformerBlock`) is written.** At that point we know the exact dispatch surface and can evaluate whether comptime elimination is worth the Variant expansion.
+2. **The Layer Variant combinatorics become a problem.** If we have 3+ comptime knobs (e.g. `use_bias`, `use_layer_norm`, `use_scale`), the 2^N explosion may force a redesign of how `Layer`/`Module` dispatch works — possibly switching from a flat Variant to a trait-based or delegate-based architecture.
+3. **A measured performance regression from the `Optional` tag.** Unlikely, but if a profile shows the extra byte or `.value()` call matters in a tight Transformer loop, Phase 2 eliminates it.
+
+### Type Dispatch Chain (Reference)
+
+```
+Linear[dtype, mode] / LinearBLAS[dtype, mode]
+    ↓ into()
+Layer[dtype] = Variant[Linear[dtype, mm], LinearBLAS[dtype, mm], ...]
+    ↓ stored in
+Module[dtype] { layer: Layer, tag: Int }
+    ↓ tag dispatch to Variant.get[ConcreteType]()
+__call__ / parameters / named_parameters / num_parameters / train / eval / to_gpu / to_cpu
+    ↓ consumed by
+Sequential[dtype] / SequentialBLAS[dtype]
+```
+
+With Phase 2 (comptime `use_bias`), `Module` would need:
+
+```mojo
+if tag == LINEAR:        self.layer[Linear[dtype, mm, True]](xs)
+if tag == LINEAR_NO_BIAS: self.layer[Linear[dtype, mm, False]](xs)
+```
+
+The `Linear[dtype, mm, True]` and `Linear[dtype, mm, False]` are different concrete types — the Variant holds one or the other, and `Variant.get[WrongType]()` panics at runtime.
+
+### Conv2D Phase 1 Migration Note
+
+When `Conv2D` is updated from sentinel to `Optional[Tensor]`:
+- `var bias: Tensor` → `var bias: Optional[Tensor]`
+- `self.bias = Tensor.scalar(0)` → `self.bias = None`
+- `self.bias = Tensor(...)` → `self.bias = Optional(Tensor(...))`
+- `self.bias.shape().rank() > 0` → `self.bias`
+- `.to_gpu()`/`.to_cpu()`: guard transfer with `if self.bias:` (same pattern)
+- `parameters()`: guard with `if self.bias:` (already done, just change condition)
+
+This is a low-priority cleanup — sentinel works, it just wastes 1 element.
+
 ## ⛔ CRITICAL: NEVER launch multiple tests in parallel — Mojo compilation is memory-bound and will crash the machine. Run ONE `./execute.sh` or `./fire.sh` at a time, wait for it to complete, then run the next.
 

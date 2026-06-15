@@ -227,6 +227,7 @@ declare -a GPU_TESTS=(
     "variance_and_std|tests/test_variance_and_std.mojo"
     "tiles|tests/test_tiles.mojo"
     "ce|tests/test_cross_entropy.mojo"
+    "views_gpu|tests/gpu/test_views_gpu.mojo"
 )
 
 # Clear screen
@@ -433,6 +434,7 @@ run_test_by_name() {
         ce)             run_test "ce" "tests/test_cross_entropy.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         checkpoint)     run_test "checkpoint" "tests/test_checkpoint.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         synth_mnist)    run_test "synth_mnist" "tests/test_synthetic_mnist.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        views_gpu)      run_test "views_gpu" "tests/gpu/test_views_gpu.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         gpu_all)
             if [ -n "$chunk_arg" ]; then
                 local chunk_file="tests/test_gpu_all_${chunk_arg}.mojo"
