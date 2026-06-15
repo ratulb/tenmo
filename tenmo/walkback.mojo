@@ -65,3 +65,5 @@ from .gather import GatherBackward
 from .bceloss import BCEWithLogitsBackward, BCELossBackward
 from .absolute import AbsBackward
 from .tril import TrilBackward
+from .triu import TriuBackward
+from .where import WhereBackward

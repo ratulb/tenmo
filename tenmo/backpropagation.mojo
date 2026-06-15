@@ -92,6 +92,8 @@ comptime BACKWARD_BCE_WITH_LOGITS = 59
 comptime BACKWARD_BCE = 60
 comptime BACKWARD_ABS = 61
 comptime BACKWARD_TRIL = 62
+comptime BACKWARD_TRIU = 63
+comptime BACKWARD_WHERE = 64
 
 
 trait ArgumentType(ImplicitlyCopyable & Movable):
@@ -359,6 +361,20 @@ struct TrilArg(ArgumentType):
     var N: Int
 
 
+@fieldwise_init
+struct TriuArg(ArgumentType):
+    var diagonal: Int
+    var M: Int
+    var N: Int
+
+
+@fieldwise_init
+struct WhereArg[dtype: DType](ArgumentType):
+    var condition: NDBuffer[Self.dtype]
+    var a_requires_grad: Bool
+    var b_requires_grad: Bool
+
+
 # ============================================================================
 # Backward — Jump Table Dispatcher
 # ============================================================================
@@ -600,5 +616,13 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             )
         elif op_code == BACKWARD_TRIL:
             TrilBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
+        elif op_code == BACKWARD_TRIU:
+            TriuBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
+        elif op_code == BACKWARD_WHERE:
+            WhereBackward[Self.dtype].backward(
                 output, parent_ids, retain_graph
             )

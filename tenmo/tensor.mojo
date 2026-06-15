@@ -2616,6 +2616,97 @@ struct Tensor[dtype: DType](
             self, diagonal=diagonal, requires_grad=requires_grad, sync=sync
         )
 
+    def triu[
+        track_grad: Bool = True,
+    ](
+        self,
+        diagonal: Int = 0,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype]:
+        return Triu[Self.dtype].forward[track_grad=track_grad](
+            self, diagonal=diagonal, requires_grad=requires_grad, sync=sync
+        )
+
+    @staticmethod
+    def where[
+        track_grad: Bool = True,
+    ](
+        condition: Tensor[DType.bool],
+        a: Tensor[Self.dtype],
+        b: Tensor[Self.dtype],
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) raises -> Tensor[Self.dtype]:
+        return Where[Self.dtype].forward[track_grad](
+            condition, a, b, requires_grad=requires_grad, sync=sync
+        )
+
+    @staticmethod
+    def where[
+        track_grad: Bool = True,
+    ](
+        condition: Tensor[DType.bool],
+        a: Scalar[Self.dtype],
+        b: Tensor[Self.dtype],
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) raises -> Tensor[Self.dtype]:
+        return Where[Self.dtype].forward[track_grad](
+            condition, a, b, requires_grad=requires_grad, sync=sync
+        )
+
+    @staticmethod
+    def where[
+        track_grad: Bool = True,
+    ](
+        condition: Tensor[DType.bool],
+        a: Tensor[Self.dtype],
+        b: Scalar[Self.dtype],
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) raises -> Tensor[Self.dtype]:
+        return Where[Self.dtype].forward[track_grad](
+            condition, a, b, requires_grad=requires_grad, sync=sync
+        )
+
+    @staticmethod
+    def where[
+        track_grad: Bool = True,
+    ](
+        condition: Tensor[DType.bool],
+        a: Scalar[Self.dtype],
+        b: Scalar[Self.dtype],
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) raises -> Tensor[Self.dtype]:
+        return Where[Self.dtype].forward[track_grad](
+            condition, a, b, requires_grad=requires_grad, sync=sync
+        )
+
+    def masked_fill[
+        track_grad: Bool = True,
+    ](
+        self,
+        mask: Tensor[DType.bool],
+        value: Scalar[Self.dtype],
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) raises -> Tensor[Self.dtype]:
+        """Fill elements where mask is True with value.
+        Equivalent to Tensor.where(mask, value, self).
+        Args:
+            mask: Boolean tensor of the same shape.
+            value: Scalar fill value.
+            requires_grad: Whether the result tracks gradients.
+            sync: Whether to sync GPU operations.
+        Returns:
+            A new tensor with masked elements replaced.
+        """
+        return Where[Self.dtype].forward[track_grad](
+            mask, value, self, requires_grad=requires_grad, sync=sync
+        )
+
     def __radd__[
         track_grad: Bool = True, sync: Bool = True
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:

@@ -96,6 +96,9 @@ declare -a ALL_TESTS_IN_ORDER=(
     "sqrt|tests/test_sqrt.mojo"
     "abs|tests/test_abs.mojo"
     "tril|tests/test_tril.mojo"
+    "triu|tests/test_triu.mojo"
+    "where|tests/test_where.mojo"
+    "masked_fill|tests/test_masked_fill.mojo"
     "attn_matmul|tests/test_attn_matmul.mojo"
     "bce|tests/test_bce.mojo"
     "tensors|tests/test_tensors.mojo"
@@ -216,6 +219,9 @@ declare -a GPU_TESTS=(
     "logarithm|tests/test_logarithm.mojo"
     "abs|tests/test_abs.mojo"
     "tril|tests/test_tril.mojo"
+    "triu|tests/test_triu.mojo"
+    "where|tests/test_where.mojo"
+    "masked_fill|tests/test_masked_fill.mojo"
     "tanh|tests/test_tanh.mojo"
     "softmax|tests/test_softmax.mojo"
     "argminmax|tests/test_argminmax.mojo"
@@ -405,6 +411,9 @@ run_test_by_name() {
         losses)         run_test "losses" "tests/test_losses.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         abs)            run_test "abs" "tests/test_abs.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         tril)           run_test "tril" "tests/test_tril.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        triu)           run_test "triu" "tests/test_triu.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        where)          run_test "where" "tests/test_where.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        masked_fill)    run_test "masked_fill" "tests/test_masked_fill.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         tanh)           run_test "tanh" "tests/test_tanh.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         data)           run_test "data" "tests/test_data.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         softmax)        run_test "softmax" "tests/test_softmax.mojo" "$DEBUG_MODE"; exit_code=$? ;;

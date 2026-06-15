@@ -50,3 +50,5 @@ from tenmo.gather import Gather, GatherArg
 from tenmo.embedding import Embedding
 from tenmo.absolute import Absolute
 from tenmo.tril import Tril
+from tenmo.triu import Triu
+from tenmo.where import Where
