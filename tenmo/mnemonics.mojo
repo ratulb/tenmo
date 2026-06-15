@@ -58,3 +58,4 @@ comptime INVERT = 50
 comptime SUM = 51
 comptime MEAN = 52
 comptime PRODUCT = 53
+comptime ABS_BACKWARD = 54

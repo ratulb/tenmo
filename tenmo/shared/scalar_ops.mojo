@@ -34,6 +34,7 @@ from tenmo.mnemonics import (
     LessThanEqual,
     LessThan,
     LOG_BACKWARD,
+    ABS_BACKWARD,
 )
 from std.math import sqrt, log, exp, tanh, rsqrt
 
@@ -240,6 +241,11 @@ def simd_op[
         return min(a, b)
     elif op_code == POW:
         return a ** b
+    elif op_code == ABS_BACKWARD:
+        var zero = SIMD[dtype, simd_width](0)
+        var pos = SIMD[dtype, simd_width](a.gt(zero))
+        var neg = SIMD[dtype, simd_width](a.lt(zero))
+        return b * (pos - neg)
     else:  # LOG_BACKWARD
         return b / max(a, eps)
 
@@ -279,6 +285,14 @@ def scalar_op[
         return min(a, b)
     elif op_code == POW:
         return a ** b
+    elif op_code == ABS_BACKWARD:
+        var zero = Scalar[dtype](0)
+        if a > zero:
+            return b
+        elif a < zero:
+            return -b
+        else:
+            return zero
     else:  # LOG_BACKWARD
         return b / max(a, epsilon)
 

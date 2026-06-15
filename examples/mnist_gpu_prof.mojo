@@ -137,11 +137,11 @@ def train_mnist() raises:
     print()
 
     var w1 = model.modules[0].layer[Linear[FEATURE_DTYPE, mm]].weight
-    var b1 = model.modules[0].layer[Linear[FEATURE_DTYPE, mm]].bias
+    var b1 = model.modules[0].layer[Linear[FEATURE_DTYPE, mm]].bias.value()
     var w2 = model.modules[2].layer[Linear[FEATURE_DTYPE, mm]].weight
-    var b2 = model.modules[2].layer[Linear[FEATURE_DTYPE, mm]].bias
+    var b2 = model.modules[2].layer[Linear[FEATURE_DTYPE, mm]].bias.value()
     var w3 = model.modules[4].layer[Linear[FEATURE_DTYPE, mm]].weight
-    var b3 = model.modules[4].layer[Linear[FEATURE_DTYPE, mm]].bias
+    var b3 = model.modules[4].layer[Linear[FEATURE_DTYPE, mm]].bias.value()
 
     var optimizer = SGD(
         model.parameters(),

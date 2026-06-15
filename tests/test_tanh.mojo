@@ -307,7 +307,7 @@ def test_tanh_with_linear_layer() raises:
     loss.backward()
 
     assert_true(layer.weight.has_grad(), "Linear weight should have gradient")
-    assert_true(layer.bias.has_grad(), "Linear bias should have gradient")
+    assert_true(layer.bias.value().has_grad(), "Linear bias should have gradient")
 
 
 # ============================================================================

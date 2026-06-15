@@ -94,6 +94,8 @@ declare -a ALL_TESTS_IN_ORDER=(
     "product|tests/test_product_reduction.mojo"
     "unary|tests/test_unary_ops.mojo"
     "sqrt|tests/test_sqrt.mojo"
+    "abs|tests/test_abs.mojo"
+    "tril|tests/test_tril.mojo"
     "attn_matmul|tests/test_attn_matmul.mojo"
     "bce|tests/test_bce.mojo"
     "tensors|tests/test_tensors.mojo"
@@ -212,6 +214,8 @@ declare -a GPU_TESTS=(
     "dropout|tests/test_dropout.mojo"
     "dev_transfer|tests/test_device_transfer_gradflow.mojo"
     "logarithm|tests/test_logarithm.mojo"
+    "abs|tests/test_abs.mojo"
+    "tril|tests/test_tril.mojo"
     "tanh|tests/test_tanh.mojo"
     "softmax|tests/test_softmax.mojo"
     "argminmax|tests/test_argminmax.mojo"
@@ -337,6 +341,7 @@ run_test_by_name() {
         reciprocal)     run_test "reciprocal" "tests/test_reciprocal.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         product)        run_test "product" "tests/test_product_reduction.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         unary)          run_test "unary" "tests/test_unary_ops.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        abs)            run_test "abs" "tests/test_abs.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         sqrt)           run_test "sqrt" "tests/test_sqrt.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         attn_matmul)    run_test "attn_matmul" "tests/test_attn_matmul.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         bce)            run_test "bce" "tests/test_bce.mojo" "$DEBUG_MODE"; exit_code=$? ;;
@@ -398,6 +403,8 @@ run_test_by_name() {
         utils)          run_test "utils" "tests/test_utils.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         indexhelper)    run_test "indexhelper" "tests/test_indexhelper.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         losses)         run_test "losses" "tests/test_losses.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        abs)            run_test "abs" "tests/test_abs.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        tril)           run_test "tril" "tests/test_tril.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         tanh)           run_test "tanh" "tests/test_tanh.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         data)           run_test "data" "tests/test_data.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         softmax)        run_test "softmax" "tests/test_softmax.mojo" "$DEBUG_MODE"; exit_code=$? ;;

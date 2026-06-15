@@ -928,6 +928,20 @@ struct NDBuffer[dtype: DType](
         )
 
         if max_index >= size:
+            print(
+                "NDBuffer → share FAILURE: self.shape=",
+                self.shape,
+                " size=",
+                size,
+                " cpu_buffer_len=",
+                len(self.buffer),
+                " view_shape=",
+                new_shape,
+                " strides=",
+                new_strides,
+                " offset=",
+                offset,
+            )
             panic(
                 "NDBuffer → share: invalid view [max_index="
                 + String(max_index)

@@ -2589,13 +2589,31 @@ struct Tensor[dtype: DType](
         )
 
     def __abs__(self) -> Tensor[Self.dtype]:
-        """Element-wise absolute value.
+        return Absolute[Self.dtype].forward[track_grad=False](self, sync=True)
 
-        Returns:
-            Tensor with absolute values.
-        """
-        return Tensor[Self.dtype](
-            self.buffer.unary_ops[ABS](), requires_grad=False
+    def abs[
+        track_grad: Bool = True,
+    ](
+        self,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[
+        Self.dtype
+    ]:
+        return Absolute[Self.dtype].forward[track_grad=track_grad](
+            self, requires_grad=requires_grad, sync=sync
+        )
+
+    def tril[
+        track_grad: Bool = True,
+    ](
+        self,
+        diagonal: Int = 0,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype]:
+        return Tril[Self.dtype].forward[track_grad=track_grad](
+            self, diagonal=diagonal, requires_grad=requires_grad, sync=sync
         )
 
     def __radd__[

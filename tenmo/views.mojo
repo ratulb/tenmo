@@ -23,7 +23,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         retain_graph: Bool = False,
     ):
         comptime if has_accelerator():
-            if output.is_on_gpu():
+            if output.gradients().is_on_gpu():
                 Self.backward_gpu(output, parent_ids)
                 ref gradbox = output.gradients()
                 gradbox.zero_grad()
@@ -152,11 +152,12 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             # Materialise entire GPU DeviceBuffer to CPU — raw flat copy
             var ds = gradbox.buffer().device_state.value()
             var cpu_ndb_flat = ds.into(Shape(len(ds)))
-            # Re-attach the view's logical shape/strides/offset
-            # so backward_cpu coordinate mapping works correctly
-            var cpu_ndb = cpu_ndb_flat.share(
-                shape, Strides.default(shape), offset
-            )
+            # Re-attach the view's logical shape/strides
+            # so backward_cpu coordinate mapping works correctly.
+            # Use offset=0 because the materialized data starts at the view's
+            # first element — the view's Gradbox is a fresh contiguous allocation,
+            # not a zero-copy slice of the parent's buffer.
+            var cpu_ndb = cpu_ndb_flat.share(shape, Strides.default(shape), 0)
             cpu_gradbox = Gradbox[Self.dtype](cpu_ndb^)
         except e:
             panic(

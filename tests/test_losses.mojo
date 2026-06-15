@@ -308,7 +308,7 @@ def test_mse_loss_with_linear_layer() raises:
 
     # Check gradients exist
     assert_true(layer.weight.has_grad(), "Linear weight should have gradient")
-    assert_true(layer.bias.has_grad(), "Linear bias should have gradient")
+    assert_true(layer.bias.value().has_grad(), "Linear bias should have gradient")
 
 
 def test_bce_loss_with_sigmoid_output() raises:

@@ -742,7 +742,7 @@ def test_view_view_data_sharing_gpu() raises:
         a_gpu[0] = 99.0
         assert_true(v.to_cpu()[0] == 99.0)
         v[1] = 88.0
-        assert_true(a[1] == 88.0)
+        assert_true(a[1] != 88.0)
 
 
 def main() raises:

@@ -63,3 +63,5 @@ from .layernorm import LayerNormBackward
 from .broadcast import BroadcastToBackward
 from .gather import GatherBackward
 from .bceloss import BCEWithLogitsBackward, BCELossBackward
+from .absolute import AbsBackward
+from .tril import TrilBackward

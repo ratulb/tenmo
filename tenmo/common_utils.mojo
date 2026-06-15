@@ -465,11 +465,14 @@ def print_summary[
             current_shape = output_shape
 
             # Params
-            var params = (
-                l.weight.shape().num_elements() + l.bias.shape().num_elements()
-            )
+            var bias_numels = 0
+            var bias_trainable = False
+            if l.bias:
+                bias_numels = l.bias.value().shape().num_elements()
+                bias_trainable = l.bias.value().requires_grad
+            var params = l.weight.shape().num_elements() + bias_numels
             total_params += params
-            if l.weight.requires_grad or l.bias.requires_grad:
+            if l.weight.requires_grad or bias_trainable:
                 trainable_params += params
 
             rows.append(
@@ -479,7 +482,7 @@ def print_summary[
                     input_shape,
                     output_shape,
                     String(params),
-                    String(l.weight.requires_grad or l.bias.requires_grad),
+                    String(l.weight.requires_grad or bias_trainable),
                 ]
             )
 

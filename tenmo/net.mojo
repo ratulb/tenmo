@@ -46,14 +46,13 @@ from .device import GPU
 from .named_parameter import NamedParameter
 
 
-@fieldwise_init
 struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
     """Fully connected layer: y = xW + b."""
 
     comptime TAG = LINEAR
 
     var weight: Tensor[Self.dtype]
-    var bias: Tensor[Self.dtype]
+    var bias: Optional[Tensor[Self.dtype]]
     var in_features: Int
     var out_features: Int
     var training: Bool
@@ -64,6 +63,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         out_features: Int,
         init_seed: Optional[Int] = None,
         init_method: String = "standard",  # "standard", "xavier", "he"
+        bias: Bool = True,
         bias_zero: Bool = True,
     ):
         """
@@ -77,14 +77,14 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 - "standard": Uniform[-0.1, 0.1] (good for [0,1] normalized inputs).
                 - "xavier": Xavier/Glorot uniform (good for tanh/sigmoid).
                 - "he": He/Kaiming normal (good for ReLU with standardized inputs).
-            bias_zero: If True, initialize bias to zeros.
+            bias: If True, create bias parameter. If False, no bias is allocated.
+            bias_zero: If True and bias=True, initialize bias to zeros.
         """
         self.in_features = in_features
         self.out_features = out_features
         self.training = True
 
         if init_method == "xavier":
-            # Xavier/Glorot uniform initialization
             var limit = Scalar[Self.dtype](
                 sqrt(6.0 / Float64(in_features + out_features))
             )
@@ -95,21 +95,27 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 init_seed=init_seed,
                 requires_grad=True,
             )
-            if not bias_zero:
-                self.bias = Tensor[Self.dtype].rand(
-                    Shape(out_features),
-                    min=-limit,
-                    max=limit,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
+            if bias:
+                if not bias_zero:
+                    self.bias = Optional(
+                        Tensor[Self.dtype].rand(
+                            Shape(out_features),
+                            min=-limit,
+                            max=limit,
+                            init_seed=init_seed,
+                            requires_grad=True,
+                        )
+                    )
+                else:
+                    self.bias = Optional(
+                        Tensor[Self.dtype].zeros(
+                            Shape(out_features), requires_grad=True
+                        )
+                    )
             else:
-                self.bias = Tensor[Self.dtype].zeros(
-                    Shape(out_features), requires_grad=True
-                )
+                self.bias = None
 
         elif init_method == "he":
-            # He/Kaiming normal initialization (for ReLU)
             var std = sqrt(2.0 / Float64(in_features))
             self.weight = Tensor[Self.dtype].randn(
                 shape=Shape(in_features, out_features),
@@ -118,21 +124,27 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 init_seed=init_seed,
                 requires_grad=True,
             )
-            if not bias_zero:
-                self.bias = Tensor[Self.dtype].randn(
-                    Shape(out_features),
-                    mean=0.0,
-                    std=std * 0.01,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
+            if bias:
+                if not bias_zero:
+                    self.bias = Optional(
+                        Tensor[Self.dtype].randn(
+                            Shape(out_features),
+                            mean=0.0,
+                            std=std * 0.01,
+                            init_seed=init_seed,
+                            requires_grad=True,
+                        )
+                    )
+                else:
+                    self.bias = Optional(
+                        Tensor[Self.dtype].zeros(
+                            Shape(out_features), requires_grad=True
+                        )
+                    )
             else:
-                self.bias = Tensor[Self.dtype].zeros(
-                    Shape(out_features), requires_grad=True
-                )
+                self.bias = None
 
         else:  # "standard" or default
-            # Simple uniform initialization (good for [0,1] normalized inputs)
             var limit = Scalar[Self.dtype](0.1)
             self.weight = Tensor[Self.dtype].rand(
                 shape=Shape(in_features, out_features),
@@ -141,24 +153,32 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 init_seed=init_seed,
                 requires_grad=True,
             )
-            if not bias_zero:
-                self.bias = Tensor[Self.dtype].rand(
-                    Shape(out_features),
-                    min=-limit,
-                    max=limit,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
+            if bias:
+                if not bias_zero:
+                    self.bias = Optional(
+                        Tensor[Self.dtype].rand(
+                            Shape(out_features),
+                            min=-limit,
+                            max=limit,
+                            init_seed=init_seed,
+                            requires_grad=True,
+                        )
+                    )
+                else:
+                    self.bias = Optional(
+                        Tensor[Self.dtype].zeros(
+                            Shape(out_features), requires_grad=True
+                        )
+                    )
             else:
-                self.bias = Tensor[Self.dtype].zeros(
-                    Shape(out_features), requires_grad=True
-                )
+                self.bias = None
 
-        # Share weight buffer so ancestry copies are a refcount bump, not deep memcpy
         if self.weight.requires_grad:
             self.weight.buffer.buffer.shared()
 
-    def __call__(mut self, mut xs: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
+    def __call__(
+        mut self, mut xs: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         ref xs_shape = xs.shape()
         ref weight_shape = self.weight.shape()
 
@@ -175,17 +195,23 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
             var matmul_out = Matmul[Self.dtype].forward[
                 track_grad=True, mode=Self.mode
             ](xs, self.weight, sync=sync)
-            result = Adder[Self.dtype].forward[track_grad=True](
-                matmul_out^, self.bias, sync=sync
-            )
+            if self.bias:
+                result = Adder[Self.dtype].forward[track_grad=True](
+                    matmul_out^, self.bias.value(), sync=sync
+                )
+            else:
+                result = matmul_out^
 
         else:
             var matmul_out = Matmul[Self.dtype].forward[
                 track_grad=False, mode=Self.mode
             ](xs, self.weight, sync=sync)
-            result = Adder[Self.dtype].forward[track_grad=False](
-                matmul_out^, self.bias, sync=sync
-            )
+            if self.bias:
+                result = Adder[Self.dtype].forward[track_grad=False](
+                    matmul_out^, self.bias.value(), sync=sync
+                )
+            else:
+                result = matmul_out^
 
         return result^
 
@@ -198,10 +224,12 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
             .unsafe_mut_cast[True]()
             .as_any_origin()
         )
-        params.append(
-            UnsafePointer(to=self.bias).unsafe_mut_cast[True]().as_any_origin()
-        )
-
+        if self.bias:
+            params.append(
+                UnsafePointer(to=self.bias.value())
+                .unsafe_mut_cast[True]()
+                .as_any_origin()
+            )
         return params^
 
     def named_parameters(
@@ -210,12 +238,16 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         var result = List[NamedParameter[Self.dtype]]()
         var w = UnsafePointer(to=self.weight).unsafe_mut_cast[True]()
         result.append(NamedParameter(prefix + "weight", w.as_any_origin()))
-        var b = UnsafePointer(to=self.bias).unsafe_mut_cast[True]()
-        result.append(NamedParameter(prefix + "bias", b.as_any_origin()))
+        if self.bias:
+            var b = UnsafePointer(to=self.bias.value()).unsafe_mut_cast[True]()
+            result.append(NamedParameter(prefix + "bias", b.as_any_origin()))
         return result^
 
     def num_parameters(self) -> Int:
-        return self.weight.numels() + self.bias.numels()
+        var count = self.weight.numels()
+        if self.bias:
+            count += self.bias.value().numels()
+        return count
 
     def train(mut self):
         """Set to training mode - enables gradient tracking."""
@@ -235,10 +267,11 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         Consumes self — original CPU Linear is destroyed.
         """
         var weight_gpu = self.weight.to_gpu(gpu=gpu, stop_grad=True)
-        var bias_gpu = self.bias.to_gpu(gpu=gpu, stop_grad=True)
         var out = self^
         out.weight = weight_gpu^
-        out.bias = bias_gpu^
+        if out.bias:
+            var bias_gpu = out.bias.value().to_gpu(gpu=gpu, stop_grad=True)
+            out.bias = Optional(Tensor[Self.dtype](bias_gpu^))
         return out^
 
     def to_cpu(deinit self) raises -> Linear[Self.dtype, Self.mode]:
@@ -246,10 +279,11 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         Consumes self — original GPU Linear is destroyed.
         """
         var weight_cpu = self.weight.to_cpu(stop_grad=True)
-        var bias_cpu = self.bias.to_cpu(stop_grad=True)
         var out = self^
         out.weight = weight_cpu^
-        out.bias = bias_cpu^
+        if out.bias:
+            var bias_cpu = out.bias.value().to_cpu(stop_grad=True)
+            out.bias = Optional(Tensor[Self.dtype](bias_cpu^))
         return out^
 
 
@@ -273,14 +307,13 @@ struct Profile(RegisterPassable & ImplicitlyCopyable):
         self.profile_samples = profile_samples
 
 
-@fieldwise_init
 struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
     """Fully connected layer: y = xW + b."""
 
     comptime TAG = LINEAR_BLAS
 
     var weight: Tensor[Self.dtype]
-    var bias: Tensor[Self.dtype]
+    var bias: Optional[Tensor[Self.dtype]]
     var in_features: Int
     var out_features: Int
     var training: Bool
@@ -294,6 +327,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         out_features: Int,
         init_seed: Optional[Int] = None,
         init_method: String = "standard",  # "standard", "xavier", "he"
+        bias: Bool = True,
         bias_zero: Bool = True,
         profile_samples: Int = 10,
     ):
@@ -308,7 +342,8 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 - "standard": Uniform[-0.1, 0.1] (good for [0,1] normalized inputs).
                 - "xavier": Xavier/Glorot uniform (good for tanh/sigmoid).
                 - "he": He/Kaiming normal (good for ReLU with standardized inputs).
-            bias_zero: If True, initialize bias to zeros.
+            bias: If True, create bias parameter. If False, no bias is allocated.
+            bias_zero: If True and bias=True, initialize bias to zeros.
             profile_samples: Samples per method for profiling:
                 - 0: Skip profiling, always use native
                 - 1-3: Fast profiling (may be noisy)
@@ -322,7 +357,6 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         self.train_profile = Profile(profile_samples)
         self.validation_profile = Profile(profile_samples)
 
-        # If profiling disabled, skip directly to native
         if profile_samples == 0:
             self.train_profile.profiled = True
             self.train_profile.use_blas = False
@@ -330,7 +364,6 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
             self.validation_profile.use_blas = False
 
         if init_method == "xavier":
-            # Xavier/Glorot uniform initialization
             var limit = Scalar[Self.dtype](
                 sqrt(6.0 / Float64(in_features + out_features))
             )
@@ -341,21 +374,27 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 init_seed=init_seed,
                 requires_grad=True,
             )
-            if not bias_zero:
-                self.bias = Tensor[Self.dtype].rand(
-                    Shape(out_features),
-                    min=-limit,
-                    max=limit,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
+            if bias:
+                if not bias_zero:
+                    self.bias = Optional(
+                        Tensor[Self.dtype].rand(
+                            Shape(out_features),
+                            min=-limit,
+                            max=limit,
+                            init_seed=init_seed,
+                            requires_grad=True,
+                        )
+                    )
+                else:
+                    self.bias = Optional(
+                        Tensor[Self.dtype].zeros(
+                            Shape(out_features), requires_grad=True
+                        )
+                    )
             else:
-                self.bias = Tensor[Self.dtype].zeros(
-                    Shape(out_features), requires_grad=True
-                )
+                self.bias = None
 
         elif init_method == "he":
-            # He/Kaiming normal initialization (for ReLU)
             var std = sqrt(2.0 / Float64(in_features))
             self.weight = Tensor[Self.dtype].randn(
                 shape=Shape(in_features, out_features),
@@ -364,21 +403,27 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 init_seed=init_seed,
                 requires_grad=True,
             )
-            if not bias_zero:
-                self.bias = Tensor[Self.dtype].randn(
-                    Shape(out_features),
-                    mean=0.0,
-                    std=std * 0.01,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
+            if bias:
+                if not bias_zero:
+                    self.bias = Optional(
+                        Tensor[Self.dtype].randn(
+                            Shape(out_features),
+                            mean=0.0,
+                            std=std * 0.01,
+                            init_seed=init_seed,
+                            requires_grad=True,
+                        )
+                    )
+                else:
+                    self.bias = Optional(
+                        Tensor[Self.dtype].zeros(
+                            Shape(out_features), requires_grad=True
+                        )
+                    )
             else:
-                self.bias = Tensor[Self.dtype].zeros(
-                    Shape(out_features), requires_grad=True
-                )
+                self.bias = None
 
         else:  # "standard" or default
-            # Simple uniform initialization (good for [0,1] normalized inputs)
             var limit = Scalar[Self.dtype](0.1)
             self.weight = Tensor[Self.dtype].rand(
                 shape=Shape(in_features, out_features),
@@ -387,25 +432,33 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 init_seed=init_seed,
                 requires_grad=True,
             )
-            if not bias_zero:
-                self.bias = Tensor[Self.dtype].rand(
-                    Shape(out_features),
-                    min=-limit,
-                    max=limit,
-                    init_seed=init_seed,
-                    requires_grad=True,
-                )
+            if bias:
+                if not bias_zero:
+                    self.bias = Optional(
+                        Tensor[Self.dtype].rand(
+                            Shape(out_features),
+                            min=-limit,
+                            max=limit,
+                            init_seed=init_seed,
+                            requires_grad=True,
+                        )
+                    )
+                else:
+                    self.bias = Optional(
+                        Tensor[Self.dtype].zeros(
+                            Shape(out_features), requires_grad=True
+                        )
+                    )
             else:
-                self.bias = Tensor[Self.dtype].zeros(
-                    Shape(out_features), requires_grad=True
-                )
+                self.bias = None
 
-        # Share weight buffer so ancestry copies are a refcount bump, not deep memcpy
-        # if self.weight.requires_grad:
         self.weight.buffer.buffer.shared()
-        self.bias.buffer.buffer.shared()
+        if self.bias:
+            self.bias.value().buffer.buffer.shared()
 
-    def __call__(mut self, mut xs: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
+    def __call__(
+        mut self, mut xs: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         ref xs_shape = xs.shape()
         ref weight_shape = self.weight.shape()
 
@@ -426,31 +479,26 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
             else:
                 return self.matmul(xs, sync=sync)
 
-        else:  # We are still in profiling phase
+        else:
             var curr_profile = profile.copy()
-            # Check if we can/should profile
             var can_profile = (
-                self.blas_lite  # BLAS is available
+                self.blas_lite
                 and self.weight.is_contiguous()
                 and xs.is_contiguous()
             )
 
             if not can_profile:
-                # Skip profiling - just use native and mark as profiled
                 curr_profile.profiled = True
                 curr_profile.use_blas = False
 
                 if self.training:
                     self.train_profile = curr_profile^
-
                 else:
                     self.validation_profile = curr_profile^
 
                 return self.matmul(xs, sync=sync)
 
-            # Perform profiling
             elif curr_profile.call_count < curr_profile.profile_samples:
-                # First Profile -> profile_samples: measure native matmul
                 var start = now()
                 var result = self.matmul(xs, sync=sync)
                 curr_profile.time_native += now() - start
@@ -463,14 +511,12 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
                 return result^
 
-            else:  # curr_profile.call_count < curr_profile.profile_samples * 2:
-                # Next 'profile_samples' calls: measure BLAS matmul
+            else:
                 var start = now()
                 var result = self.matmul_blas(xs, sync=sync)
                 curr_profile.time_blas += now() - start
                 curr_profile.call_count += 1
 
-                # After profile_samples * 2 call, finalize decision
                 if curr_profile.call_count == curr_profile.profile_samples * 2:
                     curr_profile.use_blas = (
                         curr_profile.time_blas < curr_profile.time_native
@@ -516,63 +562,74 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
     def to_gpu(
         self, gpu: Optional[GPU] = None
     ) raises -> Linear[Self.dtype, Self.mode]:
-        """LinearBLAS does not support GPU.
-
-        BLAS operates on CPU memory. Use Linear for GPU models.
-        """
         panic(
             "LinearBLAS does not support GPU — use Linear[dtype] for GPU models"
         )
-        # Unreachable — satisfies compiler
         return Linear[Self.dtype, Self.mode](
             self.in_features, self.out_features
         )
 
     def to_cpu(self) raises -> Self:
         panic("LinearBLAS does not support GPU — nothing to transfer back")
-        return self  # unreachable
+        return self
 
     @always_inline
-    def matmul(mut self, mut xs: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
+    def matmul(
+        mut self, mut xs: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         var result: Tensor[Self.dtype]
 
         if self.training:
             var matmul_out = Matmul[Self.dtype].forward[
                 track_grad=True, mode=Self.mode
             ](xs, self.weight, sync=sync)
-            result = Adder[Self.dtype].forward[track_grad=True](
-                matmul_out^, self.bias, sync=sync
-            )
+            if self.bias:
+                result = Adder[Self.dtype].forward[track_grad=True](
+                    matmul_out^, self.bias.value(), sync=sync
+                )
+            else:
+                result = matmul_out^
 
         else:
             var matmul_out = Matmul[Self.dtype].forward[
                 track_grad=False, mode=Self.mode
             ](xs, self.weight, sync=sync)
-            result = Adder[Self.dtype].forward[track_grad=False](
-                matmul_out^, self.bias, sync=sync
-            )
+            if self.bias:
+                result = Adder[Self.dtype].forward[track_grad=False](
+                    matmul_out^, self.bias.value(), sync=sync
+                )
+            else:
+                result = matmul_out^
 
         return result^
 
     @always_inline
-    def matmul_blas(mut self, mut xs: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
+    def matmul_blas(
+        mut self, mut xs: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         var result: Tensor[Self.dtype]
 
         if self.training:
             var matmul_out = self.blas_lite.value().matmul[track_grad=True](
                 xs, self.weight, transpose_A=False, transpose_B=False
             )
-            result = Adder[Self.dtype].forward[track_grad=True](
-                matmul_out^, self.bias, sync=sync
-            )
+            if self.bias:
+                result = Adder[Self.dtype].forward[track_grad=True](
+                    matmul_out^, self.bias.value(), sync=sync
+                )
+            else:
+                result = matmul_out^
 
         else:
             var matmul_out = self.blas_lite.value().matmul[track_grad=False](
                 xs, self.weight, transpose_A=False, transpose_B=False
             )
-            result = Adder[Self.dtype].forward[track_grad=False](
-                matmul_out^, self.bias, sync=sync
-            )
+            if self.bias:
+                result = Adder[Self.dtype].forward[track_grad=False](
+                    matmul_out^, self.bias.value(), sync=sync
+                )
+            else:
+                result = matmul_out^
 
         return result^
 
@@ -585,10 +642,12 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
             .unsafe_mut_cast[True]()
             .as_any_origin()
         )
-        params.append(
-            UnsafePointer(to=self.bias).unsafe_mut_cast[True]().as_any_origin()
-        )
-
+        if self.bias:
+            params.append(
+                UnsafePointer(to=self.bias.value())
+                .unsafe_mut_cast[True]()
+                .as_any_origin()
+            )
         return params^
 
     def named_parameters(
@@ -597,12 +656,16 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         var result = List[NamedParameter[Self.dtype]]()
         var w = UnsafePointer(to=self.weight).unsafe_mut_cast[True]()
         result.append(NamedParameter(prefix + "weight", w.as_any_origin()))
-        var b = UnsafePointer(to=self.bias).unsafe_mut_cast[True]()
-        result.append(NamedParameter(prefix + "bias", b.as_any_origin()))
+        if self.bias:
+            var b = UnsafePointer(to=self.bias.value()).unsafe_mut_cast[True]()
+            result.append(NamedParameter(prefix + "bias", b.as_any_origin()))
         return result^
 
     def num_parameters(self) -> Int:
-        return self.weight.numels() + self.bias.numels()
+        var count = self.weight.numels()
+        if self.bias:
+            count += self.bias.value().numels()
+        return count
 
     def train(mut self):
         """Set to training mode - enables gradient tracking."""
@@ -626,7 +689,9 @@ struct ReLU[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     def __init__(out self, *, copy: Self):
         self.training = copy.training
 
-    def __call__(self, x: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
+    def __call__(
+        self, x: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         if self.training:
             return x.relu[track_grad=True](sync=sync)
         else:
@@ -1198,7 +1263,10 @@ struct MSELoss[dtype: DType = DType.float32](RegisterPassable):
         self.training = True
 
     def __call__(
-        self, preds: Tensor[Self.dtype], target: Tensor[Self.dtype], sync: Bool = True
+        self,
+        preds: Tensor[Self.dtype],
+        target: Tensor[Self.dtype],
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         if self.training:
             return preds.mse[track_grad=True](target, sync=sync)
@@ -1223,7 +1291,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
     comptime TAG = CONV2D
 
     var weight: Tensor[Self.dtype]  # (out_channels, in_channels, KH, KW)
-    var bias: Tensor[Self.dtype]  # (out_channels,)
+    var bias: Optional[Tensor[Self.dtype]]  # (out_channels,) or None
     var in_channels: Int
     var out_channels: Int
     var kernel_size: Int
@@ -1243,22 +1311,8 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         padding: Padding = Padding("valid"),
         bias: Bool = True,
         init_seed: Optional[Int] = None,
-        init_method: String = "he",  # "he" for ReLU, "xavier" for tanh/sigmoid
+        init_method: String = "he",
     ):
-        """
-        Initialize Conv2D layer.
-
-        Args:
-            in_channels: Number of input channels (e.g., 3 for RGB).
-            out_channels: Number of output feature maps/filters.
-            kernel_size: Size of square kernel (kernel_h = kernel_w).
-            stride: Stride for convolution.
-            dilation: Dilation factor.
-            padding: "valid", "same", int, or custom.
-            bias: Whether to include bias term.
-            init_seed: Optional seed.
-            init_method: Weight initialization ("xavier", "he", "standard").
-        """
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
@@ -1267,13 +1321,11 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         self.padding = padding.copy()
         self.training = True
 
-        # Initialize weights: (out_channels, in_channels, kernel_size, kernel_size)
         var weight_shape = Shape(
             out_channels, in_channels, kernel_size, kernel_size
         )
         var fan_in = in_channels * kernel_size * kernel_size
         if init_method == "xavier":
-            # Xavier/Glorot uniform initialization
             var fan_out = out_channels * kernel_size * kernel_size
             var limit = Scalar[Self.dtype](
                 sqrt(6.0 / Float64(fan_in + fan_out))
@@ -1286,19 +1338,19 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
                 requires_grad=True,
             )
             if bias:
-                self.bias = Tensor[Self.dtype].rand(
-                    Shape(out_channels),
-                    min=-limit,
-                    max=limit,
-                    init_seed=init_seed,
-                    requires_grad=True,
+                self.bias = Optional(
+                    Tensor[Self.dtype].rand(
+                        Shape(out_channels),
+                        min=-limit,
+                        max=limit,
+                        init_seed=init_seed,
+                        requires_grad=True,
+                    )
                 )
             else:
-                # Create a dummy bias - would not be used
-                self.bias = Tensor[Self.dtype].scalar(0)
+                self.bias = None
 
         elif init_method == "he":
-            # He/Kaiming normal initialization (for ReLU)
             var std = sqrt(2.0 / Float64(fan_in))
             self.weight = Tensor[Self.dtype].randn(
                 shape=weight_shape,
@@ -1308,19 +1360,19 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
                 requires_grad=True,
             )
             if bias:
-                self.bias = Tensor[Self.dtype].randn(
-                    Shape(out_channels),
-                    mean=0.0,
-                    std=std * 0.01,
-                    init_seed=init_seed,
-                    requires_grad=True,
+                self.bias = Optional(
+                    Tensor[Self.dtype].randn(
+                        Shape(out_channels),
+                        mean=0.0,
+                        std=std * 0.01,
+                        init_seed=init_seed,
+                        requires_grad=True,
+                    )
                 )
             else:
-                # Create a dummy bias - would not be used
-                self.bias = Tensor[Self.dtype].scalar(0)
+                self.bias = None
 
-        else:  # "standard" or default
-            # Simple uniform initialization (good for [0,1] normalized inputs)
+        else:  # "standard"
             var limit = Scalar[Self.dtype](0.1)
             self.weight = Tensor[Self.dtype].rand(
                 shape=weight_shape,
@@ -1330,15 +1382,17 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
                 requires_grad=True,
             )
             if bias:
-                self.bias = Tensor[Self.dtype].rand(
-                    Shape(out_channels),
-                    min=-limit,
-                    max=limit,
-                    init_seed=init_seed,
-                    requires_grad=True,
+                self.bias = Optional(
+                    Tensor[Self.dtype].rand(
+                        Shape(out_channels),
+                        min=-limit,
+                        max=limit,
+                        init_seed=init_seed,
+                        requires_grad=True,
+                    )
                 )
             else:
-                self.bias = Tensor[Self.dtype].scalar(0)
+                self.bias = None
 
         self.delegate = Conv2dFused[Self.dtype]()
         print("Conv2D initialized:")
@@ -1372,19 +1426,11 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         self.training = take.training
         self.delegate = take.delegate^
 
-    def __call__(mut self, image: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
-        """
-        Forward pass.
-
-        Args:
-            image: (batch_size, in_channels, height, width).
-
-        Returns:
-            Output: (batch_size, out_channels, out_height, out_width).
-        """
+    def __call__(
+        mut self, image: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         ref img_shape = image.shape()
 
-        # Validate input
         if img_shape.rank() != 4:
             panic(
                 "Conv2D input must be 4D: (N, C, H, W), got shape: ",
@@ -1399,12 +1445,11 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
                 String(img_shape[1]),
             )
 
-        # Forward pass
         if self.training:
             return self.delegate[track_grad=True](
                 image,
                 self.weight,
-                bias=Optional(self.bias) if self.bias.requires_grad else None,
+                bias=self.bias,
                 stride=self.stride,
                 dilation=self.dilation,
                 padding=self.padding,
@@ -1415,7 +1460,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
             return self.delegate[track_grad=False](
                 image,
                 self.weight,
-                bias=Optional(self.bias) if self.bias.requires_grad else None,
+                bias=self.bias,
                 stride=self.stride,
                 dilation=self.dilation,
                 padding=self.padding,
@@ -1426,22 +1471,18 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
     def parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
-        """Return trainable parameters for optimizer."""
         var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
-
         params.append(
             UnsafePointer(to=self.weight)
             .unsafe_mut_cast[True]()
             .as_any_origin()
         )
-
-        if self.bias.shape().rank() > 0:  # Has actual bias
+        if self.bias:
             params.append(
-                UnsafePointer(to=self.bias)
+                UnsafePointer(to=self.bias.value())
                 .unsafe_mut_cast[True]()
                 .as_any_origin()
             )
-
         return params^
 
     def named_parameters(
@@ -1450,61 +1491,44 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         var result = List[NamedParameter[Self.dtype]]()
         var w = UnsafePointer(to=self.weight).unsafe_mut_cast[True]()
         result.append(NamedParameter(prefix + "weight", w.as_any_origin()))
-        if self.bias.shape().rank() > 0:
-            var b = UnsafePointer(to=self.bias).unsafe_mut_cast[True]()
+        if self.bias:
+            var b = UnsafePointer(to=self.bias.value()).unsafe_mut_cast[True]()
             result.append(NamedParameter(prefix + "bias", b.as_any_origin()))
         return result^
 
     def num_parameters(self) -> Int:
-        """Count total parameters."""
         var count = self.weight.numels()
-        if self.bias.shape().rank() > 0:
-            count += self.bias.numels()
+        if self.bias:
+            count += self.bias.value().numels()
         return count
 
     def train(mut self):
-        """Set to training mode."""
         self.training = True
 
     def eval(mut self):
-        """Set to evaluation mode."""
         self.training = False
 
     def into(self) -> Module[Self.dtype]:
-        """Convert to Module for Sequential."""
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
     def to_gpu(
         deinit self, gpu: Optional[GPU] = None
     ) raises -> Conv2D[Self.dtype]:
-        """Move this Conv2D layer to GPU.
-
-        Consumes self.
-
-        Weights and bias become permanent GPU residents.
-        Gradients accumulate on GPU.
-
-        Args:
-            gpu: Target GPU. Uses default GPU if None.
-
-        Returns:
-            New Conv2D layer with GPU weights and bias.
-        """
         var weight_gpu = self.weight.to_gpu(gpu=gpu, stop_grad=True)
-        var bias_gpu = self.bias.to_gpu(gpu=gpu, stop_grad=True)
-
         var out = self^
         out.weight = weight_gpu^
-        out.bias = bias_gpu^
-
+        if out.bias:
+            var bias_gpu = out.bias.value().to_gpu(gpu=gpu, stop_grad=True)
+            out.bias = Optional(Tensor[Self.dtype](bias_gpu^))
         return out^
 
     def to_cpu(deinit self) raises -> Conv2D[Self.dtype]:
         var weight_cpu = self.weight.to_cpu(stop_grad=True)
-        var bias_cpu = self.bias.to_cpu(stop_grad=True)
         var out = self^
         out.weight = weight_cpu^
-        out.bias = bias_cpu^
+        if out.bias:
+            var bias_cpu = out.bias.value().to_cpu(stop_grad=True)
+            out.bias = Optional(Tensor[Self.dtype](bias_cpu^))
         return out^
 
 
@@ -1522,7 +1546,9 @@ struct Flatten[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     def __init__(out self, *, copy: Self):
         self.training = copy.training
 
-    def __call__(self, mut x: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
+    def __call__(
+        self, mut x: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         ref shape = x.shape()
 
         _ = """if shape.rank() != 4:

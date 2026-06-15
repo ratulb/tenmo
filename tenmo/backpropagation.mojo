@@ -90,6 +90,8 @@ comptime BACKWARD_BROADCAST_TO = 57
 comptime BACKWARD_GATHER = 58
 comptime BACKWARD_BCE_WITH_LOGITS = 59
 comptime BACKWARD_BCE = 60
+comptime BACKWARD_ABS = 61
+comptime BACKWARD_TRIL = 62
 
 
 trait ArgumentType(ImplicitlyCopyable & Movable):
@@ -350,6 +352,13 @@ struct BCELossBwdArg[dtype: DType](ArgumentType):
     var numels: Int
 
 
+@fieldwise_init
+struct TrilArg(ArgumentType):
+    var diagonal: Int
+    var M: Int
+    var N: Int
+
+
 # ============================================================================
 # Backward — Jump Table Dispatcher
 # ============================================================================
@@ -583,5 +592,13 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             )
         elif op_code == BACKWARD_BCE:
             BCELossBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
+        elif op_code == BACKWARD_ABS:
+            AbsBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
+        elif op_code == BACKWARD_TRIL:
+            TrilBackward[Self.dtype].backward(
                 output, parent_ids, retain_graph
             )

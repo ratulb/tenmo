@@ -61,14 +61,14 @@ def test_checkpoint_roundtrip_linear() raises:
     var original_w = Tensor[DType.float32].rand(shape=Shape(4, 3))
     var original_b = Tensor[DType.float32].rand(Shape(3))
     model.modules[0].layer[Linear[DType.float32]].weight = original_w
-    model.modules[0].layer[Linear[DType.float32]].bias = original_b
+    model.modules[0].layer[Linear[DType.float32]].bias = Optional(original_b)
     var tmp_path = "/tmp/test_ckpt_linear.npy"
     save_checkpoint(model, tmp_path)
     var model2 = Sequential[DType.float32]()
     model2.append(Linear[DType.float32](4, 3).into())
     load_checkpoint(model2, tmp_path)
     var w_loaded = model2.modules[0].layer[Linear[DType.float32]].weight
-    var b_loaded = model2.modules[0].layer[Linear[DType.float32]].bias
+    var b_loaded = model2.modules[0].layer[Linear[DType.float32]].bias.value()
     assert_true(w_loaded.all_close(original_w))
     assert_true(b_loaded.all_close(original_b))
 
@@ -81,18 +81,18 @@ def test_checkpoint_roundtrip_multi_layer() raises:
     var orig_w1 = Tensor[DType.float32].rand(Shape(3, 2))
     var orig_b1 = Tensor[DType.float32].rand(Shape(2))
     model.modules[0].layer[Linear[DType.float32]].weight = orig_w0
-    model.modules[0].layer[Linear[DType.float32]].bias = orig_b0
+    model.modules[0].layer[Linear[DType.float32]].bias = Optional(orig_b0)
     model.modules[2].layer[Linear[DType.float32]].weight = orig_w1
-    model.modules[2].layer[Linear[DType.float32]].bias = orig_b1
+    model.modules[2].layer[Linear[DType.float32]].bias = Optional(orig_b1)
     var tmp_path = "/tmp/test_ckpt_multi.npy"
     save_checkpoint(model, tmp_path)
     var model2 = Sequential[DType.float32]()
     model2.append(Linear[DType.float32](4, 3).into(), ReLU[DType.float32]().into(), Linear[DType.float32](3, 2).into())
     load_checkpoint(model2, tmp_path)
     var w0_loaded = model2.modules[0].layer[Linear[DType.float32]].weight
-    var b0_loaded = model2.modules[0].layer[Linear[DType.float32]].bias
+    var b0_loaded = model2.modules[0].layer[Linear[DType.float32]].bias.value()
     var w1_loaded = model2.modules[2].layer[Linear[DType.float32]].weight
-    var b1_loaded = model2.modules[2].layer[Linear[DType.float32]].bias
+    var b1_loaded = model2.modules[2].layer[Linear[DType.float32]].bias.value()
     assert_true(w0_loaded.all_close(orig_w0))
     assert_true(b0_loaded.all_close(orig_b0))
     assert_true(w1_loaded.all_close(orig_w1))
@@ -105,14 +105,14 @@ def test_checkpoint_roundtrip_conv2d() raises:
     var orig_w = Tensor[DType.float32].rand(shape=Shape(2, 1, 3, 3))
     var orig_b = Tensor[DType.float32].rand(Shape(2))
     model.modules[0].layer[Conv2D[DType.float32]].weight = orig_w
-    model.modules[0].layer[Conv2D[DType.float32]].bias = orig_b
+    model.modules[0].layer[Conv2D[DType.float32]].bias = Optional(orig_b)
     var tmp_path = "/tmp/test_ckpt_conv.npy"
     save_checkpoint(model, tmp_path)
     var model2 = Sequential[DType.float32]()
     model2.append(Conv2D[DType.float32](1, 2, 3, bias=True).into(), Flatten[DType.float32]().into())
     load_checkpoint(model2, tmp_path)
     var w_loaded = model2.modules[0].layer[Conv2D[DType.float32]].weight
-    var b_loaded = model2.modules[0].layer[Conv2D[DType.float32]].bias
+    var b_loaded = model2.modules[0].layer[Conv2D[DType.float32]].bias.value()
     assert_true(w_loaded.all_close(orig_w))
     assert_true(b_loaded.all_close(orig_b))
 
@@ -129,7 +129,7 @@ def test_checkpoint_pytorch_compatible_format() raises:
     model.append(Linear[DType.float32](4, 3).into())
     load_checkpoint(model, tmp_path)
     var w = model.modules[0].layer[Linear[DType.float32]].weight
-    var b = model.modules[0].layer[Linear[DType.float32]].bias
+    var b = model.modules[0].layer[Linear[DType.float32]].bias.value()
     # Note: saved as float64, loaded into float32 — values should match
     assert_true(w.all_close(Tensor[DType.float32].ones(Shape(4, 3))))
     assert_true(b.all_close(Tensor[DType.float32].zeros(Shape(3))))
