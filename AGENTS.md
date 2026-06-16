@@ -860,124 +860,34 @@ tensors, it iterates coordinates on CPU and writes elements via per-element
 crossentropy kernel eliminates this bottleneck by computing NLL in-kernel
 instead of via onehot masking.
 
-### GPU `scatter_add` only supports axis=0
+### GPU `scatter_add` only supports axis=0 — Fixed
 
-GPU kernels `scatter_add_rows_kernel` and `scatter_add_broadcast_kernel` (`tenmo/kernels/filler_kernel.mojo`) compute target flat indices assuming row-major layout where `indices` pick rows (axis=0). For axis != 0, `Filler.scatter_add` (`tenmo/filler.mojo:138`) falls back to `_scatter_add_cpu`, which accesses GPU memory element-by-element via `device_state[idx]` — correct but very slow.
+GPU kernels `scatter_add_rows_kernel` and `scatter_add_broadcast_kernel` (`tenmo/kernels/filler_kernel.mojo`) compute target flat indices assuming row-major layout where `indices` pick rows (axis=0). For axis != 0, `Filler.scatter_add` (`tenmo/filler.mojo:138`) fell back to `_scatter_add_cpu`, which accessed GPU memory element-by-element via `device_state[idx]` — correct but very slow.
 
-**Fix:** Thread `axis` through `_scatter_add_gpu` to the GPU kernel. The kernel should compute target flat index as either:
-- axis=0: `target_offset + indices[row] * stride0 + col * stride1`
-- axis=1: `target_offset + col * stride0 + indices[row] * stride1`
+**Fix:** Added `scatter_add_nd_kernel` (`tenmo/kernels/filler_kernel.mojo:120`) — a general N-dimensional GPU kernel that accepts shape and strides arrays and uses the same coordinate decomposition as the CPU path. `FillerGpu._scatter_add_nd_gpu` copies shape/strides to GPU device buffers and dispatches the kernel with one block per index.
 
-The unused `scatter_add_rows_strided_kernel` (line 72) already accepts strides and offset — it just needs an `axis` parameter to swap which factor uses `indices[row]`. Then wire it into `_scatter_add_gpu`'s dispatch.
+**Dispatch:** `Filler.scatter_add` routes axis != 0 through the new general kernel; axis == 0 still uses the existing fast path. All 5 new GPU gather backward tests for axis=1 and axis=2 pass.
 
-Not urgent — all production callers (embedding backward, gather axis=0) use axis=0.
-
-### GPU Multiply Broadcast Backward — Two Bugs Discovered
+### GPU Multiply Broadcast Backward — Two Bugs Fixed
 
 **Location:** `tenmo/broadcast.mojo:90-113` (`upstream_grad_share`), `tenmo/kernels/binary_ops_kernel.mojo` (GPU broadcast kernel dispatch), `tenmo/multiplication.mojo:85-90` (`MultiplyBroadcastBackward`)
 
-**Symptom:** 7 GPU multiply broadcast backward tests failed originally. The intermediate variable fix (`var product_ndb = upstream_grad * other; grad_contrib = Gradbox[Self.dtype](product_ndb^)`) resolved **1** of 7 — 6 remain failing.
+**Symptom:** 7 GPU multiply broadcast backward tests failed originally.
 
-**Kaggle log analysis (`/tmp/broadcast.log`):**
+**Bug 1 — Gradbox one-liner destruction race (fixed):**
 
-```
-6 failures remain after the intermediate variable fix:
-  test_gpu_mul_scalar_times_matrix_result_scalar   ✗
-  test_gpu_mul_broadcast_col_times_matrix            ✗
-  test_gpu_mul_broadcast_scalar_times_matrix          ✗
-  test_gpu_mul_broadcast_3d_batch                    ✗
-  test_gpu_mul_broadcast_only_rhs_requires_grad       ✗
-  test_gpu_mul_broadcast_large                       ✗
+The one-liner `grad_contrib = Gradbox[Self.dtype](upstream_grad * other)` destroyed the temporary NDBuffer (Mojo ASAP) before `Gradbox.__init__` finished copying data from the GPU buffer. Fixed by using an intermediate variable:
 
-Key passing test data (reveals the masking pattern):
-  test_gpu_mul_broadcast_only_lhs_requires_grad — b = [[1],[1]] → PASSES ✓
-  test_gpu_mul_broadcast_only_rhs_requires_grad — a = [[1],[2]] → FAILS ✗
-```
-
-**Bug 1 — Gradbox one-liner destruction race (1 test):**
-
-The intermediate variable fix resolves exactly one test (likely `test_gpu_mul_broadcast_only_lhs_requires_grad` where `b=[[1],[1]]` masked the true GPU kernel bug — the test appeared as a 7th failure before the fix because the destruction race caused a crash/assertion). In the one-liner:
-
-```mojo
-grad_contrib = Gradbox[Self.dtype](upstream_grad * other)
-```
-
-The temporary NDBuffer from `upstream_grad * other` is destroyed (Mojo ASAP destruction) before `Gradbox.__init__` finishes copying data from the GPU buffer. The named variable extends the temporary's lifetime past the Gradbox construction. **Fix retained** — the intermediate variable pattern stays.
-
-**Bug 2 — GPU broadcast arithmetic kernel indexing error (6 tests):**
-
-All 6 remaining failures involve the `upstream_grad * other` multiply where `other` has **varying values along the broadcast dimension**. When the broadcast operand has constant values (all 1s, or identical rows/columns), the result happens to be correct — masking the bug.
-
-Evidence:
-| Test | Broadcast type | Operand data | Status |
-|---|---|---|---|
-| `only_lhs_requires_grad` | col broadcast (2,1)→(2,2) | `b = [[1],[1]]` | **PASSES** — all values 1 |
-| `only_rhs_requires_grad` | col broadcast (2,1)→(2,3) | `a = [[1],[2]]` | **FAILS** — row 1 gets `[2,1,1]` not `[2,2,2]` |
-| `scalar_row_times_matrix` | row broadcast (1,4)→(3,4) | `a = [1,2,3,4]` | **PASSES** — all 3 broadcast rows identical |
-| `scalar_times_matrix` | 1D→2D (1,)→(3,4) | `a = [2.0]` | **FAILS** — broadcasts to (3,4) |
-| `col_times_matrix` | col broadcast (3,1)→(3,4) | `a = [[1],[2],[3]]` | **FAILS** — varying rows |
-| `large` | row broadcast (1,64)→(32,64) | `a = rand(1,64)` | **FAILS** — rows 6+ show garbage |
-
-**Dispatch path analysis** (`tenmo/kernels/binary_ops_kernel.mojo:728-899`):
-
-The GPU broadcast arithmetic dispatch hits different paths depending on operand shapes. For all failing cases, `A = upstream_grad` (contiguous, fills broadcast shape) and `B = other` (the broadcast operand). The dispatch enters **PATH 3** (`A_is_contiguous and A_shape == broadcast_shape`, line 778), which uses either:
-- `arithmetic_ops_A_contiguous_lastdim_contiguous_B` (fast path for bias_add pattern, line 790) — row broadcast case where `B_broadcast_strides = [0,...,0,1]`
-- `arithmetic_ops_A_contiguous` (general path, line 810) — col broadcast, 1D→2D, and other stride patterns
-
-The fast path (`arithmetic_ops_A_contiguous_lastdim_contiguous_B`) at line 408 uses modulo indexing:
-```mojo
-var b_idx = i % last_dim
-```
-For row broadcast `(1,4)→(3,4)`: `B_broadcast_strides = [0, 1]`, `last_dim=4`. Reads `B[i%4]` — correct stride-1 access across B's inner dimension. Row broadcast passes because the stride pattern `[0,1]` is the only one matching this fast path, and B's (1,4) layout means `B[0..3]` = `[1,2,3,4]` gives correct column values for every row.
-
-The general path (`arithmetic_ops_A_contiguous`) computes B's base offset:
-```mojo
-var inner_offset = i % inner_dim
-var outer_remaining = i // inner_dim
-var b_base = 0
-for dim in range(rank - 2, -1, -1):
-    var coord = outer_remaining % result_shape[dim]
-    b_base += coord * B_strides[dim]
-    outer_remaining //= result_shape[dim]
-```
-
-For col broadcast `(3,1)→(3,4)`: `B_strides = [1, 0]`, `inner_dim=4`, `rank=2`.
-- Dim 0: `coord = outer_remaining % 3`, `b_base = coord * 1 = coord`
-
-The computed `b_base` correctly identifies the row. The fast SIMD path then reads:
-```mojo
-if B_strides[rank - 1] == 1:
-    var vec_b = B.load[width=simd_width](b_base + inner_offset)
-else:
-    var vec_b = SIMD[dtype, simd_width](B[b_base])
-```
-
-Since `B_strides[1] = 0`, it uses the `else` branch: splat `B[b_base]` across all lanes. This is correct for col broadcast.
-
-**Why it still fails:** The kernel logic traces correctly for simple cases. The failure may be:
-1. **Non-contiguous upstream_grad** — If the upstream gradient NDBuffer is not truly contiguous (e.g., from Gradbox with a non-standard layout), `A_is_contiguous` might be `True` but `A_buffer` might have different layout than expected by linear indexing. The `A.load[width=simd_width](i)` would read wrong data.
-2. **Device buffer aliasing** — The stored `ancestor.ndb` (parent buffer) might share device memory with another tensor. If the ancestor's NDBuffer's `DeviceState` wraps a `DeviceBuffer` that was freed and reused, reads return stale data.
-3. **Wrong path dispatch** — If `A_is_contiguous` incorrectly returns `True` for a strided view, PATH 3 is taken when PATH 2 (both_contiguous_broadcast) should be used. The kernel assumes A is linear-contiguous when it isn't.
-
-**Most likely root cause:** Option 3 — the gradient NDBuffer stored in the Gradbox (`upstream_grad`) might have the wrong `_contiguous` flag. Gradbox stores its NDBuffer via `NDBuffer(shape)` which calls `.contiguous()` internally. But when the Gradbox is created on GPU via `DeviceState.new()`, the resulting NDBuffer has `offset=0` and default strides — `_contiguous` should be `True`. If `_contiguous` is incorrectly `False` (stale cache), the kernel might dispatch to a wrong path. Conversely, if `_contiguous` is incorrectly `True` but strides are non-default, PATH 3 incorrectly uses linear indexing on a strided buffer.
-
-**Fix retained:**
 ```mojo
 var product_ndb = upstream_grad * other
 grad_contrib = Gradbox[Self.dtype](product_ndb^)
 ```
-This intermediate variable fixes Bug 1 (Gradbox destruction race). Bug 2 requires GPU kernel debugging.
 
-**Steps to resolve Bug 2:**
-1. On Kaggle: insert debug prints in the backward to check `upstream_grad.is_contiguous()` and `upstream_grad.strides` before the multiply kernel dispatch.
-2. Verify PATH selection by printing `A_is_contiguous`, `A_shape == broadcast_shape`, `B_is_contiguous`, and `B_broadcast_strides` in `binary_ops_kernel.mojo:broadcast_arithmetic`.
-3. If PATH 3 is the correct path, add `sync()` calls before/after the kernel launch to isolate timing.
-4. If the bug is in the kernel itself (not dispatch), write a minimal stand-alone GPU broadcast test that exercises the same stride pattern.
-5. If the bug is in Gradbox's NDBuffer metadata, fix `Gradbox.as_tensor()` or `Gradbox.buffer()` to ensure correct contiguity flags.
+**Bug 2 — GPU broadcast arithmetic kernel indexing error (fixed):**
 
-**Why Multiply is the only op affected:** Add/Sub broadcast backward uses `augment=False` — `upstream_grad_shape_only` which never launches GPU arithmetic. Divide has a fully custom `DivideBackward` that uses `DivNdBuffer.divide_backward`. Multiply's `BroadcastBackward[augment=True]` is the sole place that calls `upstream_grad_share` → `upstream_grad * other` on GPU.
+Root cause: the broadcast operand's GPU `DeviceBuffer` was freed and reused before the kernel read it, returning stale data. The multiply kernel was queued asynchronously, but the parent tensor's GPU buffer (shared via `ancestor.ndb`) was freed by Mojo's ASAP destruction before the kernel actually executed. Fix: ensure the parent NDBuffer's GPU device state survives through the kernel launch by extending the lifetime of the broadcast operand.
 
-**Add/Sub/Div GPU broadcast backward tests:** 14 tests added — all pass on CPU. Rely on GPU path parity (they test the same arithmetic as forward, just in backward). The pass/fail pattern on Kaggle shows all 14 Add/Sub/Div GPU tests pass, confirming the bug is exclusive to Multiply's `BroadcastBackward[augment=True]` path.
+**All 7 GPU multiply broadcast backward tests now pass.**
 
 ### CE Probability-Target GPU Forward — CPU Fallback (Technical Debt)
 

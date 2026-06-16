@@ -117,6 +117,61 @@ def scatter_add_broadcast_kernel[
     _ = Atomic.fetch_add(target + target_row * row_width + col, source[col])
 
 
+def scatter_add_nd_kernel[
+    dtype: DType
+](
+    target: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    source: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    indices: UnsafePointer[Int32, ImmutAnyOrigin],
+    n_indices: Int,
+    axis: Int,
+    rank: Int,
+    slice_volume: Int,
+    target_shape: UnsafePointer[Int32, ImmutAnyOrigin],
+    target_strides: UnsafePointer[Int32, ImmutAnyOrigin],
+    source_strides: UnsafePointer[Int32, ImmutAnyOrigin],
+    target_offset: Int,
+    source_offset: Int,
+    is_broadcast: Int,
+):
+    """N-dimensional scatter-add GPU kernel for any axis.
+
+    Each block handles one index k. Each thread handles one element
+    within the slice orthogonal to the given axis. Decomposes the
+    flat element index into non-axis coordinates (same logic as CPU
+    _scatter_add_cpu) to compute correct strided offsets for any rank.
+    """
+    var row = Int(block_idx.x)
+    var col = Int(thread_idx.x)
+
+    if row >= n_indices or col >= slice_volume:
+        return
+
+    var tgt_idx = Int(indices[row])
+    var rem = col
+
+    var dst_off = target_offset + tgt_idx * Int(target_strides[axis])
+    var src_off = source_offset
+    if not is_broadcast:
+        src_off += row * Int(source_strides[axis])
+
+    var d = rank - 1
+    while d >= 0:
+        if d != axis:
+            var dim_size = Int(target_shape[d])
+            var cd = rem % dim_size
+            rem //= dim_size
+            dst_off += cd * Int(target_strides[d])
+            if not is_broadcast:
+                src_off += cd * Int(source_strides[d])
+        d -= 1
+
+    if is_broadcast:
+        src_off = source_offset + col
+
+    _ = Atomic.fetch_add(target + dst_off, source[src_off])
+
+
 @fieldwise_init
 struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     @staticmethod
@@ -285,5 +340,75 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                     grid_dim=blocks,
                     block_dim=tpb,
                 )
+
+            if sync: ctx.synchronize()
+
+    @staticmethod
+    def _scatter_add_nd_gpu(
+        target: NDBuffer[Self.dtype],
+        source: NDBuffer[Self.dtype],
+        indices: IntArray,
+        n_indices: Int,
+        slice_volume: Int,
+        axis: Int,
+        sync: Bool = False,
+    ) raises:
+        """N-dimensional scatter-add GPU dispatch for any axis.
+
+        Copies indices, shape, and strides to GPU device buffers,
+        then launches scatter_add_nd_kernel with one block per index.
+        """
+        comptime if has_accelerator():
+            ref t_state = target.device_state.value()
+            ref s_state = source.device_state.value()
+            ref gpu = t_state.get_gpu()
+            var ctx = gpu[]
+
+            var idx_buf = ctx.enqueue_create_buffer[DType.int32](n_indices)
+            with idx_buf.map_to_host() as host_idx:
+                for k in range(n_indices):
+                    host_idx[k] = Int32(indices[k])
+
+            var rank = target.shape.rank()
+            var shape_buf = ctx.enqueue_create_buffer[DType.int32](rank)
+            var t_stride_buf = ctx.enqueue_create_buffer[DType.int32](rank)
+            var s_stride_buf = ctx.enqueue_create_buffer[DType.int32](rank)
+
+            with shape_buf.map_to_host() as h:
+                for d in range(rank):
+                    h[d] = Int32(target.shape[d])
+            with t_stride_buf.map_to_host() as h:
+                for d in range(rank):
+                    h[d] = Int32(target.strides[d])
+            with s_stride_buf.map_to_host() as h:
+                for d in range(rank):
+                    h[d] = Int32(source.strides[d])
+
+            var tpb = min(slice_volume, 512)
+            var blocks = n_indices
+            var is_broadcast = Int(1 if source.shape.rank() == 1 else 0)
+
+            var compiled = ctx.compile_function[
+                scatter_add_nd_kernel[Self.dtype],
+                scatter_add_nd_kernel[Self.dtype],
+            ]()
+            ctx.enqueue_function(
+                compiled,
+                t_state.device_buffer(),
+                s_state.device_buffer(),
+                idx_buf,
+                n_indices,
+                axis,
+                rank,
+                slice_volume,
+                shape_buf,
+                t_stride_buf,
+                s_stride_buf,
+                target.offset,
+                source.offset,
+                is_broadcast,
+                grid_dim=blocks,
+                block_dim=tpb,
+            )
 
             if sync: ctx.synchronize()

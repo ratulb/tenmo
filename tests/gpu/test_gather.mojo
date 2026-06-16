@@ -280,6 +280,126 @@ def test_mcpy_gpu_2d_grad_through_downstream_op() raises:
         assert_true(grad[i(2), s()].all_close(Tensor[dtype].d1([0.0, 0.0])))
 
 
+# ── GPU / Grad flow / axis=1 and axis=2 (non-axis-0 scatter_add) ──────────────
+
+
+def test_mcpy_gpu_2d_axis1_grad() raises:
+    """GPU gather axis=1 with grad — exercises scatter_add_nd_gpu axis=1."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2(
+            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+        )
+        var a_gpu = a.to_gpu()
+        var idx = IntArray()
+        idx.append(0)
+        idx.append(2)
+        var result = a_gpu.gather(idx, axis=1)
+        var loss = result.sum()
+        loss.backward()
+        var grad = a.grad()
+        assert_true(
+            grad[i(0), s()].all_close(Tensor[dtype].d1([1.0, 0.0, 1.0]))
+        )
+        assert_true(
+            grad[i(1), s()].all_close(Tensor[dtype].d1([1.0, 0.0, 1.0]))
+        )
+
+
+def test_mcpy_gpu_3d_axis1_grad() raises:
+    """GPU gather 3D axis=1 with grad — exercises scatter_add_nd_gpu axis=1."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d3(
+            [
+                [[1.0, 2.0], [3.0, 4.0]],
+                [[5.0, 6.0], [7.0, 8.0]],
+            ],
+            requires_grad=True,
+        )
+        var a_gpu = a.to_gpu()
+        var idx = IntArray()
+        idx.append(0)
+        var result = a_gpu.gather(idx, axis=1)
+        var loss = result.sum()
+        loss.backward()
+        var grad = a.grad()
+        assert_true(
+            grad[i(0), i(0), s()].all_close(Tensor[dtype].d1([1.0, 1.0]))
+        )
+        assert_true(
+            grad[i(0), i(1), s()].all_close(Tensor[dtype].d1([0.0, 0.0]))
+        )
+        assert_true(
+            grad[i(1), i(0), s()].all_close(Tensor[dtype].d1([1.0, 1.0]))
+        )
+        assert_true(
+            grad[i(1), i(1), s()].all_close(Tensor[dtype].d1([0.0, 0.0]))
+        )
+
+
+def test_mcpy_gpu_3d_axis2_grad() raises:
+    """GPU gather 3D axis=2 with grad — exercises scatter_add_nd_gpu axis=2."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d3(
+            [
+                [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
+                [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]],
+            ],
+            requires_grad=True,
+        )
+        var a_gpu = a.to_gpu()
+        var idx = IntArray()
+        idx.append(0)
+        idx.append(2)
+        var result = a_gpu.gather(idx, axis=2)
+        var loss = result.sum()
+        loss.backward()
+        var grad = a.grad()
+        assert_true(
+            grad[i(0), i(0), s()].all_close(Tensor[dtype].d1([1.0, 0.0, 1.0]))
+        )
+        assert_true(
+            grad[i(0), i(1), s()].all_close(Tensor[dtype].d1([1.0, 0.0, 1.0]))
+        )
+        assert_true(
+            grad[i(1), i(0), s()].all_close(Tensor[dtype].d1([1.0, 0.0, 1.0]))
+        )
+        assert_true(
+            grad[i(1), i(1), s()].all_close(Tensor[dtype].d1([1.0, 0.0, 1.0]))
+        )
+
+
+def test_mcpy_cpu_gpu_parity_2d_axis1_grad() raises:
+    """CPU–GPU parity for gather axis=1 backward (non-reduction)."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2(
+            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+        )
+        var idx = IntArray()
+        idx.append(0)
+        idx.append(2)
+
+        # CPU
+        var cpu_out = a.gather(idx, axis=1)
+        var cpu_loss = cpu_out.sum()
+        cpu_loss.backward()
+        var cpu_grad = a.grad()
+
+        # Reset grad
+        var b = Tensor[dtype].d2(
+            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+        )
+        var gpu_out = b.to_gpu().gather(idx, axis=1)
+        var gpu_loss = gpu_out.sum()
+        gpu_loss.backward()
+        var gpu_grad = b.grad()
+
+        assert_true(cpu_grad.all_close[atol=1e-5](gpu_grad))
+
+
 # ── GPU / fuse_sum ────────────────────────────────────────────────────────────
 
 
