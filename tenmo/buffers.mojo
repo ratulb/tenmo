@@ -1976,19 +1976,6 @@ struct Buffer[dtype: DType = DType.float32](
             out[i] = pred(self[i])
         return out^
 
-    @always_inline
-    def map_where(
-        self: Buffer[Self.dtype],
-        pred: def(Scalar[Self.dtype]) thin -> Bool,
-        value: Scalar[Self.dtype],
-    ) -> Buffer[Self.dtype]:
-        """Apply predicate to each element, setting value where predicate holds,
-        returning a new buffer."""
-        var out = Buffer[Self.dtype](self.size)
-        for i in range(self.size):
-            out[i] = value if pred(self[i]) else self[i]
-        return out^
-
     def all_true(self: Buffer[DType.bool]) -> Bool:
         """Check if all elements in a boolean buffer are True."""
         if self.size == 0:

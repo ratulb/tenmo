@@ -1116,41 +1116,6 @@ struct NDBuffer[dtype: DType](
             out = NDBuffer[Self.dtype].Empty()
         return out^
 
-    def map_where(
-        self,
-        pred: def(Scalar[Self.dtype]) thin -> Bool,
-        value: Scalar[Self.dtype],
-    ) -> NDBuffer[Self.dtype]:
-        comptime if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    var mapped_ds = DeviceState[Self.dtype].map_where(
-                        self, pred, value
-                    )
-                    return NDBuffer[Self.dtype].with_device_state(
-                        mapped_ds^, self.shape
-                    )
-                except e:
-                    print(e)
-                    panic("NDBuffer mapp_where error")
-                    return NDBuffer[Self.dtype].Empty()
-            else:
-                return self.map_where_cpu(pred, value)
-        return self.map_where_cpu(pred, value)
-
-    @always_inline
-    def map_where_cpu(
-        self,
-        pred: def(Scalar[Self.dtype]) thin -> Bool,
-        value: Scalar[Self.dtype],
-    ) -> NDBuffer[Self.dtype]:
-        var buffer = Buffer[Self.dtype](len(self))
-        var index = 0
-        for next in self.index_iterator():
-            buffer[index] = value if pred(self.get(next)) else self.get(next)
-            index += 1
-        return NDBuffer[Self.dtype](buffer^, self.shape)
-
     # =============================================================================
     # log_sum — extracted to tenmo/softmax.mojo (SoftmaxNdBuffer.log_sum)
     # =============================================================================

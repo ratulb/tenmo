@@ -390,7 +390,7 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
-    ) where Self.dtype.is_floating_point():
+    ) raises where Self.dtype.is_floating_point():
         if not output.has_ancestry():
             print("Inside Backward invoke: output ancestry is not set")
             return

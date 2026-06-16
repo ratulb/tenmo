@@ -47,9 +47,22 @@ struct WhereBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var parent = output.ancestry().get(ancestor_index)
             if parent.requires_grad:
                 var cond_shape = condition.shape
-                var ones = NDBuffer[Self.dtype].full(
-                    cond_shape, Scalar[Self.dtype](1.0)
-                )
+                var ones: NDBuffer[Self.dtype]
+                comptime if has_accelerator():
+                    if condition.is_on_gpu():
+                        var gpu = condition.device_state.value().get_gpu()
+                        ones = NDBuffer[Self.dtype].full(
+                            cond_shape, Scalar[Self.dtype](1.0),
+                            device=gpu.into(),
+                        )
+                    else:
+                        ones = NDBuffer[Self.dtype].full(
+                            cond_shape, Scalar[Self.dtype](1.0)
+                        )
+                else:
+                    ones = NDBuffer[Self.dtype].full(
+                        cond_shape, Scalar[Self.dtype](1.0)
+                    )
                 var one_minus_cond = ones.arithmetic_ops[Subtract](condition)
                 var grad_b_ndb = grad_ndb.arithmetic_ops[Multiply](one_minus_cond^)
                 var grad_b = Gradbox[Self.dtype](grad_b_ndb^)
@@ -64,10 +77,19 @@ def bool_to_float_ndb[
     dtype: DType,
 ](
     cond_ndb: NDBuffer[DType.bool],
-) -> NDBuffer[dtype]:
+) raises -> NDBuffer[dtype]:
     var shape = cond_ndb.shape
     var numels = cond_ndb.numels()
     var out = NDBuffer[dtype].zeros(shape)
+    comptime if has_accelerator():
+        if cond_ndb.is_on_gpu():
+            var gpu = cond_ndb.device_state.value().get_gpu()
+            var cpu_ndb = cond_ndb.to_cpu(sync=True)
+            var src = cpu_ndb.data_ptr().unsafe_mut_cast[True]()
+            var dst = out.data_ptr().unsafe_mut_cast[True]()
+            for i in range(numels):
+                dst[i] = Scalar[dtype](1.0) if src[i] else Scalar[dtype](0.0)
+            return out.to_gpu(gpu)
     var src = cond_ndb.data_ptr().unsafe_mut_cast[True]()
     var dst = out.data_ptr().unsafe_mut_cast[True]()
     for i in range(numels):
@@ -132,6 +154,11 @@ struct Where[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var out_ndb: NDBuffer[Self.dtype]
         comptime if has_accelerator():
             if cond_ndb.is_on_gpu():
+                var gpu = cond_ndb.device_state.value().gpu
+                if not a_ndb.is_on_gpu():
+                    a_ndb = a_ndb.to_gpu(gpu)
+                if not b_ndb.is_on_gpu():
+                    b_ndb = b_ndb.to_gpu(gpu)
                 out_ndb = WhereGpuKernel[Self.dtype].launch_forward(
                     a_ndb, b_ndb, cond_ndb, False, False,
                     Scalar[Self.dtype](0), Scalar[Self.dtype](0),

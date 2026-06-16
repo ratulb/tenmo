@@ -212,25 +212,6 @@ struct DeviceState[dtype: DType](
             self.sync()
         return device_state
 
-    @staticmethod
-    def map_where(
-        ref ndb: NDBuffer[Self.dtype],
-        pred: def(Scalar[Self.dtype]) thin -> Bool,
-        value: Scalar[Self.dtype],
-        sync: Bool = False,
-    ) raises -> DeviceState[Self.dtype]:
-        ref src_device_state = ndb.device_state.value()
-        var dst_device_state = DeviceState[Self.dtype](len(ndb), ndb.get_gpu())
-        with src_device_state.buffer.map_to_host() as src, dst_device_state.buffer.map_to_host() as dst:
-            for index in ndb.index_iterator():
-                dst[index] = value.cast[Self.datatype]() if pred(
-                    src[index].cast[Self.dtype]()
-                ) else src[index].cast[Self.datatype]()
-        if sync:
-            dst_device_state.sync()
-
-        return dst_device_state
-
     def fill(self, value: Scalar[Self.dtype], sync: Bool = False) raises:
         with self.buffer.map_to_host() as host_buffer:
             comptime if Self.dtype == DType.bool:

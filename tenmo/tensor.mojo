@@ -1157,24 +1157,28 @@ struct Tensor[dtype: DType](
         """
         self.buffer.fill(value)
 
-    def map_where(
+    def map_where[
+        track_grad: Bool = True,
+    ](
         self,
         pred: def(Scalar[Self.dtype]) thin -> Bool,
         value: Scalar[Self.dtype],
-        requires_grad: Bool = False,
-    ) -> Tensor[Self.dtype]:
+    ) raises -> Tensor[Self.dtype]:
         """Replace elements matching a predicate with a scalar value.
+
+        Builds a boolean mask via map_to_bool, then delegates to masked_fill
+        for fused autograd and GPU support.
 
         Args:
             pred: Function that returns True for elements to replace.
             value: Scalar value to write where pred returns True.
-            requires_grad: Whether the result tracks gradients.
 
         Returns:
             A new tensor with replaced values.
         """
-        var ndb = self.buffer.map_where(pred, value)
-        return Tensor[Self.dtype](ndb^, requires_grad=requires_grad)
+        var mask_ndb = self.buffer.map_to_bool(pred)
+        var mask = Tensor[DType.bool](mask_ndb^)
+        return self.masked_fill[track_grad=track_grad](mask, value)
 
     @staticmethod
     def full_like(
@@ -3172,7 +3176,10 @@ struct Tensor[dtype: DType](
 
                 if node.has_ancestry():
                     parent_ids.clear()
-                    Backward[Self.dtype].invoke(node, parent_ids, retain_graph)
+                    try:
+                        Backward[Self.dtype].invoke(node, parent_ids, retain_graph)
+                    except e:
+                        print("Backward invoke error: ", e)
                     for i in range(len(parent_ids)):
                         var target_id = parent_ids[i]
                         if target_id in fanin:

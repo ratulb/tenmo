@@ -17,7 +17,7 @@ struct TriuBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
         retain_graph: Bool = False,
-    ):
+    ) raises:
         ref bwd_arg = output.ancestry().backward_fn_arg().get[TriuArg]()
         var diagonal = bwd_arg.diagonal
         var M = bwd_arg.M
@@ -25,9 +25,20 @@ struct TriuBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
 
-        var grad_ndb = apply_triu_cpu[Self.dtype](
-            gradbox.buffer(), M, N, diagonal
-        )
+        var grad_ndb: NDBuffer[Self.dtype]
+        comptime if has_accelerator():
+            if gradbox.is_on_gpu():
+                grad_ndb = TriuGpuKernel[Self.dtype].launch_backward(
+                    gradbox.buffer().copy(), diagonal
+                )
+            else:
+                grad_ndb = apply_triu_cpu[Self.dtype](
+                    gradbox.buffer(), M, N, diagonal
+                )
+        else:
+            grad_ndb = apply_triu_cpu[Self.dtype](
+                gradbox.buffer(), M, N, diagonal
+            )
         var gradbox_ancestor = Gradbox[Self.dtype](grad_ndb^)
 
         if parent.requires_grad:
