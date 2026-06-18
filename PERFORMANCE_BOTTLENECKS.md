@@ -11,7 +11,7 @@ memory management, SIMD paths, and system-level issues.
 
 **Status: 🟢 FIXED — Phase 1 complete.**
 
-All 41 kernel launchers now default `sync=False`. Sync is only triggered
+All 42 kernel launchers now default `sync=False`. Sync is only triggered
 when callers explicitly pass `sync=True`. NDBuffer dispatch methods all default
 `sync=False`. Tensor dunders default `sync=True` and thread it to forward
 structs, but most forward structs don't actually pass sync to NDBuffer calls,
@@ -544,7 +544,7 @@ for any future caller that explicitly passes `sync=True`.
 
 ### Additional completed work
 
-- ~~Remove `synchronize()` from GPU launchers~~ **🟢 DONE** — All 41 launchers
+- ~~Remove `synchronize()` from GPU launchers~~ **🟢 DONE** — All 42 launchers
   default `sync=False` (Phase 1)
 - ~~Layer structs proactively share buffers~~ **🟢 DONE** — `add_ancestry` no
   longer deep-copies weights that are already shared

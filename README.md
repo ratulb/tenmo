@@ -270,7 +270,7 @@ var model = SequentialBLAS[dtype]()
 model.append(LinearBLAS[dtype](784, 128, profile_samples=10).into())
 ```
 
-Set `BLAS_PATH` environment variable to use a custom BLAS library (defaults to OpenBLAS).
+Set `BLAS_PATH` compile-time define to use a custom BLAS library (defaults to OpenBLAS). Pass it via `mojo -D BLAS_PATH=/path/to/libblas.so` or set `MOJO_DEFINES=BLAS_PATH=/path/to/libblas.so`.
 
 ---
 

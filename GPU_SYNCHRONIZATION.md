@@ -58,7 +58,7 @@ ctx.enqueue_function(compiled, args..., grid_dim=NB, block_dim=TB)
 if sync: ctx.synchronize()
 ```
 
-All 41 kernel launchers previously defaulted `sync: Bool = True`. Phase 1
+All 42 kernel launchers previously defaulted `sync: Bool = True`. Phase 1
 changed all defaults to `sync: Bool = False`. The body is uniformly
 `if sync: device_context.synchronize()` — callers pass `sync` explicitly
 when coordination is needed.
@@ -138,7 +138,7 @@ PyTorch sync points: `.item()`, `.numpy()`, `.cpu()`, `print()`,
 
 ## 4. Sync Call Sites
 
-### 4a. Kernel Launchers — 41 functions across 17 files
+### 4a. Kernel Launchers — 42 functions across 17 files
 
 All default `sync=False` (Phase 1). Every function calls `synchronize()` when
 `sync` is `True` — callers pass `sync=True` explicitly.
@@ -153,7 +153,7 @@ All default `sync=False` (Phase 1). Every function calls `synchronize()` when
 | `unary_ops_kernel.mojo` | `UnaryOpsKernel.launch`, `launch_with_mask` | 307, 406 |
 | `division_kernel.mojo` | `DivisionKernel.launch_rdiv_scalar_backward`, `launch_divide_backward` | 114, 180 |
 | `compare_kernel.mojo` | `AllClose.launch`, `Compare.launch`, `CompareScalar.launch` | 150, 313, 458 |
-| `filler_kernel.mojo` | `_fill_scalar_gpu`, `_fill_buffer_gpu`, `_scatter_add_gpu` | 128, 167, 238 |
+| `filler_kernel.mojo` | `_fill_scalar_gpu`, `_fill_buffer_gpu`, `_scatter_add_gpu`, `_scatter_add_nd_gpu` | 128, 167, 238, 347 |
 | `gather_kernel.mojo` | `GatherGpu.gather_gpu` | 182 |
 | `shuffle_kernel.mojo` | `ShuffleGpu.launch_gather`, `launch_scatter` | 85, 136 |
 | `dropout_kernel.mojo` | `DropoutKernel.launch` | 126 |
@@ -399,7 +399,7 @@ sync and the now-dead `sync` parameter entirely. Saves 1 sync per `.to_cpu()`,
 because NDBuffer callers pass `sync` explicitly.
 
 **Files:**
-- 16 kernel files (41 launchers) listed in §4a
+- 16 kernel files (42 launchers) listed in §4a
 - `device.mojo` (5 DeviceState methods) listed in §4b
 
 ### Phase 2 — Remove redundant syncs from compound operations ✅
@@ -654,7 +654,7 @@ Compare to default `sync=True` path: ~3 separate syncs (1 per kernel launch) + 1
 | NDBuffer dispatch (11 methods) | `sync=True` | **`sync=False`** |
 | Tensor ops (~35) | no sync param | `sync: Bool = True` |
 | Forward structs (~25) | mostly no sync param | thread `sync` through |
-| Kernel launchers (41) | `sync=False` ✅ | no change |
+| Kernel launchers (42) | `sync=False` ✅ | no change |
 | Backward handlers (58) | no sync param | no change — hardcode `sync=False` internally |
 
 **Gap 2 — Compound ops without sync threading.** `StdDev.forward` lacks a `sync` param entirely — hardcodes `sync=False` on Welford + `.sync()` at end. `Gather.forward` also lacks `sync`. These need `sync` threading to be consistent with top-down percolation.
@@ -846,7 +846,7 @@ loss.backward(sync=True)                       # single sync point
 
 | Metric | Count |
 |---|---|---|
-| GPU kernel launchers | 41 |
+| GPU kernel launchers | 42 |
 | DeviceState methods with sync param | 5 (into() sync param removed in Phase 0) |
 | NDBuffer GPU dispatch methods | 12 |
 | Compound multi-kernel ops (batched) | 5 (Welford, StdDev, LayerNorm, Gather, CrossEntropy) |

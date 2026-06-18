@@ -38,20 +38,24 @@ If you want to *understand* autograd — not just use it — this document walks
 ### Tensor Fields
 
 ```mojo
-struct Tensor[dtype: DType]:
+struct Tensor[dtype: DType](
+    ImplicitlyCopyable & Movable & Sized & Writable & Absable & Equatable & Iterable
+):
     var _id: UInt                           # unique identity for graph traversal
     var buffer: NDBuffer[Self.dtype]       # shape, strides, offset, data (single source of truth)
     var requires_grad: Bool                 # gradient tracking flag
-    var gradbox: UnsafePointer[Gradbox]    # gradient storage (allocated only when needed)
-    var ancestors: Optional[Ancestors]       # lightweight parent handles for autograd graph
+    var gradbox: Optional[Gradbox[Self.dtype]]   # gradient storage (allocated only when needed)
+    var ancestors: Optional[Ancestors[Self.dtype]]  # lightweight parent handles for autograd graph
 ```
 
 ### Gradbox — Gradient Storage
 
 ```mojo
-struct Gradbox[dtype: DType]:
-    var buffer: NDBuffer                    # contiguous gradient storage
-    var _refcount: UnsafePointer         # independent refcount — survives tensor destruction
+struct Gradbox[dtype: DType](
+    ImplicitlyCopyable & Movable & Sized & Writable & Equatable & Absable
+):
+    var _ndb_ptr: Optional[UnsafePointer[NDBuffer[Self.dtype], MutAnyOrigin]]   # heap-allocated NDBuffer
+    var _refcount: Optional[UnsafePointer[Atomic[DType.uint64], MutAnyOrigin]]  # independent atomic refcount
 ```
 
 **Key design**: Gradbox has its own refcount. When Mojo ASAP-destroys an intermediate tensor, the gradbox survives if other ancestors still reference it.
@@ -59,12 +63,12 @@ struct Gradbox[dtype: DType]:
 ### Ancestor — Lightweight Parent Handle
 
 ```mojo
-struct Ancestor[dtype: DType]:
-    var _id: UInt                     # graph traversal
-    var requires_grad: Bool         # grad routing decision
-    var gradbox: UnsafePointer      # refcounted pointer to gradient storage
-    var ndb: NDBuffer               # data + layout (refcount bump only)
-    var parents: Optional[Ancestors] # recursive graph structure
+struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
+    var _id: UInt                           # graph traversal key
+    var requires_grad: Bool                 # skip gradient update if False
+    var gradbox: Optional[Gradbox[Self.dtype]]   # gradient storage (inline via Optional)
+    var ndb: Optional[NDBuffer[Self.dtype]]      # data+layout (None unless needs_parent_data=True)
+    var parents: Optional[Ancestors[Self.dtype]] # recursive ancestry chain
 ```
 
 **Why not store full Tensors?** The old design copied entire Tensors at every `add_ancestry` call — triggering recursive copies, gradbox allocations, and heap blocks. `Ancestor` carries only what backward actually needs.
@@ -72,11 +76,12 @@ struct Ancestor[dtype: DType]:
 ### BackwardFnArg — Type-Erased Operation Argument
 
 ```mojo
-struct BackwardFnArg[dtype: DType]:
+struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
     var op_code: Int                     # dispatch tag (e.g., BACKWARD_MULTIPLY_SCALAR)
-    var ptr: UnsafePointer[UInt8]        # type-erased argument (scalar, shape, etc.)
-    var destroy: DestroyerFn              # custom destructor
-    var copy_fn: CopyFn                # custom copier
+    var ptr: UnsafePointer[UInt8, MutAnyOrigin]   # type-erased argument (scalar, shape, etc.)
+    var destroy: DestroyerFn                        # custom destructor
+    var copy_fn: CopyFn                           # custom copier
+    var needs_parent_data: Bool                    # whether backward reads parent shape/buffer
 ```
 
 This is the key: a **jump table** dispatch instead of variant extraction.
@@ -101,7 +106,7 @@ var c = a * 42 + b
 From `tenmo/multiplication.mojo`:
 
 ```mojo
-fn forward[track_grad: Bool = True](self, factor) -> Tensor:
+def forward[track_grad: Bool = True](self, factor) -> Tensor:
     var out = Tensor(self.buffer.scalar_ops[Multiply](factor), requires_grad=False)
 
     comptime if track_grad:
@@ -126,7 +131,7 @@ fn forward[track_grad: Bool = True](self, factor) -> Tensor:
 From `tenmo/addition.mojo`:
 
 ```mojo
-fn forward[track_grad: Bool = True](self, other) -> Tensor:
+def forward[track_grad: Bool = True](self, other) -> Tensor:
     var out = Tensor(self.buffer.arithmetic_ops[Add](other.buffer), requires_grad=False)
 
     comptime if track_grad:
@@ -354,7 +359,7 @@ This prevents **dangling pointers** in the autograd graph.
 ### Why track_grad is compile-time?
 
 ```mojo
-fn forward[track_grad: Bool = True](self, factor):
+def forward[track_grad: Bool = True](self, factor):
     # If track_grad = False at compile time:
     # - No graph building code generated
     # - No ancestry setup

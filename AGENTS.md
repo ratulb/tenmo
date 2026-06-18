@@ -640,7 +640,7 @@ Direct gradient update on Tensor (used by some paths):
 - `SequentialBLAS` with `LinearBLAS` layers auto-profile native Mojo vs BLAS matmul at runtime
 - Profiling happens on first forward calls, then selects faster path
 - Full backward pass support through BLAS
-- Set `BLAS_PATH` env var for custom BLAS library path
+- Set `BLAS_PATH` compile-time define for custom BLAS library path: `mojo -D BLAS_PATH=/path/to/libblas.so`
 
 ## Style Conventions
 

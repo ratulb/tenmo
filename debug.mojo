@@ -23,6 +23,7 @@ from tenmo.device import GPU
 from std.utils.numerics import max_finite, min_finite
 from tenmo.numpy_interop import to_ndarray, from_ndarray
 from std.random import seed
+from std.sys.defines import get_defined_string
 from tenmo.mnemonics import (
     Multiply,
     Add,
@@ -54,11 +55,14 @@ def main() raises:
     var expected = Tensor[DType.int32].d1([3, 1, 0, 1, 5])
     assert_true(y == expected)
     assert_true(y1 == expected)"""
-    var x = Tensor[DType.int32].d1([-3, -1, 0, 1, 5])
+    _="""var x = Tensor[DType.int32].d1([-3, -1, 0, 1, 5])
     var y = x.abs[track_grad=False]()
     var expected: List[Int32] = [3, 1, 0, 1, 5]
     for i in range(5):
-        assert_true(y[i] == expected[i])
+        assert_true(y[i] == expected[i])"""
+
+    comptime BLAS_PATH = get_defined_string["BLAS_PATH", "/tmp/blas/blas01.so"]()
+    print("BLAS_PATH: ", BLAS_PATH)
 
 def attention() raises:
     inputs = Tensor[dtype].d2(
