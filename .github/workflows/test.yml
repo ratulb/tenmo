@@ -3,7 +3,7 @@ name: Mojo Tests
 on:
   push:
     branches:
-      - gpu_lazy
+      - dev
       - main
   pull_request:
     branches:
