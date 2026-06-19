@@ -222,6 +222,7 @@ declare -a GPU_TESTS=(
     "logarithm|tests/test_logarithm.mojo"
     "abs|tests/test_abs.mojo"
     "cumsum|tests/test_cumsum.mojo"
+    "multinomial|tests/test_multinomial.mojo"
     "tril|tests/test_tril.mojo"
     "triu|tests/test_triu.mojo"
     "where|tests/test_where.mojo"
@@ -416,6 +417,7 @@ run_test_by_name() {
         losses)         run_test "losses" "tests/test_losses.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         abs)            run_test "abs" "tests/test_abs.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         cumsum)         run_test "cumsum" "tests/test_cumsum.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        multinomial)    run_test "multinomial" "tests/test_multinomial.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         tril)           run_test "tril" "tests/test_tril.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         triu)           run_test "triu" "tests/test_triu.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         where)          run_test "where" "tests/test_where.mojo" "$DEBUG_MODE"; exit_code=$? ;;

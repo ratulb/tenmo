@@ -53,3 +53,4 @@ from tenmo.absolute import Absolute
 from tenmo.tril import Tril
 from tenmo.triu import Triu
 from tenmo.where import Where
+from tenmo.multinomial import Multinomial

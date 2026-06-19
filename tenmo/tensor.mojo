@@ -2697,6 +2697,17 @@ struct Tensor[dtype: DType](
             condition, a, b, requires_grad=requires_grad, sync=sync
         )
 
+    def multinomial(
+        self,
+        num_samples: Int = 1,
+        replacement: Bool = False,
+        temperature: Scalar[Self.dtype] = 1.0,
+        init_seed: Optional[Int] = None,
+    ) raises -> Tensor[DType.int32] where Self.dtype.is_floating_point():
+        return Multinomial[Self.dtype].sample(
+            self, num_samples, replacement, temperature, init_seed
+        )
+
     def masked_fill[
         track_grad: Bool = True,
     ](
