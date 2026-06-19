@@ -66,4 +66,5 @@ from .bceloss import BCEWithLogitsBackward, BCELossBackward
 from .absolute import AbsBackward
 from .tril import TrilBackward
 from .triu import TriuBackward
+from .cumsum import CumsumBackward
 from .where import WhereBackward

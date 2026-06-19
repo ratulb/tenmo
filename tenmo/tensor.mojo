@@ -2605,6 +2605,18 @@ struct Tensor[dtype: DType](
             self, requires_grad=requires_grad, sync=sync
         )
 
+    def cumsum[
+        track_grad: Bool = True,
+    ](
+        self,
+        axis: Int = 0,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype]:
+        return Cumsum[Self.dtype].forward[track_grad=track_grad](
+            self, axis=axis, requires_grad=requires_grad, sync=sync
+        )
+
     def tril[
         track_grad: Bool = True,
     ](

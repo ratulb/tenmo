@@ -87,7 +87,7 @@ environments:
       - conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-1.0.0b1-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mblack-26.3.0-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mojo-python-1.0.0b1-release.conda
-      - conda_source: mojodoc[05da7d24] @ git+https://github.com/ratulb/mojodoc?branch=main#5045ef9f7936e00dfc4206cc69c3d3197da165b5
+      - conda_source: mojodoc[3fa11a7e] @ git+https://github.com/ratulb/mojodoc?branch=main#5045ef9f7936e00dfc4206cc69c3d3197da165b5
       - pypi: https://files.pythonhosted.org/packages/4b/f9/d8ac11ddbd5d506e7c6be71b8a33698c73fd9dc108f6c9e0595f7cd60619/pure_cifar_10-0.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/c6/27/ab926560371a7fe729a60d603a326e05dad022e5684dd2fc07d687b49692/mnist_datasets-0.14-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/eb/75/1a0392bcc21c44dcdf87b3cf2d137e7829be2c083a1e38d44efca3d57a16/tqdm-4.68.2-py3-none-any.whl
@@ -177,7 +177,7 @@ environments:
       - conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-1.0.0b1-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mblack-26.3.0-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mojo-python-1.0.0b1-release.conda
-      - conda_source: mojodoc[05da7d24] @ git+https://github.com/ratulb/mojodoc?branch=main#5045ef9f7936e00dfc4206cc69c3d3197da165b5
+      - conda_source: mojodoc[3fa11a7e] @ git+https://github.com/ratulb/mojodoc?branch=main#5045ef9f7936e00dfc4206cc69c3d3197da165b5
       - pypi: https://files.pythonhosted.org/packages/4b/f9/d8ac11ddbd5d506e7c6be71b8a33698c73fd9dc108f6c9e0595f7cd60619/pure_cifar_10-0.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/c6/27/ab926560371a7fe729a60d603a326e05dad022e5684dd2fc07d687b49692/mnist_datasets-0.14-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/eb/75/1a0392bcc21c44dcdf87b3cf2d137e7829be2c083a1e38d44efca3d57a16/tqdm-4.68.2-py3-none-any.whl
@@ -1318,7 +1318,7 @@ packages:
   run_exports: {}
   size: 23114
   timestamp: 1777594699418
-- conda_source: mojodoc[05da7d24] @ git+https://github.com/ratulb/mojodoc?branch=main#5045ef9f7936e00dfc4206cc69c3d3197da165b5
+- conda_source: mojodoc[3fa11a7e] @ git+https://github.com/ratulb/mojodoc?branch=main#5045ef9f7936e00dfc4206cc69c3d3197da165b5
   version: 0.0.1
   build: hb0f4dca_0
   subdir: linux-64

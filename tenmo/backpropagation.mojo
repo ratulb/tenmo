@@ -93,6 +93,7 @@ comptime BACKWARD_BCE = 60
 comptime BACKWARD_ABS = 61
 comptime BACKWARD_TRIL = 62
 comptime BACKWARD_TRIU = 63
+comptime BACKWARD_CUMSUM = 65
 comptime BACKWARD_WHERE = 64
 
 
@@ -620,6 +621,10 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             )
         elif op_code == BACKWARD_TRIU:
             TriuBackward[Self.dtype].backward(
+                output, parent_ids, retain_graph
+            )
+        elif op_code == BACKWARD_CUMSUM:
+            CumsumBackward[Self.dtype].backward(
                 output, parent_ids, retain_graph
             )
         elif op_code == BACKWARD_WHERE:

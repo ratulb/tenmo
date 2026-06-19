@@ -98,6 +98,7 @@ declare -a ALL_TESTS_IN_ORDER=(
     "tril|tests/test_tril.mojo"
     "triu|tests/test_triu.mojo"
     "where|tests/test_where.mojo"
+    "cumsum|tests/test_cumsum.mojo"
     "masked_fill|tests/test_masked_fill.mojo"
     "attn_matmul|tests/test_attn_matmul.mojo"
     "bce|tests/test_bce.mojo"
@@ -220,6 +221,7 @@ declare -a GPU_TESTS=(
     "dev_transfer|tests/test_device_transfer_gradflow.mojo"
     "logarithm|tests/test_logarithm.mojo"
     "abs|tests/test_abs.mojo"
+    "cumsum|tests/test_cumsum.mojo"
     "tril|tests/test_tril.mojo"
     "triu|tests/test_triu.mojo"
     "where|tests/test_where.mojo"
@@ -413,6 +415,7 @@ run_test_by_name() {
         indexhelper)    run_test "indexhelper" "tests/test_indexhelper.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         losses)         run_test "losses" "tests/test_losses.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         abs)            run_test "abs" "tests/test_abs.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        cumsum)         run_test "cumsum" "tests/test_cumsum.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         tril)           run_test "tril" "tests/test_tril.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         triu)           run_test "triu" "tests/test_triu.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         where)          run_test "where" "tests/test_where.mojo" "$DEBUG_MODE"; exit_code=$? ;;

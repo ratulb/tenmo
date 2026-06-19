@@ -48,6 +48,7 @@ from tenmo.reciprocal import Reciprocal
 from tenmo.broadcast import Broadcast
 from tenmo.gather import Gather, GatherArg
 from tenmo.embedding import Embedding
+from tenmo.cumsum import Cumsum
 from tenmo.absolute import Absolute
 from tenmo.tril import Tril
 from tenmo.triu import Triu
