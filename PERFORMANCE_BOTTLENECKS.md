@@ -473,30 +473,23 @@ scalar_loss). Wire into `CEProbabilitiesForward.forward` with the same
 
 ### 1. `compute_accuracy` CPU round-trip — write GPU kernel
 
-**Status: 🟡 IN PROGRESS**
+**Status: 🟢 DONE**
 
-**Problem:** The training loop calls `pred.to_cpu()` every batch (line 188 of
-`examples/mnist_gpu.mojo`) just to compute argmax in a scalar CPU loop.
-This transfers 640 floats (64×10) from GPU→CPU and runs a per-element Python-
-style loop. The sync from `map_to_host()` is cheap (pipeline already drained
-by `backward(sync=True)` + `step()`), but the unnecessary data transfer is
-wasteful.
+`Accuracy[dtype].launch()` at `tenmo/kernels/accuracy_kernel.mojo:40` runs
+argmax + compare + atomic accumulate in 1 GPU kernel. Single `Int64` readback
+via `map_to_host()`. Eliminated `pred.to_cpu()` per batch.
 
-**Fix:** Single GPU kernel: one thread per sample computes argmax, compares
-with label, atomically increments counter. Single `Int` read-back instead of
-full 640-element transfer. Eliminates `pred.to_cpu()` from the training loop.
+Code has been further unified into `Accuracy[dtype].compute(pred, target)` at
+`tenmo/accuracy.mojo`, which dispatches to the GPU kernel when either input is
+on GPU, or uses a fused SIMD argmax loop (zero intermediate tensor allocs)
+on CPU. The SIMD path uses `simd_load` for memory bandwidth with a scalar
+register walk for argmax logic.
 
-**Design:**
-- Kernel file: `tenmo/kernels/accuracy_kernel.mojo`
-- Launcher: `Accuracy[dtype].launch(pred_ndb, labels_ndb)` → returns `Int`
-- Launch config: 1 block, `batch_size` threads
-- Each thread: argmax over row → compare with label → `Atomic.add` to result
-- Single `Int` read back via `map_to_host`
-- Also remove `pred.to_cpu()` from training loop in `examples/mnist_gpu.mojo`
+All 4 CPU example files (`mnist.mojo`, `mnist_conv2d.mojo`, `cifar_10.mojo`,
+`mnist_gpu.mojo`) and 2 GPU example files (`mnist_gpu.mojo`,
+`mnist_gpu_prof.mojo`) now call the unified API.
 
-**ROI:** Eliminates 1 `to_cpu()` per batch × 938 batches/epoch = 938 unnecessary
-GPU→CPU transfers. Net impact on epoch time: small for MNIST (640 elements is
-tiny), but critical for larger models with more classes or wider outputs.
+Tests: 12 CPU tests + 10 GPU-guarded parity tests at `tests/test_accuracy.mojo`.
 
 ---
 
@@ -558,6 +551,9 @@ for any future caller that explicitly passes `sync=True`.
   `map_to_host()` round-trips with async GPU kernel launches per parameter
 - ~~Matmul forward sync-threading~~ **🟢 DONE** — `sync` threaded through
   `Matmul.forward` → all 4 dispatch paths (dot/vm/mv/mm)
+- ~~`compute_accuracy` GPU kernel~~ **🟢 DONE** — single-kernel argmax+compare+
+  accumulate w/ Int readback + unified `Accuracy[dtype].compute()` API
+  (SIMD CPU path, GPU kernel dispatch, 22 tests)
 
 ### Remaining work (low priority / not blocking MNIST GPU)
 

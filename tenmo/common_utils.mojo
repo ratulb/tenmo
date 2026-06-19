@@ -570,7 +570,7 @@ def print_buffer[
 
     size = buffer.shape[current_dim]
 
-    if size < 0 or size > 1_000_000:
+    if size < 0 or size > 100_000_000:
         print(
             "ERROR: suspicious size: ",
             size,

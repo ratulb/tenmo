@@ -31,7 +31,7 @@ from .mnemonics import (
     GreaterThan,
     GreaterThanEqual,
 )
-from .shared.scalar_ops import ScalarOps, simd_op, scalar_op
+from .shared.scalar_ops import compare_pair, simd_op, scalar_op
 
 
 struct Buffer[dtype: DType = DType.float32](
@@ -965,7 +965,7 @@ struct Buffer[dtype: DType = DType.float32](
                 var other_val = other[idx]
                 var result: Bool
 
-                result = ScalarOps[Self.dtype].compare_pair[op_code](self_val, other_val)
+                result = compare_pair[op_code, Self.dtype](self_val, other_val)
 
                 out[idx] = result
 
@@ -1022,7 +1022,7 @@ struct Buffer[dtype: DType = DType.float32](
                 var val = self[idx]
                 var result: Bool
 
-                result = ScalarOps[Self.dtype].compare_pair[op_code](val, scalar)
+                result = compare_pair[op_code, Self.dtype](val, scalar)
 
                 out[idx] = result
 
@@ -1527,7 +1527,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * smdwidth
 
         for k in range(i, total):
-            if not ScalarOps[Self.dtype].compare_pair[op_code](
+            if not compare_pair[op_code, Self.dtype](
                 self.load[simdwidth=1](k), scalar
             ):
                 return False
@@ -1703,7 +1703,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * smdwidth
 
         for k in range(i, total):
-            if not ScalarOps[Self.dtype].compare_pair[op_code](
+            if not compare_pair[op_code, Self.dtype](
                 self.load[simdwidth=1](k), other.load[simdwidth=1](k)
             ):
                 return False

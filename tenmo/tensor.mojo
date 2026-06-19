@@ -148,16 +148,13 @@ struct Tensor[dtype: DType](
         else:
             return Gradbox[Self.dtype](self^.buffer^)
 
-    def as_list(self) -> List[Scalar[Self.dtype]]:
+    def tolist(self) raises -> List[Scalar[Self.dtype]]:
         """Copy tensor data into a Mojo List.
 
         Returns:
             List containing all tensor elements in row-major order.
         """
-        var count = self.numels()
-        var tensor_data = List[Scalar[Self.dtype]](capacity=count)
-        memcpy(dest=tensor_data.unsafe_ptr(), src=self.data_ptr(), count=count)
-        return tensor_data^
+        return self.buffer.tolist()
 
     def __init__(out self, *, deinit take: Self):
         self._id = take._id
@@ -264,9 +261,9 @@ struct Tensor[dtype: DType](
 
         Returns:
             The total number of elements (product of shape dimensions).
-            Returns 0 for scalar tensors with Shape().
+            Returns 1 for scalar tensors with Shape().
         """
-        return self.shape()[0] if self.shape() != Shape() else 0
+        return self.shape().product()
 
     @always_inline
     def shape(ref self) -> ref[self.buffer.shape] Shape:
@@ -3177,7 +3174,9 @@ struct Tensor[dtype: DType](
                 if node.has_ancestry():
                     parent_ids.clear()
                     try:
-                        Backward[Self.dtype].invoke(node, parent_ids, retain_graph)
+                        Backward[Self.dtype].invoke(
+                            node, parent_ids, retain_graph
+                        )
                     except e:
                         print("Backward invoke error: ", e)
                     for i in range(len(parent_ids)):

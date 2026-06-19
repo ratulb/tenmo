@@ -37,7 +37,7 @@ def accuracy_kernel[
 
 
 @fieldwise_init
-struct Accuracy[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct AccuracyGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def launch(
         pred: NDBuffer[Self.dtype],

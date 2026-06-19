@@ -270,7 +270,20 @@ var model = SequentialBLAS[dtype]()
 model.append(LinearBLAS[dtype](784, 128, profile_samples=10).into())
 ```
 
-Set `BLAS_PATH` compile-time define to use a custom BLAS library (defaults to OpenBLAS). Pass it via `mojo -D BLAS_PATH=/path/to/libblas.so` or set `MOJO_DEFINES=BLAS_PATH=/path/to/libblas.so`.
+### Installation
+
+**Option 1 — System OpenBLAS (recommended, works out of the box):**
+```bash
+sudo apt-get update && sudo apt-get install -y libopenblas-dev
+```
+Installs to `/lib/x86_64-linux-gnu/libopenblas.so.0` — the default path Tenmo looks for, no `-D` flag needed.
+
+**Option 2 — Pixi-managed OpenBLAS (conda):**
+```bash
+pixi add openblas
+# Then pass the path explicitly:
+mojo -I . -D BLAS_PATH=$(find $CONDA_PREFIX/lib -name "libopenblas.so" | head -1) ...
+```
 
 ---
 

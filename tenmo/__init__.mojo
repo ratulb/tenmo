@@ -125,6 +125,7 @@ from .numpy_interop import *
 from .pad import *
 from .permute import *
 from .pooling import *
+from .accuracy import *
 from .kernels.reduction_kernel import *
 from .relu import *
 from .repeat import *
@@ -173,3 +174,9 @@ def empty[dtype: DType=DType.float32](*indices: Int) -> Tensor[dtype]:
 
 def dot[dtype: DType=DType.float32](a: Tensor[dtype], b: Tensor[dtype]) -> Tensor[dtype]:
     return a.dot(b)
+
+def randint(low: Int, high: Int, shape: List[Int]) -> List[Int]:
+    var indexer = Tensor[DType.int64].rand(
+        shape, low=Int64(low), high=Int64(high)
+    )
+    return [Int(index) for _, index in indexer]

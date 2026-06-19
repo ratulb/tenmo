@@ -637,10 +637,47 @@ Direct gradient update on Tensor (used by some paths):
 
 ## BLAS
 
-- `SequentialBLAS` with `LinearBLAS` layers auto-profile native Mojo vs BLAS matmul at runtime
-- Profiling happens on first forward calls, then selects faster path
-- Full backward pass support through BLAS
-- Set `BLAS_PATH` compile-time define for custom BLAS library path: `mojo -D BLAS_PATH=/path/to/libblas.so`
+Tenmo's BLAS integration is in `tenmo/blashandle.mojo`. At compile time it looks up
+`BLAS_PATH` via:
+
+```mojo
+comptime BLAS_PATH = get_defined_string["BLAS_PATH", "/lib/x86_64-linux-gnu/libopenblas.so.0"]()
+```
+
+The second argument is the **fallback default** — used when `-D BLAS_PATH=...` is not
+passed on the command line.
+
+### Option 1 — System OpenBLAS (default, works out of the box)
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libopenblas-dev
+```
+
+This installs to `/lib/x86_64-linux-gnu/libopenblas.so.0` which is the default fallback
+path — no `-D` flag needed.
+
+### Option 2 — Pixi-managed OpenBLAS (conda)
+
+```bash
+pixi add openblas
+# pixi.toml entry (auto-generated): openblas = ">=0.3.33,<0.4"
+find $CONDA_PREFIX/lib -name "libopenblas.so" | head -1
+```
+
+Then pass the path explicitly:
+
+```bash
+mojo -I . -D BLAS_PATH=$HOME/tenmo/.pixi/envs/default/lib/libopenblas.so tests/test_cpu_all_3.mojo
+# or with auto-discovery:
+mojo -I . -D BLAS_PATH=$(find $CONDA_PREFIX/lib -name "libopenblas.so" | head -1) tests/test_cpu_all_3.mojo
+```
+
+### Runtime Behaviour
+
+- `SequentialBLAS` with `LinearBLAS` layers auto-profile native Mojo vs BLAS matmul
+  at runtime on the first forward call, then select the faster path.
+- Full backward pass support through BLAS (gradient flows through BLAS matmul).
 
 ## Style Conventions
 

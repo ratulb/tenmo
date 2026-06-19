@@ -14,6 +14,7 @@ from tenmo.dataloader import NumpyDataset, MNIST_MEAN, MNIST_STD
 from tenmo.device import GPU
 from std.time import perf_counter_ns
 from std.sys import has_accelerator
+from tenmo.accuracy import Accuracy
 
 
 def train_mnist() raises:
@@ -181,9 +182,9 @@ def train_mnist() raises:
             optimizer.step()
 
             # loss.item() syncs GPU (reads scalar value back)
-            # compute_accuracy_gpu runs argmax on GPU, reads single Int back
+            # Accuracy.compute runs argmax on GPU, reads single Int back
             train_loss += loss.item() * Float32(batch.batch_size)
-            train_correct += compute_accuracy_gpu(pred, labels_gpu)
+            train_correct += Accuracy[FEATURE_DTYPE].compute(pred, labels_gpu, sync=sync)
             train_total += batch.batch_size
 
         # --- Validation Phase ---
@@ -204,7 +205,7 @@ def train_mnist() raises:
             var loss = criterion(pred, labels_gpu)
 
             val_loss += loss.item() * Float32(batch.batch_size)
-            val_correct += compute_accuracy_gpu(pred, labels_gpu)
+            val_correct += Accuracy[FEATURE_DTYPE].compute(pred, labels_gpu, sync=sync)
             val_total += batch.batch_size
 
         # --- Epoch Report ---
@@ -245,22 +246,6 @@ def train_mnist() raises:
     _model = model.to_cpu()
     print("  Model weights saved to CPU")
     print("=" * 80)
-
-
-def compute_accuracy_gpu[
-    dtype: DType
-](pred: Tensor[dtype], target: Tensor[DType.int32]) raises -> Int:
-    """GPU-accelerated classification accuracy.
-
-    Args:
-        pred: (batch_size, num_classes) tensor on GPU.
-        target: (batch_size,) label tensor on GPU (int32).
-
-    Returns:
-        Number of correct predictions.
-    """
-    from tenmo.kernels import Accuracy
-    return Accuracy[dtype].launch(pred.buffer, target.buffer, sync=True)
 
 
 def main() raises:

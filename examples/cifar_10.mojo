@@ -11,6 +11,7 @@ from std.python import Python
 from tenmo.numpy_interop import from_ndarray, numpy_dtype
 from tenmo.dataloader import NumpyDataset
 from std.time import perf_counter_ns
+from tenmo.accuracy import Accuracy
 
 
 def train_cifar_10() raises:
@@ -183,7 +184,7 @@ def train_cifar_10() raises:
 
             # Accuracy computation
             t0 = perf_counter_ns()
-            train_correct += compute_accuracy(pred, batch.labels)
+            train_correct += Accuracy[FEATURE_DTYPE].compute(pred, batch.labels)
             t1 = perf_counter_ns()
             train_accuracy_time += Float64(t1 - t0) / 1e9
 
@@ -213,7 +214,7 @@ def train_cifar_10() raises:
             val_loss += loss.item() * Float32(batch.batch_size)
 
             t0 = perf_counter_ns()
-            val_correct += compute_accuracy(pred, batch.labels)
+            val_correct += Accuracy[FEATURE_DTYPE].compute(pred, batch.labels)
             t1 = perf_counter_ns()
             val_accuracy_time += Float64(t1 - t0) / 1e9
 
@@ -261,23 +262,10 @@ def train_cifar_10() raises:
     var total_time = Float64(perf_counter_ns() - training_start) / 1e9
     print("\n" + "=" * 80)
     print("Training completed in", total_time, "seconds")
-    print("Average time per epoch:", total_time / Float64(num_epochs), "seconds")
-    print("=" * 80)
-
-
-def compute_accuracy[
-    dtype: DType
-](pred: Tensor[dtype], target: Tensor[DType.int32]) -> Int64:
-    """Compute classification accuracy by comparing argmax predictions to targets.
-    """
-    pred_classes = pred.argmax(axis=1)
-    correct = (
-        pred_classes.eq(target)
-        .to_dtype[DType.int64]()
-        .sum[track_grad=False]()
-        .item()
+    print(
+        "Average time per epoch:", total_time / Float64(num_epochs), "seconds"
     )
-    return correct
+    print("=" * 80)
 
 
 def main() raises:

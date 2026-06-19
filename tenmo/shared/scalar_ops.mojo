@@ -50,85 +50,6 @@ struct ScalarOps[dtype: DType](
     """
 
     # ------------------------------------------------------------------
-    # Binary scalar arithmetic (op_code dispatch)
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    @always_inline
-    def scalar_fn[
-        op_code: Int,
-    ](
-        lhs: Scalar[Self.dtype],
-        rhs: Scalar[Self.dtype],
-        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
-    ) -> Scalar[Self.dtype]:
-        comptime if op_code == Add:
-            return lhs + rhs
-        elif op_code == Subtract:
-            return lhs - rhs
-        elif op_code == ReverseSubtract:
-            return rhs - lhs
-        elif op_code == Multiply:
-            return lhs * rhs
-        elif op_code == Divide:
-            return lhs / rhs
-        elif op_code == MAX:
-            return max(lhs, rhs)
-        elif op_code == MIN:
-            return min(lhs, rhs)
-        elif op_code == SIGMOID_BACKWARD:
-            return rhs * lhs * (One[Self.dtype].value() - lhs)
-        elif op_code == SQRT_BACKWARD:
-            return rhs * (
-                One[Self.dtype].value()
-                / (epsilon + Scalar[Self.dtype](2) * sqrt(lhs))
-            )
-        elif op_code == TANH_BACKWARD:
-            return rhs * (One[Self.dtype].value() - lhs * lhs)
-        elif op_code == POW:
-            return lhs**rhs
-        else:  # op_code == ReverseDivide
-            return rhs / lhs
-
-    # ------------------------------------------------------------------
-    # Floating-point unary operations
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    @always_inline
-    def float_unary_fn_helper[
-        op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
-    ](scalar: Scalar[Self.dtype]) -> Scalar[
-        Self.dtype
-    ] where Self.dtype.is_floating_point():
-        comptime if op_code == LOG:
-            return log(max(scalar, epsilon))
-        elif op_code == SIGMOID_FORWARD:
-            return One[Self.dtype].value() / (
-                One[Self.dtype].value() + exp(scalar)
-            )
-        elif op_code == TANH_FORWARD:
-            return tanh(scalar)
-        else:  # op_code == EXP
-            return exp(scalar)
-
-    # ------------------------------------------------------------------
-    # General unary operations (any numeric dtype)
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    @always_inline
-    def unary_fn_helper[
-        op_code: Int
-    ](scalar: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
-        comptime if op_code == NEGATE:
-            return -scalar
-        elif op_code == SQRT:
-            return sqrt(scalar)
-        else:  # op_code == ABS
-            return scalar.__abs__()
-
-    # ------------------------------------------------------------------
     # Float64 cast helper  (used by PRODUCT reduction)
     # ------------------------------------------------------------------
 
@@ -175,28 +96,6 @@ struct ScalarOps[dtype: DType](
             var sign = Scalar[DType.float64](-1 if excl_neg % 2 == 1 else 1)
             return Self.cast_result[Self.dtype](sign * exp(excl_log))
 
-    # ------------------------------------------------------------------
-    # Scalar comparison  (from Buffer.compare_pair)
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    @always_inline
-    def compare_pair[
-        op_code: Int
-    ](left: Scalar[Self.dtype], right: Scalar[Self.dtype]) -> Bool:
-        comptime if op_code == Equal:
-            return left == right
-        elif op_code == NotEqual:
-            return left != right
-        elif op_code == GreaterThanEqual:
-            return left >= right
-        elif op_code == GreaterThan:
-            return left > right
-        elif op_code == LessThanEqual:
-            return left <= right
-        else:  # op_code == LessThan
-            return left < right
-
 
 # =============================================================================
 # Standalone SIMD and scalar op dispatch — shared by CPU broadcast and GPU
@@ -240,7 +139,7 @@ def simd_op[
     elif op_code == MIN:
         return min(a, b)
     elif op_code == POW:
-        return a ** b
+        return a**b
     elif op_code == ABS_BACKWARD:
         var zero = SIMD[dtype, simd_width](0)
         var pos = SIMD[dtype, simd_width](a.gt(zero))
@@ -284,7 +183,7 @@ def scalar_op[
     elif op_code == MIN:
         return min(a, b)
     elif op_code == POW:
-        return a ** b
+        return a**b
     elif op_code == ABS_BACKWARD:
         var zero = Scalar[dtype](0)
         if a > zero:
@@ -301,10 +200,8 @@ def scalar_op[
 def unary_op[
     op_code: Int,
     dtype: DType,
-](
-    scalar: Scalar[dtype],
-) -> Scalar[dtype]:
-    """Standalone unary scalar op dispatch — mirrors ScalarOps.unary_fn_helper."""
+](scalar: Scalar[dtype],) -> Scalar[dtype]:
+    """Standalone unary scalar op dispatch."""
     comptime if op_code == NEGATE:
         return -scalar
     elif op_code == SQRT:
@@ -318,10 +215,8 @@ def float_unary_op[
     op_code: Int,
     dtype: DType,
     epsilon: Scalar[dtype] = Epsilon[dtype].value(),
-](
-    scalar: Scalar[dtype],
-) -> Scalar[dtype] where dtype.is_floating_point():
-    """Standalone float unary scalar op dispatch — mirrors ScalarOps.float_unary_fn_helper."""
+](scalar: Scalar[dtype],) -> Scalar[dtype] where dtype.is_floating_point():
+    """Standalone float unary scalar op dispatch."""
     comptime if op_code == LOG:
         return log(max(scalar, epsilon))
     elif op_code == SIGMOID_FORWARD:
@@ -333,14 +228,11 @@ def float_unary_op[
 
 
 @always_inline
-def compare_op[
+def compare_pair[
     op_code: Int,
     dtype: DType,
-](
-    left: Scalar[dtype],
-    right: Scalar[dtype],
-) -> Bool:
-    """Standalone scalar comparison dispatch — mirrors ScalarOps.compare_pair."""
+](left: Scalar[dtype], right: Scalar[dtype],) -> Bool:
+    """Standalone scalar comparison dispatch."""
     comptime if op_code == Equal:
         return left == right
     elif op_code == NotEqual:

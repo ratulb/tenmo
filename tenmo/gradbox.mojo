@@ -854,6 +854,17 @@ struct Gradbox[dtype: DType](
             )
         return self.buffer().compare[NotEqual](other.buffer()).buffer.all_true()
 
+    def to_dtype[
+        NewType: DType
+    ](self) -> Gradbox[NewType]:
+        """Convert Gradbox to a different data type.
+
+        Returns:
+            A new gradbox with the specified dtype.
+        """
+        var new_type_buffer = self.buffer().to_dtype[NewType]()
+        return Gradbox[NewType](new_type_buffer^)
+
     def get_gpu(self) raises -> GPU:
         """Get the GPU this Gradbox is on.
 

@@ -139,6 +139,7 @@ declare -a ALL_TESTS_IN_ORDER=(
     "variance|tests/test_variance.mojo"
     "variance_and_std|tests/test_variance_and_std.mojo"
     "utils|tests/test_utils.mojo"
+    "accuracy|tests/test_accuracy.mojo"
     "indexhelper|tests/test_indexhelper.mojo"
     "losses|tests/test_losses.mojo"
     "tanh|tests/test_tanh.mojo"
@@ -209,6 +210,7 @@ declare -a GPU_TESTS=(
     "gpusummean|tests/test_gpu_sum_mean.mojo"
     "broadcast|tests/test_broadcast.mojo"
     "scalar|tests/test_scalar_tensors.mojo"
+    "accuracy|tests/test_accuracy.mojo"
     "scalar_gpu|tests/test_scalar_gpu.mojo"
     "inplace|tests/test_inplace.mojo"
     "gpu_expand|tests/test_gpu_expand.mojo"
@@ -274,7 +276,7 @@ if [ $# -eq 0 ]; then
     echo "  allany, compare, count_unique, transmute, exp, summean, sigmoid"
     echo "  gpusummean, broadcast, scalar, inplace, expand, gpu_expand, gpu_cpu"
     echo "  sgd, sparse_sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout, dev_transfer"
-    echo "  std_variance, stack, logarithm, concat, variance, variance_and_std, utils, onehot, power"
+    echo "  std_variance, stack, logarithm, concat, variance, variance_and_std, accuracy, utils, onehot, power"
     echo "  indexhelper, losses, tanh, data, softmax, repeat, mmnd, attn_matmul"
     echo "  attn_matmul, bce, intarray, mm2d, matmul_2d_verify, vm, mv, slice, view_slice, tiles, linspace, argminmax"
     echo "  minmax, relu, shuffle, permute, flatten, gather, squeeze, unsqueeze"
@@ -407,6 +409,7 @@ run_test_by_name() {
         variance)       run_test "variance" "tests/test_variance.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         variance_and_std) run_test "variance_and_std" "tests/test_variance_and_std.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         utils)          run_test "utils" "tests/test_utils.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        accuracy)       run_test "accuracy" "tests/test_accuracy.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         indexhelper)    run_test "indexhelper" "tests/test_indexhelper.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         losses)         run_test "losses" "tests/test_losses.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         abs)            run_test "abs" "tests/test_abs.mojo" "$DEBUG_MODE"; exit_code=$? ;;

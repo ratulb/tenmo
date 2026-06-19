@@ -18,6 +18,7 @@ from tenmo.device import GPU
 from std.time import perf_counter_ns
 from std.sys import has_accelerator
 from tenmo.mnemonics import mm
+from tenmo.accuracy import Accuracy
 
 
 def pct(x: Float64, total: Float64) -> Float64:
@@ -326,7 +327,7 @@ def train_mnist() raises:
             var t5 = perf_counter_ns()
 
             train_loss += loss.item() * Float32(batch.batch_size)
-            train_correct += compute_accuracy_gpu(pred, labels_gpu)
+            train_correct += Accuracy[FEATURE_DTYPE].compute(pred, labels_gpu, sync=False)
             train_total += batch.batch_size
             var t6 = perf_counter_ns()
 
@@ -373,7 +374,7 @@ def train_mnist() raises:
             var loss = criterion(pred, labels_gpu, sync=False)
 
             val_loss += loss.item() * Float32(batch.batch_size)
-            val_correct += compute_accuracy_gpu(pred, labels_gpu)
+            val_correct += Accuracy[FEATURE_DTYPE].compute(pred, labels_gpu, sync=False)
             val_total += batch.batch_size
 
         var epoch_time = Float64(perf_counter_ns() - epoch_start) / 1e9
@@ -411,22 +412,6 @@ def train_mnist() raises:
     _ = model.to_cpu()
     print("  Model weights saved to CPU")
     print("=" * 80)
-
-
-def compute_accuracy_gpu[
-    dtype: DType
-](pred: Tensor[dtype], target: Tensor[DType.int32]) raises -> Int:
-    """GPU-accelerated classification accuracy.
-
-    Args:
-        pred: (batch_size, num_classes) tensor on GPU.
-        target: (batch_size,) label tensor on GPU (int32).
-
-    Returns:
-        Number of correct predictions.
-    """
-    from tenmo.kernels import Accuracy
-    return Accuracy[dtype].launch(pred.buffer, target.buffer, sync=True)
 
 
 def main() raises:

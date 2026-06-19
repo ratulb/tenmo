@@ -23,7 +23,7 @@ from tenmo.kernels.unary_ops_kernel import UnaryOpsKernel
 from tenmo.kernels.matmul_kernel import MatmulNdGpu
 from tenmo.matmul_cpu import MmCpu2d, MmCpuNd
 from tenmo.cpu_arithmetics import CpuArithmeticOps
-from tenmo.shared.scalar_ops import compare_op
+from tenmo.shared.scalar_ops import compare_pair
 from tenmo.kernels.compare_kernel import AllClose, Compare, CompareScalar
 
 from std.math import sqrt, log, exp, tanh
@@ -253,6 +253,21 @@ struct NDBuffer[dtype: DType](
                     return Self.Empty()
             else:
                 return ndb^
+
+    def tolist(self) raises -> List[Scalar[Self.dtype]]:
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    return self.to_cpu().buffer.tolist()
+                except e:
+                    print(e)
+                    raise e^
+        if self.is_contiguous():
+            var start = self.offset
+            var end = self.numels() + start
+            return self.buffer[start:end].tolist()
+        else:
+            return self.contiguous_buffer().tolist()
 
     def get_gpu(
         ref self,
@@ -2182,7 +2197,7 @@ struct NDBuffer[dtype: DType](
 
                 var other_val = other.buffer[next_index]
 
-                buffer[index] = compare_op[op_code, Self.dtype](
+                buffer[index] = compare_pair[op_code, Self.dtype](
                     self_val, other_val
                 )
 
@@ -2238,7 +2253,7 @@ struct NDBuffer[dtype: DType](
             for idx in self.index_iterator():
                 var value = self.buffer[idx]
 
-                buffer[index] = compare_op[op_code, Self.dtype](value, scalar)
+                buffer[index] = compare_pair[op_code, Self.dtype](value, scalar)
 
                 index += 1
 

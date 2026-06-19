@@ -13,6 +13,7 @@ from tenmo.numpy_interop import from_ndarray, numpy_dtype
 from tenmo.dataloader import NumpyDataset, MNIST_MEAN, MNIST_STD
 from tenmo.forwards import Padding
 from tenmo.common_utils import now
+from tenmo.accuracy import Accuracy
 
 
 def train_mnist() raises:
@@ -175,7 +176,7 @@ def train_mnist() raises:
             optimizer.step()
 
             train_loss += loss.item() * Float32(batch.batch_size)
-            train_correct += compute_accuracy(pred, batch.labels)
+            train_correct += Accuracy[FEATURE_DTYPE].compute(pred, batch.labels)
             train_total += batch.batch_size
             batch_num += 1
 
@@ -194,7 +195,7 @@ def train_mnist() raises:
             var loss = criterion(pred, batch.labels)
 
             val_loss += loss.item() * Float32(batch.batch_size)
-            val_correct += compute_accuracy(pred, batch.labels)
+            val_correct += Accuracy[FEATURE_DTYPE].compute(pred, batch.labels)
             val_total += batch.batch_size
 
         # --- Epoch Report ---
@@ -227,30 +228,6 @@ def train_mnist() raises:
     print("=" * 80)
     print("Training completed in", total_time, "seconds")
     print("=" * 80)
-
-
-def compute_accuracy[
-    dtype: DType
-](pred: Tensor[dtype], target: Tensor[DType.int32]) -> Int:
-    """
-    Compute accuracy by comparing argmax predictions to targets.
-    """
-    var correct = 0
-    var batch_size = pred.shape()[0]
-    var num_classes = pred.shape()[1]
-
-    for i in range(batch_size):
-        var max_idx = 0
-        var max_val = pred[i, 0]
-        for j in range(1, num_classes):
-            if pred[i, j] > max_val:
-                max_val = pred[i, j]
-                max_idx = j
-
-        if max_idx == Int(target[i]):
-            correct += 1
-
-    return correct
 
 
 def main() raises:
