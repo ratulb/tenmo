@@ -108,16 +108,23 @@ struct PadConstantGpuKernel[dtype: DType](
         debug_assert(dst_ndb.is_on_gpu(), "PadConstantGpuKernel requires GPU dst")
 
         var ndim = src_ndb.rank()
-        var numels = src_ndb.numels()
-
-        # Build Array objects for the GPU kernel
+        var numels: Int
         var src_shape = Array()
         var dst_strides = Array()
         var pad_before = Array()
-        for d in range(ndim):
-            src_shape.append(src_ndb.shape[d])
-            dst_strides.append(dst_ndb.strides[d])
-            pad_before.append(pad[d][0])
+
+        comptime if forward:
+            numels = src_ndb.numels()
+            for d in range(ndim):
+                src_shape.append(src_ndb.shape[d])
+                dst_strides.append(dst_ndb.strides[d])
+                pad_before.append(pad[d][0])
+        else:
+            numels = dst_ndb.numels()
+            for d in range(ndim):
+                src_shape.append(dst_ndb.shape[d])
+                dst_strides.append(src_ndb.strides[d])
+                pad_before.append(pad[d][0])
 
         ref dst_state = dst_ndb.device_state.value()
         ref gpu = dst_state.get_gpu()
