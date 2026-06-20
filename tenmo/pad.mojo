@@ -32,6 +32,8 @@ from std.utils import Variant
 from std.sys import simd_width_of
 from std.algorithm import parallelize
 from .ancestry import Ancestor
+from std.sys import has_accelerator
+from tenmo.kernels.pad_kernel import PadConstantGpuKernel
 
 comptime Padding = Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]]
 
@@ -57,11 +59,34 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         if ancestor_ref.requires_grad:
             ref parent_shape = ancestor_ref.shape()
-            var grad_parent = Gradbox[Self.dtype].zeros(
-                parent_shape, 
-            )
 
-            # Different backward pass based on mode
+            # ===== GPU BACKWARD (constant mode) =====
+            comptime if has_accelerator():
+                if mode == "constant" and grad_out.is_on_gpu():
+                    try:
+                        var gpu_device = grad_out.buffer().device()
+                        var grad_parent = Gradbox[Self.dtype].zeros(
+                            parent_shape, device=gpu_device
+                        )
+                        PadConstantGpuKernel[Self.dtype].launch_backward(
+                            grad_out.buffer(), grad_parent.buffer(), pad
+                        )
+                        ancestor_ref.update_grad(
+                            grad_parent^, AddTensor, None
+                        )
+                    except e:
+                        panic(
+                            "PadBackward GPU backward failed: "
+                            + String(e)
+                        )
+                    parent_ids.append(ancestor_ref._id)
+                    if not retain_graph:
+                        grad_out.zero_grad()
+                    return
+
+            # ===== CPU BACKWARD =====
+            var grad_parent = Gradbox[Self.dtype].zeros(parent_shape)
+
             if mode == "constant":
                 if parent_shape.rank() == 4:
                     Self._extract_4d_constant_simd(
@@ -340,7 +365,32 @@ struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var after = pad[i][1]
             out_shape.append(x_shape[i] + before + after)
 
-        # Create output tensor
+        # ===== GPU PATH (constant mode only) =====
+        comptime if has_accelerator():
+            if x.is_on_gpu() and mode == "constant":
+                var result = Tensor[Self.dtype].full(
+                    out_shape, value, device=x.device()
+                )
+                try:
+                    PadConstantGpuKernel[Self.dtype].launch_forward(
+                        x.buffer, result.buffer, pad
+                    )
+                except e:
+                    panic("Pad GPU forward failed: " + String(e))
+
+                comptime if track_grad:
+                    var req_grad = requires_grad.or_else(x.requires_grad)
+                    if req_grad:
+                        result.requires_grad_(True)
+                        var backwardFnArg = BackwardFnArg[Self.dtype](
+                            BACKWARD_PAD, PadArg(pad.copy(), mode)
+                        )
+                        backwardFnArg.needs_parent_data = True
+                        result.add_ancestry(backwardFnArg^, x)
+
+                return result^
+
+        # ===== CPU PATH =====
         var result = Tensor[Self.dtype].zeros(out_shape)
 
         # Apply padding based on mode

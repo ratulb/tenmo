@@ -28,6 +28,7 @@ from .accuracy_kernel import AccuracyGpu
 from .sgd_kernel import SGDStep
 from .multinomial_kernel import MultinomialGpuKernel
 from .concate_kernel import ConcateGpuKernel
+from .pad_kernel import PadConstantGpuKernel
 
 
 # output_to_input_base and rank_to_reduced_offset now live in

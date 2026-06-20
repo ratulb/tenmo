@@ -6,6 +6,7 @@ from std.testing import (
     TestSuite,
 )
 from tenmo.shapes import Shape
+from std.sys import has_accelerator
 
 # ============================================================================
 # FORWARD PASS TESTS - CONSTANT PADDING
@@ -465,6 +466,201 @@ def test_pad_requires_grad_propagation() raises:
 
     var result2 = Tensor[dtype].pad(x, pad, requires_grad=False)
     assert_true(result2.requires_grad == False)
+
+
+# ============================================================================
+# GPU CONSTANT PADDING TESTS
+# ============================================================================
+
+
+def test_pad_gpu_constant_2d_symmetric() raises:
+    """GPU forward constant 2D symmetric padding."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
+
+        var pad = List[Tuple[Int, Int]]()
+        pad.append((1, 1))
+        pad.append((1, 1))
+
+        var result = Tensor[dtype].pad(x.to_gpu(), pad)
+        assert_true(result.is_on_gpu())
+
+        var expected = Tensor[dtype].pad(x, pad)
+        assert_true(result.to_cpu().all_close[atol=1e-6](expected))
+
+
+def test_pad_gpu_constant_2d_asymmetric() raises:
+    """GPU forward constant 2D asymmetric padding."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+
+        var pad = List[Tuple[Int, Int]]()
+        pad.append((2, 1))
+        pad.append((0, 3))
+
+        var result = Tensor[dtype].pad(x.to_gpu(), pad)
+        assert_true(result.is_on_gpu())
+
+        var expected = Tensor[dtype].pad(x, pad)
+        assert_true(result.to_cpu().all_close[atol=1e-6](expected))
+
+
+def test_pad_gpu_constant_4d_conv() raises:
+    """GPU forward constant 4D padding (convolution style)."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var x3 = Tensor[dtype].d3([
+            [[1.0, 2.0], [3.0, 4.0]],
+            [[5.0, 6.0], [7.0, 8.0]],
+        ])
+        var x = x3.unsqueeze(0)  # (1, 2, 2, 2)
+
+        var pad = List[Tuple[Int, Int]]()
+        pad.append((0, 0))  # N: no pad
+        pad.append((0, 0))  # C: no pad
+        pad.append((1, 1))  # H: pad 1 each side
+        pad.append((1, 1))  # W: pad 1 each side
+
+        var result = Tensor[dtype].pad(x.to_gpu(), pad)
+        assert_true(result.is_on_gpu())
+
+        var expected = Tensor[dtype].pad(x, pad)
+        assert_true(result.to_cpu().all_close[atol=1e-6](expected))
+
+
+def test_pad_gpu_constant_nonzero_value() raises:
+    """GPU forward constant padding with nonzero pad value."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].d1([1.0, 2.0, 3.0])
+
+        var pad = List[Tuple[Int, Int]]()
+        pad.append((2, 3))
+
+        var result = Tensor[dtype].pad(x.to_gpu(), pad, value=5.0)
+        assert_true(result.is_on_gpu())
+
+        var expected = Tensor[dtype].pad(x, pad, value=5.0)
+        assert_true(result.to_cpu().all_close[atol=1e-6](expected))
+
+
+def test_pad_gpu_constant_1d() raises:
+    """GPU forward constant 1D padding."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])
+
+        var pad = List[Tuple[Int, Int]]()
+        pad.append((3, 5))
+
+        var result = Tensor[dtype].pad(x.to_gpu(), pad)
+        assert_true(result.is_on_gpu())
+
+        var expected = Tensor[dtype].pad(x, pad)
+        assert_true(result.to_cpu().all_close[atol=1e-6](expected))
+
+
+def test_pad_gpu_backward_constant() raises:
+    """GPU backward gradient flow through constant padding."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var cpu_x = Tensor[dtype].d2(
+            [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+        )
+        var pad = List[Tuple[Int, Int]]()
+        pad.append((1, 2))
+        pad.append((0, 1))
+
+        var cpu_result = Tensor[dtype].pad(cpu_x, pad)
+        var cpu_loss = cpu_result.sum()
+        cpu_loss.backward()
+
+        var gpu_x = Tensor[dtype].d2(
+            [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+        ).to_gpu()
+        var gpu_result = Tensor[dtype].pad(gpu_x, pad)
+        var gpu_loss = gpu_result.sum()
+        gpu_loss.backward()
+
+        assert_true(
+            gpu_x.grad().to_cpu().all_close[atol=1e-6](cpu_x.grad())
+        )
+
+
+def test_pad_gpu_backward_weighted() raises:
+    """GPU backward with weighted loss through padding."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var cpu_x = Tensor[dtype].d2(
+            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+        )
+        var pad = List[Tuple[Int, Int]]()
+        pad.append((0, 2))
+        pad.append((1, 1))
+
+        var cpu_result = Tensor[dtype].pad(cpu_x, pad)
+        var cpu_weights = Tensor[dtype].rand(cpu_result.shape())
+        var cpu_weighted = cpu_result * cpu_weights
+        var cpu_loss = cpu_weighted.sum()
+        cpu_loss.backward()
+
+        var gpu_x = Tensor[dtype].d2(
+            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+        ).to_gpu()
+        var gpu_weights = cpu_weights.to_gpu()
+        var gpu_result = Tensor[dtype].pad(gpu_x, pad)
+        var gpu_weighted = gpu_result * gpu_weights
+        var gpu_loss = gpu_weighted.sum()
+        gpu_loss.backward()
+
+        assert_true(
+            gpu_x.grad().to_cpu().all_close[atol=1e-6](cpu_x.grad())
+        )
+
+
+def test_pad_gpu_backward_chain() raises:
+    """GPU backward through chained operations with padding."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var cpu_x = Tensor[dtype].d1(
+            [1.0, 2.0, 3.0], requires_grad=True
+        )
+        var pad = List[Tuple[Int, Int]]()
+        pad.append((1, 1))
+
+        var cpu_padded = Tensor[dtype].pad(cpu_x, pad)
+        var cpu_squared = cpu_padded * cpu_padded
+        var cpu_loss = cpu_squared.sum()
+        cpu_loss.backward()
+
+        var gpu_x = Tensor[dtype].d1(
+            [1.0, 2.0, 3.0], requires_grad=True
+        ).to_gpu()
+        var gpu_padded = Tensor[dtype].pad(gpu_x, pad)
+        var gpu_squared = gpu_padded * gpu_padded
+        var gpu_loss = gpu_squared.sum()
+        gpu_loss.backward()
+
+        assert_true(
+            gpu_x.grad().to_cpu().all_close[atol=1e-6](cpu_x.grad())
+        )
+
+
+def test_pad_gpu_no_track_grad() raises:
+    """GPU pad with requires_grad=False produces no gradbox."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
+
+        var pad = List[Tuple[Int, Int]]()
+        pad.append((1, 1))
+        pad.append((1, 1))
+
+        var result = Tensor[dtype].pad(x.to_gpu(), pad)
+        assert_true(result.is_on_gpu())
+        assert_true(not result.requires_grad)
 
 
 # ============================================================================

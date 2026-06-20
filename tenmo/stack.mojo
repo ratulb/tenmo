@@ -8,6 +8,8 @@ from .indexhelper import IndexCalculator
 from .shapes import Shape
 from .forwards import Concate
 from .ancestry import Ancestor
+from std.sys import has_accelerator
+from tenmo.kernels.concate_kernel import ConcateGpuKernel
 
 
 @fieldwise_init
@@ -48,7 +50,63 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 String(stack_size),
             )
 
-        # ===== SPLIT GRADIENT ALONG STACKED AXIS =====
+        # ===== GPU BACKWARD PATH =====
+        comptime if has_accelerator():
+            if grad_output.is_on_gpu():
+                try:
+                    var stride_axis = 1
+                    for d in range(axis + 1, grad_shape.rank()):
+                        stride_axis *= grad_shape[d]
+                    var gpu_device = grad_output.buffer().device()
+
+                    for tensor_idx in range(count):
+                        var ancestor_ref = output.ancestry().get(tensor_idx)
+                        if not ancestor_ref.requires_grad:
+                            continue
+
+                        # Build unsqueezed shape: insert dim of size 1 at axis
+                        var unsqueezed_dims = List[Int]()
+                        for d in range(grad_shape.rank()):
+                            unsqueezed_dims.append(
+                                grad_shape[d] if d != axis else 1
+                            )
+                        var unsqueezed_shape = Shape(unsqueezed_dims)
+
+                        # Create temp gradbox with unsqueezed shape on GPU
+                        var grad_temp = Gradbox[Self.dtype].zeros(
+                            unsqueezed_shape, device=gpu_device
+                        )
+
+                        # Extract slice at tensor_idx along axis
+                        ConcateGpuKernel[Self.dtype].launch_backward(
+                            grad_output.buffer(),
+                            grad_temp.buffer(),
+                            1,
+                            stack_size,
+                            stride_axis,
+                            tensor_idx,
+                        )
+
+                        # Squeeze via contiguous copy with parent shape
+                        var grad_input_ndb = grad_temp.buffer().contiguous(
+                            ancestor_ref.shape()
+                        )
+                        ancestor_ref.update_grad(
+                            Gradbox[Self.dtype](grad_input_ndb^),
+                            AddTensor,
+                            None,
+                        )
+                        parent_ids.append(ancestor_ref._id)
+
+                    if not retain_graph:
+                        grad_output.zero_grad()
+                except e:
+                    panic(
+                        "StackBackward GPU backward failed: " + String(e)
+                    )
+                return
+
+        # ===== CPU BACKWARD PATH =====
         for tensor_idx in range(count):
             var ancestor_ref = output.ancestry().get(tensor_idx)
 
@@ -63,7 +121,6 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             var grad_input_shape = Shape(grad_input_shape_dims)
             var grad_input = Gradbox[Self.dtype].zeros(grad_input_shape)
-            # var grad_input_data = grad_input.buffer.buffer.data
             var grad_input_data = grad_input.data_ptr()
 
             # ===== EXTRACT SLICE: grad_output[..., tensor_idx, ...] =====

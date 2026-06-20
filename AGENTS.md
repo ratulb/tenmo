@@ -997,8 +997,8 @@ These operations have no GPU dispatch path. When called on GPU-resident tensors 
 
 | ID | Operation | File | Status | Root Cause |
 |----|-----------|------|--------|------------|
-| KI-01 | **Concate / Stack / vstack / hstack** | `concate.mojo:136` | ❌ No GPU path | Allocates `Tensor.zeros`, copies element-by-element via `data_buffer()` + `IndexCalculator.flatten_index()` — raw CPU pointer access |
-| KI-02 | **Pad** | `pad.mojo` | ❌ No GPU path | `data_ptr()` raw pointer access with SIMD loops and `parallelize`. No GPU guard |
+| KI-01 | **Concate / Stack / vstack / hstack** | `concate.mojo:136`, `stack.mojo:19` | ✅ Done | Fused GPU copy kernel (`ConcateGpuKernel`) with coordinate decomposition. Forward + backward for all axes. Stack uses same kernel via temp unsqueeze + contiguous squeeze. |
+| KI-02 | **Pad** (constant mode) | `pad.mojo:369`, `pad_kernel.mojo` | ✅ Done (GPU tests added) | Fused GPU copy kernel (`PadConstantGpuKernel`) with coordinate decomposition via `Array`. Forward + backward for constant mode. Replicate/reflect/circular still CPU. |
 | KI-03 | **Conv2D** (Conv2dFused) | `cnn.mojo` | ❌ No GPU path (WIP) | `FusedIm2Col` uses `data_ptr()` for all reads/writes. SIMD + `parallelize`. Documented WIP |
 | KI-04 | **MaxPool2d** | `pooling.mojo` | ❌ No GPU path | Pooling kernels use `data_ptr()` with stride arithmetic + `parallelize`. No GPU guard |
 | KI-05 | **Tensor.rand** | `tensor.mojo:1301` | ❌ No GPU allocation | No `device` parameter. Creates CPU `Buffer` and fills with `random_float64` in a `for` loop |

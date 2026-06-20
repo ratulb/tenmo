@@ -33,36 +33,27 @@ from tenmo.mnemonics import (
 )
 import tenmo
 from tenmo.net import Linear
+from std.collections import Set
+from tenmo.backpropagation import ArgumentType
 comptime dtype = DType.float32
 
+trait Argument:
+    comptime new_type: Optional[DType]
+
+@fieldwise_init
+struct NewTypeArg[orig_type: DType]:
+    @staticmethod
+    def convert[new_dtype: DType, //](var gradbox: Gradbox[new_dtype]) -> Gradbox[Self.orig_type]:
+        return gradbox.to_dtype[Self.orig_type]()
 
 def main() raises:
     comptime dtype = DType.float32
-    _="""var n = 7
+    var logits = Tensor[dtype].rand(2, 3, 2)
+    logits.print()
+    print()
+    var selected = logits[s(), i(-1), s()]  # shape: (B, C)
+    selected.print()
 
-    var rows = Tensor[dtype].arange(Scalar[dtype](n))
-    rows = rows.unsqueeze(1)  # (7, 1)
-    var cols = Tensor[dtype].arange(Scalar[dtype](n))
-    cols = cols.unsqueeze(0)  # (1, 7)
-
-    # Explicitly broadcast to (n, n) before comparing
-    var rows_exp = rows.expand(n, n)   # (7, 7)
-    var cols_exp = cols.expand(n, n)   # (7, 7)
-    (rows_exp >= cols_exp).to_dtype[dtype]().print()"""
-    _="""var x = Tensor[DType.int32].d1([-3, -1, 0, 1, 5])
-    var y = x.abs[track_grad=False]()
-    var y1 = Tensor[DType.int32].abs(x)
-    var expected = Tensor[DType.int32].d1([3, 1, 0, 1, 5])
-    assert_true(y == expected)
-    assert_true(y1 == expected)"""
-    _="""var x = Tensor[DType.int32].d1([-3, -1, 0, 1, 5])
-    var y = x.abs[track_grad=False]()
-    var expected: List[Int32] = [3, 1, 0, 1, 5]
-    for i in range(5):
-        assert_true(y[i] == expected[i])"""
-
-    comptime BLAS_PATH = get_defined_string["BLAS_PATH", "/tmp/blas/blas01.so"]()
-    print("BLAS_PATH: ", BLAS_PATH)
 
 def attention() raises:
     inputs = Tensor[dtype].d2(
