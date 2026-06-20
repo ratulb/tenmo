@@ -991,6 +991,24 @@ struct CEProbabilityFusedKernel[dtype: DType, max_block_size: Int]:
 
 **Blocks:** None. Code compiles, all 139 CE tests pass (including the 3 GPU-guarded prob tests which now skip gracefully with the CPU fallback instead of crashing).
 
+### GPU Capability Gaps — CPU-Only Operations
+
+These operations have no GPU dispatch path. When called on GPU-resident tensors they either crash (dereference empty CPU buffer), produce wrong results, or silently fall back to slow per-element CPU round trips. Each is a numbered action item.
+
+| ID | Operation | File | Status | Root Cause |
+|----|-----------|------|--------|------------|
+| KI-01 | **Concate / Stack / vstack / hstack** | `concate.mojo:136` | ❌ No GPU path | Allocates `Tensor.zeros`, copies element-by-element via `data_buffer()` + `IndexCalculator.flatten_index()` — raw CPU pointer access |
+| KI-02 | **Pad** | `pad.mojo` | ❌ No GPU path | `data_ptr()` raw pointer access with SIMD loops and `parallelize`. No GPU guard |
+| KI-03 | **Conv2D** (Conv2dFused) | `cnn.mojo` | ❌ No GPU path (WIP) | `FusedIm2Col` uses `data_ptr()` for all reads/writes. SIMD + `parallelize`. Documented WIP |
+| KI-04 | **MaxPool2d** | `pooling.mojo` | ❌ No GPU path | Pooling kernels use `data_ptr()` with stride arithmetic + `parallelize`. No GPU guard |
+| KI-05 | **Tensor.rand** | `tensor.mojo:1301` | ❌ No GPU allocation | No `device` parameter. Creates CPU `Buffer` and fills with `random_float64` in a `for` loop |
+| KI-06 | **Tensor.randn** | `tensor.mojo:1360` | ❌ No GPU allocation | No `device` parameter. CPU-only Box-Muller via `NDBuffer.randn` |
+| KI-07 | **Tensor.arange / linspace** | `ndbuffer.mojo` | ❌ No GPU allocation | `NDBuffer.arange`/`linspace` create CPU `Buffer` directly, no device parameter |
+| KI-08 | **Tensor.onehot** | `ndbuffer.mojo:411` | ❌ No GPU path (known) | CPU coordinate iteration with per-element `DeviceState.__setitem__` — each write is a `map_to_host()` round trip |
+| KI-09 | **Tensor.eye** | `tensor.mojo` | ⚠️ Partial | Allocates on GPU via `device` param, but fill loop (`for i: out[i,i]=1`) hits per-element CPU round trips; no GPU kernel |
+
+**Priority ordering:** KI-01 (Concate/Stack) blocks any GPU training path that gathers per-sample outputs into batches. KI-02 (Pad) blocks Conv2D on GPU. KI-03/KI-04 are WIP. KI-05/KI-06/KI-07 are convenience — workaround is `.to_gpu()` after construction. KI-08/KI-09 are slow but functional.
+
 ## Bias Implementation — `Linear` / `LinearBLAS` / `Conv2D`
 
 ### Status

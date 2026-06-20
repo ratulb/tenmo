@@ -1,6 +1,7 @@
 from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
 from tenmo.shapes import Shape
+from std.sys import has_accelerator
 
 # ============================================================================
 # FORWARD PASS TESTS - STACK OPERATIONS
@@ -633,6 +634,359 @@ def test_hstack_backward_1d() raises:
 
     assert_true(A.grad().all_close[atol=1e-6](expected_grad_A))
     assert_true(B.grad().all_close[atol=1e-6](expected_grad_B))
+
+
+# ============================================================================
+# GPU CONCATENATION TESTS
+# ============================================================================
+
+
+def test_concat_gpu_axis0_2d() raises:
+    """Concatenate 2D tensors along axis 0 on GPU."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        var B = Tensor[dtype].d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])
+
+        var tensors = List[Tensor[dtype]]()
+        tensors.append(A.to_gpu())
+        tensors.append(B.to_gpu())
+
+        var result = Tensor[dtype].concat(tensors, axis=0)
+        assert_true(result.is_on_gpu())
+
+        var tensors_cpu = List[Tensor[dtype]]()
+        tensors_cpu.append(A)
+        tensors_cpu.append(B)
+        var expected = Tensor[dtype].concat(tensors_cpu, axis=0)
+        assert_true(result.to_cpu().all_close[atol=1e-6](expected))
+
+
+def test_concat_gpu_axis1_2d() raises:
+    """Concatenate 2D tensors along axis 1 on GPU."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        var B = Tensor[dtype].d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])
+
+        var tensors = List[Tensor[dtype]]()
+        tensors.append(A.to_gpu())
+        tensors.append(B.to_gpu())
+
+        var result = Tensor[dtype].concat(tensors, axis=1)
+        assert_true(result.is_on_gpu())
+
+        var tensors_cpu = List[Tensor[dtype]]()
+        tensors_cpu.append(A)
+        tensors_cpu.append(B)
+        var expected = Tensor[dtype].concat(tensors_cpu, axis=1)
+        assert_true(result.to_cpu().all_close[atol=1e-6](expected))
+
+
+def test_concat_gpu_axis0_3d() raises:
+    """Concatenate 3D tensors along axis 0 on GPU."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].d3([
+            [[1.0, 2.0], [3.0, 4.0]],
+            [[5.0, 6.0], [7.0, 8.0]],
+        ])
+        var B = Tensor[dtype].d3([
+            [[9.0, 10.0], [11.0, 12.0]],
+            [[13.0, 14.0], [15.0, 16.0]],
+        ])
+
+        var tensors = List[Tensor[dtype]]()
+        tensors.append(A.to_gpu())
+        tensors.append(B.to_gpu())
+
+        var result = Tensor[dtype].concat(tensors, axis=0)
+        assert_true(result.is_on_gpu())
+
+        var tensors_cpu = List[Tensor[dtype]]()
+        tensors_cpu.append(A)
+        tensors_cpu.append(B)
+        var expected = Tensor[dtype].concat(tensors_cpu, axis=0)
+        assert_true(result.to_cpu().all_close[atol=1e-6](expected))
+
+
+def test_concat_gpu_axis1_3d() raises:
+    """Concatenate 3D tensors along axis 1 on GPU."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].d3([
+            [[1.0, 2.0], [3.0, 4.0]],
+            [[5.0, 6.0], [7.0, 8.0]],
+        ])
+        var B = Tensor[dtype].d3([
+            [[9.0, 10.0], [11.0, 12.0]],
+            [[13.0, 14.0], [15.0, 16.0]],
+        ])
+
+        var tensors = List[Tensor[dtype]]()
+        tensors.append(A.to_gpu())
+        tensors.append(B.to_gpu())
+
+        var result = Tensor[dtype].concat(tensors, axis=1)
+        assert_true(result.is_on_gpu())
+
+        var tensors_cpu = List[Tensor[dtype]]()
+        tensors_cpu.append(A)
+        tensors_cpu.append(B)
+        var expected = Tensor[dtype].concat(tensors_cpu, axis=1)
+        assert_true(result.to_cpu().all_close[atol=1e-6](expected))
+
+
+def test_concat_gpu_axis2_3d() raises:
+    """Concatenate 3D tensors along axis 2 on GPU."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].d3([
+            [[1.0, 2.0], [3.0, 4.0]],
+            [[5.0, 6.0], [7.0, 8.0]],
+        ])
+        var B = Tensor[dtype].d3([
+            [[9.0, 10.0], [11.0, 12.0]],
+            [[13.0, 14.0], [15.0, 16.0]],
+        ])
+
+        var tensors = List[Tensor[dtype]]()
+        tensors.append(A.to_gpu())
+        tensors.append(B.to_gpu())
+
+        var result = Tensor[dtype].concat(tensors, axis=2)
+        assert_true(result.is_on_gpu())
+
+        var tensors_cpu = List[Tensor[dtype]]()
+        tensors_cpu.append(A)
+        tensors_cpu.append(B)
+        var expected = Tensor[dtype].concat(tensors_cpu, axis=2)
+        assert_true(result.to_cpu().all_close[atol=1e-6](expected))
+
+
+def test_concat_gpu_three_inputs() raises:
+    """Concatenate three tensors on GPU."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
+        var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])
+        var C = Tensor[dtype].d2([[9.0, 10.0], [11.0, 12.0]])
+
+        var tensors = List[Tensor[dtype]]()
+        tensors.append(A.to_gpu())
+        tensors.append(B.to_gpu())
+        tensors.append(C.to_gpu())
+
+        var result = Tensor[dtype].concat(tensors, axis=0)
+        assert_true(result.is_on_gpu())
+
+        var tensors_cpu = List[Tensor[dtype]]()
+        tensors_cpu.append(A)
+        tensors_cpu.append(B)
+        tensors_cpu.append(C)
+        var expected = Tensor[dtype].concat(tensors_cpu, axis=0)
+        assert_true(result.to_cpu().all_close[atol=1e-6](expected))
+
+
+def test_concat_gpu_backward_axis0() raises:
+    """Gradient flows correctly through GPU concat axis=0."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        # CPU backward
+        var cpu_A = Tensor[dtype].d2(
+            [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+        )
+        var cpu_B = Tensor[dtype].d2(
+            [[5.0, 6.0], [7.0, 8.0]], requires_grad=True
+        )
+        var tensors_cpu = List[Tensor[dtype]]()
+        tensors_cpu.append(cpu_A)
+        tensors_cpu.append(cpu_B)
+        var result_cpu = Tensor[dtype].concat(tensors_cpu, axis=0)
+        var loss_cpu = result_cpu.sum()
+        loss_cpu.backward()
+
+        # GPU backward
+        var gpu_A = Tensor[dtype].d2(
+            [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+        ).to_gpu()
+        var gpu_B = Tensor[dtype].d2(
+            [[5.0, 6.0], [7.0, 8.0]], requires_grad=True
+        ).to_gpu()
+        var tensors_gpu = List[Tensor[dtype]]()
+        tensors_gpu.append(gpu_A)
+        tensors_gpu.append(gpu_B)
+        var result_gpu = Tensor[dtype].concat(tensors_gpu, axis=0)
+        var loss_gpu = result_gpu.sum()
+        loss_gpu.backward()
+
+        assert_true(
+            gpu_A.grad().to_cpu().all_close[atol=1e-6](cpu_A.grad())
+        )
+        assert_true(
+            gpu_B.grad().to_cpu().all_close[atol=1e-6](cpu_B.grad())
+        )
+
+
+def test_concat_gpu_backward_axis1() raises:
+    """Gradient flows correctly through GPU concat axis=1."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        # CPU backward
+        var cpu_A = Tensor[dtype].d2(
+            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+        )
+        var cpu_B = Tensor[dtype].d2(
+            [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]], requires_grad=True
+        )
+        var tensors_cpu = List[Tensor[dtype]]()
+        tensors_cpu.append(cpu_A)
+        tensors_cpu.append(cpu_B)
+        var result_cpu = Tensor[dtype].concat(tensors_cpu, axis=1)
+        var loss_cpu = result_cpu.sum()
+        loss_cpu.backward()
+
+        # GPU backward
+        var gpu_A = Tensor[dtype].d2(
+            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+        ).to_gpu()
+        var gpu_B = Tensor[dtype].d2(
+            [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]], requires_grad=True
+        ).to_gpu()
+        var tensors_gpu = List[Tensor[dtype]]()
+        tensors_gpu.append(gpu_A)
+        tensors_gpu.append(gpu_B)
+        var result_gpu = Tensor[dtype].concat(tensors_gpu, axis=1)
+        var loss_gpu = result_gpu.sum()
+        loss_gpu.backward()
+
+        assert_true(
+            gpu_A.grad().to_cpu().all_close[atol=1e-6](cpu_A.grad())
+        )
+        assert_true(
+            gpu_B.grad().to_cpu().all_close[atol=1e-6](cpu_B.grad())
+        )
+
+
+def test_concat_gpu_backward_axis2_3d() raises:
+    """Gradient flows correctly through GPU concat axis=2 on 3D tensors."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var cpu_A = Tensor[dtype].d3(
+            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+            requires_grad=True,
+        )
+        var cpu_B = Tensor[dtype].d3(
+            [[[9.0, 10.0], [11.0, 12.0]], [[13.0, 14.0], [15.0, 16.0]]],
+            requires_grad=True,
+        )
+        var tensors_cpu = List[Tensor[dtype]]()
+        tensors_cpu.append(cpu_A)
+        tensors_cpu.append(cpu_B)
+        var result_cpu = Tensor[dtype].concat(tensors_cpu, axis=2)
+        var loss_cpu = result_cpu.sum()
+        loss_cpu.backward()
+
+        var gpu_A = Tensor[dtype].d3(
+            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+            requires_grad=True,
+        ).to_gpu()
+        var gpu_B = Tensor[dtype].d3(
+            [[[9.0, 10.0], [11.0, 12.0]], [[13.0, 14.0], [15.0, 16.0]]],
+            requires_grad=True,
+        ).to_gpu()
+        var tensors_gpu = List[Tensor[dtype]]()
+        tensors_gpu.append(gpu_A)
+        tensors_gpu.append(gpu_B)
+        var result_gpu = Tensor[dtype].concat(tensors_gpu, axis=2)
+        var loss_gpu = result_gpu.sum()
+        loss_gpu.backward()
+
+        assert_true(
+            gpu_A.grad().to_cpu().all_close[atol=1e-6](cpu_A.grad())
+        )
+        assert_true(
+            gpu_B.grad().to_cpu().all_close[atol=1e-6](cpu_B.grad())
+        )
+
+
+def test_stack_gpu_axis0() raises:
+    """Stack tensors along axis 0 on GPU."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        var B = Tensor[dtype].d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])
+
+        var tensors = List[Tensor[dtype]]()
+        tensors.append(A.to_gpu())
+        tensors.append(B.to_gpu())
+
+        var result = Tensor[dtype].stack(tensors, axis=0)
+        assert_true(result.is_on_gpu())
+
+        var tensors_cpu = List[Tensor[dtype]]()
+        tensors_cpu.append(A)
+        tensors_cpu.append(B)
+        var expected = Tensor[dtype].stack(tensors_cpu, axis=0)
+        assert_true(result.to_cpu().all_close[atol=1e-6](expected))
+
+
+def test_stack_gpu_axis1() raises:
+    """Stack tensors along axis 1 on GPU."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        var B = Tensor[dtype].d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])
+
+        var tensors = List[Tensor[dtype]]()
+        tensors.append(A.to_gpu())
+        tensors.append(B.to_gpu())
+
+        var result = Tensor[dtype].stack(tensors, axis=1)
+        assert_true(result.is_on_gpu())
+
+        var tensors_cpu = List[Tensor[dtype]]()
+        tensors_cpu.append(A)
+        tensors_cpu.append(B)
+        var expected = Tensor[dtype].stack(tensors_cpu, axis=1)
+        assert_true(result.to_cpu().all_close[atol=1e-6](expected))
+
+
+def test_stack_gpu_axis2() raises:
+    """Stack tensors along axis 2 on GPU."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        var B = Tensor[dtype].d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])
+
+        var tensors = List[Tensor[dtype]]()
+        tensors.append(A.to_gpu())
+        tensors.append(B.to_gpu())
+
+        var result = Tensor[dtype].stack(tensors, axis=2)
+        assert_true(result.is_on_gpu())
+
+        var tensors_cpu = List[Tensor[dtype]]()
+        tensors_cpu.append(A)
+        tensors_cpu.append(B)
+        var expected = Tensor[dtype].stack(tensors_cpu, axis=2)
+        assert_true(result.to_cpu().all_close[atol=1e-6](expected))
+
+
+def test_concat_gpu_no_track_grad() raises:
+    """GPU concat with track_grad=False produces no gradbox."""
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
+        var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])
+
+        var tensors = List[Tensor[dtype]]()
+        tensors.append(A.to_gpu())
+        tensors.append(B.to_gpu())
+
+        var result = Tensor[dtype].concat(tensors, axis=0)
+        assert_true(result.is_on_gpu())
+        assert_true(not result.requires_grad)
 
 
 def main() raises:

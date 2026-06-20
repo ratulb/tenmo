@@ -11,6 +11,9 @@ from .intarray import IntArray
 from .indexhelper import IndexCalculator
 from .shapes import Shape
 from .ancestry import Ancestor
+from .ndbuffer import NDBuffer
+from std.sys import has_accelerator
+from tenmo.kernels.concate_kernel import ConcateGpuKernel
 
 
 @fieldwise_init
@@ -23,11 +26,56 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ):
         var axis = output.ancestry().backward_fn_arg().get[Integer]().value
         ref grad_output = output.gradients()
+        var count = len(output.ancestry())
+
+        # ===== GPU BACKWARD PATH =====
+        comptime if has_accelerator():
+            if grad_output.is_on_gpu():
+                try:
+                    var grad_shape = grad_output.shape()
+                    var output_axis_size = grad_shape[axis]
+                    var stride_axis = 1
+                    for d in range(axis + 1, grad_shape.rank()):
+                        stride_axis *= grad_shape[d]
+                    var gpu_device = grad_output.buffer().device()
+
+                    var offset = 0
+                    for i in range(count):
+                        ref parent = output.ancestry().get(i)
+                        ref parent_shape = parent.shape()
+                        if not parent.requires_grad:
+                            offset += parent_shape[axis]
+                            continue
+
+                        var grad_input = Gradbox[Self.dtype].zeros(
+                            parent_shape, device=gpu_device
+                        )
+
+                        ConcateGpuKernel[Self.dtype].launch_backward(
+                            grad_output.buffer(),
+                            grad_input.buffer(),
+                            parent_shape[axis],
+                            output_axis_size,
+                            stride_axis,
+                            offset,
+                        )
+
+                        offset += parent_shape[axis]
+                        parent.update_grad(grad_input^, AddTensor, None)
+                        parent_ids.append(parent._id)
+
+                    if not retain_graph:
+                        grad_output.zero_grad()
+                except e:
+                    panic(
+                        "ConcatBackward GPU backward failed: " + String(e)
+                    )
+                return
+
+        # ===== CPU BACKWARD PATH =====
         var grad_data = grad_output.data_ptr()
         var grad_shape = grad_output.shape()
         var grad_strides = grad_output.strides()
-
-        var count = len(output.ancestry())
 
         # Fast path: axis 0
         if axis == 0:
@@ -133,6 +181,66 @@ struct Concate[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         var output_shape = Shape(output_dims)
 
+        # ===== GPU FORWARD PATH =====
+        comptime if has_accelerator():
+            var any_gpu = False
+            for i in range(len(tensors)):
+                if tensors[i].is_on_gpu():
+                    any_gpu = True
+                    break
+
+            if any_gpu:
+                try:
+                    # Allocate output on GPU
+                    var device = tensors[0].device()
+                    var result = Tensor[Self.dtype].zeros(
+                        output_shape, device=device
+                    )
+
+                    var grad_required = False
+                    var offset = 0
+                    for tensor_idx in range(len(tensors)):
+                        ref tensor = tensors[tensor_idx]
+                        grad_required = (
+                            grad_required or tensor.requires_grad
+                        )
+                        var input_axis_size = tensor.shape()[concat_axis]
+                        var stride_axis = result.strides()[concat_axis]
+
+                        ConcateGpuKernel[Self.dtype].launch_forward(
+                            tensor.buffer,
+                            result.buffer,
+                            input_axis_size,
+                            output_shape[concat_axis],
+                            stride_axis,
+                            offset,
+                        )
+
+                        offset += input_axis_size
+
+                    # Setup autograd
+                    comptime if track_grad:
+                        grad_required = requires_grad.or_else(
+                            grad_required
+                        )
+                        if grad_required:
+                            result.requires_grad_(True)
+                            var backwardFnArg = BackwardFnArg[
+                                Self.dtype
+                            ].integer_arg(BACKWARD_CONCAT, concat_axis)
+                            backwardFnArg.needs_parent_data = True
+                            for i in range(len(tensors)):
+                                result.add_ancestry(
+                                    backwardFnArg, tensors[i]
+                                )
+
+                    return result^
+                except e:
+                    panic(
+                        "Concate GPU forward failed: " + String(e)
+                    )
+
+        # ===== CPU FORWARD PATH =====
         # ===== 3. ALLOCATE OUTPUT =====
         var result = Tensor[Self.dtype].zeros(output_shape)
         ref result_data = result.buffer.data_buffer()
