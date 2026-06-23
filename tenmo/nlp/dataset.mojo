@@ -1,16 +1,23 @@
-from bpe import Tokenizer
+# from bpe import Tokenizer
 from tenmo.dataloader import Dataset, DataLoader
 from tenmo.shapes import Shape
 from tenmo.common_utils import panic
 from std.memory import memcpy
+from std.random import random_float64
+
+
+trait Tokenizer:
+    def decode(self, token_ids: List[Int]) raises -> String:
+        ...
+
+    def encode(self, text: String) raises -> List[Int]:
+        ...
 
 
 struct LLMDataset[
     TokType: Tokenizer,
     dtype: DType = DType.int64,
-](
-    Sized & Copyable & Movable & Dataset
-):
+](Sized & Copyable & Movable & Dataset):
     """
     A sliding-window language modelling dataset.
 
@@ -80,6 +87,39 @@ struct LLMDataset[
     def get_labels_per_sample(self) -> Int:
         return self._max_length
 
+    def sample(
+        ref self,
+        idx: Optional[Int] = None,
+    ) raises -> Tuple[Tensor[Self._feature_dtype], Tensor[Self._label_dtype]]:
+        var index = idx.value() if idx else Int(
+            random_float64() * Float64(self._num_samples)
+        )
+        var features = Tensor[Self._feature_dtype].zeros(
+            Shape(self._max_length)
+        )
+        var labels = Tensor[Self._label_dtype].zeros(Shape(self._max_length))
+        var src_feat = self._input_data.unsafe_ptr() + index * self._max_length
+        var src_label = (
+            self._target_data.unsafe_ptr() + index * self._max_length
+        )
+        var dst_feat = (
+            features.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var dst_label = (
+            labels.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        memcpy(
+            dest=dst_feat, src=src_feat.as_immutable(), count=self._max_length
+        )
+        memcpy(
+            dest=dst_label, src=src_label.as_immutable(), count=self._max_length
+        )
+        return features^, labels^
+
     def into_loader(
         ref self,
         batch_size: Int,
@@ -87,6 +127,119 @@ struct LLMDataset[
         drop_last: Bool = False,
         normalize_mean: Optional[Scalar[Self._feature_dtype]] = None,
         normalize_std: Optional[Scalar[Self._feature_dtype]] = None,
+    ) -> DataLoader[Self, origin_of(self)]:
+        return DataLoader(
+            Pointer(to=self),
+            batch_size,
+            shuffle,
+            drop_last,
+            normalize_mean=normalize_mean,
+            normalize_std=normalize_std,
+        )
+
+
+@fieldwise_init
+struct RandomSlidingWindowDataset[
+    dtype: DType = DType.int64,
+](Sized & Copyable & Movable & Dataset):
+    """Sliding-window dataset from a 1D token tensor.
+
+    Given a 1D tensor of token IDs and a window size, pre-computes all
+    overlapping context/target pairs so that ``DataLoader`` can access
+    them via fixed-offset pointer arithmetic.
+    """
+
+    comptime _feature_dtype = Self.dtype
+    comptime _label_dtype = Self.dtype
+
+    var _input_data: List[Scalar[Self.dtype]]
+    var _target_data: List[Scalar[Self.dtype]]
+    var _num_samples: Int
+    var _block_size: Int
+
+    def __init__(
+        out self,
+        data: Tensor[Self.dtype],
+        block_size: Int,
+    ):
+        self._block_size = block_size
+        var n = len(data)
+        self._num_samples = n - block_size if n > block_size else 0
+
+        var cap = self._num_samples * block_size
+        self._input_data = List[Scalar[Self.dtype]](capacity=cap)
+        self._target_data = List[Scalar[Self.dtype]](capacity=cap)
+
+        for i in range(self._num_samples):
+            for j in range(block_size):
+                self._input_data.append(data[i + j])
+                self._target_data.append(data[i + 1 + j])
+
+    def __len__(self) -> Int:
+        return self._num_samples
+
+    def get_features_ptr(
+        ref self,
+    ) -> UnsafePointer[Scalar[Self._feature_dtype], ImmutAnyOrigin]:
+        return self._input_data.unsafe_ptr().as_immutable()
+
+    def get_labels_ptr(
+        ref self,
+    ) -> UnsafePointer[Scalar[Self._label_dtype], ImmutAnyOrigin]:
+        return self._target_data.unsafe_ptr().as_immutable()
+
+    def get_feature_shape(self) -> Shape:
+        return Shape(self._block_size)
+
+    def get_label_shape(self) -> Shape:
+        return Shape(self._block_size)
+
+    def get_features_per_sample(self) -> Int:
+        return self._block_size
+
+    def get_labels_per_sample(self) -> Int:
+        return self._block_size
+
+    def sample(
+        ref self,
+        idx: Optional[Int] = None,
+    ) raises -> Tuple[Tensor[Self._feature_dtype], Tensor[Self._label_dtype]]:
+        var index = idx.value() if idx else Int(
+            random_float64() * Float64(self._num_samples)
+        )
+        var features = Tensor[Self._feature_dtype].zeros(
+            Shape(self._block_size)
+        )
+        var labels = Tensor[Self._label_dtype].zeros(Shape(self._block_size))
+        var src_feat = self._input_data.unsafe_ptr() + index * self._block_size
+        var src_label = (
+            self._target_data.unsafe_ptr() + index * self._block_size
+        )
+        var dst_feat = (
+            features.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var dst_label = (
+            labels.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        memcpy(
+            dest=dst_feat, src=src_feat.as_immutable(), count=self._block_size
+        )
+        memcpy(
+            dest=dst_label, src=src_label.as_immutable(), count=self._block_size
+        )
+        return features^, labels^
+
+    def into_loader(
+        ref self,
+        batch_size: Int,
+        shuffle: Bool = True,
+        drop_last: Bool = False,
+        normalize_mean: Optional[Scalar[Self._feature_dtype]] = None,
+        normalize_std: Optional[Scalar[Self._label_dtype]] = None,
     ) -> DataLoader[Self, origin_of(self)]:
         return DataLoader(
             Pointer(to=self),

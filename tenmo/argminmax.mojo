@@ -6,13 +6,16 @@ from std.utils.numerics import max_finite, min_finite
 from .ndbuffer import NDBuffer
 from std.sys import has_accelerator
 from .kernels.argminmax_kernel import ArgMinMaxGpu
+from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
 
 
 @fieldwise_init
-struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct ArgMinMaxReducer[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
+    ImplicitlyCopyable, RegisterPassable
+):
     """
     Unified CPU + GPU argmin/argmax on NDBuffer.
-    Returns an NDBuffer[DType.int32] with the output shape.
+    Returns an NDBuffer[Self.index_dtype] with the output shape.
     """
 
     @staticmethod
@@ -24,7 +27,7 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         axis: Int,
         keepdims: Bool = False,
         sync: Bool = True,
-    ) raises -> NDBuffer[DType.int32]:
+    ) raises -> NDBuffer[Self.index_dtype]:
         var shape = A.shape
         var rank = shape.rank()
         var ax = axis if axis >= 0 else axis + rank
@@ -50,9 +53,17 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         comptime if has_accelerator():
             if A.is_on_gpu():
-                return ArgMinMaxGpu[Self.dtype]._gpu_reduce[
+                return ArgMinMaxGpu[Self.dtype, Self.index_dtype]._gpu_reduce[
                     is_max, max_block_size
-                ](A, ax, keepdims, out_shape, total_output, reduced_volume, sync=sync)
+                ](
+                    A,
+                    ax,
+                    keepdims,
+                    out_shape,
+                    total_output,
+                    reduced_volume,
+                    sync=sync,
+                )
 
         return Self._cpu_reduce[is_max](A, ax, keepdims, out_shape)
 
@@ -66,9 +77,9 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ax: Int,
         keepdims: Bool,
         out_shape: Shape,
-    ) -> NDBuffer[DType.int32]:
+    ) -> NDBuffer[Self.index_dtype]:
         var shape = A.shape
-        var out = NDBuffer[DType.int32].zeros(out_shape)
+        var out = NDBuffer[Self.index_dtype].zeros(out_shape)
 
         for out_idx in out_shape:
             var best_val: Scalar[Self.dtype]
@@ -96,9 +107,9 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             if keepdims:
                 var write_idx = out_idx.replace(ax, 0)
-                out[write_idx] = Int32(best_pos)
+                out[write_idx] = Scalar[Self.index_dtype](best_pos)
             else:
-                out[out_idx] = Int32(best_pos)
+                out[out_idx] = Scalar[Self.index_dtype](best_pos)
 
         return out^
 
@@ -106,22 +117,22 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 # ── Public structs (thin wrappers) ────────────────────────────────────────────
 
 
-struct Argmin[dtype: DType]:
+struct Argmin[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:
     @staticmethod
     def argmin(
         ndb: NDBuffer[Self.dtype],
         axis: Int = 0,
         keepdims: Bool = False,
-    ) -> NDBuffer[DType.int32]:
+    ) -> NDBuffer[Self.index_dtype]:
         try:
-            return ArgMinMaxReducer[Self.dtype].reduce[is_max=False](
-                ndb, axis, keepdims
-            )
+            return ArgMinMaxReducer[Self.dtype, Self.index_dtype].reduce[
+                is_max=False
+            ](ndb, axis, keepdims)
         except e:
             print(e)
             panic("Argmin failed at ArgMinMaxReducer reduce")
             # Unreachable
-            return NDBuffer[DType.int32].zeros(Shape())
+            return NDBuffer[Self.index_dtype].zeros(Shape())
 
     # Tensor convenience overload
     @staticmethod
@@ -129,35 +140,35 @@ struct Argmin[dtype: DType]:
         tensor: Tensor[Self.dtype],
         axis: Int = 0,
         keepdims: Bool = False,
-    ) -> Tensor[DType.int32]:
+    ) -> Tensor[Self.index_dtype]:
         try:
-            var result_ndb = ArgMinMaxReducer[Self.dtype].reduce[is_max=False](
-                tensor.buffer, axis, keepdims
-            )
-            return Tensor[DType.int32](result_ndb^, requires_grad=False)
+            var result_ndb = ArgMinMaxReducer[
+                Self.dtype, Self.index_dtype
+            ].reduce[is_max=False](tensor.buffer, axis, keepdims)
+            return Tensor[Self.index_dtype](result_ndb^, requires_grad=False)
         except e:
             print(e)
             panic("Argmin tensor failed at ArgMinMaxReducer reduce")
             # Unreachable
-            return Tensor[DType.int32].scalar(0)
+            return Tensor[Self.index_dtype].scalar(0)
 
 
-struct Argmax[dtype: DType]:
+struct Argmax[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:
     @staticmethod
     def argmax(
         ndb: NDBuffer[Self.dtype],
         axis: Int = 0,
         keepdims: Bool = False,
-    ) -> NDBuffer[DType.int32]:
+    ) -> NDBuffer[Self.index_dtype]:
         try:
-            return ArgMinMaxReducer[Self.dtype].reduce[is_max=True](
-                ndb, axis, keepdims
-            )
+            return ArgMinMaxReducer[Self.dtype, Self.index_dtype].reduce[
+                is_max=True
+            ](ndb, axis, keepdims)
         except e:
             print(e)
             panic("Argmax failed at ArgMinMaxReducer reduce")
             # Unreachable
-            return NDBuffer[DType.int32].zeros(Shape())
+            return NDBuffer[Self.index_dtype].zeros(Shape())
 
     # Tensor convenience overload
     @staticmethod
@@ -165,14 +176,14 @@ struct Argmax[dtype: DType]:
         tensor: Tensor[Self.dtype],
         axis: Int = 0,
         keepdims: Bool = False,
-    ) -> Tensor[DType.int32]:
+    ) -> Tensor[Self.index_dtype]:
         try:
-            var result_ndb = ArgMinMaxReducer[Self.dtype].reduce[is_max=True](
-                tensor.buffer, axis, keepdims
-            )
-            return Tensor[DType.int32](result_ndb^, requires_grad=False)
+            var result_ndb = ArgMinMaxReducer[
+                Self.dtype, Self.index_dtype
+            ].reduce[is_max=True](tensor.buffer, axis, keepdims)
+            return Tensor[Self.index_dtype](result_ndb^, requires_grad=False)
         except e:
             print(e)
             panic("Argmax tensor failed at ArgMinMaxReducer reduce")
             # Unreachable
-            return Tensor[DType.int32].scalar(0)
+            return Tensor[Self.index_dtype].scalar(0)

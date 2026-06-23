@@ -19,6 +19,7 @@ from std.pathlib import Path
 from std.python import Python, PythonObject
 
 from .nlp.tokenizer import *
+from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
 
 comptime LOG_LEVEL = get_defined_string["LOGGING_LEVEL", "INFO"]()
 comptime log = Logger[Level._from_str(LOG_LEVEL)]()
@@ -43,21 +44,23 @@ def now() -> Float64:
 @always_inline
 def binary_accuracy[
     dtype: DType,
+    index_dtype: DType = DEFAULT_INDEX_DTYPE,
     //,
     threshold: Scalar[dtype] = Scalar[dtype](0.5),
-](pred: Tensor[dtype], target: Tensor[DType.int64]) -> Tuple[Int, Int]:
+](pred: Tensor[dtype], target: Tensor[index_dtype]) -> Tuple[Int, Int]:
     var batch_size = pred.shape()[0]
 
-    var prediction = pred.gt(threshold).to_dtype[DType.int64](
+    var prediction = pred.gt(threshold).to_dtype[index_dtype](
         requires_grad=False
     )
+
     var correct = prediction.eq(target).count(Scalar[DType.bool](True))
     return correct, batch_size
 
 
 def multiclass_accuracy[
-    dtype: DType, //
-](pred: Tensor[dtype], target: Tensor[DType.int32]) -> Int:
+    dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE, //
+](pred: Tensor[dtype], target: Tensor[index_dtype]) -> Int:
     var correct = 0
     var batch_size = pred.shape()[0]
     var num_classes = pred.shape()[1]

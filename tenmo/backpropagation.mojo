@@ -38,7 +38,8 @@ comptime BACKWARD_TRANSPOSE = 5
 comptime BACKWARD_PERMUTE = 6
 comptime BACKWARD_SIGMOID = 7
 comptime BACKWARD_SOFTMAX = 8
-comptime BACKWARD_CE_CLASS_INDICES = 9
+comptime BACKWARD_CE_CLASS_INDICES_INT32 = 9
+comptime BACKWARD_CE_CLASS_INDICES_INT64 = 66
 comptime BACKWARD_CE_PROBABILITIES = 10
 comptime BACKWARD_TANH = 11
 comptime BACKWARD_SUB = 12
@@ -421,8 +422,12 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             ReLUBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_VIEW:
             ViewBackward[Self.dtype].backward(output, parent_ids, retain_graph)
-        elif op_code == BACKWARD_CE_CLASS_INDICES:
-            CEClassIndicesBackward[Self.dtype].backward(
+        elif op_code == BACKWARD_CE_CLASS_INDICES_INT32:
+            CEClassIndicesBackward[Self.dtype, DType.int32].backward(
+                output, parent_ids, retain_graph
+            )
+        elif op_code == BACKWARD_CE_CLASS_INDICES_INT64:
+            CEClassIndicesBackward[Self.dtype, DType.int64].backward(
                 output, parent_ids, retain_graph
             )
         elif op_code == BACKWARD_CE_PROBABILITIES:
@@ -612,22 +617,14 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                 output, parent_ids, retain_graph
             )
         elif op_code == BACKWARD_ABS:
-            AbsBackward[Self.dtype].backward(
-                output, parent_ids, retain_graph
-            )
+            AbsBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_TRIL:
-            TrilBackward[Self.dtype].backward(
-                output, parent_ids, retain_graph
-            )
+            TrilBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_TRIU:
-            TriuBackward[Self.dtype].backward(
-                output, parent_ids, retain_graph
-            )
+            TriuBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_CUMSUM:
             CumsumBackward[Self.dtype].backward(
                 output, parent_ids, retain_graph
             )
         elif op_code == BACKWARD_WHERE:
-            WhereBackward[Self.dtype].backward(
-                output, parent_ids, retain_graph
-            )
+            WhereBackward[Self.dtype].backward(output, parent_ids, retain_graph)

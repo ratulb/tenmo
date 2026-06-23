@@ -1,6 +1,6 @@
 from .tensor import Tensor
 from .common_utils import panic
-from std.random import shuffle as reshuffle
+from std.random import shuffle as reshuffle, random_si64
 from std.python import PythonObject
 from .numpy_interop import from_ndarray, numpy_dtype
 from std.memory import memcpy, Pointer
@@ -92,6 +92,12 @@ trait Dataset(Sized & Copyable & Movable):
     ) -> DataLoader[Self, origin_of(self)]:
         ...
 
+    def sample(
+        ref self,
+        idx: Optional[Int] = None,
+    ) raises -> Tuple[Tensor[Self._feature_dtype], Tensor[Self._label_dtype]]:
+        ...
+
 
 # ==============================================================================
 # UPDATED DATALOADER - Preserves multi-dimensional shapes
@@ -157,8 +163,12 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
         batch_size: Int,
         shuffle: Bool = False,
         drop_last: Bool = False,
-        normalize_mean: Optional[Scalar[Self.DatasetSource._feature_dtype]] = None,
-        normalize_std: Optional[Scalar[Self.DatasetSource._feature_dtype]] = None,
+        normalize_mean: Optional[
+            Scalar[Self.DatasetSource._feature_dtype]
+        ] = None,
+        normalize_std: Optional[
+            Scalar[Self.DatasetSource._feature_dtype]
+        ] = None,
     ):
         self.dataset = dataset
         self.batch_size = batch_size
@@ -331,7 +341,9 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
             .unsafe_origin_cast[MutAnyOrigin]()
         )
 
-        var total_feature_elements = actual_batch_size * self._features_per_sample
+        var total_feature_elements = (
+            actual_batch_size * self._features_per_sample
+        )
         var total_label_elements = actual_batch_size * self._labels_per_sample
 
         # OPTIMIZATION: Bulk copy if not shuffled
@@ -381,13 +393,18 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
         # Apply normalization after fill (SIMD)
         if self._normalize_mean and self._normalize_std:
             var mean = self._normalize_mean.value()
-            var inv_std = Scalar[Self.DatasetSource._feature_dtype](1) / self._normalize_std.value()
+            var inv_std = (
+                Scalar[Self.DatasetSource._feature_dtype](1)
+                / self._normalize_std.value()
+            )
 
             comptime simd_width = simd_width_of[
                 Scalar[Self.DatasetSource._feature_dtype]
             ]()
             var i = 0
-            for i in range(0, total_feature_elements - simd_width + 1, simd_width):
+            for i in range(
+                0, total_feature_elements - simd_width + 1, simd_width
+            ):
                 var vec = batch_features_ptr.load[width=simd_width](i)
                 vec = (vec - mean) * inv_std
                 batch_features_ptr.store[width=simd_width](i, vec)
@@ -562,6 +579,15 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
         )
 
         return (sample_feature^, sample_label^)
+
+    def sample(
+        ref self,
+        idx: Optional[Int] = None,
+    ) raises -> Tuple[Tensor[Self.feature_dtype], Tensor[Self.label_dtype]]:
+        if idx:
+            return self.__getitem__(idx.value())
+        else:
+            return self.__getitem__(Int(random_si64(0, self._size - 1)))
 
     def into_loader(
         ref self,
@@ -745,6 +771,15 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
         )
 
         return (sample_feature^, sample_label^)
+
+    def sample(
+        ref self,
+        idx: Optional[Int] = None,
+    ) raises -> Tuple[Tensor[Self.feature_dtype], Tensor[Self.label_dtype]]:
+        if idx:
+            return self.__getitem__(idx.value())
+        else:
+            return self.__getitem__(Int(random_si64(0, self._size - 1)))
 
     def into_loader(
         ref self,

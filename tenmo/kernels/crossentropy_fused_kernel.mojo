@@ -26,6 +26,7 @@ from tenmo.common_utils import panic
 from tenmo.shapes import Shape
 from tenmo.intarray import IntArray
 from tenmo.shared import Reduction
+from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
 
 
 comptime MAX_BLOCK_SIZE: Int = 256
@@ -37,10 +38,11 @@ comptime MAX_INIT: Float64 = -3.402823466e38
 
 def fused_ce_class_indices_forward_kernel[
     dtype: DType,
+    target_dtype: DType = DEFAULT_INDEX_DTYPE,
     max_block_size: Int = MAX_BLOCK_SIZE,
 ](
     logits: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    target: UnsafePointer[Scalar[DType.int32], ImmutAnyOrigin],
+    target: UnsafePointer[Scalar[target_dtype], ImmutAnyOrigin],
     softmax_out: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     per_sample_loss: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     scalar_loss: UnsafePointer[Scalar[dtype], MutAnyOrigin],
@@ -135,7 +137,7 @@ def fused_ce_class_indices_forward_kernel[
     # Thread 0 computes per-sample loss and atomics
     if tid == 0:
         var tgt = target[row]
-        var is_valid = tgt != Scalar[DType.int32](ignore_index)
+        var is_valid = tgt != Scalar[target_dtype](ignore_index)
         var loss = Scalar[dtype](0)
 
         if is_valid:
@@ -145,24 +147,25 @@ def fused_ce_class_indices_forward_kernel[
 
             if has_ls:
                 var inv_C = Scalar[dtype](1) / Scalar[dtype](C)
-                var mean_log_softmax = sum_logits * inv_C - max_val - log_sum_exp
-                loss = (Scalar[dtype](1) - label_smoothing) * loss - label_smoothing * mean_log_softmax
+                var mean_log_softmax = (
+                    sum_logits * inv_C - max_val - log_sum_exp
+                )
+                loss = (
+                    Scalar[dtype](1) - label_smoothing
+                ) * loss - label_smoothing * mean_log_softmax
 
         per_sample_loss[row] = loss
         _ = Atomic.fetch_add(scalar_loss, loss)
         if is_valid:
-            _ = Atomic.fetch_add(
-                valid_count_out, Scalar[DType.int32](1)
-            )
-
-
+            _ = Atomic.fetch_add(valid_count_out, Scalar[DType.int32](1))
 
 
 def onehot_fill_kernel[
     dtype: DType,
+    target_dtype: DType = DEFAULT_INDEX_DTYPE,
 ](
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    indices: UnsafePointer[Scalar[DType.int32], ImmutAnyOrigin],
+    indices: UnsafePointer[Scalar[target_dtype], ImmutAnyOrigin],
     M: Int,
     C: Int,
     ignore_index: Int,
@@ -176,7 +179,7 @@ def onehot_fill_kernel[
     if row >= M:
         return
     var tgt = indices[row]
-    if tgt == Scalar[DType.int32](ignore_index):
+    if tgt == Scalar[target_dtype](ignore_index):
         return
     var c = tgt.__int__()
     if 0 <= c < C:
@@ -188,10 +191,11 @@ def onehot_fill_kernel[
 
 def fused_ce_class_indices_backward_kernel[
     dtype: DType,
+    target_dtype: DType = DEFAULT_INDEX_DTYPE,
     max_block_size: Int = MAX_BLOCK_SIZE,
 ](
     softmax: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    target: UnsafePointer[Scalar[DType.int32], ImmutAnyOrigin],
+    target: UnsafePointer[Scalar[target_dtype], ImmutAnyOrigin],
     upstream: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     grad_out: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     M: Int,
@@ -237,7 +241,7 @@ def fused_ce_class_indices_backward_kernel[
 
     # Determine target class and validity for this row
     var tgt_scalar = target[row]
-    var is_valid = tgt_scalar != Scalar[DType.int32](ignore_index)
+    var is_valid = tgt_scalar != Scalar[target_dtype](ignore_index)
     var tgt_class: Int
     if is_valid:
         tgt_class = tgt_scalar.__int__()
@@ -274,19 +278,21 @@ def fused_ce_class_indices_backward_kernel[
 # ── Launcher ──────────────────────────────────────────────────────────────────
 
 
-struct CrossEntropyFusedKernel[dtype: DType](ImplicitlyCopyable & Movable):
+struct CrossEntropyFusedKernel[
+    dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE
+](ImplicitlyCopyable & Movable):
     @staticmethod
     def launch(
         logits_2d: NDBuffer[Self.dtype],
-        target_1d: NDBuffer[DType.int32],
+        target_1d: NDBuffer[Self.target_dtype],
         reduction: Reduction,
         ignore_index: Int,
         label_smoothing: Scalar[Self.dtype],
     ) raises -> Tuple[
-        NDBuffer[Self.dtype],    # softmax_probs (M, C)
-        NDBuffer[Self.dtype],    # per_sample_loss (M,)
-        Scalar[Self.dtype],      # scalar_loss (sum of all per-sample losses)
-        Int,                     # valid_count (non-ignored rows)
+        NDBuffer[Self.dtype],  # softmax_probs (M, C)
+        NDBuffer[Self.dtype],  # per_sample_loss (M,)
+        Scalar[Self.dtype],  # scalar_loss (sum of all per-sample losses)
+        Int,  # valid_count (non-ignored rows)
     ] where Self.dtype.is_floating_point():
         debug_assert(logits_2d.is_on_gpu())
         debug_assert(target_1d.is_on_gpu())
@@ -324,10 +330,12 @@ struct CrossEntropyFusedKernel[dtype: DType](ImplicitlyCopyable & Movable):
         var compiled = device_context.compile_function[
             fused_ce_class_indices_forward_kernel[
                 dtype=Self.dtype,
+                target_dtype=Self.target_dtype,
                 max_block_size=MAX_BLOCK_SIZE,
             ],
             fused_ce_class_indices_forward_kernel[
                 dtype=Self.dtype,
+                target_dtype=Self.target_dtype,
                 max_block_size=MAX_BLOCK_SIZE,
             ],
         ]()
@@ -352,8 +360,12 @@ struct CrossEntropyFusedKernel[dtype: DType](ImplicitlyCopyable & Movable):
         device_context.synchronize()
 
         # Read back scalar_loss and valid_count from GPU
-        var scalar_state = DeviceState[Self.dtype](scalar_buffer^, device_state.gpu)
-        var valid_state = DeviceState[DType.int32](valid_buffer^, device_state.gpu)
+        var scalar_state = DeviceState[Self.dtype](
+            scalar_buffer^, device_state.gpu
+        )
+        var valid_state = DeviceState[DType.int32](
+            valid_buffer^, device_state.gpu
+        )
 
         var scalar_val: Scalar[Self.dtype]
         var valid_cnt: Int
@@ -366,9 +378,7 @@ struct CrossEntropyFusedKernel[dtype: DType](ImplicitlyCopyable & Movable):
         var softmax_state = DeviceState[Self.dtype](
             softmax_buffer^, device_state.gpu
         )
-        var loss_state = DeviceState[Self.dtype](
-            loss_buffer^, device_state.gpu
-        )
+        var loss_state = DeviceState[Self.dtype](loss_buffer^, device_state.gpu)
 
         var softmax_ndb = NDBuffer[Self.dtype].with_device_state(
             softmax_state^, logits_2d.shape
@@ -381,7 +391,7 @@ struct CrossEntropyFusedKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
     def launch_onehot(
-        target_1d: NDBuffer[DType.int32],
+        target_1d: NDBuffer[Self.target_dtype],
         num_classes: Int,
         ignore_index: Int,
     ) raises -> NDBuffer[Self.dtype]:
@@ -403,8 +413,8 @@ struct CrossEntropyFusedKernel[dtype: DType](ImplicitlyCopyable & Movable):
         result_buffer.enqueue_fill(0)
 
         var compiled = ctx.compile_function[
-            onehot_fill_kernel[Self.dtype],
-            onehot_fill_kernel[Self.dtype],
+            onehot_fill_kernel[Self.dtype, Self.target_dtype],
+            onehot_fill_kernel[Self.dtype, Self.target_dtype],
         ]()
 
         ctx.enqueue_function(
@@ -421,12 +431,14 @@ struct CrossEntropyFusedKernel[dtype: DType](ImplicitlyCopyable & Movable):
         var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu
         )
-        return NDBuffer[Self.dtype].with_device_state(result_state^, Shape(M, C))
+        return NDBuffer[Self.dtype].with_device_state(
+            result_state^, Shape(M, C)
+        )
 
     @staticmethod
     def launch_backward(
         softmax_ndb: NDBuffer[Self.dtype],
-        target_ndb: NDBuffer[DType.int32],
+        target_ndb: NDBuffer[Self.target_dtype],
         upstream_ndb: NDBuffer[Self.dtype],
         reduction: Reduction,
         valid_count: Int,
@@ -481,10 +493,12 @@ struct CrossEntropyFusedKernel[dtype: DType](ImplicitlyCopyable & Movable):
         var compiled = ctx.compile_function[
             fused_ce_class_indices_backward_kernel[
                 dtype=Self.dtype,
+                target_dtype=Self.target_dtype,
                 max_block_size=MAX_BLOCK_SIZE,
             ],
             fused_ce_class_indices_backward_kernel[
                 dtype=Self.dtype,
+                target_dtype=Self.target_dtype,
                 max_block_size=MAX_BLOCK_SIZE,
             ],
         ]()
@@ -517,4 +531,6 @@ struct CrossEntropyFusedKernel[dtype: DType](ImplicitlyCopyable & Movable):
         var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu
         )
-        return NDBuffer[Self.dtype].with_device_state(result_state^, Shape(M, C))
+        return NDBuffer[Self.dtype].with_device_state(
+            result_state^, Shape(M, C)
+        )

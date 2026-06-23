@@ -271,7 +271,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         out.weight = weight_gpu^
         if out.bias:
             var bias_gpu = out.bias.value().to_gpu(gpu=gpu, stop_grad=True)
-            out.bias = Optional(Tensor[Self.dtype](bias_gpu^))
+            out.bias = bias_gpu^
         return out^
 
     def to_cpu(deinit self) raises -> Linear[Self.dtype, Self.mode]:
@@ -283,7 +283,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         out.weight = weight_cpu^
         if out.bias:
             var bias_cpu = out.bias.value().to_cpu(stop_grad=True)
-            out.bias = Optional(Tensor[Self.dtype](bias_cpu^))
+            out.bias = bias_cpu^
         return out^
 
 
@@ -1519,7 +1519,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         out.weight = weight_gpu^
         if out.bias:
             var bias_gpu = out.bias.value().to_gpu(gpu=gpu, stop_grad=True)
-            out.bias = Optional(Tensor[Self.dtype](bias_gpu^))
+            out.bias = bias_gpu^
         return out^
 
     def to_cpu(deinit self) raises -> Conv2D[Self.dtype]:
@@ -1528,7 +1528,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         out.weight = weight_cpu^
         if out.bias:
             var bias_cpu = out.bias.value().to_cpu(stop_grad=True)
-            out.bias = Optional(Tensor[Self.dtype](bias_cpu^))
+            out.bias = bias_cpu^
         return out^
 
 

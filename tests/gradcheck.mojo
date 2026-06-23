@@ -1,12 +1,14 @@
-from tenmo import Tensor
+from tenmo import Tensor, DEFAULT_INDEX_DTYPE
 from tenmo.common_utils import log_debug, RED, CYAN
 from tenmo.net import Sequential
 
 comptime dtype = DType.float32
 
+
 def main() raises:
     test_gradcheck1()
     test_gradcheck2()
+
 
 # --------------------
 # Gradient checker (safe using parameters_ptrs)
@@ -14,8 +16,10 @@ def main() raises:
 def gradcheck_param(
     mut model: Sequential[dtype],
     mut x: Tensor[dtype],
-    y: Tensor[DType.int32],
-    loss_fn: def(Tensor[dtype], Tensor[DType.int32]) thin -> Tensor[dtype],
+    y: Tensor[DEFAULT_INDEX_DTYPE],
+    loss_fn: def(Tensor[dtype], Tensor[DEFAULT_INDEX_DTYPE]) thin -> Tensor[
+        dtype
+    ],
     eps: Scalar[dtype] = Scalar[dtype](1e-3),
     tol: Scalar[dtype] = Scalar[dtype](1e-2),
 ) raises -> Bool where dtype.is_floating_point():
@@ -93,9 +97,11 @@ def test_gradcheck1() raises:
     model.append(Linear[dtype](5, 3).into())
 
     var x = Tensor[dtype].rand([2, 4], requires_grad=True)
-    var y = Tensor[DType.int32].d1([1, 2])
+    var y = Tensor[DEFAULT_INDEX_DTYPE].d1([1, 2])
 
-    def criterion(logits: Tensor[dtype], target: Tensor[DType.int32]) -> Tensor[dtype]:
+    def criterion(
+        logits: Tensor[dtype], target: Tensor[DEFAULT_INDEX_DTYPE]
+    ) -> Tensor[dtype]:
         var criterion = CrossEntropyLoss[dtype]()
         # print("ce logits/target shapes: ", logits.shape, target.shape)
         return criterion(logits, target)
@@ -125,11 +131,13 @@ def test_gradcheck2() raises:
 
     var x = Tensor[dtype].rand([2, 4], requires_grad=True)
     # Target must match output shape [2, 3]
-    var y = Tensor[DType.int32]([2, 3])
+    var y = Tensor[DEFAULT_INDEX_DTYPE]([2, 3])
 
     def mse_loss[
         dtype: DType
-    ](preds: Tensor[dtype], target: Tensor[DType.int32]) -> Tensor[dtype]:
+    ](preds: Tensor[dtype], target: Tensor[DEFAULT_INDEX_DTYPE]) -> Tensor[
+        dtype
+    ]:
         var mse = MSELoss[dtype]()
         return mse(preds, target.to_dtype[dtype]())
 
@@ -145,6 +153,3 @@ def test_gradcheck2() raises:
         print(CYAN, "Gradient check PASSED ✅ (MSE)")
     else:
         print(RED, "Gradient check FAILED ❌ (MSE)")
-
-
-

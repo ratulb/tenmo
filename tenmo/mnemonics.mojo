@@ -59,3 +59,5 @@ comptime SUM = 51
 comptime MEAN = 52
 comptime PRODUCT = 53
 comptime ABS_BACKWARD = 54
+
+comptime DEFAULT_INDEX_DTYPE = DType.int64

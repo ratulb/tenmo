@@ -1,6 +1,7 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from tenmo.argminmax import Argmin, Argmax
+from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
 from std.sys import has_accelerator
 
 
@@ -20,8 +21,10 @@ def test_tensor_argmax_keepdims() raises:
     var a2 = t.argmax(axis=1, keepdims=True)
     assert_true(a1.shape() == Shape(2))
     assert_true(a2.shape() == Shape(2, 1))
-    assert_true(a1 == Tensor[DType.int32].d1([1, 2]))
-    assert_true(a2 == Tensor[dtype].d2([[1], [2]]).to_dtype[DType.int32]())
+    assert_true(a1 == Tensor[DEFAULT_INDEX_DTYPE].d1([1, 2]))
+    assert_true(
+        a2 == Tensor[dtype].d2([[1], [2]]).to_dtype[DEFAULT_INDEX_DTYPE]()
+    )
     print("Passed argmax keepdims test")
 
 
@@ -35,7 +38,7 @@ def test_tensor_argmax_1d() raises:
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([0.5, 2.3, 1.1, 2.3])
     var a = t.argmax(axis=0)
-    assert_true(a == Tensor[DType.int32].scalar(1))
+    assert_true(a == Tensor[DEFAULT_INDEX_DTYPE].scalar(1))
     print("Passed 1D argmax test")
 
 
@@ -47,8 +50,8 @@ def test_tensor_argmax_2d_basic() raises:
     )
     var a0 = t.argmax(axis=0)
     var a1 = t.argmax(axis=1)
-    assert_true(a0 == Tensor[DType.int32].d1([1, 2, 1]))
-    assert_true(a1 == Tensor[DType.int32].d1([1, 2, 1]))
+    assert_true(a0 == Tensor[DEFAULT_INDEX_DTYPE].d1([1, 2, 1]))
+    assert_true(a1 == Tensor[DEFAULT_INDEX_DTYPE].d1([1, 2, 1]))
     print("Passed 2D argmax basic test")
 
 
@@ -60,8 +63,8 @@ def test_tensor_argmax_2d_keepdims() raises:
     var a2 = t.argmax(axis=1, keepdims=True)
     assert_true(a1.shape() == Shape(2))
     assert_true(a2.shape() == Shape(2, 1))
-    assert_true(a1 == Tensor[DType.int32].d1([1, 2]))
-    assert_true(a2 == Tensor[DType.int32].d2([[1], [2]]))
+    assert_true(a1 == Tensor[DEFAULT_INDEX_DTYPE].d1([1, 2]))
+    assert_true(a2 == Tensor[DEFAULT_INDEX_DTYPE].d2([[1], [2]]))
     print("Passed argmax keepdims test")
 
 
@@ -103,7 +106,7 @@ def test_tensor_argmin_1d() raises:
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([5.0, -1.0, 3.0, -1.0])
     var a = t.argmin(axis=0)
-    assert_true(a == Tensor[DType.int32].scalar(1))
+    assert_true(a == Tensor[DEFAULT_INDEX_DTYPE].scalar(1))
     print("Passed 1D argmin test")
 
 
@@ -116,8 +119,8 @@ def test_tensor_argmin_2d_basic() raises:
     var a0 = t.argmin(axis=0)
     var a1 = t.argmin(axis=1)
     a0.print()
-    assert_true(a0 == Tensor[DType.int32].d1([1, 1, 2]))
-    assert_true(a1 == Tensor[DType.int32].d1([1, 1, 2]))
+    assert_true(a0 == Tensor[DEFAULT_INDEX_DTYPE].d1([1, 1, 2]))
+    assert_true(a1 == Tensor[DEFAULT_INDEX_DTYPE].d1([1, 1, 2]))
     print("Passed 2D argmin basic test")
 
 
@@ -129,8 +132,8 @@ def test_tensor_argmin_2d_keepdims() raises:
     var a2 = t.argmin(axis=1, keepdims=True)
     assert_true(a1.shape() == Shape(2))
     assert_true(a2.shape() == Shape(2, 1))
-    assert_true(a1 == Tensor[DType.int32].d1([1, 2]))
-    assert_true(a2 == Tensor[DType.int32].d2([[1], [2]]))
+    assert_true(a1 == Tensor[DEFAULT_INDEX_DTYPE].d1([1, 2]))
+    assert_true(a2 == Tensor[DEFAULT_INDEX_DTYPE].d2([[1], [2]]))
     print("Passed argmin keepdims test")
 
 
@@ -177,7 +180,7 @@ def test_argmin_1d_basic_cpu() raises:
     var t = Tensor[dtype].d1([5.0, 2.0, 8.0, 1.0, 9.0])
     var _tmp0 = t.argmin(axis=0)
     var result = _tmp0.reshape(Shape(1))
-    assert_true(result == Tensor[DType.int32].d1([3]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([3]))
     print("✓ Passed")
 
 
@@ -187,7 +190,7 @@ def test_argmax_1d_basic_cpu() raises:
     var t = Tensor[dtype].d1([5.0, 2.0, 8.0, 1.0, 9.0])
     var _tmp0 = t.argmax(axis=0)
     var result = _tmp0.reshape(Shape(1))
-    assert_true(result == Tensor[DType.int32].d1([4]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([4]))
     print("✓ Passed")
 
 
@@ -197,7 +200,7 @@ def test_argmin_1d_negative_values_cpu() raises:
     var t = Tensor[dtype].d1([-5.0, -2.0, -8.0, -1.0, -9.0])
     var _tmp0 = t.argmin(axis=0)
     var result = _tmp0.reshape(Shape(1))
-    assert_true(result == Tensor[DType.int32].d1([4]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([4]))
     print("✓ Passed")
 
 
@@ -207,7 +210,7 @@ def test_argmax_1d_negative_values_cpu() raises:
     var t = Tensor[dtype].d1([-5.0, -2.0, -8.0, -1.0, -9.0])
     var _tmp0 = t.argmax(axis=0)
     var result = _tmp0.reshape(Shape(1))
-    assert_true(result == Tensor[DType.int32].d1([3]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([3]))
     print("✓ Passed")
 
 
@@ -217,7 +220,7 @@ def test_argmin_1d_keepdims_cpu() raises:
     var t = Tensor[dtype].d1([5.0, 2.0, 8.0, 1.0, 9.0])
     var result = t.argmin(axis=0, keepdims=True)
     assert_true(result.shape() == Shape(1))
-    assert_true(result == Tensor[DType.int32].d1([3]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([3]))
     print("✓ Passed")
 
 
@@ -233,7 +236,7 @@ def test_argmin_2d_axis0_cpu() raises:
         [[3.0, 1.0, 4.0], [2.0, 0.5, 6.0], [7.0, 5.5, 1.0]]
     )
     var result = t.argmin(axis=0)
-    assert_true(result == Tensor[DType.int32].d1([1, 1, 2]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([1, 1, 2]))
     print("✓ Passed")
 
 
@@ -244,7 +247,7 @@ def test_argmin_2d_axis1_cpu() raises:
         [[3.0, 1.0, 4.0], [2.0, 0.5, 6.0], [7.0, 5.5, 1.0]]
     )
     var result = t.argmin(axis=1)
-    assert_true(result == Tensor[DType.int32].d1([1, 1, 2]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([1, 1, 2]))
     print("✓ Passed")
 
 
@@ -255,7 +258,7 @@ def test_argmax_2d_axis0_cpu() raises:
         [[3.0, 1.0, 4.0], [2.0, 0.5, 6.0], [7.0, 5.5, 1.0]]
     )
     var result = t.argmax(axis=0)
-    assert_true(result == Tensor[DType.int32].d1([2, 2, 1]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([2, 2, 1]))
     print("✓ Passed")
 
 
@@ -266,7 +269,7 @@ def test_argmax_2d_axis1_cpu() raises:
         [[3.0, 1.0, 4.0], [2.0, 0.5, 6.0], [7.0, 5.5, 1.0]]
     )
     var result = t.argmax(axis=1)
-    assert_true(result == Tensor[DType.int32].d1([2, 2, 0]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([2, 2, 0]))
     print("✓ Passed")
 
 
@@ -276,7 +279,7 @@ def test_argmin_2d_keepdims_axis0_cpu() raises:
     var t = Tensor[dtype].d2([[3.0, 1.0, 4.0], [2.0, 0.5, 6.0]])
     var result = t.argmin(axis=0, keepdims=True)
     assert_true(result.shape() == Shape(1, 3))
-    assert_true(result == Tensor[DType.int32].d2([[1, 1, 0]]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d2([[1, 1, 0]]))
     print("✓ Passed")
 
 
@@ -286,7 +289,7 @@ def test_argmax_2d_keepdims_axis1_cpu() raises:
     var t = Tensor[dtype].d2([[3.0, 1.0, 4.0], [2.0, 0.5, 6.0]])
     var result = t.argmax(axis=1, keepdims=True)
     assert_true(result.shape() == Shape(2, 1))
-    assert_true(result == Tensor[DType.int32].d2([[2], [2]]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d2([[2], [2]]))
     print("✓ Passed")
 
 
@@ -295,7 +298,7 @@ def test_argmin_2d_negative_axis_cpu() raises:
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[3.0, 1.0, 4.0], [2.0, 0.5, 6.0]])
     var result = t.argmin(axis=-1)
-    assert_true(result == Tensor[DType.int32].d1([1, 1]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([1, 1]))
     print("✓ Passed")
 
 
@@ -304,7 +307,7 @@ def test_argmax_2d_single_row_cpu() raises:
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[3.0, 1.0, 4.0, 2.0]])
     var result = t.argmax(axis=1)
-    assert_true(result == Tensor[DType.int32].d1([2]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([2]))
     print("✓ Passed")
 
 
@@ -313,7 +316,7 @@ def test_argmin_2d_single_column_cpu() raises:
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[3.0], [1.0], [4.0], [2.0]])
     var result = t.argmin(axis=0)
-    assert_true(result == Tensor[DType.int32].d1([1]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([1]))
     print("✓ Passed")
 
 
@@ -329,7 +332,7 @@ def test_argmin_3d_axis0_cpu() raises:
         [[[1.0, 2.0], [3.0, 4.0]], [[0.5, 1.5], [2.5, 3.5]]]
     )
     var result = t.argmin(axis=0)
-    assert_true(result == Tensor[DType.int32].d2([[1, 1], [1, 1]]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d2([[1, 1], [1, 1]]))
     print("✓ Passed")
 
 
@@ -340,7 +343,7 @@ def test_argmin_3d_axis1_cpu() raises:
         [[[1.0, 2.0], [3.0, 4.0]], [[0.5, 1.5], [2.5, 3.5]]]
     )
     var result = t.argmin(axis=1)
-    assert_true(result == Tensor[DType.int32].d2([[0, 0], [0, 0]]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d2([[0, 0], [0, 0]]))
     print("✓ Passed")
 
 
@@ -351,7 +354,7 @@ def test_argmin_3d_axis2_cpu() raises:
         [[[1.0, 2.0], [3.0, 4.0]], [[0.5, 1.5], [2.5, 3.5]]]
     )
     var result = t.argmin(axis=2)
-    assert_true(result == Tensor[DType.int32].d2([[0, 0], [0, 0]]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d2([[0, 0], [0, 0]]))
     print("✓ Passed")
 
 
@@ -362,7 +365,7 @@ def test_argmax_3d_axis0_cpu() raises:
         [[[1.0, 2.0], [3.0, 4.0]], [[0.5, 1.5], [2.5, 3.5]]]
     )
     var result = t.argmax(axis=0)
-    assert_true(result == Tensor[DType.int32].d2([[0, 0], [0, 0]]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d2([[0, 0], [0, 0]]))
     print("✓ Passed")
 
 
@@ -373,7 +376,7 @@ def test_argmax_3d_axis1_cpu() raises:
         [[[1.0, 2.0], [3.0, 4.0]], [[0.5, 1.5], [2.5, 3.5]]]
     )
     var result = t.argmax(axis=1)
-    assert_true(result == Tensor[DType.int32].d2([[1, 1], [1, 1]]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d2([[1, 1], [1, 1]]))
     print("✓ Passed")
 
 
@@ -384,7 +387,7 @@ def test_argmax_3d_axis2_cpu() raises:
         [[[1.0, 2.0], [3.0, 4.0]], [[0.5, 1.5], [2.5, 3.5]]]
     )
     var result = t.argmax(axis=2)
-    assert_true(result == Tensor[DType.int32].d2([[1, 1], [1, 1]]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d2([[1, 1], [1, 1]]))
     print("✓ Passed")
 
 
@@ -416,7 +419,8 @@ def test_argmin_4d_axis0_cpu() raises:
     var result = t.argmin(axis=0)
     assert_true(result.shape() == Shape(2, 2, 2))
     assert_true(
-        result == Tensor[DType.int32].d3([[[1, 1], [1, 1]], [[1, 1], [1, 1]]])
+        result
+        == Tensor[DEFAULT_INDEX_DTYPE].d3([[[1, 1], [1, 1]], [[1, 1], [1, 1]]])
     )
     print("✓ Passed")
 
@@ -433,7 +437,8 @@ def test_argmax_4d_axis3_cpu() raises:
     var result = t.argmax(axis=3)
     assert_true(result.shape() == Shape(2, 2, 2))
     assert_true(
-        result == Tensor[DType.int32].d3([[[1, 1], [1, 1]], [[1, 1], [1, 1]]])
+        result
+        == Tensor[DEFAULT_INDEX_DTYPE].d3([[[1, 1], [1, 1]], [[1, 1], [1, 1]]])
     )
     print("✓ Passed")
 
@@ -463,7 +468,7 @@ def test_argmin_all_same_values_cpu() raises:
     var t = Tensor[dtype].d2([[5.0, 5.0, 5.0], [5.0, 5.0, 5.0]])
     var result = t.argmin(axis=1)
     # Should return first occurrence (index 0)
-    assert_true(result == Tensor[DType.int32].d1([0, 0]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([0, 0]))
     print("✓ Passed")
 
 
@@ -473,7 +478,7 @@ def test_argmax_all_same_values_cpu() raises:
     var t = Tensor[dtype].d2([[5.0, 5.0, 5.0], [5.0, 5.0, 5.0]])
     var result = t.argmax(axis=1)
     # Should return first occurrence (index 0)
-    assert_true(result == Tensor[DType.int32].d1([0, 0]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([0, 0]))
     print("✓ Passed")
 
 
@@ -482,7 +487,7 @@ def test_argmin_single_element_cpu() raises:
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[5.0]])
     var result = t.argmin(axis=0)
-    assert_true(result == Tensor[DType.int32].d1([0]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([0]))
     print("✓ Passed")
 
 
@@ -491,7 +496,7 @@ def test_argmax_with_zeros_cpu() raises:
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[0.0, -1.0, 2.0], [0.0, 0.0, 0.0]])
     var result = t.argmax(axis=1)
-    assert_true(result == Tensor[DType.int32].d1([2, 0]))
+    assert_true(result == Tensor[DEFAULT_INDEX_DTYPE].d1([2, 0]))
     print("✓ Passed")
 
 
@@ -509,7 +514,7 @@ def test_argmin_1d_basic_gpu() raises:
         var result = t_gpu.argmin(axis=0)
         var _tmp0 = result.to_cpu()
         var result_cpu = _tmp0.reshape(Shape(1))
-        assert_true(result_cpu == Tensor[DType.int32].d1([3]))
+        assert_true(result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d1([3]))
         print("✓ Passed")
 
 
@@ -522,7 +527,7 @@ def test_argmax_1d_basic_gpu() raises:
         var result = t_gpu.argmax(axis=0)
         var _tmp0 = result.to_cpu()
         var result_cpu = _tmp0.reshape(Shape(1))
-        assert_true(result_cpu == Tensor[DType.int32].d1([4]))
+        assert_true(result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d1([4]))
         print("✓ Passed")
 
 
@@ -535,7 +540,7 @@ def test_argmin_1d_negative_values_gpu() raises:
         var result = t_gpu.argmin(axis=0)
         var _tmp0 = result.to_cpu()
         var result_cpu = _tmp0.reshape(Shape(1))
-        assert_true(result_cpu == Tensor[DType.int32].d1([4]))
+        assert_true(result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d1([4]))
         print("✓ Passed")
 
 
@@ -548,7 +553,7 @@ def test_argmax_1d_negative_values_gpu() raises:
         var result = t_gpu.argmax(axis=0)
         var _tmp0 = result.to_cpu()
         var result_cpu = _tmp0.reshape(Shape(1))
-        assert_true(result_cpu == Tensor[DType.int32].d1([3]))
+        assert_true(result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d1([3]))
         print("✓ Passed")
 
 
@@ -567,7 +572,7 @@ def test_argmin_2d_axis0_gpu() raises:
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmin(axis=0)
         var result_cpu = result.to_cpu()
-        assert_true(result_cpu == Tensor[DType.int32].d1([1, 1, 2]))
+        assert_true(result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d1([1, 1, 2]))
         print("✓ Passed")
 
 
@@ -581,7 +586,7 @@ def test_argmin_2d_axis1_gpu() raises:
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmin(axis=1)
         var result_cpu = result.to_cpu()
-        assert_true(result_cpu == Tensor[DType.int32].d1([1, 1, 2]))
+        assert_true(result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d1([1, 1, 2]))
         print("✓ Passed")
 
 
@@ -595,7 +600,7 @@ def test_argmax_2d_axis0_gpu() raises:
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmax(axis=0)
         var result_cpu = result.to_cpu()
-        assert_true(result_cpu == Tensor[DType.int32].d1([2, 2, 1]))
+        assert_true(result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d1([2, 2, 1]))
         print("✓ Passed")
 
 
@@ -609,7 +614,7 @@ def test_argmax_2d_axis1_gpu() raises:
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmax(axis=1)
         var result_cpu = result.to_cpu()
-        assert_true(result_cpu == Tensor[DType.int32].d1([2, 2, 0]))
+        assert_true(result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d1([2, 2, 0]))
         print("✓ Passed")
 
 
@@ -622,7 +627,7 @@ def test_argmin_2d_keepdims_axis0_gpu() raises:
         var result = t_gpu.argmin(axis=0, keepdims=True)
         var result_cpu = result.to_cpu()
         assert_true(result_cpu.shape() == Shape(1, 3))
-        assert_true(result_cpu == Tensor[DType.int32].d2([[1, 1, 0]]))
+        assert_true(result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d2([[1, 1, 0]]))
         print("✓ Passed")
 
 
@@ -635,7 +640,7 @@ def test_argmax_2d_keepdims_axis1_gpu() raises:
         var result = t_gpu.argmax(axis=1, keepdims=True)
         var result_cpu = result.to_cpu()
         assert_true(result_cpu.shape() == Shape(2, 1))
-        assert_true(result_cpu == Tensor[DType.int32].d2([[2], [2]]))
+        assert_true(result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d2([[2], [2]]))
         print("✓ Passed")
 
 
@@ -647,7 +652,7 @@ def test_argmin_2d_negative_axis_gpu() raises:
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmin(axis=-1)
         var result_cpu = result.to_cpu()
-        assert_true(result_cpu == Tensor[DType.int32].d1([1, 1]))
+        assert_true(result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d1([1, 1]))
         print("✓ Passed")
 
 
@@ -666,7 +671,9 @@ def test_argmin_3d_axis0_gpu() raises:
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmin(axis=0)
         var result_cpu = result.to_cpu()
-        assert_true(result_cpu == Tensor[DType.int32].d2([[1, 1], [1, 1]]))
+        assert_true(
+            result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d2([[1, 1], [1, 1]])
+        )
         print("✓ Passed")
 
 
@@ -680,7 +687,9 @@ def test_argmin_3d_axis1_gpu() raises:
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmin(axis=1)
         var result_cpu = result.to_cpu()
-        assert_true(result_cpu == Tensor[DType.int32].d2([[0, 0], [0, 0]]))
+        assert_true(
+            result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d2([[0, 0], [0, 0]])
+        )
         print("✓ Passed")
 
 
@@ -694,7 +703,9 @@ def test_argmin_3d_axis2_gpu() raises:
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmin(axis=2)
         var result_cpu = result.to_cpu()
-        assert_true(result_cpu == Tensor[DType.int32].d2([[0, 0], [0, 0]]))
+        assert_true(
+            result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d2([[0, 0], [0, 0]])
+        )
         print("✓ Passed")
 
 
@@ -708,7 +719,9 @@ def test_argmax_3d_axis0_gpu() raises:
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmax(axis=0)
         var result_cpu = result.to_cpu()
-        assert_true(result_cpu == Tensor[DType.int32].d2([[0, 0], [0, 0]]))
+        assert_true(
+            result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d2([[0, 0], [0, 0]])
+        )
         print("✓ Passed")
 
 
@@ -722,7 +735,9 @@ def test_argmax_3d_axis1_gpu() raises:
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmax(axis=1)
         var result_cpu = result.to_cpu()
-        assert_true(result_cpu == Tensor[DType.int32].d2([[1, 1], [1, 1]]))
+        assert_true(
+            result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d2([[1, 1], [1, 1]])
+        )
         print("✓ Passed")
 
 
@@ -736,7 +751,9 @@ def test_argmax_3d_axis2_gpu() raises:
         var t_gpu = t.to_gpu()
         var result = t_gpu.argmax(axis=2)
         var result_cpu = result.to_cpu()
-        assert_true(result_cpu == Tensor[DType.int32].d2([[1, 1], [1, 1]]))
+        assert_true(
+            result_cpu == Tensor[DEFAULT_INDEX_DTYPE].d2([[1, 1], [1, 1]])
+        )
         print("✓ Passed")
 
 

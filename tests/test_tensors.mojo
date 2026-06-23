@@ -4,7 +4,7 @@ from tenmo.intarray import IntArray
 from tenmo.shapes import Shape
 from tenmo.common_utils import *
 from std.utils.numerics import min_finite
-from tenmo.mnemonics import AddTensor
+from tenmo.mnemonics import AddTensor, DEFAULT_INDEX_DTYPE
 
 from tenmo.strides import Strides
 
@@ -4731,25 +4731,25 @@ def test_argmin_max() raises:
     a = Tensor[dtype].d1(l)
     v = a.view(shape=[4], offset=2)
     assert_true(
-        (a.argmax(0) == Tensor[DType.int32].scalar(4)),
+        (a.argmax(0) == Tensor[DEFAULT_INDEX_DTYPE].scalar(4)),
         "argmax assertion 1failed",
     )
     assert_true(
-        (a.argmax() == Tensor[DType.int32].scalar(4)),
+        (a.argmax() == Tensor[DEFAULT_INDEX_DTYPE].scalar(4)),
         "argmax assertion 2 failed",
     )
 
     assert_true(
-        (a.argmin() == Tensor[DType.int32].scalar(2)),
+        (a.argmin() == Tensor[DEFAULT_INDEX_DTYPE].scalar(2)),
         "tensor argmin assertion 1 failed",
     )
     assert_true(
-        (v.argmax() == Tensor[DType.int32].scalar(2)),
+        (v.argmax() == Tensor[DEFAULT_INDEX_DTYPE].scalar(2)),
         "view argmax assertion 1 failed",
     )
 
     assert_true(
-        (v.argmin() == Tensor[DType.int32].scalar(0)),
+        (v.argmin() == Tensor[DEFAULT_INDEX_DTYPE].scalar(0)),
         "view argmax assertion 1 failed",
     )
 

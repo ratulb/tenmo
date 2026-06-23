@@ -7,6 +7,7 @@ from tenmo.intarray import IntArray
 from std.sys import has_accelerator
 from tenmo.crossentropy import CrossEntropyLoss
 from tenmo.shared import Reduction
+from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
 from std.math import log, exp
 from std.utils.numerics import min_finite
 
@@ -197,7 +198,7 @@ def assert_approx_equal(
 
 def _ce_gradients_basic_uu() raises:
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
-    var target = Tensor[DType.int32].d1([0, 1])
+    var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)
     var loss = loss_fn(logits, target)
@@ -214,7 +215,7 @@ def _ce_gradients_basic_uu() raises:
 # Negative validation tests (should not panic if validation is correct)
 def _ce_validation_wrong_target_dims() raises:
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
-    var target = Tensor[DType.int32].d2([[0, 1], [1, 0]])  # Wrong: should be 1D
+    var target = Tensor[DEFAULT_INDEX_DTYPE].d2([[0, 1], [1, 0]])  # Wrong: should be 1D
 
     # This should be caught by validation before any computation
     # (Test framework should handle the panic)
@@ -224,7 +225,7 @@ def _ce_validation_wrong_target_dims() raises:
 
 def _ce_validation_class_out_of_bounds() raises:
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()  # 2 classes
-    var target = Tensor[DType.int32].d1([0, 2])  # Class 2 is out of bounds"""
+    var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 2])  # Class 2 is out of bounds"""
 
     # Should be caught by validation
 
@@ -234,7 +235,7 @@ def _ce_validation_class_out_of_bounds() raises:
 
 def _ce_validation_spatial_mismatch() raises:
     var logits = Tensor.d4([[[[2.0, 1.0], [1.0, 2.0]]]]).float()  # (1, 2, 2, 2)
-    var target = Tensor[DType.int32].d3(
+    var target = Tensor[DEFAULT_INDEX_DTYPE].d3(
         [[[0, 1, 0]]]
     )  # Wrong spatial dim: (1, 1, 3)
 
@@ -245,7 +246,7 @@ def _ce_validation_spatial_mismatch() raises:
 
 def _ce_validation_batch_size_mismatch() raises:
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()  # batch size 2
-    var target = Tensor[DType.int32].d1([0, 1, 0])  # batch size 3
+    var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1, 0])  # batch size 3
 
     # Should be caught by batch size validation
 
@@ -339,8 +340,8 @@ def test_ce_gpu_ci_basic_mean() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]]).to_gpu()
-        var target = Tensor[DType.int32].d1([0, 1])
-        var target_gpu = Tensor[DType.int32].d1([0, 1]).to_gpu()
+        var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
+        var target_gpu = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1]).to_gpu()
         var ce = CrossEntropyLoss[dtype](reduction="mean")
         var loss = ce(logits, target_gpu)
         var logits_cpu = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]])
@@ -353,8 +354,8 @@ def test_ce_gpu_ci_basic_sum() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]]).to_gpu()
-        var target = Tensor[DType.int32].d1([0, 1]).to_gpu()
-        var target_cpu = Tensor[DType.int32].d1([0, 1])
+        var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1]).to_gpu()
+        var target_cpu = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
         var ce = CrossEntropyLoss[dtype](reduction="sum")
         var loss = ce(logits, target)
         var logits_cpu = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]])
@@ -368,8 +369,8 @@ def test_ce_gpu_ci_ignore_index() raises:
         var logits = Tensor[dtype].d2(
             [[2.0, 1.0, 0.5], [1.0, 2.0, 0.1], [3.0, 1.0, 0.2]]
         ).to_gpu()
-        var target = Tensor[DType.int32].d1([0, -100, 2]).to_gpu()
-        var target_cpu = Tensor[DType.int32].d1([0, -100, 2])
+        var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, -100, 2]).to_gpu()
+        var target_cpu = Tensor[DEFAULT_INDEX_DTYPE].d1([0, -100, 2])
         var ce = CrossEntropyLoss[dtype](ignore_index=-100, reduction="mean")
         var loss = ce(logits, target)
         var logits_cpu = Tensor[dtype].d2(
@@ -385,7 +386,7 @@ def test_ce_gpu_ci_label_smoothing() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5]]).to_gpu()
-        var target = Tensor[DType.int32].d1([0])
+        var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0])
 
         var ce = CrossEntropyLoss[dtype](
             reduction="mean", label_smoothing=Scalar[dtype](0.1)
@@ -420,7 +421,7 @@ def test_ce_gpu_ci_3d() raises:
             requires_grad=True
         )
 
-        var target = Tensor[DType.int32].d2(
+        var target = Tensor[DEFAULT_INDEX_DTYPE].d2(
             [[0, 2],   # Batch 0: spatial0→class0, spatial1→class2
              [1, 0]]   # Batch 1: spatial0→class1, spatial1→class0
         )
@@ -457,7 +458,7 @@ def test_ce_gpu_bwd_ci_grad_shape() raises:
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]], requires_grad=True)
         var a_gpu = a.to_gpu()
-        var target = Tensor[DType.int32].d1([0, 1])
+        var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
         var ce = CrossEntropyLoss[dtype](reduction="mean")
         var loss = ce(a_gpu, target.to_gpu())
         loss.backward()
@@ -473,7 +474,7 @@ def test_ce_gpu_bwd_ci_parity() raises:
         var a_gpu = Tensor[dtype].d2(
             [[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]], requires_grad=True
         ).to_gpu()
-        var target = Tensor[DType.int32].d1([0, 1])
+        var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
         var ce = CrossEntropyLoss[dtype](reduction="mean")
         var loss_cpu = ce(a_cpu, target)
         loss_cpu.backward()
@@ -494,7 +495,7 @@ def test_ce_gpu_bwd_ci_ignore_zeros_grad() raises:
             requires_grad=True,
         )
         var a_gpu = a.to_gpu()
-        var target = Tensor[DType.int32].d1([0, -100, 2])
+        var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, -100, 2])
         var ce = CrossEntropyLoss[dtype](ignore_index=-100, reduction="mean")
         var loss = ce(a_gpu, target.to_gpu())
         loss.backward()
@@ -514,7 +515,7 @@ def test_ce_gpu_bwd_ci_3d_ignore() raises:
             requires_grad=True,
         )
         var a_gpu = a.to_gpu()
-        var target = Tensor[DType.int32].d2([[0, -100, 2], [1, 0, -100]])
+        var target = Tensor[DEFAULT_INDEX_DTYPE].d2([[0, -100, 2], [1, 0, -100]])
         var ce = CrossEntropyLoss[dtype](ignore_index=-100, reduction="mean")
         var loss = ce(a_gpu, target.to_gpu())
         loss.backward()
@@ -531,7 +532,7 @@ def test_ce_gpu_bwd_ci_label_smoothing() raises:
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[2.0, 1.0, 0.5]], requires_grad=True)
         var a_gpu = Tensor[dtype].d2([[2.0, 1.0, 0.5]], requires_grad=True).to_gpu()
-        var target = Tensor[DType.int32].d1([0])
+        var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0])
         var ce = CrossEntropyLoss[dtype](
             reduction="mean", label_smoothing=Scalar[dtype](0.1)
         )

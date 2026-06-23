@@ -26,7 +26,12 @@ from tenmo.common_utils import panic
 from tenmo.tensor import Tensor
 from tenmo.ancestry import Ancestor
 from tenmo.backpropagation import BackwardFnArg, BACKWARD_GATHER, ArgumentType
-from tenmo.mnemonics import AddTensor, ScatterAddTensor, ZeroGrad
+from tenmo.mnemonics import (
+    AddTensor,
+    ScatterAddTensor,
+    ZeroGrad,
+    DEFAULT_INDEX_DTYPE,
+)
 from tenmo.shared import Reduction
 from .kernels.gather_kernel import GatherGpu
 
@@ -105,7 +110,9 @@ struct GatherBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
 
 @fieldwise_init
-struct Gather[dtype: DType](Copyable, RegisterPassable):
+struct Gather[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
+    Copyable, RegisterPassable
+):
     @staticmethod
     def forward[
         track_grad: Bool = True
@@ -246,7 +253,7 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
         track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],
-        indices: Tensor[DType.int64],
+        indices: Tensor[Self.index_dtype],
         axis: Int = 0,
         reduction: Reduction = Reduction(2),
         padding_idx: Optional[Int] = None,
@@ -427,7 +434,9 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
             comptime if has_accelerator():
                 if self.is_on_gpu():
                     try:
-                        var ndb = GatherGpu[Self.dtype].gather_gpu(
+                        var ndb = GatherGpu[
+                            Self.dtype, Self.index_dtype
+                        ].gather_gpu(
                             self.buffer, ax, normalized, reduction, sync=sync
                         )
                         return Tensor[Self.dtype](ndb^, requires_grad=False)
@@ -459,9 +468,14 @@ struct Gather[dtype: DType](Copyable, RegisterPassable):
                     # Batch sync: if a follow-up sum/mean handles sync, skip
                     # gather_gpu's internal sync.
                     var has_followup = reduction.is_sum() or reduction.is_mean()
-                    var ndb = GatherGpu[Self.dtype].gather_gpu(
-                        self.buffer, ax, normalized, Reduction(2),
-                        sync=sync and not has_followup
+                    var ndb = GatherGpu[
+                        Self.dtype, Self.index_dtype
+                    ].gather_gpu(
+                        self.buffer,
+                        ax,
+                        normalized,
+                        Reduction(2),
+                        sync=sync and not has_followup,
                     )
                     var gathered = Tensor[Self.dtype](ndb^, requires_grad=False)
                     if reduction.is_sum():

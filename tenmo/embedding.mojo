@@ -4,13 +4,15 @@ from tenmo.intarray import IntArray
 from tenmo.gather import Gather
 from tenmo.net import Module, Layer
 from tenmo.device import Device
-from tenmo.mnemonics import EMBEDDING
+from tenmo.mnemonics import EMBEDDING, DEFAULT_INDEX_DTYPE
 from tenmo.common_utils import i, s
 from tenmo.shared import Reduction
 
 
 @fieldwise_init
-struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
+struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
+    ImplicitlyCopyable & Movable
+):
     """Lookup table mapping integer indices to dense embedding vectors.
 
     Forward: out[i] = weight[indices[i]]  — a gather along axis=0
@@ -133,7 +135,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
         xs: Tensor[Self.dtype],
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
-        var xs_casted = xs.to_dtype[DType.int64]()
+        var xs_casted = xs.to_dtype[Self.index_dtype]()
         return self.__call__(xs_casted, sync=sync)
 
     def __call__(
@@ -164,7 +166,9 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
         """
         var result: Tensor[Self.dtype]
         if self.training:
-            result = Gather[Self.dtype].forward[track_grad=True](
+            result = Gather[Self.dtype, Self.index_dtype].forward[
+                track_grad=True
+            ](
                 self.weight,
                 indices,
                 axis=0,
@@ -173,8 +177,13 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
                 sync=sync,
             )
         else:
-            result = Gather[Self.dtype].forward[track_grad=False](
-                self.weight, indices, axis=0, reduction=self.reduction,
+            result = Gather[Self.dtype, Self.index_dtype].forward[
+                track_grad=False
+            ](
+                self.weight,
+                indices,
+                axis=0,
+                reduction=self.reduction,
                 sync=sync,
             )
 
@@ -186,7 +195,7 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
 
     def __call__(
         mut self,
-        indices: Tensor[DType.int64],
+        indices: Tensor[Self.index_dtype],
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Lookup embeddings for indices given as an int64 Tensor.
@@ -196,14 +205,24 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
         """
         var result: Tensor[Self.dtype]
         if self.training:
-            result = Gather[Self.dtype].forward[track_grad=True](
-                self.weight, indices, axis=0, reduction=self.reduction,
+            result = Gather[Self.dtype, Self.index_dtype].forward[
+                track_grad=True
+            ](
+                self.weight,
+                indices,
+                axis=0,
+                reduction=self.reduction,
                 padding_idx=self.padding_idx,
                 sync=sync,
             )
         else:
-            result = Gather[Self.dtype].forward[track_grad=False](
-                self.weight, indices, axis=0, reduction=self.reduction,
+            result = Gather[Self.dtype, Self.index_dtype].forward[
+                track_grad=False
+            ](
+                self.weight,
+                indices,
+                axis=0,
+                reduction=self.reduction,
                 sync=sync,
             )
         if self.max_norm:
@@ -315,13 +334,13 @@ struct Embedding[dtype: DType](ImplicitlyCopyable & Movable):
     def to_gpu(
         deinit self,
         gpu: Optional[GPU] = None,
-    ) raises -> Embedding[Self.dtype]:
+    ) raises -> Embedding[Self.dtype, Self.index_dtype]:
         var weight_gpu = self.weight.to_gpu(gpu=gpu, stop_grad=True)
         var out = self^
         out.weight = weight_gpu^
         return out^
 
-    def to_cpu(deinit self) raises -> Embedding[Self.dtype]:
+    def to_cpu(deinit self) raises -> Embedding[Self.dtype, Self.index_dtype]:
         var weight_cpu = self.weight.to_cpu(stop_grad=True)
         var out = self^
         out.weight = weight_cpu^

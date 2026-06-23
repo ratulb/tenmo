@@ -16,18 +16,20 @@ from tenmo.array import Array
 from tenmo.intarray import IntArray
 from tenmo.common_utils import panic
 from tenmo.shared import Reduction
+from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
 
 
 def gather_gpu_kernel[
     dtype: DType,
     rank: Int,
+    index_dtype: DType = DEFAULT_INDEX_DTYPE,
 ](
     out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     in_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     in_shape: Array,
     in_strides: Array,
     in_offset: Int,
-    indices_buffer: UnsafePointer[Int64, ImmutAnyOrigin],
+    indices_buffer: UnsafePointer[Scalar[index_dtype], ImmutAnyOrigin],
     indices_len: Int,
     axis: Int,
     out_shape: Array,
@@ -49,7 +51,7 @@ def gather_gpu_kernel[
         var src_coords = out_coords
         var idx_val = indices_buffer[out_coords[axis]]
         if idx_val < 0:
-            idx_val += Int64(in_shape[axis])
+            idx_val += Scalar[index_dtype](in_shape[axis])
         src_coords.storage[axis] = Int(idx_val)
 
         var src_flat = in_strides.fma(src_coords, in_offset)
@@ -60,14 +62,15 @@ def gather_gpu_kernel[
 
 
 def gather_rows_2d_kernel[
-    dtype: DType
+    dtype: DType,
+    index_dtype: DType = DEFAULT_INDEX_DTYPE,
 ](
     out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     in_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     in_rows: Int,
     in_cols: Int,
     in_row_stride: Int,
-    indices_buffer: UnsafePointer[Int64, ImmutAnyOrigin],
+    indices_buffer: UnsafePointer[Scalar[index_dtype], ImmutAnyOrigin],
     out_rows: Int,
     out_row_stride: Int,
 ):
@@ -79,13 +82,13 @@ def gather_rows_2d_kernel[
 
     var src_row = indices_buffer[row]
     if src_row < 0:
-        src_row += Int64(in_rows)
+        src_row += Scalar[index_dtype](in_rows)
 
     var col_stride = Int(block_dim.x)
     var c = col
     while c < in_cols:
         out_buffer[row * out_row_stride + c] = in_buffer[
-            src_row * Int64(in_row_stride) + Int64(c)
+            Int(src_row) * in_row_stride + c
         ]
         c += col_stride
 
@@ -93,13 +96,14 @@ def gather_rows_2d_kernel[
 def embedding_bag_kernel[
     dtype: DType,
     mean: Bool,
+    index_dtype: DType = DEFAULT_INDEX_DTYPE,
 ](
     out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     in_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     in_rows: Int,
     in_cols: Int,
     in_row_stride: Int,
-    indices_buffer: UnsafePointer[Int64, ImmutAnyOrigin],
+    indices_buffer: UnsafePointer[Scalar[index_dtype], ImmutAnyOrigin],
     n_indices: Int,
 ):
     var col = Int(thread_idx.x)
@@ -111,16 +115,13 @@ def embedding_bag_kernel[
         for k in range(n_indices):
             var src_row = indices_buffer[k]
             if src_row < 0:
-                src_row += Int64(in_rows)
-            acc += in_buffer[src_row * Int64(in_row_stride) + Int64(c)]
+                src_row += Scalar[index_dtype](in_rows)
+            acc += in_buffer[Int(src_row) * in_row_stride + c]
         comptime if mean:
             out_buffer[c] = acc / divisor
         else:
             out_buffer[c] = acc
         c += col_stride
-
-
-
 
 
 def _gather_2d_block_cols(in_cols: Int) -> Int:
@@ -136,7 +137,7 @@ def _gather_2d_block_cols(in_cols: Int) -> Int:
 
 
 def _launch_gather_generic[
-    dtype: DType, rank: Int
+    dtype: DType, rank: Int, index_dtype: DType = DEFAULT_INDEX_DTYPE
 ](
     ctx: DeviceContext,
     out_dev: DeviceBuffer[dtype],
@@ -144,7 +145,7 @@ def _launch_gather_generic[
     in_shape: Array,
     in_strides: Array,
     in_offset: Int,
-    idx_dev: DeviceBuffer[DType.int64],
+    idx_dev: DeviceBuffer[index_dtype],
     indices_len: Int,
     axis: Int,
     out_shape: Array,
@@ -154,8 +155,8 @@ def _launch_gather_generic[
     comptime simdwidth = simd_width_of[dtype]()
     var (blocks, tpb) = elementwise_launch_config(total_output, simdwidth)
     var compiled = ctx.compile_function[
-        gather_gpu_kernel[dtype, rank],
-        gather_gpu_kernel[dtype, rank],
+        gather_gpu_kernel[dtype, rank, index_dtype],
+        gather_gpu_kernel[dtype, rank, index_dtype],
     ]()
     ctx.enqueue_function(
         compiled,
@@ -176,7 +177,9 @@ def _launch_gather_generic[
 
 
 @fieldwise_init
-struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct GatherGpu[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
+    ImplicitlyCopyable, RegisterPassable
+):
     @staticmethod
     def gather_gpu(
         tensor: NDBuffer[Self.dtype],
@@ -197,10 +200,10 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref gpu = ds.get_gpu()
         var ctx = gpu[]
 
-        var idx_dev = ctx.enqueue_create_buffer[DType.int64](n_indices)
+        var idx_dev = ctx.enqueue_create_buffer[Self.index_dtype](n_indices)
         with idx_dev.map_to_host() as host_idx:
             for k in range(n_indices):
-                host_idx[k] = Int64(indices[k])
+                host_idx[k] = Scalar[Self.index_dtype](indices[k])
 
         var in_dev = ds.buffer
 
@@ -214,8 +217,8 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var out_dev = ctx.enqueue_create_buffer[datatype](in_cols)
             if reduction.is_mean():
                 var compiled = ctx.compile_function[
-                    embedding_bag_kernel[datatype, True],
-                    embedding_bag_kernel[datatype, True],
+                    embedding_bag_kernel[datatype, True, Self.index_dtype],
+                    embedding_bag_kernel[datatype, True, Self.index_dtype],
                 ]()
                 ctx.enqueue_function(
                     compiled,
@@ -231,8 +234,8 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 )
             else:
                 var compiled = ctx.compile_function[
-                    embedding_bag_kernel[datatype, False],
-                    embedding_bag_kernel[datatype, False],
+                    embedding_bag_kernel[datatype, False, Self.index_dtype],
+                    embedding_bag_kernel[datatype, False, Self.index_dtype],
                 ]()
                 ctx.enqueue_function(
                     compiled,
@@ -246,7 +249,8 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     grid_dim=1,
                     block_dim=block_cols,
                 )
-            if sync: ctx.synchronize()
+            if sync:
+                ctx.synchronize()
             var out_shape = Shape(in_cols)
             var result_state = DeviceState[Self.dtype].__init__[special=True](
                 out_dev^, gpu
@@ -268,8 +272,8 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var in_cols = tensor.shape[1]
             var block_cols = _gather_2d_block_cols(in_cols)
             var compiled = ctx.compile_function[
-                gather_rows_2d_kernel[datatype],
-                gather_rows_2d_kernel[datatype],
+                gather_rows_2d_kernel[datatype, Self.index_dtype],
+                gather_rows_2d_kernel[datatype, Self.index_dtype],
             ]()
             ctx.enqueue_function(
                 compiled,
@@ -285,7 +289,7 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 block_dim=block_cols,
             )
         elif rank == 1:
-            _launch_gather_generic[datatype, 1](
+            _launch_gather_generic[datatype, 1, Self.index_dtype](
                 ctx,
                 out_dev,
                 in_dev,
@@ -300,7 +304,7 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 total_output,
             )
         elif rank == 2:
-            _launch_gather_generic[datatype, 2](
+            _launch_gather_generic[datatype, 2, Self.index_dtype](
                 ctx,
                 out_dev,
                 in_dev,
@@ -315,7 +319,7 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 total_output,
             )
         elif rank == 3:
-            _launch_gather_generic[datatype, 3](
+            _launch_gather_generic[datatype, 3, Self.index_dtype](
                 ctx,
                 out_dev,
                 in_dev,
@@ -330,7 +334,7 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 total_output,
             )
         elif rank == 4:
-            _launch_gather_generic[datatype, 4](
+            _launch_gather_generic[datatype, 4, Self.index_dtype](
                 ctx,
                 out_dev,
                 in_dev,
@@ -345,7 +349,7 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 total_output,
             )
         elif rank == 5:
-            _launch_gather_generic[datatype, 5](
+            _launch_gather_generic[datatype, 5, Self.index_dtype](
                 ctx,
                 out_dev,
                 in_dev,
@@ -360,7 +364,7 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 total_output,
             )
         elif rank == 6:
-            _launch_gather_generic[datatype, 6](
+            _launch_gather_generic[datatype, 6, Self.index_dtype](
                 ctx,
                 out_dev,
                 in_dev,
@@ -375,7 +379,7 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 total_output,
             )
         elif rank == 7:
-            _launch_gather_generic[datatype, 7](
+            _launch_gather_generic[datatype, 7, Self.index_dtype](
                 ctx,
                 out_dev,
                 in_dev,
@@ -390,7 +394,7 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 total_output,
             )
         else:
-            _launch_gather_generic[datatype, 8](
+            _launch_gather_generic[datatype, 8, Self.index_dtype](
                 ctx,
                 out_dev,
                 in_dev,
@@ -405,7 +409,8 @@ struct GatherGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 total_output,
             )
 
-        if sync: ctx.synchronize()
+        if sync:
+            ctx.synchronize()
         var result_state = DeviceState[Self.dtype].__init__[special=True](
             out_dev^, gpu
         )

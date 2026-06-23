@@ -10,14 +10,16 @@ from tenmo.device import DeviceState
 from tenmo.ndbuffer import NDBuffer
 from tenmo.shapes import Shape
 from tenmo.common_utils import panic
+from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
 
 
 def reduce_argminmax[
     dtype: DType,
+    index_dtype: DType = DEFAULT_INDEX_DTYPE,
     max_block_size: Int = 512,
     is_max: Bool = True,
 ](
-    out_buffer: UnsafePointer[Scalar[DType.int32], MutAnyOrigin],
+    out_buffer: UnsafePointer[Scalar[index_dtype], MutAnyOrigin],
     in_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     in_shape: Array,
     in_strides: Array,
@@ -33,7 +35,7 @@ def reduce_argminmax[
         max_block_size, Scalar[dtype], address_space=AddressSpace.SHARED
     ]()
     var smem_idx = stack_allocation[
-        max_block_size, Scalar[DType.int32], address_space=AddressSpace.SHARED
+        max_block_size, Scalar[index_dtype], address_space=AddressSpace.SHARED
     ]()
 
     var tid = Int(thread_idx.x)
@@ -57,7 +59,7 @@ def reduce_argminmax[
     var axis_stride = in_strides[reduction_axis]
 
     var local_val: Scalar[dtype]
-    var local_idx: Scalar[DType.int32] = 0
+    var local_idx: Scalar[index_dtype] = 0
 
     comptime if is_max:
         local_val = min_finite[dtype]()
@@ -71,11 +73,11 @@ def reduce_argminmax[
         comptime if is_max:
             if val > local_val:
                 local_val = val
-                local_idx = Int32(r)
+                local_idx = Scalar[index_dtype](r)
         else:
             if val < local_val:
                 local_val = val
-                local_idx = Int32(r)
+                local_idx = Scalar[index_dtype](r)
 
         r += block_size
 
@@ -103,7 +105,9 @@ def reduce_argminmax[
 
 
 @fieldwise_init
-struct ArgMinMaxGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct ArgMinMaxGpu[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
+    ImplicitlyCopyable, RegisterPassable
+):
     @staticmethod
     def _gpu_reduce[
         is_max: Bool,
@@ -116,7 +120,7 @@ struct ArgMinMaxGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         total_output: Int,
         reduced_volume: Int,
         sync: Bool = False,
-    ) raises -> NDBuffer[DType.int32]:
+    ) raises -> NDBuffer[Self.index_dtype]:
         ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu[]
@@ -128,13 +132,17 @@ struct ArgMinMaxGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             max_block_size
         ](total_output, reduced_volume)
 
-        var out_device_buf = device_context.enqueue_create_buffer[DType.int32](
-            total_output
-        )
+        var out_device_buf = device_context.enqueue_create_buffer[
+            Self.index_dtype
+        ](total_output)
 
         var compiled = device_context.compile_function[
-            reduce_argminmax[Self.dtype, max_block_size, is_max],
-            reduce_argminmax[Self.dtype, max_block_size, is_max],
+            reduce_argminmax[
+                Self.dtype, Self.index_dtype, max_block_size, is_max
+            ],
+            reduce_argminmax[
+                Self.dtype, Self.index_dtype, max_block_size, is_max
+            ],
         ]()
 
         device_context.enqueue_function(
@@ -149,10 +157,13 @@ struct ArgMinMaxGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
-        var out_state = DeviceState[DType.int32](out_device_buf^, gpu)
-        return NDBuffer[DType.int32].with_device_state(out_state^, out_shape)
+        var out_state = DeviceState[Self.index_dtype](out_device_buf^, gpu)
+        return NDBuffer[Self.index_dtype].with_device_state(
+            out_state^, out_shape
+        )
 
     @staticmethod
     def _launch_config[

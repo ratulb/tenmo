@@ -1633,6 +1633,35 @@ struct Tensor[dtype: DType](
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
     @staticmethod
+    def from_list(
+        values: List[Int], requires_grad: Bool = False
+    ) -> Tensor[Self.dtype]:
+        """Create a 1D tensor from a list of ``Int`` values.
+
+        Args:
+            values: List of integer values.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A 1D tensor with ``len(values)`` elements.
+        """
+        Validator.validate_dtype_consistency(
+            Self.dtype, requires_grad, "from_list"
+        )
+        if len(values) == 0:
+            return Tensor[Self.dtype].scalar(
+                min_finite[Self.dtype](), requires_grad=requires_grad
+            )
+        numels = len(values)
+        shape = Shape(IntArray(numels))
+        buffer = Buffer[Self.dtype](numels)
+        var data = buffer.data.unsafe_value()
+        for i in range(numels):
+            data[i] = Scalar[Self.dtype](values[i])
+        nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
+        return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
+
+    @staticmethod
     def d2(
         rows: List[Self.Row], requires_grad: Bool = False
     ) -> Tensor[Self.dtype]:
@@ -2697,14 +2726,16 @@ struct Tensor[dtype: DType](
             condition, a, b, requires_grad=requires_grad, sync=sync
         )
 
-    def multinomial(
+    def multinomial[
+        index_dtype: DType = DEFAULT_INDEX_DTYPE,
+    ](
         self,
         num_samples: Int = 1,
         replacement: Bool = False,
         temperature: Scalar[Self.dtype] = 1.0,
         init_seed: Optional[Int] = None,
-    ) raises -> Tensor[DType.int32] where Self.dtype.is_floating_point():
-        return Multinomial[Self.dtype].sample(
+    ) raises -> Tensor[index_dtype] where Self.dtype.is_floating_point():
+        return Multinomial[Self.dtype, index_dtype].sample(
             self, num_samples, replacement, temperature, init_seed
         )
 
@@ -3743,35 +3774,17 @@ struct Tensor[dtype: DType](
             self, axes, requires_grad, sync=sync
         )
 
-    def argmax(
-        self, axis: Int = 0, keepdims: Bool = False
-    ) -> Tensor[DType.int32]:
-        """Index of the maximum value along an axis.
-
-        Args:
-            axis: Axis along which to find the argmax.
-            keepdims: If True, keep reduced axis with size 1.
-
-        Returns:
-            Tensor of indices indicating the position of the max value.
-        """
-        return Argmax[Self.dtype].argmax(
+    def argmax[
+        index_dtype: DType = DEFAULT_INDEX_DTYPE,
+    ](self, axis: Int = 0, keepdims: Bool = False) -> Tensor[index_dtype]:
+        return Argmax[Self.dtype, index_dtype].argmax(
             tensor=self, axis=axis, keepdims=keepdims
         )
 
-    def argmin(
-        self, axis: Int = 0, keepdims: Bool = False
-    ) -> Tensor[DType.int32]:
-        """Index of the minimum value along an axis.
-
-        Args:
-            axis: Axis along which to find the argmin.
-            keepdims: If True, keep reduced axis with size 1.
-
-        Returns:
-            Tensor of indices indicating the position of the min value.
-        """
-        return Argmin[Self.dtype].argmin(
+    def argmin[
+        index_dtype: DType = DEFAULT_INDEX_DTYPE,
+    ](self, axis: Int = 0, keepdims: Bool = False) -> Tensor[index_dtype]:
+        return Argmin[Self.dtype, index_dtype].argmin(
             tensor=self, axis=axis, keepdims=keepdims
         )
 

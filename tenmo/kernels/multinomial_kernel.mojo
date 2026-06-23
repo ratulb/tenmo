@@ -42,10 +42,12 @@ from std.math import log
 from tenmo.ndbuffer import NDBuffer
 from tenmo.device import GPU, DeviceState
 from tenmo.shapes import Shape
+from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
 
 
 def multinomial_fused_kernel[
     dtype: DType,
+    index_dtype: DType = DEFAULT_INDEX_DTYPE,
     max_block_size: Int = 512,
 ](
     # log_probs: [B, C] GPU-resident contiguous copy of log-probabilities.
@@ -56,12 +58,12 @@ def multinomial_fused_kernel[
     log_probs: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     # output: [B, K] GPU-resident output indices (Int32).
     #   output[row * K + s] = argmax_c (log_prob[row, c] + Gumbel[row,s,c])
-    output: UnsafePointer[Scalar[DType.int32], MutAnyOrigin],
+    output: UnsafePointer[Scalar[index_dtype], MutAnyOrigin],
     batch_size: Int,
     num_classes: Int,
     num_samples: Int,
     seed: UInt64,
-    with_replacement: Int,          # 0 = without, 1 = with replacement
+    with_replacement: Int,  # 0 = without, 1 = with replacement
 ):
     """
     Fused Gumbel-max multinomial kernel.
@@ -87,7 +89,7 @@ def multinomial_fused_kernel[
         max_block_size, Scalar[dtype], address_space=AddressSpace.SHARED
     ]()
     var smem_idx = stack_allocation[
-        max_block_size, Scalar[DType.int32], address_space=AddressSpace.SHARED
+        max_block_size, Scalar[index_dtype], address_space=AddressSpace.SHARED
     ]()
 
     # Per-thread contiguous chunk assignment — loop-invariant across samples.
@@ -104,7 +106,7 @@ def multinomial_fused_kernel[
         # SIMD output instead of discarding 3 of 4 values.
         #
         var best_val: Scalar[dtype] = neg_inf[dtype]()
-        var best_idx: Scalar[DType.int32] = 0
+        var best_idx: Scalar[index_dtype] = 0
 
         var c = chunk_start
         while c < chunk_end:
@@ -114,7 +116,7 @@ def multinomial_fused_kernel[
                 subsequence=UInt64(row),
                 offset=UInt64(s * num_classes + c),
             )
-            var u4 = rng.step_uniform()          # SIMD[float32, 4]
+            var u4 = rng.step_uniform()  # SIMD[float32, 4]
 
             var remaining = chunk_end - c
             for lane in range(4):
@@ -128,7 +130,7 @@ def multinomial_fused_kernel[
 
                 if score > best_val:
                     best_val = score
-                    best_idx = Scalar[DType.int32](idx)
+                    best_idx = Scalar[index_dtype](idx)
 
             c += 4
 
@@ -163,12 +165,14 @@ def multinomial_fused_kernel[
 
 
 @fieldwise_init
-struct MultinomialGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
+struct MultinomialGpuKernel[
+    dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE
+](ImplicitlyCopyable & Movable):
     """
     Fused Gumbel-max multinomial sampler on GPU.
 
     Usage (from within a comptime if has_accelerator() guard):
-        var out_ndb = MultinomialGpuKernel[dtype].launch(
+        var out_ndb = MultinomialGpuKernel[dtype, index_dtype].launch(
             log_probs_ndb, out_shape, num_samples, seed, replacement
         )
     """
@@ -181,7 +185,7 @@ struct MultinomialGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
         seed: UInt64,
         with_replacement: Bool,
         sync: Bool = False,
-    ) raises -> NDBuffer[DType.int32]:
+    ) raises -> NDBuffer[Self.index_dtype]:
         """
         Launch the fused Gumbel-max multinomial kernel.
 
@@ -212,9 +216,11 @@ struct MultinomialGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
         if not with_replacement:
             debug_assert(
                 num_samples <= log_probs.shape[-1],
-                "without-replacement multinomial requires num_samples <= num_classes, "
-                "but got num_samples=" + String(num_samples)
-                + " > num_classes=" + String(log_probs.shape[-1]),
+                "without-replacement multinomial requires num_samples <="
+                " num_classes, but got num_samples="
+                + String(num_samples)
+                + " > num_classes="
+                + String(log_probs.shape[-1]),
             )
 
         var batch_size = 1 if log_probs.rank() == 1 else log_probs.shape[0]
@@ -223,9 +229,11 @@ struct MultinomialGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         debug_assert(
             out_shape.product() == output_flat_size,
-            "out_shape product (" + String(out_shape.product())
+            "out_shape product ("
+            + String(out_shape.product())
             + ") does not match batch_size * num_samples ("
-            + String(output_flat_size) + ")",
+            + String(output_flat_size)
+            + ")",
         )
 
         # Deep contiguous copy — the kernel modifies this copy in-place
@@ -237,7 +245,9 @@ struct MultinomialGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
         ref gpu = device_state.get_gpu()
         var device_context = gpu[]
 
-        var out_device_buf = device_context.enqueue_create_buffer[DType.int32](
+        var out_device_buf = device_context.enqueue_create_buffer[
+            Self.index_dtype
+        ](
             output_flat_size,
         )
 
@@ -250,8 +260,12 @@ struct MultinomialGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_size <<= 1
 
         var compiled = device_context.compile_function[
-            multinomial_fused_kernel[Self.dtype, MAX_BLOCK_SIZE],
-            multinomial_fused_kernel[Self.dtype, MAX_BLOCK_SIZE],
+            multinomial_fused_kernel[
+                Self.dtype, Self.index_dtype, MAX_BLOCK_SIZE
+            ],
+            multinomial_fused_kernel[
+                Self.dtype, Self.index_dtype, MAX_BLOCK_SIZE
+            ],
         ]()
 
         device_context.enqueue_function(
@@ -270,5 +284,7 @@ struct MultinomialGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
         if sync:
             device_context.synchronize()
 
-        var out_state = DeviceState[DType.int32](out_device_buf^, gpu)
-        return NDBuffer[DType.int32].with_device_state(out_state^, out_shape)
+        var out_state = DeviceState[Self.index_dtype](out_device_buf^, gpu)
+        return NDBuffer[Self.index_dtype].with_device_state(
+            out_state^, out_shape
+        )

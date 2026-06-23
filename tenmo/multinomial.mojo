@@ -4,9 +4,11 @@ from tenmo.buffers import Buffer
 from tenmo.shapes import Shape
 from std.sys import has_accelerator
 from tenmo.kernels.multinomial_kernel import MultinomialGpuKernel
+from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
+
 
 @fieldwise_init
-struct Multinomial[dtype: DType]:
+struct Multinomial[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:
     @staticmethod
     def sample(
         probs: Tensor[Self.dtype],
@@ -14,7 +16,7 @@ struct Multinomial[dtype: DType]:
         replacement: Bool = False,
         temperature: Scalar[Self.dtype] = 1.0,
         init_seed: Optional[Int] = None,
-    ) raises -> Tensor[DType.int32] where Self.dtype.is_floating_point():
+    ) raises -> Tensor[Self.index_dtype] where Self.dtype.is_floating_point():
         var rank = probs.rank()
         var N = probs.shape()[-1]
 
@@ -26,7 +28,8 @@ struct Multinomial[dtype: DType]:
 
         if not replacement and num_samples > N:
             raise Error(
-                "multinomial: num_samples exceeds vocab size without replacement"
+                "multinomial: num_samples exceeds vocab size without"
+                " replacement"
             )
 
         var last_axis = List[Int]()
@@ -55,7 +58,9 @@ struct Multinomial[dtype: DType]:
                 var out_shape = Shape(num_samples) if rank == 1 else Shape(
                     B, num_samples
                 )
-                var out_ndb = MultinomialGpuKernel[Self.dtype].launch(
+                var out_ndb = MultinomialGpuKernel[
+                    Self.dtype, Self.index_dtype
+                ].launch(
                     p_log.buffer,
                     out_shape,
                     num_samples,
@@ -63,10 +68,10 @@ struct Multinomial[dtype: DType]:
                     replacement,
                     sync=True,
                 )
-                return Tensor[DType.int32](out_ndb^, requires_grad=False)
+                return Tensor[Self.index_dtype](out_ndb^, requires_grad=False)
 
         # ── CPU path ──────────────────────────────────────────────────────────
-        var out_buf = Buffer[DType.int32](B * num_samples)
+        var out_buf = Buffer[Self.index_dtype](B * num_samples)
 
         for s in range(num_samples):
             var seed: Optional[Int] = None
@@ -82,22 +87,26 @@ struct Multinomial[dtype: DType]:
             var idx = scores.argmax(-1)
 
             if rank == 1:
-                out_buf[s] = idx.item()
+                out_buf[s] = Scalar[Self.index_dtype](idx.item())
             else:
                 for b in range(B):
-                    out_buf[b * num_samples + s] = idx[b]
+                    out_buf[b * num_samples + s] = Scalar[Self.index_dtype](
+                        idx[b]
+                    )
 
             if s < num_samples - 1 and not replacement:
                 p = Multinomial[Self.dtype]._zero_out(p, idx, B, N, rank)
 
-        var out_shape = Shape(num_samples) if rank == 1 else Shape(B, num_samples)
-        var out_ndb = NDBuffer[DType.int32](out_buf^, out_shape^)
-        return Tensor[DType.int32](out_ndb^, requires_grad=False)
+        var out_shape = Shape(num_samples) if rank == 1 else Shape(
+            B, num_samples
+        )
+        var out_ndb = NDBuffer[Self.index_dtype](out_buf^, out_shape^)
+        return Tensor[Self.index_dtype](out_ndb^, requires_grad=False)
 
     @staticmethod
     def _zero_out(
         p: Tensor[Self.dtype],
-        idx: Tensor[DType.int32],
+        idx: Tensor[Self.index_dtype],
         B: Int,
         N: Int,
         rank: Int,
@@ -106,16 +115,18 @@ struct Multinomial[dtype: DType]:
         if rank == 1:
             var sel = idx.item().__int__()
             for i in range(N):
-                mask_buf[i] = (i == sel)
+                mask_buf[i] = i == sel
         else:
             for b in range(B):
                 var sel = idx[b].__int__()
                 for i in range(N):
-                    mask_buf[b * N + i] = (i == sel)
+                    mask_buf[b * N + i] = i == sel
         var mask_shape = Shape(N) if rank == 1 else Shape(B, N)
         var mask_ndb = NDBuffer[DType.bool](mask_buf^, mask_shape^)
         var mask = Tensor[DType.bool](mask_ndb^, requires_grad=False)
-        var result = p.masked_fill[track_grad=False](mask, Scalar[Self.dtype](0.0))
+        var result = p.masked_fill[track_grad=False](
+            mask, Scalar[Self.dtype](0.0)
+        )
         var last_axis = List[Int]()
         last_axis.append(rank - 1)
         return result / result.sum[track_grad=False](last_axis, keepdims=True)

@@ -1,14 +1,14 @@
 from std.sys import simd_width_of, has_accelerator
 from tenmo.tensor import Tensor
 from tenmo.ndbuffer import NDBuffer
+from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
 
 
-struct Accuracy[dtype: DType]:
-
+struct Accuracy[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:
     @staticmethod
     def compute(
         pred: Tensor[Self.dtype],
-        target: Tensor[DType.int32],
+        target: Tensor[Self.index_dtype],
         sync: Bool = True,
     ) raises -> Int:
         comptime if has_accelerator():
@@ -19,7 +19,7 @@ struct Accuracy[dtype: DType]:
     @staticmethod
     def _accuracy_cpu(
         pred: Tensor[Self.dtype],
-        target: Tensor[DType.int32],
+        target: Tensor[Self.index_dtype],
     ) raises -> Int:
         var pred_ndb = pred.buffer
         var tgt_ndb = target.buffer
@@ -68,10 +68,11 @@ struct Accuracy[dtype: DType]:
     @staticmethod
     def _accuracy_gpu(
         pred_in: Tensor[Self.dtype],
-        target_in: Tensor[DType.int32],
+        target_in: Tensor[Self.index_dtype],
         sync: Bool,
     ) raises -> Int:
         from tenmo.kernels import AccuracyGpu
+
         var pred = pred_in
         var target = target_in
         if not pred.is_on_gpu():
@@ -79,4 +80,6 @@ struct Accuracy[dtype: DType]:
         if not target.is_on_gpu():
             target = target.to_gpu(sync=sync)
 
-        return AccuracyGpu[Self.dtype].launch(pred.buffer, target.buffer, sync=sync)
+        return AccuracyGpu[Self.dtype, Self.index_dtype].launch(
+            pred.buffer, target.buffer, sync=sync
+        )

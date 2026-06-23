@@ -7,4 +7,4 @@ from .tokenizer import (
     END_OF_TEXT,
     DefaultTokenizer,
 )
-from .dataset import LLMDataset
+from .dataset import LLMDataset, RandomSlidingWindowDataset

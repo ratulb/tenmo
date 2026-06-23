@@ -5,10 +5,11 @@ from tenmo.subtraction import Subtractor
 from tenmo.backpropagation import (
     BackwardFnArg,
     ArgumentType,
-    BACKWARD_CE_CLASS_INDICES,
+    BACKWARD_CE_CLASS_INDICES_INT32,
+    BACKWARD_CE_CLASS_INDICES_INT64,
     BACKWARD_CE_PROBABILITIES,
 )
-from tenmo.mnemonics import AddTensor, NotEqual
+from tenmo.mnemonics import AddTensor, NotEqual, DEFAULT_INDEX_DTYPE
 from tenmo.gradbox import Gradbox
 from tenmo.ndbuffer import NDBuffer
 from tenmo.intarray import IntArray
@@ -110,11 +111,9 @@ struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
 
     @staticmethod
-    def validate_target_indices(
-        target: Tensor[DType.int32],
-        num_classes: Int,
-        ignore_index: Int,
-    ):
+    def validate_target_indices[
+        target_dtype: DType = DType.int64,
+    ](target: Tensor[target_dtype], num_classes: Int, ignore_index: Int,):
         """
         All target indices must be in [0, num_classes) or == ignore_index.
         ignore_index is always valid regardless of its value.
@@ -146,14 +145,16 @@ struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
 
 @fieldwise_init
-struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
+    ImplicitlyCopyable, RegisterPassable
+):
     @staticmethod
     def flatten_spatial_class_indices(
         logits: Tensor[Self.dtype],
-        target: Tensor[DType.int32],
+        target: Tensor[Self.target_dtype],
     ) -> Tuple[
         NDBuffer[Self.dtype],  # logits_2d (M, C)
-        NDBuffer[DType.int32],  # target_1d (M,)
+        NDBuffer[Self.target_dtype],  # target_1d (M,)
         Int,  # M
         Int,  # C
         Shape,  # spatial_shape (for reshaping output)
@@ -239,7 +240,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     def build_ignore_mask(
-        target_1d: NDBuffer[DType.int32],
+        target_1d: NDBuffer[Self.target_dtype],
         ignore_index: Int,
     ) -> NDBuffer[Self.dtype]:
         """
@@ -248,7 +249,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         GPU safe: compare_scalar returns NDBuffer[DType.bool] → to_dtype.
         """
         return target_1d.compare_scalar[NotEqual](
-            Scalar[DType.int32](ignore_index)
+            Scalar[Self.target_dtype](ignore_index)
         ).to_dtype[Self.dtype]()
 
     @staticmethod
@@ -285,7 +286,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         track_grad: Bool
     ](
         logits_2d: NDBuffer[Self.dtype],
-        target_1d: NDBuffer[DType.int32],
+        target_1d: NDBuffer[Self.target_dtype],
         reduction: Reduction,
         ignore_index: Int,
         label_smoothing: Scalar[Self.dtype],
@@ -368,7 +369,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var log_sum_exp = log(safe_sum_exp)
 
             # ── Loss (O(1) per row — target lookup) ──
-            var is_valid = target_1d.get(row) != Scalar[DType.int32](
+            var is_valid = target_1d.get(row) != Scalar[Self.target_dtype](
                 ignore_index
             )
             var loss = Scalar[Self.dtype](0)
@@ -661,7 +662,9 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
 
 @fieldwise_init
-struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
+struct CEClassIndicesBackward[dtype: DType, target_dtype: DType = DType.int32](
+    ImplicitlyCopyable & Movable
+):
     """
     Backward for class index targets.
 
@@ -680,7 +683,7 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         ref bwd_arg = (
             output.ancestry()
             .backward_fn_arg()
-            .get[ClassIndicesBwdArg[Self.dtype]]()
+            .get[ClassIndicesBwdArg[Self.dtype, Self.target_dtype]]()
         )
         var (
             softmax_probs,
@@ -717,7 +720,7 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
             if softmax_probs.is_on_gpu():
                 try:
                     scaled = CrossEntropyFusedKernel[
-                        Self.dtype
+                        Self.dtype, Self.target_dtype
                     ].launch_backward(
                         softmax_probs,
                         target_1d,
@@ -751,9 +754,9 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
                     ).scalar_ops[Subtract](ls_uniform)
                 else:
                     grad = grad.arithmetic_ops[Subtract](onehot)
-                var ignore_mask = CECommon[Self.dtype].build_ignore_mask(
-                    target_1d, ignore_index
-                )
+                var ignore_mask = CECommon[
+                    Self.dtype, Self.target_dtype
+                ].build_ignore_mask(target_1d, ignore_index)
                 var ignore_mask_2d = ignore_mask.unsqueeze(
                     IntArray(-1)
                 ).broadcast_to(Shape(M, C))
@@ -778,9 +781,9 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
                 ).scalar_ops[Subtract](ls_uniform)
             else:
                 grad = grad.arithmetic_ops[Subtract](onehot)
-            var ignore_mask = CECommon[Self.dtype].build_ignore_mask(
-                target_1d, ignore_index
-            )
+            var ignore_mask = CECommon[
+                Self.dtype, Self.target_dtype
+            ].build_ignore_mask(target_1d, ignore_index)
             var ignore_mask_2d = ignore_mask.unsqueeze(
                 IntArray(-1)
             ).broadcast_to(Shape(M, C))
@@ -822,9 +825,11 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
 # CEClassIndicesForward
 @fieldwise_init
-struct ClassIndicesBwdArg[dtype: DType](ArgumentType):
+struct ClassIndicesBwdArg[
+    dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE
+](ArgumentType):
     var softmax_probs: NDBuffer[Self.dtype]
-    var target_1d: NDBuffer[DType.int32]
+    var target_1d: NDBuffer[Self.target_dtype]
     var logits_shape: Shape
     var reduction: Reduction
     var ignore_index: Int
@@ -836,9 +841,10 @@ struct ClassIndicesBwdArg[dtype: DType](ArgumentType):
 
 def _forward_cpu_impl[
     dtype: DType,
+    target_dtype: DType = DEFAULT_INDEX_DTYPE,
 ](
     logits_2d_ndb: NDBuffer[dtype],
-    target_1d_ndb: NDBuffer[DType.int32],
+    target_1d_ndb: NDBuffer[target_dtype],
     reduction: Reduction,
     ignore_index: Int,
     label_smoothing: Scalar[dtype],
@@ -854,7 +860,7 @@ def _forward_cpu_impl[
         dtype
     ].compute_log_softmax_and_softmax(logits_2d_ndb)
 
-    var ignore_mask_ndb = CECommon[dtype].build_ignore_mask(
+    var ignore_mask_ndb = CECommon[dtype, target_dtype].build_ignore_mask(
         target_1d_ndb, ignore_index
     )
     var valid_count = (
@@ -911,9 +917,9 @@ def _forward_cpu_impl[
 
 
 @fieldwise_init
-struct CEClassIndicesForward[dtype: DType](
-    ImplicitlyCopyable, RegisterPassable
-):
+struct CEClassIndicesForward[
+    dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE
+](ImplicitlyCopyable, RegisterPassable):
     """
     Forward pass for class index targets.
 
@@ -933,7 +939,7 @@ struct CEClassIndicesForward[dtype: DType](
         track_grad: Bool
     ](
         logits: Tensor[Self.dtype],
-        target: Tensor[DType.int32],
+        target: Tensor[Self.target_dtype],
         reduction: Reduction,
         ignore_index: Int,
         label_smoothing: Scalar[Self.dtype],
@@ -950,19 +956,19 @@ struct CEClassIndicesForward[dtype: DType](
             CEValidation[Self.dtype].validate_class_indices_shapes(
                 logits_shape, target.shape()
             )
-            CEValidation[Self.dtype].validate_target_indices(
+            CEValidation[Self.dtype].validate_target_indices[Self.target_dtype](
                 target, C, ignore_index
             )
 
         # Flatten spatial dims
         var logits_2d_ndb: NDBuffer[Self.dtype]
-        var target_1d_ndb: NDBuffer[DType.int32]
+        var target_1d_ndb: NDBuffer[Self.target_dtype]
         var M: Int
         var C2: Int
         var spatial_shape: Shape
         var N: Int
         logits_2d_ndb, target_1d_ndb, M, C2, spatial_shape, N = CECommon[
-            Self.dtype
+            Self.dtype, Self.target_dtype
         ].flatten_spatial_class_indices(logits, target)
 
         # ── Compute softmax + loss: GPU fused vs CPU decomposed ──
@@ -985,7 +991,9 @@ struct CEClassIndicesForward[dtype: DType](
                         losses_ndb,
                         scalar_loss_val,
                         valid_count,
-                    ) = CrossEntropyFusedKernel[Self.dtype].launch(
+                    ) = CrossEntropyFusedKernel[
+                        Self.dtype, Self.target_dtype
+                    ].launch(
                         logits_2d_ndb,
                         target_1d_ndb,
                         reduction,
@@ -1019,7 +1027,7 @@ struct CEClassIndicesForward[dtype: DType](
                     )
             else:
                 softmax_probs_ndb, valid_count, out = CECommon[
-                    Self.dtype
+                    Self.dtype, Self.target_dtype
                 ]._fused_forward_class_indices[track_grad](
                     logits_2d_ndb,
                     target_1d_ndb,
@@ -1033,7 +1041,7 @@ struct CEClassIndicesForward[dtype: DType](
                 )
         else:
             softmax_probs_ndb, valid_count, out = CECommon[
-                Self.dtype
+                Self.dtype, Self.target_dtype
             ]._fused_forward_class_indices[track_grad](
                 logits_2d_ndb,
                 target_1d_ndb,
@@ -1049,9 +1057,12 @@ struct CEClassIndicesForward[dtype: DType](
         comptime if track_grad:
             if logits.requires_grad:
                 out.requires_grad_(True)
+                var ce_op_code = BACKWARD_CE_CLASS_INDICES_INT32
+                if Self.target_dtype == DType.int64:
+                    ce_op_code = BACKWARD_CE_CLASS_INDICES_INT64
                 var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_CE_CLASS_INDICES,
-                    ClassIndicesBwdArg[Self.dtype](
+                    ce_op_code,
+                    ClassIndicesBwdArg[Self.dtype, Self.target_dtype](
                         softmax_probs_ndb^,
                         target_1d_ndb^,
                         logits_shape^,
@@ -1278,7 +1289,9 @@ struct CEProbabilitiesForward[dtype: DType](
 
 
 @fieldwise_init
-struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct CrossEntropyLoss[
+    dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE
+](ImplicitlyCopyable, RegisterPassable):
     """
     CrossEntropyLoss — flexible, modular, GPU-ready.
 
@@ -1347,13 +1360,15 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def __call__(
         self,
         logits: Tensor[Self.dtype],
-        target: Tensor[DType.int32],
+        target: Tensor[Self.target_dtype],
         validate: Bool = True,
         sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """Class index targets."""
         if self.training:
-            return CEClassIndicesForward[Self.dtype].forward[track_grad=True](
+            return CEClassIndicesForward[Self.dtype, Self.target_dtype].forward[
+                track_grad=True
+            ](
                 logits,
                 target,
                 self.reduction,
@@ -1363,7 +1378,9 @@ struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 sync=sync,
             )
         else:
-            return CEClassIndicesForward[Self.dtype].forward[track_grad=False](
+            return CEClassIndicesForward[Self.dtype, Self.target_dtype].forward[
+                track_grad=False
+            ](
                 logits,
                 target,
                 self.reduction,

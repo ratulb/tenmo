@@ -4,14 +4,16 @@ from std.sys import simd_width_of
 
 from tenmo.device import DeviceState
 from tenmo.ndbuffer import NDBuffer
+from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
 
 
 def accuracy_kernel[
     dtype: DType,
+    index_dtype: DType = DEFAULT_INDEX_DTYPE,
 ](
     result: UnsafePointer[Scalar[DType.int64], MutAnyOrigin],
     pred: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    labels: UnsafePointer[Scalar[DType.int32], ImmutAnyOrigin],
+    labels: UnsafePointer[Scalar[index_dtype], ImmutAnyOrigin],
     batch_size: Int,
     num_classes: Int,
 ):
@@ -37,11 +39,13 @@ def accuracy_kernel[
 
 
 @fieldwise_init
-struct AccuracyGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct AccuracyGpu[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
+    ImplicitlyCopyable, RegisterPassable
+):
     @staticmethod
     def launch(
         pred: NDBuffer[Self.dtype],
-        labels: NDBuffer[DType.int32],
+        labels: NDBuffer[Self.index_dtype],
         sync: Bool = False,
     ) raises -> Int:
         var batch_size = pred.shape[0]
@@ -58,8 +62,8 @@ struct AccuracyGpu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref labels_buf = labels_dev.device_buffer()
 
         var compiled = ctx.compile_function[
-            accuracy_kernel[Self.dtype],
-            accuracy_kernel[Self.dtype],
+            accuracy_kernel[Self.dtype, Self.index_dtype],
+            accuracy_kernel[Self.dtype, Self.index_dtype],
         ]()
 
         ctx.enqueue_function(
