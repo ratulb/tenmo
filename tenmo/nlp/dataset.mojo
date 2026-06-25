@@ -155,23 +155,23 @@ struct RandomSlidingWindowDataset[
     var _input_data: List[Scalar[Self.dtype]]
     var _target_data: List[Scalar[Self.dtype]]
     var _num_samples: Int
-    var _block_size: Int
+    var _seq_length: Int
 
     def __init__(
         out self,
         data: Tensor[Self.dtype],
-        block_size: Int,
+        seq_length: Int,
     ):
-        self._block_size = block_size
+        self._seq_length = seq_length
         var n = len(data)
-        self._num_samples = n - block_size if n > block_size else 0
+        self._num_samples = n - seq_length if n > seq_length else 0
 
-        var cap = self._num_samples * block_size
+        var cap = self._num_samples * seq_length
         self._input_data = List[Scalar[Self.dtype]](capacity=cap)
         self._target_data = List[Scalar[Self.dtype]](capacity=cap)
 
         for i in range(self._num_samples):
-            for j in range(block_size):
+            for j in range(seq_length):
                 self._input_data.append(data[i + j])
                 self._target_data.append(data[i + 1 + j])
 
@@ -189,16 +189,16 @@ struct RandomSlidingWindowDataset[
         return self._target_data.unsafe_ptr().as_immutable()
 
     def get_feature_shape(self) -> Shape:
-        return Shape(self._block_size)
+        return Shape(self._seq_length)
 
     def get_label_shape(self) -> Shape:
-        return Shape(self._block_size)
+        return Shape(self._seq_length)
 
     def get_features_per_sample(self) -> Int:
-        return self._block_size
+        return self._seq_length
 
     def get_labels_per_sample(self) -> Int:
-        return self._block_size
+        return self._seq_length
 
     def sample(
         ref self,
@@ -208,12 +208,12 @@ struct RandomSlidingWindowDataset[
             random_float64() * Float64(self._num_samples)
         )
         var features = Tensor[Self._feature_dtype].zeros(
-            Shape(self._block_size)
+            Shape(self._seq_length)
         )
-        var labels = Tensor[Self._label_dtype].zeros(Shape(self._block_size))
-        var src_feat = self._input_data.unsafe_ptr() + index * self._block_size
+        var labels = Tensor[Self._label_dtype].zeros(Shape(self._seq_length))
+        var src_feat = self._input_data.unsafe_ptr() + index * self._seq_length
         var src_label = (
-            self._target_data.unsafe_ptr() + index * self._block_size
+            self._target_data.unsafe_ptr() + index * self._seq_length
         )
         var dst_feat = (
             features.data_ptr()
@@ -226,10 +226,10 @@ struct RandomSlidingWindowDataset[
             .unsafe_origin_cast[MutAnyOrigin]()
         )
         memcpy(
-            dest=dst_feat, src=src_feat.as_immutable(), count=self._block_size
+            dest=dst_feat, src=src_feat.as_immutable(), count=self._seq_length
         )
         memcpy(
-            dest=dst_label, src=src_label.as_immutable(), count=self._block_size
+            dest=dst_label, src=src_label.as_immutable(), count=self._seq_length
         )
         return features^, labels^
 

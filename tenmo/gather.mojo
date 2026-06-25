@@ -324,72 +324,19 @@ struct Gather[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
                 )
                 return flat.reshape[track_grad](Shape(out_dims))
 
-        # ── CPU: multi-dimensional _gather_copy ───────────────────────────────
-        var indices_shape_arr = IntArray()
-        for d in range(indices.shape().rank()):
-            indices_shape_arr.append(indices.shape()[d])
-
-        var is_fast_path = (
-            (reduction.is_sum() or reduction.is_mean())
-            and ax == 0
-            and rank == 2
+        # ── CPU: route through IntArray forward + tracked reshape ─────────────
+        # Same pattern as GPU: avoids scatter_add backward having to handle
+        # multi-dimensional source gradients (GatherBackward sends flat indices
+        # + axis=0 to Filler.scatter_add, which assumes source rank == target rank).
+        var flat = Self.forward[track_grad](
+            self,
+            normalized,
+            axis=ax,
+            reduction=reduction,
+            padding_idx=padding_idx,
+            requires_grad=requires_grad,
         )
-
-        var out: Tensor[Self.dtype]
-        comptime if track_grad:
-            var grad_required = requires_grad.or_else(self.requires_grad)
-            if (
-                grad_required
-                and not is_fast_path
-                and (reduction.is_sum() or reduction.is_mean())
-            ):
-                out = Self._gather_copy(
-                    self,
-                    ax=ax,
-                    normalized=normalized,
-                    reduction=Reduction(2),
-                    indices_shape=indices_shape_arr,
-                )
-                out.requires_grad_(True)
-                var bfa = BackwardFnArg[Self.dtype](
-                    BACKWARD_GATHER,
-                    GatherArg(ax, normalized, padding_idx, Reduction(2)),
-                )
-                out.add_ancestry(bfa^, self)
-                if reduction.is_sum():
-                    out = out.sum[track_grad=True](IntArray(ax))
-                elif reduction.is_mean():
-                    out = out.mean[track_grad=True](IntArray(ax))
-            else:
-                out = Self._gather_copy(
-                    self,
-                    ax=ax,
-                    normalized=normalized,
-                    reduction=reduction,
-                    indices_shape=indices_shape_arr,
-                )
-                if grad_required:
-                    out.requires_grad_(True)
-                    var bfa = BackwardFnArg[Self.dtype](
-                        BACKWARD_GATHER,
-                        GatherArg(ax, normalized, padding_idx, reduction),
-                    )
-                    out.add_ancestry(bfa^, self)
-        else:
-            out = Self._gather_copy(
-                self,
-                ax=ax,
-                normalized=normalized,
-                reduction=reduction if is_fast_path else Reduction(2),
-                indices_shape=indices_shape_arr,
-            )
-            if not is_fast_path:
-                if reduction.is_sum():
-                    out = out.sum[track_grad=False](IntArray(ax))
-                elif reduction.is_mean():
-                    out = out.mean[track_grad=False](IntArray(ax))
-
-        return out^
+        return flat.reshape[track_grad](Shape(out_dims))
 
     @staticmethod
     def _gather_copy(

@@ -269,6 +269,15 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
             self._last_batch_size = 0
             self._last_batch = None
 
+    def sample(
+        ref self,
+        idx: Optional[Int] = None,
+    ) raises -> Tuple[
+        Tensor[Self.DatasetSource._feature_dtype],
+        Tensor[Self.DatasetSource._label_dtype],
+    ]:
+        return self.dataset[].sample(idx)
+
     def __iter__(mut self) -> ref[self] Self.IteratorType[origin_of(self)]:
         self._current_idx = 0
         if self.shuffle_data:
