@@ -79,7 +79,7 @@ tenmo/          # library source (~93 .mojo files)
   ancestry.mojo # Ancestor/Ancestors — lightweight parent handles
   backpropagation.mojo  # backward dispatch (jump table via op_code)
   net.mojo      # NN modules: Sequential, Linear, ReLU, Sigmoid, Conv2d, etc.
-  sgd.mojo      # SGD optimizer with momentum
+  optim.mojo      # SGD optimizer with momentum
   dataloader.mojo       # DataLoader, TensorDataset, NumpyDataset
   nlp/          # NLP-specific modules
 tests/          # ~90 test files

@@ -176,6 +176,7 @@ declare -a ALL_TESTS_IN_ORDER=(
     "validators|tests/test_validators.mojo"
     "ce|tests/test_cross_entropy.mojo"
     "checkpoint|tests/test_checkpoint.mojo"
+    "module_list|tests/test_module_list.mojo"
     "retain_graph|tests/test_retain_graph.mojo"
 )
 
@@ -457,6 +458,7 @@ run_test_by_name() {
         validators)     run_test "validators" "tests/test_validators.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         ce)             run_test "ce" "tests/test_cross_entropy.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         checkpoint)     run_test "checkpoint" "tests/test_checkpoint.mojo" "$DEBUG_MODE"; exit_code=$? ;;
+        module_list)    run_test "module_list" "tests/test_module_list.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         synth_mnist)    run_test "synth_mnist" "tests/test_synthetic_mnist.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         views_gpu)      run_test "views_gpu" "tests/gpu/test_views_gpu.mojo" "$DEBUG_MODE"; exit_code=$? ;;
         gpu_all)

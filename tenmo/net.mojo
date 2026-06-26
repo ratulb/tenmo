@@ -1253,6 +1253,154 @@ struct SequentialBLAS[dtype: DType](Copyable & Movable):
 
 
 # -----------------------------------------
+# ModuleList — ordered container of modules
+# -----------------------------------------
+@fieldwise_init
+struct ModuleListIterator[
+    mut: Bool,
+    //,
+    origin: Origin[mut=mut],
+    dtype: DType,
+    forward: Bool = True,
+](ImplicitlyCopyable & Sized & Iterable & Iterator):
+    var index: Int
+    var src: Pointer[ModuleList[Self.dtype], Self.origin]
+
+    comptime Element = Module[Self.dtype]
+    comptime IteratorType[
+        iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
+    ]: Iterator = Self
+
+    @always_inline
+    def __iter__(ref self) -> Self:
+        return self
+
+    def __next__(mut self) -> Self.Element:
+        comptime if Self.forward:
+            var idx = self.index
+            self.index += 1
+            return self.src[].modules[idx]
+        else:
+            self.index -= 1
+            return self.src[].modules[self.index]
+
+    @always_inline
+    def __has_next__(self) -> Bool:
+        return self.__len__() > 0
+
+    def __len__(self) -> Int:
+        comptime if Self.forward:
+            return len(self.src[]) - self.index
+        else:
+            return self.index
+
+    def bounds(self) -> Tuple[Int, Optional[Int]]:
+        var iter_len: Int
+        comptime if Self.forward:
+            iter_len = len(self.src[]) - self.index
+        else:
+            iter_len = self.index
+        return (iter_len, {iter_len})
+
+
+@fieldwise_init
+struct ModuleList[dtype: DType](Copyable & Movable & Sized & Iterable):
+    """Ordered container for modules.
+
+    Like PyTorch's ModuleList — stores a list of modules and delegates
+    parameters(), named_parameters(), num_parameters(), train(), eval(),
+    to_gpu(), to_cpu(), and zero_grad() through to contained modules.
+
+    Does NOT have __call__ — it's a container, not a forward chain.
+    Does NOT guard against LinearBLAS (unlike Sequential).
+    """
+
+    var modules: List[Module[Self.dtype]]
+
+    def __init__(out self):
+        self.modules = List[Module[Self.dtype]]()
+
+    def __init__(out self, *ms: Module[Self.dtype]):
+        self.modules = List[Module[Self.dtype]]()
+        for m in ms:
+            self.modules.append(m)
+
+    def append(mut self, m: Module[Self.dtype]):
+        self.modules.append(m)
+
+    def extend(mut self, *ms: Module[Self.dtype]):
+        for m in ms:
+            self.modules.append(m)
+
+    def insert(mut self, idx: Int, m: Module[Self.dtype]):
+        self.modules.insert(idx, m)
+
+    def __len__(self) -> Int:
+        return len(self.modules)
+
+    def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+        return ModuleListIterator[origin_of(self), Self.dtype](
+            0, Pointer(to=self)
+        )
+
+    comptime IteratorType[
+        iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
+    ]: Iterator = ModuleListIterator[iterable_origin, Self.dtype]
+
+    def parameters(
+        ref self,
+    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
+        var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
+        for module in self.modules:
+            params.extend(module.parameters())
+        return params^
+
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        var result = List[NamedParameter[Self.dtype]]()
+        for i in range(len(self.modules)):
+            var module_prefix = prefix + String(i) + "."
+            result.extend(self.modules[i].named_parameters(module_prefix))
+        return result^
+
+    def num_parameters(self) -> Int:
+        var total: Int = 0
+        for parameter in self.parameters():
+            total += parameter[].numels()
+        return total
+
+    def train(mut self):
+        """Set all modules to training mode."""
+        for i in range(len(self.modules)):
+            self.modules[i].train()
+
+    def eval(mut self):
+        """Set all modules to evaluation mode."""
+        for i in range(len(self.modules)):
+            self.modules[i].eval()
+
+    def zero_grad(mut self):
+        """Zero gradients for all modules."""
+        for i in range(len(self.modules)):
+            self.modules[i].zero_grad()
+
+    def to_gpu(
+        mut self, gpu: Optional[GPU] = None, stop_grad: Bool = True
+    ) raises -> ModuleList[Self.dtype]:
+        var out = ModuleList[Self.dtype]()
+        for i in range(len(self.modules)):
+            out.modules.append(self.modules[i].to_gpu(gpu))
+        return out^
+
+    def to_cpu(mut self) raises -> ModuleList[Self.dtype]:
+        var out = ModuleList[Self.dtype]()
+        for i in range(len(self.modules)):
+            out.modules.append(self.modules[i].to_cpu())
+        return out^
+
+
+# -----------------------------------------
 # Mean Squared Error Loss
 # -----------------------------------------
 @fieldwise_init
@@ -1532,6 +1680,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         return out^
 
 
+@fieldwise_init
 struct Flatten[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     """
     Flatten spatial dimensions: (N, C, H, W) → (N, C*H*W).
