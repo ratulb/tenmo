@@ -423,7 +423,7 @@ def str_repeat(s: String, n: Int) -> String:
 
 
 def print_summary[
-    dtype: DType
+    dtype: DType, //,
 ](
     mod: Sequential[dtype], sample_input: Optional[Tensor[dtype]] = None
 ) where dtype.is_floating_point():
@@ -538,7 +538,7 @@ def print_summary[
 
 
 def print_buffer[
-    dtype: DType
+    dtype: DType, //,
 ](
     read buffer: NDBuffer[dtype],
     mut indices: List[Int],

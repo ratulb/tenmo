@@ -777,7 +777,7 @@ struct NDBuffer[dtype: DType](
             end="\n",
         )
         empty = List[Int]()
-        print_buffer[Self.dtype](
+        print_buffer(
             self,
             empty,
             1,
