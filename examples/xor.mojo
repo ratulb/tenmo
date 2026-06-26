@@ -8,7 +8,7 @@ from tenmo.tensor import Tensor
 from tenmo.net import Sequential, Linear, Sigmoid, MSELoss
 from std.time import perf_counter_ns
 from std.math import sqrt
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 
 
 def xor_classification() -> None:

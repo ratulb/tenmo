@@ -4,7 +4,7 @@ A simple neural network implementation for MNIST digit classification.
 """
 
 from tenmo.tensor import Tensor
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 from tenmo.net import Linear, ReLU, Sequential, Conv2D, Flatten, Dropout
 from tenmo.forwards import MaxPool2d
 from tenmo.crossentropy import CrossEntropyLoss

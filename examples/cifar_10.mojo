@@ -4,7 +4,7 @@ Includes detailed timing measurements to identify bottlenecks.
 """
 
 from tenmo.tensor import Tensor
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 from tenmo.net import LinearBLAS, ReLU, SequentialBLAS, Dropout
 from tenmo.crossentropy import CrossEntropyLoss
 from std.python import Python

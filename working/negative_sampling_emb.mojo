@@ -14,7 +14,7 @@ from bpe import BasicTokenizer
 from std.time import perf_counter_ns
 from tenmo.embedding import Embedding
 from tenmo.shared import Reduction
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 from tenmo.net import BCEWithLogitsLoss
 
 comptime STOPWORDS = """

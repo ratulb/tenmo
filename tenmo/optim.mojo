@@ -1,5 +1,6 @@
 from .tensor import Tensor
 from .gradbox import Gradbox
+from .intarray import IntArray
 from std.math import sqrt
 from std.sys import simd_width_of, has_accelerator
 from .common_utils import panic

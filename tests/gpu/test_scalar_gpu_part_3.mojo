@@ -9,7 +9,7 @@ from tenmo.relu import ReLU
 from tenmo.buffers import Buffer
 from std.testing import assert_true, assert_equal, TestSuite
 from tenmo.strides import Strides
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 from tenmo.common_utils import s
 
 from tenmo.shuffle import Shuffle

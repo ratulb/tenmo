@@ -1,7 +1,7 @@
 from tensors import Tensor
 from layers import Linear, ReLU, Sequential
 from tenmo.crossentropy import CrossEntropyLoss
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 from std.testing import assert_true
 from std.python import Python, PythonObject
 from tenmo.numpy_interop import from_ndarray

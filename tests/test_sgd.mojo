@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from std.testing import assert_true, TestSuite
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 from tenmo.common_utils import s
 from std.sys import has_accelerator
 

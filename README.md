@@ -131,7 +131,7 @@ A's gradients
 ```mojo
 from tenmo.tensor import Tensor
 from tenmo.net import Sequential, Linear, Sigmoid, MSELoss
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 
 def main() raises:
     """

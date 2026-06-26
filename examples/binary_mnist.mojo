@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
 from tenmo.net import Linear, ReLU, Sequential, BCELoss, Sigmoid
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 from std.python import Python, PythonObject
 from tenmo.numpy_interop import from_ndarray
 from tenmo.common_utils import now

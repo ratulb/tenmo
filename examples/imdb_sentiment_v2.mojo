@@ -1,6 +1,6 @@
 from tenmo.shapes import Shape
 from std.math import sqrt
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 from std.random import seed
 from tenmo.tensor import Tensor
 from std.pathlib import Path

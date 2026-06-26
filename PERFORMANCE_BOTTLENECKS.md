@@ -497,7 +497,7 @@ Tests: 12 CPU tests + 10 GPU-guarded parity tests at `tests/test_accuracy.mojo`.
 
 **Status: 🟢 FIXED**
 
-**Problem:** `SGD.step()` (`tenmo/sgd.mojo:403`) mapped all GPU parameters and
+**Problem:** `SGD.step()` (`tenmo/optim.mojo:403`) mapped all GPU parameters and
 gradients to CPU via `map_to_host()`, applied momentum, weight decay, and
 gradient updates on the CPU, then wrote back to GPU via `param_ds.sync()`.
 This round-tripped every parameter across PCIe on every batch.
@@ -559,8 +559,8 @@ for any future caller that explicitly passes `sync=True`.
 
 | Item | Priority | Why left |
 |---|---|---|---|
-| `clip_gradients()` GPU kernel (`sgd.mojo:291-400`) | Low | Not used by MNIST (both clip_norm/clip_value default 0). Still uses `map_to_host()`. |
-| Sparse SGD GPU kernel (sgd.mojo:440-479) | Low | Only needed for embedding/word2vec sparse training. Not used by MLP. |
+| `clip_gradients()` GPU kernel (`optim.mojo:291-400`) | Low | Not used by MNIST (both clip_norm/clip_value default 0). Still uses `map_to_host()`. |
+| Sparse SGD GPU kernel (optim.mojo:440-479) | Low | Only needed for embedding/word2vec sparse training. Not used by MLP. |
 | Fused GPU forward kernel for CEProbabilities (`crossentropy.mojo:829-845`) | Medium | Not used by MNIST (uses class-indices CE). ~12 GPU launches per loss call on probabilities path. |
 | `backward(sync=True)` redundant sync in same-stream execution | Very low | Kept as safety fence. Removal is 0.5µs savings. Not measurable. |
 | Tensor dunders `sync=True` default → not threaded to NDBuffer | Very low | No functional impact (NDBuffer defaults `sync=False`). Pipeline runs async regardless. |

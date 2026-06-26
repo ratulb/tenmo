@@ -9,7 +9,7 @@ from std.math import tanh as scalar_tanh, abs as scalar_abs
 
 comptime dtype = DType.float32
 comptime tol = Float32(1e-4)
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 from tenmo.filler import Filler
 from std.math import log, exp
 

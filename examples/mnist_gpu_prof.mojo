@@ -8,7 +8,7 @@ kernel) to compare warm-up/compilation vs steady-state.
 """
 
 from tenmo.tensor import Tensor
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 from tenmo.net import Linear, ReLU, Sequential
 from tenmo.crossentropy import CrossEntropyLoss
 from std.python import Python

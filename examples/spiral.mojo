@@ -36,7 +36,7 @@ Performance:
 """
 
 from tenmo.tensor import Tensor
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 from tenmo.net import (
     Sequential,
     Linear,

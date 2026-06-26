@@ -46,7 +46,7 @@ def main() raises:
 ```mojo
 from tenmo.tensor import Tensor
 from tenmo.net import Sequential, Linear, ReLU
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 
 def main() raises:
     var model = Sequential[DType.float32]()
@@ -132,7 +132,7 @@ from .repeat import *
 from .reshape import *
 from .kernels.scalar_inplace_ops_kernel import *
 from .kernels.scalar_ops_kernel import *
-from .sgd import *
+from .optim import *
 
 from .shuffle import *
 from .sigmoid import *

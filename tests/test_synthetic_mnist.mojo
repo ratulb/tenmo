@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from tenmo.net import Linear, ReLU, Sequential
-from tenmo.sgd import SGD
+from tenmo.optim import SGD
 from tenmo.crossentropy import CrossEntropyLoss
 from std.testing import assert_true, TestSuite
 from std.utils.numerics import max_finite
