@@ -20,6 +20,8 @@ def numpy_dtype(dtype: DType) raises -> PythonObject:
         return np.int8
     elif dtype == DType.int32:
         return np.int32
+    elif dtype == DType.int64:
+        return np.int64
     elif dtype == DType.uint8:
         return np.uint8
     elif dtype == DType.bool:

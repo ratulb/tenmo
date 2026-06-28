@@ -41,8 +41,7 @@ def scalar_ops[
 
     """
 
-    var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
+    var gtid = thread_idx.x + block_dim.x * block_idx.x
     var stride = block_dim.x * grid_dim.x
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
@@ -54,8 +53,8 @@ def scalar_ops[
 
     while base_idx < size:
         # Process simd_vectors_per_thread vectors per thread
-        comptime for item in range(simd_vectors_per_thread):
-            var i = base_idx + item * simd_width
+        comptime for vector in range(simd_vectors_per_thread):
+            var i = base_idx + vector * simd_width
 
             # Bounds check for this vector
             if i + simd_width <= size:

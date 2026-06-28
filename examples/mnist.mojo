@@ -12,7 +12,7 @@ from tenmo.numpy_interop import from_ndarray, numpy_dtype
 from tenmo.dataloader import NumpyDataset, MNIST_MEAN, MNIST_STD
 from std.time import perf_counter_ns
 from tenmo.accuracy import Accuracy
-
+from tenmo.mnemonics import DEFAULT_INDEX_DTYPE as LABEL_DTYPE
 
 def train_mnist() raises:
     """Train a neural network on MNIST dataset."""
@@ -38,7 +38,7 @@ def train_mnist() raises:
 
     # ========== Data Preparation ==========
     comptime FEATURE_DTYPE = DType.float32
-    comptime LABEL_DTYPE = DType.int32
+    #comptime LABEL_DTYPE = DType.int32
 
     train_images = train_images.astype(numpy_dtype(FEATURE_DTYPE))
     train_labels = train_labels.astype(numpy_dtype(LABEL_DTYPE))
