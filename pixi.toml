@@ -6,7 +6,7 @@ version = "0.1.0"
 preview = ["pixi-build"]
 
 [dependencies]
-python = ">=3.10,<3.15"
+python = ">=3.10,<3.13"
 mojo = "==1.0.0b1"
 tiktoken = "==0.12.0"
 openblas = ">=0.3.33,<0.4"
