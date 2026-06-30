@@ -11,7 +11,7 @@ from tenmo.shared import Reduction
 from tenmo.filler import Filler
 from tenmo.intarray import IntArray
 from std.collections import Set
-from bpe import BasicTokenizer
+#from bpe import BasicTokenizer
 from std.time import perf_counter_ns
 
 comptime STOPWORDS = """
@@ -42,11 +42,11 @@ struct Tokenizer(Sized & ImplicitlyCopyable & Movable):
         self.int_to_str = {item.value: item.key for item in vocab.items()}
         self.str_to_int = vocab^
 
-    def __init__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         self.int_to_str = copy.int_to_str.copy()
         self.str_to_int = copy.str_to_int.copy()
 
-    def __init__(out self, take: Self):
+    def __init__(out self, *, deinit take: Self):
         self.int_to_str = take.int_to_str^
         self.str_to_int = take.str_to_int^
 
