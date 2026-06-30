@@ -788,7 +788,7 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
         if idx:
             return self.__getitem__(idx.value())
         else:
-            return self.__getitem__(Int(random_si64(0, self._size - 1)))
+            return self.__getitem__(Int(random_si64(0, Int64(self._size - 1))))
 
     def into_loader(
         ref self,

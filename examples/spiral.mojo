@@ -1,38 +1,36 @@
 """
-Spiral Classification Example
-===============================
+Spiral Classification Example.
 
-This example demonstrates training a neural network on the classic spiral dataset,
+This example demonstrates training a neural network on the classic spiral dataset.
 a popular benchmark for testing non-linear classification capabilities.
 
 Problem:
     Binary classification of 2D points arranged in two interleaved spirals.
-    This is a challenging non-linear problem that tests a network's ability to
-    learn complex decision boundaries.
+    This is a challenging non-linear problem that tests a network's ability to learn complex decision boundaries.
 
 Network Architecture:
-    Input:  2 features (x, y coordinates)
-    Hidden: 64 → 32 → 16 neurons with ReLU activation
-    Output: 1 neuron with Sigmoid activation (binary classification)
+    Input:  2 features (x, y coordinates).
+    Hidden: 64 → 32 → 16 neurons with ReLU activation.
+    Output: 1 neuron with Sigmoid activation (binary classification).
 
 Key Features Demonstrated:
-    ✓ Mini-batch training with DataLoader
-    ✓ Train/Validation split
-    ✓ Train/Eval mode switching
-    ✓ Binary Cross-Entropy loss
-    ✓ Accuracy monitoring
-    ✓ Proper gradient tracking control
+     Mini-batch training with DataLoader.
+     Train/Validation split.
+     Train/Eval mode switching.
+     Binary Cross-Entropy loss.
+     Accuracy monitoring.
+     Proper gradient tracking control.
 
 Dataset:
-    - Training: 500 samples
-    - Validation: 250 samples
-    - Batch size: 32 (training), 64 (validation)
-    - Data augmentation: Random shuffling each epoch
+    - Training: 500 samples.
+    - Validation: 250 samples.
+    - Batch size: 32 (training), 64 (validation).
+    - Data augmentation: Random shuffling each epoch.
 
 Performance:
-    - Training time: ~1-2 minutes on CPU (15,000 epochs)
-    - Expected accuracy: >95% on validation set
-    - Loss convergence: <0.05 final validation loss
+    - Training time: ~1-2 minutes on CPU (15,000 epochs).
+    - Expected accuracy: >95% on validation set.
+    - Loss convergence: <0.05 final validation loss.
 """
 
 from tenmo.tensor import Tensor
@@ -116,10 +114,10 @@ def train_spiral_classifier():
     """Train a neural network to classify spiral dataset with mini-batch training.
 
     This example demonstrates:
-    1. DataLoader for mini-batch training
-    2. Train/validation split for generalization monitoring
-    3. Train/eval mode for proper gradient tracking
-    4. Accuracy and loss tracking
+    1. DataLoader for mini-batch training.
+    2. Train/validation split for generalization monitoring.
+    3. Train/eval mode for proper gradient tracking.
+    4. Accuracy and loss tracking.
     """
 
     print("=" * 80)
@@ -407,17 +405,17 @@ def train_spiral_classifier():
 
     # Determine if training was successful
     if final_val_accuracy > 95.0 and final_avg_val_loss < 0.1:
-        print("✓ Training successful! Model learned the spiral pattern.")
+        print(" Training successful! Model learned the spiral pattern.")
     elif final_val_accuracy > 90.0:
-        print("✓ Training good! Model mostly learned the pattern.")
+        print(" Training good! Model mostly learned the pattern.")
     elif final_val_accuracy > 80.0:
         print(
-            "⚠ Training okay. Consider more epochs or different"
+            "Training okay. Consider more epochs or different"
             " hyperparameters."
         )
     else:
         print(
-            "✗ Training needs improvement. Try adjusting architecture or"
+            "Training needs improvement. Try adjusting architecture or"
             " hyperparameters."
         )
 

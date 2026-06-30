@@ -128,7 +128,7 @@ def train_mnist() raises:
     var clip_norm = Scalar[FEATURE_DTYPE](1)
     var clip_value = Scalar[FEATURE_DTYPE](0.5)
 
-    var criterion = CrossEntropyLoss[FEATURE_DTYPE]()
+    var criterion = CrossEntropyLoss[FEATURE_DTYPE, LABEL_DTYPE]()
 
     # ========== Transfer Model to GPU ==========
     print("Transferring model parameters to GPU...")
@@ -327,7 +327,7 @@ def train_mnist() raises:
             var t5 = perf_counter_ns()
 
             train_loss += loss.item() * Float32(batch.batch_size)
-            train_correct += Accuracy[FEATURE_DTYPE].compute(pred, labels_gpu, sync=False)
+            train_correct += Accuracy[FEATURE_DTYPE, LABEL_DTYPE].compute(pred, labels_gpu, sync=False)
             train_total += batch.batch_size
             var t6 = perf_counter_ns()
 
@@ -374,7 +374,7 @@ def train_mnist() raises:
             var loss = criterion(pred, labels_gpu, sync=False)
 
             val_loss += loss.item() * Float32(batch.batch_size)
-            val_correct += Accuracy[FEATURE_DTYPE].compute(pred, labels_gpu, sync=False)
+            val_correct += Accuracy[FEATURE_DTYPE, LABEL_DTYPE].compute(pred, labels_gpu, sync=False)
             val_total += batch.batch_size
 
         var epoch_time = Float64(perf_counter_ns() - epoch_start) / 1e9

@@ -131,7 +131,7 @@ def train_mnist() raises:
     var clip_norm = Scalar[dtype](1)
     var clip_value = Scalar[dtype](0.5)
 
-    var criterion = CrossEntropyLoss[dtype]()
+    var criterion = CrossEntropyLoss[dtype, label_dtype]()
     var optimizer = SGD(
         model.parameters(),
         lr=learning_rate,
@@ -176,7 +176,7 @@ def train_mnist() raises:
             optimizer.step()
 
             train_loss += loss.item() * Float32(batch.batch_size)
-            train_correct += Accuracy[FEATURE_DTYPE].compute(pred, batch.labels)
+            train_correct += Accuracy[dtype, label_dtype].compute(pred, batch.labels)
             train_total += batch.batch_size
             batch_num += 1
 
@@ -195,7 +195,7 @@ def train_mnist() raises:
             var loss = criterion(pred, batch.labels)
 
             val_loss += loss.item() * Float32(batch.batch_size)
-            val_correct += Accuracy[FEATURE_DTYPE].compute(pred, batch.labels)
+            val_correct += Accuracy[dtype, label_dtype].compute(pred, batch.labels)
             val_total += batch.batch_size
 
         # --- Epoch Report ---

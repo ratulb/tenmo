@@ -15,6 +15,7 @@ from tenmo.device import GPU
 from std.time import perf_counter_ns
 from std.sys import has_accelerator
 from tenmo.accuracy import Accuracy
+from tenmo.mnemonics import DEFAULT_INDEX_DTYPE as LABEL_DTYPE
 
 
 def train_mnist() raises:
@@ -44,7 +45,6 @@ def train_mnist() raises:
 
     # ========== Data Preparation ==========
     comptime FEATURE_DTYPE = DType.float32
-    comptime LABEL_DTYPE = DType.int32
 
     train_images = train_images.astype(numpy_dtype(FEATURE_DTYPE))
     train_labels = train_labels.astype(numpy_dtype(LABEL_DTYPE))
@@ -184,7 +184,7 @@ def train_mnist() raises:
             # loss.item() syncs GPU (reads scalar value back)
             # Accuracy.compute runs argmax on GPU, reads single Int back
             train_loss += loss.item() * Float32(batch.batch_size)
-            train_correct += Accuracy[FEATURE_DTYPE].compute(pred, labels_gpu, sync=sync)
+            train_correct += Accuracy[FEATURE_DTYPE].compute(pred, labels_gpu, sync=True)
             train_total += batch.batch_size
 
         # --- Validation Phase ---
@@ -205,7 +205,7 @@ def train_mnist() raises:
             var loss = criterion(pred, labels_gpu)
 
             val_loss += loss.item() * Float32(batch.batch_size)
-            val_correct += Accuracy[FEATURE_DTYPE].compute(pred, labels_gpu, sync=sync)
+            val_correct += Accuracy[FEATURE_DTYPE].compute(pred, labels_gpu, sync=True)
             val_total += batch.batch_size
 
         # --- Epoch Report ---

@@ -126,7 +126,7 @@ def train_cifar_10() raises:
     var learning_rate = Scalar[FEATURE_DTYPE](0.001075)
     var momentum = Scalar[FEATURE_DTYPE](0.9)
 
-    var criterion = CrossEntropyLoss[FEATURE_DTYPE]()
+    var criterion = CrossEntropyLoss[FEATURE_DTYPE, LABEL_DTYPE]()
     var optimizer = SGD(model.parameters(), lr=learning_rate, momentum=momentum)
 
     print("Training configuration:")
@@ -184,7 +184,7 @@ def train_cifar_10() raises:
 
             # Accuracy computation
             t0 = perf_counter_ns()
-            train_correct += Accuracy[FEATURE_DTYPE].compute(pred, batch.labels)
+            train_correct += Int64(Accuracy[FEATURE_DTYPE, LABEL_DTYPE].compute(pred, batch.labels))
             t1 = perf_counter_ns()
             train_accuracy_time += Float64(t1 - t0) / 1e9
 
@@ -214,7 +214,7 @@ def train_cifar_10() raises:
             val_loss += loss.item() * Float32(batch.batch_size)
 
             t0 = perf_counter_ns()
-            val_correct += Accuracy[FEATURE_DTYPE].compute(pred, batch.labels)
+            val_correct += Int64(Accuracy[FEATURE_DTYPE, LABEL_DTYPE].compute(pred, batch.labels))
             t1 = perf_counter_ns()
             val_accuracy_time += Float64(t1 - t0) / 1e9
 

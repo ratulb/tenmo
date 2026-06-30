@@ -62,11 +62,11 @@ def xor_classification() -> None:
                     grad_norm_sq += (g * g).sum().item()
 
             var loss_str = String(loss.item())
-            if len(loss_str) > 8:
+            if loss_str.count_codepoints() > 8:
                 loss_str = String(loss_str[byte=0:8])
 
             var grad_str = String(sqrt(grad_norm_sq))
-            if len(grad_str) > 8:
+            if grad_str.count_codepoints() > 8:
                 grad_str = String(grad_str[byte=0:8])
 
             print(
@@ -89,11 +89,11 @@ def xor_classification() -> None:
                     var exp = Int(y[i, 0])
                     var pred_val = final_pred[i, 0]
                     var pred_str = String(pred_val)
-                    if len(pred_str) > 6:
+                    if pred_str.count_codepoints() > 6:
                         pred_str = String(pred_str[byte=0:6])
                     var err = abs(Float64(exp) - Float64(pred_val))
                     var err_str = String(err)
-                    if len(err_str) > 6:
+                    if err_str.count_codepoints() > 6:
                         err_str = String(err_str[byte=0:6])
 
                     print(
