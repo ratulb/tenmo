@@ -3,11 +3,9 @@ name: Mojo Tests
 on:
   push:
     branches:
-      - dev
       - main
   pull_request:
     branches:
-      - dev
       - main
 
 env:
@@ -18,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 1  # Mojo compilation is memory-bound — even 2 parallel compilations OOM a GitHub runner
+      max-parallel: 8  # Mojo compilation is memory-bound
       matrix:
         test:
           - attn_matmul
@@ -108,10 +106,7 @@ jobs:
 
       - name: Run test — ${{ matrix.test }} (with retry)
         id: run_test
-        env:
-          MOJO_STACK_SIZE: 67108864   # 64MB — default is 8MB
         run: |
-          ulimit -s unlimited
           attempt=0
           exit_code=0
           while [ $attempt -le ${{ env.MAX_RETRIES }} ]; do
