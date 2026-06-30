@@ -2,9 +2,9 @@ from .tensor import Tensor
 from .mnemonics import AddTensor, SUM
 from .intarray import IntArray
 from .shapes import Shape
-from .backpropagation import BackwardFnArg, ReductionArg, BACKWARD_SUM
+from .backpropagation import BackwardFnArg, BACKWARD_SUM
 from .validators import Validator
-from .sum_mean_reduction import SumMeanReduction
+from .sum_mean_reduction import ReductionArg, SumMeanReduction
 from .gradbox import Gradbox
 from .ancestry import Ancestor
 

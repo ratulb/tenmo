@@ -1,5 +1,5 @@
 from .tensor import Tensor
-from .backpropagation import BackwardFnArg, TilesArg, BACKWARD_TILE
+from .backpropagation import ArgumentType, BackwardFnArg, BACKWARD_TILE
 from .intarray import IntArray
 from .mnemonics import AddTensor
 from .shapes import Shape
@@ -7,6 +7,12 @@ from .validators import Validator
 from .gradbox import Gradbox
 from .indexhelper import IndexCalculator
 from .ancestry import Ancestor
+
+
+@fieldwise_init
+struct TilesArg(ArgumentType):
+    var repeat: IntArray
+    var orig_shape: Shape
 
 
 @fieldwise_init

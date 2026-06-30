@@ -1,5 +1,5 @@
 from .tensor import Tensor
-from .backpropagation import BackwardFnArg, StackArg, BACKWARD_STACK
+from .backpropagation import ArgumentType, BackwardFnArg, BACKWARD_STACK
 from .mnemonics import AddTensor
 from .common_utils import panic
 from .gradbox import Gradbox
@@ -10,6 +10,12 @@ from .forwards import Concate
 from .ancestry import Ancestor
 from std.sys import has_accelerator
 from tenmo.kernels.concate_kernel import ConcateGpuKernel
+
+
+@fieldwise_init
+struct StackArg(ArgumentType):
+    var axis: Int
+    var num_tensors: Int
 
 
 @fieldwise_init

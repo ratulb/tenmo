@@ -1,6 +1,6 @@
 from .tensor import Tensor
 from .mnemonics import AddTensor
-from .backpropagation import BackwardFnArg, BACKWARD_TRIU, TriuArg
+from .backpropagation import ArgumentType, BackwardFnArg, BACKWARD_TRIU
 from .gradbox import Gradbox
 from .ancestry import Ancestor
 from .ndbuffer import NDBuffer
@@ -8,6 +8,13 @@ from .common_utils import panic
 from std.sys import has_accelerator
 from std.sys import simd_width_of
 from .kernels.triu_kernel import TriuGpuKernel
+
+
+@fieldwise_init
+struct TriuArg(ArgumentType):
+    var diagonal: Int
+    var M: Int
+    var N: Int
 
 
 @fieldwise_init

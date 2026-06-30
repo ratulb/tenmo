@@ -1,9 +1,15 @@
 from .tensor import Tensor
 from .mnemonics import AddTensor
-from .backpropagation import BackwardFnArg, ClipArg, BACKWARD_CLIP
+from .backpropagation import ArgumentType, BackwardFnArg, BACKWARD_CLIP
 from .gradbox import Gradbox
 from std.sys import simd_width_of
 from .ancestry import Ancestor
+
+
+@fieldwise_init
+struct ClipArg[dtype: DType](ArgumentType):
+    var min_val: Scalar[Self.dtype]
+    var max_val: Scalar[Self.dtype]
 
 
 @fieldwise_init

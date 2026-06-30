@@ -2,8 +2,8 @@ from .intarray import IntArray
 from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
 from .backpropagation import (
+    ArgumentType,
     BackwardFnArg,
-    SoftmaxArg,
     BACKWARD_SOFTMAX,
     BACKWARD_LOG_SOFTMAX,
 )
@@ -18,6 +18,12 @@ from .common_utils import Epsilon
 from std.sys import has_accelerator
 from std.math import log, exp, max
 from std.sys import simd_width_of
+
+
+@fieldwise_init
+struct SoftmaxArg[dtype: DType](ArgumentType):
+    var axes: IntArray
+    var softmax_out: NDBuffer[Self.dtype]
 
 
 @fieldwise_init

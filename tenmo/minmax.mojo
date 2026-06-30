@@ -1,7 +1,7 @@
 from .tensor import Tensor
 from .mnemonics import AddTensor
 from .shapes import Shape
-from .backpropagation import BackwardFnArg, MinMaxArg, BACKWARD_MINMAX
+from .backpropagation import ArgumentType, BackwardFnArg, BACKWARD_MINMAX
 from .validators import Validator
 from .intarray import IntArray
 from .gradbox import Gradbox
@@ -10,6 +10,13 @@ from .ancestry import Ancestor
 from tenmo.kernels.minmax_kernel import ReductionMinMax
 from .common_utils import panic
 from std.sys.info import has_accelerator
+
+
+@fieldwise_init
+struct MinMaxArg[dtype: DType](ArgumentType):
+    var axes: IntArray
+    var keepdims: Bool
+    var mask: NDBuffer[Self.dtype]
 
 
 @fieldwise_init

@@ -1,7 +1,7 @@
 from .tensor import Tensor
 from .mnemonics import AddTensor
 from .validators import Validator
-from .backpropagation import BackwardFnArg, ShuffleArg, BACKWARD_SHUFFLE
+from .backpropagation import ArgumentType, BackwardFnArg, BACKWARD_SHUFFLE
 from std.random import shuffle, seed
 from .gradbox import Gradbox
 from std.sys import has_accelerator
@@ -9,6 +9,16 @@ from .ndbuffer import NDBuffer
 from .common_utils import panic
 from .ancestry import Ancestor
 from .kernels.shuffle_kernel import ShuffleGPU
+
+
+@fieldwise_init
+struct ShuffleArg(ArgumentType):
+    var axis: Int
+    var permutation: List[Int]
+
+    def __init__(out self, *, copy: Self):
+        self.axis = copy.axis
+        self.permutation = copy.permutation.copy()
 
 
 @fieldwise_init

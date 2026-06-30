@@ -1,6 +1,6 @@
 from .tensor import Tensor
 from .mnemonics import AddTensor
-from .backpropagation import BackwardFnArg, StdArg, BACKWARD_STD
+from .backpropagation import BackwardFnArg, BACKWARD_STD
 from .gradbox import Gradbox
 from .ancestry import Ancestor
 from tenmo.common_utils import Epsilon

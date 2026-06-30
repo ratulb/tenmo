@@ -19,9 +19,8 @@ from tenmo.buffers import Buffer
 from tenmo.shapes import Shape
 from tenmo.kernels.bce_kernel import BceKernel
 from tenmo.backpropagation import (
+    ArgumentType,
     BackwardFnArg,
-    BCEWithLogitsBwdArg,
-    BCELossBwdArg,
     BACKWARD_BCE_WITH_LOGITS,
     BACKWARD_BCE,
 )
@@ -33,6 +32,27 @@ from tenmo.shared import Reduction
 from tenmo.common_utils import panic
 from std.sys import simd_width_of, has_accelerator
 from std.math import exp, log
+
+
+# =============================================================================
+# Backward argument types
+# =============================================================================
+
+
+@fieldwise_init
+struct BCEWithLogitsBwdArg[dtype: DType](ArgumentType):
+    var sigmoid: NDBuffer[Self.dtype]
+    var target: NDBuffer[Self.dtype]
+    var reduction: Reduction
+    var numels: Int
+
+
+@fieldwise_init
+struct BCELossBwdArg[dtype: DType](ArgumentType):
+    var clipped_pred: NDBuffer[Self.dtype]
+    var target: NDBuffer[Self.dtype]
+    var reduction: Reduction
+    var numels: Int
 
 
 # =============================================================================

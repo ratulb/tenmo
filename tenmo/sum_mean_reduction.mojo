@@ -8,6 +8,7 @@
 # GPU dispatch goes through Reduction.launch in reduction_kernel.mojo.
 # =============================================================================
 
+from .backpropagation import ArgumentType
 from .ndbuffer import NDBuffer
 from .intarray import IntArray
 from .shapes import Shape
@@ -17,6 +18,12 @@ from std.algorithm import parallelize
 from std.sys.info import num_physical_cores
 from .mnemonics import SUM, MEAN
 from std.sys import has_accelerator
+
+
+@fieldwise_init
+struct ReductionArg(ArgumentType):
+    var axes: IntArray
+    var keepdims: Bool
 
 
 struct SumMeanReduction[dtype: DType]:

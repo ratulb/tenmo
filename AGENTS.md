@@ -25,7 +25,7 @@ pixi install              # install deps
 ./execute.sh -p all       # parallel test run
 ./execute.sh -d <name>    # debug mode (-D LOGGING_LEVEL=debug)
 ./execute.sh from <name>  # run <name> and all tests after it in order
-./example.sh xor          # run an example (xor|mnist|spiral|cifar_10|imdb|mnist_gpu|mnist_conv2d|mnist_gpu_prof)
+./example.sh xor          # run an example (word2vec_cbow|xor|mnist|spiral|cifar_10|imdb|mnist_gpu|mnist_conv2d|mnist_gpu_prof)
 ./example.sh <name> d     # example with debug logging
 ./fire.sh                 # quick-run scratchpad.mojo (or pass another file)
 ```

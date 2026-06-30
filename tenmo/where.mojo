@@ -1,6 +1,6 @@
 from .tensor import Tensor
 from .mnemonics import AddTensor, Multiply, Subtract
-from .backpropagation import BackwardFnArg, BACKWARD_WHERE, WhereArg
+from .backpropagation import ArgumentType, BackwardFnArg, BACKWARD_WHERE
 from .gradbox import Gradbox
 from .ancestry import Ancestor
 from .ndbuffer import NDBuffer
@@ -8,6 +8,13 @@ from .common_utils import panic
 from std.sys import has_accelerator
 from .kernels.where_kernel import WhereGpuKernel
 from .broadcasthelper import ShapeBroadcaster
+
+
+@fieldwise_init
+struct WhereArg[dtype: DType](ArgumentType):
+    var condition: NDBuffer[Self.dtype]
+    var a_requires_grad: Bool
+    var b_requires_grad: Bool
 
 
 @fieldwise_init

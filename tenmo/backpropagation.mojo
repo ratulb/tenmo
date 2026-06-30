@@ -24,8 +24,6 @@ from .ndbuffer import NDBuffer
 from .intarray import IntArray
 from .strides import Strides
 from .shapes import Shape
-from .blashandle import BLASHandleLite
-from tenmo.shared import Reduction
 
 # Centralized backward operation tags
 
@@ -252,25 +250,6 @@ struct IntArrayArg(ArgumentType):
 
 
 @fieldwise_init
-struct ReductionArg(ArgumentType):
-    var axes: IntArray
-    var keepdims: Bool
-
-
-@fieldwise_init
-struct BlasArg[dtype: DType](ArgumentType):
-    var transpose_A: Bool
-    var transpose_B: Bool
-    var blas: BLASHandleLite[Self.dtype]
-
-
-@fieldwise_init
-struct StackArg(ArgumentType):
-    var axis: Int
-    var num_tensors: Int
-
-
-@fieldwise_init
 struct BufferArg[dtype: DType](ArgumentType):
     var buffer: Buffer[Self.dtype]
 
@@ -285,96 +264,6 @@ struct ViewArg(ArgumentType):
     var shape: Shape
     var strides: Strides
     var offset: Int
-
-
-@fieldwise_init
-struct ShuffleArg(ArgumentType):
-    var axis: Int
-    var permutation: List[Int]
-
-    def __init__(out self, *, copy: Self):
-        self.axis = copy.axis
-        self.permutation = copy.permutation.copy()
-
-
-@fieldwise_init
-struct PadArg(ArgumentType):
-    var pad: List[Tuple[Int, Int]]
-    var mode: String
-
-    def __init__(out self, *, copy: Self):
-        self.pad = copy.pad.copy()
-        self.mode = copy.mode.copy()
-
-
-@fieldwise_init
-struct MinMaxArg[dtype: DType](ArgumentType):
-    var axes: IntArray
-    var keepdims: Bool
-    var mask: NDBuffer[Self.dtype]
-
-
-@fieldwise_init
-struct SoftmaxArg[dtype: DType](ArgumentType):
-    var axes: IntArray
-    var softmax_out: NDBuffer[Self.dtype]
-
-
-@fieldwise_init
-struct ClipArg[dtype: DType](ArgumentType):
-    var min_val: Scalar[Self.dtype]
-    var max_val: Scalar[Self.dtype]
-
-
-@fieldwise_init
-struct TilesArg(ArgumentType):
-    var repeat: IntArray
-    var orig_shape: Shape
-
-
-@fieldwise_init
-struct StdArg[dtype: DType](ArgumentType):
-    var axis: Int
-    var unbiased: Bool
-    var keepdims: Bool
-    var epsilon: Scalar[Self.dtype]
-
-
-@fieldwise_init
-struct BCEWithLogitsBwdArg[dtype: DType](ArgumentType):
-    var sigmoid: NDBuffer[Self.dtype]
-    var target: NDBuffer[Self.dtype]
-    var reduction: Reduction
-    var numels: Int
-
-
-@fieldwise_init
-struct BCELossBwdArg[dtype: DType](ArgumentType):
-    var clipped_pred: NDBuffer[Self.dtype]
-    var target: NDBuffer[Self.dtype]
-    var reduction: Reduction
-    var numels: Int
-
-
-@fieldwise_init
-struct TrilArg(ArgumentType):
-    var diagonal: Int
-    var M: Int
-    var N: Int
-
-
-@fieldwise_init
-struct TriuArg(ArgumentType):
-    var diagonal: Int
-    var M: Int
-    var N: Int
-
-
-@fieldwise_init
-struct WhereArg[dtype: DType](ArgumentType):
-    var condition: NDBuffer[Self.dtype]
-    var a_requires_grad: Bool
-    var b_requires_grad: Bool
 
 
 # ============================================================================

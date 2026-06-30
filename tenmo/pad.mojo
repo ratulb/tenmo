@@ -24,7 +24,7 @@ Examples:
 from .tensor import Tensor
 from .shapes import Shape
 from .gradbox import Gradbox
-from .backpropagation import BackwardFnArg, PadArg, BACKWARD_PAD
+from .backpropagation import ArgumentType, BackwardFnArg, BACKWARD_PAD
 from .mnemonics import AddTensor
 from .common_utils import panic
 from .intarray import IntArray
@@ -36,6 +36,16 @@ from std.sys import has_accelerator
 from tenmo.kernels.pad_kernel import PadConstantGpuKernel
 
 comptime Padding = Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]]
+
+
+@fieldwise_init
+struct PadArg(ArgumentType):
+    var pad: List[Tuple[Int, Int]]
+    var mode: String
+
+    def __init__(out self, *, copy: Self):
+        self.pad = copy.pad.copy()
+        self.mode = copy.mode.copy()
 
 
 @fieldwise_init

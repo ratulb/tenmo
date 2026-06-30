@@ -3,11 +3,18 @@ from .tensor import Tensor
 from .shapes import Shape
 from .common_utils import panic
 from .mnemonics import AddTensor
-from .backpropagation import BlasArg, BackwardFnArg, BLAS_BACKWARD_MATMUL_2D
+from .backpropagation import ArgumentType, BackwardFnArg, BLAS_BACKWARD_MATMUL_2D
 from std.sys.defines import get_defined_string
 from .gradbox import Gradbox
 from std.memory import ArcPointer
 from .ancestry import Ancestor
+
+
+@fieldwise_init
+struct BlasArg[dtype: DType](ArgumentType):
+    var transpose_A: Bool
+    var transpose_B: Bool
+    var blas: BLASHandleLite[Self.dtype]
 
 
 @fieldwise_init
