@@ -1632,35 +1632,7 @@ struct Tensor[dtype: DType](
         nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
-    @staticmethod
-    def from_list_xxx(
-        values: List[Int], requires_grad: Bool = False
-    ) -> Tensor[Self.dtype]:
-        """Create a 1D tensor from a list of ``Int`` values.
-
-        Args:
-            values: List of integer values.
-            requires_grad: Whether to track gradients.
-
-        Returns:
-            A 1D tensor with ``len(values)`` elements.
-        """
-        Validator.validate_dtype_consistency(
-            Self.dtype, requires_grad, "from_list"
-        )
-        if len(values) == 0:
-            return Tensor[Self.dtype].scalar(
-                min_finite[Self.dtype](), requires_grad=requires_grad
-            )
-        numels = len(values)
-        shape = Shape(IntArray(numels))
-        buffer = Buffer[Self.dtype](numels)
-        var data = buffer.data.unsafe_value()
-        for i in range(numels):
-            data[i] = Scalar[Self.dtype](values[i])
-        nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
-        return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
-
+    
     @staticmethod
     def from_list[
         mut: Bool, //, origin: Origin[mut=mut], src_dtype: DType
