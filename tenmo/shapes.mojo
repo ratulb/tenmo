@@ -338,7 +338,6 @@ struct Shape(
         Example:
             Shape(2, 3) + Shape(4, 5) -> Shape(2, 3, 4, 5)
         """
-        # Use extend for bulk copy instead of loop
         dims = self.dims + other.dims
         return Shape(dims^)
 
@@ -518,14 +517,12 @@ struct Shape(
         """
         var rank = self.rank()
 
-        # Reduce all axes
         if len(normalized_axes) == 0:
             if keepdims:
                 return Shape(IntArray.filled(rank, 1))
             else:
                 return Shape()
 
-        # Validate if needed
         if not validated:
             for i in range(len(normalized_axes)):
                 var axis = normalized_axes[i]
@@ -534,11 +531,9 @@ struct Shape(
                 if i > 0 and axis <= normalized_axes[i - 1]:
                     panic("Shape: reduction axes must be sorted and unique")
 
-        # Full reduction without keepdims
         if len(normalized_axes) == rank and not keepdims:
             return Shape()
 
-        # Build output shape
         var expected_size = rank if keepdims else rank - len(normalized_axes)
         var result = IntArray.with_capacity(expected_size)
         result.reserve(expected_size)  # Guarantee no realloc

@@ -580,7 +580,9 @@ struct BinaryInplaceOperations[dtype: DType](
         # axes and its physical buffer is smaller than output_size.
         var needs_broadcasting = B_shape != broadcast_shape
 
-        var (num_blocks, threads_per_block) = Self.launch_config(output_size, simdwidth)
+        var (num_blocks, threads_per_block) = Self.launch_config(
+            output_size, simdwidth
+        )
 
         ref A_device_state = A.device_state.value()
         ref B_device_state = B.device_state.value()
@@ -602,9 +604,6 @@ struct BinaryInplaceOperations[dtype: DType](
         # ================================================================
         if A_is_contiguous and B_is_contiguous and not needs_broadcasting:
             var compiled_func = device_context.compile_function[
-                arithmetic_ops_both_contiguous[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
                 arithmetic_ops_both_contiguous[
                     op_code, Self.dtype, simdwidth, 2 * simdwidth
                 ],
@@ -669,9 +668,6 @@ struct BinaryInplaceOperations[dtype: DType](
                     arithmetic_ops_A_contiguous_lastdim_contiguous_B[
                         op_code, Self.dtype, simdwidth, 2 * simdwidth
                     ],
-                    arithmetic_ops_A_contiguous_lastdim_contiguous_B[
-                        op_code, Self.dtype, simdwidth, 2 * simdwidth
-                    ],
                 ]()
                 device_context.enqueue_function(
                     compiled_func,
@@ -684,9 +680,6 @@ struct BinaryInplaceOperations[dtype: DType](
                 )
             else:
                 var compiled_func = device_context.compile_function[
-                    arithmetic_ops_A_contiguous[
-                        op_code, Self.dtype, simdwidth, 2 * simdwidth
-                    ],
                     arithmetic_ops_A_contiguous[
                         op_code, Self.dtype, simdwidth, 2 * simdwidth
                     ],
@@ -727,9 +720,6 @@ struct BinaryInplaceOperations[dtype: DType](
                 arithmetic_ops_B_contiguous[
                     op_code, Self.dtype, simdwidth, 2 * simdwidth
                 ],
-                arithmetic_ops_B_contiguous[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
             ]()
             device_context.enqueue_function(
                 compiled_func,
@@ -760,9 +750,6 @@ struct BinaryInplaceOperations[dtype: DType](
         # Result is always written at a_idx (A's physical address).
         # ================================================================
         var compiled_func = device_context.compile_function[
-            arithmetic_ops_both_strided[
-                op_code, Self.dtype, simdwidth, 2 * simdwidth
-            ],
             arithmetic_ops_both_strided[
                 op_code, Self.dtype, simdwidth, 2 * simdwidth
             ],

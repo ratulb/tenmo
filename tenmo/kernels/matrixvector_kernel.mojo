@@ -88,9 +88,7 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
         M: NDBuffer[Self.dtype],
         v: NDBuffer[Self.dtype],
         sync: Bool = False,
-    ) raises -> NDBuffer[
-        Self.dtype
-    ]:
+    ) raises -> NDBuffer[Self.dtype]:
         var M_shape = M.shape
         var v_shape = v.shape
 
@@ -141,7 +139,6 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
 
         var compiled_func = device_context.compile_function[
             matrix_vector_nd[Self.dtype, block_size],
-            matrix_vector_nd[Self.dtype, block_size],
         ]()
 
         device_context.enqueue_function(
@@ -162,7 +159,8 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
             block_dim=block_size,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
         var out = NDBuffer[Self.dtype].with_device_state(

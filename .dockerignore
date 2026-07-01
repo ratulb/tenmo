@@ -1,0 +1,40 @@
+# Build context — only tenmo/, examples/, and pixi.toml are needed
+
+# Big dirs
+.pixi/
+.git/
+__pycache__/
+logs/
+docs/
+tests/
+scripts/
+nanogpt/
+.github/
+.idea/
+.vscode/
+
+# Useless files in root
+*.log
+*.md
+*.py
+*.pub
+*.lock
+.gitignore
+.gitattributes
+.agignore
+
+# Scratch / generated
+working/
+dbg_trrev.mojo
+debug.mojo
+profile_gpu.mojo
+execute.sh
+fire.sh
+example.sh
+install.sh
+setup.sh
+run_gpu_stripped.sh
+run_gpu_test_files.sh
+train.py
+mnist_pytorch.py
+Dockerfile

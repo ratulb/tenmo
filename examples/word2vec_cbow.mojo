@@ -88,10 +88,10 @@ struct Tokenizer(Sized & ImplicitlyCopyable & Movable):
         self.id_to_word = copy.id_to_word.copy()
         self.word_to_id = copy.word_to_id.copy()
 
-    def __init__(out self, *, deinit take: Self):
+    def __init__(out self, *, deinit move: Self):
         """Move constructor."""
-        self.id_to_word = take.id_to_word^
-        self.word_to_id = take.word_to_id^
+        self.id_to_word = move.id_to_word^
+        self.word_to_id = move.word_to_id^
 
     @staticmethod
     def clean_text(
@@ -501,7 +501,9 @@ struct Word2Vec[dtype: DType]:
     ):
         self.input_embeddings = Tensor[Self.dtype].rand(
             Shape(vocab_size, embedding_dim),
-            min=-0.1, max=0.1, init_seed=init_seed,
+            min=-0.1,
+            max=0.1,
+            init_seed=init_seed,
         )
         self.output_embeddings = Tensor[Self.dtype].zeros(
             Shape(vocab_size, embedding_dim),
@@ -561,7 +563,9 @@ struct Word2Vec[dtype: DType]:
         )
 
         # Output embeddings — outer product, each target row gets its own
-        var out_update = -gradient.unsqueeze(1) * self.cached_avg.unsqueeze(0) * lr
+        var out_update = (
+            -gradient.unsqueeze(1) * self.cached_avg.unsqueeze(0) * lr
+        )
         Filler[Self.dtype].scatter_add(
             self.output_embeddings.buffer,
             out_update.buffer,
@@ -627,7 +631,9 @@ def main() raises:
     print("  Vocabulary Size:      ", vocabulary_size)
     print("  Reviews Used:         ", num_reviews, "of", len(tokenized_reviews))
 
-    var initial_weight_sum = model.input_embeddings.sum[track_grad=False]().item()
+    var initial_weight_sum = model.input_embeddings.sum[
+        track_grad=False
+    ]().item()
 
     for iteration in range(TRAINING_ITERATIONS):
         shuffle(tokenized_reviews)
@@ -664,13 +670,17 @@ def main() raises:
             if (review_idx + 1) % 25 == 0:
                 var pct = Float32(review_idx + 1) / Float32(num_reviews) * 100.0
                 python_sys.stdout.write(
-                    "\rIteration:" + String(iteration)
-                    + "  Progress: " + String(Int(pct)) + "%"
+                    "\rIteration:"
+                    + String(iteration)
+                    + "  Progress: "
+                    + String(Int(pct))
+                    + "%"
                 )
 
         var final_sum = model.input_embeddings.sum[track_grad=False]().item()
         print(
-            "\n  ✓ Weight sum change:", final_sum - initial_weight_sum,
+            "\n  ✓ Weight sum change:",
+            final_sum - initial_weight_sum,
             "(should be != 0 — proves gradients are flowing!)",
         )
 
@@ -680,7 +690,9 @@ def main() raises:
             for item in find_similar_words(tokenizer, cpu_emb, "terrible"):
                 print("  ", item[0], "→ similarity:", item[1])
         else:
-            for item in find_similar_words(tokenizer, model.input_embeddings, "terrible"):
+            for item in find_similar_words(
+                tokenizer, model.input_embeddings, "terrible"
+            ):
                 print("  ", item[0], "→ similarity:", item[1])
 
 

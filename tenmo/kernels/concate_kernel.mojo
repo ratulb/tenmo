@@ -61,8 +61,8 @@ def concate_copy_kernel[
         stride_axis: Stride of the concat axis (= product of later dims).
         offset: Cumulative concat axis offset for this parent.
     """
-    var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
-    var gstride = Int(block_dim.x * grid_dim.x)
+    var gtid = thread_idx.x + block_dim.x * block_idx.x
+    var gstride = block_dim.x * grid_dim.x
     var before_divisor = input_axis_size * stride_axis
 
     var flat = gtid
@@ -71,9 +71,11 @@ def concate_copy_kernel[
         var coord = (flat // stride_axis) % input_axis_size
         var after = flat % stride_axis
 
-        var mapped = before * output_axis_size * stride_axis
-                   + (coord + offset) * stride_axis
-                   + after
+        var mapped = (
+            before * output_axis_size * stride_axis
+            + (coord + offset) * stride_axis
+            + after
+        )
 
         comptime if forward:
             dst[mapped] = src[flat]
@@ -84,9 +86,7 @@ def concate_copy_kernel[
 
 
 @fieldwise_init
-struct ConcateGpuKernel[dtype: DType](
-    ImplicitlyCopyable & Movable
-):
+struct ConcateGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
     """
     GPU concatenation kernel launcher.
 
@@ -136,7 +136,6 @@ struct ConcateGpuKernel[dtype: DType](
 
         var compiled = device_context.compile_function[
             concate_copy_kernel[Self.dtype, forward],
-            concate_copy_kernel[Self.dtype, forward],
         ]()
 
         device_context.enqueue_function(
@@ -169,8 +168,12 @@ struct ConcateGpuKernel[dtype: DType](
         dst[mapped(flat)] = src[flat]  for all flat in [0, src.numels())
         """
         ConcateGpuKernel[Self.dtype]._launch[True](
-            src, dst,
-            input_axis_size, output_axis_size, stride_axis, offset,
+            src,
+            dst,
+            input_axis_size,
+            output_axis_size,
+            stride_axis,
+            offset,
         )
 
     @staticmethod
@@ -187,6 +190,10 @@ struct ConcateGpuKernel[dtype: DType](
         grad_input[flat] = grad_output[mapped(flat)] for all flat.
         """
         ConcateGpuKernel[Self.dtype]._launch[False](
-            grad_output, grad_input,
-            parent_axis_size, output_axis_size, stride_axis, offset,
+            grad_output,
+            grad_input,
+            parent_axis_size,
+            output_axis_size,
+            stride_axis,
+            offset,
         )

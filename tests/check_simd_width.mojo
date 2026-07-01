@@ -16,6 +16,7 @@ from std.gpu import thread_idx, block_idx, block_dim
 
 # ── Host-side print of compile-time SIMD widths ─────────────────────────
 
+
 def print_cpu_simd_widths():
     print("── CPU / Host Compile-Time SIMD Widths ──")
     print("has_accelerator():   ", has_accelerator())
@@ -36,23 +37,49 @@ def print_cpu_simd_widths():
     print("── Derived values ──")
 
     comptime sw_f32 = simd_width_of[DType.float32]()
-    print("float32: simd_width=", sw_f32, ", CHUNK_SIZE(2*sw²)=", 2 * sw_f32 * sw_f32)
+    print(
+        "float32: simd_width=",
+        sw_f32,
+        ", CHUNK_SIZE(2*sw²)=",
+        2 * sw_f32 * sw_f32,
+    )
 
     comptime sw_f64 = simd_width_of[DType.float64]()
-    print("float64: simd_width=", sw_f64, ", CHUNK_SIZE(2*sw²)=", 2 * sw_f64 * sw_f64)
+    print(
+        "float64: simd_width=",
+        sw_f64,
+        ", CHUNK_SIZE(2*sw²)=",
+        2 * sw_f64 * sw_f64,
+    )
 
     comptime sw_f16 = simd_width_of[DType.float16]()
-    print("float16: simd_width=", sw_f16, ", CHUNK_SIZE(2*sw²)=", 2 * sw_f16 * sw_f16)
+    print(
+        "float16: simd_width=",
+        sw_f16,
+        ", CHUNK_SIZE(2*sw²)=",
+        2 * sw_f16 * sw_f16,
+    )
 
     comptime sw_bf16 = simd_width_of[DType.bfloat16]()
-    print("bfloat16: simd_width=", sw_bf16, ", CHUNK_SIZE(2*sw²)=", 2 * sw_bf16 * sw_bf16)
+    print(
+        "bfloat16: simd_width=",
+        sw_bf16,
+        ", CHUNK_SIZE(2*sw²)=",
+        2 * sw_bf16 * sw_bf16,
+    )
 
     comptime sw_i32 = simd_width_of[DType.int32]()
-    print("int32: simd_width=", sw_i32, ", CHUNK_SIZE(2*sw²)=", 2 * sw_i32 * sw_i32)
+    print(
+        "int32: simd_width=",
+        sw_i32,
+        ", CHUNK_SIZE(2*sw²)=",
+        2 * sw_i32 * sw_i32,
+    )
 
 
 # ── GPU kernel to print SIMD widths from inside the kernel ──────────────
 # This compiles only when has_accelerator() is true.
+
 
 def check_simd_width_kernel():
     if thread_idx.x == 0 and block_idx.x == 0:
@@ -69,10 +96,10 @@ def check_simd_width_kernel():
 def launch_gpu_check() raises:
     comptime if has_accelerator():
         from std.gpu.host import DeviceContext
+
         print("── GPU Kernel Check ──")
         var device_context = DeviceContext()
         var compiled = device_context.compile_function[
-            check_simd_width_kernel,
             check_simd_width_kernel,
         ]()
         device_context.enqueue_function(

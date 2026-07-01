@@ -75,12 +75,12 @@ struct Gradbox[dtype: DType](
         self._ndb_ptr = ndb_ptr
         self._refcount = ref_ptr
 
-    def __init__(out self, *, deinit take: Self):
+    def __init__(out self, *, deinit move: Self):
         """Move constructor — transfer ownership without copying."""
-        self._ndb_ptr = take._ndb_ptr
-        self._refcount = take._refcount
-        _ = take._ndb_ptr = {}
-        _ = take._refcount = {}
+        self._ndb_ptr = move._ndb_ptr
+        self._refcount = move._refcount
+        _ = move._ndb_ptr = {}
+        _ = move._refcount = {}
 
     def __init__(out self, *, copy: Self):
         """Copy constructor — bump refcount."""
@@ -854,9 +854,7 @@ struct Gradbox[dtype: DType](
             )
         return self.buffer().compare[NotEqual](other.buffer()).buffer.all_true()
 
-    def to_dtype[
-        NewType: DType
-    ](self) -> Gradbox[NewType]:
+    def to_dtype[NewType: DType](self) -> Gradbox[NewType]:
         """Convert Gradbox to a different data type.
 
         Returns:

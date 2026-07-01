@@ -6,7 +6,6 @@ from std.sys.defines import get_defined_string
 from std.logger import Level, Logger
 from .net import Sequential, Linear, ReLU
 from std.time import perf_counter_ns, monotonic
-from std.math import cos, sin, pi
 from std.os import abort
 from std.utils import Variant
 from std.utils.numerics import min_finite
@@ -269,24 +268,7 @@ def inf[dtype: DType]() -> Scalar[dtype]:
         dtype.is_floating_point()
     ), "Only floating point dtypes support +inf."
 
-    comptime if dtype == DType.bfloat16:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<bf16>`,
-        )
-    elif dtype == DType.float16:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f16>`,
-        )
-    elif dtype == DType.float32:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f32>`,
-        )
-    elif dtype == DType.float64:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f64>`,
-        )
-    else:
-        comptime assert False, "unsupported float type"
+    return Scalar[dtype](1.0) / Scalar[dtype](0.0)
 
 
 @always_inline("nodebug")
@@ -316,16 +298,7 @@ def nan[dtype: DType]() -> Scalar[dtype]:
         dtype.is_floating_point()
     ), "Only floating point dtypes support NaN."
 
-    comptime if dtype == DType.float32:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f32>`,
-        )
-    elif dtype == DType.float64:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f64>`,
-        )
-    else:
-        comptime assert False, "unsupported float type"
+    return Scalar[dtype](0.0) / Scalar[dtype](0.0)
 
 
 # Helper
@@ -423,7 +396,8 @@ def str_repeat(s: String, n: Int) -> String:
 
 
 def print_summary[
-    dtype: DType, //,
+    dtype: DType,
+    //,
 ](
     mod: Sequential[dtype], sample_input: Optional[Tensor[dtype]] = None
 ) where dtype.is_floating_point():
@@ -538,7 +512,8 @@ def print_summary[
 
 
 def print_buffer[
-    dtype: DType, //,
+    dtype: DType,
+    //,
 ](
     read buffer: NDBuffer[dtype],
     mut indices: List[Int],

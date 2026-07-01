@@ -156,7 +156,6 @@ def _launch_gather_generic[
     var (blocks, tpb) = elementwise_launch_config(total_output, simdwidth)
     var compiled = ctx.compile_function[
         gather_gpu_kernel[dtype, rank, index_dtype],
-        gather_gpu_kernel[dtype, rank, index_dtype],
     ]()
     ctx.enqueue_function(
         compiled,
@@ -218,7 +217,6 @@ struct GatherGpu[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             if reduction.is_mean():
                 var compiled = ctx.compile_function[
                     embedding_bag_kernel[datatype, True, Self.index_dtype],
-                    embedding_bag_kernel[datatype, True, Self.index_dtype],
                 ]()
                 ctx.enqueue_function(
                     compiled,
@@ -234,7 +232,6 @@ struct GatherGpu[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
                 )
             else:
                 var compiled = ctx.compile_function[
-                    embedding_bag_kernel[datatype, False, Self.index_dtype],
                     embedding_bag_kernel[datatype, False, Self.index_dtype],
                 ]()
                 ctx.enqueue_function(
@@ -272,7 +269,6 @@ struct GatherGpu[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             var in_cols = tensor.shape[1]
             var block_cols = _gather_2d_block_cols(in_cols)
             var compiled = ctx.compile_function[
-                gather_rows_2d_kernel[datatype, Self.index_dtype],
                 gather_rows_2d_kernel[datatype, Self.index_dtype],
             ]()
             ctx.enqueue_function(

@@ -112,7 +112,7 @@ def gen():
 
     dims = [
         ("1d", "arange(1, 9)",         "1D, size=8"),
-        ("2d", "arange(1, 25).reshape(Shape(5, 5))", "2D (5,5)"),
+        ("2d", "arange(1, 26).reshape(Shape(5, 5))", "2D (5,5)"),
         ("3d", "arange(1, 61).reshape(Shape(3, 4, 5))", "3D (3,4,5)"),
         ("4d", "arange(1, 121).reshape(Shape(3, 2, 4, 5))", "4D (3,2,4,5)"),
     ]
@@ -286,7 +286,7 @@ def gen():
     # Identity
     for op, scalar_val in [("Add", "Scalar[dtype](0)"), ("Multiply", "Scalar[dtype](1.0)")]:
         name = f"test_oop_identity_{op.lower()}_gpu_scalar"
-        all_lines += make_oop_test(name, op, "arange(1, 25).reshape(Shape(5, 5))",
+        all_lines += make_oop_test(name, op, "arange(1, 26).reshape(Shape(5, 5))",
                                    scalar_val, size_comment="identity op")
 
     # Negative
@@ -332,7 +332,7 @@ def gen():
 
     for op, scalar_val in [("Add", "Scalar[dtype](0)"), ("Multiply", "Scalar[dtype](1.0)")]:
         name = f"test_ip_identity_{op.lower()}_gpu_scalar"
-        all_lines += make_ip_test(name, op, "arange(1, 25).reshape(Shape(5, 5))",
+        all_lines += make_ip_test(name, op, "arange(1, 26).reshape(Shape(5, 5))",
                                   scalar_val, size_comment="identity op")
 
     for op in ["Add", "Multiply", "MAX", "MIN"]:

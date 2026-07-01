@@ -709,7 +709,9 @@ struct BinaryOperations[dtype: DType = DType.float32](
         var output_size = broadcast_shape.product()
         var rank = broadcast_shape.rank()
 
-        var (num_blocks, threads_per_block) = Self.launch_config(output_size, simdwidth)
+        var (num_blocks, threads_per_block) = Self.launch_config(
+            output_size, simdwidth
+        )
 
         ref A_device_state = A.device_state.value()
         ref B_device_state = B.device_state.value()
@@ -733,9 +735,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
         # ================================================================
         if A_shape == B_shape and A_is_contiguous and B_is_contiguous:
             var compiled_func = device_context.compile_function[
-                arithmetic_ops_both_contiguous[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
                 arithmetic_ops_both_contiguous[
                     op_code, Self.dtype, simdwidth, 2 * simdwidth
                 ],
@@ -790,9 +789,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
                     arithmetic_ops_A_contiguous_lastdim_contiguous_B[
                         op_code, Self.dtype, simdwidth, 2 * simdwidth
                     ],
-                    arithmetic_ops_A_contiguous_lastdim_contiguous_B[
-                        op_code, Self.dtype, simdwidth, 2 * simdwidth
-                    ],
                 ]()
                 device_context.enqueue_function(
                     compiled_func,
@@ -807,9 +803,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
                 )
             else:
                 var compiled_func = device_context.compile_function[
-                    arithmetic_ops_A_contiguous[
-                        op_code, Self.dtype, simdwidth, 2 * simdwidth
-                    ],
                     arithmetic_ops_A_contiguous[
                         op_code, Self.dtype, simdwidth, 2 * simdwidth
                     ],
@@ -842,9 +835,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
                 arithmetic_ops_B_contiguous[
                     op_code, Self.dtype, simdwidth, 2 * simdwidth
                 ],
-                arithmetic_ops_B_contiguous[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
             ]()
             device_context.enqueue_function(
                 compiled_func,
@@ -874,9 +864,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
                 arithmetic_ops_both_contiguous_broadcast[
                     op_code, Self.dtype, simdwidth, 2 * simdwidth
                 ],
-                arithmetic_ops_both_contiguous_broadcast[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
             ]()
             device_context.enqueue_function(
                 compiled_func,
@@ -903,9 +890,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
         # PATH 5: General fallback — both strided or complex broadcast.
         # ================================================================
         var compiled_func = device_context.compile_function[
-            arithmetic_ops_both_strided[
-                op_code, Self.dtype, simdwidth, 2 * simdwidth
-            ],
             arithmetic_ops_both_strided[
                 op_code, Self.dtype, simdwidth, 2 * simdwidth
             ],

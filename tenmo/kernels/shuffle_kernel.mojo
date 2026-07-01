@@ -111,7 +111,6 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         var compiled = device_context.compile_function[
             shuffle_gather[Self.dtype],
-            shuffle_gather[Self.dtype],
         ]()
 
         device_context.enqueue_function(
@@ -127,7 +126,8 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(result_state^, shape)
@@ -163,7 +163,6 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         var compiled = device_context.compile_function[
             shuffle_scatter[Self.dtype],
-            shuffle_scatter[Self.dtype],
         ]()
 
         device_context.enqueue_function(
@@ -179,7 +178,8 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(result_state^, shape)

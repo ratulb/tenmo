@@ -156,12 +156,12 @@ struct Tensor[dtype: DType](
         """
         return self.buffer.tolist()
 
-    def __init__(out self, *, deinit take: Self):
-        self._id = take._id
-        self.buffer = take.buffer^
-        self.requires_grad = take.requires_grad
-        self.gradbox = take.gradbox
-        self.ancestors = take.ancestors^
+    def __init__(out self, *, deinit move: Self):
+        self._id = move._id
+        self.buffer = move.buffer^
+        self.requires_grad = move.requires_grad
+        self.gradbox = move.gradbox
+        self.ancestors = move.ancestors^
 
     def __init__(out self, *, copy: Self):
         self._id = copy._id
@@ -357,7 +357,6 @@ struct Tensor[dtype: DType](
             ),
             requires_grad=False,
         )
-        # No add_ancestry call — graph connection severed
         return out^
 
     @always_inline
@@ -1629,35 +1628,6 @@ struct Tensor[dtype: DType](
         shape = Shape(IntArray(numels))
         buffer = Buffer[Self.dtype](numels)
         memcpy(dest=buffer.data, src=row.unsafe_ptr(), count=numels)
-        nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
-        return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
-
-    @staticmethod
-    def from_list_xxx(
-        values: List[Int], requires_grad: Bool = False
-    ) -> Tensor[Self.dtype]:
-        """Create a 1D tensor from a list of ``Int`` values.
-
-        Args:
-            values: List of integer values.
-            requires_grad: Whether to track gradients.
-
-        Returns:
-            A 1D tensor with ``len(values)`` elements.
-        """
-        Validator.validate_dtype_consistency(
-            Self.dtype, requires_grad, "from_list"
-        )
-        if len(values) == 0:
-            return Tensor[Self.dtype].scalar(
-                min_finite[Self.dtype](), requires_grad=requires_grad
-            )
-        numels = len(values)
-        shape = Shape(IntArray(numels))
-        buffer = Buffer[Self.dtype](numels)
-        var data = buffer.data.unsafe_value()
-        for i in range(numels):
-            data[i] = Scalar[Self.dtype](values[i])
         nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 

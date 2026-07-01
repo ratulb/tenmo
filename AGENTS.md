@@ -629,7 +629,7 @@ Direct gradient update on Tensor (used by some paths):
 ## Pixi / Environment
 
 - Platform: **linux-64 only**
-- Mojo pinned to `==1.0.0b1` from `conda.modular.com/max-nightly`
+- Mojo pinned to `==1.0.0b2` from `conda.modular.com/max-nightly`
 - Python 3.10–3.14
 - PyPI deps: `mnist-datasets`, `pure-cifar-10`, `tiktoken`
 - Dev feature includes `mojodoc` and a local `bpe` at `../bpe`
@@ -838,20 +838,31 @@ To run specific test functions within a file, the `TestSuite` discovers all `fn 
 - `mojo run <file.mojo> --skip test_slow test_flaky` — skip specified tests
 - See `TestSuite` documentation for full CLI filtering capabilities.
 
-## Mojo 1.0.0b1 Migration Notes
+## Mojo 1.0.0b1 → 1.0.0b2 Migration Notes
+
+### Breaking Changes (compile errors)
+
+- **`fn` is now an error** — Use `def` instead of `fn` for all function/struct method declarations and function pointer types (`fn(...) thin` → `def(...) thin`).
+- **`Movable.__init__` argument renamed `take` → `move`** — All `def __init__(out self, *, deinit take: Self)` must become `def __init__(out self, *, deinit move: Self)`. Internal `take.xxx` references must become `move.xxx`.
+
+### Deprecation Warnings (still compiles, fix when modifying nearby code)
+
+- **`compile_function[func, func]()` → `compile_function[func]()`** — Single-arg form replaces the old double-arg pattern. 86 call sites in 31 kernel files.
+- **`as_any_origin()` → `as_unsafe_any_origin()`** — 17 calls in `net.mojo`, `layernorm.mojo`, `embedding.mojo`.
+- **`unsafe_origin_cast[MutAnyOrigin]()` → `unsafe_origin_cast[MutUnsafeAnyOrigin]()`** — 36 calls across 8 files.
+- **`MutAnyOrigin`/`ImmutAnyOrigin` → `MutUnsafeAnyOrigin`/`ImmutUnsafeAnyOrigin`** — Hundreds of call sites. Slated for future deprecation; compiles silently in b2.
+- **`ExternalOrigin`/`MutExternalOrigin`/`ImmutExternalOrigin` → `UntrackedOrigin`/`MutUntrackedOrigin`/`ImmutUntrackedOrigin`** — Already migrated (0 hits in codebase).
+
+### Persistent b1 Notes (still relevant)
 
 - **No `address_of`** — Use `UnsafePointer(to=...)` or `Pointer(to=...)` instead.
-- **`alloc[T](count)` returns `UnsafePointer[T, MutAnyOrigin]`** — All `MutExternalOrigin` on `alloc`-assigned pointers should be `MutAnyOrigin`.
-- **`Optional[UnsafePointer[...]]` pattern** — Field must be `Optional[UnsafePointer[T, MutAnyOrigin]]` (not `MutExternalOrigin`) to match `alloc` return type.
-- **`.unsafe_value()` not `.value()`** — `.value()` requires `ref` receiver; `.unsafe_value()` works on value receivers and is the consistent accessor for `Optional[UnsafePointer[...]]`.
-- **`def(...) thin` function pointers** — Replace `ScalarPredicate` trait and broken `fn(...)` types. Works with parameterized types like `def(Scalar[Self.dtype]) thin -> Bool`. Named functions only (no lambdas).
-- **Atomic API change** — `from std.os.atomic` → `from std.atomic`. `Atomic[UInt64]` → `Atomic[DType.uint64]` (takes `DType` now). `Consistency.MONOTONIC` → `Ordering.RELAXED`, `.RELEASE` → `.RELEASE`, `.ACQUIRE` → `.ACQUIRE`.
-- **Standard origin: `MutAnyOrigin`** — All `UnsafePointer` fields should use `MutAnyOrigin`. External pointers (numpy via `ndarray_ptr` → `MutAnyOrigin`, `alloc` → `MutAnyOrigin`) both flow through this origin. `MutExternalOrigin` is never constructed directly.
-- **Numpy interop** — `ndarray_ptr` at `numpy_interop.mojo:45` returns `UnsafePointer[Scalar[dtype], MutAnyOrigin]`. The `from_ndarray` non-copy path passes it to `Tensor.__init__` which forwards to `Buffer.__init__` — all typed `MutAnyOrigin`.
-- **`UnsafePointer(...)()` null constructor removed** — Use `Optional[UnsafePointer[...]]` with `{}` (None) or `self.field = {}` for absent pointers. Never construct a null `UnsafePointer` directly.
-- **`fn` is deprecated** — Use `def` instead of `fn` for all function/struct method declarations.
-- **`alias` is deprecated** — Use `comptime` instead of `alias` for compile-time constants (e.g. `comptime dtype = DType.float32`).
-- **`@parameter` decorator is deprecated** — Use `comptime if` instead of `@parameter if` for compile-time conditional blocks. The `@parameter` decorator (which forced a `for` loop body to be unrolled at compile time) is no longer needed — write `comptime for` directly. In branches: `@parameter if cond:` → `comptime if cond:`.
+- **`alloc[T](count)` returns `UnsafePointer[T, MutAnyOrigin]`**
+- **`.unsafe_value()` not `.value()`** for `Optional[UnsafePointer[...]]`
+- **`def(...) thin` function pointers** — Replace broken `fn(...)` types. Named functions only (no lambdas).
+- **Atomic API** — `from std.atomic`, `Atomic[DType.uint64]`, `Ordering.RELAXED`/`RELEASE`/`ACQUIRE`.
+- **`UnsafePointer(...)()` null constructor removed** — Use `Optional[UnsafePointer[...]]` with `{}`.
+- **`alias` is deprecated** — Use `comptime` instead (already fully migrated).
+- **`@parameter` decorator is deprecated** — Use `comptime if` / `comptime for` directly (already fully migrated).
 
 ## Known Issues / Future Work
 

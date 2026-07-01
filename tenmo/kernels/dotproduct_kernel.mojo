@@ -22,7 +22,7 @@ def dot_product_32[
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     a: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     b: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    size: UInt,
+    size: Int,
 ):
     """
     Warp-optimized dot product kernel.
@@ -41,21 +41,21 @@ def dot_product_32[
         NUM_WARPS, Scalar[dtype], address_space=AddressSpace.SHARED
     ]()
 
-    var tid = Int(thread_idx.x)
-    var gtid = tid + Int(block_dim.x * block_idx.x)
+    var tid = thread_idx.x
+    var gtid = tid + block_dim.x * block_idx.x
 
     var accum = Scalar[dtype](0)
     var i = gtid
-    while i < Int(size):
+    while i < size:
         accum += a[i] * b[i]
-        i += Int(block_dim.x * grid_dim.x)
+        i += block_dim.x * grid_dim.x
 
     var lane = lane_id()
     var warp = warp_id()
 
-    var offset = UInt32(WARP_SIZE // 2)
+    var offset = WARP_SIZE // 2
     while offset > 0:
-        accum += shuffle_down(accum, offset)
+        accum += shuffle_down(accum, UInt32(offset))
         offset //= 2
 
     if lane == 0:
@@ -66,9 +66,9 @@ def dot_product_32[
     if warp == 0:
         accum = warp_sums[lane] if lane < NUM_WARPS else Scalar[dtype](0)
 
-        offset = UInt32(NUM_WARPS // 2)
+        offset = NUM_WARPS // 2
         while offset > 0:
-            accum += shuffle_down(accum, offset)
+            accum += shuffle_down(accum, UInt32(offset))
             offset //= 2
 
         if lane == 0:
@@ -82,21 +82,21 @@ def dot_product_64[
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     a: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     b: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    size: UInt,
+    size: Int,
 ):
     var block_shared_memory = stack_allocation[
         BLOCK_SIZE, Scalar[dtype], address_space=AddressSpace.SHARED
     ]()
-    var cache_index = Int(thread_idx.x)
-    var gtid = cache_index + Int(block_dim.x * block_idx.x)
+    var cache_index = thread_idx.x
+    var gtid = cache_index + block_dim.x * block_idx.x
     var accum: Scalar[dtype] = 0
-    for i in range(gtid, Int(size), Int(block_dim.x * grid_dim.x)):
+    for i in range(gtid, size, block_dim.x * grid_dim.x):
         accum += a[i] * b[i]
 
     block_shared_memory[cache_index] = accum
     barrier()
 
-    var stride = Int(block_dim.x // 2)
+    var stride = block_dim.x // 2
 
     while stride > 0:
         if cache_index < stride:
@@ -116,9 +116,9 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
         num_blocks: Int = 1,
         threads_per_block: Int = 512,
         suppress_validation: Bool = False,
-    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = False) raises -> Tensor[
-        Self.dtype
-    ]:
+    ](
+        A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = False
+    ) raises -> Tensor[Self.dtype]:
         comptime assert (
             threads_per_block <= 512
         ), "Threads per block should be <= 512"
@@ -161,7 +161,6 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
         comptime if use_32_kernel:
             var compiled_func = device_context.compile_function[
                 dot_product_32[Self.dtype, BLOCK_SIZE=threads_per_block],
-                dot_product_32[Self.dtype, BLOCK_SIZE=threads_per_block],
             ]()
 
             device_context.enqueue_function(
@@ -169,14 +168,13 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 result_buffer,
                 A_buffer,
                 B_buffer,
-                UInt(numels),
+                numels,
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
         else:
             var compiled_func = device_context.compile_function[
                 dot_product_64[Self.dtype, BLOCK_SIZE=threads_per_block],
-                dot_product_64[Self.dtype, BLOCK_SIZE=threads_per_block],
             ]()
 
             device_context.enqueue_function(
@@ -184,12 +182,13 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 result_buffer,
                 A_buffer,
                 B_buffer,
-                UInt(numels),
+                numels,
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
         var device_state = DeviceState[Self.dtype](
             result_buffer^, A_device_state.get_gpu()
         )

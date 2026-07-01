@@ -963,7 +963,10 @@ struct Reduction[dtype: DType = DType.float32](
         op_code: Int = SUM,
         max_block_width: Int = 512,
     ](
-        A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool, sync: Bool = False
+        A: NDBuffer[Self.dtype],
+        normalized_axes: IntArray,
+        keepdims: Bool,
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         """Launch sum or mean reduction.
 
@@ -1015,7 +1018,6 @@ struct Reduction[dtype: DType = DType.float32](
 
         var compiled_func = device_context.compile_function[
             reduce[Self.dtype, max_block_width, op_code],
-            reduce[Self.dtype, max_block_width, op_code],
         ]()
 
         device_context.enqueue_function(
@@ -1031,7 +1033,8 @@ struct Reduction[dtype: DType = DType.float32](
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(
             device_state^, output_shape
@@ -1044,7 +1047,10 @@ struct Reduction[dtype: DType = DType.float32](
         store_excl_product: Bool = True,
         max_block_width: Int = 512,
     ](
-        A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool, sync: Bool = False
+        A: NDBuffer[Self.dtype],
+        normalized_axes: IntArray,
+        keepdims: Bool,
+        sync: Bool = False,
     ) raises -> Tuple[NDBuffer[Self.dtype], ProductArg[Self.dtype]]:
         """Launch product reduction.
 
@@ -1112,7 +1118,6 @@ struct Reduction[dtype: DType = DType.float32](
         # ── Kernel 1: product_reduce ──────────────────────────────────────────
         var compiled_product = device_context.compile_function[
             product_reduce[Self.dtype, max_block_width],
-            product_reduce[Self.dtype, max_block_width],
         ]()
 
         device_context.enqueue_function(
@@ -1129,7 +1134,8 @@ struct Reduction[dtype: DType = DType.float32](
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         # Wrap output
         var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
@@ -1158,7 +1164,6 @@ struct Reduction[dtype: DType = DType.float32](
 
             var compiled_excl = device_context.compile_function[
                 excl_product_kernel[Self.dtype, max_block_width],
-                excl_product_kernel[Self.dtype, max_block_width],
             ]()
 
             device_context.enqueue_function(
@@ -1174,7 +1179,8 @@ struct Reduction[dtype: DType = DType.float32](
                 block_dim=excl_threads,
             )
 
-            if sync: device_context.synchronize()
+            if sync:
+                device_context.synchronize()
 
             var excl_state = DeviceState[Self.dtype](excl_buffer^, gpu)
             var excl_ndb = NDBuffer[Self.dtype].with_device_state(
@@ -1236,7 +1242,6 @@ struct Reduction[dtype: DType = DType.float32](
 
         var compiled = device_context.compile_function[
             excl_product_kernel[Self.dtype, 512],
-            excl_product_kernel[Self.dtype, 512],
         ]()
 
         device_context.enqueue_function(
@@ -1252,7 +1257,8 @@ struct Reduction[dtype: DType = DType.float32](
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var excl_state = DeviceState[Self.dtype](excl_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(excl_state^, shape_A)
@@ -1264,7 +1270,10 @@ struct Reduction[dtype: DType = DType.float32](
         max_block_width: Int = 512,
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](
-            A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool, sync: Bool = False,
+        A: NDBuffer[Self.dtype],
+        normalized_axes: IntArray,
+        keepdims: Bool,
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         var shape_A = A.shape
         var strides_A = A.strides
@@ -1303,10 +1312,6 @@ struct Reduction[dtype: DType = DType.float32](
                     max_block_size=max_block_width,
                     epsilon=epsilon.cast[DType.float32](),
                 ],
-                log_sum_exp_f32[
-                    max_block_size=max_block_width,
-                    epsilon=epsilon.cast[DType.float32](),
-                ],
             ]()
             device_context.enqueue_function(
                 compiled_func,
@@ -1322,10 +1327,6 @@ struct Reduction[dtype: DType = DType.float32](
             )
         elif Self.dtype == DType.float64:
             var compiled_func = device_context.compile_function[
-                log_sum_exp_f64[
-                    max_block_size=max_block_width,
-                    epsilon=epsilon.cast[DType.float64](),
-                ],
                 log_sum_exp_f64[
                     max_block_size=max_block_width,
                     epsilon=epsilon.cast[DType.float64](),
@@ -1348,7 +1349,8 @@ struct Reduction[dtype: DType = DType.float32](
                 "Reduction.launch_log_sum: only float32 and float64 supported"
             )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(
             device_state^, output_shape
@@ -1415,7 +1417,6 @@ struct Reduction[dtype: DType = DType.float32](
 
         var compiled_func = device_context.compile_function[
             welford_reduce[Self.dtype, max_block_width],
-            welford_reduce[Self.dtype, max_block_width],
         ]()
 
         device_context.enqueue_function(
@@ -1432,7 +1433,8 @@ struct Reduction[dtype: DType = DType.float32](
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var mean_state = DeviceState[Self.dtype](mean_buffer^, gpu)
         var M2_state = DeviceState[Self.dtype](M2_buffer^, gpu)

@@ -343,7 +343,6 @@ struct StdVarianceBackwardKernel[dtype: DType](
         comptime max_block = 512
         var compiled = device_context.compile_function[
             variance_backward_normalize[Self.dtype, max_block],
-            variance_backward_normalize[Self.dtype, max_block],
         ]()
 
         device_context.enqueue_function(
@@ -362,7 +361,8 @@ struct StdVarianceBackwardKernel[dtype: DType](
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var out_state = DeviceState[Self.dtype](out_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(out_state^, out_shape)
@@ -418,7 +418,6 @@ struct StdVarianceBackwardKernel[dtype: DType](
         comptime max_block = 512
         var compiled = device_context.compile_function[
             std_backward_normalize[Self.dtype, max_block],
-            std_backward_normalize[Self.dtype, max_block],
         ]()
 
         device_context.enqueue_function(
@@ -437,7 +436,8 @@ struct StdVarianceBackwardKernel[dtype: DType](
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var out_state = DeviceState[Self.dtype](out_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(out_state^, out_shape)

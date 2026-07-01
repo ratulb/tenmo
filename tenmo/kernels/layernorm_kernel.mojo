@@ -177,7 +177,6 @@ struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         comptime max_block = 512
         var compiled = device_context.compile_function[
             layernorm_normalize[Self.dtype, max_block],
-            layernorm_normalize[Self.dtype, max_block],
         ]()
 
         device_context.enqueue_function(
@@ -197,7 +196,8 @@ struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         # rstd shape is (*, 1) — same as mean/var from Welford
         var rstd_shape = out_shape[0:-1] + [1]

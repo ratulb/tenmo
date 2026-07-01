@@ -154,10 +154,14 @@ struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         treat_nan_equal: Bool = True,
         simd_width: Int = simd_width_of[Self.dtype](),
         simd_vectors_per_thread: Int = 2,
-    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = False) raises -> Bool:
+    ](
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = False
+    ) raises -> Bool:
         comptime simdwidth = simd_width_of[Self.dtype]()
 
-        var (num_blocks, threads_per_block) = Self.launch_config(A.numels(), simdwidth)
+        var (num_blocks, threads_per_block) = Self.launch_config(
+            A.numels(), simdwidth
+        )
 
         ref A_device_state = A.device_state.value()
         ref B_device_state = B.device_state.value()
@@ -178,14 +182,6 @@ struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 simdwidth,
                 2 * simdwidth,
             ],
-            all_close[
-                Self.dtype,
-                rtol,
-                atol,
-                treat_nan_equal,
-                simdwidth,
-                2 * simdwidth,
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -198,7 +194,8 @@ struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
         var all_close_result: Bool
         with result_buffer.map_to_host() as host_buffer:
             all_close_result = True if host_buffer[0] == 1 else False
@@ -300,14 +297,16 @@ struct Compare[dtype: DType = DType.float32](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = False) raises -> NDBuffer[
-        DType.bool
-    ]:
+    ](
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], sync: Bool = False
+    ) raises -> NDBuffer[DType.bool]:
         comptime simdwidth = simd_width_of[Self.datatype]()
         var output_shape = A.shape
         var output_size = output_shape.num_elements()
 
-        var (num_blocks, threads_per_block) = Self.launch_config(output_size, simdwidth)
+        var (num_blocks, threads_per_block) = Self.launch_config(
+            output_size, simdwidth
+        )
 
         ref A_device_state = A.device_state.value()
         ref B_device_state = B.device_state.value()
@@ -323,7 +322,6 @@ struct Compare[dtype: DType = DType.float32](
 
         var compiled_func = device_context.compile_function[
             compare[op_code, Self.datatype, simdwidth, 2 * simdwidth],
-            compare[op_code, Self.datatype, simdwidth, 2 * simdwidth],
         ]()
 
         device_context.enqueue_function(
@@ -338,7 +336,8 @@ struct Compare[dtype: DType = DType.float32](
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var device_state = DeviceState[DType.bool].__init__[True](
             result_buffer^, gpu
@@ -432,9 +431,9 @@ struct CompareScalar[dtype: DType = DType.float32](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = False) raises -> NDBuffer[
-        DType.bool
-    ]:
+    ](
+        A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = False
+    ) raises -> NDBuffer[DType.bool]:
         var numels = A.numels()
         comptime simdwidth = simd_width_of[Self.datatype]()
 
@@ -446,12 +445,6 @@ struct CompareScalar[dtype: DType = DType.float32](
         var device_context = gpu[]
 
         var compiled_func = device_context.compile_function[
-            compare_scalar[
-                op_code=op_code,
-                dtype=Self.datatype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
             compare_scalar[
                 op_code=op_code,
                 dtype=Self.datatype,
@@ -490,7 +483,8 @@ struct CompareScalar[dtype: DType = DType.float32](
                 block_dim=threads_per_block,
             )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var device_state = DeviceState[DType.bool].__init__[True](
             result_buffer^, gpu

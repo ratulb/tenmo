@@ -547,11 +547,6 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 simd_width=simdwidth,
                 simd_vectors_per_thread=2 * simdwidth,
             ],
-            bce_with_logits_forward_kernel[
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -566,7 +561,8 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var loss_state = DeviceState[Self.dtype](loss_buffer^, device_state.gpu)
         var sigmoid_state = DeviceState[Self.dtype](
@@ -625,11 +621,6 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 simd_width=simdwidth,
                 simd_vectors_per_thread=2 * simdwidth,
             ],
-            bce_with_logits_forward_reduce_kernel[
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -644,7 +635,8 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var scalar_state = DeviceState[Self.dtype](
             scalar_buffer^, device_state.gpu
@@ -708,11 +700,6 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 simd_width=simdwidth,
                 simd_vectors_per_thread=2 * simdwidth,
             ],
-            bce_forward_kernel[
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -727,7 +714,8 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var loss_state = DeviceState[Self.dtype](loss_buffer^, device_state.gpu)
         var safe_state = DeviceState[Self.dtype](safe_buffer^, device_state.gpu)
@@ -784,11 +772,6 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 simd_width=simdwidth,
                 simd_vectors_per_thread=2 * simdwidth,
             ],
-            bce_forward_reduce_kernel[
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -803,7 +786,8 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var scalar_state = DeviceState[Self.dtype](
             scalar_buffer^, device_state.gpu
@@ -861,11 +845,6 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 simd_width=simdwidth,
                 simd_vectors_per_thread=2 * simdwidth,
             ],
-            bce_with_logits_backward_kernel[
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -879,7 +858,8 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu
@@ -926,11 +906,6 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 simd_width=simdwidth,
                 simd_vectors_per_thread=2 * simdwidth,
             ],
-            bce_with_logits_backward_scaled_kernel[
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -944,7 +919,8 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu
@@ -992,11 +968,6 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 simd_width=simdwidth,
                 simd_vectors_per_thread=2 * simdwidth,
             ],
-            bce_backward_kernel[
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -1010,7 +981,8 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu
@@ -1057,11 +1029,6 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 simd_width=simdwidth,
                 simd_vectors_per_thread=2 * simdwidth,
             ],
-            bce_backward_scaled_kernel[
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -1075,7 +1042,8 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu

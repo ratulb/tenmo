@@ -194,7 +194,6 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                 var (blocks, tpb) = elementwise_launch_config(size, simdwidth)
                 var compiled = ctx.compile_function[
                     fill_scalar_kernel[Self.dtype],
-                    fill_scalar_kernel[Self.dtype],
                 ]()
                 ctx.enqueue_function(
                     compiled,
@@ -204,7 +203,8 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                     grid_dim=blocks,
                     block_dim=tpb,
                 )
-                if sync: ctx.synchronize()
+                if sync:
+                    ctx.synchronize()
             else:
                 var index_iterator = IndexIterator(
                     shape=Pointer(to=shape),
@@ -239,7 +239,6 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                 ref s_state = source.device_state.value()
                 var compiled = ctx.compile_function[
                     fill_from_buffer_kernel[Self.dtype],
-                    fill_from_buffer_kernel[Self.dtype],
                 ]()
                 ctx.enqueue_function(
                     compiled,
@@ -251,7 +250,8 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                     grid_dim=blocks,
                     block_dim=tpb,
                 )
-                if sync: ctx.synchronize()
+                if sync:
+                    ctx.synchronize()
             else:
                 if shape == source.shape:
                     var src_offset = source.offset
@@ -313,7 +313,6 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             if source.shape.rank() == 1:
                 var compiled = ctx.compile_function[
                     scatter_add_broadcast_kernel[Self.dtype],
-                    scatter_add_broadcast_kernel[Self.dtype],
                 ]()
                 ctx.enqueue_function(
                     compiled,
@@ -328,7 +327,6 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             else:
                 var compiled = ctx.compile_function[
                     scatter_add_rows_kernel[Self.dtype],
-                    scatter_add_rows_kernel[Self.dtype],
                 ]()
                 ctx.enqueue_function(
                     compiled,
@@ -341,7 +339,8 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                     block_dim=tpb,
                 )
 
-            if sync: ctx.synchronize()
+            if sync:
+                ctx.synchronize()
 
     @staticmethod
     def _scatter_add_nd_gpu(
@@ -390,7 +389,6 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
             var compiled = ctx.compile_function[
                 scatter_add_nd_kernel[Self.dtype],
-                scatter_add_nd_kernel[Self.dtype],
             ]()
             ctx.enqueue_function(
                 compiled,
@@ -411,4 +409,5 @@ struct FillerGpu[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                 block_dim=tpb,
             )
 
-            if sync: ctx.synchronize()
+            if sync:
+                ctx.synchronize()

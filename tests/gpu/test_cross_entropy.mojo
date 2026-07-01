@@ -25,28 +25,11 @@ def inf[dtype: DType]() -> Scalar[dtype]:
     Returns:
         The +inf value of the given dtype.
     """
-    comptime assert
-        dtype.is_floating_point(),
-        "Only floating point dtypes support +inf."
+    comptime assert (
+        dtype.is_floating_point()
+    ), "Only floating point dtypes support +inf."
 
-    comptime if dtype == DType.bfloat16:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<bf16>`,
-        )
-    elif dtype == DType.float16:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f16>`,
-        )
-    elif dtype == DType.float32:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f32>`,
-        )
-    elif dtype == DType.float64:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f64>`,
-        )
-    else:
-        comptime assert False, "unsupported float type"
+    return Scalar[dtype](1.0) / Scalar[dtype](0.0)
 
 
 def isinf[dtype: DType, //](value: Scalar[dtype]) -> Bool:
@@ -70,20 +53,11 @@ def nan[dtype: DType]() -> Scalar[dtype]:
     Returns:
         The NaN value of the given dtype.
     """
-    comptime assert
-        dtype.is_floating_point(),
-        "Only floating point dtypes support NaN."
+    comptime assert (
+        dtype.is_floating_point()
+    ), "Only floating point dtypes support NaN."
 
-    comptime if dtype == DType.float32:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f32>`,
-        )
-    elif dtype == DType.float64:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f64>`,
-        )
-    else:
-        comptime assert False, "unsupported float type"
+    return Scalar[dtype](0.0) / Scalar[dtype](0.0)
 
 
 # ============================================================================
@@ -215,7 +189,9 @@ def _ce_gradients_basic_uu() raises:
 # Negative validation tests (should not panic if validation is correct)
 def _ce_validation_wrong_target_dims() raises:
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
-    var target = Tensor[DEFAULT_INDEX_DTYPE].d2([[0, 1], [1, 0]])  # Wrong: should be 1D
+    var target = Tensor[DEFAULT_INDEX_DTYPE].d2(
+        [[0, 1], [1, 0]]
+    )  # Wrong: should be 1D
 
     # This should be caught by validation before any computation
     # (Test framework should handle the panic)
@@ -225,7 +201,9 @@ def _ce_validation_wrong_target_dims() raises:
 
 def _ce_validation_class_out_of_bounds() raises:
     var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()  # 2 classes
-    var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 2])  # Class 2 is out of bounds"""
+    var target = Tensor[DEFAULT_INDEX_DTYPE].d1(
+        [0, 2]
+    )  # Class 2 is out of bounds"""
 
     # Should be caught by validation
 
@@ -259,7 +237,9 @@ def _ce_validation_batch_size_mismatch() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-def softmax_1d(logits: Tensor[DType.float32], row: Int, C: Int) -> List[Float32]:
+def softmax_1d(
+    logits: Tensor[DType.float32], row: Int, C: Int
+) -> List[Float32]:
     """Compute softmax for a single row manually."""
     var max_val = logits[[row, 0]]
     for c in range(1, C):
@@ -277,7 +257,9 @@ def softmax_1d(logits: Tensor[DType.float32], row: Int, C: Int) -> List[Float32]
     return result^
 
 
-def log_softmax_val(logits: Tensor[DType.float32], row: Int, cls: Int, C: Int) -> Float32:
+def log_softmax_val(
+    logits: Tensor[DType.float32], row: Int, cls: Int, C: Int
+) -> Float32:
     """Compute log_softmax[row, cls] manually."""
     var probs = softmax_1d(logits, row, C)
     return log(probs[cls])
@@ -339,7 +321,9 @@ def allclose(a: Float32, b: Float32, atol: Float32 = 1e-4) -> Bool:
 def test_ce_gpu_ci_basic_mean() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]]).to_gpu()
+        var logits = (
+            Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]]).to_gpu()
+        )
         var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
         var target_gpu = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1]).to_gpu()
         var ce = CrossEntropyLoss[dtype](reduction="mean")
@@ -353,22 +337,28 @@ def test_ce_gpu_ci_basic_mean() raises:
 def test_ce_gpu_ci_basic_sum() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]]).to_gpu()
+        var logits = (
+            Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]]).to_gpu()
+        )
         var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1]).to_gpu()
         var target_cpu = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
         var ce = CrossEntropyLoss[dtype](reduction="sum")
         var loss = ce(logits, target)
         var logits_cpu = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]])
-        var loss_cpu = CrossEntropyLoss[dtype](reduction="sum")(logits_cpu, target_cpu)
+        var loss_cpu = CrossEntropyLoss[dtype](reduction="sum")(
+            logits_cpu, target_cpu
+        )
         assert_true(allclose(loss.item(), loss_cpu.item()))
 
 
 def test_ce_gpu_ci_ignore_index() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var logits = Tensor[dtype].d2(
-            [[2.0, 1.0, 0.5], [1.0, 2.0, 0.1], [3.0, 1.0, 0.2]]
-        ).to_gpu()
+        var logits = (
+            Tensor[dtype]
+            .d2([[2.0, 1.0, 0.5], [1.0, 2.0, 0.1], [3.0, 1.0, 0.2]])
+            .to_gpu()
+        )
         var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, -100, 2]).to_gpu()
         var target_cpu = Tensor[DEFAULT_INDEX_DTYPE].d1([0, -100, 2])
         var ce = CrossEntropyLoss[dtype](ignore_index=-100, reduction="mean")
@@ -398,6 +388,7 @@ def test_ce_gpu_ci_label_smoothing() raises:
         )(logits_cpu, target)
         assert_true(allclose(loss.item(), loss_cpu.item()))
 
+
 def test_ce_gpu_ci_3d() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -407,23 +398,25 @@ def test_ce_gpu_ci_3d() raises:
             [
                 # Batch 0
                 [
-                    [2.0, 1.0],   # Class 0: spatial positions 0, 1
-                    [1.0, 2.0],   # Class 1: spatial positions 0, 1
-                    [0.5, 1.5]    # Class 2: spatial positions 0, 1
+                    [2.0, 1.0],  # Class 0: spatial positions 0, 1
+                    [1.0, 2.0],  # Class 1: spatial positions 0, 1
+                    [0.5, 1.5],  # Class 2: spatial positions 0, 1
                 ],
                 # Batch 1
                 [
-                    [1.5, 2.0],   # Class 0: spatial positions 0, 1
-                    [2.0, 1.0],   # Class 1: spatial positions 0, 1
-                    [1.0, 2.0]    # Class 2: spatial positions 0, 1
-                ]
+                    [1.5, 2.0],  # Class 0: spatial positions 0, 1
+                    [2.0, 1.0],  # Class 1: spatial positions 0, 1
+                    [1.0, 2.0],  # Class 2: spatial positions 0, 1
+                ],
             ],
-            requires_grad=True
+            requires_grad=True,
         )
 
         var target = Tensor[DEFAULT_INDEX_DTYPE].d2(
-            [[0, 2],   # Batch 0: spatial0→class0, spatial1→class2
-             [1, 0]]   # Batch 1: spatial0→class1, spatial1→class0
+            [
+                [0, 2],  # Batch 0: spatial0→class0, spatial1→class2
+                [1, 0],
+            ]  # Batch 1: spatial0→class1, spatial1→class0
         )
 
         # GPU forward
@@ -433,7 +426,9 @@ def test_ce_gpu_ci_3d() raises:
         var loss_gpu = ce(logits_gpu, target_gpu)
 
         # CPU forward for comparison
-        var loss_cpu = ce(logits, target)  # Use same criterion instance or create new
+        var loss_cpu = ce(
+            logits, target
+        )  # Use same criterion instance or create new
 
         # Compare results
         assert_true(allclose(loss_gpu.to_cpu().item(), loss_cpu.item(), 1e-5))
@@ -446,8 +441,6 @@ def test_ce_gpu_ci_3d() raises:
         assert_true(logits.grad().all_close(2 * logits_gpu.grad().to_cpu()))
 
 
-
-
 # ═════════════════════════════════════════════════════════════════════════════
 # GROUP J: GPU Backward — Class Indices
 # ═════════════════════════════════════════════════════════════════════════════
@@ -456,7 +449,9 @@ def test_ce_gpu_ci_3d() raises:
 def test_ce_gpu_bwd_ci_grad_shape() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]], requires_grad=True)
+        var a = Tensor[dtype].d2(
+            [[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]], requires_grad=True
+        )
         var a_gpu = a.to_gpu()
         var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
         var ce = CrossEntropyLoss[dtype](reduction="mean")
@@ -471,9 +466,11 @@ def test_ce_gpu_bwd_ci_parity() raises:
         var a_cpu = Tensor[dtype].d2(
             [[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]], requires_grad=True
         )
-        var a_gpu = Tensor[dtype].d2(
-            [[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]], requires_grad=True
-        ).to_gpu()
+        var a_gpu = (
+            Tensor[dtype]
+            .d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]], requires_grad=True)
+            .to_gpu()
+        )
         var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
         var ce = CrossEntropyLoss[dtype](reduction="mean")
         var loss_cpu = ce(a_cpu, target)
@@ -483,7 +480,9 @@ def test_ce_gpu_bwd_ci_parity() raises:
         for i in range(2):
             for c in range(3):
                 assert_true(
-                    allclose(a_cpu.grad()[[i, c]], a_gpu.grad()[[i, c]], atol=1e-4)
+                    allclose(
+                        a_cpu.grad()[[i, c]], a_gpu.grad()[[i, c]], atol=1e-4
+                    )
                 )
 
 
@@ -515,7 +514,9 @@ def test_ce_gpu_bwd_ci_3d_ignore() raises:
             requires_grad=True,
         )
         var a_gpu = a.to_gpu()
-        var target = Tensor[DEFAULT_INDEX_DTYPE].d2([[0, -100, 2], [1, 0, -100]])
+        var target = Tensor[DEFAULT_INDEX_DTYPE].d2(
+            [[0, -100, 2], [1, 0, -100]]
+        )
         var ce = CrossEntropyLoss[dtype](ignore_index=-100, reduction="mean")
         var loss = ce(a_gpu, target.to_gpu())
         loss.backward()
@@ -531,7 +532,9 @@ def test_ce_gpu_bwd_ci_label_smoothing() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[2.0, 1.0, 0.5]], requires_grad=True)
-        var a_gpu = Tensor[dtype].d2([[2.0, 1.0, 0.5]], requires_grad=True).to_gpu()
+        var a_gpu = (
+            Tensor[dtype].d2([[2.0, 1.0, 0.5]], requires_grad=True).to_gpu()
+        )
         var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0])
         var ce = CrossEntropyLoss[dtype](
             reduction="mean", label_smoothing=Scalar[dtype](0.1)
@@ -541,7 +544,9 @@ def test_ce_gpu_bwd_ci_label_smoothing() raises:
         var loss_gpu = ce(a_gpu, target.to_gpu())
         loss_gpu.backward()
         for c in range(3):
-            assert_true(allclose(a_cpu.grad()[[0, c]], a_gpu.grad()[[0, c]], atol=1e-4))
+            assert_true(
+                allclose(a_cpu.grad()[[0, c]], a_gpu.grad()[[0, c]], atol=1e-4)
+            )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -567,9 +572,11 @@ def test_ce_gpu_prob_backward_parity() raises:
         var a_cpu = Tensor[dtype].d2(
             [[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]], requires_grad=True
         )
-        var a_gpu = Tensor[dtype].d2(
-            [[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]], requires_grad=True
-        ).to_gpu()
+        var a_gpu = (
+            Tensor[dtype]
+            .d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]], requires_grad=True)
+            .to_gpu()
+        )
         var target = Tensor[dtype].d2([[0.7, 0.2, 0.1], [0.1, 0.6, 0.3]])
         var ce = CrossEntropyLoss[dtype](reduction="mean")
         var loss_cpu = ce(a_cpu, target)
@@ -579,7 +586,9 @@ def test_ce_gpu_prob_backward_parity() raises:
         for i in range(2):
             for c in range(3):
                 assert_true(
-                    allclose(a_cpu.grad()[[i, c]], a_gpu.grad()[[i, c]], atol=1e-4)
+                    allclose(
+                        a_cpu.grad()[[i, c]], a_gpu.grad()[[i, c]], atol=1e-4
+                    )
                 )
 
 
@@ -587,7 +596,9 @@ def test_ce_gpu_prob_label_smoothing_parity() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[2.0, 1.0, 0.5]], requires_grad=True)
-        var a_gpu = Tensor[dtype].d2([[2.0, 1.0, 0.5]], requires_grad=True).to_gpu()
+        var a_gpu = (
+            Tensor[dtype].d2([[2.0, 1.0, 0.5]], requires_grad=True).to_gpu()
+        )
         var target = Tensor[dtype].d2([[0.6, 0.3, 0.1]])
         var ce = CrossEntropyLoss[dtype](
             reduction="mean", label_smoothing=Scalar[dtype](0.1)
@@ -597,7 +608,9 @@ def test_ce_gpu_prob_label_smoothing_parity() raises:
         var loss_gpu = ce(a_gpu, target.to_gpu())
         loss_gpu.backward()
         for c in range(3):
-            assert_true(allclose(a_cpu.grad()[[0, c]], a_gpu.grad()[[0, c]], atol=1e-4))
+            assert_true(
+                allclose(a_cpu.grad()[[0, c]], a_gpu.grad()[[0, c]], atol=1e-4)
+            )
 
 
 # ═════════════════════════════════════════════════════════════════════════════

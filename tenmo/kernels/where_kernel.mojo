@@ -62,7 +62,6 @@ struct WhereGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         var compiled = device_context.compile_function[
             where_forward_kernel[Self.datatype],
-            where_forward_kernel[Self.datatype],
         ]()
         device_context.enqueue_function(
             compiled,
@@ -75,7 +74,8 @@ struct WhereGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype].__init__[True](
             result_buffer^, device_state.gpu

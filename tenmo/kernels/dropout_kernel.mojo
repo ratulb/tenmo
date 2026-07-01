@@ -170,11 +170,6 @@ struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 simd_width=simdwidth,
                 simd_vectors_per_thread=2 * simdwidth,
             ],
-            dropout_forward_kernel[
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -190,7 +185,8 @@ struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu

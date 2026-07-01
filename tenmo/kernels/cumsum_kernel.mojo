@@ -108,7 +108,6 @@ struct CumsumGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         var compiled = device_context.compile_function[
             cumsum_kernel[Self.datatype],
-            cumsum_kernel[Self.datatype],
         ]()
         device_context.enqueue_function(
             compiled,
@@ -156,7 +155,6 @@ struct CumsumGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
         )
 
         var compiled = device_context.compile_function[
-            cumsum_backward_kernel[Self.datatype],
             cumsum_backward_kernel[Self.datatype],
         ]()
         device_context.enqueue_function(

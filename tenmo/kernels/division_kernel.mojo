@@ -146,11 +146,6 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 simd_width=simdwidth,
                 simd_vectors_per_thread=2 * simdwidth,
             ],
-            rdiv_scalar_backward_kernel[
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -164,7 +159,8 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         # var result_state = DeviceState[Self.dtype].__init__[True](
         var result_state = DeviceState[Self.dtype](
@@ -208,8 +204,14 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
         # sizes — required because the kernel uses flat SIMD indexing and
         # does not handle broadcasting internally.
         var contig_grad = grad_output.contiguous_device_state()
-        var bx = x.broadcast_to(target_shape) if x.shape != target_shape else x.copy()
-        var by = y.broadcast_to(target_shape) if y.shape != target_shape else y.copy()
+        var bx = (
+            x.broadcast_to(target_shape) if x.shape
+            != target_shape else x.copy()
+        )
+        var by = (
+            y.broadcast_to(target_shape) if y.shape
+            != target_shape else y.copy()
+        )
         var contig_x = bx.contiguous_device_state()
         var contig_y = by.contiguous_device_state()
 
@@ -221,11 +223,6 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
         )
 
         var compiled = device_context.compile_function[
-            divide_backward_kernel[
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
             divide_backward_kernel[
                 dtype=Self.dtype,
                 simd_width=simdwidth,
@@ -245,7 +242,8 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var grad_x_state = DeviceState[Self.dtype](
             grad_x_buffer^, device_state.gpu

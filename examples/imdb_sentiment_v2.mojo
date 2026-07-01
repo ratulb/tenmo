@@ -168,8 +168,15 @@ def main() raises:
     var preprocessor = IMDBPreprocessor()
     preprocessor.load_from_folder(TRAIN_FOLDER)
 
-    print("Building vocabulary with retention frequency: ", WORD_RETENTION_MIN_FREQ, " and ngram_size: ", NGRAM_SIZE)
-    var tokenizer = preprocessor.init_tokenizer(min_freq=WORD_RETENTION_MIN_FREQ, max_n=NGRAM_SIZE)
+    print(
+        "Building vocabulary with retention frequency: ",
+        WORD_RETENTION_MIN_FREQ,
+        " and ngram_size: ",
+        NGRAM_SIZE,
+    )
+    var tokenizer = preprocessor.init_tokenizer(
+        min_freq=WORD_RETENTION_MIN_FREQ, max_n=NGRAM_SIZE
+    )
     var vocab_size = len(tokenizer)
     print("Vocabulary size:", vocab_size)
 
@@ -213,10 +220,10 @@ def main() raises:
         parameters=[
             UnsafePointer(to=weights_0_1)
             .mut_cast[True]()
-            .unsafe_origin_cast[MutAnyOrigin](),
+            .unsafe_origin_cast[MutUnsafeAnyOrigin](),
             UnsafePointer(to=weights_1_2)
             .mut_cast[True]()
-            .unsafe_origin_cast[MutAnyOrigin](),
+            .unsafe_origin_cast[MutUnsafeAnyOrigin](),
         ],
         lr=Scalar[dtype](LEARNING_RATE),
         momentum=Scalar[dtype](0.9),
@@ -256,7 +263,9 @@ def main() raises:
                 .sum(axes=[0], keepdims=False)
                 .sigmoid()
             )"""
-            var hidden = weights_0_1.gather(token_ids, reduction=Reduction(1)).sigmoid()
+            var hidden = weights_0_1.gather(
+                token_ids, reduction=Reduction(1)
+            ).sigmoid()
             var prediction = hidden.dot(weights_1_2).sigmoid()
 
             # ── Loss — MSE ────────────────────────────────────────────────────
@@ -382,7 +391,7 @@ def similar(
     for ref pair in tokenizer.str_to_int.items():
         var word = pair.key
         var index = pair.value
-        if word == target or '_' in word:
+        if word == target or "_" in word:
             continue
         var raw_diff = target_row - embeddings.gather[track_grad=False]([index])
         scores[word] = -sqrt((raw_diff * raw_diff).sum().item())

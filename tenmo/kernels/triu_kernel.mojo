@@ -52,7 +52,9 @@ def triu_kernel[
                     var within = idx % batch_stride
                     var row = within // N
                     var col = within % N
-                    result[idx] = A[idx] if col >= row + diagonal else Scalar[dtype](0)
+                    result[idx] = A[idx] if col >= row + diagonal else Scalar[
+                        dtype
+                    ](0)
 
         base_idx += stride * CHUNK_SIZE
 
@@ -102,7 +104,9 @@ def triu_backward_kernel[
                     var within = idx % batch_stride
                     var row = within // N
                     var col = within % N
-                    result[idx] = grad[idx] if col >= row + diagonal else Scalar[dtype](0)
+                    result[idx] = grad[
+                        idx
+                    ] if col >= row + diagonal else Scalar[dtype](0)
 
         base_idx += stride * CHUNK_SIZE
 
@@ -137,7 +141,6 @@ struct TriuGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         var compiled = device_context.compile_function[
             triu_kernel[Self.datatype, simdwidth, 2 * simdwidth],
-            triu_kernel[Self.datatype, simdwidth, 2 * simdwidth],
         ]()
         device_context.enqueue_function(
             compiled,
@@ -151,7 +154,8 @@ struct TriuGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype].__init__[True](
             result_buffer^, device_state.gpu
@@ -185,7 +189,6 @@ struct TriuGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         var compiled = device_context.compile_function[
             triu_backward_kernel[Self.datatype, simdwidth, 2 * simdwidth],
-            triu_backward_kernel[Self.datatype, simdwidth, 2 * simdwidth],
         ]()
         device_context.enqueue_function(
             compiled,
@@ -199,7 +202,8 @@ struct TriuGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype].__init__[True](
             result_buffer^, device_state.gpu

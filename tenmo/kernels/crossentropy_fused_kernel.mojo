@@ -212,10 +212,15 @@ def fused_ce_class_indices_backward_kernel[
                   * ignore_mask[m] * upstream_scaled[m]
 
     reduction: 0=none, 1=sum, 2=mean
-    - none: upstream is (M,) — each row reads its own upstream[row]
-    - sum/mean: upstream is scalar — all rows read upstream[0]
+    - none: upstream is (M,)
+    - sum/mean: upstream is scalar
       mean further divides by valid_count
     """
+    comptime if not dtype.is_floating_point():
+        panic(
+            "fused_ce_class_indices_backward_kernel requires a floating point"
+            " dtype"
+        )
     var row = block_idx.x
     if row >= M:
         return
@@ -333,11 +338,6 @@ struct CrossEntropyFusedKernel[
                 target_dtype=Self.target_dtype,
                 max_block_size=MAX_BLOCK_SIZE,
             ],
-            fused_ce_class_indices_forward_kernel[
-                dtype=Self.dtype,
-                target_dtype=Self.target_dtype,
-                max_block_size=MAX_BLOCK_SIZE,
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -414,7 +414,6 @@ struct CrossEntropyFusedKernel[
 
         var compiled = ctx.compile_function[
             onehot_fill_kernel[Self.dtype, Self.target_dtype],
-            onehot_fill_kernel[Self.dtype, Self.target_dtype],
         ]()
 
         ctx.enqueue_function(
@@ -450,7 +449,7 @@ struct CrossEntropyFusedKernel[
         """Fused backward: onehot + smoothing + ignore_mask + scaling in one launch.
 
         Args:
-            softmax_ndb: (M, C) — softmax probabilities on GPU
+            softmax_ndb: (M, C) - softmax probabilities on GPU
             target_ndb:  (M,) — class indices on GPU
             upstream_ndb: upstream gradient buffer
                 For none reduction: shape (M,) — must be on GPU
@@ -490,43 +489,44 @@ struct CrossEntropyFusedKernel[
         block_size = block_pow2
         var num_blocks = M
 
-        var compiled = ctx.compile_function[
-            fused_ce_class_indices_backward_kernel[
-                dtype=Self.dtype,
-                target_dtype=Self.target_dtype,
-                max_block_size=MAX_BLOCK_SIZE,
-            ],
-            fused_ce_class_indices_backward_kernel[
-                dtype=Self.dtype,
-                target_dtype=Self.target_dtype,
-                max_block_size=MAX_BLOCK_SIZE,
-            ],
-        ]()
+        comptime if Self.dtype.is_floating_point():
+            var compiled = ctx.compile_function[
+                fused_ce_class_indices_backward_kernel[
+                    dtype=Self.dtype,
+                    target_dtype=Self.target_dtype,
+                    max_block_size=MAX_BLOCK_SIZE,
+                ],
+            ]()
 
-        # Convert reduction to integer for kernel dispatch
-        var reduction_int: Int
-        if reduction.is_none():
-            reduction_int = 0
-        elif reduction.is_sum():
-            reduction_int = 1
+            # Convert reduction to integer for kernel dispatch
+            var reduction_int: Int
+            if reduction.is_none():
+                reduction_int = 0
+            elif reduction.is_sum():
+                reduction_int = 1
+            else:
+                reduction_int = 2
+
+            ctx.enqueue_function(
+                compiled,
+                softmax_ndb.contiguous_device_state().device_buffer(),
+                target_ndb.contiguous_device_state().device_buffer(),
+                upstream_gpu.contiguous_device_state().device_buffer(),
+                result_buffer,
+                M,
+                C,
+                ignore_index,
+                label_smoothing,
+                reduction_int,
+                valid_count,
+                grid_dim=num_blocks,
+                block_dim=block_size,
+            )
         else:
-            reduction_int = 2
-
-        ctx.enqueue_function(
-            compiled,
-            softmax_ndb.contiguous_device_state().device_buffer(),
-            target_ndb.contiguous_device_state().device_buffer(),
-            upstream_gpu.contiguous_device_state().device_buffer(),
-            result_buffer,
-            M,
-            C,
-            ignore_index,
-            label_smoothing,
-            reduction_int,
-            valid_count,
-            grid_dim=num_blocks,
-            block_dim=block_size,
-        )
+            panic(
+                "CrossEntropyFusedKernel.launch_backward: "
+                "requires a floating point dtype"
+            )
 
         var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu

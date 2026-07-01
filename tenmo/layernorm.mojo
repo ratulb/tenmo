@@ -271,7 +271,13 @@ struct LayerNormForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # rstd = rsqrt(var + eps) computed inside kernel — saved for backward
         # x_hat saved for backward — written in pass 2 anyway, zero extra cost
         var (out_ndb, x_hat_ndb, rstd_ndb) = LayerNormCpu[Self.dtype].normalize(
-            self.buffer, mean_ndb, var_ndb, gamma.buffer, beta.buffer, eps, sync=False
+            self.buffer,
+            mean_ndb,
+            var_ndb,
+            gamma.buffer,
+            beta.buffer,
+            eps,
+            sync=False,
         )
 
         comptime if has_accelerator():
@@ -340,7 +346,9 @@ struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
             Shape(normalized_shape), requires_grad=True
         )
 
-    def __call__(self, x: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
+    def __call__(
+        self, x: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         if self.training:
             return LayerNormForward[Self.dtype].forward[track_grad=True](
                 x, self.gamma, self.beta, self.eps, sync=sync
@@ -355,10 +363,14 @@ struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
         params.append(
-            UnsafePointer(to=self.gamma).unsafe_mut_cast[True]().as_any_origin()
+            UnsafePointer(to=self.gamma)
+            .unsafe_mut_cast[True]()
+            .as_unsafe_any_origin()
         )
         params.append(
-            UnsafePointer(to=self.beta).unsafe_mut_cast[True]().as_any_origin()
+            UnsafePointer(to=self.beta)
+            .unsafe_mut_cast[True]()
+            .as_unsafe_any_origin()
         )
         return params^
 
@@ -367,9 +379,11 @@ struct LayerNorm[dtype: DType](ImplicitlyCopyable & Movable):
     ) -> List[NamedParameter[Self.dtype]]:
         var result = List[NamedParameter[Self.dtype]]()
         var g = UnsafePointer(to=self.gamma).unsafe_mut_cast[True]()
-        result.append(NamedParameter(prefix + "gamma", g.as_any_origin()))
+        result.append(
+            NamedParameter(prefix + "gamma", g.as_unsafe_any_origin())
+        )
         var b = UnsafePointer(to=self.beta).unsafe_mut_cast[True]()
-        result.append(NamedParameter(prefix + "beta", b.as_any_origin()))
+        result.append(NamedParameter(prefix + "beta", b.as_unsafe_any_origin()))
         return result^
 
     def num_parameters(self) -> Int:

@@ -221,12 +221,12 @@ struct Buffer[dtype: DType = DType.float32](
                 self.data = alloc[Scalar[Self.dtype]](self.size)
                 memcpy(dest=self.data, src=copy.data, count=self.size)
 
-    def __init__(out self, *, deinit take: Self):
+    def __init__(out self, *, deinit move: Self):
         """Move buffer - no refcount change."""
-        self.size = take.size
-        self.data = take.data
-        self.external = take.external
-        self._refcount = take._refcount
+        self.size = move.size
+        self.data = move.data
+        self.external = move.external
+        self._refcount = move._refcount
 
     def __del__(deinit self):
         """Destroy buffer - handle both shared and unshared cases."""
@@ -526,7 +526,9 @@ struct Buffer[dtype: DType = DType.float32](
         # Process full SIMD chunks
         while remaining >= simd_width:
             var block = self.load[simdwidth=simd_width](idx)
-            var op_result = simd_op[op_code, Self.dtype, simd_width](block, scalar)
+            var op_result = simd_op[op_code, Self.dtype, simd_width](
+                block, scalar
+            )
             self.store[simdwidth=simd_width](idx, op_result)
             idx += simd_width
             remaining -= simd_width
@@ -1966,9 +1968,9 @@ struct Buffer[dtype: DType = DType.float32](
         return True
 
     @always_inline
-    fn map_to_bool(
+    def map_to_bool(
         self: Buffer[Self.dtype],
-        pred: fn(Scalar[Self.dtype]) thin -> Bool,
+        pred: def(Scalar[Self.dtype]) thin -> Bool,
     ) -> Buffer[DType.bool]:
         """Apply predicate to each element, returning a boolean buffer."""
         var out = Buffer[DType.bool](self.size)

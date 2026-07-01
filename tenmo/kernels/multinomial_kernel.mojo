@@ -263,9 +263,6 @@ struct MultinomialGpuKernel[
             multinomial_fused_kernel[
                 Self.dtype, Self.index_dtype, MAX_BLOCK_SIZE
             ],
-            multinomial_fused_kernel[
-                Self.dtype, Self.index_dtype, MAX_BLOCK_SIZE
-            ],
         ]()
 
         device_context.enqueue_function(

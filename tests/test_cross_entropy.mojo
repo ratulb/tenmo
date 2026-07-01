@@ -29,24 +29,7 @@ def inf[dtype: DType]() -> Scalar[dtype]:
         dtype.is_floating_point(),
         "Only floating point dtypes support +inf."
 
-    comptime if dtype == DType.bfloat16:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<bf16>`,
-        )
-    elif dtype == DType.float16:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f16>`,
-        )
-    elif dtype == DType.float32:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f32>`,
-        )
-    elif dtype == DType.float64:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f64>`,
-        )
-    else:
-        comptime assert False, "unsupported float type"
+    return Scalar[dtype](1.0) / Scalar[dtype](0.0)
 
 
 def isinf[dtype: DType, //](value: Scalar[dtype]) -> Bool:
@@ -74,16 +57,7 @@ def nan[dtype: DType]() -> Scalar[dtype]:
         dtype.is_floating_point(),
         "Only floating point dtypes support NaN."
 
-    comptime if dtype == DType.float32:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f32>`,
-        )
-    elif dtype == DType.float64:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f64>`,
-        )
-    else:
-        comptime assert False, "unsupported float type"
+    return Scalar[dtype](0.0) / Scalar[dtype](0.0)
 
 
 # ============================================================================

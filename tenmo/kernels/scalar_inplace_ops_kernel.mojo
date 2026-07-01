@@ -56,7 +56,9 @@ def inplace_scalar_ops[
                 # Full vector load
                 var vec_a = A.load[width=simd_width](i)
                 var vec_result = simd_op[op_code, dtype, simd_width](
-                    vec_a, SIMD[dtype, simd_width](scalar), Epsilon[dtype].value()
+                    vec_a,
+                    SIMD[dtype, simd_width](scalar),
+                    Epsilon[dtype].value(),
                 )
                 A.store[width=simd_width](i, vec_result)
             elif i < size:
@@ -233,8 +235,7 @@ def inplace_scalar_ops_strided[
                         # Per-lane read and write, outer base computed once.
                         comptime for lane in range(simd_width):
                             var a_idx = (
-                                a_base
-                                + (inner_offset + lane) * a_inner_stride
+                                a_base + (inner_offset + lane) * a_inner_stride
                             )
                             var a = A[a_idx]
                             var res = scalar_op[op_code, dtype](
@@ -342,8 +343,7 @@ def inplace_pow_op_f32_strided[
                     else:
                         comptime for lane in range(simd_width):
                             var a_idx = (
-                                a_base
-                                + (inner_offset + lane) * a_inner_stride
+                                a_base + (inner_offset + lane) * a_inner_stride
                             )
                             A[a_idx] = pow(A[a_idx], exponent)
                 else:
@@ -422,8 +422,7 @@ def inplace_pow_op_f64_strided[
                     else:
                         comptime for lane in range(simd_width):
                             var a_idx = (
-                                a_base
-                                + (inner_offset + lane) * a_inner_stride
+                                a_base + (inner_offset + lane) * a_inner_stride
                             )
                             A[a_idx] = pow(A[a_idx], exponent)
                 else:
@@ -460,7 +459,9 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = False) raises:
+    ](
+        A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = False
+    ) raises:
         var numels = A.numels()
         var rank = A.shape.rank()
 
@@ -479,12 +480,6 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
         if A.is_contiguous():
             # PATH 1: Contiguous A → flat linear indexing (fast SIMD).
             var compiled_func = device_context.compile_function[
-                inplace_scalar_ops[
-                    op_code=op_code,
-                    dtype=Self.dtype,
-                    simd_width=simdwidth,
-                    simd_vectors_per_thread=2 * simdwidth,
-                ],
                 inplace_scalar_ops[
                     op_code=op_code,
                     dtype=Self.dtype,
@@ -510,12 +505,6 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
                     simd_width=simdwidth,
                     simd_vectors_per_thread=2 * simdwidth,
                 ],
-                inplace_scalar_ops_strided[
-                    op_code=op_code,
-                    dtype=Self.dtype,
-                    simd_width=simdwidth,
-                    simd_vectors_per_thread=2 * simdwidth,
-                ],
             ]()
 
             device_context.enqueue_function(
@@ -530,7 +519,8 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
                 block_dim=threads_per_block,
             )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
     @staticmethod
     def launch_inplace_pow(
@@ -561,10 +551,6 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
                         simd_width=simdwidth,
                         simd_vectors_per_thread=2 * simdwidth,
                     ],
-                    inplace_pow_op_f32[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread=2 * simdwidth,
-                    ],
                 ]()
                 device_context.enqueue_function(
                     compiled,
@@ -577,10 +563,6 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
             else:
                 var rank = A.shape.rank()
                 var compiled = device_context.compile_function[
-                    inplace_pow_op_f32_strided[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread=2 * simdwidth,
-                    ],
                     inplace_pow_op_f32_strided[
                         simd_width=simdwidth,
                         simd_vectors_per_thread=2 * simdwidth,
@@ -604,10 +586,6 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
                         simd_width=simdwidth,
                         simd_vectors_per_thread=2 * simdwidth,
                     ],
-                    inplace_pow_op_f64[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread=2 * simdwidth,
-                    ],
                 ]()
                 device_context.enqueue_function(
                     compiled,
@@ -620,10 +598,6 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
             else:
                 var rank = A.shape.rank()
                 var compiled = device_context.compile_function[
-                    inplace_pow_op_f64_strided[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread=2 * simdwidth,
-                    ],
                     inplace_pow_op_f64_strided[
                         simd_width=simdwidth,
                         simd_vectors_per_thread=2 * simdwidth,
@@ -642,10 +616,12 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
                 )
         else:
             panic(
-                "InplaceScalarOperations: POW only supported for float32 and float64"
+                "InplaceScalarOperations: POW only supported for float32 and"
+                " float64"
             )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
     @staticmethod
     def launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:

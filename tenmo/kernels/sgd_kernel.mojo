@@ -72,7 +72,6 @@ struct SGDStep[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref grad_buf = grad_ds.device_buffer()
         var compiled = ctx.compile_function[
             sgd_step_no_momentum_kernel[Self.dtype],
-            sgd_step_no_momentum_kernel[Self.dtype],
         ]()
         ctx.enqueue_function(
             compiled,
@@ -109,7 +108,6 @@ struct SGDStep[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref vel_ds = vel_ndb.device_state.value()
         ref vel_buf = vel_ds.device_buffer()
         var compiled = ctx.compile_function[
-            sgd_step_momentum_kernel[Self.dtype],
             sgd_step_momentum_kernel[Self.dtype],
         ]()
         ctx.enqueue_function(

@@ -77,9 +77,7 @@ def pad_constant_kernel[
 
 
 @fieldwise_init
-struct PadConstantGpuKernel[dtype: DType](
-    ImplicitlyCopyable & Movable
-):
+struct PadConstantGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
     """
     GPU constant-padding kernel launcher.
 
@@ -104,8 +102,12 @@ struct PadConstantGpuKernel[dtype: DType](
         Makes src contiguous, enqueues the copy kernel, synchronises.
         dst must already contain the pad value in its padded regions.
         """
-        debug_assert(src_ndb.is_on_gpu(), "PadConstantGpuKernel requires GPU src")
-        debug_assert(dst_ndb.is_on_gpu(), "PadConstantGpuKernel requires GPU dst")
+        debug_assert(
+            src_ndb.is_on_gpu(), "PadConstantGpuKernel requires GPU src"
+        )
+        debug_assert(
+            dst_ndb.is_on_gpu(), "PadConstantGpuKernel requires GPU dst"
+        )
 
         var ndim = src_ndb.rank()
         var numels: Int
@@ -139,7 +141,6 @@ struct PadConstantGpuKernel[dtype: DType](
         var contig_src_state = src_ndb.contiguous_device_state()
 
         var compiled = device_context.compile_function[
-            pad_constant_kernel[Self.dtype, forward],
             pad_constant_kernel[Self.dtype, forward],
         ]()
 
@@ -180,4 +181,6 @@ struct PadConstantGpuKernel[dtype: DType](
 
         grad_parent[flat] = grad_output[out_flat]  for all flat.
         """
-        PadConstantGpuKernel[Self.dtype]._launch[False](grad_output, grad_parent, pad)
+        PadConstantGpuKernel[Self.dtype]._launch[False](
+            grad_output, grad_parent, pad
+        )

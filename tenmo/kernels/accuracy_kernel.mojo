@@ -63,7 +63,6 @@ struct AccuracyGpu[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
 
         var compiled = ctx.compile_function[
             accuracy_kernel[Self.dtype, Self.index_dtype],
-            accuracy_kernel[Self.dtype, Self.index_dtype],
         ]()
 
         ctx.enqueue_function(

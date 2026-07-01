@@ -222,13 +222,13 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         params.append(
             UnsafePointer(to=self.weight)
             .unsafe_mut_cast[True]()
-            .as_any_origin()
+            .as_unsafe_any_origin()
         )
         if self.bias:
             params.append(
                 UnsafePointer(to=self.bias.value())
                 .unsafe_mut_cast[True]()
-                .as_any_origin()
+                .as_unsafe_any_origin()
             )
         return params^
 
@@ -237,10 +237,14 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
     ) -> List[NamedParameter[Self.dtype]]:
         var result = List[NamedParameter[Self.dtype]]()
         var w = UnsafePointer(to=self.weight).unsafe_mut_cast[True]()
-        result.append(NamedParameter(prefix + "weight", w.as_any_origin()))
+        result.append(
+            NamedParameter(prefix + "weight", w.as_unsafe_any_origin())
+        )
         if self.bias:
             var b = UnsafePointer(to=self.bias.value()).unsafe_mut_cast[True]()
-            result.append(NamedParameter(prefix + "bias", b.as_any_origin()))
+            result.append(
+                NamedParameter(prefix + "bias", b.as_unsafe_any_origin())
+            )
         return result^
 
     def num_parameters(self) -> Int:
@@ -640,13 +644,13 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         params.append(
             UnsafePointer(to=self.weight)
             .unsafe_mut_cast[True]()
-            .as_any_origin()
+            .as_unsafe_any_origin()
         )
         if self.bias:
             params.append(
                 UnsafePointer(to=self.bias.value())
                 .unsafe_mut_cast[True]()
-                .as_any_origin()
+                .as_unsafe_any_origin()
             )
         return params^
 
@@ -655,10 +659,14 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
     ) -> List[NamedParameter[Self.dtype]]:
         var result = List[NamedParameter[Self.dtype]]()
         var w = UnsafePointer(to=self.weight).unsafe_mut_cast[True]()
-        result.append(NamedParameter(prefix + "weight", w.as_any_origin()))
+        result.append(
+            NamedParameter(prefix + "weight", w.as_unsafe_any_origin())
+        )
         if self.bias:
             var b = UnsafePointer(to=self.bias.value()).unsafe_mut_cast[True]()
-            result.append(NamedParameter(prefix + "bias", b.as_any_origin()))
+            result.append(
+                NamedParameter(prefix + "bias", b.as_unsafe_any_origin())
+            )
         return result^
 
     def num_parameters(self) -> Int:
@@ -1562,17 +1570,17 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         self.training = copy.training
         self.delegate = copy.delegate
 
-    def __init__(out self, *, deinit take: Self):
-        self.weight = take.weight^
-        self.bias = take.bias^
-        self.in_channels = take.in_channels
-        self.out_channels = take.out_channels
-        self.kernel_size = take.kernel_size
-        self.stride = take.stride
-        self.dilation = take.dilation
-        self.padding = take.padding^
-        self.training = take.training
-        self.delegate = take.delegate^
+    def __init__(out self, *, deinit move: Self):
+        self.weight = move.weight^
+        self.bias = move.bias^
+        self.in_channels = move.in_channels
+        self.out_channels = move.out_channels
+        self.kernel_size = move.kernel_size
+        self.stride = move.stride
+        self.dilation = move.dilation
+        self.padding = move.padding^
+        self.training = move.training
+        self.delegate = move.delegate^
 
     def __call__(
         mut self, image: Tensor[Self.dtype], sync: Bool = True
@@ -1623,13 +1631,13 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         params.append(
             UnsafePointer(to=self.weight)
             .unsafe_mut_cast[True]()
-            .as_any_origin()
+            .as_unsafe_any_origin()
         )
         if self.bias:
             params.append(
                 UnsafePointer(to=self.bias.value())
                 .unsafe_mut_cast[True]()
-                .as_any_origin()
+                .as_unsafe_any_origin()
             )
         return params^
 
@@ -1638,10 +1646,14 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
     ) -> List[NamedParameter[Self.dtype]]:
         var result = List[NamedParameter[Self.dtype]]()
         var w = UnsafePointer(to=self.weight).unsafe_mut_cast[True]()
-        result.append(NamedParameter(prefix + "weight", w.as_any_origin()))
+        result.append(
+            NamedParameter(prefix + "weight", w.as_unsafe_any_origin())
+        )
         if self.bias:
             var b = UnsafePointer(to=self.bias.value()).unsafe_mut_cast[True]()
-            result.append(NamedParameter(prefix + "bias", b.as_any_origin()))
+            result.append(
+                NamedParameter(prefix + "bias", b.as_unsafe_any_origin())
+            )
         return result^
 
     def num_parameters(self) -> Int:

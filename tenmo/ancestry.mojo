@@ -28,12 +28,12 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         self.ndb = copy.ndb.copy()
         self.parents = copy.parents.copy()
 
-    def __init__(out self, *, deinit take: Self):
-        self._id = take._id
-        self.requires_grad = take.requires_grad
-        self.gradbox = take.gradbox
-        self.ndb = take.ndb^
-        self.parents = take.parents^
+    def __init__(out self, *, deinit move: Self):
+        self._id = move._id
+        self.requires_grad = move.requires_grad
+        self.gradbox = move.gradbox
+        self.ndb = move.ndb^
+        self.parents = move.parents^
 
     def has_ancestry(ref self) -> Bool:
         return self.parents is not None and len(self.parents.value()) > 0
@@ -41,7 +41,7 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
     def shape(ref self) -> ref[self.ndb.value().shape] Shape:
         return self.ndb.value().shape
 
-    def buffer(ref self) -> ref[self.ndb.value()]NDBuffer[Self.dtype]:
+    def buffer(ref self) -> ref[self.ndb.value()] NDBuffer[Self.dtype]:
         return self.ndb.value()
 
     def gradients(ref self) -> ref[self.gradbox.value()] Gradbox[Self.dtype]:
@@ -98,9 +98,7 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
                 arg.axis,
             )
             if arg.padding_idx:
-                gradbox.fill(
-                    0.0, i(arg.padding_idx.value()), s()
-                )
+                gradbox.fill(0.0, i(arg.padding_idx.value()), s())
         else:
             print("Ancestor → update_grad: unknown op_code", String(op_code))
 
@@ -108,12 +106,9 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         pass
 
 
-# ========================================
-# Ancestors — holds List[Ancestor] + BackwardFnArg
-# ========================================
-
-
 struct Ancestors[dtype: DType](Sized & Copyable & Movable):
+    """Ancestors — holds List[Ancestor] + BackwardFnArg."""
+
     var origins: List[Ancestor[Self.dtype]]
     var backwardFnArg: BackwardFnArg[Self.dtype]
 
@@ -125,9 +120,9 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         self.origins = copy.origins.copy()
         self.backwardFnArg = copy.backwardFnArg.copy()
 
-    def __init__(out self, *, deinit take: Self):
-        self.origins = take.origins^
-        self.backwardFnArg = take.backwardFnArg^
+    def __init__(out self, *, deinit move: Self):
+        self.origins = move.origins^
+        self.backwardFnArg = move.backwardFnArg^
 
     def backward_fn_arg(
         ref self,
@@ -169,11 +164,6 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         ref self,
     ) -> AncestorIterator[Self.dtype, origin_of(self)]:
         return AncestorIterator[Self.dtype](0, Pointer(to=self))
-
-
-# ========================================
-# AncestorIterator — yields Ancestor
-# ========================================
 
 
 struct AncestorIterator[dtype: DType, origin: ImmutOrigin](

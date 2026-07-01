@@ -88,9 +88,7 @@ struct VectorMatmulNdGpu[dtype: DType = DType.float32](
         v: NDBuffer[Self.dtype],
         M: NDBuffer[Self.dtype],
         sync: Bool = False,
-    ) raises -> NDBuffer[
-        Self.dtype
-    ]:
+    ) raises -> NDBuffer[Self.dtype]:
         var v_shape = v.shape
         var M_shape = M.shape
 
@@ -140,7 +138,6 @@ struct VectorMatmulNdGpu[dtype: DType = DType.float32](
 
         var compiled_func = device_context.compile_function[
             vector_matmul_nd[Self.dtype, block_size],
-            vector_matmul_nd[Self.dtype, block_size],
         ]()
 
         device_context.enqueue_function(
@@ -161,7 +158,8 @@ struct VectorMatmulNdGpu[dtype: DType = DType.float32](
             block_dim=block_size,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
         var out = NDBuffer[Self.dtype].with_device_state(

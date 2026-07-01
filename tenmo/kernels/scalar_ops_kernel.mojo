@@ -61,7 +61,9 @@ def scalar_ops[
                 # Full vector load
                 var vec_a = A.load[width=simd_width](i)
                 var vec_result = simd_op[op_code, dtype, simd_width](
-                    vec_a, SIMD[dtype, simd_width](scalar), Epsilon[dtype].value()
+                    vec_a,
+                    SIMD[dtype, simd_width](scalar),
+                    Epsilon[dtype].value(),
                 )
                 result.store[width=simd_width](i, vec_result)
             elif i < size:
@@ -150,8 +152,7 @@ def scalar_ops_strided[
                         # Per-lane read from A, write to contiguous result.
                         comptime for lane in range(simd_width):
                             var a_idx = (
-                                a_base
-                                + (inner_offset + lane) * a_inner_stride
+                                a_base + (inner_offset + lane) * a_inner_stride
                             )
                             var a = A[a_idx]
                             var res = scalar_op[op_code, dtype](
@@ -278,9 +279,9 @@ struct ScalarOperations[dtype: DType = DType.float32](
     @staticmethod
     def launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = False) raises -> NDBuffer[
-        Self.dtype
-    ]:
+    ](
+        A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = False
+    ) raises -> NDBuffer[Self.dtype]:
         var numels = A.numels()
         var rank = A.shape.rank()
 
@@ -308,12 +309,6 @@ struct ScalarOperations[dtype: DType = DType.float32](
                     simd_width=simdwidth,
                     simd_vectors_per_thread=2 * simdwidth,
                 ],
-                scalar_ops[
-                    op_code=op_code,
-                    dtype=Self.dtype,
-                    simd_width=simdwidth,
-                    simd_vectors_per_thread=2 * simdwidth,
-                ],
             ]()
 
             device_context.enqueue_function(
@@ -328,12 +323,6 @@ struct ScalarOperations[dtype: DType = DType.float32](
         else:
             # PATH 2: Strided A → stride-decomposed indexing.
             var compiled_func = device_context.compile_function[
-                scalar_ops_strided[
-                    op_code=op_code,
-                    dtype=Self.dtype,
-                    simd_width=simdwidth,
-                    simd_vectors_per_thread=2 * simdwidth,
-                ],
                 scalar_ops_strided[
                     op_code=op_code,
                     dtype=Self.dtype,
@@ -355,7 +344,8 @@ struct ScalarOperations[dtype: DType = DType.float32](
                 block_dim=threads_per_block,
             )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
         var out = NDBuffer[Self.dtype].with_device_state(device_state^, A.shape)
 
@@ -363,7 +353,9 @@ struct ScalarOperations[dtype: DType = DType.float32](
 
     @staticmethod
     def launch_pow(
-        A: NDBuffer[Self.dtype], exponent: Scalar[Self.dtype], sync: Bool = False
+        A: NDBuffer[Self.dtype],
+        exponent: Scalar[Self.dtype],
+        sync: Bool = False,
     ) raises -> NDBuffer[Self.dtype]:
         """
         Dedicated POW launcher — dispatches to typed f32/f64 kernels.
@@ -390,10 +382,6 @@ struct ScalarOperations[dtype: DType = DType.float32](
                     simd_width=simdwidth,
                     simd_vectors_per_thread=2 * simdwidth,
                 ],
-                pow_op_f32[
-                    simd_width=simdwidth,
-                    simd_vectors_per_thread=2 * simdwidth,
-                ],
             ]()
             device_context.enqueue_function(
                 compiled,
@@ -406,10 +394,6 @@ struct ScalarOperations[dtype: DType = DType.float32](
             )
         elif Self.dtype == DType.float64:
             var compiled = device_context.compile_function[
-                pow_op_f64[
-                    simd_width=simdwidth,
-                    simd_vectors_per_thread=2 * simdwidth,
-                ],
                 pow_op_f64[
                     simd_width=simdwidth,
                     simd_vectors_per_thread=2 * simdwidth,
@@ -429,7 +413,8 @@ struct ScalarOperations[dtype: DType = DType.float32](
                 "ScalarOperations: POW only supported for float32 and float64"
             )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(device_state^, A.shape)
 

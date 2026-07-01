@@ -131,9 +131,7 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
         A: NDBuffer[Self.dtype],
         B: NDBuffer[Self.dtype],
         sync: Bool = False,
-    ) raises -> NDBuffer[
-        Self.dtype
-    ]:
+    ) raises -> NDBuffer[Self.dtype]:
         """ND batched matrix multiply with broadcasting.
 
         A: [..., m, k]
@@ -250,9 +248,7 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
 
         var (grid, block) = Self.launch_config[tile_size](m, n, total_batch)
 
-        # Single template arg for compile_function
         var compiled_func = device_context.compile_function[
-            matmul_2d_tiled[Self.dtype, tile_size],
             matmul_2d_tiled[Self.dtype, tile_size],
         ]()
 
@@ -274,7 +270,8 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
             block_dim=block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
         var out = NDBuffer[Self.dtype].with_device_state(

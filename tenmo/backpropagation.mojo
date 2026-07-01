@@ -96,30 +96,32 @@ comptime BACKWARD_CUMSUM = 65
 comptime BACKWARD_WHERE = 64
 
 
-trait ArgumentType(ImplicitlyCopyable & Movable):
+trait ArgumentType(ImplicitlyCopyable & Movable & ImplicitlyDestructible):
     pass
 
 
-comptime DestroyerFn = def(UnsafePointer[UInt8, MutAnyOrigin]) thin -> None
+comptime DestroyerFn = def(
+    UnsafePointer[UInt8, MutUnsafeAnyOrigin]
+) thin -> None
 
 
 def make_destroyer[T: ArgumentType]() -> DestroyerFn:
-    def destroy(p: UnsafePointer[UInt8, MutAnyOrigin]) -> None:
+    def destroy(p: UnsafePointer[UInt8, MutUnsafeAnyOrigin]) -> None:
         p.bitcast[T]().destroy_pointee()
         p.bitcast[T]().free()
 
     return destroy
 
 
-comptime CopyFn = def(UnsafePointer[UInt8, MutAnyOrigin]) thin -> UnsafePointer[
-    UInt8, MutAnyOrigin
-]
+comptime CopyFn = def(
+    UnsafePointer[UInt8, MutUnsafeAnyOrigin]
+) thin -> UnsafePointer[UInt8, MutUnsafeAnyOrigin]
 
 
 def make_copier[T: ArgumentType]() -> CopyFn:
     def copy_it(
-        src: UnsafePointer[UInt8, MutAnyOrigin]
-    ) -> UnsafePointer[UInt8, MutAnyOrigin]:
+        src: UnsafePointer[UInt8, MutUnsafeAnyOrigin]
+    ) -> UnsafePointer[UInt8, MutUnsafeAnyOrigin]:
         var dst = alloc[T](1)
         dst.init_pointee_copy(src.bitcast[T]()[])
         return dst.bitcast[UInt8]()
@@ -138,7 +140,7 @@ def make_copier[T: ArgumentType]() -> CopyFn:
 @fieldwise_init
 struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
     var op_code: Int
-    var ptr: UnsafePointer[UInt8, MutAnyOrigin]  # type-erased arg
+    var ptr: UnsafePointer[UInt8, MutUnsafeAnyOrigin]  # type-erased arg
     var destroy: DestroyerFn
     var copy_fn: CopyFn
     var needs_parent_data: Bool

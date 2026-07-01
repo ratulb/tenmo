@@ -140,9 +140,6 @@ struct ArgMinMaxGpu[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             reduce_argminmax[
                 Self.dtype, Self.index_dtype, max_block_size, is_max
             ],
-            reduce_argminmax[
-                Self.dtype, Self.index_dtype, max_block_size, is_max
-            ],
         ]()
 
         device_context.enqueue_function(

@@ -315,7 +315,7 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             params.append(
                 UnsafePointer(to=self.weight)
                 .unsafe_mut_cast[True]()
-                .as_any_origin()
+                .as_unsafe_any_origin()
             )
         return params^
 

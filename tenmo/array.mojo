@@ -1,5 +1,5 @@
 from .common_utils import panic
-from std.builtin.device_passable import DevicePassable
+from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 from std.utils import StaticTuple
 from .intarray import IntArray
 import .mnemonics
@@ -55,7 +55,9 @@ struct Array(
     def get_device_type_name() -> String:
         return Self.get_type_name()
 
-    def _to_device_type(self, target: MutOpaquePointer[_]):
+    def _to_device_type(
+        self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]
+    ):
         target.bitcast[Self.device_type]()[] = self
 
     var storage: StaticTuple[Int, max_rank]

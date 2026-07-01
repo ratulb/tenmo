@@ -64,7 +64,6 @@ def unary_ops[
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
     simd_vectors_per_thread: Int = 2 * simd_width,
-    # epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ](
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
@@ -154,57 +153,58 @@ def float_unary_ops[
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     size: Int,
 ) where dtype.is_floating_point():
-    """Floating point unary ops kernel — LOG, EXP, TANH, SIGMOID.
-    Requires dtype.is_floating_point() — supported in Mojo 0.26.2+.
-    """
-    var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
-    var stride = block_dim.x * grid_dim.x
+    """Floating point unary ops kernel — LOG, EXP, TANH, SIGMOID."""
+    comptime if dtype.is_floating_point():
+        var tid = thread_idx.x
+        var gtid = tid + block_dim.x * block_idx.x
+        var stride = block_dim.x * grid_dim.x
 
-    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
-    var base_idx = gtid * CHUNK_SIZE
+        comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+        var base_idx = gtid * CHUNK_SIZE
 
-    while base_idx < size:
-        comptime for item in range(simd_vectors_per_thread):
-            var i = base_idx + item * simd_width
+        while base_idx < size:
+            comptime for item in range(simd_vectors_per_thread):
+                var i = base_idx + item * simd_width
 
-            if i + simd_width <= size:
-                var vec_a = A.load[width=simd_width](i)
-                var one = SIMD[dtype, simd_width](1.0)
-                var vec_result: SIMD[dtype, simd_width]
-
-                comptime if op_code == LOG:
-                    vec_result = log(
-                        max(vec_a, SIMD[dtype, simd_width](epsilon))
-                    )
-                elif op_code == EXP:
-                    vec_result = exp(vec_a)
-                elif op_code == TANH_FORWARD:
-                    var e2x = exp(vec_a + vec_a)
-                    vec_result = (e2x - one) / (e2x + one)
-                else:  # SIGMOID_FORWARD
-                    vec_result = one / (one + exp(-vec_a))
-
-                result.store[width=simd_width](i, vec_result)
-
-            elif i < size:
-                for j in range(size - i):
-                    var x = A[i + j]
-                    var res: Scalar[dtype]
+                if i + simd_width <= size:
+                    var vec_a = A.load[width=simd_width](i)
+                    var vec_result: SIMD[dtype, simd_width]
+                    var one = SIMD[dtype, simd_width](1.0)
 
                     comptime if op_code == LOG:
-                        res = log(max(x, epsilon))
+                        vec_result = log(
+                            max(vec_a, SIMD[dtype, simd_width](epsilon))
+                        )
                     elif op_code == EXP:
-                        res = exp(x)
+                        vec_result = exp(vec_a)
                     elif op_code == TANH_FORWARD:
-                        var e2x = exp(x + x)
-                        res = (e2x - 1.0) / (e2x + 1.0)
+                        var e2x = exp(vec_a + vec_a)
+                        vec_result = (e2x - one) / (e2x + one)
                     else:  # SIGMOID_FORWARD
-                        res = 1.0 / (1.0 + exp(-x))
+                        vec_result = one / (one + exp(-vec_a))
 
-                    result[i + j] = res
+                    result.store[width=simd_width](i, vec_result)
+
+                elif i < size:
+                    for j in range(size - i):
+                        var x = A[i + j]
+                        var res: Scalar[dtype]
+
+                        comptime if op_code == LOG:
+                            res = log(max(x, epsilon))
+                        elif op_code == EXP:
+                            res = exp(x)
+                        elif op_code == TANH_FORWARD:
+                            var e2x = exp(x + x)
+                            res = (e2x - 1.0) / (e2x + 1.0)
+                        else:  # SIGMOID_FORWARD
+                            res = 1.0 / (1.0 + exp(-x))
+
+                        result[i + j] = res
 
         base_idx += stride * CHUNK_SIZE
+    else:
+        panic("float_unary_ops requires a floating point dtype")
 
 
 # =============================================================================
@@ -307,8 +307,10 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     def launch[
         op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
-    ](A: NDBuffer[Self.dtype], sync: Bool = False) raises -> NDBuffer[Self.dtype]:
-        comptime epsilon_rebinded = rebind[Scalar[Self.datatype]](epsilon)
+    ](A: NDBuffer[Self.dtype], sync: Bool = False) raises -> NDBuffer[
+        Self.dtype
+    ]:
+        comptime epsilon_for_float = rebind[Scalar[Self.dtype]](epsilon)
         comptime if op_code == INVERT:
             comptime assert (
                 Self.dtype == DType.bool or Self.dtype.is_integral()
@@ -326,38 +328,31 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
             numels
         )
         comptime if op_code == LOG or op_code == EXP or op_code == TANH_FORWARD or op_code == SIGMOID_FORWARD:
-            comptime if not Self.dtype.is_floating_point():
+            comptime if Self.dtype.is_floating_point():
+                var compiled = device_context.compile_function[
+                    float_unary_ops[
+                        op_code=op_code,
+                        dtype=Self.dtype,
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread=2 * simdwidth,
+                        epsilon=epsilon_for_float,
+                    ],
+                ]()
+                device_context.enqueue_function(
+                    compiled,
+                    result_buffer,
+                    contig_state.device_buffer(),
+                    numels,
+                    grid_dim=num_blocks,
+                    block_dim=threads_per_block,
+                )
+            else:
                 panic(
                     "UnaryOpsKernel: LOG/EXP/TANH/SIGMOID require a floating"
                     " point dtype"
                 )
-            var compiled = device_context.compile_function[
-                float_unary_ops[
-                    op_code=op_code,
-                    dtype=Self.datatype,
-                    simd_width=simdwidth,
-                    simd_vectors_per_thread=2 * simdwidth,
-                    epsilon=epsilon_rebinded,
-                ],
-                float_unary_ops[
-                    op_code=op_code,
-                    dtype=Self.datatype,
-                    simd_width=simdwidth,
-                    simd_vectors_per_thread=2 * simdwidth,
-                    epsilon=epsilon_rebinded,
-                ],
-            ]()
-            device_context.enqueue_function(
-                compiled,
-                result_buffer,
-                contig_state.device_buffer(),
-                numels,
-                grid_dim=num_blocks,
-                block_dim=threads_per_block,
-            )
         elif op_code == INVERT and Self.dtype == DType.bool:
             var compiled = device_context.compile_function[
-                invert_bool[simdwidth, 2 * simdwidth],
                 invert_bool[simdwidth, 2 * simdwidth],
             ]()
             device_context.enqueue_function(
@@ -377,12 +372,6 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     simd_width=simdwidth,
                     simd_vectors_per_thread=2 * simdwidth,
                 ],
-                unary_ops[
-                    op_code=op_code,
-                    dtype=Self.datatype,
-                    simd_width=simdwidth,
-                    simd_vectors_per_thread=2 * simdwidth,
-                ],
             ]()
             device_context.enqueue_function(
                 compiled,
@@ -393,7 +382,8 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 block_dim=threads_per_block,
             )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype].__init__[True](
             result_buffer^, device_state.gpu
@@ -452,12 +442,6 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 simd_width=simdwidth,
                 simd_vectors_per_thread=2 * simdwidth,
             ],
-            unary_ops_with_mask[
-                op_code=op_code,
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
         ]()
 
         # Single kernel dispatch — writes result AND mask simultaneously
@@ -471,7 +455,8 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
             result_buffer^, device_state.gpu

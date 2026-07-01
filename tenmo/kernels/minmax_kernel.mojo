@@ -266,7 +266,6 @@ struct ReductionMinMax[dtype: DType = DType.float32](
         )
         var compiled_reduce = device_context.compile_function[
             reduce_minmax[Self.dtype, max_block_width, is_max],
-            reduce_minmax[Self.dtype, max_block_width, is_max],
         ]()
         device_context.enqueue_function(
             compiled_reduce,
@@ -280,7 +279,8 @@ struct ReductionMinMax[dtype: DType = DType.float32](
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         # ── Pass 2: build normalised mask ────────────────────────────────────
         var mask_buffer = device_context.enqueue_create_buffer[Self.dtype](
@@ -290,7 +290,6 @@ struct ReductionMinMax[dtype: DType = DType.float32](
         mask_buffer.enqueue_fill(Scalar[Self.dtype](0))
 
         var compiled_mask = device_context.compile_function[
-            build_minmax_mask[Self.dtype, max_block_width, is_max],
             build_minmax_mask[Self.dtype, max_block_width, is_max],
         ]()
         device_context.enqueue_function(
@@ -306,7 +305,8 @@ struct ReductionMinMax[dtype: DType = DType.float32](
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
         var result_ndb = NDBuffer[Self.dtype].with_device_state(
