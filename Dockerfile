@@ -29,7 +29,7 @@ RUN MOJO_VERSION="${MOJO_VERSION:-$(grep 'mojo =' pixi.toml | sed 's/.*"==\(.*\)
 COPY . .
 
 RUN mkdir -p /app/bin && for name in $EXAMPLES; do \
-      mojo build -I . "examples/${name}.mojo" -o "/app/bin/${name}"; \
+      mojo build -I . -Xlinker -lm "examples/${name}.mojo" -o "/app/bin/${name}"; \
     done
 
 # Persist the resolved Mojo version for the runtime stage
@@ -51,7 +51,7 @@ RUN MOJO_VERSION="${MOJO_VERSION:-$(cat /tmp/mojo_version.txt)}" && \
 COPY --from=builder /app/bin /app/bin
 
 # Entrypoint: list binaries or exec requested one
-COPY <<"EOF" /entrypoint.sh
+COPY --chmod=+x <<"EOF" /entrypoint.sh
 #!/bin/sh
 if [ $# -eq 0 ]; then
    echo "Available:"
