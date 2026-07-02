@@ -20,7 +20,7 @@ from tenmo.kernels.matmul_kernel import MatmulNdGpu
 from std.sys import prefetch, PrefetchOptions
 from std import math
 from tenmo.device import GPU
-from std.utils.numerics import max_finite, min_finite
+from std.utils.numerics import max_finite, min_finite, neg_inf
 from tenmo.numpy_interop import to_ndarray, from_ndarray
 from std.random import seed
 from std.sys.defines import get_defined_string
@@ -35,24 +35,65 @@ import tenmo
 from tenmo.net import Linear
 from std.collections import Set
 from tenmo.backpropagation import ArgumentType
+from tenmo.shared import Reduction
+
 comptime dtype = DType.float32
+
 
 trait Argument:
     comptime new_type: Optional[DType]
 
+
 @fieldwise_init
 struct NewTypeArg[orig_type: DType]:
     @staticmethod
-    def convert[new_dtype: DType, //](var gradbox: Gradbox[new_dtype]) -> Gradbox[Self.orig_type]:
+    def convert[
+        new_dtype: DType, //
+    ](var gradbox: Gradbox[new_dtype]) -> Gradbox[Self.orig_type]:
         return gradbox.to_dtype[Self.orig_type]()
 
+
 def main() raises:
+    var inputs = Tensor[dtype].d2(
+        [
+            [0.43, 0.15, 0.89],
+            [0.55, 0.87, 0.66],
+            [0.57, 0.85, 0.64],
+            [0.22, 0.58, 0.33],
+            [0.77, 0.25, 0.10],
+            [0.05, 0.80, 0.55],
+        ]
+    )
+
+    inputs.print()
+
+
+def main1() raises:
     comptime dtype = DType.float32
-    var logits = Tensor[dtype].rand(2, 3, 2)
-    logits.print()
+    var B, T, C = 4, 8, 2
+    var X = Tensor[dtype].rand(B, T, C)
+    var bow = Tensor[dtype].zeros(B, T, C)
+    for b in range(B):
+        for t in range(T):
+            var x_prev = X[i(b), s(0, t + 1), s()]
+            bow.fill(x_prev.mean(axes=[0]), i(b), i(t), s())
+
+    var wei = Tensor[dtype].ones(T, T)
+    wei = wei.tril[False]()
+    wei = wei / wei.sum(axes=[1], keepdims=True)
+    # wei.print()
+
+    var bow2 = wei.matmul(X)
+    assert_true(bow.all_close(bow2))
+    var tril = Tensor[dtype].ones(T, T).tril()
+    wei = Tensor[dtype].zeros(T, T)
+    wei = wei.masked_fill(tril == 0, neg_inf[dtype]())
+    wei.print()
+    wei = wei.softmax(axes=[-1])
     print()
-    var selected = logits[s(), i(-1), s()]  # shape: (B, C)
-    selected.print()
+    wei.print()
+    var bow3 = wei.matmul(X)
+    assert_true(bow.all_close(bow3))
 
 
 def attention() raises:
@@ -66,7 +107,7 @@ def attention() raises:
             [0.05, 0.80, 0.55],
         ]
     )
-    _="""query = inputs[i(1), s()]
+    _ = """query = inputs[i(1), s()]
     attn_scores_2 = Tensor[dtype].empty(inputs.shape()[0])
     for i, x_i in enumerate(inputs.slices()):
         attn_scores_2[i] = x_i.dot(query).item()
@@ -180,22 +221,29 @@ struct SelfAttention_v1[dtype: DType](ImplicitlyCopyable & Movable):
         var context_vec = attn_weights.matmul(values)
         return context_vec^
 
+
 struct SelfAttention_v2[dtype: DType](ImplicitlyCopyable & Movable):
     var W_query: Linear[Self.dtype]
     var W_key: Linear[Self.dtype]
     var W_value: Linear[Self.dtype]
 
     def __init__(out self, d_in: Int, d_out: Int):
-        self.W_query = Linear[Self.dtype](d_in, d_out, init_method="xavier", bias_zero=True)
-        self.W_key = Linear[Self.dtype](d_in, d_out, init_method="xavier", bias_zero=True)
-        self.W_value = Linear[Self.dtype](d_in, d_out, init_method="xavier", bias_zero=True)
+        self.W_query = Linear[Self.dtype](
+            d_in, d_out, init_method="xavier", bias_zero=True
+        )
+        self.W_key = Linear[Self.dtype](
+            d_in, d_out, init_method="xavier", bias_zero=True
+        )
+        self.W_value = Linear[Self.dtype](
+            d_in, d_out, init_method="xavier", bias_zero=True
+        )
 
     def __call__(
         mut self, mut x: Tensor[Self.dtype]
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var keys = self.W_key(x)
         var queries = self.W_query(x)
-        var values =self.W_value(x)
+        var values = self.W_value(x)
         var attn_scores = queries.matmul(keys.transpose())
         var denom = Scalar[Self.dtype](math.sqrt(keys.shape()[-1]))
         var attn_weights = (attn_scores / denom).softmax(axes=[-1])

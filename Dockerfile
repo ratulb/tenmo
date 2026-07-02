@@ -1,9 +1,12 @@
+# Usage 1: docker build -t tenmo:latest .
+# Usage 2: docker build --build-arg EXAMPLES="mnist_unified" -t tenmo:mnist .
 # ── Build arguments ────────────────────────────────────────────────
 # MOJO_VERSION: leave empty to auto-detect from pixi.toml, or set
 #               explicitly (e.g. --build-arg MOJO_VERSION=1.0.0b1).
 # EXAMPLES:     space-separated list of example names to build.
 ARG MOJO_VERSION=""
-ARG EXAMPLES="mnist mnist_unified word2vec_cbow xor"
+#ARG EXAMPLES="mnist mnist_unified word2vec_cbow xor"
+ARG EXAMPLES="mnist"
 
 # ── Builder stage ──────────────────────────────────────────────────
 FROM python:3.12-slim AS builder

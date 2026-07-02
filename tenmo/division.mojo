@@ -100,6 +100,7 @@ struct DivBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         y: Buffer[Self.dtype],
     ) -> Tuple[Buffer[Self.dtype], Buffer[Self.dtype]]:
         """Fused backward for x / y. Computes both gradients in one pass.
+
         grad_x = grad_output / y
         grad_y = -grad_output * x / y²
         """

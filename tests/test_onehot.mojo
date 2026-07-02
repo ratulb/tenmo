@@ -357,6 +357,110 @@ def test_onehot_gpu_parity_2d() raises:
         assert_true(result_cpu.all_close(result_gpu.to_cpu()))
 
 
+# ── Large-Size Tests ────────────────────────────────────────────────────────────
+
+
+def test_onehot_cpu_large_1d() raises:
+    comptime dtype = DType.float32
+    var N: Int = 1000
+    var C: Int = 100
+    var indices_list = List[Scalar[dtype]]()
+    for i in range(N):
+        indices_list.append(Scalar[dtype](i % C))
+    var indices = Tensor[dtype].d1(indices_list)
+    var result = Tensor[dtype].onehot(indices, C)
+    assert_true(result.shape() == Shape(N, C))
+    # Row sums must be 1
+    for i in range(N):
+        var row_sum = Scalar[dtype](0)
+        for j in range(C):
+            row_sum += result[[i, j]]
+        assert_true(row_sum == Scalar[dtype](1.0))
+    # Each row has 1 at column (i % C)
+    for i in range(N):
+        var cls = i % C
+        assert_true(result[[i, cls]] == Scalar[dtype](1.0))
+
+
+def test_onehot_cpu_large_2d_batch() raises:
+    comptime dtype = DType.float32
+    var B: Int = 64
+    var T: Int = 32
+    var C: Int = 50
+    var indices_data = List[Scalar[dtype]]()
+    for i in range(B * T):
+        indices_data.append(Scalar[dtype]((i * 7) % C))
+    var indices_1d = Tensor[dtype].d1(indices_data)
+    var indices_t = indices_1d.reshape(Shape(B, T))
+    var result = Tensor[dtype].onehot(indices_t, C)
+    assert_true(result.shape() == Shape(B, T, C))
+    for b in range(B):
+        for t in range(T):
+            var cls = ((b * T + t) * 7) % C
+            assert_true(result[[b, t, cls]] == Scalar[dtype](1.0))
+
+
+def test_onehot_gpu_large_1d() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var N: Int = 1000
+        var C: Int = 100
+        var indices_list = List[Scalar[dtype]]()
+        for i in range(N):
+            indices_list.append(Scalar[dtype](i % C))
+        var indices = Tensor[dtype].d1(indices_list).to_gpu()
+        var result = Tensor[dtype].onehot(indices, C)
+        assert_true(result.is_on_gpu())
+        assert_true(result.shape() == Shape(N, C))
+        var result_cpu = result.to_cpu()
+        for i in range(N):
+            var row_sum = Scalar[dtype](0)
+            for j in range(C):
+                row_sum += result_cpu[[i, j]]
+            assert_true(row_sum == Scalar[dtype](1.0))
+        for i in range(N):
+            var cls = i % C
+            assert_true(result_cpu[[i, cls]] == Scalar[dtype](1.0))
+
+
+def test_onehot_gpu_large_2d_batch() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var B: Int = 64
+        var T: Int = 32
+        var C: Int = 50
+        var indices_data = List[Scalar[dtype]]()
+        for i in range(B * T):
+            indices_data.append(Scalar[dtype]((i * 7) % C))
+        var indices_1d = Tensor[dtype].d1(indices_data)
+        var indices_2d = indices_1d.reshape(Shape(B, T))
+        var indices_gpu = indices_2d.to_gpu()
+        var result = Tensor[dtype].onehot(indices_gpu, C)
+        assert_true(result.is_on_gpu())
+        assert_true(result.shape() == Shape(B, T, C))
+        var result_cpu = result.to_cpu()
+        for b in range(B):
+            for t in range(T):
+                var cls = ((b * T + t) * 7) % C
+                assert_true(result_cpu[[b, t, cls]] == Scalar[dtype](1.0))
+
+
+def test_onehot_gpu_large_parity() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var N: Int = 500
+        var C: Int = 80
+        var indices_list = List[Scalar[dtype]]()
+        for i in range(N):
+            indices_list.append(Scalar[dtype]((i * 3 + 7) % C))
+        var indices_cpu = Tensor[dtype].d1(indices_list)
+        var indices_gpu = Tensor[dtype].d1(indices_list).to_gpu()
+        var result_cpu = Tensor[dtype].onehot(indices_cpu, C)
+        var result_gpu = Tensor[dtype].onehot(indices_gpu, C)
+        assert_true(result_gpu.is_on_gpu())
+        assert_true(result_cpu.all_close(result_gpu.to_cpu()))
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 

@@ -882,31 +882,33 @@ from expected ~0.05ms each to ~6.5ms, ~1.2ms, ~1.2ms. ~9ms/batch waste on GPU.
 **Fix applied:** Two-line change. After fix, bias_add dispatches through PATH 2
 (one operand unit-stride, one broadcasts) using SIMD-splat for the scalar side.
 
-### CrossEntropy GPU Path — Planned Fused Kernel
+### CrossEntropy GPU Path — Fused Kernel (Fixed)
 
-**Problem:** `CEClassIndicesForward.forward` on GPU triggers ~18 separate
-kernel launches + 1 CPU-fallback onehot loop for a single crossentropy call.
-Profiling shows 29ms per (64, 10) call — dominated by kernel launch overhead
-and CPU-fallback onehot (64 per-element DeviceState round trips).
+**Problem (historical):** `CEClassIndicesForward.forward` on GPU used to trigger
+~18 separate kernel launches + 1 CPU-fallback onehot loop for a single
+crossentropy call. Profiling showed 29ms per (64, 10) call — dominated by
+kernel launch overhead and CPU-fallback onehot (64 per-element DeviceState
+round trips).
 
-**Fix (planned):** Write a fused forward kernel at
-`tenmo/kernels/crossentropy_fused_kernel.mojo` that computes max, exp,
-sum_exp, softmax, log_softmax_target, and per-sample loss in 1 launch:
-- Thread-block-per-row pattern (M blocks)
-- Shared-memory tree reduction for max and sum_exp
-- `Atomic.fetch_add` for scalar_loss and valid_count
-- Handles ignore_index and label_smoothing in-kernel
-- Replaces the existing ~18 kernel decomposition + CPU onehot entirely
+**Fix applied:**
+- **Forward fused kernel** at `tenmo/kernels/crossentropy_fused_kernel.mojo:290`,
+  wired at `tenmo/crossentropy.mojo:984` — computes max, exp, sum_exp, softmax,
+  per-sample loss, label smoothing, ignore_mask, and atomic scalar-loss in **1 launch**.
+- **Backward fused kernel** at `launch_backward` (line 438), wired at
+  `crossentropy.mojo:724` — fuses onehot, smoothing, ignore_mask, and scaling
+  in **1 launch** (not 4 separate arithmetic ops).
+- **Standalone GPU onehot** at `CrossEntropyFusedKernel.launch_onehot` (line 392)
+  — used internally by the CE backward.
 
-Backward stays unchanged — 4 GPU arithmetic ops using stored softmax.
+### Onehot Missing GPU Kernel (Partially Fixed)
 
-### Onehot Missing GPU Kernel
-
-`NDBuffer.onehot` at `ndbuffer.mojo:411` has no GPU path. For GPU-resident
-tensors, it iterates coordinates on CPU and writes elements via per-element
+**Standalone GPU onehot kernel exists** at `CrossEntropyFusedKernel.launch_onehot`
+(`kernels/crossentropy_fused_kernel.mojo:392`), used internally by the fused CE
+backward. However, `NDBuffer.onehot` at `ndbuffer.mojo:426` still has no GPU
+path — it iterates coordinates on CPU and writes elements via per-element
 `DeviceState.__setitem__()` — each a `map_to_host()` round trip. The fused
-crossentropy kernel eliminates this bottleneck by computing NLL in-kernel
-instead of via onehot masking.
+crossentropy kernel avoids needing this for CE, but any other code calling
+`NDBuffer.onehot` on GPU tensors will hit the slow path.
 
 ### GPU `scatter_add` only supports axis=0 — Fixed
 

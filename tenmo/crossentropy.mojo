@@ -431,22 +431,6 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
 
         return softmax_ndb^, valid_count, out^
 
-    @always_inline
-    @staticmethod
-    def compute_log_softmax_and_softmax(
-        logits_2d: NDBuffer[Self.dtype],
-    ) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ] where Self.dtype.is_floating_point():
-        """
-        Returns (log_softmax, softmax) along axis=1.
-        GPU safe — log_softmax and softmax are both GPU ready.
-        Returns NDBuffers — safe for backward storage.
-        """
-        return SoftmaxNdBuffer[Self.dtype].log_softmax(
-            logits_2d, IntArray([1]), validated=True
-        )
-
     @staticmethod
     def scale_grad_by_upstream(
         grad: NDBuffer[Self.dtype],
@@ -837,83 +821,6 @@ struct ClassIndicesBwdArg[
     var valid_count: Int
     var M: Int
     var C: Int
-
-
-def _forward_cpu_impl[
-    dtype: DType,
-    target_dtype: DType = DEFAULT_INDEX_DTYPE,
-](
-    logits_2d_ndb: NDBuffer[dtype],
-    target_1d_ndb: NDBuffer[target_dtype],
-    reduction: Reduction,
-    ignore_index: Int,
-    label_smoothing: Scalar[dtype],
-    spatial_shape: Shape,
-    N: Int,
-    C: Int,
-) -> Tuple[NDBuffer[dtype], Int, Tensor[dtype]] where dtype.is_floating_point():
-    """CPU decomposed forward path. Returns (softmax_probs, valid_count, out).
-    """
-    var log_probs_ndb: NDBuffer[dtype]
-    var softmax_probs_ndb: NDBuffer[dtype]
-    log_probs_ndb, softmax_probs_ndb = CECommon[
-        dtype
-    ].compute_log_softmax_and_softmax(logits_2d_ndb)
-
-    var ignore_mask_ndb = CECommon[dtype, target_dtype].build_ignore_mask(
-        target_1d_ndb, ignore_index
-    )
-    var valid_count = (
-        SumMeanReduction[dtype]
-        .sum(ignore_mask_ndb, normalized_axes=IntArray())
-        .item()
-        .__int__()
-    )
-    var device = logits_2d_ndb.device()
-    var onehot_mask = NDBuffer[dtype].onehot(
-        target_1d_ndb.to_dtype[dtype](),
-        C,
-        device,
-        ignore_index=ignore_index,
-    )
-
-    var losses: NDBuffer[dtype]
-    if label_smoothing > Scalar[dtype](0):
-        var nll = (
-            SumMeanReduction[dtype]
-            .sum(
-                onehot_mask.arithmetic_ops[Multiply](log_probs_ndb),
-                normalized_axes=IntArray(1),
-            )
-            .unary_ops[NEGATE]()
-        )
-        var mean_log_p = (
-            SumMeanReduction[dtype]
-            .sum(log_probs_ndb, normalized_axes=IntArray(1))
-            .scalar_ops[Divide](Scalar[dtype](C))
-        )
-        losses = nll.scalar_ops[Multiply](
-            Scalar[dtype](1) - label_smoothing
-        ).arithmetic_ops[Subtract](
-            mean_log_p.scalar_ops[Multiply](label_smoothing)
-        )
-    else:
-        losses = (
-            SumMeanReduction[dtype]
-            .sum(
-                onehot_mask.arithmetic_ops[Multiply](log_probs_ndb),
-                normalized_axes=IntArray(1),
-            )
-            .unary_ops[NEGATE]()
-        )
-
-    losses = losses.arithmetic_ops[Multiply](ignore_mask_ndb)
-
-    var out = CECommon[dtype].apply_reduction(
-        losses, reduction, N, spatial_shape, valid_count
-    )
-
-    return softmax_probs_ndb, valid_count, out
 
 
 @fieldwise_init

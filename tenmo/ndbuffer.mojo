@@ -20,6 +20,7 @@ from tenmo.kernels.scalar_inplace_ops_kernel import InplaceScalarOperations
 from tenmo.kernels.binary_ops_kernel import BinaryOperations
 from tenmo.kernels.binary_inplace_ops_kernel import BinaryInplaceOperations
 from tenmo.kernels.unary_ops_kernel import UnaryOpsKernel
+from tenmo.kernels.onehot import Onehot
 from tenmo.kernels.matmul_kernel import MatmulNdGpu
 from tenmo.matmul_cpu import MmCpu2d, MmCpuNd
 from tenmo.cpu_arithmetics import CpuArithmeticOps
@@ -430,39 +431,11 @@ struct NDBuffer[dtype: DType](
         ignore_index: Optional[Int] = None,
     ) -> NDBuffer[Self.dtype]:
         """Convert NDBuffer of class indices to one-hot encoding.
-        Args:
-            indices: Tensor of shape (...,) containing class indices.
-            num_classes: Number of classes.
-            device: Target device.
-            ignore_index: If provided, rows where index == ignore_index become all zeros.
-        Returns: Tensor of shape (..., num_classes).
+        Delegates to Onehot[dtype, dtype].launch() — CPU and GPU paths.
         """
-        ref shape = indices.shape
-        ref target_device = device.or_else(indices.device())
-        var result = NDBuffer[Self.dtype].zeros(
-            shape + [num_classes], device=target_device
+        return Onehot[Self.dtype, Self.dtype].launch(
+            indices, num_classes, device, ignore_index
         )
-
-        var ignore_val = ignore_index.or_else(-1000000)  # sentinel
-
-        for coord in shape:
-            var class_index = indices[coord].__int__()
-
-            # Skip ignored indices entirely — leave row as zeros
-            if ignore_index and class_index == ignore_val:
-                continue
-
-            if class_index < 0 or class_index >= num_classes:
-                panic(
-                    "Tensor → onehot: invalid class",
-                    String(class_index),
-                    "at coordinate",
-                    String(coord),
-                )
-            var onehot_coord = coord + class_index
-            result[onehot_coord] = Scalar[Self.dtype](1)
-
-        return result^
 
     def shuffle(
         self,

@@ -160,32 +160,6 @@ def fused_ce_class_indices_forward_kernel[
             _ = Atomic.fetch_add(valid_count_out, Scalar[DType.int32](1))
 
 
-def onehot_fill_kernel[
-    dtype: DType,
-    target_dtype: DType = DEFAULT_INDEX_DTYPE,
-](
-    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    indices: UnsafePointer[Scalar[target_dtype], ImmutAnyOrigin],
-    M: Int,
-    C: Int,
-    ignore_index: Int,
-):
-    """Fill result[row * C + target[row]] = 1 for each valid row.
-
-    One block per row — only thread 0 does work per block.
-    Rows where target[row] == ignore_index are skipped (left as zeros).
-    """
-    var row = block_idx.x
-    if row >= M:
-        return
-    var tgt = indices[row]
-    if tgt == Scalar[target_dtype](ignore_index):
-        return
-    var c = tgt.__int__()
-    if 0 <= c < C:
-        result[row * C + c] = Scalar[dtype](1)
-
-
 # ── Fused Backward Kernel ──────────────────────────────────────────────────────
 
 
@@ -388,51 +362,6 @@ struct CrossEntropyFusedKernel[
         )
 
         return (softmax_ndb^, loss_ndb^, scalar_val, valid_cnt)
-
-    @staticmethod
-    def launch_onehot(
-        target_1d: NDBuffer[Self.target_dtype],
-        num_classes: Int,
-        ignore_index: Int,
-    ) raises -> NDBuffer[Self.dtype]:
-        """Fill a (M, C) GPU buffer with onehot encoding of target_1d.
-
-        One block per row. Each block sets element (row, target[row]) to 1.
-        Rows where target[row] == ignore_index stay all zeros.
-        """
-        debug_assert(target_1d.is_on_gpu())
-        var M = target_1d.shape[0]
-        var C = num_classes
-
-        ref device_state = target_1d.device_state.value()
-        var ctx = device_state.gpu[]
-
-        var contig_target = target_1d.contiguous_device_state()
-
-        var result_buffer = ctx.enqueue_create_buffer[Self.dtype](M * C)
-        result_buffer.enqueue_fill(0)
-
-        var compiled = ctx.compile_function[
-            onehot_fill_kernel[Self.dtype, Self.target_dtype],
-        ]()
-
-        ctx.enqueue_function(
-            compiled,
-            result_buffer,
-            contig_target.device_buffer(),
-            M,
-            C,
-            ignore_index,
-            grid_dim=M,
-            block_dim=1,
-        )
-
-        var result_state = DeviceState[Self.dtype](
-            result_buffer^, device_state.gpu
-        )
-        return NDBuffer[Self.dtype].with_device_state(
-            result_state^, Shape(M, C)
-        )
 
     @staticmethod
     def launch_backward(

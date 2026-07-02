@@ -634,14 +634,14 @@ Ranked by estimated performance impact. Covers all CPU-only code paths found dur
 **Phase C: Code organization — ✅ DONE**
 
 - [x] **C1. Factor duplication** — Forward structs call the fused function once (CPU path in single call, no track_grad branching).
-- [x] **C2. Decomposed fallback** — `_forward_cpu_impl` (L779) and `compute_log_softmax_and_softmax` (L409) preserved as fallback.
+- [x] **C2. Decomposed fallback** — `_forward_cpu_impl` and `compute_log_softmax_and_softmax` removed (dead code since fused paths handle everything).
 
 **Phase D: Follow-up refinements — ✅ DONE**
 
 - [x] **D1. SIMD inner loop** — Both functions use `comptime SIMD_WIDTH = simd_width_of[Self.dtype]()` with `simd_end` guard for remainder handling.
 - [x] **D2. Early exit** — `comptime if track_grad:` eliminates softmax and smoothed_target allocations in eval mode. `reduction='none'` + `track_grad=False` allocates only `per_sample_loss`.
 
-**Files:** `tenmo/crossentropy.mojo` — `_fused_forward_class_indices` (L283), `_fused_forward_probabilities` (L467). Old decomposed path preserved at L779.
+**Files:** `tenmo/crossentropy.mojo` — `_fused_forward_class_indices` (L285), `_fused_forward_probabilities` (L484). Old decomposed path removed.
 
 **Estimated impact:** ~10-20× faster CPU crossentropy (both paths) by replacing ~10-18 full NDBuffer passes with 3 fused SIMD passes per row, eliminating 15-21 heap allocations per loss call.
 

@@ -480,8 +480,8 @@ def print_summary[
     for j in range(len(headers)):
         var maxw = 0
         for row in rows:
-            if len(row[j]) > maxw:
-                maxw = len(row[j])
+            if row[j].byte_length() > maxw:
+                maxw = row[j].byte_length()
         widths.append(maxw)
 
     # Print horizontal rule
@@ -498,7 +498,7 @@ def print_summary[
         var line = ""
         for j in range(len(rows[idx])):
             var val = rows[idx][j]
-            line += "| " + val + str_repeat(" ", widths[j] - len(val)) + " "
+            line += "| " + val + str_repeat(" ", widths[j] - val.byte_length()) + " "
         line += "|"
         print(line)
         print_rule(widths)

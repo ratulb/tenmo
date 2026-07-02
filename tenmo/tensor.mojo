@@ -1,5 +1,5 @@
 from std.math import exp, log, sqrt
-from std.random import seed, random_float64
+from std.random import seed, random_float64, random_ui64
 from std.sys import simd_width_of
 from std.utils.numerics import min_finite
 from std.memory import memcpy, memset, memset_zero
@@ -32,6 +32,7 @@ from .broadcasthelper import ShapeBroadcaster
 from .ndbuffer import NDBuffer
 from std.gpu.host import DeviceBuffer, DeviceContext
 from .device import Device, CPU, GPU
+from tenmo.kernels.random_kernel import RandomKernel
 from tenmo.shared import Reduction
 from tenmo.sum_mean_reduction import SumMeanReduction
 from std.sys.info import has_accelerator
@@ -1259,6 +1260,7 @@ struct Tensor[dtype: DType](
         high: Scalar[Self.dtype] = 1,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
         """Create a tensor with uniform random values in [low, high).
 
@@ -1268,11 +1270,14 @@ struct Tensor[dtype: DType](
             high: Upper bound (exclusive).
             init_seed: Random seed. If None, randomizes each call.
             requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
 
         Returns:
             A tensor of given shape with uniform random values.
         """
-        return Self.rand(Shape(dims), low, high, init_seed, requires_grad)
+        return Self.rand(
+            Shape(dims), low, high, init_seed, requires_grad, device
+        )
 
     @staticmethod
     def rand(
@@ -1281,6 +1286,7 @@ struct Tensor[dtype: DType](
         high: Scalar[Self.dtype] = 1,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
         """Create a tensor with uniform random values in [low, high).
 
@@ -1290,11 +1296,14 @@ struct Tensor[dtype: DType](
             high: Upper bound (exclusive).
             init_seed: Random seed. If None, randomizes each call.
             requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
 
         Returns:
             A tensor of given shape with uniform random values.
         """
-        return Self.rand(Shape(shape), low, high, init_seed, requires_grad)
+        return Self.rand(
+            Shape(shape), low, high, init_seed, requires_grad, device
+        )
 
     @staticmethod
     def rand(
@@ -1303,6 +1312,7 @@ struct Tensor[dtype: DType](
         max: Scalar[Self.dtype] = 1,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
         """Create a tensor with uniform random values in [min, max).
 
@@ -1312,10 +1322,37 @@ struct Tensor[dtype: DType](
             max: Upper bound (exclusive).
             init_seed: Random seed. If None, randomizes each call.
             requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
 
         Returns:
             A tensor of given shape with uniform random values.
         """
+        var target_device = device.or_else(CPU().into())
+
+        # GPU path
+        comptime if has_accelerator():
+            if target_device.is_gpu():
+                try:
+                    var rng_seed = (
+                        UInt64(init_seed.value())
+                        if init_seed
+                        else random_ui64(0, UInt64.MAX)
+                    )
+                    var gpu = target_device.gpu()
+                    var nd_buffer = RandomKernel[Self.dtype].launch_uniform(
+                        shape,
+                        min,
+                        max,
+                        rng_seed,
+                        gpu,
+                    )
+                    return Tensor[Self.dtype](
+                        nd_buffer^, requires_grad=requires_grad
+                    )
+                except e:
+                    panic("Tensor.rand GPU launch failed: " + String(e))
+
+        # CPU path
         if init_seed:
             seed(init_seed.value())
         else:
@@ -1340,6 +1377,7 @@ struct Tensor[dtype: DType](
         std: Float64 = 1.0,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
         """Create a tensor with values from a normal distribution.
 
@@ -1349,11 +1387,14 @@ struct Tensor[dtype: DType](
             std: Distribution standard deviation.
             init_seed: Random seed. If None, randomizes each call.
             requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
 
         Returns:
             A tensor of given shape with normally distributed values.
         """
-        return Self.randn(Shape(dims), mean, std, init_seed, requires_grad)
+        return Self.randn(
+            Shape(dims), mean, std, init_seed, requires_grad, device
+        )
 
     @staticmethod
     def randn(
@@ -1362,6 +1403,7 @@ struct Tensor[dtype: DType](
         std: Float64 = 1.0,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
         """Create a tensor with values from a normal distribution.
 
@@ -1371,12 +1413,40 @@ struct Tensor[dtype: DType](
             std: Distribution standard deviation.
             init_seed: Random seed. If None, randomizes each call.
             requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
 
         Returns:
             A tensor of given shape with normally distributed values.
         """
+        var target_device = device.or_else(CPU().into())
 
-        var nd_buffer = NDBuffer[Self.dtype].randn(shape, mean, std, init_seed)
+        # GPU path
+        comptime if has_accelerator():
+            if target_device.is_gpu():
+                try:
+                    var rng_seed = (
+                        UInt64(init_seed.value())
+                        if init_seed
+                        else random_ui64(0, UInt64.MAX)
+                    )
+                    var gpu = target_device.gpu()
+                    var nd_buffer = RandomKernel[Self.dtype].launch_normal(
+                        shape,
+                        mean.cast[DType.float32](),
+                        std.cast[DType.float32](),
+                        rng_seed,
+                        gpu,
+                    )
+                    return Tensor[Self.dtype](
+                        nd_buffer^, requires_grad=requires_grad
+                    )
+                except e:
+                    panic("Tensor.randn GPU launch failed: " + String(e))
+
+        # CPU path
+        var nd_buffer = NDBuffer[Self.dtype].randn(
+            shape, mean, std, init_seed
+        )
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
     @staticmethod
