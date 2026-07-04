@@ -65,7 +65,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.6.17-hbd8a1cb_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/certifi-2026.6.17-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/charset-normalizer-3.4.7-pyhd8ed1ab_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/click-8.4.1-pyhc90fa1f_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/click-8.4.2-pyhc90fa1f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/cpython-3.12.13-py312hd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/h2-4.3.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hpack-4.2.0-pyhd8ed1ab_0.conda
@@ -93,7 +93,7 @@ environments:
       - conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-1.0.0b2-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mblack-26.4.0-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mojo-python-1.0.0b2-release.conda
-      - conda_source: mojodoc[046d3d48] @ git+https://github.com/ratulb/mojodoc?branch=main#d6e7df5baabde7efe1c90b132cffce0f75b9bedf
+      - conda_source: mojodoc[f946c8c6] @ git+https://github.com/ratulb/mojodoc?branch=main#f6f25bc0376cac6e0df5de91f123adbf21ece8db
       - pypi: https://files.pythonhosted.org/packages/4b/f9/d8ac11ddbd5d506e7c6be71b8a33698c73fd9dc108f6c9e0595f7cd60619/pure_cifar_10-0.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/bb/6b/f4a3d0637692c49da8ef99d72d52526f92e0a8d6ac4f0ca9f31441b9d9ea/numpy-2.5.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/c6/27/ab926560371a7fe729a60d603a326e05dad022e5684dd2fc07d687b49692/mnist_datasets-0.14-py3-none-any.whl
@@ -156,7 +156,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.6.17-hbd8a1cb_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/certifi-2026.6.17-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/charset-normalizer-3.4.7-pyhd8ed1ab_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/click-8.4.1-pyhc90fa1f_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/click-8.4.2-pyhc90fa1f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/cpython-3.12.13-py312hd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/h2-4.3.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hpack-4.2.0-pyhd8ed1ab_0.conda
@@ -184,7 +184,7 @@ environments:
       - conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-1.0.0b2-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mblack-26.4.0-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mojo-python-1.0.0b2-release.conda
-      - conda_source: mojodoc[046d3d48] @ git+https://github.com/ratulb/mojodoc?branch=main#d6e7df5baabde7efe1c90b132cffce0f75b9bedf
+      - conda_source: mojodoc[f946c8c6] @ git+https://github.com/ratulb/mojodoc?branch=main#f6f25bc0376cac6e0df5de91f123adbf21ece8db
       - pypi: https://files.pythonhosted.org/packages/4b/f9/d8ac11ddbd5d506e7c6be71b8a33698c73fd9dc108f6c9e0595f7cd60619/pure_cifar_10-0.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/bb/6b/f4a3d0637692c49da8ef99d72d52526f92e0a8d6ac4f0ca9f31441b9d9ea/numpy-2.5.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/c6/27/ab926560371a7fe729a60d603a326e05dad022e5684dd2fc07d687b49692/mnist_datasets-0.14-py3-none-any.whl
@@ -970,9 +970,9 @@ packages:
   run_exports: {}
   size: 58872
   timestamp: 1775127203018
-- conda: https://conda.anaconda.org/conda-forge/noarch/click-8.4.1-pyhc90fa1f_0.conda
-  sha256: c253a41cdf898b651a0786cbb76c6d5fc101d0dbbe719f93a124bc4fde5cdd6a
-  md5: 554304a07e581a85891b15e39ea9f268
+- conda: https://conda.anaconda.org/conda-forge/noarch/click-8.4.2-pyhc90fa1f_0.conda
+  sha256: ccc4787f511964f9a1f2d2d2859c91c5d571fb60f7f09d4c4e092c9b7a94e671
+  md5: 2c4bd6aeb90bb157456841c3270a0d92
   depends:
   - __unix
   - python
@@ -982,8 +982,8 @@ packages:
   purls:
   - pkg:pypi/click?source=compressed-mapping
   run_exports: {}
-  size: 104999
-  timestamp: 1779900548735
+  size: 107155
+  timestamp: 1783085363526
 - conda: https://conda.anaconda.org/conda-forge/noarch/cpython-3.12.13-py312hd8ed1ab_0.conda
   noarch: generic
   sha256: d3e9bbd7340199527f28bbacf947702368f31de60c433a16446767d3c6aaf6fe
@@ -1253,7 +1253,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/traitlets?source=hash-mapping
+  - pkg:pypi/traitlets?source=compressed-mapping
   run_exports: {}
   size: 115158
   timestamp: 1780507822178
@@ -1341,7 +1341,7 @@ packages:
   run_exports: {}
   size: 24682
   timestamp: 1781220753246
-- conda_source: mojodoc[046d3d48] @ git+https://github.com/ratulb/mojodoc?branch=main#d6e7df5baabde7efe1c90b132cffce0f75b9bedf
+- conda_source: mojodoc[f946c8c6] @ git+https://github.com/ratulb/mojodoc?branch=main#f6f25bc0376cac6e0df5de91f123adbf21ece8db
   version: 0.0.1
   build: hb0f4dca_0
   subdir: linux-64
