@@ -159,6 +159,7 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
 
         Args:
             indices:  Token ids to look up. Each must be in [0, num_embeddings).
+            sync:     Whether to synchronize the GPU operation.
 
         Returns:
             (len(indices), embedding_dim) when reduction is NONE.
@@ -278,6 +279,7 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             weights:     Pretrained weight tensor, shape (vocab_size, dim).
             padding_idx: Row to keep zeroed.
             max_norm:    Renormalisation threshold.
+            norm_type:   Type of norm to use (default: 2.0).
             freeze:      If True (default), embeddings are not updated during training.
                          Set False to fine-tune pretrained embeddings.
             reduction:   How to reduce gathered rows (NONE/SUM/MEAN).

@@ -40,9 +40,9 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         """Initialize the index iterator.
 
         Args:
-            shape: Pointer to the Shape of the tensor
-            strides: Pointer to the Strides of the tensor
-            start_offset: Initial memory offset (default: 0)
+            shape: Pointer to the Shape of the tensor.
+            strides: Pointer to the Strides of the tensor.
+            start_offset: Initial memory offset (default: 0).
         """
         self.shape = shape
         self.strides = strides
@@ -236,16 +236,13 @@ struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
         """Calculate flat (linear) index from multi-dimensional indices.
 
         Args:
-            shape: Shape of the tensor
-            indices: IntArray of indices, one per dimension
-            strides: Strides of the tensor
-            offset: Base offset to add (default: 0)
+            shape: Shape of the tensor.
+            indices: IntArray of indices, one per dimension.
+            strides: Strides of the tensor.
+            offset: Base offset to add (default: 0).
 
         Returns:
-            The flat memory offset corresponding to the given indices
-
-        Raises:
-            Panic if indices or strides have wrong rank, or if any index is out of bounds.
+            The flat memory offset corresponding to the given indices.
         """
         # 1. Rank check
         var rank = shape.rank()
@@ -301,14 +298,11 @@ struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
         """Convert flat (linear) index to multi-dimensional coordinates.
 
         Args:
-            shape: Shape of the tensor
-            flat_index: Linear index to convert
+            shape: Shape of the tensor.
+            flat_index: Linear index to convert.
 
         Returns:
-            IntArray of coordinates corresponding to the flat index
-
-        Raises:
-            Panic if flat_index is out of bounds.
+            IntArray of coordinates corresponding to the flat index.
         """
         if flat_index < 0 or flat_index >= shape.num_elements():
             panic(
@@ -333,9 +327,9 @@ struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
         """Calculate the maximum valid flat index for the given shape and strides.
 
         Args:
-            shape: Shape of the tensor
-            strides: Strides of the tensor
-            offset: Base offset to add
+            shape: Shape of the tensor.
+            strides: Strides of the tensor.
+            offset: Base offset to add.
 
         Returns:
             The maximum flat index that can be accessed in the tensor.

@@ -1,8 +1,7 @@
-# Generalized Padding Implementation for Mojo Tensor Library
-# Supports arbitrary dimensions with asymmetric padding and gradient flow
+# Generalized Padding Implementation for Mojo Tensor Library.
 
 """
-PADDING SPECIFICATION:
+Padding specification.
 
 For N-dimensional tensor, padding is specified as a list of tuples:
 [(before_0, after_0), (before_1, after_1), ..., (before_N-1, after_N-1)]

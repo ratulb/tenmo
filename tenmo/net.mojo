@@ -1143,6 +1143,7 @@ struct Sequential[dtype: DType](Copyable & Movable):
 
         Args:
             gpu: Target GPU. Uses default GPU if None.
+            stop_grad: Whether to stop gradients at the transfer boundary.
 
         Returns:
             New Sequential with all parameterised layers on GPU.

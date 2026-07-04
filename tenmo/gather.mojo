@@ -146,9 +146,11 @@ struct Gather[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             self:          Tensor.
             indices:       Indices along `axis`. Negative values are normalized.
             axis:          Axis to gather along. Negative axes are normalized.
-            requires_grad: Override requires_grad. Defaults to self.requires_grad.
             reduction:     How to reduce gathered rows (NONE/SUM/MEAN).
                            SUM/MEAN fuse gather+sum, output shape: (cols,).
+            padding_idx:   Row index to keep zeroed.
+            requires_grad: Override requires_grad. Defaults to self.requires_grad.
+            sync:          Whether to synchronize the GPU operation.
 
         Returns:
             Contiguous tensor. Shape is (len(indices), ...) normally,
@@ -363,6 +365,7 @@ struct Gather[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
                              Empty (default) → 1D behavior, output dim `ax` = len(normalized).
                              Non-empty → output gains `len(indices_shape)-1` extra dims
                              inserted at `ax`.
+            sync:            Whether to synchronize the GPU operation.
 
         Returns:
             Fresh contiguous tensor on the same device as self.

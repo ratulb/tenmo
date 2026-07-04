@@ -79,8 +79,7 @@ def elementwise_launch_config(
     numels: Int,
     simd_width: Int,
 ) -> Tuple[Int, Int]:
-    """Compute (num_blocks, threads_per_block) for an elementwise GPU kernel
-    that uses the following thread-work layout:
+    """Compute launch configuration for an elementwise GPU kernel.
 
         CHUNK_SIZE = simd_vectors_per_thread * simd_width
                    = 2 * simd_width          (simd_vectors_per_thread == 2)

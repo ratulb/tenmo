@@ -75,6 +75,7 @@ struct LayerNormCpu[dtype: DType](ImplicitlyCopyable & Movable):
          gamma: Scale (D,).
          beta:  Shift (D,).
          eps:   Numerical stability constant.
+         sync:  Whether to synchronize the GPU operation.
         """
         comptime if has_accelerator():
             if x.is_on_gpu():

@@ -221,9 +221,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             A Gradbox containing the norm(s).
-
-        Raises:
-            Panic if p is not 2.0.
         """
         if p == 2.0:
             # L2 norm: sqrt(sum(x²))
@@ -242,7 +239,7 @@ struct Gradbox[dtype: DType](
         """Create a 1D Gradbox with evenly spaced values.
 
         Args:
-            *args: Start, stop, and optionally step values.
+            args: Start, stop, and optionally step values.
 
         Returns:
             A 1D Gradbox with values from start to stop.
@@ -378,6 +375,7 @@ struct Gradbox[dtype: DType](
             min: Lower bound (inclusive).
             max: Upper bound (exclusive).
             init_seed: Random seed. If None, randomizes each call.
+            requires_grad: Whether to track gradients.
 
         Returns:
             A new Gradbox with random values in [min, max).
@@ -453,7 +451,6 @@ struct Gradbox[dtype: DType](
         """Sum over broadcasted axes to match target shape.
 
         Args:
-            extended_grad: The gradient that was broadcasted.
             target_shape: The shape to expand to.
 
         Returns:
@@ -472,9 +469,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             A new Gradbox with the target shape.
-
-        Raises:
-            Panic if the shapes are not broadcastable.
         """
         if not ShapeBroadcaster.broadcastable(self.shape(), target_shape):
             panic(
@@ -492,7 +486,7 @@ struct Gradbox[dtype: DType](
         """Index the Gradbox with Idx objects (integers or slices).
 
         Args:
-            *indices: One index per axis — either an integer or a Slice.
+            indices: One index per axis — either an integer or a Slice.
 
         Returns:
             A new Gradbox view over the indexed region.
@@ -550,9 +544,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             The scalar value at the specified coordinates.
-
-        Raises:
-            Panic if called on a scalar Gradbox with non-empty indices.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -571,9 +562,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             The scalar value at the specified coordinates.
-
-        Raises:
-            Panic if called on a scalar Gradbox with non-empty indices.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -588,13 +576,10 @@ struct Gradbox[dtype: DType](
         """Index the Gradbox with variadic integer indices.
 
         Args:
-            *indices: One index per axis.
+            indices: One index per axis.
 
         Returns:
             The scalar value at the specified coordinates.
-
-        Raises:
-            Panic if called on a scalar Gradbox.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -611,9 +596,6 @@ struct Gradbox[dtype: DType](
         Args:
             indices: List of axis indices.
             value: The value to write.
-
-        Raises:
-            Panic if called on a scalar Gradbox with non-empty indices.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -630,9 +612,6 @@ struct Gradbox[dtype: DType](
         Args:
             indices: IntArray of axis indices.
             value: The value to write.
-
-        Raises:
-            Panic if called on a scalar Gradbox with non-empty indices.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -646,11 +625,8 @@ struct Gradbox[dtype: DType](
         """Set a scalar value at given coordinates.
 
         Args:
-            *indices: One index per axis.
+            indices: One index per axis.
             value: The value to write.
-
-        Raises:
-            Panic if called on a scalar Gradbox with non-empty indices.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -690,9 +666,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             The scalar value.
-
-        Raises:
-            Panic if the Gradbox is not a scalar.
         """
         return self.buffer().item()
 
@@ -793,9 +766,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             The scalar value at that index.
-
-        Raises:
-            Panic if index is out of bounds.
         """
         return self.buffer().get(index)
 
@@ -820,9 +790,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             True if all elements are equal.
-
-        Raises:
-            Panic if shapes don't match.
         """
         if self.shape() != other.shape():
             panic(
@@ -841,9 +808,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             True if any elements differ.
-
-        Raises:
-            Panic if shapes don't match.
         """
         if self.shape() != other.shape():
             panic(
@@ -1020,7 +984,7 @@ struct Gradbox[dtype: DType](
 
         Args:
             value: The value to write.
-            *indices: Idx objects defining the region.
+            indices: Idx objects defining the region.
         """
         Filler[Self.dtype].fill(self.buffer(), value, indices)
 
@@ -1029,7 +993,7 @@ struct Gradbox[dtype: DType](
 
         Args:
             tensor: The tensor to copy from.
-            *indices: Idx objects defining the destination region.
+            indices: Idx objects defining the destination region.
         """
         Filler[Self.dtype].fill(self.buffer(), tensor.buffer, indices)
 
@@ -1038,7 +1002,7 @@ struct Gradbox[dtype: DType](
 
         Args:
             gradbox: The Gradbox to copy from.
-            *indices: Idx objects defining the destination region.
+            indices: Idx objects defining the destination region.
         """
         Filler[Self.dtype].fill(self.buffer(), gradbox.buffer(), indices)
 
@@ -1172,9 +1136,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             A new Gradbox with the result.
-
-        Raises:
-            Panic if scalar is zero.
         """
         if scalar == Scalar[Self.dtype](0):
             panic("Gradbox → __truediv__(scalar): can not divide by zero")
@@ -1231,7 +1192,6 @@ struct Gradbox[dtype: DType](
         """Matrix multiplication.
 
         Args:
-            A: Left operand.
             B: Right operand.
 
         Returns:
@@ -1386,15 +1346,10 @@ struct Gradbox[dtype: DType](
         """Check if all elements are close to another Gradbox.
 
         Args:
-            rtol: Relative tolerance.
-            atol: Absolute tolerance.
             other: The Gradbox to compare with.
 
         Returns:
             True if all elements are within tolerance.
-
-        Raises:
-            Panic if shapes differ or dtype is not floating point.
         """
         comptime assert (
             Self.dtype.is_floating_point()
@@ -1416,15 +1371,10 @@ struct Gradbox[dtype: DType](
         """Check if all elements are close to a Tensor.
 
         Args:
-            rtol: Relative tolerance.
-            atol: Absolute tolerance.
             other: The Tensor to compare with.
 
         Returns:
             True if all elements are within tolerance.
-
-        Raises:
-            Panic if shapes differ or dtype is not floating point.
         """
         comptime assert (
             Self.dtype.is_floating_point()
@@ -1445,9 +1395,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             A scalar Gradbox.
-
-        Raises:
-            Panic if the Gradbox has more than one element.
         """
         if self.numels() != 1:
             panic(
@@ -1481,9 +1428,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             True if all elements are equal.
-
-        Raises:
-            Panic if shapes differ.
         """
         if self.shape() != tensor.shape():
             panic(

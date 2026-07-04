@@ -327,7 +327,7 @@ struct Product[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             axes:               Reduction axes (unnormalised).
             keepdims:           Keep reduced dimensions.
             requires_grad:      Override grad tracking.
-            store_excl_product: Comptime flag — store or recompute excl_product.
+            sync:               Whether to synchronize the GPU operation.
 
         Returns:
             Output tensor with product applied.

@@ -64,6 +64,7 @@ struct ReLU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         Args:
             self: Input tensor.
             requires_grad: Override gradient tracking (default: inherit from input).
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Output tensor with ReLU applied.

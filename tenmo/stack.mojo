@@ -171,6 +171,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             tensors: List of tensors to stack (must have identical shapes).
             axis: Position where new dimension is inserted.
             requires_grad: Whether to track gradients.
+            sync: Whether to sync GPU after operation.
 
         Returns:
             Stacked tensor with new dimension at position 'axis'.

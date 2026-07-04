@@ -378,16 +378,20 @@ struct CrossEntropyFusedKernel[
         """Fused backward: onehot + smoothing + ignore_mask + scaling in one launch.
 
         Args:
-            softmax_ndb: (M, C) - softmax probabilities on GPU
-            target_ndb:  (M,) — class indices on GPU
-            upstream_ndb: upstream gradient buffer
-                For none reduction: shape (M,) — must be on GPU
-                For sum/mean reduction: shape () — can be CPU, auto-transferred
-            reduction: none/sum/mean enum
-            valid_count: number of non-ignored rows (for mean scaling)
+            softmax_ndb:   (M, C) - softmax probabilities on GPU.
+            target_ndb:    (M,) — class indices on GPU.
+            upstream_ndb:  Upstream gradient buffer.
+                For none reduction: shape (M,) — must be on GPU.
+                For sum/mean reduction: shape () — can be CPU, auto-transferred.
+            reduction:     None/sum/mean enum.
+            valid_count:   Number of non-ignored rows (for mean scaling).
+            M:             Number of rows.
+            C:             Number of classes.
+            ignore_index:  Class index to ignore in loss.
+            label_smoothing: Label smoothing factor.
 
         Returns:
-            (M, C) NDBuffer with the full gradient w.r.t. logits
+            (M, C) NDBuffer with the full gradient w.r.t. logits.
         """
         debug_assert(softmax_ndb.is_on_gpu())
         debug_assert(target_ndb.is_on_gpu())

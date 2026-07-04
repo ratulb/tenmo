@@ -138,6 +138,7 @@ struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
             p:        Dropout probability.
             scale:    1 / (1 - p).
             rng_seed: Seed forwarded to Philox — same seed → same mask.
+            sync:     Whether to sync GPU after operation.
 
         Returns:
             Tuple of (output NDBuffer, mask NDBuffer), both on GPU.

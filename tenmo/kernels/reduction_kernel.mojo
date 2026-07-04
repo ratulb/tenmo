@@ -976,6 +976,7 @@ struct Reduction[dtype: DType = DType.float32](
             A:               Input NDBuffer. Must be on GPU.
             normalized_axes: Validated, normalised reduction axes.
             keepdims:        Whether to keep reduced dimensions.
+            sync:            Whether to sync GPU after operation.
 
         Returns:
             NDBuffer with reduction applied.
@@ -1072,6 +1073,7 @@ struct Reduction[dtype: DType = DType.float32](
             A:               Input NDBuffer. Must be on GPU.
             normalized_axes: Validated, normalised reduction axes.
             keepdims:        Whether to keep reduced dimensions.
+            sync:            Whether to sync GPU after operation.
 
         Returns:
             Tuple of (output NDBuffer, ProductArg for backward).
@@ -1374,6 +1376,7 @@ struct Reduction[dtype: DType = DType.float32](
             A:               Input NDBuffer. Must be on GPU.
             normalized_axes: Validated, normalised reduction axes.
             keepdims:        Whether to keep reduced dimensions.
+            sync:            Whether to sync GPU after operation.
 
         Returns:
             Tuple of (mean NDBuffer, M2 NDBuffer), same shape as sum/mean output.

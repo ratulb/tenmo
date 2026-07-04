@@ -137,6 +137,7 @@ struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             gamma: Scale parameters. Shape (D,).
             beta:  Shift parameters. Shape (D,).
             eps:   Numerical stability constant.
+            sync:  Whether to sync GPU after operation.
 
         Returns:
             Tuple of (output, x_hat, rstd) NDBuffers.

@@ -43,7 +43,7 @@ struct IntArray(
         """Create IntArray from variadic integer arguments.
 
         Args:
-            *values: Variable number of integers to initialize the array with
+            values: Variable number of integers to initialize the array with.
 
         Example:
             IntArray(1, 2, 3) creates an array with elements [1, 2, 3]
@@ -61,7 +61,7 @@ struct IntArray(
         """Create IntArray from a VariadicList of integers.
 
         Args:
-            values: VariadicList of integers to initialize the array with
+            values: VariadicList of integers to initialize the array with.
         """
         var n = len(values)
         self._data = alloc[Int](n)
@@ -76,7 +76,7 @@ struct IntArray(
         """Create IntArray from a Mojo List.
 
         Args:
-            values: Mojo List of integers to initialize the array with
+            values: Mojo List of integers to initialize the array with.
 
         Note:
             This creates a copy of the data from the input list.
@@ -118,14 +118,14 @@ struct IntArray(
         """Create an IntArray filled with a specific value.
 
         Args:
-            size: Number of elements in the array
-            value: Value to fill each element with
+            size: Number of elements in the array.
+            value: Value to fill each element with.
 
         Returns:
             IntArray instance with all elements set to the specified value
 
         Example:
-            IntArray.filled(5, 42) creates [42, 42, 42, 42, 42]
+            IntArray.filled(5, 42) creates [42, 42, 42, 42, 42].
         """
         var result = IntArray.with_capacity(size)
         for _ in range(size):
@@ -138,20 +138,17 @@ struct IntArray(
         """Create an IntArray from a range of values.
 
         Args:
-            start: Starting value (inclusive)
-            end: Ending value (exclusive)
-            step: Increment between values (default: 1)
+            start: Starting value (inclusive).
+            end: Ending value (exclusive).
+            step: Increment between values (default: 1).
 
         Returns:
-            IntArray instance containing the range of values
-
-        Raises:
-            Panic if step is zero
+            IntArray instance containing the range of values.
 
         Example:
             IntArray.range(0, 5) -> [0, 1, 2, 3, 4]
             IntArray.range(0, 10, 2) -> [0, 2, 4, 6, 8]
-            IntArray.range(10, 0, -2) -> [10, 8, 6, 4, 2]
+            IntArray.range(10, 0, -2) -> [10, 8, 6, 4, 2].
         """
         if step == 0:
             panic("IntArray.range: step cannot be zero")
@@ -182,7 +179,7 @@ struct IntArray(
         """Create an IntArray with pre-allocated capacity but zero size.
 
         Args:
-            capacity: Pre-allocated capacity for the array
+            capacity: Pre-allocated capacity for the array.
 
         Returns:
             IntArray instance with specified capacity but zero length
@@ -203,13 +200,13 @@ struct IntArray(
         """Invert a permutation array.
 
         Args:
-            perm: IntArray representing a permutation
+            perm: IntArray representing a permutation.
 
         Returns:
             IntArray representing the inverse permutation
 
         Example:
-            For perm = [2, 0, 1], the inverse is [1, 2, 0]
+            For perm = [2, 0, 1], the inverse is [1, 2, 0].
         """
         var inverted = IntArray.filled(len(perm), 0)
         for i in range(len(perm)):
@@ -288,9 +285,6 @@ struct IntArray(
 
         Returns:
             Reference to the element at the specified index.
-
-        Raises:
-            Panic if index is out of bounds.
         """
         var index = idx if idx >= 0 else idx + self._size
         if index < 0 or index >= self._size:
@@ -304,9 +298,6 @@ struct IntArray(
         Args:
             idx: Index of element to set. Supports negative indexing.
             value: New value to store at the specified index.
-
-        Raises:
-            Panic if index is out of bounds or array is a view.
         """
         if not self.owning():
             panic("IntArray: can't modify a view")
@@ -382,13 +373,10 @@ struct IntArray(
         """Ensure capacity, reallocating if needed.
 
         Args:
-            required: Minimum required capacity
-
-        Raises:
-            Panic if called on a non-owning (view) array.
+            required: Minimum required capacity.
 
         Note:
-            Growth strategy: new capacity = max(required, current_capacity * 1.5 + 1)
+            Growth strategy: new capacity = max(required, current_capacity * 1.5 + 1).
         """
         if not self.owning():
             panic("IntArray: can't reserve on a view")
@@ -416,7 +404,7 @@ struct IntArray(
         """Append one or more elements to the end of the array.
 
         Args:
-            *values: One or more integers to append to the array
+            values: One or more integers to append to the array.
 
         Note:
             Automatically reserves additional capacity if needed using exponential growth strategy.
@@ -432,7 +420,7 @@ struct IntArray(
         """Prepend an element to the beginning of the array.
 
         Args:
-            value: Integer value to prepend
+            value: Integer value to prepend.
 
         Note:
             Uses memmove for O(n) block shift.
@@ -449,10 +437,7 @@ struct IntArray(
         """In-place addition with another IntArray.
 
         Args:
-            other: IntArray to add element-wise to this array
-
-        Raises:
-            Panic if arrays have unequal lengths or array is a view.
+            other: IntArray to add element-wise to this array.
         """
         if not self.owning() and self._size > 0:
             panic("IntArray: can't mutate a view")
@@ -466,10 +451,7 @@ struct IntArray(
         """In-place addition with a Mojo List.
 
         Args:
-            other: Mojo List of integers to add element-wise to this array
-
-        Raises:
-            Panic if array and list have unequal lengths or array is a view.
+            other: Mojo List of integers to add element-wise to this array.
         """
         if not self.owning() and self._size > 0:
             panic("IntArray: can't mutate a view")
@@ -483,7 +465,7 @@ struct IntArray(
         """Reverse addition with an integer.
 
         Args:
-            value: Integer to prepend to the array
+            value: Integer to prepend to the array.
 
         Returns:
             New IntArray with value at the start followed by elements of this array
@@ -498,7 +480,7 @@ struct IntArray(
         """Return new array with value appended.
 
         Args:
-            value: Integer to append to the array
+            value: Integer to append to the array.
 
         Returns:
             New IntArray with value at the end
@@ -522,7 +504,7 @@ struct IntArray(
         """Return new array with values of other IntArray concatenated.
 
         Args:
-            other: IntArray to concatenate with this array
+            other: IntArray to concatenate with this array.
 
         Returns:
             New IntArray containing elements of this array followed by elements of other
@@ -551,7 +533,7 @@ struct IntArray(
         """Return new array with values of other List[Int] concatenated.
 
         Args:
-            other: List of integers to concatenate with this array
+            other: List of integers to concatenate with this array.
 
         Returns:
             New IntArray containing elements of this array followed by elements of other
@@ -566,10 +548,10 @@ struct IntArray(
         """Reverse addition with a List[Int].
 
         Args:
-            other: List of integers to prepend to this array
+            other: List of integers to prepend to this array.
 
         Returns:
-            New IntArray containing elements of other followed by elements of this array
+            New IntArray containing elements of other followed by elements of this array.
         """
         return IntArray(other).__add__(self)
 
@@ -578,10 +560,7 @@ struct IntArray(
         """Remove and return element at specified index.
 
         Args:
-            index: Index of element to remove (default: -1 for last element)
-
-        Raises:
-            Panic if array is empty, index is out of bounds, or array is a view.
+            index: Index of element to remove (default: -1 for last element).
         """
         if not self.owning():
             panic("IntArray: can't pop from a view")
@@ -601,9 +580,6 @@ struct IntArray(
 
     def clear(mut self):
         """Remove all elements from the array.
-
-        Raises:
-            Panic if array is a view.
 
         Note:
             Does not free memory; only resets size to zero.
@@ -706,9 +682,6 @@ struct IntArray(
 
     def sort(mut self, asc: Bool = True):
         """Insertion sort in place.
-
-        Raises:
-            Panic if array is a view (and non-empty).
         """
         if not self.owning() and self._size > 0:
             panic("IntArray: can't sort a view")
@@ -740,9 +713,6 @@ struct IntArray(
     @always_inline("nodebug")
     def fill(mut self, value: Int):
         """Fill with value.
-
-        Raises:
-            Panic if array is a view (and non-empty).
         """
         if not self.owning() and self._size > 0:
             panic("IntArray: can't fill a view")
@@ -819,7 +789,7 @@ struct IntArray(
         """Write IntArray to a writer.
 
         Args:
-            writer: Writer to write to
+            writer: Writer to write to.
         """
         writer.write(self.__str__())
 
@@ -854,9 +824,6 @@ struct IntArray(
     @always_inline("nodebug")
     def reverse(mut self):
         """Reverse the array in place.
-
-        Raises:
-            Panic if array is a view (and non-empty).
 
         Note:
             Modifies the array in place, reversing the order of elements.

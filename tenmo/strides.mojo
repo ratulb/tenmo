@@ -33,10 +33,10 @@ struct Strides(
         """Create strides filled with zeros for the given rank.
 
         Args:
-            rank: Number of dimensions for the strides
+            rank: Number of dimensions for the strides.
 
         Returns:
-            Strides instance with all elements set to 0
+            Strides instance with all elements set to 0.
         """
         return Strides(IntArray.filled(rank, 0))
 
@@ -49,7 +49,7 @@ struct Strides(
         """Create strides from an IntArray.
 
         Args:
-            values: IntArray containing stride values for each dimension
+            values: IntArray containing stride values for each dimension.
         """
         self.data = values
 
@@ -58,7 +58,7 @@ struct Strides(
         """Create strides from a Mojo List of integers.
 
         Args:
-            values: Mojo List of integers representing stride values for each dimension
+            values: Mojo List of integers representing stride values for each dimension.
         """
         self.data = IntArray(values)
 
@@ -67,7 +67,7 @@ struct Strides(
         """Create strides from individual integer values.
 
         Args:
-            *values: Variable number of integers representing stride values for each dimension
+            values: Variable number of integers representing stride values for each dimension.
         """
         self.data = IntArray(values)
 
@@ -76,7 +76,7 @@ struct Strides(
         """Create a copy of another strides instance.
 
         Args:
-             copy: Strides instance to copy from
+             copy: Strides instance to copy from.
         """
         self.data = copy.data
 
@@ -85,7 +85,7 @@ struct Strides(
         """Get the number of dimensions (rank) of the strides.
 
         Returns:
-             Number of dimensions in the strides instance
+             Number of dimensions in the strides instance.
         """
         return len(self.data)
 
@@ -94,7 +94,7 @@ struct Strides(
         """Convert strides to an Array.
 
         Returns:
-            Array containing the same elements as the strides
+            Array containing the same elements as the strides.
         """
         var result = Array()
         result.size = len(self)
@@ -107,10 +107,10 @@ struct Strides(
         """Get the stride value at the specified dimension index.
 
         Args:
-            i: Dimension index
+            i: Dimension index.
 
         Returns:
-            Stride value for dimension i
+            Stride value for dimension i.
         """
         return self.data[i]
 
@@ -119,8 +119,8 @@ struct Strides(
         """Set the stride value at the specified dimension index.
 
         Args:
-            i: Dimension index
-            value: New stride value for dimension i
+            i: Dimension index.
+            value: New stride value for dimension i.
         """
         self.data[i] = value
 
@@ -129,10 +129,10 @@ struct Strides(
         """Get a slice of strides.
 
         Args:
-             slice: Slice specifying the range to extract
+             slice: Slice specifying the range to extract.
 
         Returns:
-            New Strides instance containing the sliced elements
+            New Strides instance containing the sliced elements.
         """
         return Strides(self.data[slice].owned_copy())
 
@@ -140,10 +140,10 @@ struct Strides(
         """Check if two strides instances are equal.
 
         Args:
-             other: Strides instance to compare with
+             other: Strides instance to compare with.
 
         Returns:
-            True if strides are equal, False otherwise
+            True if strides are equal, False otherwise.
         """
         return self.data == other.data
 
@@ -151,7 +151,7 @@ struct Strides(
         """Get string representation of the strides.
 
         Returns:
-            String representation in the format '(s0, s1, ..., sn)'
+            String representation in the format '(s0, s1, ..., sn)'.
         """
         var s = self.data.__str__()
         return "(" + s[byte = 1 : s.byte_length() - 1] + ")"
@@ -160,7 +160,7 @@ struct Strides(
         """Get official string representation of the strides.
 
         Returns:
-            String representation suitable for debugging
+            String representation suitable for debugging.
         """
         return self.__str__()
 
@@ -168,7 +168,7 @@ struct Strides(
         """Write strides to a writer.
 
         Args:
-             writer: Writer to write to
+             writer: Writer to write to.
         """
         writer.write(self.__str__())
 
@@ -177,7 +177,7 @@ struct Strides(
         """Convert strides to a Mojo List.
 
         Returns:
-            Mojo List containing the stride values for each dimension
+            Mojo List containing the stride values for each dimension.
         """
         return self.data.tolist()
 
@@ -186,7 +186,7 @@ struct Strides(
         """Get the underlying IntArray of the strides.
 
         Returns:
-            IntArray containing the stride values
+            IntArray containing the stride values.
         """
         return self.data
 
@@ -196,10 +196,10 @@ struct Strides(
 
         Args:
             axes: IntArray specifying the new order of dimensions
-                  (e.g., [2,0,1] means dim0->dim2, dim1->dim0, dim2->dim1)
+                  (e.g., [2,0,1] means dim0->dim2, dim1->dim0, dim2->dim1).
 
         Returns:
-             New Strides instance with dimensions reordered according to axes
+             New Strides instance with dimensions reordered according to axes.
 
         Example:
             ```mojo
@@ -218,14 +218,14 @@ struct Strides(
         """Compute default C-contiguous strides for the given shape.
 
         Args:
-            shape: Shape representing tensor dimensions
+            shape: Shape representing tensor dimensions.
 
         Returns:
-             Strides instance representing C-contiguous memory layout
+             Strides instance representing C-contiguous memory layout.
 
         Example:
             For shape (2, 3, 4), returns strides (12, 4, 1)
-            where 12 = 3*4, 4 = 4, 1 = 1
+            where 12 = 3*4, 4 = 4, 1 = 1.
         """
         var rank = shape.rank()
         var strides = IntArray.with_capacity(rank)
@@ -240,10 +240,10 @@ struct Strides(
         """Check if the strides represent a contiguous memory layout for the given shape.
 
         Args:
-            shape: Shape representing tensor dimensions
+            shape: Shape representing tensor dimensions.
 
         Returns:
-            True if strides represent contiguous layout, False otherwise
+            True if strides represent contiguous layout, False otherwise.
 
         Note:
             A layout is contiguous if elements are stored in memory without gaps,
@@ -271,10 +271,10 @@ struct Strides(
         """Create an empty strides instance with pre-allocated capacity.
 
         Args:
-            capacity: Pre-allocated capacity for the strides data
+            capacity: Pre-allocated capacity for the strides data.
 
         Returns:
-            Empty Strides instance with specified capacity
+            Empty Strides instance with specified capacity.
 
         Note:
             This avoids frequent reallocations when you know approximately

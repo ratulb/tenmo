@@ -309,6 +309,7 @@ struct StdVarianceBackwardKernel[dtype: DType](
             x:     Input NDBuffer (*, D). Must be on GPU.
             mean:  Per-row mean (*, 1) from Welford forward.
             scale: 2 / divisor uniform scalar.
+            sync:  Whether to sync GPU after operation.
 
         Returns:
             Contiguous NDBuffer (*, D) — (x - mean) * scale.
@@ -384,6 +385,7 @@ struct StdVarianceBackwardKernel[dtype: DType](
             x:     Input NDBuffer (*, D). Must be on GPU.
             mean:  Per-row mean (*, 1) from Welford forward.
             denom: Per-row denominator (*, 1) — (std+eps)*divisor.
+            sync:  Whether to sync GPU after operation.
 
         Returns:
             Contiguous NDBuffer (*, D) — (x - mean) / denom.

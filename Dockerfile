@@ -1,5 +1,19 @@
+# Install docker
+# curl -fsSL https://get.docker.com | sh
+# sudo usermod -aG docker $USER
+# newgrp docker          # apply group change without logout
+# docker --version       # verify
+
+# Build image
 # Usage 1: docker build -t tenmo:latest .
 # Usage 2: docker build --build-arg EXAMPLES="mnist_unified" -t tenmo:mnist .
+# Usage 3: docker build -t tenmo:mnist .
+# Push
+# docker login -u <username>
+# docker tag tenmo:mnist ratulb/tenmo:latest
+# docker push ratulb/tenmo:latest
+# Run
+# docker run -it ratulb/tenmo:latest
 # ── Build arguments ────────────────────────────────────────────────
 # MOJO_VERSION: leave empty to auto-detect from pixi.toml, or set
 #               explicitly (e.g. --build-arg MOJO_VERSION=1.0.0b1).

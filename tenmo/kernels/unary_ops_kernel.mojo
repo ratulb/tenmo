@@ -406,7 +406,8 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
         the kernel operates on the resulting flat buffer.
 
         Args:
-            A: Input NDBuffer. Must be on GPU.
+            A:    Input NDBuffer. Must be on GPU.
+            sync: Whether to sync GPU after operation.
 
         Returns:
             Tuple of (output NDBuffer, mask NDBuffer), both contiguous on GPU.

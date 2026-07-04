@@ -382,9 +382,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             Scalar value at the specified coordinates.
-
-        Raises:
-            Panic if tensor is scalar but indices are provided.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -402,9 +399,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             Scalar value at the specified coordinates.
-
-        Raises:
-            Panic if tensor is scalar but indices are provided.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -418,13 +412,10 @@ struct Tensor[dtype: DType](
         """Index tensor with variadic integer indices.
 
         Args:
-            *indices: One index per axis.
+            indices: One index per axis.
 
         Returns:
             Scalar value at the specified coordinates.
-
-        Raises:
-            Panic if tensor is scalar or if index count is unsupported.
         """
         if self.rank() == 0:
             panic(
@@ -440,7 +431,8 @@ struct Tensor[dtype: DType](
         """Slice tensor using Slice objects along each axis.
 
         Args:
-            *slices: One Slice per axis, specifying start, stop, step.
+            slices: One Slice per axis, specifying start, stop, step.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A view tensor with computed shape, strides, and offset.
@@ -463,7 +455,7 @@ struct Tensor[dtype: DType](
         Allocates a new buffer — gradients do not flow back to the source.
 
         Args:
-            *indices: Indices along the first axis to extract.
+            indices: Indices along the first axis to extract.
             requires_grad: Whether the result tracks gradients.
 
         Returns:
@@ -478,8 +470,9 @@ struct Tensor[dtype: DType](
         """Advanced indexing with Idx objects (integers or slices).
 
         Args:
-            *indices: Idx per axis — either an integer or a Slice.
+            indices: Idx per axis — either an integer or a Slice.
                 Missing axes default to full slices.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A view tensor over the indexed region.
@@ -527,15 +520,13 @@ struct Tensor[dtype: DType](
                      which are normalized to axis_dim + index.
             axis:    Axis to gather along. May be negative. Defaults to 0.
             reduction: How to reduce gathered rows (NONE/SUM/MEAN).
+            padding_idx: Index to use for padding out-of-bounds indices.
+            requires_grad: Whether the result tracks gradients.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A new contiguous tensor with shape identical to self except
             axis dimension is replaced by len(indices).
-
-        Panics:
-            - axis out of bounds
-            - indices is empty
-            - any index out of bounds after normalization
         """
 
         return Gather[Self.dtype].forward[track_grad=track_grad](
@@ -564,6 +555,7 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Second tensor. Will be flattened to 1-D.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             2-D tensor of shape (self.numels(), other.numels()).
@@ -592,11 +584,8 @@ struct Tensor[dtype: DType](
         """Set a scalar value at given coordinates.
 
         Args:
-            *indices: One index per axis.
+            indices: One index per axis.
             value: Scalar value to write.
-
-        Raises:
-            Panic if tensor is scalar.
         """
         if self.rank() == 0:
             panic(
@@ -612,9 +601,6 @@ struct Tensor[dtype: DType](
         Args:
             indices: List of axis indices.
             value: Scalar value to write.
-
-        Raises:
-            Panic if tensor is scalar but indices are provided.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -628,11 +614,8 @@ struct Tensor[dtype: DType](
         """Set a scalar value at given coordinates.
 
         Args:
-            coord: IntArray of axis indices.
+            coord: IntArray of coordinates.
             value: Scalar value to write.
-
-        Raises:
-            Panic if tensor is scalar but indices are provided.
         """
         if self.rank() == 0 and len(coord) != 0:
             panic(
@@ -647,7 +630,7 @@ struct Tensor[dtype: DType](
 
         Args:
             value: Scalar value to write.
-            *indices: Idx objects (integers or slices) defining the region.
+            indices: Idx objects (integers or slices) defining the region.
         """
         Filler[Self.dtype].fill(self.buffer, value, indices)
 
@@ -656,7 +639,7 @@ struct Tensor[dtype: DType](
 
         Args:
             tensor: Source tensor to copy from.
-            *indices: Idx objects (integers or slices) defining the destination region.
+            indices: Idx objects (integers or slices) defining the destination region.
         """
         Filler[Self.dtype].fill(self.buffer, tensor.buffer, indices)
 
@@ -665,7 +648,7 @@ struct Tensor[dtype: DType](
 
         Args:
             gradbox: Source Gradbox to copy from.
-            *indices: Idx objects (integers or slices) defining the destination region.
+            indices: Idx objects (integers or slices) defining the destination region.
         """
         Filler[Self.dtype].fill(self.buffer, gradbox.buffer(), indices)
 
@@ -740,6 +723,8 @@ struct Tensor[dtype: DType](
 
         Args:
             gpu: Target GPU. Uses default GPU if None.
+            requires_grad: If provided, overrides the requires_grad flag
+                on the returned tensor.
             stop_grad: If True, gradient stops at this GPU tensor —
                        no DeviceTransferBackward registered. Use for
                        permanent GPU residents (model weights).
@@ -838,9 +823,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             Reference to the Gradbox storing accumulated gradients.
-
-        Raises:
-            Panic if called on a tensor that does not require grad or has no gradient.
         """
         if not self.requires_grad or not self.has_grad():
             panic(
@@ -855,9 +837,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             The Gradbox containing accumulated gradients.
-
-        Raises:
-            Panic if called on a tensor that does not require grad or has no gradient.
         """
         if not self.requires_grad or not self.has_grad():
             panic(
@@ -1041,9 +1020,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             Reference to the Ancestors containing parent dependencies.
-
-        Raises:
-            Panic if ancestry has not been initialized.
         """
         if self.ancestors == None:
             panic("Tensor → ancestry: ancestry not initialized")
@@ -1082,8 +1058,6 @@ struct Tensor[dtype: DType](
         """Check if two tensors are element-wise close within tolerance.
 
         Args:
-            rtol: Relative tolerance.
-            atol: Absolute tolerance.
             other: Tensor to compare against.
 
         Returns:
@@ -1265,7 +1239,7 @@ struct Tensor[dtype: DType](
         """Create a tensor with uniform random values in [low, high).
 
         Args:
-            *dims: Shape dimensions as variadic ints.
+            dims: Shape dimensions as variadic ints.
             low: Lower bound (inclusive).
             high: Upper bound (exclusive).
             init_seed: Random seed. If None, randomizes each call.
@@ -1382,7 +1356,7 @@ struct Tensor[dtype: DType](
         """Create a tensor with values from a normal distribution.
 
         Args:
-            *dims: Shape dimensions as variadic ints.
+            dims: Shape dimensions as variadic ints.
             mean: Distribution mean.
             std: Distribution standard deviation.
             init_seed: Random seed. If None, randomizes each call.
@@ -1457,7 +1431,7 @@ struct Tensor[dtype: DType](
         """Create a 1D tensor with evenly spaced values.
 
         Args:
-            *args: Start, stop, and optionally step values.
+            args: Start, stop, and optionally step values.
             requires_grad: Whether to track gradients.
 
         Returns:
@@ -1554,7 +1528,7 @@ struct Tensor[dtype: DType](
         """Create a tensor of zeros.
 
         Args:
-            *axes_spans: Shape dimensions as variadic ints.
+            axes_spans: Shape dimensions as variadic ints.
             requires_grad: Whether to track gradients.
             device: Target device. Defaults to CPU.
 
@@ -1573,6 +1547,7 @@ struct Tensor[dtype: DType](
         """Create a zeros tensor matching another tensor's shape.
 
         Args:
+            self: Reference tensor whose shape to match.
             requires_grad: If provided, overrides requires_grad.
             device: Target device. Defaults to self's device.
 
@@ -1636,6 +1611,7 @@ struct Tensor[dtype: DType](
         """Create a ones tensor matching another tensor's shape.
 
         Args:
+            self: Reference tensor whose shape to match.
             requires_grad: If provided, overrides requires_grad.
             device: Target device. Defaults to self's device.
 
@@ -1742,9 +1718,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             A 2D tensor of shape (len(rows), len(rows[0])).
-
-        Raises:
-            Panic if rows have inconsistent lengths.
         """
         Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d2")
         dims = IntArray(len(rows), len(rows[0]))
@@ -1772,9 +1745,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             A 3D tensor.
-
-        Raises:
-            Panic if blocks have inconsistent dimensions.
         """
         Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d3")
         dims = IntArray(len(blocks), len(blocks[0]), len(blocks[0][0]))
@@ -1806,9 +1776,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             A 4D tensor.
-
-        Raises:
-            Panic if blockgrid has inconsistent dimensions.
         """
         Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d4")
         dims = IntArray(
@@ -1856,9 +1823,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             A 5D tensor.
-
-        Raises:
-            Panic if blockhive has inconsistent dimensions.
         """
         Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d5")
         dims = IntArray(
@@ -1924,7 +1888,7 @@ struct Tensor[dtype: DType](
         """Create a tensor of ones.
 
         Args:
-            *axes_spans: Shape dimensions as variadic ints.
+            axes_spans: Shape dimensions as variadic ints.
             requires_grad: Whether to track gradients.
             device: Target device. Defaults to CPU.
 
@@ -1969,12 +1933,10 @@ struct Tensor[dtype: DType](
         Args:
             target_shape: Shape to broadcast to.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with the target shape.
-
-        Raises:
-            Panic if current shape cannot broadcast to target_shape.
         """
         if not ShapeBroadcaster.broadcastable(self.shape(), target_shape):
             panic(
@@ -2029,6 +1991,7 @@ struct Tensor[dtype: DType](
             start_dim: First dimension to flatten (default: 0).
             end_dim: Last dimension to flatten (default: last).
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with flattened dimensions.
@@ -2050,6 +2013,7 @@ struct Tensor[dtype: DType](
         Args:
             repeat: Number of repeats per dimension.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with repeated data.
@@ -2069,8 +2033,9 @@ struct Tensor[dtype: DType](
         """Repeat tensor along each axis.
 
         Args:
-            *repeat: Number of repeats per dimension as variadic ints.
+            repeat: Number of repeats per dimension as variadic ints.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with repeated data.
@@ -2092,6 +2057,7 @@ struct Tensor[dtype: DType](
         Args:
             repeat: Number of tiles per dimension.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tiled tensor.
@@ -2111,8 +2077,9 @@ struct Tensor[dtype: DType](
         """Tile the tensor by repeating it along each axis.
 
         Args:
-            *repeat: Number of tiles per dimension as variadic ints.
+            repeat: Number of tiles per dimension as variadic ints.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tiled tensor.
@@ -2130,6 +2097,7 @@ struct Tensor[dtype: DType](
 
         Args:
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A contiguous tensor with the same data.
@@ -2209,7 +2177,6 @@ struct Tensor[dtype: DType](
         """Handle gradient broadcasting and augmentation during backprop.
 
         Args:
-            augment: If True, multiplies upstream_grad by other before accumulating.
             other: The other tensor involved in the operation.
             upstream_grad: Incoming gradient to be processed.
 
@@ -2254,6 +2221,7 @@ struct Tensor[dtype: DType](
             axes: Axes along which to sum.
             keepdims: If True, keep reduced axes with size 1.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with summed values along the specified axes.
@@ -2277,6 +2245,7 @@ struct Tensor[dtype: DType](
             axes: Axes along which to sum.
             keepdims: If True, keep reduced axes with size 1.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with summed values along the specified axes.
@@ -2302,6 +2271,7 @@ struct Tensor[dtype: DType](
             axes: Axes along which to compute product.
             keepdims: If True, keep reduced axes with size 1.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with product values along the specified axes.
@@ -2326,6 +2296,7 @@ struct Tensor[dtype: DType](
             axes: Axes along which to compute product.
             keepdims: If True, keep reduced axes with size 1.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with product values along the specified axes.
@@ -2347,6 +2318,7 @@ struct Tensor[dtype: DType](
         Args:
             epsilon: Small value added for numerical stability.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with square root of each element.
@@ -2370,6 +2342,7 @@ struct Tensor[dtype: DType](
             axes: Axes along which to compute mean.
             keepdims: If True, keep reduced axes with size 1.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with mean values along the specified axes.
@@ -2393,6 +2366,7 @@ struct Tensor[dtype: DType](
             axes: Axes along which to compute mean.
             keepdims: If True, keep reduced axes with size 1.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with mean values along the specified axes.
@@ -2412,6 +2386,7 @@ struct Tensor[dtype: DType](
 
         Args:
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with reciprocal values of the elements.
@@ -2437,6 +2412,7 @@ struct Tensor[dtype: DType](
             keepdims: If True, keep reduced axis with size 1.
             unbiased: If True, use n-1 (sample variance). If False, use n (population).
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with variance along the specified axis.
@@ -2462,6 +2438,7 @@ struct Tensor[dtype: DType](
             keepdims: If True, keep reduced axis with size 1.
             unbiased: If True, use n-1. If False, use n.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with std deviation along the specified axis.
@@ -2485,9 +2462,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             Tensor with the Lp norm value.
-
-        Raises:
-            Panic if p != 2.0 (only L2 norm supported).
         """
         if p == 2.0:
             var squared = self.__mul__[track_grad=False](self)
@@ -2522,9 +2496,6 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Tensor to add.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -2538,9 +2509,6 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Tensor to subtract.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -2563,9 +2531,6 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Tensor to multiply by.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -2580,9 +2545,6 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Tensor to divide by.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -2643,6 +2605,7 @@ struct Tensor[dtype: DType](
 
         Args:
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with exponential of each element.
@@ -2655,9 +2618,6 @@ struct Tensor[dtype: DType](
         track_grad: Bool = True, sync: Bool = True
     ](self) -> Tensor[Self.dtype]:
         """Negate all elements.
-
-        Args:
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with negated values.
@@ -2838,7 +2798,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value on the left.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with scalar added to all elements.
@@ -2852,7 +2811,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value to add.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with scalar added to all elements.
@@ -2904,7 +2862,6 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Tensor to add.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with element-wise sum.
@@ -2918,7 +2875,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value on the left.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with scalar minus each element.
@@ -2934,7 +2890,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value to subtract.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with scalar subtracted from each element.
@@ -2950,7 +2905,6 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Tensor to subtract.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with element-wise difference.
@@ -2979,7 +2933,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value on the left.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with each element multiplied by scalar.
@@ -2993,7 +2946,6 @@ struct Tensor[dtype: DType](
 
         Args:
             factor: Scalar value to multiply by.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with each element multiplied by factor.
@@ -3009,7 +2961,6 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Tensor to multiply by.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with element-wise product.
@@ -3082,9 +3033,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value to add.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -3098,9 +3046,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value to subtract.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -3114,9 +3059,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value to multiply by.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -3130,9 +3072,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value to divide by.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -3175,7 +3114,7 @@ struct Tensor[dtype: DType](
 
         Args:
             target: Target tensor to compare against.
-            track_grad: Whether to track gradients.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Scalar tensor with the MSE loss value.
@@ -3209,7 +3148,6 @@ struct Tensor[dtype: DType](
 
         Args:
             start_grad: Initial gradient value (default: 1.0).
-            graph_size: Maximum graph size for traversal.
             retain_graph: If True, intermediate gradients are preserved.
             sync: If True, synchronize GPU before backward.
         """
@@ -3343,9 +3281,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             The scalar value at that index.
-
-        Raises:
-            Panic if index is out of bounds.
         """
         return self.buffer.get(index)
 
@@ -3354,8 +3289,7 @@ struct Tensor[dtype: DType](
 
         Args:
             index: Flat (linear) index into the tensor's memory.
-
-            Panic if index is out of bounds.
+            scalar: Scalar value to write.
         """
         self.buffer.set(index, scalar)
 
@@ -3378,6 +3312,7 @@ struct Tensor[dtype: DType](
             offset: Base memory offset.
             requires_grad: If provided, overrides requires_grad.
             validated: If True, skips validation.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A view tensor over the same buffer.
@@ -3403,6 +3338,7 @@ struct Tensor[dtype: DType](
             strides: Memory strides as a list.
             offset: Base memory offset.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A view tensor over the same buffer.
@@ -3430,9 +3366,10 @@ struct Tensor[dtype: DType](
         """Create a contiguous view with the given shape.
 
         Args:
-            *shape_dims: Target shape as variadic ints.
+            shape_dims: Target shape as variadic ints.
             offset: Base memory offset.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A contiguous view tensor.
@@ -3458,6 +3395,7 @@ struct Tensor[dtype: DType](
             shape: Target shape as a list of ints.
             offset: Base memory offset.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A contiguous view tensor.
@@ -3483,6 +3421,7 @@ struct Tensor[dtype: DType](
             shape: Target shape.
             offset: Base memory offset.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A contiguous view tensor.
@@ -3525,8 +3464,9 @@ struct Tensor[dtype: DType](
         """Transpose tensor by reversing or permuting axes.
 
         Args:
-            *axes: Axes to permute. If empty, reverses all axes.
+            axes: Axes to permute. If empty, reverses all axes.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A transposed view tensor.
@@ -3548,6 +3488,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Axes to permute as a list.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A transposed view tensor.
@@ -3569,6 +3510,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Axes to permute as an IntArray.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A transposed view tensor.
@@ -3667,6 +3609,7 @@ struct Tensor[dtype: DType](
         Args:
             target: Shape to broadcast to.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor broadcasted to the target shape.
@@ -3686,8 +3629,9 @@ struct Tensor[dtype: DType](
         """Broadcast tensor to a target shape.
 
         Args:
-            *target_dims: Target shape as variadic ints.
+            target_dims: Target shape as variadic ints.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor broadcasted to the target shape.
@@ -3709,6 +3653,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Axes to squeeze. If empty, removes all size-1 axes.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with size-1 axes removed.
@@ -3728,8 +3673,9 @@ struct Tensor[dtype: DType](
         """Remove axes of size 1.
 
         Args:
-            *axes: Axes to squeeze as variadic ints.
+            axes: Axes to squeeze as variadic ints.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with size-1 axes removed.
@@ -3749,8 +3695,9 @@ struct Tensor[dtype: DType](
         """Insert axes of size 1.
 
         Args:
-            *axes: Axes at which to insert size-1 dimensions.
+            axes: Axes at which to insert size-1 dimensions.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with size-1 axes inserted.
@@ -3772,6 +3719,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Axes at which to insert size-1 dimensions.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with size-1 axes inserted.
@@ -3793,6 +3741,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Axes at which to insert size-1 dimensions.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with size-1 axes inserted.
@@ -3814,6 +3763,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Permutation order (e.g. [2, 0, 1] for 3D).
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with axes permuted.
@@ -3835,6 +3785,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Permutation order as IntArray.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with axes permuted.
@@ -3952,6 +3903,7 @@ struct Tensor[dtype: DType](
             perm: Permutation indices for the given axis.
             axis: Axis along which to shuffle.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A shuffled tensor.
@@ -3969,6 +3921,7 @@ struct Tensor[dtype: DType](
 
         Args:
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with ReLU applied element-wise.
@@ -3990,6 +3943,7 @@ struct Tensor[dtype: DType](
             min_val: Minimum value.
             max_val: Maximum value.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with values clipped to [min_val, max_val].
@@ -4011,6 +3965,7 @@ struct Tensor[dtype: DType](
 
         Args:
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with tanh applied element-wise.
@@ -4030,6 +3985,7 @@ struct Tensor[dtype: DType](
 
         Args:
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with sigmoid applied element-wise.
@@ -4051,6 +4007,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Axes along which to apply softmax.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with softmax probabilities. Use log=True for log-softmax.
@@ -4077,6 +4034,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Axes along which to apply softmax.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with softmax probabilities. Use log=True for log-softmax.
@@ -4102,10 +4060,10 @@ struct Tensor[dtype: DType](
         """Binary cross entropy loss.
 
         Args:
-            pred: Predicted probabilities.
             target: Ground truth labels (0 or 1).
             epsilon: Small value for numerical stability.
             reduction: "mean", "sum", or "none".
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Scalar tensor with the BCE loss (mean/sum) or per-element (none).
@@ -4126,10 +4084,10 @@ struct Tensor[dtype: DType](
         """BCE loss with logits (sigmoid applied internally).
 
         Args:
-            logits: Raw unnormalized predictions.
             target: Ground truth labels (0 or 1).
             epsilon: Small value for numerical stability.
             reduction: "mean", "sum", or "none".
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Scalar tensor with the BCE loss (mean/sum) or per-element (none).
@@ -4214,10 +4172,8 @@ struct Tensor[dtype: DType](
         """Matrix multiplication of two tensors.
 
         Args:
-            A: Left-hand tensor.
             B: Right-hand tensor.
-            track_grad: Whether to track gradients.
-            mode: Matrix multiplication mode (default: mm).
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Result of matrix multiplication.
@@ -4232,7 +4188,6 @@ struct Tensor[dtype: DType](
         """Matrix multiplication with a Gradbox.
 
         Args:
-            A: Left-hand tensor.
             B: Right-hand Gradbox.
 
         Returns:
@@ -4255,6 +4210,7 @@ struct Tensor[dtype: DType](
             tensors: List of tensors to concatenate.
             axis: Axis along which to concatenate.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A single concatenated tensor.
@@ -4278,6 +4234,7 @@ struct Tensor[dtype: DType](
             tensors: List of tensors to stack.
             axis: Axis at which to insert the new dimension.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A stacked tensor with shape extended by one dimension.
@@ -4299,6 +4256,7 @@ struct Tensor[dtype: DType](
         Args:
             tensors: List of 1D tensors to stack vertically.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Stacked tensor.
@@ -4320,6 +4278,7 @@ struct Tensor[dtype: DType](
         Args:
             tensors: List of 1D tensors to stack horizontally.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Stacked tensor.
@@ -4347,6 +4306,7 @@ struct Tensor[dtype: DType](
             mode: Padding mode ("constant", etc.).
             value: Fill value for constant mode.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Padded tensor.
@@ -4372,6 +4332,7 @@ struct Tensor[dtype: DType](
             pad: List of (before, after) padding pairs per axis.
             value: Fill value (default: 0.0).
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Padded tensor.
@@ -4405,6 +4366,7 @@ struct Tensor[dtype: DType](
             mode: Padding mode.
             value: Fill value for constant mode.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             2D-padded tensor.
@@ -4433,9 +4395,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             Padded 4D tensor.
-
-        Raises:
-            Panic if tensor is not 4D.
         """
         var x_shape = x.shape()
         if x_shape.rank() != 4:
