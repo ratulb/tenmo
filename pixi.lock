@@ -93,7 +93,7 @@ environments:
       - conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-1.0.0b1-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mblack-26.3.0-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mojo-python-1.0.0b1-release.conda
-      - conda_source: mojodoc[046d3d48] @ git+https://github.com/ratulb/mojodoc?branch=main#d6e7df5baabde7efe1c90b132cffce0f75b9bedf
+      - conda_source: mojodoc[f946c8c6] @ git+https://github.com/ratulb/mojodoc?branch=main#f6f25bc0376cac6e0df5de91f123adbf21ece8db
       - pypi: https://files.pythonhosted.org/packages/4b/f9/d8ac11ddbd5d506e7c6be71b8a33698c73fd9dc108f6c9e0595f7cd60619/pure_cifar_10-0.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/bb/6b/f4a3d0637692c49da8ef99d72d52526f92e0a8d6ac4f0ca9f31441b9d9ea/numpy-2.5.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/c6/27/ab926560371a7fe729a60d603a326e05dad022e5684dd2fc07d687b49692/mnist_datasets-0.14-py3-none-any.whl
@@ -184,7 +184,7 @@ environments:
       - conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-1.0.0b1-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mblack-26.3.0-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mojo-python-1.0.0b1-release.conda
-      - conda_source: mojodoc[046d3d48] @ git+https://github.com/ratulb/mojodoc?branch=main#d6e7df5baabde7efe1c90b132cffce0f75b9bedf
+      - conda_source: mojodoc[f946c8c6] @ git+https://github.com/ratulb/mojodoc?branch=main#f6f25bc0376cac6e0df5de91f123adbf21ece8db
       - pypi: https://files.pythonhosted.org/packages/4b/f9/d8ac11ddbd5d506e7c6be71b8a33698c73fd9dc108f6c9e0595f7cd60619/pure_cifar_10-0.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/bb/6b/f4a3d0637692c49da8ef99d72d52526f92e0a8d6ac4f0ca9f31441b9d9ea/numpy-2.5.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/c6/27/ab926560371a7fe729a60d603a326e05dad022e5684dd2fc07d687b49692/mnist_datasets-0.14-py3-none-any.whl
@@ -1341,7 +1341,7 @@ packages:
   run_exports: {}
   size: 23114
   timestamp: 1777594699418
-- conda_source: mojodoc[046d3d48] @ git+https://github.com/ratulb/mojodoc?branch=main#d6e7df5baabde7efe1c90b132cffce0f75b9bedf
+- conda_source: mojodoc[f946c8c6] @ git+https://github.com/ratulb/mojodoc?branch=main#f6f25bc0376cac6e0df5de91f123adbf21ece8db
   version: 0.0.1
   build: hb0f4dca_0
   subdir: linux-64
