@@ -108,12 +108,8 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         pass
 
 
-# ========================================
-# Ancestors — holds List[Ancestor] + BackwardFnArg
-# ========================================
-
-
 struct Ancestors[dtype: DType](Sized & Copyable & Movable):
+    """Ancestors — holds List[Ancestor] + BackwardFnArg."""
     var origins: List[Ancestor[Self.dtype]]
     var backwardFnArg: BackwardFnArg[Self.dtype]
 
@@ -169,11 +165,6 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         ref self,
     ) -> AncestorIterator[Self.dtype, origin_of(self)]:
         return AncestorIterator[Self.dtype](0, Pointer(to=self))
-
-
-# ========================================
-# AncestorIterator — yields Ancestor
-# ========================================
 
 
 struct AncestorIterator[dtype: DType, origin: ImmutOrigin](
