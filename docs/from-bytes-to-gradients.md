@@ -4,7 +4,7 @@ When you call `loss.backward()` in PyTorch, a C++ autograd engine climbs the com
 
 What if you could read *every line* of the system between `loss.backward()` and the weight update? That's the premise of Tenmo, a tensor library and neural network framework written entirely in Mojo. Every autograd dispatch, every SIMD matmul kernel, every GPU launch is in one repository in 130+ source files.
 
-This post traces one MNIST training step — `matmul → bias_add → relu → matmul → bias_add → relu → matmul → bias_add → cross_entropy` — through every layer of the system. We'll start with raw memory allocation and end with the final parameter update, showing the real code at each stage.
+This [post](https://ratulb.github.io/techcottage/2026/06/from-bytes-to-gradients/) traces one MNIST training step — `matmul → bias_add → relu → matmul → bias_add → relu → matmul → bias_add → cross_entropy` — through every layer of the system. We'll start with raw memory allocation and end with the final parameter update, showing the real code at each stage.
 
 <blockquote style="color: #d4d4d8; text-shadow: 0 1px 3px rgba(0,0,0,0.4);">
   <strong>Audience note:</strong> this post assumes familiarity with autograd and basic SIMD concepts.
