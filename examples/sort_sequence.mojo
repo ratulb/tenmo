@@ -63,7 +63,7 @@ This produces sequences where some digits repeat 2-3 times and others don't
 appear at all — e.g., [3, 3, 7, 1, 1, 1, 9, 0]. The target y is the sorted
 version of the same sequence via bubble sort: [0, 1, 1, 1, 3, 3, 7, 9].
 
-Inputs and targets are stored as Tensor[IDTYPE] of shape
+Inputs and targets are stored as Tensor[idx_dtype] of shape
 (num_samples, seq_len) = (NUM_TRAIN, SEQ_LEN) for training,
 (NUM_TEST, SEQ_LEN) for testing.
 
@@ -103,7 +103,7 @@ representation — each position's vector now encodes both its own token identit
 and weighted context from the first layer.
 
 Step 1 — Embeddings
-~~~~~~~~~~~~~~~~~~~~
+───────────────────
 
 Input batch.features has shape (B, SEQ_LEN) — each element is an integer token ID.
 
@@ -116,14 +116,14 @@ has a D_MODEL-dimensional dense vector instead of a raw integer.
 Self-attention has no inherent notion of order (it's permutation-invariant), so we
 inject position information:
 
-  var pos_ids = make_pos_ids(B, SEQ_LEN)    # (B, SEQ_LEN) — [0,1,2,...,SEQ_LEN-1]
+  var pos_ids = make_pos_indices(B, SEQ_LEN)    # (B, SEQ_LEN) — [0,1,2,...,SEQ_LEN-1]
   var x = tok_x + pos_embed(pos_ids)        # (B, SEQ_LEN, D_MODEL)
 
 pos_embed is a second Embedding(SEQ_LEN, D_MODEL) that maps each position index to
 a learned D_MODEL-dim vector. Element-wise addition fuses identity and position.
 
 Step 2 — QKV Projections
-~~~~~~~~~~~~~~~~~~~~~~~~~
+────────────────────────
 
   Q = w_q(x)    # (B, SEQ_LEN, D_MODEL)
   K = w_k(x)    # (B, SEQ_LEN, D_MODEL)
@@ -132,7 +132,7 @@ Step 2 — QKV Projections
 Each is x @ W^T with no bias. Xavier/Glorot init to keep activation scales stable.
 
 Step 3 — Scaled Dot-Product Attention
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+─────────────────────────────────────
 
   K_t = K.transpose(0, 2, 1)               # (B, D_MODEL, SEQ_LEN)
   scores = Q @ K_t                          # (B, SEQ_LEN, SEQ_LEN)
@@ -146,7 +146,7 @@ output position 1, etc. This means the attention pattern depends on the token
 values, not just on fixed position pairs.
 
 Step 4 — Context
-~~~~~~~~~~~~~~~~~
+────────────────
 
   ctx = attn @ V                            # (B, SEQ_LEN, D_MODEL)
 
@@ -156,7 +156,7 @@ whichever input position holds the smallest value; output position 1 to the inpu
 with the second smallest value, etc.
 
 Step 5 — Residual Connection
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+────────────────────────────
 
   combined = x + ctx                        # (B, SEQ_LEN, D_MODEL)
 
@@ -167,7 +167,7 @@ The residual serves two purposes:
     if attention doesn't help.
 
 Step 6 — Output Projection
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+──────────────────────────
 
   logits = w_out(combined)                  # (B, SEQ_LEN, VOCAB)
   preds  = logits.argmax(axis=-1)           # (B, SEQ_LEN) — predicted token IDs
@@ -245,7 +245,7 @@ What wouldn't work: a sequence longer than 8 — pos_embed would OOB on index 8+
 
 What you'd need to change to actually use it:
   1. The inference input tensor: Shape(1, 5) instead of Shape(1, SEQ_LEN).
-  2. Position IDs: make_pos_ids(1, 5) instead of make_pos_ids(1, SEQ_LEN).
+  2. Position IDs: make_pos_indices(1, 5) instead of make_pos_indices(1, SEQ_LEN).
 
 The catch: training on length 8 and inferring on length 5 is not useful — the
 model learned ranking patterns for 8 elements, not 5. You'd want to set SEQ_LEN=5
@@ -411,7 +411,7 @@ space grows factorially):
 
 What does NOT need changing:
   • generate_sort_data — takes vocab, seq_len as runtime params
-  • make_pos_ids — works for any B, T
+  • make_pos_indices — works for any B, T
   • Accuracy.token_accuracy / Accuracy.sequence_accuracy — generic over dimensions
   • Softmax, CrossEntropyLoss, matmul, transpose, residual, SGD — all
     dimension-agnostic
@@ -430,14 +430,13 @@ from tenmo.softmax import Softmax
 from tenmo.intarray import IntArray
 from tenmo.shapes import Shape
 from tenmo.dataloader import TensorDataset
-from tenmo.mnemonics import DEFAULT_INDEX_DTYPE as IDX_DTYPE
+from tenmo.mnemonics import DEFAULT_INDEX_DTYPE as idx_dtype
 from std.random import shuffle, random_ui64
 from std.time import perf_counter_ns
 from std.math import sqrt
 
 
-comptime DTYPE = DType.float32
-comptime IDTYPE = IDX_DTYPE
+comptime dtype = DType.float32
 
 comptime VOCAB = 10
 comptime SEQ_LEN = 8
@@ -455,9 +454,9 @@ def generate_sort_data(
     seq_len: Int,
     vocab: Int,
     allow_duplicates: Bool = True,
-) -> Tuple[Tensor[IDTYPE], Tensor[IDTYPE]]:
-    var x = Tensor[IDTYPE](Shape(num_samples, seq_len))
-    var y = Tensor[IDTYPE](Shape(num_samples, seq_len))
+) -> Tuple[Tensor[idx_dtype], Tensor[idx_dtype]]:
+    var x = Tensor[idx_dtype](Shape(num_samples, seq_len))
+    var y = Tensor[idx_dtype](Shape(num_samples, seq_len))
 
     var base = List[Int](capacity=vocab)
     for k in range(vocab):
@@ -488,7 +487,7 @@ def generate_sort_data(
                 raw.append(perm[j])
 
         for j in range(seq_len):
-            x[i, j] = Scalar[IDTYPE](raw[j])
+            x[i, j] = Scalar[idx_dtype](raw[j])
 
         var n = seq_len
         for a in range(n):
@@ -499,26 +498,28 @@ def generate_sort_data(
                     raw[b] = tmp
 
         for j in range(seq_len):
-            y[i, j] = Scalar[IDTYPE](raw[j])
+            y[i, j] = Scalar[idx_dtype](raw[j])
 
     return (x^, y^)
 
 
-def make_pos_ids(B: Int, T: Int) -> Tensor[IDTYPE]:
-    var pos = Tensor[IDTYPE](Shape(B, T))
-    for b in range(B):
-        for t in range(T):
-            pos[b, t] = Scalar[IDTYPE](t)
-    return pos^
+def make_pos_indices(batch_size: Int, seq_len: Int) -> Tensor[idx_dtype]:
+    return Tensor[idx_dtype].stack(
+        [
+            Tensor[idx_dtype].arange(Scalar[idx_dtype](seq_len))
+            for _ in range(batch_size)
+        ]
+    )
 
 
 def compute_accuracy(
-    logits: Tensor[DTYPE], targets: Tensor[IDTYPE]
-) -> Tuple[Float64, Float64]:
+    logits: Tensor[dtype], targets: Tensor[idx_dtype]
+) raises -> Tuple[Float64, Float64]:
     from tenmo.accuracy import Accuracy
+
     return (
-        Accuracy[DTYPE].token_accuracy(logits, targets),
-        Accuracy[DTYPE].sequence_accuracy(logits, targets),
+        Accuracy[dtype].token_accuracy(logits, targets),
+        Accuracy[dtype].sequence_accuracy(logits, targets),
     )
 
 
@@ -538,15 +539,15 @@ def main() raises:
     var test_x, test_y = generate_sort_data(NUM_TEST, SEQ_LEN, VOCAB)
 
     var demo_count = min(5, NUM_TEST)
-    var demo_x = Tensor[IDTYPE](Shape(demo_count, SEQ_LEN))
-    var demo_y = Tensor[IDTYPE](Shape(demo_count, SEQ_LEN))
+    var demo_x = Tensor[idx_dtype](Shape(demo_count, SEQ_LEN))
+    var demo_y = Tensor[idx_dtype](Shape(demo_count, SEQ_LEN))
     for idx in range(demo_count):
         for t in range(SEQ_LEN):
             demo_x[idx, t] = test_x[idx, t]
             demo_y[idx, t] = test_y[idx, t]
 
-    var train_dataset = TensorDataset[IDTYPE, IDTYPE](train_x, train_y)
-    var test_dataset = TensorDataset[IDTYPE, IDTYPE](test_x, test_y)
+    var train_dataset = TensorDataset[idx_dtype, idx_dtype](train_x, train_y)
+    var test_dataset = TensorDataset[idx_dtype, idx_dtype](test_x, test_y)
     var train_loader = train_dataset.into_loader(
         batch_size=BATCH_SIZE, shuffle=True, drop_last=False
     )
@@ -556,18 +557,19 @@ def main() raises:
     print()
 
     # ── Model ──────────────────────────────────────────────────────────
-    var tok_embed = Embedding[DTYPE, IDTYPE](VOCAB, D_MODEL)
-    var pos_embed = Embedding[DTYPE, IDTYPE](SEQ_LEN, D_MODEL)
-    var w_q1 = Linear[DTYPE](D_MODEL, D_MODEL, bias=False, init_method="xavier")
-    var w_k1 = Linear[DTYPE](D_MODEL, D_MODEL, bias=False, init_method="xavier")
-    var w_v1 = Linear[DTYPE](D_MODEL, D_MODEL, bias=False, init_method="xavier")
-    var w_q2 = Linear[DTYPE](D_MODEL, D_MODEL, bias=False, init_method="xavier")
-    var w_k2 = Linear[DTYPE](D_MODEL, D_MODEL, bias=False, init_method="xavier")
-    var w_v2 = Linear[DTYPE](D_MODEL, D_MODEL, bias=False, init_method="xavier")
-    var w_out = Linear[DTYPE](D_MODEL, VOCAB, bias=True, init_method="xavier")
+    var tok_embed = Embedding[dtype, idx_dtype](VOCAB, D_MODEL)
+    var pos_embed = Embedding[dtype, idx_dtype](SEQ_LEN, D_MODEL)
+    var w_q1 = Linear[dtype](D_MODEL, D_MODEL, bias=False, init_method="xavier")
+    var w_k1 = Linear[dtype](D_MODEL, D_MODEL, bias=False, init_method="xavier")
+    var w_v1 = Linear[dtype](D_MODEL, D_MODEL, bias=False, init_method="xavier")
+    var w_q2 = Linear[dtype](D_MODEL, D_MODEL, bias=False, init_method="xavier")
+    var w_k2 = Linear[dtype](D_MODEL, D_MODEL, bias=False, init_method="xavier")
+    var w_v2 = Linear[dtype](D_MODEL, D_MODEL, bias=False, init_method="xavier")
+    var w_out = Linear[dtype](D_MODEL, VOCAB, bias=True, init_method="xavier")
 
     # ── Parameter collection ──────────────────────────────────────────
-    var params = List[UnsafePointer[Tensor[DTYPE], MutAnyOrigin]]()
+
+    var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.extend(tok_embed.parameters())
     params.extend(pos_embed.parameters())
     params.extend(w_q1.parameters())
@@ -580,14 +582,17 @@ def main() raises:
 
     params.extend(w_out.parameters())
 
+    var optimizer = SGD[dtype](
+        params^, lr=0.01, momentum=MOMENTUM, weight_decay=1e-4
+    )
+
     var total_params = 0
-    for p in params:
+    for p in optimizer.parameters:
         total_params += p[].numels()
     print("Parameters:", total_params)
     print()
 
-    var optimizer = SGD(params, lr=LR, momentum=MOMENTUM, weight_decay=1e-4)
-    var criterion = CrossEntropyLoss[DTYPE, IDTYPE]()
+    var criterion = CrossEntropyLoss[dtype, idx_dtype]()
 
     # ── Training ──────────────────────────────────────────────────────
     print("Training...")
@@ -617,7 +622,7 @@ def main() raises:
             var B = batch.features.shape()[0]
 
             var tok_x = tok_embed(batch.features)
-            var pos_ids = make_pos_ids(B, SEQ_LEN)
+            var pos_ids = make_pos_indices(B, SEQ_LEN)
             var x = tok_x + pos_embed(pos_ids)
 
             # Layer 1
@@ -625,9 +630,7 @@ def main() raises:
             var K = w_k1(x)
             var K_t = K.transpose(0, 2, 1)
             var scores = Q.matmul(K_t) / sqrt(Float32(D_MODEL))
-            var attn = Softmax[DTYPE].forward(
-                scores, axes=IntArray(-1)
-            )
+            var attn = Softmax[dtype].forward(scores, axes=IntArray(-1))
             var ctx = attn.matmul(w_v1(x))
             x = x + ctx
 
@@ -636,9 +639,7 @@ def main() raises:
             K = w_k2(x)
             K_t = K.transpose(0, 2, 1)
             scores = Q.matmul(K_t) / sqrt(Float32(D_MODEL))
-            attn = Softmax[DTYPE].forward(
-                scores, axes=IntArray(-1)
-            )
+            attn = Softmax[dtype].forward(scores, axes=IntArray(-1))
             ctx = attn.matmul(w_v2(x))
             x = x + ctx
 
@@ -675,7 +676,7 @@ def main() raises:
             var B = batch.features.shape()[0]
 
             var tok_x = tok_embed(batch.features)
-            var pos_ids = make_pos_ids(B, SEQ_LEN)
+            var pos_ids = make_pos_indices(B, SEQ_LEN)
             var x = tok_x + pos_embed(pos_ids)
 
             # Layer 1
@@ -683,7 +684,7 @@ def main() raises:
             var K = w_k1(x)
             var K_t = K.transpose(0, 2, 1)
             var scores = Q.matmul(K_t) / sqrt(Float32(D_MODEL))
-            var attn = Softmax[DTYPE].forward[track_grad=False](
+            var attn = Softmax[dtype].forward[track_grad=False](
                 scores, axes=IntArray(-1)
             )
             var ctx = attn.matmul(w_v1(x))
@@ -694,7 +695,7 @@ def main() raises:
             K = w_k2(x)
             K_t = K.transpose(0, 2, 1)
             scores = Q.matmul(K_t) / sqrt(Float32(D_MODEL))
-            attn = Softmax[DTYPE].forward[track_grad=False](
+            attn = Softmax[dtype].forward[track_grad=False](
                 scores, axes=IntArray(-1)
             )
             ctx = attn.matmul(w_v2(x))
@@ -714,11 +715,21 @@ def main() raises:
 
         var epoch_time = Float64(perf_counter_ns() - t_epoch_start) / 1e9
         print(
-            "  Epoch", epoch + 1, "/", NUM_EPOCHS,
-            "| loss:", epoch_loss / Float64(NUM_TRAIN),
-            "| tok_acc:", token_acc * 100, "%",
-            "| seq_acc:", seq_acc * 100, "%",
-            "|", epoch_time, "s",
+            "  Epoch",
+            epoch + 1,
+            "/",
+            NUM_EPOCHS,
+            "| loss:",
+            epoch_loss / Float64(NUM_TRAIN),
+            "| tok_acc:",
+            token_acc * 100,
+            "%",
+            "| seq_acc:",
+            seq_acc * 100,
+            "%",
+            "|",
+            epoch_time,
+            "s",
         )
 
     # ── Final results ─────────────────────────────────────────────────
@@ -741,12 +752,12 @@ def main() raises:
 
     print("Sample predictions (test set):")
     for idx in range(demo_count):
-        var inp = Tensor[IDTYPE](Shape(1, SEQ_LEN))
+        var inp = Tensor[idx_dtype](Shape(1, SEQ_LEN))
         for t in range(SEQ_LEN):
             inp[0, t] = demo_x[idx, t]
 
         var tok_x = tok_embed(inp)
-        var pos_ids = make_pos_ids(1, SEQ_LEN)
+        var pos_ids = make_pos_indices(1, SEQ_LEN)
         var x = tok_x + pos_embed(pos_ids)
 
         # Layer 1
@@ -754,7 +765,7 @@ def main() raises:
         var K = w_k1(x)
         var K_t = K.transpose(0, 2, 1)
         var scores = Q.matmul(K_t) / sqrt(Float32(D_MODEL))
-        var attn = Softmax[DTYPE].forward[track_grad=False](
+        var attn = Softmax[dtype].forward[track_grad=False](
             scores, axes=IntArray(-1)
         )
         var ctx = attn.matmul(w_v1(x))
@@ -765,49 +776,74 @@ def main() raises:
         K = w_k2(x)
         K_t = K.transpose(0, 2, 1)
         scores = Q.matmul(K_t) / sqrt(Float32(D_MODEL))
-        attn = Softmax[DTYPE].forward[track_grad=False](
+        attn = Softmax[dtype].forward[track_grad=False](
             scores, axes=IntArray(-1)
         )
         ctx = attn.matmul(w_v2(x))
         x = x + ctx
 
         var logits = w_out(x)
-        var preds = logits.argmax[IDTYPE](axis=-1)
+        var preds = logits.argmax[idx_dtype](axis=-1)
 
         print("  Example", idx + 1)
         for t in range(SEQ_LEN):
             print(
-                "    Pos", t,
-                "| in:", Int(demo_x[idx, t]),
-                "-> pred:", Int(preds[0, t]),
-                "(target:", Int(demo_y[idx, t]), ")",
+                "    Pos",
+                t,
+                "| in:",
+                Int(demo_x[idx, t]),
+                "-> pred:",
+                Int(preds[0, t]),
+                "(target:",
+                Int(demo_y[idx, t]),
+                ")",
             )
         print()
 
     # ── Repeat-pattern tests ──
     print("Repeat-pattern inference tests:")
 
-    var repeat_vals = Tensor[IDTYPE](Shape(5, SEQ_LEN))
-    repeat_vals[0, 0] = Scalar[IDTYPE](1); repeat_vals[0, 1] = Scalar[IDTYPE](1)
-    repeat_vals[0, 2] = Scalar[IDTYPE](3); repeat_vals[0, 3] = Scalar[IDTYPE](3)
-    repeat_vals[0, 4] = Scalar[IDTYPE](9); repeat_vals[0, 5] = Scalar[IDTYPE](9)
-    repeat_vals[0, 6] = Scalar[IDTYPE](0); repeat_vals[0, 7] = Scalar[IDTYPE](0)
-    repeat_vals[1, 0] = Scalar[IDTYPE](4); repeat_vals[1, 1] = Scalar[IDTYPE](4)
-    repeat_vals[1, 2] = Scalar[IDTYPE](4); repeat_vals[1, 3] = Scalar[IDTYPE](7)
-    repeat_vals[1, 4] = Scalar[IDTYPE](7); repeat_vals[1, 5] = Scalar[IDTYPE](2)
-    repeat_vals[1, 6] = Scalar[IDTYPE](2); repeat_vals[1, 7] = Scalar[IDTYPE](2)
-    repeat_vals[2, 0] = Scalar[IDTYPE](0); repeat_vals[2, 1] = Scalar[IDTYPE](0)
-    repeat_vals[2, 2] = Scalar[IDTYPE](0); repeat_vals[2, 3] = Scalar[IDTYPE](0)
-    repeat_vals[2, 4] = Scalar[IDTYPE](0); repeat_vals[2, 5] = Scalar[IDTYPE](0)
-    repeat_vals[2, 6] = Scalar[IDTYPE](0); repeat_vals[2, 7] = Scalar[IDTYPE](0)
-    repeat_vals[3, 0] = Scalar[IDTYPE](9); repeat_vals[3, 1] = Scalar[IDTYPE](8)
-    repeat_vals[3, 2] = Scalar[IDTYPE](7); repeat_vals[3, 3] = Scalar[IDTYPE](6)
-    repeat_vals[3, 4] = Scalar[IDTYPE](5); repeat_vals[3, 5] = Scalar[IDTYPE](4)
-    repeat_vals[3, 6] = Scalar[IDTYPE](3); repeat_vals[3, 7] = Scalar[IDTYPE](2)
-    repeat_vals[4, 0] = Scalar[IDTYPE](5); repeat_vals[4, 1] = Scalar[IDTYPE](5)
-    repeat_vals[4, 2] = Scalar[IDTYPE](3); repeat_vals[4, 3] = Scalar[IDTYPE](3)
-    repeat_vals[4, 4] = Scalar[IDTYPE](3); repeat_vals[4, 5] = Scalar[IDTYPE](1)
-    repeat_vals[4, 6] = Scalar[IDTYPE](1); repeat_vals[4, 7] = Scalar[IDTYPE](1)
+    var repeat_vals = Tensor[idx_dtype](Shape(5, SEQ_LEN))
+    repeat_vals[0, 0] = Scalar[idx_dtype](1)
+    repeat_vals[0, 1] = Scalar[idx_dtype](1)
+    repeat_vals[0, 2] = Scalar[idx_dtype](3)
+    repeat_vals[0, 3] = Scalar[idx_dtype](3)
+    repeat_vals[0, 4] = Scalar[idx_dtype](9)
+    repeat_vals[0, 5] = Scalar[idx_dtype](9)
+    repeat_vals[0, 6] = Scalar[idx_dtype](0)
+    repeat_vals[0, 7] = Scalar[idx_dtype](0)
+    repeat_vals[1, 0] = Scalar[idx_dtype](4)
+    repeat_vals[1, 1] = Scalar[idx_dtype](4)
+    repeat_vals[1, 2] = Scalar[idx_dtype](4)
+    repeat_vals[1, 3] = Scalar[idx_dtype](7)
+    repeat_vals[1, 4] = Scalar[idx_dtype](7)
+    repeat_vals[1, 5] = Scalar[idx_dtype](2)
+    repeat_vals[1, 6] = Scalar[idx_dtype](2)
+    repeat_vals[1, 7] = Scalar[idx_dtype](2)
+    repeat_vals[2, 0] = Scalar[idx_dtype](0)
+    repeat_vals[2, 1] = Scalar[idx_dtype](0)
+    repeat_vals[2, 2] = Scalar[idx_dtype](0)
+    repeat_vals[2, 3] = Scalar[idx_dtype](0)
+    repeat_vals[2, 4] = Scalar[idx_dtype](0)
+    repeat_vals[2, 5] = Scalar[idx_dtype](0)
+    repeat_vals[2, 6] = Scalar[idx_dtype](0)
+    repeat_vals[2, 7] = Scalar[idx_dtype](0)
+    repeat_vals[3, 0] = Scalar[idx_dtype](9)
+    repeat_vals[3, 1] = Scalar[idx_dtype](8)
+    repeat_vals[3, 2] = Scalar[idx_dtype](7)
+    repeat_vals[3, 3] = Scalar[idx_dtype](6)
+    repeat_vals[3, 4] = Scalar[idx_dtype](5)
+    repeat_vals[3, 5] = Scalar[idx_dtype](4)
+    repeat_vals[3, 6] = Scalar[idx_dtype](3)
+    repeat_vals[3, 7] = Scalar[idx_dtype](2)
+    repeat_vals[4, 0] = Scalar[idx_dtype](5)
+    repeat_vals[4, 1] = Scalar[idx_dtype](5)
+    repeat_vals[4, 2] = Scalar[idx_dtype](3)
+    repeat_vals[4, 3] = Scalar[idx_dtype](3)
+    repeat_vals[4, 4] = Scalar[idx_dtype](3)
+    repeat_vals[4, 5] = Scalar[idx_dtype](1)
+    repeat_vals[4, 6] = Scalar[idx_dtype](1)
+    repeat_vals[4, 7] = Scalar[idx_dtype](1)
 
     var test_descs = List[String](capacity=5)
     test_descs.append("pairs  [1,1,3,3,9,9,0,0]")
@@ -817,19 +853,19 @@ def main() raises:
     test_descs.append("mixed [5,5,3,3,3,1,1,1]")
 
     for test_idx in range(5):
-        var inp = Tensor[IDTYPE](Shape(1, SEQ_LEN))
+        var inp = Tensor[idx_dtype](Shape(1, SEQ_LEN))
         for t in range(SEQ_LEN):
             inp[0, t] = repeat_vals[test_idx, t]
 
         var tok_x = tok_embed(inp)
-        var pos_ids = make_pos_ids(1, SEQ_LEN)
+        var pos_ids = make_pos_indices(1, SEQ_LEN)
         var x = tok_x + pos_embed(pos_ids)
 
         var Q = w_q1(x)
         var K = w_k1(x)
         var K_t = K.transpose(0, 2, 1)
         var scores = Q.matmul(K_t) / sqrt(Float32(D_MODEL))
-        var attn = Softmax[DTYPE].forward[track_grad=False](
+        var attn = Softmax[dtype].forward[track_grad=False](
             scores, axes=IntArray(-1)
         )
         var ctx = attn.matmul(w_v1(x))
@@ -839,14 +875,14 @@ def main() raises:
         K = w_k2(x)
         K_t = K.transpose(0, 2, 1)
         scores = Q.matmul(K_t) / sqrt(Float32(D_MODEL))
-        attn = Softmax[DTYPE].forward[track_grad=False](
+        attn = Softmax[dtype].forward[track_grad=False](
             scores, axes=IntArray(-1)
         )
         ctx = attn.matmul(w_v2(x))
         x = x + ctx
 
         var logits = w_out(x)
-        var preds = logits.argmax[IDTYPE](axis=-1)
+        var preds = logits.argmax[idx_dtype](axis=-1)
 
         var expected = List[Int](capacity=SEQ_LEN)
         for t in range(SEQ_LEN):
@@ -862,17 +898,20 @@ def main() raises:
         print("  Test", test_idx + 1, ":", test_descs[test_idx])
         print("    Input  : [", end="")
         for t in range(SEQ_LEN):
-            if t > 0: print(", ", end="")
+            if t > 0:
+                print(", ", end="")
             print(Int(repeat_vals[test_idx, t]), end="")
         print("]")
         print("    Predict: [", end="")
         for t in range(SEQ_LEN):
-            if t > 0: print(", ", end="")
+            if t > 0:
+                print(", ", end="")
             print(Int(preds[0, t]), end="")
         print("]")
         print("    Expect : [", end="")
         for t in range(SEQ_LEN):
-            if t > 0: print(", ", end="")
+            if t > 0:
+                print(", ", end="")
             print(expected[t], end="")
         print("]")
         var ok = True

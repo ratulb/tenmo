@@ -8,7 +8,7 @@ from .kernels import SGDStep
 
 
 @fieldwise_init
-struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
+struct SGD[dtype: DType](ImplicitlyCopyable & Movable):
     """
     SGD with momentum, weight decay, and gradient clipping.
     """
@@ -52,7 +52,6 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                             Gradbox[Self.dtype].full(
                                 parameter.shape(),
                                 Scalar[Self.dtype](0),
-
                                 device=parameter.device(),
                             )
                         )
@@ -79,15 +78,15 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         self.use_momentum = copy.use_momentum
         self.velocities = copy.velocities.copy()
 
-    def __init__(out self, deinit existing: Self):
-        self.parameters = existing.parameters^
-        self.lr = existing.lr
-        self.momentum = existing.momentum
-        self.weight_decay = existing.weight_decay
-        self.clip_norm = existing.clip_norm
-        self.clip_value = existing.clip_value
-        self.use_momentum = existing.use_momentum
-        self.velocities = existing.velocities^
+    def __init__(out self, *, deinit move: Self):
+        self.parameters = move.parameters^
+        self.lr = move.lr
+        self.momentum = move.momentum
+        self.weight_decay = move.weight_decay
+        self.clip_norm = move.clip_norm
+        self.clip_value = move.clip_value
+        self.use_momentum = move.use_momentum
+        self.velocities = move.velocities^
 
     @always_inline
     def _step_no_momentum[
@@ -508,18 +507,24 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                             var grad_ndb = grad.buffer().copy()
                             var vel_ndb = velocity.buffer().copy()
                             SGDStep[Self.dtype].launch_momentum(
-                                param_ndb^, grad_ndb^, vel_ndb^,
+                                param_ndb^,
+                                grad_ndb^,
+                                vel_ndb^,
                                 num_elements,
-                                self.lr, self.momentum, self.weight_decay,
+                                self.lr,
+                                self.momentum,
+                                self.weight_decay,
                                 sync=False,
                             )
                         else:
                             var param_ndb = parameter.buffer.copy()
                             var grad_ndb = grad.buffer().copy()
                             SGDStep[Self.dtype].launch_no_momentum(
-                                param_ndb^, grad_ndb^,
+                                param_ndb^,
+                                grad_ndb^,
                                 num_elements,
-                                self.lr, self.weight_decay,
+                                self.lr,
+                                self.weight_decay,
                                 sync=False,
                             )
                     except e:

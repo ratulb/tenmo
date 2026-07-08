@@ -10,17 +10,75 @@ struct Accuracy[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:
         pred: Tensor[Self.dtype],
         target: Tensor[Self.index_dtype],
         sync: Bool = True,
-    ) raises -> Int:
+    ) raises -> Float64:
+        """Fraction of rows where argmax(pred, axis=-1) matches target.
+
+        pred: (N, C) — logits, class dim last.
+        target: (N,) — ground-truth class indices.
+        """
         comptime if has_accelerator():
             if pred.is_on_gpu() or target.is_on_gpu():
                 return Self._accuracy_gpu(pred, target, sync)
         return Self._accuracy_cpu(pred, target)
 
     @staticmethod
+    def token_accuracy(
+        pred: Tensor[Self.dtype],
+        target: Tensor[Self.index_dtype],
+        sync: Bool = True,
+    ) raises -> Float64:
+        """Fraction of individual positions correctly predicted.
+
+        pred: (B, T, ..., C) — any shape, class dim last.
+        target: (B, T, ...) — matching shape without class dim.
+        Both must be on the same device (panics if mixed).
+        """
+        comptime if has_accelerator():
+            if (pred.is_on_gpu() and target.is_on_cpu()) or (
+                pred.is_on_cpu() and target.is_on_gpu()
+            ):
+                panic(
+                    "Accuracy.token_accuracy - both tensors must be on the same"
+                    " device"
+                )
+        var num_classes = pred.shape()[pred.shape().ndim() - 1]
+        var flat_pred = Tensor[Self.dtype](copy=pred)
+        flat_pred = flat_pred.reshape(target.numels(), num_classes)
+        var flat_target = Tensor[Self.index_dtype](copy=target)
+        flat_target = flat_target.reshape(target.numels())
+        return Self.compute(flat_pred, flat_target, sync)
+
+    @staticmethod
+    def sequence_accuracy(
+        pred: Tensor[Self.dtype],
+        target: Tensor[Self.index_dtype],
+        sync: Bool = True,
+    ) raises -> Float64:
+        """Fraction of sequences where ALL positions are correctly predicted.
+
+        pred: (B, T, C) — 3D, class dim last.
+        target: (B, T) — matching sequence labels.
+        Both must be on the same device (panics if mixed).
+        """
+        comptime if has_accelerator():
+            if pred.is_on_gpu() and target.is_on_gpu():
+                var correct = Self._sequence_accuracy_gpu(pred, target, sync)
+                return Float64(correct) / Float64(pred.shape()[0])
+            elif (pred.is_on_gpu() and target.is_on_cpu()) or (
+                pred.is_on_cpu() and target.is_on_gpu()
+            ):
+                panic(
+                    "Accuracy.sequence_accuracy - both tensors must be on the"
+                    " same device"
+                )
+        var correct = Self._sequence_accuracy_cpu(pred, target)
+        return Float64(correct) / Float64(pred.shape()[0])
+
+    @staticmethod
     def _accuracy_cpu(
         pred: Tensor[Self.dtype],
         target: Tensor[Self.index_dtype],
-    ) raises -> Int:
+    ) raises -> Float64:
         var pred_ndb = pred.buffer
         var tgt_ndb = target.buffer
         var batch_size = pred_ndb.shape[0]
@@ -63,14 +121,14 @@ struct Accuracy[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:
                         (max_val, max_idx) = (val, j)
                 if max_idx == Int(tbuf[toff + row * ts0]):
                     correct += 1
-        return correct
+        return Float64(correct) / Float64(batch_size)
 
     @staticmethod
     def _accuracy_gpu(
         pred_in: Tensor[Self.dtype],
         target_in: Tensor[Self.index_dtype],
         sync: Bool,
-    ) raises -> Int:
+    ) raises -> Float64:
         from tenmo.kernels import AccuracyGpu
 
         var pred = pred_in
@@ -80,6 +138,38 @@ struct Accuracy[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:
         if not target.is_on_gpu():
             target = target.to_gpu(sync=sync)
 
-        return AccuracyGpu[Self.dtype, Self.index_dtype].launch(
+        var correct = AccuracyGpu[Self.dtype, Self.index_dtype].launch(
+            pred.buffer, target.buffer, sync=sync
+        )
+        return Float64(correct) / Float64(pred.shape()[0])
+
+    @staticmethod
+    def _sequence_accuracy_cpu(
+        pred: Tensor[Self.dtype],
+        target: Tensor[Self.index_dtype],
+    ) raises -> Int:
+        var preds = pred.argmax[Self.index_dtype](axis=-1)
+        var B = preds.shape()[0]
+        var T = preds.shape()[1]
+        var correct = 0
+        for b in range(B):
+            var ok = True
+            for t in range(T):
+                if Int(preds[b, t]) != Int(target[b, t]):
+                    ok = False
+                    break
+            if ok:
+                correct += 1
+        return correct
+
+    @staticmethod
+    def _sequence_accuracy_gpu(
+        pred: Tensor[Self.dtype],
+        target: Tensor[Self.index_dtype],
+        sync: Bool,
+    ) raises -> Int:
+        from tenmo.kernels import SequenceAccuracyGpu
+
+        return SequenceAccuracyGpu[Self.dtype, Self.index_dtype].launch(
             pred.buffer, target.buffer, sync=sync
         )

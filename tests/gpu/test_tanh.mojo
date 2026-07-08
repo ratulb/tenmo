@@ -17,9 +17,6 @@ from std.math import log, exp
 from tenmo.mnemonics import AddTensor
 
 
-
-
-
 # ============================================================================
 # Tanh Activation Tests
 # ============================================================================
@@ -724,7 +721,6 @@ def test_squz_unsquz_gpu_round_trip_multi() raises:
 # ============================================================
 
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. FORWARD PASS – CPU
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1064,7 +1060,6 @@ def test_sqrt_parity_bwd_3d() raises:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-
 def test_gpu_sparse_sgd_step_only_updates_specified_rows() raises:
     """Sparse step on GPU: only rows at specified indices change."""
     comptime if not has_accelerator():
@@ -1080,7 +1075,7 @@ def test_gpu_sparse_sgd_step_only_updates_specified_rows() raises:
     var w = w_cpu.to_gpu()
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
-    var sgd = SGD(params, lr=0.1)
+    var sgd = SGD[dtype](params, lr=0.1)
     w.seed_grad(1.0)
     sgd.step(IntArray([0, 2]))
     var result = w.to_cpu()
@@ -1102,7 +1097,7 @@ def test_gpu_sparse_sgd_with_momentum() raises:
     var w = w_cpu.to_gpu()
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
-    var sgd = SGD(params, lr=0.1, momentum=0.9)
+    var sgd = SGD[dtype](params, lr=0.1, momentum=0.9)
     var idx = IntArray([1])
     w.seed_grad(1.0)
     sgd.step(idx)
@@ -1113,8 +1108,6 @@ def test_gpu_sparse_sgd_with_momentum() raises:
         [[10.0, 10.0], [19.9, 19.9], [30.0, 30.0]],
     )
     assert_true(result.all_close(expected))
-
-
 
 
 # Old tests
@@ -1493,7 +1486,6 @@ def test_log_softmax_parity_using_zero_grad() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-
 # ===----------------------------------------------------------------------=== #
 # Sigmoid exhaustive tests — prefix: sig_
 # Covers: forward, backward, grad flow, 0-D through 4-D, CPU & GPU
@@ -1770,7 +1762,6 @@ def test_sig_gpu_cpu_backward_parity() raises:
 # ===----------------------------------------------------------------------=== #
 # Entry point
 # ===----------------------------------------------------------------------=== #
-
 
 
 def test_gpu_scalar_add_backward_only() raises:

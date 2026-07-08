@@ -2,7 +2,15 @@ from tenmo import NDBuffer, Shape, IntArray
 from std.sys import has_accelerator
 from tenmo.device import GPU
 from tenmo.mnemonics import (
-    Add, Subtract, ReverseSubtract, Multiply, Divide, ReverseDivide, MAX, MIN, POW,
+    Add,
+    Subtract,
+    ReverseSubtract,
+    Multiply,
+    Divide,
+    ReverseDivide,
+    MAX,
+    MIN,
+    POW,
 )
 from tenmo.tensor import Tensor
 from tenmo.relu import ReLU
@@ -13,54 +21,68 @@ from tenmo.optim import SGD
 from tenmo.common_utils import s
 
 from tenmo.shuffle import Shuffle
+
 comptime dtype = DType.float32
-
-
-
-
 
 
 # =============================================================================
 # A. Out-of-place scalar_ops — contiguous input (flat SIMD kernel)
 # =============================================================================
 
-  # 1D, size=8
+
+# 1D, size=8
 def test_oop_size1000_add_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 1001)
         var expected = a.scalar_ops[Add](Scalar[dtype](5.0))
-        var result = a.to_gpu(gpu).scalar_ops[Add](Scalar[dtype](5.0), sync=True)
+        var result = a.to_gpu(gpu).scalar_ops[Add](
+            Scalar[dtype](5.0), sync=True
+        )
         assert_true(result.to_cpu().all_close[atol=1e-5](expected))
-  # 1000 elements
+
+
+# 1000 elements
 def test_oop_size1000_multiply_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 1001)
         var expected = a.scalar_ops[Multiply](Scalar[dtype](2.0))
-        var result = a.to_gpu(gpu).scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
+        var result = a.to_gpu(gpu).scalar_ops[Multiply](
+            Scalar[dtype](2.0), sync=True
+        )
         assert_true(result.to_cpu().all_close[atol=1e-5](expected))
-  # 7777 elements
+
+
+# 7777 elements
 def test_oop_size7777_add_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 7778)
         var expected = a.scalar_ops[Add](Scalar[dtype](5.0))
-        var result = a.to_gpu(gpu).scalar_ops[Add](Scalar[dtype](5.0), sync=True)
+        var result = a.to_gpu(gpu).scalar_ops[Add](
+            Scalar[dtype](5.0), sync=True
+        )
         assert_true(result.to_cpu().all_close[atol=1e-5](expected))
-  # 7777 elements
+
+
+# 7777 elements
 def test_oop_size7777_multiply_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 7778)
         var expected = a.scalar_ops[Multiply](Scalar[dtype](2.0))
-        var result = a.to_gpu(gpu).scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
+        var result = a.to_gpu(gpu).scalar_ops[Multiply](
+            Scalar[dtype](2.0), sync=True
+        )
         assert_true(result.to_cpu().all_close[atol=1e-5](expected))
-  # identity op
+
+
+# identity op
 def test_oop_identity_add_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -69,51 +91,72 @@ def test_oop_identity_add_gpu_scalar() raises:
         var expected = a.scalar_ops[Add](Scalar[dtype](0))
         var result = a.to_gpu(gpu).scalar_ops[Add](Scalar[dtype](0), sync=True)
         assert_true(result.to_cpu().all_close[atol=1e-5](expected))
-  # identity op
+
+
+# identity op
 def test_oop_identity_multiply_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 25).reshape(Shape(4, 6))
         var expected = a.scalar_ops[Multiply](Scalar[dtype](1.0))
-        var result = a.to_gpu(gpu).scalar_ops[Multiply](Scalar[dtype](1.0), sync=True)
+        var result = a.to_gpu(gpu).scalar_ops[Multiply](
+            Scalar[dtype](1.0), sync=True
+        )
         assert_true(result.to_cpu().all_close[atol=1e-5](expected))
-  # negative scalar
+
+
+# negative scalar
 def test_oop_neg_add_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
         var expected = a.scalar_ops[Add](Scalar[dtype](-3.0))
-        var result = a.to_gpu(gpu).scalar_ops[Add](Scalar[dtype](-3.0), sync=True)
+        var result = a.to_gpu(gpu).scalar_ops[Add](
+            Scalar[dtype](-3.0), sync=True
+        )
         assert_true(result.to_cpu().all_close[atol=1e-5](expected))
-  # negative scalar
+
+
+# negative scalar
 def test_oop_neg_multiply_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
         var expected = a.scalar_ops[Multiply](Scalar[dtype](-2.0))
-        var result = a.to_gpu(gpu).scalar_ops[Multiply](Scalar[dtype](-2.0), sync=True)
+        var result = a.to_gpu(gpu).scalar_ops[Multiply](
+            Scalar[dtype](-2.0), sync=True
+        )
         assert_true(result.to_cpu().all_close[atol=1e-5](expected))
-  # negative scalar
+
+
+# negative scalar
 def test_oop_neg_max_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
         var expected = a.scalar_ops[MAX](Scalar[dtype](-3.0))
-        var result = a.to_gpu(gpu).scalar_ops[MAX](Scalar[dtype](-3.0), sync=True)
+        var result = a.to_gpu(gpu).scalar_ops[MAX](
+            Scalar[dtype](-3.0), sync=True
+        )
         assert_true(result.to_cpu().all_close[atol=1e-5](expected))
-  # negative scalar
+
+
+# negative scalar
 def test_oop_neg_min_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
         var expected = a.scalar_ops[MIN](Scalar[dtype](-3.0))
-        var result = a.to_gpu(gpu).scalar_ops[MIN](Scalar[dtype](-3.0), sync=True)
+        var result = a.to_gpu(gpu).scalar_ops[MIN](
+            Scalar[dtype](-3.0), sync=True
+        )
         assert_true(result.to_cpu().all_close[atol=1e-5](expected))
+
 
 # =============================================================================
 # F8. f64 strided — 2D transposed out-of-place
@@ -126,9 +169,14 @@ def test_oop_2d_add_transposed_f64_gpu_scalar() raises:
         var gpu = GPU()
         var a_base = NDBuffer[dtype].arange(1, 25).reshape(Shape(6, 4))
         var a = a_base.transpose()
-        var expected = a.contiguous().scalar_ops[Add](Scalar[DType.float64](5.0))
-        var result = a.to_gpu(gpu).scalar_ops[Add](Scalar[DType.float64](5.0), sync=True)
+        var expected = a.contiguous().scalar_ops[Add](
+            Scalar[DType.float64](5.0)
+        )
+        var result = a.to_gpu(gpu).scalar_ops[Add](
+            Scalar[DType.float64](5.0), sync=True
+        )
         assert_true(result.to_cpu().all_close[atol=1e-10](expected))
+
 
 def test_oop_2d_multiply_transposed_f64_gpu_scalar() raises:
     comptime if has_accelerator():
@@ -136,15 +184,21 @@ def test_oop_2d_multiply_transposed_f64_gpu_scalar() raises:
         var gpu = GPU()
         var a_base = NDBuffer[dtype].arange(1, 25).reshape(Shape(6, 4))
         var a = a_base.transpose()
-        var expected = a.contiguous().scalar_ops[Multiply](Scalar[DType.float64](2.0))
-        var result = a.to_gpu(gpu).scalar_ops[Multiply](Scalar[DType.float64](2.0), sync=True)
+        var expected = a.contiguous().scalar_ops[Multiply](
+            Scalar[DType.float64](2.0)
+        )
+        var result = a.to_gpu(gpu).scalar_ops[Multiply](
+            Scalar[DType.float64](2.0), sync=True
+        )
         assert_true(result.to_cpu().all_close[atol=1e-10](expected))
+
 
 # =============================================================================
 # G. Edge cases — in-place
 # =============================================================================
 
-  # tail size 7
+
+# tail size 7
 def test_ip_tail7_add_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -155,7 +209,9 @@ def test_ip_tail7_add_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](5.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # tail size 7
+
+
+# tail size 7
 def test_ip_tail7_subtract_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -166,7 +222,9 @@ def test_ip_tail7_subtract_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Subtract](Scalar[dtype](3.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # tail size 7
+
+
+# tail size 7
 def test_ip_tail7_reversesubtract_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -175,9 +233,13 @@ def test_ip_tail7_reversesubtract_gpu_scalar() raises:
         var expected = a.copy()
         expected.inplace_scalar_ops[ReverseSubtract](Scalar[dtype](10.0))
         var a_gpu = a.to_gpu(gpu)
-        a_gpu.inplace_scalar_ops[ReverseSubtract](Scalar[dtype](10.0), sync=True)
+        a_gpu.inplace_scalar_ops[ReverseSubtract](
+            Scalar[dtype](10.0), sync=True
+        )
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # tail size 7
+
+
+# tail size 7
 def test_ip_tail7_multiply_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -188,7 +250,9 @@ def test_ip_tail7_multiply_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # tail size 7
+
+
+# tail size 7
 def test_ip_tail7_divide_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -199,7 +263,9 @@ def test_ip_tail7_divide_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Divide](Scalar[dtype](4.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # tail size 7
+
+
+# tail size 7
 def test_ip_tail7_max_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -210,7 +276,9 @@ def test_ip_tail7_max_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MAX](Scalar[dtype](5.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # tail size 7
+
+
+# tail size 7
 def test_ip_tail7_min_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -221,7 +289,9 @@ def test_ip_tail7_min_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MIN](Scalar[dtype](8.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # single element
+
+
+# single element
 def test_ip_1elem_add_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -232,7 +302,9 @@ def test_ip_1elem_add_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](5.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # single element
+
+
+# single element
 def test_ip_1elem_subtract_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -243,7 +315,9 @@ def test_ip_1elem_subtract_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Subtract](Scalar[dtype](3.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # single element
+
+
+# single element
 def test_ip_1elem_reversesubtract_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -252,9 +326,13 @@ def test_ip_1elem_reversesubtract_gpu_scalar() raises:
         var expected = a.copy()
         expected.inplace_scalar_ops[ReverseSubtract](Scalar[dtype](10.0))
         var a_gpu = a.to_gpu(gpu)
-        a_gpu.inplace_scalar_ops[ReverseSubtract](Scalar[dtype](10.0), sync=True)
+        a_gpu.inplace_scalar_ops[ReverseSubtract](
+            Scalar[dtype](10.0), sync=True
+        )
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # single element
+
+
+# single element
 def test_ip_1elem_multiply_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -265,7 +343,9 @@ def test_ip_1elem_multiply_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # single element
+
+
+# single element
 def test_ip_1elem_divide_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -276,7 +356,9 @@ def test_ip_1elem_divide_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Divide](Scalar[dtype](4.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # single element
+
+
+# single element
 def test_ip_1elem_max_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -287,7 +369,9 @@ def test_ip_1elem_max_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MAX](Scalar[dtype](5.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # single element
+
+
+# single element
 def test_ip_1elem_min_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -298,7 +382,9 @@ def test_ip_1elem_min_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MIN](Scalar[dtype](8.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # 100 elements
+
+
+# 100 elements
 def test_ip_size100_add_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -309,7 +395,9 @@ def test_ip_size100_add_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](5.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # 100 elements
+
+
+# 100 elements
 def test_ip_size100_multiply_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -320,7 +408,9 @@ def test_ip_size100_multiply_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # 1000 elements
+
+
+# 1000 elements
 def test_ip_size1000_add_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -331,7 +421,9 @@ def test_ip_size1000_add_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](5.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # 1000 elements
+
+
+# 1000 elements
 def test_ip_size1000_multiply_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -342,7 +434,9 @@ def test_ip_size1000_multiply_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # 7777 elements
+
+
+# 7777 elements
 def test_ip_size7777_add_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -353,7 +447,9 @@ def test_ip_size7777_add_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](5.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # 7777 elements
+
+
+# 7777 elements
 def test_ip_size7777_multiply_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -364,7 +460,9 @@ def test_ip_size7777_multiply_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # identity op
+
+
+# identity op
 def test_ip_identity_add_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -375,7 +473,9 @@ def test_ip_identity_add_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # identity op
+
+
+# identity op
 def test_ip_identity_multiply_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -386,7 +486,9 @@ def test_ip_identity_multiply_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](1.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # negative scalar
+
+
+# negative scalar
 def test_ip_neg_add_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -397,7 +499,9 @@ def test_ip_neg_add_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](-3.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # negative scalar
+
+
+# negative scalar
 def test_ip_neg_multiply_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -408,7 +512,9 @@ def test_ip_neg_multiply_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](-2.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # negative scalar
+
+
+# negative scalar
 def test_ip_neg_max_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -419,7 +525,9 @@ def test_ip_neg_max_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MAX](Scalar[dtype](-3.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
-  # negative scalar
+
+
+# negative scalar
 def test_ip_neg_min_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -430,6 +538,7 @@ def test_ip_neg_min_gpu_scalar() raises:
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MIN](Scalar[dtype](-3.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
+
 
 # =============================================================================
 # G8. f64 strided — 2D transposed in-place
@@ -448,6 +557,7 @@ def test_ip_2d_add_transposed_f64_gpu_scalar() raises:
         a_gpu.inplace_scalar_ops[Add](Scalar[DType.float64](5.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-10](expected))
 
+
 def test_ip_2d_multiply_transposed_f64_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float64
@@ -457,8 +567,11 @@ def test_ip_2d_multiply_transposed_f64_gpu_scalar() raises:
         var expected = a.contiguous()
         expected.inplace_scalar_ops[Multiply](Scalar[DType.float64](2.0))
         var a_gpu = a.to_gpu(gpu)
-        a_gpu.inplace_scalar_ops[Multiply](Scalar[DType.float64](2.0), sync=True)
+        a_gpu.inplace_scalar_ops[Multiply](
+            Scalar[DType.float64](2.0), sync=True
+        )
         assert_true(a_gpu.to_cpu().all_close[atol=1e-10](expected))
+
 
 # =============================================================================
 # H. f64 strided 3D transposed
@@ -471,9 +584,14 @@ def test_oop_3d_add_transposed_f64_gpu_scalar() raises:
         var gpu = GPU()
         var a_base = NDBuffer[dtype].arange(1, 61).reshape(Shape(3, 4, 5))
         var a = a_base.transpose()
-        var expected = a.contiguous().scalar_ops[Add](Scalar[DType.float64](5.0))
-        var result = a.to_gpu(gpu).scalar_ops[Add](Scalar[DType.float64](5.0), sync=True)
+        var expected = a.contiguous().scalar_ops[Add](
+            Scalar[DType.float64](5.0)
+        )
+        var result = a.to_gpu(gpu).scalar_ops[Add](
+            Scalar[DType.float64](5.0), sync=True
+        )
         assert_true(result.to_cpu().all_close[atol=1e-10](expected))
+
 
 def test_ip_3d_add_transposed_f64_gpu_scalar() raises:
     comptime if has_accelerator():
@@ -487,15 +605,21 @@ def test_ip_3d_add_transposed_f64_gpu_scalar() raises:
         a_gpu.inplace_scalar_ops[Add](Scalar[DType.float64](5.0), sync=True)
         assert_true(a_gpu.to_cpu().all_close[atol=1e-10](expected))
 
+
 def test_oop_3d_multiply_transposed_f64_gpu_scalar() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float64
         var gpu = GPU()
         var a_base = NDBuffer[dtype].arange(1, 61).reshape(Shape(3, 4, 5))
         var a = a_base.transpose()
-        var expected = a.contiguous().scalar_ops[Multiply](Scalar[DType.float64](2.0))
-        var result = a.to_gpu(gpu).scalar_ops[Multiply](Scalar[DType.float64](2.0), sync=True)
+        var expected = a.contiguous().scalar_ops[Multiply](
+            Scalar[DType.float64](2.0)
+        )
+        var result = a.to_gpu(gpu).scalar_ops[Multiply](
+            Scalar[DType.float64](2.0), sync=True
+        )
         assert_true(result.to_cpu().all_close[atol=1e-10](expected))
+
 
 def test_ip_3d_multiply_transposed_f64_gpu_scalar() raises:
     comptime if has_accelerator():
@@ -506,11 +630,10 @@ def test_ip_3d_multiply_transposed_f64_gpu_scalar() raises:
         var expected = a.contiguous()
         expected.inplace_scalar_ops[Multiply](Scalar[DType.float64](2.0))
         var a_gpu = a.to_gpu(gpu)
-        a_gpu.inplace_scalar_ops[Multiply](Scalar[DType.float64](2.0), sync=True)
+        a_gpu.inplace_scalar_ops[Multiply](
+            Scalar[DType.float64](2.0), sync=True
+        )
         assert_true(a_gpu.to_cpu().all_close[atol=1e-10](expected))
-
-
-
 
 
 # =============================================================================
@@ -876,7 +999,6 @@ def test_rlv_parity_bwd_2d() raises:
         assert_true(cpu_grad.all_close(gpu_grad))
 
 
-
 def test_gpu_1d_to_2d_forward() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -1236,8 +1358,6 @@ def test_gpu_grad_stays_on_cpu() raises:
         )
 
 
-
-
 # ── CPU Tests ─────────────────────────────────────────────────────────────────
 
 
@@ -1250,7 +1370,7 @@ def test_sgd_gpu_vanilla_single_step() raises:
         var w_gpu = w.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1)
+        var sgd = SGD[dtype](params, lr=0.1)
         w_gpu.seed_grad(1.0)
         sgd.step()
         var result = w_gpu.to_cpu()
@@ -1265,8 +1385,8 @@ def test_sgd_gpu_vanilla_matches_cpu() raises:
         var params_gpu = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params_cpu.append(UnsafePointer(to=w))
         params_gpu.append(UnsafePointer(to=w_gpu))
-        var sgd_cpu = SGD(params_cpu, lr=0.01)
-        var sgd_gpu = SGD(params_gpu, lr=0.01)
+        var sgd_cpu = SGD[dtype](params_cpu, lr=0.01)
+        var sgd_gpu = SGD[dtype](params_gpu, lr=0.01)
         # Same grad on both
         var grad = Tensor[dtype].rand(4, 8)
         var grad_gpu = grad.to_gpu()
@@ -1283,7 +1403,7 @@ def test_sgd_gpu_vanilla_multiple_steps() raises:
         var w_gpu = w.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1)
+        var sgd = SGD[dtype](params, lr=0.1)
         for _ in range(3):
             w_gpu.seed_grad(1.0)
             sgd.step()
@@ -1297,7 +1417,7 @@ def test_sgd_gpu_weight_decay() raises:
         var w_gpu = w.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1, weight_decay=0.1)
+        var sgd = SGD[dtype](params, lr=0.1, weight_decay=0.1)
         w_gpu.seed_grad(1.0)
         sgd.step()
         var expected = Tensor[dtype].d1(
@@ -1316,7 +1436,7 @@ def test_sgd_gpu_momentum_single_step() raises:
         var w_gpu = w.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1, momentum=0.9)
+        var sgd = SGD[dtype](params, lr=0.1, momentum=0.9)
         w_gpu.seed_grad(1.0)
         sgd.step()
         assert_true(w_gpu.to_cpu().all_close(Tensor[dtype].d1([0.9, 1.9, 2.9])))
@@ -1328,7 +1448,7 @@ def test_sgd_gpu_momentum_multiple_steps() raises:
         var w_gpu = w.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1, momentum=0.9)
+        var sgd = SGD[dtype](params, lr=0.1, momentum=0.9)
         for _ in range(3):
             w_gpu.seed_grad(1.0)
             sgd.step()
@@ -1343,8 +1463,8 @@ def test_sgd_gpu_momentum_matches_cpu() raises:
         var params_gpu = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params_cpu.append(UnsafePointer(to=w))
         params_gpu.append(UnsafePointer(to=w_gpu))
-        var sgd_cpu = SGD(params_cpu, lr=0.01, momentum=0.9)
-        var sgd_gpu = SGD(params_gpu, lr=0.01, momentum=0.9)
+        var sgd_cpu = SGD[dtype](params_cpu, lr=0.01, momentum=0.9)
+        var sgd_gpu = SGD[dtype](params_gpu, lr=0.01, momentum=0.9)
         var grad = Tensor[dtype].rand(4, 8)
         var grad_gpu = grad.to_gpu()
         for _ in range(5):
@@ -1361,7 +1481,7 @@ def test_sgd_gpu_clip_value() raises:
         var w_gpu = w.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1, clip_value=0.5)
+        var sgd = SGD[dtype](params, lr=0.1, clip_value=0.5)
         w_gpu.seed_grad(2.0)
         sgd.step()
         assert_true(
@@ -1377,8 +1497,8 @@ def test_sgd_gpu_clip_value_matches_cpu() raises:
         var params_gpu = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params_cpu.append(UnsafePointer(to=w))
         params_gpu.append(UnsafePointer(to=w_gpu))
-        var sgd_cpu = SGD(params_cpu, lr=0.01, clip_value=0.1)
-        var sgd_gpu = SGD(params_gpu, lr=0.01, clip_value=0.1)
+        var sgd_cpu = SGD[dtype](params_cpu, lr=0.01, clip_value=0.1)
+        var sgd_gpu = SGD[dtype](params_gpu, lr=0.01, clip_value=0.1)
         var grad = Tensor[dtype].rand(8, 8)
         var grad_gpu = grad.to_gpu()
         w.seed_grad(grad)
@@ -1396,8 +1516,8 @@ def test_sgd_gpu_clip_norm_matches_cpu() raises:
         var params_gpu = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params_cpu.append(UnsafePointer(to=w))
         params_gpu.append(UnsafePointer(to=w_gpu))
-        var sgd_cpu = SGD(params_cpu, lr=0.01, clip_norm=1.0)
-        var sgd_gpu = SGD(params_gpu, lr=0.01, clip_norm=1.0)
+        var sgd_cpu = SGD[dtype](params_cpu, lr=0.01, clip_norm=1.0)
+        var sgd_gpu = SGD[dtype](params_gpu, lr=0.01, clip_norm=1.0)
         var grad = Tensor[dtype].rand(8, 8)
         var grad_gpu = grad.to_gpu()
         w.seed_grad(grad)
@@ -1416,7 +1536,7 @@ def test_sgd_gpu_multiple_parameters() raises:
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w1_gpu))
         params.append(UnsafePointer(to=w2_gpu))
-        var sgd = SGD(params, lr=0.1)
+        var sgd = SGD[dtype](params, lr=0.1)
         w1_gpu.seed_grad(1.0)
         w2_gpu.seed_grad(2.0)
         sgd.step()
@@ -1430,7 +1550,7 @@ def test_sgd_gpu_zero_grad() raises:
         var w_gpu = w.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1)
+        var sgd = SGD[dtype](params, lr=0.1)
         w_gpu.seed_grad(1.0)
         sgd.step()
         sgd.zero_grad()
@@ -1446,7 +1566,7 @@ def test_sgd_gpu_backward_integration() raises:
         var x_gpu = x.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1)
+        var sgd = SGD[dtype](params, lr=0.1)
         var loss = (w_gpu * x_gpu).sum()
         loss.backward()
         sgd.step()
@@ -1466,8 +1586,8 @@ def test_sgd_gpu_backward_integration_matches_cpu() raises:
         var params_gpu = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params_cpu.append(UnsafePointer(to=w))
         params_gpu.append(UnsafePointer(to=w_gpu))
-        var sgd_cpu = SGD(params_cpu, lr=0.01)
-        var sgd_gpu = SGD(params_gpu, lr=0.01)
+        var sgd_cpu = SGD[dtype](params_cpu, lr=0.01)
+        var sgd_gpu = SGD[dtype](params_gpu, lr=0.01)
         # CPU backward
         var loss_cpu = (w * x).sum()
         loss_cpu.backward()
@@ -1489,8 +1609,8 @@ def test_sgd_gpu_large_tensor() raises:
         var params_gpu = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params_cpu.append(UnsafePointer(to=w))
         params_gpu.append(UnsafePointer(to=w_gpu))
-        var sgd_cpu = SGD(params_cpu, lr=0.01)
-        var sgd_gpu = SGD(params_gpu, lr=0.01)
+        var sgd_cpu = SGD[dtype](params_cpu, lr=0.01)
+        var sgd_gpu = SGD[dtype](params_gpu, lr=0.01)
         var grad = Tensor[dtype].rand(128, 256)
         var grad_gpu = grad.to_gpu()
         w.seed_grad(grad)
@@ -1498,9 +1618,6 @@ def test_sgd_gpu_large_tensor() raises:
         sgd_cpu.step()
         sgd_gpu.step()
         assert_true(w.all_close(w_gpu.to_cpu()))
-
-
-
 
 
 # ============================================================

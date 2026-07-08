@@ -18,9 +18,14 @@ pixi install              # install deps
 ./execute.sh gpu_all      # all GPU tests (chunks sequentially)
 ./execute.sh -d <name>    # debug mode (-D LOGGING_LEVEL=debug)
 ./execute.sh from <name>  # run <name> and all tests after it
+./execute.sh select <name> <fn>  # extract & run a single test function from a file
 ./example.sh xor          # run example: xor|mnist|mnist_unified|spiral|cifar_10|imdb|mnist_gpu|mnist_conv2d|word2vec_cbow
 ./fire.sh                 # quick-run debug.mojo (or pass another file)
+./run_gpu_stripped.sh     # batch GPU tests from tests/gpu/ (outside execute.sh)
+./run_gpu_test_files.sh   # run all GPU-guarded test_*.mojo individually
 ```
+
+`execute.sh` wraps `pixi run mojo -I . <file>` — **always** inside pixi environment. `fire.sh` and `run_gpu_*.sh` use bare `mojo` — run from `pixi shell` first.
 
 ### Test names ≠ filenames
 Use test **names** (not filenames) with `execute.sh`:
@@ -33,7 +38,7 @@ Mojo compiles the entire library from scratch on every run. **Always use ≥12 m
 
 ## Architecture
 ```
-tenmo/                    # library source (~94 .mojo files)
+tenmo/                    # library source (~135 .mojo files)
   __init__.mojo           # re-exports everything
   tensor.mojo             # Tensor[dtype] — main type, autograd, CPU+GPU
   ndbuffer.mojo           # NDBuffer — shape/strides/offset (single source of truth)
@@ -85,6 +90,35 @@ GPU ops queue asynchronously. `sync: Bool` controls CPU wait:
 - `to_gpu()` / `to_cpu()`: `sync=True` (pass `sync=False` for async batch transfer)
 - NDBuffer dispatch methods: `sync=False` (caller manages)
 
+## Accuracy Methods
+
+`Accuracy` provides three methods:
+
+- **`compute(pred, target, sync) → Float64`**: fraction of rows where
+  `argmax(pred, axis=-1)` matches `target`. pred: `(N, C)`, target: `(N,)`.
+  Dispatches to GPU if either tensor is on GPU (auto-transfers the other).
+  Returns Float64 (accuracy fraction), not Int (count).
+
+- **`token_accuracy(pred, target, sync) → Float64`**: fraction of individual
+  positions correctly predicted. pred: `(..., C)`, target: `(...)` — any shape,
+  class dim last. Copies+flattens internally. Both must be on same device (panics
+  if mixed).
+
+- **`sequence_accuracy(pred, target, sync) → Float64`**: fraction of sequences
+  where ALL positions match. pred: `(B, T, C)`, target: `(B, T)`. Both must be on
+  same device (panics if mixed).
+
+GPU kernels (`AccuracyGpu`, `SequenceAccuracyGpu`) use `block_dim=256` with
+grid-stride loops (`for i in range(tid, total, stride)`). This avoids the 1024
+thread/block hardware ceiling — correctness does not depend on grid/block dims.
+
+Kernel indexing uses direct arithmetic: `var tid = thread_idx.x + block_dim.x * block_idx.x`
+(no `Int()` cast — handled natively in modern Mojo).
+
+Copy via `Tensor(copy=orig)` preserves device residency (GPU copy stays on GPU).
+Contiguous layout assumed for GPU paths; `token_accuracy` always copies+flattens
+(contiguous). Ties go to first argmax found. No NaN handling.
+
 ## GPU Device Transfer
 | Path | Mechanism |
 |---|---|
@@ -101,6 +135,8 @@ GPU ops queue asynchronously. `sync: Bool` controls CPU wait:
 - **Tensor.rand/randn/arange/linspace** — no `device` param (workaround: `.to_gpu()` after construction)
 - **Tensor.onehot** — per-element `map_to_host()` round trips on GPU
 - **CE probability targets** — forward falls back to GPU→CPU transfer + CPU fused kernel (backward is fine)
+
+GPU-only test variants live in `tests/gpu/` (31 files). Full GPU sync architecture documented in `GPU_SYNCHRONIZATION.md`.
 
 ## BLAS
 Default path: `/lib/x86_64-linux-gnu/libopenblas.so.0` (system install via `apt-get install libopenblas-dev`). Override at compile time:

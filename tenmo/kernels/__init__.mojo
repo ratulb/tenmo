@@ -24,7 +24,7 @@ from .dotproduct_kernel import DotproductKernel
 from .argminmax_kernel import ArgMinMaxGpu
 from .filler_kernel import FillerGpu
 from .gather_kernel import GatherGpu
-from .accuracy_kernel import AccuracyGpu
+from .accuracy_kernel import AccuracyGpu, SequenceAccuracyGpu
 from .sgd_kernel import SGDStep
 from .multinomial_kernel import MultinomialGpuKernel
 from .concate_kernel import ConcateGpuKernel

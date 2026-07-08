@@ -216,7 +216,7 @@ def main() raises:
         weights_0_1 = weights_0_1.to_gpu()
         weights_1_2 = weights_1_2.to_gpu()
 
-    var optimizer = SGD(
+    var optimizer = SGD[dtype](
         parameters=[
             UnsafePointer(to=weights_0_1)
             .mut_cast[True]()

@@ -37,7 +37,9 @@ def xor_classification() -> None:
 
     # Training setup
     var criterion = MSELoss[dtype]()
-    var optimizer = SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+    var optimizer = SGD[dtype](
+        model.parameters(), lr=learning_rate, momentum=momentum
+    )
 
     print("Training XOR solver...")
     var start_time = perf_counter_ns()
@@ -132,7 +134,11 @@ def xor_classification() -> None:
     print("=" * 50)
     print("Training time: " + String(String(train_time)[byte=0:6]) + "s")
     print("Final loss: " + String(final_loss.item()))
-    print("Accuracy: " + String(Float64(100.0) * Float64(correct) / Float64(4)) + "%")
+    print(
+        "Accuracy: "
+        + String(Float64(100.0) * Float64(correct) / Float64(4))
+        + "%"
+    )
     print("Avg error: " + String(Float64(total_error) / Float64(4)))
     print()
 

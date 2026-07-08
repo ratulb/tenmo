@@ -127,7 +127,9 @@ def train_cifar_10() raises:
     var momentum = Scalar[FEATURE_DTYPE](0.9)
 
     var criterion = CrossEntropyLoss[FEATURE_DTYPE, LABEL_DTYPE]()
-    var optimizer = SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+    var optimizer = SGD[FEATURE_DTYPE](
+        model.parameters(), lr=learning_rate, momentum=momentum
+    )
 
     print("Training configuration:")
     print("  Epochs:", num_epochs)
@@ -146,7 +148,7 @@ def train_cifar_10() raises:
         model.train()
         criterion.train()
         var train_loss = Scalar[FEATURE_DTYPE](0.0)
-        var train_correct: Int64 = 0
+        var train_correct = Float64(0.0)
         var train_total = 0
 
         var train_forward_time: Float64 = 0
@@ -184,7 +186,9 @@ def train_cifar_10() raises:
 
             # Accuracy computation
             t0 = perf_counter_ns()
-            train_correct += Int64(Accuracy[FEATURE_DTYPE, LABEL_DTYPE].compute(pred, batch.labels))
+            train_correct += Accuracy[FEATURE_DTYPE, LABEL_DTYPE].compute(
+                pred, batch.labels
+            ) * Float64(batch.labels.shape()[0])
             t1 = perf_counter_ns()
             train_accuracy_time += Float64(t1 - t0) / 1e9
 
@@ -195,7 +199,7 @@ def train_cifar_10() raises:
         model.eval()
         criterion.eval()
         var val_loss = Scalar[FEATURE_DTYPE](0.0)
-        var val_correct: Int64 = 0
+        var val_correct = Float64(0.0)
         var val_total = 0
 
         var val_forward_time: Float64 = 0
@@ -214,7 +218,9 @@ def train_cifar_10() raises:
             val_loss += loss.item() * Float32(batch.batch_size)
 
             t0 = perf_counter_ns()
-            val_correct += Int64(Accuracy[FEATURE_DTYPE, LABEL_DTYPE].compute(pred, batch.labels))
+            val_correct += Accuracy[FEATURE_DTYPE, LABEL_DTYPE].compute(
+                pred, batch.labels
+            ) * Float64(batch.labels.shape()[0])
             t1 = perf_counter_ns()
             val_accuracy_time += Float64(t1 - t0) / 1e9
 
@@ -225,9 +231,9 @@ def train_cifar_10() raises:
         var epoch_time = Float64(epoch_end - epoch_start) / 1e9
 
         var avg_train_loss = train_loss / Float32(train_total)
-        var train_acc = 100.0 * Float64(train_correct) / Float64(train_total)
+        var train_acc = 100.0 * train_correct / Float64(train_total)
         var avg_val_loss = val_loss / Float32(val_total)
-        var val_acc = 100.0 * Float64(val_correct) / Float64(val_total)
+        var val_acc = 100.0 * val_correct / Float64(val_total)
 
         print(
             "Epoch",

@@ -27,7 +27,9 @@ def pct(x: Float64, total: Float64) -> Float64:
 
 def train_mnist() raises:
     comptime if not has_accelerator():
-        raise Error("No GPU accelerator found. Use mnist.mojo for CPU training.")
+        raise Error(
+            "No GPU accelerator found. Use mnist.mojo for CPU training."
+        )
 
     print("=" * 80)
     print("MNIST Training - GPU (Profiling Build)")
@@ -144,7 +146,7 @@ def train_mnist() raises:
     var w3 = model.modules[4].layer[Linear[FEATURE_DTYPE, mm]].weight
     var b3 = model.modules[4].layer[Linear[FEATURE_DTYPE, mm]].bias.value()
 
-    var optimizer = SGD(
+    var optimizer = SGD[FEATURE_DTYPE](
         model.parameters(),
         lr=learning_rate,
         momentum=momentum,
@@ -199,7 +201,7 @@ def train_mnist() raises:
         model.train()
         criterion.train()
         var train_loss = Scalar[FEATURE_DTYPE](0.0)
-        var train_correct = 0
+        var train_correct = Float64(0.0)
         var train_total = 0
 
         var phase_data_ns: Int = 0
@@ -227,8 +229,8 @@ def train_mnist() raises:
 
             # Per-op profiling block: run with sync=True, record individual times
             var do_profile = epoch == profile_epoch and (
-                (not profile_first_done and batch_idx == 0) or
-                (not profile_last_done and batch_idx == total_batches - 1)
+                (not profile_first_done and batch_idx == 0)
+                or (not profile_last_done and batch_idx == total_batches - 1)
             )
 
             if do_profile:
@@ -268,14 +270,30 @@ def train_mnist() raises:
                 loss = criterion(pred, labels_gpu)
                 var t_loss = Float64(perf_counter_ns() - t) / 1e6
 
-                var k_sum = t_mm1 + t_b1 + t_r1 + t_mm2 + t_b2 + t_r2 + t_mm3 + t_b3 + t_loss
+                var k_sum = (
+                    t_mm1
+                    + t_b1
+                    + t_r1
+                    + t_mm2
+                    + t_b2
+                    + t_r2
+                    + t_mm3
+                    + t_b3
+                    + t_loss
+                )
 
                 if not profile_first_done:
                     profile_first_done = True
-                    print("-- Forward kernel breakdown (first batch, sync=True) ---")
+                    print(
+                        "-- Forward kernel breakdown (first batch,"
+                        " sync=True) ---"
+                    )
                 else:
                     profile_last_done = True
-                    print("-- Forward kernel breakdown (last batch, sync=True) ---")
+                    print(
+                        "-- Forward kernel breakdown (last batch,"
+                        " sync=True) ---"
+                    )
 
                 print("  matmul 784x128:       ", t_mm1, "ms")
                 print("  bias_add 128:         ", t_b1, "ms")
@@ -327,7 +345,9 @@ def train_mnist() raises:
             var t5 = perf_counter_ns()
 
             train_loss += loss.item() * Float32(batch.batch_size)
-            train_correct += Accuracy[FEATURE_DTYPE, LABEL_DTYPE].compute(pred, labels_gpu, sync=False)
+            train_correct += Accuracy[FEATURE_DTYPE, LABEL_DTYPE].compute(
+                pred, labels_gpu, sync=False
+            ) * Float64(labels_gpu.shape()[0])
             train_total += batch.batch_size
             var t6 = perf_counter_ns()
 
@@ -360,7 +380,7 @@ def train_mnist() raises:
         model.eval()
         criterion.eval()
         var val_loss = Scalar[FEATURE_DTYPE](0.0)
-        var val_correct = 0
+        var val_correct = Float64(0.0)
         var val_total = 0
 
         test_loader.reset()
@@ -374,14 +394,19 @@ def train_mnist() raises:
             var loss = criterion(pred, labels_gpu, sync=False)
 
             val_loss += loss.item() * Float32(batch.batch_size)
-            val_correct += Accuracy[FEATURE_DTYPE, LABEL_DTYPE].compute(pred, labels_gpu, sync=False)
+            val_correct += Int(
+                Accuracy[FEATURE_DTYPE, LABEL_DTYPE].compute(
+                    pred, labels_gpu, sync=False
+                )
+                * Float64(labels_gpu.shape()[0])
+            )
             val_total += batch.batch_size
 
         var epoch_time = Float64(perf_counter_ns() - epoch_start) / 1e9
         var avg_train_loss = train_loss / Float32(train_total)
-        var train_acc = 100.0 * Float64(train_correct) / Float64(train_total)
+        var train_acc = 100.0 * train_correct / Float64(train_total)
         var avg_val_loss = val_loss / Float32(val_total)
-        var val_acc = 100.0 * Float64(val_correct) / Float64(val_total)
+        var val_acc = 100.0 * val_correct / Float64(val_total)
 
         var s_data = Float64(phase_data_ns) / 1e9
         var s_forward = Float64(phase_forward_ns) / 1e9
@@ -389,21 +414,98 @@ def train_mnist() raises:
         var s_backward = Float64(phase_backward_ns) / 1e9
         var s_optstep = Float64(phase_optstep_ns) / 1e9
         var s_accuracy = Float64(phase_accuracy_ns) / 1e9
-        var s_total_phases = s_data + s_forward + s_zerograd + s_backward + s_optstep + s_accuracy
+        var s_total_phases = (
+            s_data
+            + s_forward
+            + s_zerograd
+            + s_backward
+            + s_optstep
+            + s_accuracy
+        )
         var avg_ms = s_total_phases / Float64(phase_count) * 1000.0
 
         print("=" * 80)
-        print("Epoch", epoch + 1, "/", num_epochs, "|", epoch_time, "s | total_phases:", s_total_phases, "s")
+        print(
+            "Epoch",
+            epoch + 1,
+            "/",
+            num_epochs,
+            "|",
+            epoch_time,
+            "s | total_phases:",
+            s_total_phases,
+            "s",
+        )
         print("Phase summary (", phase_count, " batches, sync=False forward)")
-        print("  data_upload:     ", s_data, "s total,", s_data / Float64(phase_count) * 1000.0, "ms/batch,", pct(s_data, s_total_phases), "%")
-        print("  forward:         ", s_forward, "s total,", s_forward / Float64(phase_count) * 1000.0, "ms/batch,", pct(s_forward, s_total_phases), "%")
-        print("  zero_grad:       ", s_zerograd, "s total,", s_zerograd / Float64(phase_count) * 1000.0, "ms/batch,", pct(s_zerograd, s_total_phases), "%")
-        print("  backward:        ", s_backward, "s total,", s_backward / Float64(phase_count) * 1000.0, "ms/batch,", pct(s_backward, s_total_phases), "%")
-        print("  optimizer_step:  ", s_optstep, "s total,", s_optstep / Float64(phase_count) * 1000.0, "ms/batch,", pct(s_optstep, s_total_phases), "%")
-        print("  accuracy_readback:", s_accuracy, "s total,", s_accuracy / Float64(phase_count) * 1000.0, "ms/batch,", pct(s_accuracy, s_total_phases), "%")
+        print(
+            "  data_upload:     ",
+            s_data,
+            "s total,",
+            s_data / Float64(phase_count) * 1000.0,
+            "ms/batch,",
+            pct(s_data, s_total_phases),
+            "%",
+        )
+        print(
+            "  forward:         ",
+            s_forward,
+            "s total,",
+            s_forward / Float64(phase_count) * 1000.0,
+            "ms/batch,",
+            pct(s_forward, s_total_phases),
+            "%",
+        )
+        print(
+            "  zero_grad:       ",
+            s_zerograd,
+            "s total,",
+            s_zerograd / Float64(phase_count) * 1000.0,
+            "ms/batch,",
+            pct(s_zerograd, s_total_phases),
+            "%",
+        )
+        print(
+            "  backward:        ",
+            s_backward,
+            "s total,",
+            s_backward / Float64(phase_count) * 1000.0,
+            "ms/batch,",
+            pct(s_backward, s_total_phases),
+            "%",
+        )
+        print(
+            "  optimizer_step:  ",
+            s_optstep,
+            "s total,",
+            s_optstep / Float64(phase_count) * 1000.0,
+            "ms/batch,",
+            pct(s_optstep, s_total_phases),
+            "%",
+        )
+        print(
+            "  accuracy_readback:",
+            s_accuracy,
+            "s total,",
+            s_accuracy / Float64(phase_count) * 1000.0,
+            "ms/batch,",
+            pct(s_accuracy, s_total_phases),
+            "%",
+        )
         print("  avg_batch:       ", avg_ms, "ms total")
-        print("  Kernel launches (est.): forward=9, backward~20, opt~18 per batch")
-        print("  Train Loss:", avg_train_loss, "| Train Acc:", train_acc, "% | Val Loss:", avg_val_loss, "| Val Acc:", val_acc, "%")
+        print(
+            "  Kernel launches (est.): forward=9, backward~20, opt~18 per batch"
+        )
+        print(
+            "  Train Loss:",
+            avg_train_loss,
+            "| Train Acc:",
+            train_acc,
+            "% | Val Loss:",
+            avg_val_loss,
+            "| Val Acc:",
+            val_acc,
+            "%",
+        )
 
     var total_time = Float64(perf_counter_ns() - training_start) / 1e9
     print("=" * 80)

@@ -16,7 +16,7 @@ def test_sgd_basic() raises:
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=param))
 
-    var optimizer = SGD(parameters=params^, lr=0.1)
+    var optimizer = SGD[dtype](parameters=params^, lr=0.1)
 
     # Set gradient
     param.seed_grad(Scalar[dtype](1.0))
@@ -36,7 +36,7 @@ def test_sgd_momentum() raises:
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=param))
 
-    var optimizer = SGD(parameters=params^, lr=0.1, momentum=0.9)
+    var optimizer = SGD[dtype](parameters=params^, lr=0.1, momentum=0.9)
 
     # First step
     param.seed_grad(Scalar[dtype](1.0))
@@ -63,7 +63,7 @@ def test_sgd_weight_decay() raises:
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=param))
 
-    var optimizer = SGD(parameters=params^, lr=0.1, weight_decay=0.01)
+    var optimizer = SGD[dtype](parameters=params^, lr=0.1, weight_decay=0.01)
 
     param.seed_grad(Scalar[dtype](1.0))
     optimizer.step()
@@ -81,7 +81,7 @@ def test_sgd_grad_norm_clipping() raises:
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=param))
 
-    var optimizer = SGD(parameters=params^, lr=0.1, clip_norm=1.0)
+    var optimizer = SGD[dtype](parameters=params^, lr=0.1, clip_norm=1.0)
 
     # Set large gradient
     param.seed_grad(Scalar[dtype](10.0))
@@ -102,7 +102,7 @@ def test_sgd_value_clipping() raises:
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=param))
 
-    var optimizer = SGD(parameters=params^, lr=0.1, clip_value=0.5)
+    var optimizer = SGD[dtype](parameters=params^, lr=0.1, clip_value=0.5)
 
     param.seed_grad(Scalar[dtype](10.0))
     optimizer.step()
@@ -118,7 +118,7 @@ def test_sgd_cpu_vanilla_single_step() raises:
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
-    var sgd = SGD(params, lr=0.1)
+    var sgd = SGD[dtype](params, lr=0.1)
     # Manually set grad
     w.seed_grad(1.0)
 
@@ -131,7 +131,7 @@ def test_sgd_cpu_vanilla_multiple_steps() raises:
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
-    var sgd = SGD(params, lr=0.1)
+    var sgd = SGD[dtype](params, lr=0.1)
     for _ in range(3):
         w.seed_grad(1.0)
         sgd.step()
@@ -143,7 +143,7 @@ def test_sgd_cpu_vanilla_2d() raises:
     var w = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
-    var sgd = SGD(params, lr=0.1)
+    var sgd = SGD[dtype](params, lr=0.1)
     w.seed_grad(2.0)
     sgd.step()
     # w = w - 0.1 * 2 = w - 0.2
@@ -154,7 +154,7 @@ def test_sgd_cpu_zero_grad() raises:
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
-    var sgd = SGD(params, lr=0.1)
+    var sgd = SGD[dtype](params, lr=0.1)
     w.seed_grad(1.0)
     sgd.step()
     sgd.zero_grad()
@@ -166,7 +166,7 @@ def test_sgd_cpu_weight_decay() raises:
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
-    var sgd = SGD(params, lr=0.1, weight_decay=0.1)
+    var sgd = SGD[dtype](params, lr=0.1, weight_decay=0.1)
     w.seed_grad(1.0)
     sgd.step()
     # g_eff = g + wd*p = 1 + 0.1*p
@@ -185,7 +185,7 @@ def test_sgd_cpu_momentum_single_step() raises:
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
-    var sgd = SGD(params, lr=0.1, momentum=0.9)
+    var sgd = SGD[dtype](params, lr=0.1, momentum=0.9)
     w.seed_grad(1.0)
     sgd.step()
     # v = 0.9*0 + 1 = 1, w = w - 0.1*1 = [0.9, 1.9, 2.9]
@@ -196,7 +196,7 @@ def test_sgd_cpu_momentum_multiple_steps() raises:
     var w = Tensor[dtype].d1([1.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
-    var sgd = SGD(params, lr=0.1, momentum=0.9)
+    var sgd = SGD[dtype](params, lr=0.1, momentum=0.9)
     # Step 1: v=1, w = 1 - 0.1*1 = 0.9
     w.seed_grad(1.0)
     sgd.step()
@@ -213,7 +213,7 @@ def test_sgd_cpu_clip_value() raises:
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
-    var sgd = SGD(params, lr=0.1, clip_value=0.5)
+    var sgd = SGD[dtype](params, lr=0.1, clip_value=0.5)
     w.seed_grad(2.0)
     sgd.step()
     # clipped grad = 0.5, w = w - 0.1*0.5 = w - 0.05
@@ -226,7 +226,7 @@ def test_sgd_cpu_multiple_parameters() raises:
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w1))
     params.append(UnsafePointer(to=w2))
-    var sgd = SGD(params, lr=0.1)
+    var sgd = SGD[dtype](params, lr=0.1)
     w1.seed_grad(1.0)
     w2.seed_grad(2.0)
     sgd.step()
@@ -240,7 +240,7 @@ def test_sgd_cpu_backward_integration() raises:
     var x = Tensor[dtype].d1([1.0, 1.0, 1.0])
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
-    var sgd = SGD(params, lr=0.1)
+    var sgd = SGD[dtype](params, lr=0.1)
     var loss = (w * x).sum()
     loss.backward()
     # grad_w = x = [1,1,1]
@@ -252,7 +252,7 @@ def test_sgd_cpu_set_lr() raises:
     var w = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(UnsafePointer(to=w))
-    var sgd = SGD(params, lr=0.1)
+    var sgd = SGD[dtype](params, lr=0.1)
     w.seed_grad(1.0)
     sgd.step()
     sgd.set_lr(0.5)
@@ -273,7 +273,7 @@ def test_sgd_gpu_vanilla_single_step() raises:
         var w_gpu = w.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1)
+        var sgd = SGD[dtype](params, lr=0.1)
         w_gpu.seed_grad(1.0)
         sgd.step()
         var result = w_gpu.to_cpu()
@@ -288,8 +288,8 @@ def test_sgd_gpu_vanilla_matches_cpu() raises:
         var params_gpu = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params_cpu.append(UnsafePointer(to=w))
         params_gpu.append(UnsafePointer(to=w_gpu))
-        var sgd_cpu = SGD(params_cpu, lr=0.01)
-        var sgd_gpu = SGD(params_gpu, lr=0.01)
+        var sgd_cpu = SGD[dtype](params_cpu, lr=0.01)
+        var sgd_gpu = SGD[dtype](params_gpu, lr=0.01)
         # Same grad on both
         var grad = Tensor[dtype].rand(4, 8)
         var grad_gpu = grad.to_gpu()
@@ -306,7 +306,7 @@ def test_sgd_gpu_vanilla_multiple_steps() raises:
         var w_gpu = w.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1)
+        var sgd = SGD[dtype](params, lr=0.1)
         for _ in range(3):
             w_gpu.seed_grad(1.0)
             sgd.step()
@@ -320,7 +320,7 @@ def test_sgd_gpu_weight_decay() raises:
         var w_gpu = w.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1, weight_decay=0.1)
+        var sgd = SGD[dtype](params, lr=0.1, weight_decay=0.1)
         w_gpu.seed_grad(1.0)
         sgd.step()
         var expected = Tensor[dtype].d1(
@@ -339,7 +339,7 @@ def test_sgd_gpu_momentum_single_step() raises:
         var w_gpu = w.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1, momentum=0.9)
+        var sgd = SGD[dtype](params, lr=0.1, momentum=0.9)
         w_gpu.seed_grad(1.0)
         sgd.step()
         assert_true(w_gpu.to_cpu().all_close(Tensor[dtype].d1([0.9, 1.9, 2.9])))
@@ -351,7 +351,7 @@ def test_sgd_gpu_momentum_multiple_steps() raises:
         var w_gpu = w.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1, momentum=0.9)
+        var sgd = SGD[dtype](params, lr=0.1, momentum=0.9)
         for _ in range(3):
             w_gpu.seed_grad(1.0)
             sgd.step()
@@ -366,8 +366,8 @@ def test_sgd_gpu_momentum_matches_cpu() raises:
         var params_gpu = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params_cpu.append(UnsafePointer(to=w))
         params_gpu.append(UnsafePointer(to=w_gpu))
-        var sgd_cpu = SGD(params_cpu, lr=0.01, momentum=0.9)
-        var sgd_gpu = SGD(params_gpu, lr=0.01, momentum=0.9)
+        var sgd_cpu = SGD[dtype](params_cpu, lr=0.01, momentum=0.9)
+        var sgd_gpu = SGD[dtype](params_gpu, lr=0.01, momentum=0.9)
         var grad = Tensor[dtype].rand(4, 8)
         var grad_gpu = grad.to_gpu()
         for _ in range(5):
@@ -384,7 +384,7 @@ def test_sgd_gpu_clip_value() raises:
         var w_gpu = w.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1, clip_value=0.5)
+        var sgd = SGD[dtype](params, lr=0.1, clip_value=0.5)
         w_gpu.seed_grad(2.0)
         sgd.step()
         assert_true(
@@ -400,8 +400,8 @@ def test_sgd_gpu_clip_value_matches_cpu() raises:
         var params_gpu = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params_cpu.append(UnsafePointer(to=w))
         params_gpu.append(UnsafePointer(to=w_gpu))
-        var sgd_cpu = SGD(params_cpu, lr=0.01, clip_value=0.1)
-        var sgd_gpu = SGD(params_gpu, lr=0.01, clip_value=0.1)
+        var sgd_cpu = SGD[dtype](params_cpu, lr=0.01, clip_value=0.1)
+        var sgd_gpu = SGD[dtype](params_gpu, lr=0.01, clip_value=0.1)
         var grad = Tensor[dtype].rand(8, 8)
         var grad_gpu = grad.to_gpu()
         w.seed_grad(grad)
@@ -419,8 +419,8 @@ def test_sgd_gpu_clip_norm_matches_cpu() raises:
         var params_gpu = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params_cpu.append(UnsafePointer(to=w))
         params_gpu.append(UnsafePointer(to=w_gpu))
-        var sgd_cpu = SGD(params_cpu, lr=0.01, clip_norm=1.0)
-        var sgd_gpu = SGD(params_gpu, lr=0.01, clip_norm=1.0)
+        var sgd_cpu = SGD[dtype](params_cpu, lr=0.01, clip_norm=1.0)
+        var sgd_gpu = SGD[dtype](params_gpu, lr=0.01, clip_norm=1.0)
         var grad = Tensor[dtype].rand(8, 8)
         var grad_gpu = grad.to_gpu()
         w.seed_grad(grad)
@@ -439,7 +439,7 @@ def test_sgd_gpu_multiple_parameters() raises:
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w1_gpu))
         params.append(UnsafePointer(to=w2_gpu))
-        var sgd = SGD(params, lr=0.1)
+        var sgd = SGD[dtype](params, lr=0.1)
         w1_gpu.seed_grad(1.0)
         w2_gpu.seed_grad(2.0)
         sgd.step()
@@ -453,7 +453,7 @@ def test_sgd_gpu_zero_grad() raises:
         var w_gpu = w.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1)
+        var sgd = SGD[dtype](params, lr=0.1)
         w_gpu.seed_grad(1.0)
         sgd.step()
         sgd.zero_grad()
@@ -469,7 +469,7 @@ def test_sgd_gpu_backward_integration() raises:
         var x_gpu = x.to_gpu()
         var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params.append(UnsafePointer(to=w_gpu))
-        var sgd = SGD(params, lr=0.1)
+        var sgd = SGD[dtype](params, lr=0.1)
         var loss = (w_gpu * x_gpu).sum()
         loss.backward()
         sgd.step()
@@ -489,8 +489,8 @@ def test_sgd_gpu_backward_integration_matches_cpu() raises:
         var params_gpu = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params_cpu.append(UnsafePointer(to=w))
         params_gpu.append(UnsafePointer(to=w_gpu))
-        var sgd_cpu = SGD(params_cpu, lr=0.01)
-        var sgd_gpu = SGD(params_gpu, lr=0.01)
+        var sgd_cpu = SGD[dtype](params_cpu, lr=0.01)
+        var sgd_gpu = SGD[dtype](params_gpu, lr=0.01)
         # CPU backward
         var loss_cpu = (w * x).sum()
         loss_cpu.backward()
@@ -512,8 +512,8 @@ def test_sgd_gpu_large_tensor() raises:
         var params_gpu = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
         params_cpu.append(UnsafePointer(to=w))
         params_gpu.append(UnsafePointer(to=w_gpu))
-        var sgd_cpu = SGD(params_cpu, lr=0.01)
-        var sgd_gpu = SGD(params_gpu, lr=0.01)
+        var sgd_cpu = SGD[dtype](params_cpu, lr=0.01)
+        var sgd_gpu = SGD[dtype](params_gpu, lr=0.01)
         var grad = Tensor[dtype].rand(128, 256)
         var grad_gpu = grad.to_gpu()
         w.seed_grad(grad)

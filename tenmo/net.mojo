@@ -46,7 +46,9 @@ from .device import GPU
 from .named_parameter import NamedParameter
 
 
-struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
+struct Linear[dtype: DType, mode: Int = mm](
+    ImplicitlyCopyable & Movable & Writable
+):
     """Fully connected layer: y = xW + b."""
 
     comptime TAG = LINEAR
@@ -289,6 +291,17 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
             var bias_cpu = out.bias.value().to_cpu(stop_grad=True)
             out.bias = bias_cpu^
         return out^
+
+    @no_inline
+    def write_to[W: Writer](self, mut writer: W):
+        writer.write(
+            "[input="
+            + String(self.in_features)
+            + " → "
+            + "output="
+            + String(self.out_features)
+            + "]"
+        )
 
 
 @fieldwise_init
@@ -1157,7 +1170,7 @@ struct Sequential[dtype: DType](Copyable & Movable):
                 Linear[DType.float32](128, 10).into(),
             )
             var model_gpu = model.to_gpu()
-            var optimizer = SGD(model_gpu.parameters(), lr=0.01, momentum=0.9)
+            var optimizer = SGD[DType.float32](model_gpu.parameters(), lr=0.01, momentum=0.9)
 
             for epoch in range(epochs):
                 for batch in train_loader:

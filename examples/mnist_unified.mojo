@@ -29,20 +29,37 @@ def train_mnist() raises:
     var train_data = mnist.MNISTLoader(folder="/tmp").load()
     var test_data = mnist.MNISTLoader(folder="/tmp").load(train=False)
 
-    var X_train = from_ndarray[dtype](train_data[0].astype(numpy_dtype(dtype)), copy=True) / 255.0
-    var y_train = from_ndarray[LABEL_DTYPE](train_data[1].astype(numpy_dtype(LABEL_DTYPE)), copy=True)
-    var X_test = from_ndarray[dtype](test_data[0].astype(numpy_dtype(dtype)), copy=True) / 255.0
-    var y_test = from_ndarray[LABEL_DTYPE](test_data[1].astype(numpy_dtype(LABEL_DTYPE)), copy=True)
+    var X_train = (
+        from_ndarray[dtype](train_data[0].astype(numpy_dtype(dtype)), copy=True)
+        / 255.0
+    )
+    var y_train = from_ndarray[LABEL_DTYPE](
+        train_data[1].astype(numpy_dtype(LABEL_DTYPE)), copy=True
+    )
+    var X_test = (
+        from_ndarray[dtype](test_data[0].astype(numpy_dtype(dtype)), copy=True)
+        / 255.0
+    )
+    var y_test = from_ndarray[LABEL_DTYPE](
+        test_data[1].astype(numpy_dtype(LABEL_DTYPE)), copy=True
+    )
 
     # ── DataLoaders ──
     var batch_size = 64
-    var train_loader = NumpyDataset[dtype, LABEL_DTYPE](X_train, y_train).into_loader(
-        batch_size=batch_size, shuffle=True,
-        normalize_mean=Float32(MNIST_MEAN), normalize_std=Float32(MNIST_STD),
-    )
-    var test_loader = NumpyDataset[dtype, LABEL_DTYPE](X_test, y_test).into_loader(
+    var train_loader = NumpyDataset[dtype, LABEL_DTYPE](
+        X_train, y_train
+    ).into_loader(
         batch_size=batch_size,
-        normalize_mean=Float32(MNIST_MEAN), normalize_std=Float32(MNIST_STD),
+        shuffle=True,
+        normalize_mean=Float32(MNIST_MEAN),
+        normalize_std=Float32(MNIST_STD),
+    )
+    var test_loader = NumpyDataset[dtype, LABEL_DTYPE](
+        X_test, y_test
+    ).into_loader(
+        batch_size=batch_size,
+        normalize_mean=Float32(MNIST_MEAN),
+        normalize_std=Float32(MNIST_STD),
     )
 
     # ── Model ──
@@ -62,9 +79,13 @@ def train_mnist() raises:
     comptime if has_accelerator():
         model = model.to_gpu(stop_grad=True)
 
-    var opt = SGD(
-        model.parameters(), lr=0.01, momentum=0.9,
-        weight_decay=1e-4, clip_norm=1, clip_value=0.5,
+    var opt = SGD[dtype](
+        model.parameters(),
+        lr=0.01,
+        momentum=0.9,
+        weight_decay=1e-4,
+        clip_norm=1,
+        clip_value=0.5,
     )
 
     # ── Train ──
@@ -83,7 +104,7 @@ def train_mnist() raises:
         model.train()
         loss_fn.train()
         var train_loss = Scalar[dtype](0.0)
-        var train_correct = 0
+        var train_correct = Float64(0.0)
         var train_total = 0
 
         train_loader.reset()
@@ -103,14 +124,16 @@ def train_mnist() raises:
             opt.step()
 
             train_loss += loss.item() * Float32(batch.batch_size)
-            train_correct += Accuracy[dtype].compute(pred, y)
+            train_correct += Accuracy[dtype].compute(pred, y) * Float64(
+                y.shape()[0]
+            )
             train_total += batch.batch_size
 
         # Validation phase
         model.eval()
         loss_fn.eval()
         var val_loss = Scalar[dtype](0.0)
-        var val_correct = 0
+        var val_correct = Float64(0.0)
         var val_total = 0
 
         test_loader.reset()
@@ -126,17 +149,28 @@ def train_mnist() raises:
             var loss = loss_fn(pred, y)
 
             val_loss += loss.item() * Float32(batch.batch_size)
-            val_correct += Accuracy[dtype].compute(pred, y)
+            val_correct += Accuracy[dtype].compute(pred, y) * Float64(
+                y.shape()[0]
+            )
             val_total += batch.batch_size
 
         # Report
         var epoch_time = Float64(perf_counter_ns() - epoch_start) / 1e9
         print(
-            epoch + 1, "/", epochs,
-            "| Loss:", train_loss / Float32(train_total),
-            "Train:", 100 * Float64(train_correct) / Float64(train_total), "%",
-            "Val:", 100 * Float64(val_correct) / Float64(val_total), "%",
-            "Time:", epoch_time, "s",
+            epoch + 1,
+            "/",
+            epochs,
+            "| Loss:",
+            train_loss / Float32(train_total),
+            "Train:",
+            100 * train_correct / Float64(train_total),
+            "%",
+            "Val:",
+            100 * val_correct / Float64(val_total),
+            "%",
+            "Time:",
+            epoch_time,
+            "s",
         )
 
     var total_time = Float64(perf_counter_ns() - total_start) / 1e9

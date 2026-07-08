@@ -511,10 +511,12 @@ def test_pad_gpu_constant_4d_conv() raises:
     """GPU forward constant 4D padding (convolution style)."""
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var x3 = Tensor[dtype].d3([
-            [[1.0, 2.0], [3.0, 4.0]],
-            [[5.0, 6.0], [7.0, 8.0]],
-        ])
+        var x3 = Tensor[dtype].d3(
+            [
+                [[1.0, 2.0], [3.0, 4.0]],
+                [[5.0, 6.0], [7.0, 8.0]],
+            ]
+        )
         var x = x3.unsqueeze(0)  # (1, 2, 2, 2)
 
         var pad = List[Tuple[Int, Int]]()
@@ -577,16 +579,16 @@ def test_pad_gpu_backward_constant() raises:
         var cpu_loss = cpu_result.sum()
         cpu_loss.backward()
 
-        var gpu_x = Tensor[dtype].d2(
-            [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
-        ).to_gpu()
+        var gpu_x = (
+            Tensor[dtype]
+            .d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+            .to_gpu()
+        )
         var gpu_result = Tensor[dtype].pad(gpu_x, pad)
         var gpu_loss = gpu_result.sum()
         gpu_loss.backward()
 
-        assert_true(
-            gpu_x.grad().to_cpu().all_close[atol=1e-6](cpu_x.grad())
-        )
+        assert_true(gpu_x.grad().to_cpu().all_close[atol=1e-6](cpu_x.grad()))
 
 
 def test_pad_gpu_backward_weighted() raises:
@@ -606,27 +608,25 @@ def test_pad_gpu_backward_weighted() raises:
         var cpu_loss = cpu_weighted.sum()
         cpu_loss.backward()
 
-        var gpu_x = Tensor[dtype].d2(
-            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
-        ).to_gpu()
+        var gpu_x = (
+            Tensor[dtype]
+            .d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+            .to_gpu()
+        )
         var gpu_weights = cpu_weights.to_gpu()
         var gpu_result = Tensor[dtype].pad(gpu_x, pad)
         var gpu_weighted = gpu_result * gpu_weights
         var gpu_loss = gpu_weighted.sum()
         gpu_loss.backward()
 
-        assert_true(
-            gpu_x.grad().to_cpu().all_close[atol=1e-6](cpu_x.grad())
-        )
+        assert_true(gpu_x.grad().to_cpu().all_close[atol=1e-6](cpu_x.grad()))
 
 
 def test_pad_gpu_backward_chain() raises:
     """GPU backward through chained operations with padding."""
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var cpu_x = Tensor[dtype].d1(
-            [1.0, 2.0, 3.0], requires_grad=True
-        )
+        var cpu_x = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
         var pad = List[Tuple[Int, Int]]()
         pad.append((1, 1))
 
@@ -635,17 +635,15 @@ def test_pad_gpu_backward_chain() raises:
         var cpu_loss = cpu_squared.sum()
         cpu_loss.backward()
 
-        var gpu_x = Tensor[dtype].d1(
-            [1.0, 2.0, 3.0], requires_grad=True
-        ).to_gpu()
+        var gpu_x = (
+            Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True).to_gpu()
+        )
         var gpu_padded = Tensor[dtype].pad(gpu_x, pad)
         var gpu_squared = gpu_padded * gpu_padded
         var gpu_loss = gpu_squared.sum()
         gpu_loss.backward()
 
-        assert_true(
-            gpu_x.grad().to_cpu().all_close[atol=1e-6](cpu_x.grad())
-        )
+        assert_true(gpu_x.grad().to_cpu().all_close[atol=1e-6](cpu_x.grad()))
 
 
 def test_pad_gpu_no_track_grad() raises:
@@ -1137,7 +1135,6 @@ def test_pad_symmetric_padding_forward() raises:
     )
 
 
-
 def test_pad_symmetric_padding_backward() raises:
     """Test symmetric padding backward pass."""
 
@@ -1172,7 +1169,6 @@ def test_pad_symmetric_padding_backward() raises:
     assert_almost_equal(
         grad_image[0, 0, 2, 2], 4.0, atol=1e-5, msg="Bottom-right grad"
     )
-
 
 
 def test_pad_asymmetric_padding_forward() raises:
@@ -1222,7 +1218,6 @@ def test_pad_asymmetric_padding_forward() raises:
     )
 
 
-
 def test_pad_asymmetric_padding_backward() raises:
     """Test asymmetric padding backward pass."""
 
@@ -1262,7 +1257,6 @@ def test_pad_asymmetric_padding_backward() raises:
                 atol=1e-5,
                 msg="Gradient at " + String(i) + "," + String(j),
             )
-
 
 
 def test_pad_no_padding() raises:
@@ -1316,7 +1310,6 @@ def test_pad_no_padding() raises:
     )
 
 
-
 def test_pad_same_padding() raises:
     """Test 'same' padding mode."""
 
@@ -1339,7 +1332,6 @@ def test_pad_same_padding() raises:
     assert_true(
         grad_image.shape() == Shape(1, 1, 7, 7), "Same padding grad shape"
     )
-
 
 
 def test_pad_multi_channel() raises:
@@ -1371,7 +1363,6 @@ def test_pad_multi_channel() raises:
         grad_kernel.shape() == Shape(16, 3, 3, 3),
         "Multi-channel grad kernel shape",
     )
-
 
 
 def test_pad_with_stride() raises:
@@ -1424,7 +1415,6 @@ def test_pad_with_dilation() raises:
     )
 
 
-
 def test_pad_tuple_padding() raises:
     """Test tuple padding specification."""
 
@@ -1451,21 +1441,28 @@ def test_pad_tuple_padding() raises:
     )
 
 
-
 def test_pad_numerical_gradient_check() raises:
     """Numerical gradient verification for padding."""
 
     comptime dtype = DType.float32
-    var image = Tensor[dtype].randn(1, 1, 4, 4, requires_grad=True)
-    var kernel = Tensor[dtype].randn(1, 1, 2, 2, requires_grad=True)
+    var image = Tensor[dtype].zeros(1, 1, 4, 4, requires_grad=True)
+    for i in range(4):
+        for j in range(4):
+            image[0, 0, i, j] = Float32(i * 4 + j + 1)
+
+    var kernel = Tensor[dtype].zeros(1, 1, 2, 2, requires_grad=True)
+    kernel[0, 0, 0, 0] = 1.0
+    kernel[0, 0, 0, 1] = 2.0
+    kernel[0, 0, 1, 0] = 3.0
+    kernel[0, 0, 1, 1] = 4.0
 
     # Forward with padding
     var output = Conv2dFused[dtype].forward(
         image, kernel, padding=Padding(1), stride=1
     )
 
-    # Backward
-    var grad_out = Tensor[dtype].randn(output.shape())
+    # Backward with uniform grad_out
+    var grad_out = Tensor[dtype].ones(output.shape())
     output.backward(grad_out)
 
     var grad_analytical = image.grad()[0, 0, 1, 1]
@@ -1479,30 +1476,33 @@ def test_pad_numerical_gradient_check() raises:
     var out_plus = Conv2dFused[dtype].forward[track_grad=False](
         image, kernel, padding=Padding(1), stride=1
     )
-    var loss_plus: Float32 = 0.0
+    var loss_plus: Float64 = 0.0
     for i in range(out_plus.shape()[2]):
         for j in range(out_plus.shape()[3]):
-            loss_plus += out_plus[0, 0, i, j] * grad_out[0, 0, i, j]
+            loss_plus += Float64(out_plus[0, 0, i, j]) * Float64(
+                grad_out[0, 0, i, j]
+            )
 
     # f(x - eps)
     image[0, 0, 1, 1] = original - epsilon
     var out_minus = Conv2dFused[dtype].forward[track_grad=False](
         image, kernel, padding=Padding(1), stride=1
     )
-    var loss_minus: Float32 = 0.0
+    var loss_minus: Float64 = 0.0
     for i in range(out_minus.shape()[2]):
         for j in range(out_minus.shape()[3]):
-            loss_minus += out_minus[0, 0, i, j] * grad_out[0, 0, i, j]
+            loss_minus += Float64(out_minus[0, 0, i, j]) * Float64(
+                grad_out[0, 0, i, j]
+            )
 
-    var grad_numerical = (loss_plus - loss_minus) / (2 * epsilon)
+    var grad_numerical = (loss_plus - loss_minus) / (2.0 * Float64(epsilon))
 
     # Restore
     image[0, 0, 1, 1] = original
 
-    var rel_error = abs(grad_analytical - grad_numerical) / (
+    var rel_error = abs(Float64(grad_analytical) - grad_numerical) / (
         abs(grad_numerical) + 1e-8
     )
-
 
     assert_true(rel_error < 0.01, "Numerical gradient mismatch")
 
@@ -1546,7 +1546,6 @@ def test_pad_kernel_gradient() raises:
             )
 
 
-
 def test_pad_bias_gradient() raises:
     """Test bias gradients with padding."""
 
@@ -1573,7 +1572,6 @@ def test_pad_bias_gradient() raises:
         assert_almost_equal(
             grad_bias[i], expected, atol=1e-4, msg="Bias grad " + String(i)
         )
-
 
 
 def test_pad_large_asymmetric() raises:
@@ -1624,7 +1622,6 @@ def test_pad_large_asymmetric() raises:
                     + ","
                     + String(j),
                 )
-
 
 
 def test_pad_zero_padding_one_side() raises:

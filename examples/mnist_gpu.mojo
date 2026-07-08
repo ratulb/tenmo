@@ -21,7 +21,9 @@ from tenmo.mnemonics import DEFAULT_INDEX_DTYPE as LABEL_DTYPE
 def train_mnist() raises:
     """Train a neural network on MNIST dataset on GPU."""
     comptime if not has_accelerator():
-        raise Error("No GPU accelerator found. Use mnist.mojo for CPU training.")
+        raise Error(
+            "No GPU accelerator found. Use mnist.mojo for CPU training."
+        )
 
     print("=" * 80)
     print("MNIST Training — GPU")
@@ -130,8 +132,8 @@ def train_mnist() raises:
     model = model.to_gpu(gpu, stop_grad=True)
     print("  Model is now resident on GPU\n")
 
-    var optimizer = SGD(
-        model.parameters(),   # GPU leaves
+    var optimizer = SGD[FEATURE_DTYPE](
+        model.parameters(),  # GPU leaves
         lr=learning_rate,
         momentum=momentum,
         weight_decay=weight_decay,
@@ -162,7 +164,7 @@ def train_mnist() raises:
         model.train()
         criterion.train()
         var train_loss = Scalar[FEATURE_DTYPE](0.0)
-        var train_correct = 0
+        var train_correct = Float64(0.0)
         var train_total = 0
 
         train_loader.reset()
@@ -182,16 +184,17 @@ def train_mnist() raises:
             optimizer.step()
 
             # loss.item() syncs GPU (reads scalar value back)
-            # Accuracy.compute runs argmax on GPU, reads single Int back
             train_loss += loss.item() * Float32(batch.batch_size)
-            train_correct += Accuracy[FEATURE_DTYPE].compute(pred, labels_gpu, sync=True)
+            train_correct += Accuracy[FEATURE_DTYPE].compute(
+                pred, labels_gpu, sync=True
+            ) * Float64(labels_gpu.shape()[0])
             train_total += batch.batch_size
 
         # --- Validation Phase ---
         model.eval()
         criterion.eval()
         var val_loss = Scalar[FEATURE_DTYPE](0.0)
-        var val_correct = 0
+        var val_correct = Float64(0.0)
         var val_total = 0
 
         test_loader.reset()
@@ -205,15 +208,17 @@ def train_mnist() raises:
             var loss = criterion(pred, labels_gpu)
 
             val_loss += loss.item() * Float32(batch.batch_size)
-            val_correct += Accuracy[FEATURE_DTYPE].compute(pred, labels_gpu, sync=True)
+            val_correct += Accuracy[FEATURE_DTYPE].compute(
+                pred, labels_gpu, sync=True
+            ) * Float64(labels_gpu.shape()[0])
             val_total += batch.batch_size
 
         # --- Epoch Report ---
         var epoch_time = Float64(perf_counter_ns() - epoch_start) / 1e9
         var avg_train_loss = train_loss / Float32(train_total)
-        var train_acc = 100.0 * Float64(train_correct) / Float64(train_total)
+        var train_acc = 100.0 * train_correct / Float64(train_total)
         var avg_val_loss = val_loss / Float32(val_total)
-        var val_acc = 100.0 * Float64(val_correct) / Float64(val_total)
+        var val_acc = 100.0 * val_correct / Float64(val_total)
 
         print(
             "Epoch",
