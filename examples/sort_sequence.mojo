@@ -9,17 +9,13 @@ the routing depends on token VALUES, not just positions.
 Usage:
   pixi run mojo -I . examples/sort_sequence.mojo
 
-Expected behavior (training WITH duplicates):
-  • Epoch  1: 79.1% tok / 15.4% seq
-  • Epoch  8: 93.7% tok / 59.1% seq  (momentum overshoot dip)
-  • Epoch 12: 99.2% tok / 94.0% seq
-  • Epoch 14: 97.3% tok / 80.8% seq  (second overshoot bounce)
-  • Epoch 15: 99.9% tok / 98.8% seq  (rapid recovery)
-  • Epoch 22: 99.96% tok / 99.7% seq
-  • Epoch 25: 99.98% tok / 99.8% seq
-  Converges to ~99.8% sequence accuracy by epoch 25 with duplicates.
-  Each epoch takes ~20 seconds on CPU (two attention layers + 5000 samples);
-  total runtime ~8 minutes for 25 epochs.
+Expected behavior (default comptime values, D_MODEL=32, training WITH duplicates):
+  • Best seq accuracy: 95.9%–100% over 10 runs (mean 98.8%, median 99.3%)
+  • 9/10 runs ≥97.1% best seq accuracy
+  • 1/10 hits 100%
+  • Momentum overshoots visible at epochs 8–14, model always recovers
+  Each epoch takes ~7 seconds on CPU (two attention layers + 5000 samples);
+  total runtime ~3 minutes for 25 epochs.
 
 ── Why Two Layers ──────────────────────────────────────────────────────────────────
 
@@ -80,15 +76,15 @@ its rank position — the attention pattern must be content-dependent, not fixed
 
 All shapes assume batch size B and sequence length T = SEQ_LEN.
 
-1. Token Embedding      tok_embed: Embedding(VOCAB=10 -> D_MODEL=64)
-2. Position Embedding   pos_embed: Embedding(SEQ_LEN=8 -> D_MODEL=64)
+1. Token Embedding      tok_embed: Embedding(VOCAB -> D_MODEL)
+2. Position Embedding   pos_embed: Embedding(SEQ_LEN -> D_MODEL)
 3. Layer 1 QKV          w_q1, w_k1, w_v1: Linear(D_MODEL, D_MODEL, bias=False)
 4. Layer 1 Attention    Scaled Dot-Product + Residual
 5. Layer 2 QKV          w_q2, w_k2, w_v2: Linear(D_MODEL, D_MODEL, bias=False)
 6. Layer 2 Attention    Scaled Dot-Product + Residual
-7. Output Projection    w_out: Linear(D_MODEL, VOCAB=10, bias=True)
+7. Output Projection    w_out: Linear(D_MODEL, VOCAB, bias=True)
 
-Total parameters: 26378 (93% from the six QKV projections).
+Total parameters (defaults): 7050 (93% from the six QKV projections).
 
 ── Forward Pass Walkthrough (per batch) ──────────────────────────────────────────
 
@@ -210,11 +206,11 @@ dispatching to the backward handler for each op via an integer op_code jump tabl
 
 ── Optimizer ─────────────────────────────────────────────────────────────────────
 
-SGD with momentum (lr=0.005, momentum=0.9, weight_decay=1e-4):
+SGD with momentum (lr=0.01, momentum=0.9, weight_decay=1e-4):
   v = momentum * v - lr * (grad + weight_decay * param)
   param += v
 
-All 26378 parameters across 8 modules are updated every step.
+All parameters across 8 modules are updated every step.
 
 ── Eval ──────────────────────────────────────────────────────────────────────────
 
@@ -225,7 +221,7 @@ Accuracy.token_accuracy and Accuracy.sequence_accuracy provide the metrics:
   • Token accuracy: fraction of individual positions correct.
   • Sequence accuracy: fraction of sequences where ALL positions are correct.
 
-The test set is 500 samples (no shuffle), so evaluation is deterministic.
+The test set is 1000 samples (no shuffle), so evaluation is deterministic.
 
 ── Q&A: Feeding Shorter Sequences (Inference) ─────────────────────────────────────
 
@@ -440,12 +436,12 @@ comptime dtype = DType.float32
 
 comptime VOCAB = 10
 comptime SEQ_LEN = 8
-comptime D_MODEL = 64
+comptime D_MODEL = 32
 comptime BATCH_SIZE = 32
 comptime NUM_TRAIN = 5000
 comptime NUM_TEST = 1000
 comptime NUM_EPOCHS = 25
-comptime LR = 0.005
+comptime LR = 0.01
 comptime MOMENTUM = 0.9
 
 
@@ -523,6 +519,57 @@ def compute_accuracy(
     )
 
 
+def make_repeat_tests(vocab: Int, seq_len: Int) -> Tensor[idx_dtype]:
+    var T = Tensor[idx_dtype](Shape(5, seq_len))
+    for t in range(5):
+        for p in range(seq_len):
+            T[t, p] = Scalar[idx_dtype](0)
+
+    var p = 0
+    var v = 0
+    while p < seq_len:
+        var r = min(2, seq_len - p)
+        for _ in range(r):
+            T[0, p] = Scalar[idx_dtype](v % vocab)
+            p += 1
+        v += 1
+
+    p = 0
+    v = 0
+    while p < seq_len:
+        var r = min(3, seq_len - p)
+        for _ in range(r):
+            T[1, p] = Scalar[idx_dtype](v % vocab)
+            p += 1
+        v += 1
+
+    for p in range(seq_len):
+        T[2, p] = Scalar[idx_dtype](0)
+
+    for p in range(seq_len):
+        T[3, p] = Scalar[idx_dtype](max(vocab - 1 - p, 0))
+
+    p = 0
+    v = 0
+    while p < seq_len:
+        var r = min(2 + (v % 2), seq_len - p)
+        for _ in range(r):
+            T[4, p] = Scalar[idx_dtype](v % vocab)
+            p += 1
+        v += 1
+
+    return T^
+
+def test_descriptions(seq_len: Int) -> List[String]:
+    var d = List[String](capacity=5)
+    d.append("pairs  (2-repeats of sequential low values)")
+    d.append("triples (3-repeats of sequential low values)")
+    d.append("all-0")
+    d.append("unique (descending from V-1)")
+    d.append("mixed  (2s and 3s interleaved)")
+    return d^
+
+
 def main() raises:
     print("=" * 58)
     print("Sequence Sort Transformer - Tenmo")
@@ -557,8 +604,8 @@ def main() raises:
     print()
 
     # ── Model ──────────────────────────────────────────────────────────
-    var tok_embed = Embedding[dtype, idx_dtype](VOCAB, D_MODEL)
-    var pos_embed = Embedding[dtype, idx_dtype](SEQ_LEN, D_MODEL)
+    var tok_embed = Embedding[dtype, idx_dtype](VOCAB, D_MODEL, init_method="uniform")
+    var pos_embed = Embedding[dtype, idx_dtype](SEQ_LEN, D_MODEL, init_method="uniform")
     var w_q1 = Linear[dtype](D_MODEL, D_MODEL, bias=False, init_method="xavier")
     var w_k1 = Linear[dtype](D_MODEL, D_MODEL, bias=False, init_method="xavier")
     var w_v1 = Linear[dtype](D_MODEL, D_MODEL, bias=False, init_method="xavier")
@@ -583,7 +630,7 @@ def main() raises:
     params.extend(w_out.parameters())
 
     var optimizer = SGD[dtype](
-        params^, lr=0.01, momentum=MOMENTUM, weight_decay=1e-4
+        params^, lr=LR, momentum=MOMENTUM, weight_decay=1e-4
     )
 
     var total_params = 0
@@ -803,54 +850,8 @@ def main() raises:
     # ── Repeat-pattern tests ──
     print("Repeat-pattern inference tests:")
 
-    var repeat_vals = Tensor[idx_dtype](Shape(5, SEQ_LEN))
-    repeat_vals[0, 0] = Scalar[idx_dtype](1)
-    repeat_vals[0, 1] = Scalar[idx_dtype](1)
-    repeat_vals[0, 2] = Scalar[idx_dtype](3)
-    repeat_vals[0, 3] = Scalar[idx_dtype](3)
-    repeat_vals[0, 4] = Scalar[idx_dtype](9)
-    repeat_vals[0, 5] = Scalar[idx_dtype](9)
-    repeat_vals[0, 6] = Scalar[idx_dtype](0)
-    repeat_vals[0, 7] = Scalar[idx_dtype](0)
-    repeat_vals[1, 0] = Scalar[idx_dtype](4)
-    repeat_vals[1, 1] = Scalar[idx_dtype](4)
-    repeat_vals[1, 2] = Scalar[idx_dtype](4)
-    repeat_vals[1, 3] = Scalar[idx_dtype](7)
-    repeat_vals[1, 4] = Scalar[idx_dtype](7)
-    repeat_vals[1, 5] = Scalar[idx_dtype](2)
-    repeat_vals[1, 6] = Scalar[idx_dtype](2)
-    repeat_vals[1, 7] = Scalar[idx_dtype](2)
-    repeat_vals[2, 0] = Scalar[idx_dtype](0)
-    repeat_vals[2, 1] = Scalar[idx_dtype](0)
-    repeat_vals[2, 2] = Scalar[idx_dtype](0)
-    repeat_vals[2, 3] = Scalar[idx_dtype](0)
-    repeat_vals[2, 4] = Scalar[idx_dtype](0)
-    repeat_vals[2, 5] = Scalar[idx_dtype](0)
-    repeat_vals[2, 6] = Scalar[idx_dtype](0)
-    repeat_vals[2, 7] = Scalar[idx_dtype](0)
-    repeat_vals[3, 0] = Scalar[idx_dtype](9)
-    repeat_vals[3, 1] = Scalar[idx_dtype](8)
-    repeat_vals[3, 2] = Scalar[idx_dtype](7)
-    repeat_vals[3, 3] = Scalar[idx_dtype](6)
-    repeat_vals[3, 4] = Scalar[idx_dtype](5)
-    repeat_vals[3, 5] = Scalar[idx_dtype](4)
-    repeat_vals[3, 6] = Scalar[idx_dtype](3)
-    repeat_vals[3, 7] = Scalar[idx_dtype](2)
-    repeat_vals[4, 0] = Scalar[idx_dtype](5)
-    repeat_vals[4, 1] = Scalar[idx_dtype](5)
-    repeat_vals[4, 2] = Scalar[idx_dtype](3)
-    repeat_vals[4, 3] = Scalar[idx_dtype](3)
-    repeat_vals[4, 4] = Scalar[idx_dtype](3)
-    repeat_vals[4, 5] = Scalar[idx_dtype](1)
-    repeat_vals[4, 6] = Scalar[idx_dtype](1)
-    repeat_vals[4, 7] = Scalar[idx_dtype](1)
-
-    var test_descs = List[String](capacity=5)
-    test_descs.append("pairs  [1,1,3,3,9,9,0,0]")
-    test_descs.append("trips  [4,4,4,7,7,2,2,2]")
-    test_descs.append("all-0  [0,0,0,0,0,0,0,0]")
-    test_descs.append("unique[9,8,7,6,5,4,3,2]")
-    test_descs.append("mixed [5,5,3,3,3,1,1,1]")
+    var repeat_vals = make_repeat_tests(VOCAB, SEQ_LEN)
+    var test_descs = test_descriptions(SEQ_LEN)
 
     for test_idx in range(5):
         var inp = Tensor[idx_dtype](Shape(1, SEQ_LEN))
