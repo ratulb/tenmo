@@ -103,19 +103,30 @@ var c = a * 42 + b
 
 #### 2.1 `a * 42` (MultiplyScalar.forward)
 
-From `tenmo/multiplication.mojo`:
+From `tenmo/multiplication.mojo` — `MultiplyScalar.forward`:
 
 ```mojo
-def forward[track_grad: Bool = True](self, factor) -> Tensor:
-    var out = Tensor(self.buffer.scalar_ops[Multiply](factor), requires_grad=False)
+@fieldwise_init
+struct MultiplyScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+    @staticmethod
+    def forward[
+        track_grad: Bool = True
+    ](self: Tensor[Self.dtype], factor: Scalar[Self.dtype], sync: Bool = True) -> Tensor[
+        Self.dtype
+    ]:
+        var out = Tensor[Self.dtype](
+            self.buffer.scalar_ops[Multiply](factor, sync=sync), requires_grad=False
+        )
 
-    comptime if track_grad:
-        if self.requires_grad:
-            out.requires_grad_(True)
-            # Create type-erased argument containing scalar factor 42
-            var backwardFnArg = BackwardFnArg.scalar_arg(BACKWARD_MULTIPLY_SCALAR, factor)
-            out.add_ancestry(backwardFnArg^, self)  # record parent
-    return out
+        comptime if track_grad:
+            if self.requires_grad:
+                out.requires_grad_(True)
+                var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
+                    BACKWARD_MULTIPLY_SCALAR, factor
+                )
+                out.add_ancestry(backwardFnArg^, self)
+
+        return out^
 ```
 
 **What happens:**
@@ -128,27 +139,46 @@ def forward[track_grad: Bool = True](self, factor) -> Tensor:
 
 #### 2.2 `result + b` (Adder.forward)
 
-From `tenmo/addition.mojo`:
+From `tenmo/addition.mojo` — `Adder.forward`:
 
 ```mojo
-def forward[track_grad: Bool = True](self, other) -> Tensor:
-    var out = Tensor(self.buffer.arithmetic_ops[Add](other.buffer), requires_grad=False)
+@fieldwise_init
+struct Adder[dtype: DType](Copyable, RegisterPassable):
+    @staticmethod
+    def forward[
+        track_grad: Bool = True
+    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype], sync: Bool = True) -> Tensor[
+        Self.dtype
+    ]:
+        if not self.broadcastable(other):
+            panic("Tensor addition dimension mismatch...")
 
-    comptime if track_grad:
-        if self.requires_grad or other.requires_grad:
-            out.requires_grad_(True)
-            if self.shape() == other.shape():
-                var backwardFnArg = BackwardFnArg.null_arg(BACKWARD_ADD)
-                if self.requires_grad and other.requires_grad:
-                    out.add_ancestry(backwardFnArg^, self, other)  # two parents
-                elif self.requires_grad:
-                    out.add_ancestry(backwardFnArg^, self)       # one parent
+        var out = Tensor[Self.dtype](
+            self.buffer.arithmetic_ops[Add](other.buffer, sync=sync),
+            requires_grad=False,
+        )
+
+        comptime if track_grad:
+            if self.requires_grad or other.requires_grad:
+                out.requires_grad_(True)
+                if self.shape() == other.shape():
+                    var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
+                        BACKWARD_ADD
+                    )
+                    if self.requires_grad and other.requires_grad:
+                        out.add_ancestry(backwardFnArg^, self, other)
+                    elif self.requires_grad:
+                        out.add_ancestry(backwardFnArg^, self)
+                    else:
+                        out.add_ancestry(backwardFnArg^, other)
                 else:
-                    out.add_ancestry(backwardFnArg^, other)
-            else:
-                var backwardFnArg = BackwardFnArg.null_arg(BACKWARD_ADD_BROADCAST)
-                out.add_ancestry(backwardFnArg^, self, other)  # broadcast case
-    return out
+                    var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
+                        BACKWARD_ADD_BROADCAST
+                    )
+                    backwardFnArg.needs_parent_data = True
+                    out.add_ancestry(backwardFnArg^, self, other)
+
+        return out^
 ```
 
 **What happens:**
@@ -175,9 +205,10 @@ From `tenmo/backpropagation.mojo`:
 struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     @staticmethod
     def invoke(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-    ):
+        retain_graph: Bool = False,
+    ) raises where Self.dtype.is_floating_point():
         if not output.has_ancestry():
             return
         ref arg = output.ancestry().backward_fn_arg()
@@ -185,14 +216,14 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
         # Direct jump table — no variant extraction!
         if op_code == BACKWARD_ADD_SCALAR:
-            AddBackwardScalar[Self.dtype].backward(output, parent_ids)
+            AddBackwardScalar[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_ADD:
-            AddBackward[Self.dtype].backward(output, parent_ids)
+            AddBackward[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_MULTIPLY_SCALAR:
-            MultiplyBackwardScalar[Self.dtype].backward(output, parent_ids)
+            MultiplyBackwardScalar[Self.dtype].backward(output, parent_ids, retain_graph)
         elif op_code == BACKWARD_MULTIPLY:
-            MultiplyBackward[Self.dtype].backward(output, parent_ids)
-        # ... and so on for 50+ operations
+            MultiplyBackward[Self.dtype].backward(output, parent_ids, retain_graph)
+        # ... and so on for 58 operations
 ```
 
 Each handler receives a `mut parent_ids: List[UInt]` that it fills with the IDs of
@@ -204,29 +235,28 @@ fan-in counters. Handlers call `parent.update_grad()` internally — no return v
 From `tenmo/multiplication.mojo`:
 
 ```mojo
+@fieldwise_init
 struct MultiplyBackwardScalar[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
-        # Retrieve the scalar factor from the type-erased argument
         var factor = output.ancestry()
             .backward_fn_arg()
             .get[ScalarArg[Self.dtype]]()
             .value  # = 42
 
-        # Get incoming gradient from downstream
         ref gradbox = output.gradients()  # ∂loss/∂c
-
-        # Scale gradient: ∂loss/∂a = ∂loss/∂c * ∂c/∂a = grad * 42
+        var ancestor = output.ancestry().get(0)
         var scaled_gradbox = gradbox * factor
-
-        # Accumulate into parent's gradbox and register for fan-in
         ancestor.update_grad(scaled_gradbox^, AddTensor, None)
         parent_ids.append(ancestor._id)
+        if not retain_graph:
+            gradbox.zero_grad()
 ```
 
 ### Example: Backward for `a + b`
@@ -234,29 +264,45 @@ struct MultiplyBackwardScalar[dtype: DType](
 From `tenmo/addition.mojo`:
 
 ```mojo
+@fieldwise_init
 struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
+        retain_graph: Bool = False,
     ):
-        var gradbox = output.gradbox[]
+        var gradbox = output.gradients()
         count = len(output.ancestry())
 
-        if count == 1:  # Only one parent needed grad
+        if count == 1:
             var ancestor = output.ancestry().get(0)
             ancestor.update_grad(gradbox^, AddTensor, None)
             parent_ids.append(ancestor._id)
-        else:  # Both parents might need grad
-            var ancestor_lhs = output.ancestry().get(0)  # a
-            var ancestor_rhs = output.ancestry().get(1)  # b
+        else:
+            var ancestor_lhs = output.ancestry().get(0)
+            var ancestor_rhs = output.ancestry().get(1)
+            lhs_requires_grad = ancestor_lhs.requires_grad
+            rhs_requires_grad = ancestor_rhs.requires_grad
 
-            if ancestor_lhs.requires_grad:
+            if lhs_requires_grad and rhs_requires_grad:
                 ancestor_lhs.update_grad(gradbox, AddTensor, None)
                 parent_ids.append(ancestor_lhs._id)
-            if ancestor_rhs.requires_grad:
                 ancestor_rhs.update_grad(gradbox, AddTensor, None)
                 parent_ids.append(ancestor_rhs._id)
+
+            elif lhs_requires_grad and not rhs_requires_grad:
+                ancestor_lhs.update_grad(gradbox, AddTensor, None)
+                parent_ids.append(ancestor_lhs._id)
+
+            elif not lhs_requires_grad and rhs_requires_grad:
+                ancestor_rhs.update_grad(gradbox, AddTensor, None)
+                parent_ids.append(ancestor_rhs._id)
+
+            else:
+                pass
+        if not retain_graph:
+            gradbox.zero_grad()
 ```
 
 **Key insight**: For addition, ∂(a+b)/∂a = ∂(a+b)/∂b = 1, so the gradient passes through unchanged.

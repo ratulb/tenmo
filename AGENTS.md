@@ -20,6 +20,10 @@ pixi install              # install deps
 ./execute.sh from <name>  # run <name> and all tests after it
 ./execute.sh select <name> <fn>  # extract & run a single test function from a file
 ./example.sh xor          # run example: xor|mnist|mnist_unified|spiral|cifar_10|imdb|mnist_gpu|mnist_conv2d|word2vec_cbow
+./examples/reverse_sequence.mojo  # via: pixi run mojo -I . examples/reverse_sequence.mojo
+./examples/sort_sequence.mojo     # via: pixi run mojo -I . examples/sort_sequence.mojo
+# Both examples are fully comptime-parameterized (VOCAB, SEQ_LEN, D_MODEL, etc.)
+# Default: reversal 100% convergence in 4-10 epochs; sorting 95.9-100% in 25 epochs
 ./fire.sh                 # quick-run debug.mojo (or pass another file)
 ./run_gpu_stripped.sh     # batch GPU tests from tests/gpu/ (outside execute.sh)
 ./run_gpu_test_files.sh   # run all GPU-guarded test_*.mojo individually
