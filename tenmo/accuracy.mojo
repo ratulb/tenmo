@@ -130,7 +130,6 @@ struct Accuracy[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:
         sync: Bool,
     ) raises -> Float64:
         from tenmo.kernels import AccuracyGpu
-
         var pred = pred_in
         var target = target_in
         if not pred.is_on_gpu():
@@ -169,7 +168,6 @@ struct Accuracy[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:
         sync: Bool,
     ) raises -> Int:
         from tenmo.kernels import SequenceAccuracyGpu
-
         return SequenceAccuracyGpu[Self.dtype, Self.index_dtype].launch(
             pred.buffer, target.buffer, sync=sync
         )

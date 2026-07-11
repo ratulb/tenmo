@@ -43,6 +43,7 @@ from tenmo.ndbuffer import NDBuffer
 from tenmo.device import GPU, DeviceState
 from tenmo.shapes import Shape
 from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
+from std.utils.numerics import neg_inf
 
 
 def multinomial_fused_kernel[

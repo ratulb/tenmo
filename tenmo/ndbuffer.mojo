@@ -5,7 +5,7 @@ from tenmo.intarray import IntArray
 from tenmo.indexhelper import IndexCalculator, IndexIterator
 from tenmo.matrixshapevalidator import MatrixShapeValidator
 from tenmo.broadcasthelper import ShapeBroadcaster
-from tenmo.common_utils import panic, log_debug, print_buffer, Epsilon, One
+from tenmo.common_utils import panic, log_debug, print_buffer, Epsilon, One, Idx
 
 from tenmo.validators import Validator
 from std.memory import memcpy
@@ -28,6 +28,7 @@ from tenmo.shared.scalar_ops import compare_pair
 from tenmo.kernels.compare_kernel import AllClose, Compare, CompareScalar
 
 from std.math import sqrt, log, exp, tanh
+from std.random import seed, random_float64
 from tenmo.mnemonics import (
     Multiply,
     Add,

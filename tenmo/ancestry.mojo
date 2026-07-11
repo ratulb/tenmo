@@ -2,6 +2,7 @@ from std.memory import Pointer
 from .tensor import Tensor
 from .gradbox import Gradbox
 from .backpropagation import BackwardFnArg
+from .gather import GatherArg
 from .ndbuffer import NDBuffer
 from .common_utils import panic, i, s
 from .shapes import Shape

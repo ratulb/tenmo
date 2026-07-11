@@ -19,7 +19,8 @@ from tenmo.shared import Reduction
 from tenmo.softmax import SoftmaxNdBuffer
 from tenmo.sum_mean_reduction import SumMeanReduction
 from std.math import exp, log, max
-from std.sys import simd_width_of
+from std.sys import simd_width_of, has_accelerator
+
 from std.utils.numerics import min_finite
 
 

@@ -1,6 +1,7 @@
 from .tensor import Tensor
 from .mnemonics import AddTensor
 from .backpropagation import BackwardFnArg, BACKWARD_RESHAPE
+from std.sys import has_accelerator
 from .shapes import Shape
 from .validators import Validator
 from .gradbox import Gradbox

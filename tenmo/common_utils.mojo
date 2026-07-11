@@ -1,7 +1,7 @@
 from .shapes import Shape
 from .tensor import Tensor
 from .gradbox import Gradbox
-from std.sys import simd_width_of
+from std.sys import simd_width_of, has_accelerator
 from std.sys.defines import get_defined_string
 from std.logger import Level, Logger
 from .net import Sequential, Linear, ReLU

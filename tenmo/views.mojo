@@ -6,7 +6,7 @@ from .mnemonics import AddTensor
 from .validators import Validator
 from .gradbox import Gradbox
 from .intarray import IntArray
-from .common_utils import panic, log_warning
+from .common_utils import panic, log_warning, Idx
 from std.sys import simd_width_of
 from .device import DeviceState
 from std.sys import has_accelerator

@@ -427,6 +427,7 @@ from tenmo.intarray import IntArray
 from tenmo.shapes import Shape
 from tenmo.dataloader import TensorDataset
 from tenmo.mnemonics import DEFAULT_INDEX_DTYPE as idx_dtype
+from tenmo.accuracy import Accuracy
 from std.random import shuffle, random_ui64
 from std.time import perf_counter_ns
 from std.math import sqrt
@@ -511,8 +512,6 @@ def make_pos_indices(batch_size: Int, seq_len: Int) -> Tensor[idx_dtype]:
 def compute_accuracy(
     logits: Tensor[dtype], targets: Tensor[idx_dtype]
 ) raises -> Tuple[Float64, Float64]:
-    from tenmo.accuracy import Accuracy
-
     return (
         Accuracy[dtype].token_accuracy(logits, targets),
         Accuracy[dtype].sequence_accuracy(logits, targets),

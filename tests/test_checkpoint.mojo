@@ -1,8 +1,9 @@
 from tenmo.tensor import Tensor
 from tenmo.net import Sequential, Linear, ReLU, Conv2D, Flatten
-from tenmo.numpy_interop import save_checkpoint, load_checkpoint
+from tenmo.numpy_interop import save_checkpoint, load_checkpoint, to_ndarray
 from tenmo.named_parameter import NamedParameter
 from tenmo.shapes import Shape
+from tenmo.forwards import LayerNorm
 from std.python import Python, PythonObject
 from std.testing import assert_true, assert_equal, TestSuite
 
@@ -118,7 +119,6 @@ def test_checkpoint_roundtrip_conv2d() raises:
 
 
 def test_checkpoint_pytorch_compatible_format() raises:
-    from tenmo.numpy_interop import to_ndarray
     np = Python.import_module("numpy")
     var state_dict: PythonObject = {}
     state_dict["0.weight"] = to_ndarray(Tensor[DType.float32].ones(Shape(4, 3)))
@@ -136,7 +136,6 @@ def test_checkpoint_pytorch_compatible_format() raises:
 
 
 def test_load_numpy_dict() raises:
-    from tenmo.numpy_interop import to_ndarray
     np = Python.import_module("numpy")
     var manual_dict: PythonObject = {}
     var t = Tensor[DType.float64].arange(6)
@@ -149,7 +148,6 @@ def test_load_numpy_dict() raises:
 
 
 def test_named_params_layernorm() raises:
-    from tenmo.forwards import LayerNorm
     var ln = LayerNorm[DType.float32](8)
     var params = ln.named_parameters("")
     assert_equal(len(params), 2)

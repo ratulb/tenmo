@@ -1,6 +1,9 @@
 from std.sys import simd_width_of, has_accelerator
 from std.gpu import thread_idx, block_idx, block_dim
 
+comptime if has_accelerator():
+    from std.gpu.host import DeviceContext
+
 # =============================================================================
 # Verify what simd_width_of[dtype]() returns on CPU vs GPU compilation targets.
 #
@@ -95,8 +98,6 @@ def check_simd_width_kernel():
 
 def launch_gpu_check() raises:
     comptime if has_accelerator():
-        from std.gpu.host import DeviceContext
-
         print("── GPU Kernel Check ──")
         var device_context = DeviceContext()
         var compiled = device_context.compile_function[

@@ -2,6 +2,7 @@ from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from tenmo.intarray import IntArray
 from tenmo.gather import Gather
+from std.math import sqrt
 from tenmo.net import Module, Layer
 from tenmo.device import Device
 from tenmo.mnemonics import EMBEDDING, DEFAULT_INDEX_DTYPE

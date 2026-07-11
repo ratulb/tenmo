@@ -2,72 +2,72 @@
 clear
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
-    echo "Error: No example specified"
-    echo "Usage: $0 [word2vec_cbow|imdb|imdb_v1|binary_mnist|mnist|mnist_unified|mnist_gpu|mnist_gpu_prof|xor|spiral|cifar_10|mnist_conv2d]"
-    exit 1
+  echo "Error: No example specified"
+  echo "Usage: $0 [word2vec_cbow|imdb|imdb_v1|binary_mnist|mnist|mnist_unified|mnist_gpu|mnist_gpu_prof|xor|spiral|cifar_10|mnist_conv2d]"
+  exit 1
 fi
 
 DEBUG_MODE=""
 if [ $# -ge 2 ] && [ "$2" = "d" ]; then
-    DEBUG_MODE="-D LOGGING_LEVEL=debug"
+  DEBUG_MODE="-D LOGGING_LEVEL=debug"
 fi
 
 # Determine which test to run based on the argument
 case $1 in
-    word2vec_cbow)
-        echo "Running word2vec CBOW training loop"
-        mojo -I . $DEBUG_MODE examples/word2vec_cbow.mojo
-        ;;
+  word2vec_cbow)
+    echo "Running word2vec CBOW training loop"
+    mojo -I . $DEBUG_MODE examples/word2vec_cbow.mojo
+    ;;
 
-    imdb_v1)
-        echo "Running IMDB sentiment training loop(v1)"
-        mojo -I . $DEBUG_MODE examples/imdb_sentiment_v1.mojo
-        ;;
+  imdb_v1)
+    echo "Running IMDB sentiment training loop(v1)"
+    mojo -I . $DEBUG_MODE examples/imdb_sentiment_v1.mojo
+    ;;
 
-    imdb)
-        echo "Running IMDB sentiment training loop(v2)"
-        mojo -I . $DEBUG_MODE examples/imdb_sentiment_v2.mojo
-        ;;
-    binary_mnist)
-        echo "Running binary mnist training loop"
-        mojo -I . $DEBUG_MODE examples/binary_mnist.mojo
-        ;;
-    mnist_gpu)
-        echo "Running mnist gpu training loop"
-        mojo -I . $DEBUG_MODE examples/mnist_gpu.mojo
-        ;;
-    mnist)
-        echo "Running mnist training loop"
-        mojo -I . $DEBUG_MODE examples/mnist.mojo
-        ;;
-    mnist_unified)
-        echo "Running unified mnist (auto CPU/GPU)"
-        mojo -I . $DEBUG_MODE examples/mnist_unified.mojo
-        ;;
-    xor)
-        echo "Running xor training loop"
-        mojo -I . $DEBUG_MODE examples/xor.mojo
-        ;;
-    spiral)
-        echo "Running mojo spiral training loop"
-        mojo -I . $DEBUG_MODE examples/spiral.mojo
-        ;;
-    cifar_10)
-        echo "Running mojo cifar_10 training loop"
-        mojo -I . $DEBUG_MODE examples/cifar_10.mojo
-        ;;
-    mnist_conv2d)
-        echo "Running mojo mnist_conv2d.mojo training loop"
-        mojo -I . $DEBUG_MODE examples/mnist_conv2d.mojo
-        ;;
-    mnist_gpu_prof)
-        echo "Running mnist gpu profiled training loop"
-        mojo -I . $DEBUG_MODE examples/mnist_gpu_prof.mojo
-        ;;
+  imdb)
+    echo "Running IMDB sentiment training loop(v2)"
+    mojo -I . $DEBUG_MODE examples/imdb_sentiment_v2.mojo
+    ;;
+  binary_mnist)
+    echo "Running binary mnist training loop"
+    mojo -I . $DEBUG_MODE examples/binary_mnist.mojo
+    ;;
+  mnist_gpu)
+    echo "Running mnist gpu training loop"
+    mojo -I . $DEBUG_MODE examples/mnist_gpu.mojo
+    ;;
+  mnist)
+    echo "Running mnist training loop"
+    mojo -I . $DEBUG_MODE examples/mnist.mojo
+    ;;
+  mnist_unified)
+    echo "Running unified mnist (auto CPU/GPU)"
+    mojo -I . $DEBUG_MODE examples/mnist_unified.mojo
+    ;;
+  xor)
+    echo "Running xor training loop"
+    mojo -I . $DEBUG_MODE examples/xor.mojo
+    ;;
+  spiral)
+    echo "Running mojo spiral training loop"
+    mojo -I . $DEBUG_MODE examples/spiral.mojo
+    ;;
+  cifar_10)
+    echo "Running mojo cifar_10 training loop"
+    mojo -I . $DEBUG_MODE examples/cifar_10.mojo
+    ;;
+  mnist_conv2d)
+    echo "Running mojo mnist_conv2d.mojo training loop"
+    mojo -I . $DEBUG_MODE examples/mnist_conv2d.mojo
+    ;;
+  mnist_gpu_prof)
+    echo "Running mnist gpu profiled training loop"
+    mojo -I . $DEBUG_MODE examples/mnist_gpu_prof.mojo
+    ;;
 
-    *)
-       echo "Error: Unknown test '$1'"
-       echo "Available training loops: word2vec_cbow, imdb, imdb_v1, binary_mnist, mnist, mnist_unified, mnist_gpu, mnist_gpu_prof, xor, spiral, cifar_10, mnist_conv2d"
-       exit 1
+  *)
+    echo "Error: Unknown test '$1'"
+    echo "Available training loops: word2vec_cbow, imdb, imdb_v1, binary_mnist, mnist, mnist_unified, mnist_gpu, mnist_gpu_prof, xor, spiral, cifar_10, mnist_conv2d"
+    exit 1
     ;;
 esac
