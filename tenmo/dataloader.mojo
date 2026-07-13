@@ -1,10 +1,11 @@
-from .tensor import Tensor
-from .common_utils import panic
+from tenmo.tensor import Tensor
+from tenmo.common_utils import panic
 from std.random import shuffle as reshuffle, random_si64
 from std.python import PythonObject
-from .numpy_interop import from_ndarray, numpy_dtype
+from tenmo.numpy_interop import from_ndarray, numpy_dtype
 from std.memory import memcpy, Pointer
-from .shapes import Shape
+from tenmo.shapes import Shape
+from std.sys import simd_width_of
 
 # MNIST
 comptime MNIST_MEAN = 0.1307
