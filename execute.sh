@@ -176,6 +176,7 @@ declare -a ALL_TESTS_IN_ORDER=(
   "validators|tests/test_validators.mojo"
   "ce|tests/test_cross_entropy.mojo"
   "checkpoint|tests/test_checkpoint.mojo"
+  "scheduler|tests/test_scheduler.mojo"
   "module_list|tests/test_module_list.mojo"
   "retain_graph|tests/test_retain_graph.mojo"
 )
@@ -288,7 +289,7 @@ if [ $# -eq 0 ]; then
   echo "  gpu_all [N..M] [N]...  Run GPU tests: monolithic; chunk N; range (2..4); or list (2 4 6)"
   echo "  cpu_all [N..M] [N]...  Run CPU tests: monolithic; chunk N; range (2..4); or list (2 4 6)"
   echo "  retain_graph   Test retain_graph=True/False for all backward handlers"
-  echo "  checkpoint, shapebroadcast, validators, ce, synth_mnist"
+  echo "  scheduler, checkpoint, shapebroadcast, validators, ce, synth_mnist"
   echo ""
   print_colored "$GREEN" "  all              Run all tests"
   print_colored "$GREEN" "  gpu              Run all GPU-guarded tests"
@@ -512,6 +513,10 @@ run_test_by_name() {
       ;;
     sparse_sgd)
       run_test "sparse_sgd" "tests/test_sparse_sgd.mojo" "$DEBUG_MODE"
+      exit_code=$?
+      ;;
+    scheduler)
+      run_test "scheduler" "tests/test_scheduler.mojo" "$DEBUG_MODE"
       exit_code=$?
       ;;
     npiop)

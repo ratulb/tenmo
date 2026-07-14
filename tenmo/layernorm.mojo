@@ -38,6 +38,7 @@ from .device import GPU
 from .common_utils import panic
 from tenmo.kernels.layernorm_kernel import LayerNormKernel
 from tenmo.intarray import IntArray
+from tenmo.net import Layer, Module
 from .named_parameter import NamedParameter
 from .welford import Welford
 from std.sys import has_accelerator

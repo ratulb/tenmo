@@ -1,6 +1,7 @@
 from tenmo.tensor import Tensor
 from tenmo.shapes import Shape
 from tenmo.intarray import IntArray
+from tenmo.named_parameter import NamedParameter
 from tenmo.gather import Gather
 from std.math import sqrt
 from tenmo.net import Module, Layer
@@ -321,6 +322,21 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
                 .as_unsafe_any_origin()
             )
         return params^
+
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        var result = List[NamedParameter[Self.dtype]]()
+        if self.weight.requires_grad:
+            result.append(
+                NamedParameter[Self.dtype](
+                    prefix + "weight",
+                    UnsafePointer(to=self.weight)
+                    .unsafe_mut_cast[True]()
+                    .as_unsafe_any_origin(),
+                )
+            )
+        return result^
 
     def num_parameters(self) -> Int:
         return self.weight.numels()

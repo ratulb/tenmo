@@ -1,0 +1,22 @@
+# Install venv support (if not already installed)
+sudo apt update
+sudo apt install python3-venv python3-pip -y
+
+# Create a virtual environment (name it whatever you like)
+python3 -m venv ~/pytorch-env
+
+# Activate it
+source ~/pytorch-env/bin/activate
+
+# Upgrade pip inside the venv (avoids install issues)
+pip install --upgrade pip
+
+# Install PyTorch (CPU-only, simplest default)
+#pip install torch torchvision torchaudio
+pip install torch, torchvision tqdm
+
+#deactivate
+
+# Verify
+
+python3 -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"

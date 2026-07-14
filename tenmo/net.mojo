@@ -933,6 +933,8 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             return self.layer[Conv2D[Self.dtype]].named_parameters(prefix)
         elif self.tag == LAYER_NORM:
             return self.layer[LayerNorm[Self.dtype]].named_parameters(prefix)
+        elif self.tag == EMBEDDING:
+            return self.layer[Embedding[Self.dtype]].named_parameters(prefix)
         else:
             return List[NamedParameter[Self.dtype]]()
 

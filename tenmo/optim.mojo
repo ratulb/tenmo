@@ -3,8 +3,11 @@ from .gradbox import Gradbox
 from .intarray import IntArray
 from std.math import sqrt
 from std.sys import simd_width_of, has_accelerator
+from std.memory import memcpy
+from std.python import Python, PythonObject
 from .common_utils import panic
 from .kernels import SGDStep
+from .numpy_interop import to_ndarray, ndarray_ptr
 
 
 @fieldwise_init
@@ -599,3 +602,66 @@ struct SGD[dtype: DType](ImplicitlyCopyable & Movable):
 
     def set_weight_decay(mut self, weight_decay: Scalar[Self.dtype]):
         self.weight_decay = weight_decay
+
+    def state_dict(self) raises -> PythonObject:
+        np = Python.import_module("numpy")
+        var state: PythonObject = {}
+        state["type"] = "SGD"
+        state["lr"] = np.array([Float64(self.lr)])
+        state["momentum"] = np.array([Float64(self.momentum)])
+        state["weight_decay"] = np.array([Float64(self.weight_decay)])
+        state["clip_norm"] = np.array([Float64(self.clip_norm)])
+        state["clip_value"] = np.array([Float64(self.clip_value)])
+        if self.use_momentum:
+            var vel_list = Python.list()
+            for i in range(len(self.velocities)):
+                vel_list.append(to_ndarray(self.velocities[i]))
+            state["velocities"] = vel_list
+        return state
+
+    @staticmethod
+    def load_state_dict(
+        state: PythonObject,
+        parameters: List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]],
+    ) raises -> Self:
+        np = Python.import_module("numpy")
+
+        var lr = Scalar[Self.dtype](
+            ndarray_ptr[DType.float64](state["lr"]).load()
+        )
+        var momentum = Scalar[Self.dtype](
+            ndarray_ptr[DType.float64](state["momentum"]).load()
+        )
+        var weight_decay = Scalar[Self.dtype](
+            ndarray_ptr[DType.float64](state["weight_decay"]).load()
+        )
+        var clip_norm = Scalar[Self.dtype](
+            ndarray_ptr[DType.float64](state["clip_norm"]).load()
+        )
+        var clip_value = Scalar[Self.dtype](
+            ndarray_ptr[DType.float64](state["clip_value"]).load()
+        )
+
+        var opt = Self(
+            parameters,
+            lr=lr,
+            momentum=momentum,
+            weight_decay=weight_decay,
+            clip_norm=clip_norm,
+            clip_value=clip_value,
+        )
+
+        if opt.use_momentum and state.__contains__("velocities"):
+            var saved_velocities = state["velocities"]
+            for i in range(len(opt.velocities)):
+                var vel_nd = saved_velocities[i]
+                var src_ptr = ndarray_ptr[Self.dtype](vel_nd)
+                ref dst_gradbox = opt.velocities[i]
+                var dst_ndb = dst_gradbox.buffer()
+                memcpy(
+                    dest=dst_ndb.data_ptr().unsafe_mut_cast[True](),
+                    src=src_ptr,
+                    count=dst_ndb.numels(),
+                )
+
+        return opt^

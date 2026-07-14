@@ -126,6 +126,8 @@ from .pooling import MaxPool2d, MaxPool2dBackward, MaxPool2dBwdArg
 from .filler import Filler
 from .accuracy import Accuracy
 from .optim import SGD
+from .scheduler import StepLR, MultiStepLR, CosineAnnealingLR
+from .checkpoint import Checkpoint, save_state, load_state, apply_to_model, save_weights, load_weights
 from .dataloader import DataLoader, Dataset, Batch, TensorDataset, NumpyDataset
 
 # ── Device ──
