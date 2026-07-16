@@ -209,3 +209,80 @@ def load_weights[
 ](mut model: Sequential[dtype], path: String) raises:
     var ckpt = load_state(path)
     apply_to_model(model, ckpt)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# save_best_if_improved — checkpoint with best-model tracking
+#
+# Always saves {path_prefix}_latest.npy.
+# If current_loss < best_loss, also saves {path_prefix}_best.npy.
+# Returns min(current_loss, best_loss) so caller can update their tracker.
+#
+# Two overloads: without optimizer / with optimizer.
+# ═══════════════════════════════════════════════════════════════════════
+
+def save_best_if_improved[
+    dtype: DType, //
+](
+    path_prefix: String,
+    model: Sequential[dtype],
+    current_loss: Float64,
+    best_loss: Float64,
+    metadata: PythonObject,
+) raises -> Float64:
+    var _ = save_state(path_prefix + "_latest.npy", model, metadata)
+    var new_best = best_loss
+    if current_loss < best_loss:
+        var _ = save_state(path_prefix + "_best.npy", model, metadata)
+        new_best = current_loss
+    return new_best
+
+
+def save_best_if_improved[
+    dtype: DType, //
+](
+    path_prefix: String,
+    model: Sequential[dtype],
+    optimizer: SGD[dtype],
+    current_loss: Float64,
+    best_loss: Float64,
+    metadata: PythonObject,
+) raises -> Float64:
+    var _ = save_state(path_prefix + "_latest.npy", model, optimizer, metadata)
+    var new_best = best_loss
+    if current_loss < best_loss:
+        var _ = save_state(path_prefix + "_best.npy", model, optimizer, metadata)
+        new_best = current_loss
+    return new_best
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# save_step_checkpoint — step-numbered checkpoint snapshots
+#
+# Saves to {path_prefix}_step_{step}.npy.
+# Two overloads: without optimizer / with optimizer.
+# ═══════════════════════════════════════════════════════════════════════
+
+def save_step_checkpoint[
+    dtype: DType, //
+](
+    path_prefix: String,
+    step: Int,
+    model: Sequential[dtype],
+    metadata: PythonObject,
+) raises:
+    var path = path_prefix + "_step_" + String(step) + ".npy"
+    var _ = save_state(path, model, metadata)
+
+
+def save_step_checkpoint[
+    dtype: DType, //
+](
+    path_prefix: String,
+    step: Int,
+    model: Sequential[dtype],
+    optimizer: SGD[dtype],
+    metadata: PythonObject,
+) raises:
+    var path = path_prefix + "_step_" + String(step) + ".npy"
+    var _ = save_state(path, model, optimizer, metadata)

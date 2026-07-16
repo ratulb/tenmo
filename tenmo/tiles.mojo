@@ -35,7 +35,7 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if parent_rank == 0:
             var total_grad = grad_out.sum().item()
             var gradbox_parent = Gradbox[Self.dtype].full(
-                Shape(), total_grad, device=grad_out.device(), 
+                Shape(), total_grad, device=grad_out.device(),
             )
             parent.update_grad(gradbox_parent^, AddTensor, None)
             parent_ids.append(parent._id)

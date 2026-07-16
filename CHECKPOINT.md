@@ -35,7 +35,7 @@ The checkpoint system lives in `tenmo/numpy_interop.mojo` (~206 lines) and consi
 | **Branching point** — step-numbered checkpoints | No step-based checkpoint naming or periodic save. | Full gap |
 | **Provenance** — config, seed, git hash, dataset | Not captured. No audit trail for a given weights file. | Full gap |
 
-### Summary: ~30% complete. Phases 1–3 done. Phase 4a in progress.
+### Summary: ~30% complete. Phases 1–4a done. Phase 5 done.
 
 ---
 
@@ -290,12 +290,28 @@ load_weights(mut model, path)                # model-only convenience (detects o
 
 **Scope:** GPU-aware `apply_to_model`, `apply_to_optimizer`, `apply_to_scheduler`, Scheduler state serialization roundtrip.
 
-**Key challenges deferred:**
-- `apply_to_model` on GPU: in-place tensor replacement interacts with autograd ownership tracking
+**Why deferred:**
+
+`apply_to_model` on GPU is not just "call `to_gpu` on the loaded tensor". Mojo's autograd graph holds ownership references via `Ancestor` handles and `Gradbox` refcounts. Replacing a GPU tensor in-place (e.g. `t = gpu_t^`) must:
+- Not orphan the existing `Gradbox` (gradients in-flight during training)
+- Not break the `Ancestor` parent chain that `backward()` walks
+- Handle the case where the tensor is a view of another buffer (shared `Buffer` refcount)
+- Coordinate with `SGD.load_state_dict` which does raw `memcpy` into `Gradbox.buffer()` — that path assumes CPU `UnsafePointer`
+
+The current CPU path avoids all this because `memcpy` into `data_ptr()` does not change the Tensor identity or its graph connections. A GPU equivalent would need either: (a) a new `to_cpu().copy_into()`-style copy that preserves graph, or (b) compiling transfer into a backward-visible `DeviceTransfer` node.
+
+Separately, GPU velocity restore in `SGD.load_state_dict` requires reading velocity bytes from a CPU ndarray into a GPU `Gradbox.buffer()`, which involves CUDA memcpy — not yet wired.
+
+All of this is doable, but it's a focused yak-shave with its own test infrastructure. Phase 4a unblocks all CPU training pipelines in the meantime.
+
+**Deferred until:**
+- A real GPU training loop needs checkpoint resume and hits this gap
+- Or someone volunteers to write the GPU-specific test fixtures
+
+**Key challenges:**
+- `apply_to_model` on GPU: in-place tensor replacement vs autograd ownership
 - `SGD.load_state_dict` needs device-aware velocity buffer restore
 - Scheduler `apply_to_scheduler` requires a common trait or dispatcher
-
-No timeline. Phase 4a unblocks all CPU training pipelines — GPU integration is a focused follow-up.
 
 #### Risks (Phase 4a)
 
@@ -306,7 +322,94 @@ No timeline. Phase 4a unblocks all CPU training pipelines — GPU integration is
 | Name collision `save_checkpoint` (new module) vs old `numpy_interop` | New API uses `save_state` / `load_state` — no overlap |
 
 ### Phase 5 — Best model & step-based tracking
-- `save_best_if_improved()` + `save_step_checkpoint()` helpers
+
+Adds two high-level helper functions to `tenmo/checkpoint.mojo`. Both build on Phase 4a's `save_state` — no additional module needed.
+
+#### `save_best_if_improved`
+
+```mojo
+# Without optimizer
+def save_best_if_improved[
+    dtype: DType, //
+](
+    path_prefix: String,
+    model: Sequential[dtype],
+    current_loss: Float64,
+    best_loss: Float64,
+    metadata: PythonObject,
+) raises -> Float64:
+    # Always saves {path_prefix}_latest.npy
+    # If current_loss < best_loss, saves {path_prefix}_best.npy
+    # Returns min(current_loss, best_loss)
+
+# With optimizer
+def save_best_if_improved[
+    dtype: DType, //
+](
+    path_prefix: String,
+    model: Sequential[dtype],
+    optimizer: SGD[dtype],
+    current_loss: Float64,
+    best_loss: Float64,
+    metadata: PythonObject,
+) raises -> Float64:
+```
+
+Usage pattern:
+```mojo
+var best_loss = Float64(inf)
+for epoch in range(num_epochs):
+    train()
+    var val_loss = validate()
+    best_loss = save_best_if_improved("/tmp/model", model, val_loss, best_loss, {})
+```
+
+#### `save_step_checkpoint`
+
+```mojo
+# Without optimizer
+def save_step_checkpoint[
+    dtype: DType, //
+](
+    path_prefix: String,
+    step: Int,
+    model: Sequential[dtype],
+    metadata: PythonObject,
+) raises:
+
+# With optimizer
+def save_step_checkpoint[
+    dtype: DType, //
+](
+    path_prefix: String,
+    step: Int,
+    model: Sequential[dtype],
+    optimizer: SGD[dtype],
+    metadata: PythonObject,
+) raises:
+```
+
+Saves to `{path_prefix}_step_{step}.npy`.
+
+#### Files to touch
+
+| File | Change |
+|---|---|
+| `tenmo/checkpoint.mojo` | Add `save_best_if_improved` + `save_step_checkpoint` functions |
+| `tenmo/__init__.mojo` | Export new symbols |
+| `tests/test_checkpoint.mojo` | Add tests for both new functions |
+
+#### Tests
+
+| Test | Verifies |
+|---|---|
+| `test_save_best_if_improved_saves_latest` | Always saves `_latest.npy` regardless of loss |
+| `test_save_best_if_improved_saves_best` | Saves `_best.npy` only when `current_loss < best_loss` |
+| `test_save_best_if_improved_no_improvement` | Does NOT overwrite `_best.npy` when loss worsens |
+| `test_save_best_if_improved_returns_min` | Returns `min(current_loss, best_loss)` |
+| `test_save_best_if_improved_with_optimizer` | Full state saved in both files |
+| `test_save_step_checkpoint_basic` | Saves `{prefix}_step_{N}.npy` |
+| `test_save_step_checkpoint_with_optimizer` | Optimizer state included |
 
 ### Phase 6 — Provenance & examples
 - Git hash capture, config dict, example usage, extended tests

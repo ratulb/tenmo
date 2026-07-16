@@ -99,7 +99,7 @@ from .unsqueeze import Unsqueeze, UnsqueezeBackward
 from .flatten import FlattenForward, FlattenBackward
 from .concate import Concate, ConcatBackward
 from .stack import Stack, StackArg, StackBackward
-from .tiles import Tile, TileArg, TileBackward
+from .tiles import Tile, TilesArg, TileBackward
 from .repeat import Repeat
 from .views import View, ViewBackward
 from .shuffle import Shuffle, ShuffleArg, ShuffleBackward
@@ -120,14 +120,14 @@ from .blashandle import BLASHandle, BLASHandleLite, BlasArg, BLASMatmul2dBackwar
 from .net import Linear, LinearBLAS, Profile, Sequential, SequentialBLAS, Module, ModuleList, ModuleListIterator, ReLU, Sigmoid, Tanh, MSELoss, Conv2D, Flatten
 from .crossentropy import CrossEntropyLoss, CEClassIndicesForward, CEClassIndicesBackward, CEProbabilitiesForward, CEProbabilitiesBackward, CEValidation, CECommon, ClassIndicesBwdArg, ClassProbabilitiesBwdArg
 
-from .dropout import Dropout, DropoutArg, DropoutBackward
+from .dropout import Dropout, ArgDropout, DropoutBackward
 from .cnn import Conv2dFused, FusedIm2Col, FusedIm2ColBwdArg, FusedCol2ImBackward
 from .pooling import MaxPool2d, MaxPool2dBackward, MaxPool2dBwdArg
 from .filler import Filler
 from .accuracy import Accuracy
 from .optim import SGD
 from .scheduler import StepLR, MultiStepLR, CosineAnnealingLR
-from .checkpoint import Checkpoint, save_state, load_state, apply_to_model, save_weights, load_weights
+from .checkpoint import Checkpoint, save_state, load_state, apply_to_model, save_weights, load_weights, save_best_if_improved, save_step_checkpoint
 from .dataloader import DataLoader, Dataset, Batch, TensorDataset, NumpyDataset
 
 # ── Device ──

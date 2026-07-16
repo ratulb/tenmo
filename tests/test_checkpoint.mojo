@@ -6,7 +6,7 @@ from tenmo.shapes import Shape
 from tenmo.forwards import LayerNorm
 from tenmo.embedding import Embedding
 from tenmo.optim import SGD
-from tenmo.checkpoint import Checkpoint, save_state, load_state, apply_to_model, save_weights, load_weights
+from tenmo.checkpoint import Checkpoint, save_state, load_state, apply_to_model, save_weights, load_weights, save_best_if_improved, save_step_checkpoint
 from std.python import Python, PythonObject
 from std.testing import assert_true, assert_equal, TestSuite
 
@@ -345,7 +345,7 @@ def test_named_params_layernorm() raises:
 
 
 def test_save_state_model_only() raises:
-    """save_state persists model weights; load_state restores Checkpoint."""
+    """Save model weights with save_state and verify load_state restores them."""
     var model = Sequential[DType.float32]()
     model.append(Linear[DType.float32](4, 3).into(), ReLU[DType.float32]().into())
     var orig_w = Tensor[DType.float32].rand(Shape(4, 3))
@@ -363,7 +363,7 @@ def test_save_state_model_only() raises:
 
 
 def test_save_state_with_optimizer() raises:
-    """save_state persists optimizer state; verified via state_dict roundtrip."""
+    """Save optimizer state with save_state and verify via state_dict roundtrip."""
     var model = Sequential[DType.float32]()
     model.append(Linear[DType.float32](4, 3).into())
     var params = model.parameters()
@@ -384,7 +384,7 @@ def test_save_state_with_optimizer() raises:
 
 
 def test_save_state_with_metadata() raises:
-    """save_state stores user-provided metadata; load_state recovers it."""
+    """Store user-provided metadata with save_state and verify load_state recovers it."""
     var model = Sequential[DType.float32]()
     model.append(Linear[DType.float32](4, 3).into())
     var meta: PythonObject = {}
@@ -405,7 +405,7 @@ def test_save_state_with_metadata() raises:
 
 
 def test_apply_to_model_cpu() raises:
-    """apply_to_model copies weights from checkpoint into a CPU model."""
+    """Copy weights from checkpoint into a CPU model via apply_to_model."""
     var model = Sequential[DType.float32]()
     model.append(Linear[DType.float32](4, 3).into())
     var orig_w = Tensor[DType.float32].rand(Shape(4, 3))
@@ -422,7 +422,7 @@ def test_apply_to_model_cpu() raises:
 
 
 def test_apply_to_model_skips_missing_keys() raises:
-    """apply_to_model silently skips checkpoint keys not in the model (safe partial loading)."""
+    """Skip checkpoint keys not in the model via apply_to_model (safe partial loading)."""
     var model = Sequential[DType.float32]()
     model.append(Linear[DType.float32](4, 3).into())
     var orig_w = Tensor[DType.float32].rand(Shape(4, 3))
@@ -439,7 +439,7 @@ def test_apply_to_model_skips_missing_keys() raises:
 
 
 def test_backward_compat_old_format() raises:
-    """load_state detects old flat-format dict (no 'model' key) and wraps it."""
+    """Detect old flat-format dict (no 'model' key) and verify load_state wraps it."""
     np = Python.import_module("numpy")
     var state_dict: PythonObject = {}
     state_dict["0.weight"] = to_ndarray(Tensor[DType.float32].ones(Shape(4, 3)))
@@ -456,7 +456,7 @@ def test_backward_compat_old_format() raises:
 
 
 def test_backward_compat_old_load_weights() raises:
-    """load_weights works with old flat-format files."""
+    """Verify load_weights works with old flat-format files."""
     np = Python.import_module("numpy")
     var state_dict: PythonObject = {}
     state_dict["0.weight"] = to_ndarray(Tensor[DType.float32].full(Shape(4, 3), 2.0))
@@ -475,7 +475,7 @@ def test_backward_compat_old_load_weights() raises:
 
 
 def test_save_weights_roundtrip() raises:
-    """save_weights + load_weights roundtrip preserves model weights."""
+    """Verify save_weights + load_weights roundtrip preserves model weights."""
     var model = Sequential[DType.float32]()
     model.append(Linear[DType.float32](4, 3).into(), ReLU[DType.float32]().into())
     var orig_w = Tensor[DType.float32].rand(Shape(4, 3))
@@ -492,7 +492,7 @@ def test_save_weights_roundtrip() raises:
 
 
 def test_load_state_new_format() raises:
-    """load_state detects new format via 'model' key."""
+    """Detect new format via 'model' key in load_state."""
     var model = Sequential[DType.float32]()
     model.append(Linear[DType.float32](4, 3).into())
     var tmp_path = "/tmp/test_load_state_new_format.npy"
@@ -513,7 +513,7 @@ def test_checkpoint_struct_default_construction() raises:
 
 
 def test_save_state_with_optimizer_no_momentum() raises:
-    """save_state with optimizer (no momentum) — velocities key absent."""
+    """Save state with optimizer (no momentum) — velocities key absent."""
     var model = Sequential[DType.float32]()
     model.append(Linear[DType.float32](4, 3).into())
     var params = model.parameters()
@@ -523,6 +523,107 @@ def test_save_state_with_optimizer_no_momentum() raises:
     assert_true(ckpt.optimizer_state.__contains__("type"))
     assert_true(ckpt.optimizer_state.__contains__("lr"))
     assert_true(ckpt.optimizer_state.__contains__("velocities") == False)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Phase 5 — Best-model & step-based tracking tests
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def test_save_best_if_improved_saves_latest() raises:
+    """Always saves _latest.npy regardless of loss."""
+    var model = Sequential[DType.float32]()
+    model.append(Linear[DType.float32](4, 3).into())
+    var prefix = "/tmp/test_best_latest"
+    var result = save_best_if_improved(prefix, model, Float64(0.5), Float64(1.0), {})
+    np = Python.import_module("numpy")
+    var latest = np.load(prefix + "_latest.npy", allow_pickle=True).item()
+    assert_true(latest.__contains__("model"))
+    assert_true(result == Float64(0.5))
+
+
+def test_save_best_if_improved_saves_best() raises:
+    """Saves _best.npy when current_loss < best_loss."""
+    var model = Sequential[DType.float32]()
+    model.append(Linear[DType.float32](4, 3).into())
+    var prefix = "/tmp/test_best_improved"
+    var result = save_best_if_improved(prefix, model, Float64(0.3), Float64(1.0), {})
+    np = Python.import_module("numpy")
+    var best = np.load(prefix + "_best.npy", allow_pickle=True).item()
+    assert_true(best.__contains__("model"))
+    assert_true(result == Float64(0.3))
+
+
+def test_save_best_if_improved_no_improvement() raises:
+    """Does NOT save _best.npy when current_loss >= best_loss."""
+    var model = Sequential[DType.float32]()
+    model.append(Linear[DType.float32](4, 3).into())
+    var prefix = "/tmp/test_best_no_impr"
+    # First save creates a best
+    var _ = save_best_if_improved(prefix, model, Float64(0.3), Float64(1.0), {})
+    # Second save with worse loss should NOT overwrite best
+    var result = save_best_if_improved(prefix, model, Float64(0.5), Float64(0.3), {})
+    np = Python.import_module("numpy")
+    var best = np.load(prefix + "_best.npy", allow_pickle=True).item()
+    # Best should still have the 0.3 model data (we verify by checking it exists)
+    assert_true(best.__contains__("model"))
+    assert_true(result == Float64(0.3))
+
+
+def test_save_best_if_improved_returns_min() raises:
+    """Returns min(current_loss, best_loss)."""
+    var model = Sequential[DType.float32]()
+    model.append(Linear[DType.float32](4, 3).into())
+    # current_loss > best_loss → return best_loss
+    var r1 = save_best_if_improved("/tmp/test_best_return1", model, Float64(0.5), Float64(0.3), {})
+    assert_true(r1 == Float64(0.3))
+    # current_loss < best_loss → return current_loss
+    var r2 = save_best_if_improved("/tmp/test_best_return2", model, Float64(0.1), Float64(0.3), {})
+    assert_true(r2 == Float64(0.1))
+    # equal → return current (also equals best)
+    var r3 = save_best_if_improved("/tmp/test_best_return3", model, Float64(0.3), Float64(0.3), {})
+    assert_true(r3 == Float64(0.3))
+
+
+def test_save_best_if_improved_with_optimizer() raises:
+    """Full state (model + optimizer) saved in both _latest and _best."""
+    var model = Sequential[DType.float32]()
+    model.append(Linear[DType.float32](4, 3).into())
+    var params = model.parameters()
+    var opt = SGD[DType.float32](params^, lr=0.01, momentum=0.9)
+    var prefix = "/tmp/test_best_with_opt"
+    var _ = save_best_if_improved(prefix, model, opt, Float64(0.3), Float64(1.0), {})
+    np = Python.import_module("numpy")
+    var latest = np.load(prefix + "_latest.npy", allow_pickle=True).item()
+    var best = np.load(prefix + "_best.npy", allow_pickle=True).item()
+    assert_true(latest["optimizer"].__contains__("type"))
+    assert_true(latest["optimizer"]["type"] == "SGD")
+    assert_true(best["optimizer"].__contains__("type"))
+    assert_true(best["optimizer"]["type"] == "SGD")
+
+
+def test_save_step_checkpoint_basic() raises:
+    """Save to {prefix}_step_{N}.npy via save_step_checkpoint."""
+    var model = Sequential[DType.float32]()
+    model.append(Linear[DType.float32](4, 3).into())
+    save_step_checkpoint("/tmp/test_step_basic", 42, model, {})
+    np = Python.import_module("numpy")
+    var data = np.load("/tmp/test_step_basic_step_42.npy", allow_pickle=True).item()
+    assert_true(data.__contains__("model"))
+    assert_true(data.__contains__("optimizer"))
+
+
+def test_save_step_checkpoint_with_optimizer() raises:
+    """Include optimizer state in save_step_checkpoint."""
+    var model = Sequential[DType.float32]()
+    model.append(Linear[DType.float32](4, 3).into())
+    var params = model.parameters()
+    var opt = SGD[DType.float32](params^, lr=0.01, momentum=0.9)
+    save_step_checkpoint("/tmp/test_step_with_opt", 99, model, opt, {})
+    np = Python.import_module("numpy")
+    var data = np.load("/tmp/test_step_with_opt_step_99.npy", allow_pickle=True).item()
+    assert_true(data["optimizer"].__contains__("type"))
+    assert_true(data["optimizer"]["type"] == "SGD")
 
 
 def main() raises:

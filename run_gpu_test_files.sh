@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 # Run every GPU-containing test file individually via `mojo`.
-# Uses precompiled package: tests/tenmo.mojopkg
-#   (run `mojo package -o tests/tenmo.mojopkg tenmo/` first)
+# Uses precompiled package: tests/tenmo.mojoc
+#   (run `mojo precompile -o tests/tenmo.mojoc tenmo/` first)
 # Does NOT stop on failure — logs results for all files.
 #
 # Usage: ./run_gpu_test_files.sh
