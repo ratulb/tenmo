@@ -23,3 +23,4 @@ tests/test_gpu_all_[0-9]*.mojo
 tests/test_gpu_all.mojo
 working/
 nanogpt/
+tests/tenmo.mojoc
