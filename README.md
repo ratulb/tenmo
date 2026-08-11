@@ -2,7 +2,7 @@
 ## Build Status
 
 [![Mojo Tests](https://github.com/ratulb/tenmo/actions/workflows/test.yml/badge.svg)](https://github.com/ratulb/tenmo/actions/workflows/test.yml)
-![Last Commit](https://img.shields.io/github/last-commit/ratulb/tenmo/development)
+![Last Commit](https://img.shields.io/github/last-commit/ratulb/tenmo)
 ![License](https://img.shields.io/github/license/ratulb/tenmo)
 ![Language](https://img.shields.io/badge/language-Mojo%20🔥-orange)
 ![Open Issues](https://img.shields.io/github/issues/ratulb/tenmo)
