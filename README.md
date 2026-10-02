@@ -6,7 +6,7 @@
 ![Language](https://img.shields.io/badge/language-Mojo-orange)
 ![Open Issues](https://img.shields.io/github/issues/ratulb/tenmo)
 
-**A tensor library and neural network framework written entirely in Mojo — from SIMD kernels to transformers.**
+**A light tensor library and neural network framework in Mojo — from SIMD kernels to transformers.**
 
 Tenmo provides modern, ergonomic ML abstractions with automatic differentiation, modular neural networks, and end-to-end training pipelines: MLPs and CNNs, a GPT-2-style decoder stack with text generation, and a BERT encoder for classification and masked-language modeling.
 
