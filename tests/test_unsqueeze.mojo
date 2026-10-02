@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
-from std.testing import assert_true, TestSuite
+from tenmo.shared.shapes import Shape
+from std.testing import assert_true, assert_false, TestSuite
 
 
 def main() raises:
@@ -22,9 +22,9 @@ def test_unsqueeze_1d_to_2d_front() raises:
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)  # shape (3,)
     var u = a.unsqueeze(0)
     assert_true(u.shape() == Shape(1, 3))
-    s = u.sum()
+    var s = u.sum()
     s.backward()
-    expected_grad = Tensor[dtype].d1([1.0, 1.0, 1.0])
+    var expected_grad = Tensor[dtype].d1([1.0, 1.0, 1.0])
     assert_true(a.grad().all_close(expected_grad))
 
 
@@ -33,9 +33,9 @@ def test_unsqueeze_1d_to_2d_back() raises:
     var a = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)  # shape (3,)
     var u = a.unsqueeze(1)
     assert_true(u.shape() == Shape(3, 1))
-    s = u.sum()
+    var s = u.sum()
     s.backward()
-    expected_grad = Tensor[dtype].d1([1.0, 1.0, 1.0])
+    var expected_grad = Tensor[dtype].d1([1.0, 1.0, 1.0])
     assert_true(a.grad().all_close(expected_grad))
 
 
@@ -46,9 +46,9 @@ def test_unsqueeze_2d_insert_middle_dim() raises:
     )  # shape (2,2)
     var u = a.unsqueeze(1)  # → shape (2,1,2)
     assert_true(u.shape() == Shape(2, 1, 2))
-    s = u.sum()
+    var s = u.sum()
     s.backward()
-    expected_grad = Tensor[dtype].d2([[1.0, 1.0], [1.0, 1.0]])
+    var expected_grad = Tensor[dtype].d2([[1.0, 1.0], [1.0, 1.0]])
     assert_true(a.grad().all_close(expected_grad))
 
 
@@ -61,9 +61,9 @@ def test_unsqueeze_3d_insert_front_and_back() raises:
     var u2 = a.unsqueeze(3)  # shape (1,2,2,1)
     assert_true(u1.shape() == Shape(1, 1, 2, 2))
     assert_true(u2.shape() == Shape(1, 2, 2, 1))
-    s = u1.sum() + u2.sum()
+    var s = u1.sum() + u2.sum()
     s.backward()
-    expected_grad = Tensor[dtype].d3([[[2.0, 2.0], [2.0, 2.0]]])
+    var expected_grad = Tensor[dtype].d3([[[2.0, 2.0], [2.0, 2.0]]])
     assert_true(a.grad().all_close(expected_grad))
 
 
@@ -74,7 +74,7 @@ def test_unsqueeze_chain_grad_flow() raises:
     var y = u * 2.0
     var z = y.sum()
     z.backward()
-    expected_grad = Tensor[dtype].d1([2.0, 2.0, 2.0])
+    var expected_grad = Tensor[dtype].d1([2.0, 2.0, 2.0])
     assert_true(a.grad().all_close(expected_grad))
 
 
@@ -82,11 +82,11 @@ def test_unsqueeze_multiple_dims() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[5.0, 6.0]], requires_grad=True)  # shape (1,2)
     var uu = a.unsqueeze(0)
-    u = uu.unsqueeze(3)  # → (1,1,2,1)
+    var u = uu.unsqueeze(3)  # → (1,1,2,1)
     assert_true(u.shape() == Shape(1, 1, 2, 1))
-    s = u.sum()
+    var s = u.sum()
     s.backward()
-    expected_grad = Tensor[dtype].d2([[1.0, 1.0]])
+    var expected_grad = Tensor[dtype].d2([[1.0, 1.0]])
     assert_true(a.grad().all_close(expected_grad))
 
 
@@ -97,3 +97,28 @@ def test_unsqueeze_preserves_buffer_sharing() raises:
     assert_true(a.buffer().ptr() == u.buffer().ptr())
     assert_true(u.shape() == Shape(1, 3))
     assert_true(u.all_close(Tensor[dtype].d2([[9.0, 8.0, 7.0]])))"""
+
+
+def test_unsqueeze_requires_grad_override_noop() raises:
+    comptime dtype = DType.float32
+    # Empty axes: unsqueeze is a no-op alias path, but the explicit
+    # requires_grad=True must still produce a tracked output. (Parent is
+    # untracked, so no grad accumulates there — the pin is requires_grad
+    # plus a clean backward through the wired no-op.)
+    var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+    var u = a.unsqueeze([], requires_grad=True)
+    assert_true(u.shape() == Shape(2, 3))
+    assert_true(u.requires_grad)
+    var loss = u.sum()
+    loss.backward()
+
+
+def test_unsqueeze_requires_grad_override_false_untracks() raises:
+    comptime dtype = DType.float32
+    # Explicit requires_grad=False on a tracked input must yield an
+    # untracked output (previously the tracked alias leaked through).
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
+    var u = a.unsqueeze([], requires_grad=False)
+    assert_false(u.requires_grad)

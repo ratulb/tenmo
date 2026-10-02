@@ -1,24 +1,25 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor, LOG, LOG_BACKWARD
-from .backpropagation import BackwardFnArg, ScalarArg, BACKWARD_LOG
+from .shared.mnemonics import AddTensor, LOG_BACKWARD
+from .backpropagation import BackwardFn, ScalarArg, BackwardFnType
+
 from .gradbox import Gradbox
-from .common_utils import Epsilon
+from .shared.constants import Epsilon
 from .ancestry import Ancestor
 
 
 @fieldwise_init
-struct LogBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct LogBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         var epsilon = (
-            output.ancestry()
-            .backward_fn_arg()
-            .get[ScalarArg[Self.dtype]]()
-            .value
+            output.ancestry().backward_fn().get[ScalarArg[Self.dtype]]().value
         )
         ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
@@ -30,8 +31,7 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         parent.update_grad(parent_gradbox^, AddTensor, None)
 
         parent_ids.append(parent._id)
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -52,11 +52,11 @@ struct Logarithm[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
-                    BACKWARD_LOG, epsilon
+                var backwardFn = BackwardFn.scalar_arg[Self.dtype](
+                    epsilon, LogBackward[Self.dtype]()
                 )
-                backwardFnArg.needs_parent_data = True
+                backwardFn.needs_parent_data = True
 
-                out.add_ancestry(backwardFnArg^, self)
+                out.add_ancestry(backwardFn^, self)
 
         return out^

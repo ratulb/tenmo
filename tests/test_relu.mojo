@@ -1,9 +1,9 @@
 from tenmo.tensor import Tensor
 from tenmo.relu import ReLU
-from tenmo.buffers import Buffer
+from tenmo.shared.buffers import Buffer
 from std.sys import has_accelerator
 from std.testing import assert_true, assert_equal, TestSuite
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 
 
 def test_relu_basic() raises:
@@ -12,7 +12,7 @@ def test_relu_basic() raises:
     var t = Tensor[dtype].d1([-1.0, 0.0, 1.0, 2.0])
     t.requires_grad_(True)
     var out = ReLU[dtype].forward[True](t)
-    s = out.sum()
+    var s = out.sum()
     s.backward()
 
     assert_true(out == Tensor[dtype].d1([0.0, 0.0, 1.0, 2.0]))
@@ -55,7 +55,6 @@ def test_relu_multidim() raises:
         ]
     )
     assert_true(t.grad() == expected_grad)
-
 
 
 # =============================================================================

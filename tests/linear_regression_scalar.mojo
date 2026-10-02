@@ -7,8 +7,8 @@ def main() raises:
     var y = Tensor[DType.float64].d1([5.0, 7.0, 9.0, 11.0])  # y = 2x + 3
 
     # Parameters to learn (initialized arbitrarily)
-    var w = Tensor.scalar(0.955, requires_grad=True)
-    var b = Tensor.scalar(0.955, requires_grad=True)
+    var w = Tensor[DType.float32].scalar(0.955, requires_grad=True)
+    var b = Tensor[DType.float32].scalar(0.955, requires_grad=True)
 
     var learning_rate = 0.01555
 

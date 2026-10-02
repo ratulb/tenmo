@@ -1,14 +1,15 @@
 from .tensor import Tensor
-from .shapes import Shape
+from .shared.shapes import Shape
 from .gradbox import Gradbox
-from .backpropagation import BackwardFnArg, ArgumentType, BACKWARD_MAXPOOL2D
-from .mnemonics import AddTensor
+from .backpropagation import BackwardFn, ArgumentType, BackwardFnType
+
+from .layer_trait import LayerTrait
+from .shared.mnemonics import AddTensor
+from .shared.buffers import Buffer
 from .ndbuffer import NDBuffer
 from std.utils.numerics import neg_inf
-from .common_utils import panic
-from std.algorithm import parallelize
-from .named_parameter import NamedParameter
-from .net import Module, Layer, MAXPOOL2D
+from .shared.panic import panic
+from max.algorithm import parallelize
 from .ancestry import Ancestor
 
 
@@ -22,14 +23,15 @@ struct MaxPool2dBwdArg(ArgumentType):
 
 
 @fieldwise_init
-struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
+struct MaxPool2dBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
-        var bwd_arg = output.ancestry().backward_fn_arg().get[MaxPool2dBwdArg]()
+        var bwd_arg = output.ancestry().backward_fn().get[MaxPool2dBwdArg]()
         var (kernel_size, stride, padding, input_shape, argmax_mask) = (
             bwd_arg.kernel_size,
             bwd_arg.stride,
@@ -41,6 +43,9 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         var input_tensor_ref = output.ancestry().get(0)
 
+        # Grad is computed only if needed, but the id is ALWAYS appended:
+        # parent_ids is the engine's fanin-completion signal (appended set
+        # must equal ancestry set).
         if input_tensor_ref.requires_grad:
             var N = input_shape[0]
             var C = input_shape[1]
@@ -70,8 +75,7 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
             var grad_in_stride_N = C * H_in * W_in
             var grad_in_stride_C = H_in * W_in
 
-            @parameter
-            def scatter_gradients_optimized(idx: Int):
+            def scatter_gradients_optimized(idx: Int) {imm}:
                 var n = idx // C
                 var c = idx % C
 
@@ -92,26 +96,31 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
                     for out_x in range(W_out):
                         # Direct memory access
-                        var max_idx = Int(argmax_ptr[argmax_y_base + out_x])
+                        var max_idx = Int(
+                            argmax_ptr[unsafe_offset=argmax_y_base + out_x]
+                        )
 
                         if max_idx >= 0:
-                            var grad_val = grad_out_ptr[grad_out_y_base + out_x]
+                            var grad_val = grad_out_ptr[
+                                unsafe_offset=grad_out_y_base + out_x
+                            ]
 
                             # Accumulate gradient at max position
-                            grad_in_ptr[grad_in_nc_base + max_idx] += grad_val
+                            grad_in_ptr[
+                                unsafe_offset=grad_in_nc_base + max_idx
+                            ] += grad_val
 
-            parallelize[scatter_gradients_optimized](N * C)
+            parallelize(scatter_gradients_optimized, N * C)
             input_tensor_ref.update_grad(grad_input^, AddTensor, None)
-            parent_ids.append(input_tensor_ref._id)
+        parent_ids.append(input_tensor_ref._id)
 
-        if not retain_graph:
-            grad_output.zero_grad()
+        grad_output.zero_grad()
 
 
 @fieldwise_init
-struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
+struct MaxPool2d[dtype: DType](LayerTrait & RegisterPassable):
     """
-    Batched, multi-channel 2D Max Pooling.
+        Batched, multi-channel 2D Max Pooling.
 
     1. Direct buffer access (eliminates indexing overhead)
     2. Unrolled loops for common kernel sizes (2×2, 3×3)
@@ -119,7 +128,9 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     4. Cache-friendly memory access
     """
 
-    comptime TAG = MAXPOOL2D
+    # Homogeneous layer: consumes and produces Tensor[Self.dtype];
+    # OutputDType inherits InputDType (LayerTrait default).
+    comptime InputDType = Self.dtype
     var training: Bool
     var kernel_size: Int
     var stride: Int
@@ -136,14 +147,15 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self.stride = stride.or_else(kernel_size)
         self.padding = padding
 
-    def __call__(self, x: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
+    def __call__(
+        mut self, x: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         if self.training:
             return Self.forward[track_grad=True](
                 x,
                 self.kernel_size,
                 self.stride,
                 self.padding,
-                requires_grad=True,
                 sync=sync,
             )
         else:
@@ -152,7 +164,6 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                 self.kernel_size,
                 self.stride,
                 self.padding,
-                requires_grad=False,
                 sync=sync,
             )
 
@@ -187,8 +198,21 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         if H_out <= 0 or W_out <= 0:
             panic("Invalid MaxPool2d parameters")
 
-        var output = Tensor[Self.dtype].zeros(N, C, H_out, W_out)
-        var argmax_mask = NDBuffer[DType.int64].zeros(Shape(N, C, H_out, W_out))
+        # Uninitialized allocs: every element of both is overwritten by the
+        # pool kernels below (one output + one argmax per position), so the
+        # zeros fills were pure overhead. The mask is still only *kept* (in
+        # BwdArg) when grad is tracked.
+        var output = Tensor[Self.dtype](
+            NDBuffer[Self.dtype](
+                Buffer[Self.dtype](N * C * H_out * W_out),
+                Shape(N, C, H_out, W_out),
+            ),
+            requires_grad=False,
+        )
+        var argmax_mask = NDBuffer[DType.int64](
+            Buffer[DType.int64](N * C * H_out * W_out),
+            Shape(N, C, H_out, W_out),
+        )
 
         # Direct buffer access
         var input_ptr = (
@@ -282,8 +306,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             )
             if grad_required:
                 output.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_MAXPOOL2D,
+                var backwardFn = BackwardFn(
                     MaxPool2dBwdArg(
                         kernel_size,
                         s,  # Stride
@@ -291,17 +314,18 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                         input_shape,
                         argmax_mask,
                     ),
+                    MaxPool2dBackward[Self.dtype](),
                 )
-                output.add_ancestry(backwardFnArg^, input_tensor)
+                output.add_ancestry(backwardFn^, input_tensor)
 
         return output^
 
     # OPTIMIZED 2×2 POOLING (fully unrolled)
     @staticmethod
     def _pool_2x2(
-        input_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
-        output_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
-        argmax_ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin],
+        input_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
+        output_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
+        argmax_ptr: Pointer[Scalar[DType.int64], MutAnyOrigin],
         N: Int,
         C: Int,
         H_in: Int,
@@ -319,8 +343,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     ):
         """Fully unrolled 2×2 max pooling."""
 
-        @parameter
-        def pool_nc(idx: Int):
+        def pool_nc(idx: Int) {imm}:
             var n = idx // C
             var c = idx % C
 
@@ -350,7 +373,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                         and in_x0 < W_in
                     ):
                         var idx0 = in_nc_base + in_y0 * in_stride_H + in_x0
-                        var val0 = input_ptr[idx0]
+                        var val0 = input_ptr[unsafe_offset=idx0]
                         if val0 > max_val:
                             max_val = val0
                             max_idx = in_y0 * W_in + in_x0
@@ -364,7 +387,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                         and in_x1 < W_in
                     ):
                         var idx1 = in_nc_base + in_y0 * in_stride_H + in_x1
-                        var val1 = input_ptr[idx1]
+                        var val1 = input_ptr[unsafe_offset=idx1]
                         if val1 > max_val:
                             max_val = val1
                             max_idx = in_y0 * W_in + in_x1
@@ -378,7 +401,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                         and in_x0 < W_in
                     ):
                         var idx2 = in_nc_base + in_y1 * in_stride_H + in_x0
-                        var val2 = input_ptr[idx2]
+                        var val2 = input_ptr[unsafe_offset=idx2]
                         if val2 > max_val:
                             max_val = val2
                             max_idx = in_y1 * W_in + in_x0
@@ -391,22 +414,24 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                         and in_x1 < W_in
                     ):
                         var idx3 = in_nc_base + in_y1 * in_stride_H + in_x1
-                        var val3 = input_ptr[idx3]
+                        var val3 = input_ptr[unsafe_offset=idx3]
                         if val3 > max_val:
                             max_val = val3
                             max_idx = in_y1 * W_in + in_x1
 
-                    output_ptr[out_y_base + out_x] = max_val
-                    argmax_ptr[argmax_y_base + out_x] = Int64(max_idx)
+                    output_ptr[unsafe_offset=out_y_base + out_x] = max_val
+                    argmax_ptr[unsafe_offset=argmax_y_base + out_x] = Int64(
+                        max_idx
+                    )
 
-        parallelize[pool_nc](N * C)
+        parallelize(pool_nc, N * C)
 
     # OPTIMIZED 3×3 POOLING (fully unrolled)
     @staticmethod
     def _pool_3x3(
-        input_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
-        output_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
-        argmax_ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin],
+        input_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
+        output_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
+        argmax_ptr: Pointer[Scalar[DType.int64], MutAnyOrigin],
         N: Int,
         C: Int,
         H_in: Int,
@@ -424,8 +449,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     ):
         """Fully unrolled 3×3 max pooling."""
 
-        @parameter
-        def pool_nc(idx: Int):
+        def pool_nc(idx: Int) {imm}:
             var n = idx // C
             var c = idx % C
 
@@ -457,22 +481,24 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                                 and in_x < W_in
                             ):
                                 var idx = in_nc_base + in_y * in_stride_H + in_x
-                                var val = input_ptr[idx]
+                                var val = input_ptr[unsafe_offset=idx]
                                 if val > max_val:
                                     max_val = val
                                     max_idx = in_y * W_in + in_x
 
-                    output_ptr[out_y_base + out_x] = max_val
-                    argmax_ptr[argmax_y_base + out_x] = Int64(max_idx)
+                    output_ptr[unsafe_offset=out_y_base + out_x] = max_val
+                    argmax_ptr[unsafe_offset=argmax_y_base + out_x] = Int64(
+                        max_idx
+                    )
 
-        parallelize[pool_nc](N * C)
+        parallelize(pool_nc, N * C)
 
     # GENERIC POOLING (arbitrary kernel size)
     @staticmethod
     def _pool_generic(
-        input_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
-        output_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
-        argmax_ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin],
+        input_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
+        output_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
+        argmax_ptr: Pointer[Scalar[DType.int64], MutAnyOrigin],
         N: Int,
         C: Int,
         H_in: Int,
@@ -492,8 +518,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     ):
         """Generic pooling for arbitrary kernel sizes."""
 
-        @parameter
-        def pool_nc(idx: Int):
+        def pool_nc(idx: Int) {imm}:
             var n = idx // C
             var c = idx % C
 
@@ -524,34 +549,20 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                                 and in_x < W_in
                             ):
                                 var idx = in_nc_base + in_y * in_stride_H + in_x
-                                var val = input_ptr[idx]
+                                var val = input_ptr[unsafe_offset=idx]
                                 if val > max_val:
                                     max_val = val
                                     max_idx = in_y * W_in + in_x
 
-                    output_ptr[out_y_base + out_x] = max_val
-                    argmax_ptr[argmax_y_base + out_x] = Int64(max_idx)
+                    output_ptr[unsafe_offset=out_y_base + out_x] = max_val
+                    argmax_ptr[unsafe_offset=argmax_y_base + out_x] = Int64(
+                        max_idx
+                    )
 
-        parallelize[pool_nc](N * C)
-
-    def parameters(
-        ref self,
-    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
-        return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
-
-    def named_parameters(
-        ref self, prefix: String
-    ) -> List[NamedParameter[Self.dtype]]:
-        return List[NamedParameter[Self.dtype]]()
-
-    def num_parameters(self) -> Int:
-        return 0
+        parallelize(pool_nc, N * C)
 
     def train(mut self):
         self.training = True
 
     def eval(mut self):
         self.training = False
-
-    def into(self) -> Module[Self.dtype]:
-        return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)

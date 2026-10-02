@@ -1,13 +1,13 @@
-from tenmo.buffers import Buffer
+from tenmo.shared.buffers import Buffer
 from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
-from tenmo.common_utils import i, s
+from tenmo.shared.indexhelper import i, s
 from tenmo.ndbuffer import NDBuffer
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from tenmo.gradbox import Gradbox
 from tenmo.unsqueeze import Unsqueeze
 from tenmo.tensor import Tensor
-from tenmo.intarray import IntArray
+from tenmo.shared.intarray import IntArray
 
 
 def main() raises:
@@ -99,46 +99,46 @@ def test_gradbox_squeeze_unsqueeze_multiple_axes() raises:
 
 def test_gradbox_permute_basic() raises:
     comptime dtype = DType.float32
-    g1 = Gradbox[dtype](Shape(3, 4))
+    var g1 = Gradbox[dtype](Shape(3, 4))
     g1.buffer().fill(Scalar[dtype](1.0))
-    p = g1.permute(IntArray([1, 0]))
+    var p = g1.permute(IntArray(1, 0))
     assert_true(p.shape() == Shape(4, 3))
     assert_true(g1.numels() == p.numels())
 
 
 def test_gradbox_permute_3d() raises:
     comptime dtype = DType.float32
-    g1 = Gradbox[dtype](Shape(3, 4, 5))
+    var g1 = Gradbox[dtype](Shape(3, 4, 5))
     g1.buffer().fill(Scalar[dtype](2.0))
-    p = g1.permute(IntArray([2, 0, 1]))
+    var p = g1.permute(IntArray(2, 0, 1))
     assert_true(p.shape() == Shape(5, 3, 4))
     assert_true(g1.numels() == p.numels())
 
 
 def test_gradbox_permute_inverse() raises:
     comptime dtype = DType.float32
-    g1 = Gradbox[dtype](Shape(2, 3, 4))
+    var g1 = Gradbox[dtype](Shape(2, 3, 4))
     g1.buffer().fill(Scalar[dtype](3.0))
-    p = g1.permute(IntArray([1, 2, 0]))
-    inv = p.permute(IntArray([2, 0, 1]))
+    var p = g1.permute(IntArray(1, 2, 0))
+    var inv = p.permute(IntArray(2, 0, 1))
     assert_true(inv.shape() == g1.shape())
     assert_true(inv.all_close(g1))
 
 
 def test_gradbox_permute_identity() raises:
     comptime dtype = DType.float32
-    g1 = Gradbox[dtype](Shape(3, 4, 5))
+    var g1 = Gradbox[dtype](Shape(3, 4, 5))
     g1.buffer().fill(Scalar[dtype](5.0))
-    p = g1.permute(IntArray([0, 1, 2]))
+    var p = g1.permute(IntArray(0, 1, 2))
     assert_true(p.shape() == g1.shape())
     assert_true(p.all_close(g1))
 
 
 def test_gradbox_permute_singleton_dims() raises:
     comptime dtype = DType.float32
-    g1 = Gradbox[dtype](Shape(1, 4, 1))
+    var g1 = Gradbox[dtype](Shape(1, 4, 1))
     g1.buffer().fill(Scalar[dtype](7.0))
-    p = g1.permute(IntArray([2, 1, 0]))
+    var p = g1.permute(IntArray(2, 1, 0))
     assert_true(p.shape() == Shape(1, 4, 1))
     assert_true(p.numels() == g1.numels())
     assert_true(p.all_close(g1))
@@ -146,9 +146,9 @@ def test_gradbox_permute_singleton_dims() raises:
 
 def test_gradbox_permute_high_rank() raises:
     comptime dtype = DType.float32
-    g1 = Gradbox[dtype](Shape(2, 3, 4, 5))
+    var g1 = Gradbox[dtype](Shape(2, 3, 4, 5))
     g1.buffer().fill(Scalar[dtype](9.0))
-    p = g1.permute(IntArray([3, 2, 1, 0]))
+    var p = g1.permute(IntArray(3, 2, 1, 0))
     assert_true(p.shape() == Shape(5, 4, 3, 2))
     assert_true(g1.numels() == p.numels())
 
@@ -184,7 +184,7 @@ def test_gradbox_squeeze_with_axes_list() raises:
         ),
     )
     # specify axis 1 to squeeze -> shape becomes (2,3)
-    var s = g.squeeze(IntArray([1]))
+    var s = g.squeeze(IntArray(1))
     assert_true(s.shape() == Shape(2, 3))
     # values preserved
     assert_true(
@@ -195,15 +195,13 @@ def test_gradbox_squeeze_with_axes_list() raises:
 
 
 def test_gradbox_squeeze_preserves_value_semantics() raises:
-    # Gradbox always shares the buffer — both original and squeezed views are shared
+    # Gradbox always shares the buffer
     comptime dtype = DType.float32
     var g = Gradbox[DType.float32].full(
         Shape(1, 2, 1),
         Scalar[DType.float32](3.0),
     )
-    assert_true(g.is_shared() == True)
     var s = g.squeeze()
-    assert_true(s.is_shared() == True)
     assert_true(s.shape() == Shape(2))
     assert_true(
         s.as_tensor(requires_grad=False).all_close(Tensor[dtype].d1([3, 3]))
@@ -244,7 +242,7 @@ def test_gradbox_squeeze_integration_with_unsqueeze_backward() raises:
     )  # shape (2,2)
     # Unsqueeze axes [0, 2] -> new rank = 4, shape (1, 2, 1, 2)
     var u = Unsqueeze.forward[track_grad=True](
-        a, IntArray([0, 2]), requires_grad=None
+        a, IntArray(0, 2), requires_grad=None
     )
     # do a simple op and backward
     var out = u.sum()
@@ -260,7 +258,7 @@ def test_gradbox_squeeze_chain_of_ops() raises:
         [[[1.0, 2.0]]], requires_grad=True
     )  # shape (1,1,2)
     var u = Unsqueeze.forward[track_grad=True](
-        a, IntArray([0, 2]), requires_grad=None
+        a, IntArray(0, 2), requires_grad=None
     )
     var v = u * 3.0
     var loss = v.sum()
@@ -365,63 +363,63 @@ def test_gpu_gradbox_roundtrip_slice() raises:
 
 def test_gradbox_reverse_division() raises:
     comptime dtype = DType.float32
-    buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
-    ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
-    gradbox = Gradbox[dtype](ndb^)
-    result = 2 / gradbox
+    var buffer = Buffer[dtype](1, 2, 3, 4, 5, 6)
+    var ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
+    var gradbox = Gradbox[dtype](ndb^)
+    var result = 2 / gradbox
     assert_true(
         result.buffer().data_buffer()
-        == Buffer[dtype]([2.0, 1.0, 0.6666667, 0.5, 0.4, 0.33333334])
+        == Buffer[dtype](2.0, 1.0, 0.6666667, 0.5, 0.4, 0.33333334)
     )
 
 
 def test_gradbox_reverse_subtract() raises:
     comptime dtype = DType.float32
-    buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
-    ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
-    gradbox = Gradbox[dtype](ndb^)
-    result = 2 - gradbox
+    var buffer = Buffer[dtype](1, 2, 3, 4, 5, 6)
+    var ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
+    var gradbox = Gradbox[dtype](ndb^)
+    var result = 2 - gradbox
     assert_true(
-        result.buffer().data_buffer() == Buffer[dtype]([1, 0, -1, -2, -3, -4])
+        result.buffer().data_buffer() == Buffer[dtype](1, 0, -1, -2, -3, -4)
     )
 
 
 def test_gradbox_reshape() raises:
     comptime dtype = DType.float32
-    buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
-    ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
-    gradbox = Gradbox[dtype](ndb^)
-    reshaped = gradbox.reshape(Shape(3, 2))
+    var buffer = Buffer[dtype](1, 2, 3, 4, 5, 6)
+    var ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
+    var gradbox = Gradbox[dtype](ndb^)
+    var reshaped = gradbox.reshape(Shape(3, 2))
     assert_true(reshaped[[2, 1]] == 6 and reshaped[[1, 1]] == 4)
     reshaped.zero_grad()
     assert_true(reshaped[[2, 1]] == 0 and reshaped[[1, 1]] == 0)
-    assert_true(gradbox[[1, 2]] == 6 and gradbox[[0, 1]] == 2)
+    assert_true(gradbox[[1, 2]] == 0 and gradbox[[0, 1]] == 0)
 
 
 def test_gradbox_inplace_add() raises:
     comptime dtype = DType.float32
-    buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
-    ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
-    gradbox = Gradbox[dtype](ndb^)
+    var buffer = Buffer[dtype](1, 2, 3, 4, 5, 6)
+    var ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
+    var gradbox = Gradbox[dtype](ndb^)
 
-    buffer2 = Buffer[dtype]([11, 12, 13, 14, 15, 16])
-    ndb2 = NDBuffer[dtype](buffer2^, Shape(2, 3))
-    gradbox2 = Gradbox[dtype](ndb2^)
+    var buffer2 = Buffer[dtype](11, 12, 13, 14, 15, 16)
+    var ndb2 = NDBuffer[dtype](buffer2^, Shape(2, 3))
+    var gradbox2 = Gradbox[dtype](ndb2^)
 
     gradbox += gradbox2
     assert_true(
-        gradbox.buffer().buffer == Buffer[dtype]([12, 14, 16, 18, 20, 22])
+        gradbox.buffer().buffer == Buffer[dtype](12, 14, 16, 18, 20, 22)
     )
     assert_true(
-        gradbox.buffer().buffer == Buffer[dtype]([12, 14, 16, 18, 20, 22])
+        gradbox.buffer().buffer == Buffer[dtype](12, 14, 16, 18, 20, 22)
     )
 
 
 def test_gradbox_is_shared() raises:
     comptime dtype = DType.float32
-    buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
-    ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
-    gradbox = Gradbox[dtype](ndb^)
+    var buffer = Buffer[dtype](1, 2, 3, 4, 5, 6)
+    var ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
+    var gradbox = Gradbox[dtype](ndb^)
     assert_true(
         gradbox.buffer().is_shared(),
         "Gradbox buffer is shared - assertion failed",
@@ -430,11 +428,70 @@ def test_gradbox_is_shared() raises:
 
 def test_seed_gradbox() raises:
     comptime dtype = DType.float32
-    buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
-    ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
-    gradbox = Gradbox[dtype](ndb^)
-    assert_true(gradbox.buffer().buffer == Buffer[dtype]([1, 2, 3, 4, 5, 6]))
+    var buffer = Buffer[dtype](1, 2, 3, 4, 5, 6)
+    var ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
+    var gradbox = Gradbox[dtype](ndb^)
+    assert_true(gradbox.buffer().buffer == Buffer[dtype](1, 2, 3, 4, 5, 6))
     gradbox.seed_grad(42)
     assert_true(
-        gradbox.buffer().buffer == Buffer[dtype]([42, 42, 42, 42, 42, 42])
+        gradbox.buffer().buffer == Buffer[dtype](42, 42, 42, 42, 42, 42)
     )
+
+
+def test_gradbox_transpose_materializes() raises:
+    """Gradbox.transpose of a genuinely strided layout owns its storage."""
+    comptime dtype = DType.float32
+    var buffer = Buffer[dtype](1, 2, 3, 4, 5, 6)
+    var ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
+    var gradbox = Gradbox[dtype](ndb^)
+    var transposed = gradbox.transpose(IntArray(1, 0))
+    assert_true(transposed.shape() == Shape(3, 2))
+    assert_true(transposed.is_contiguous())
+    assert_true(transposed.offset() == 0)
+    assert_true(transposed[[0, 0]] == 1 and transposed[[0, 1]] == 4)
+    assert_true(transposed[[2, 0]] == 3 and transposed[[2, 1]] == 6)
+    # Mutation isolation: writing the result must not touch the source.
+    transposed[[0, 1]] = Scalar[dtype](42)
+    assert_true(gradbox[[0, 0]] == 1 and gradbox[[1, 0]] == 4)
+
+
+def test_gradbox_permute_identity_isolates() raises:
+    """Identity permute is a contiguous no-op shape: must still own storage."""
+    comptime dtype = DType.float32
+    var g = Gradbox[dtype](Shape(2, 3))
+    g.buffer().fill(Scalar[dtype](5.0))
+    var p = g.permute(IntArray(0, 1))
+    assert_true(p.shape() == Shape(2, 3))
+    assert_true(p.is_contiguous() and p.offset() == 0)
+    p[[0, 0]] = Scalar[dtype](7.0)
+    assert_true(g[[0, 0]] == 5.0)
+
+
+def test_gradbox_broadcast_same_shape_isolates() raises:
+    """Same-shape broadcast_to must still materialise independent storage."""
+    comptime dtype = DType.float32
+    var buffer = Buffer[dtype](1, 2, 3, 4, 5, 6)
+    var ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
+    var gradbox = Gradbox[dtype](ndb^)
+    var same = gradbox.broadcast_to(Shape(2, 3))
+    assert_true(same.is_contiguous() and same.offset() == 0)
+    assert_true(same[[0, 1]] == 2)
+    same[[0, 1]] = Scalar[dtype](42)
+    assert_true(gradbox[[0, 1]] == 2)
+
+
+def test_gradbox_squeeze_unsqueeze_isolate() raises:
+    """Squeeze/unsqueeze results own their storage."""
+    comptime dtype = DType.float32
+    var g = Gradbox[dtype](Shape(1, 3))
+    g.buffer().fill(Scalar[dtype](2.0))
+    var s = g.squeeze(IntArray(0))
+    assert_true(s.shape() == Shape(3))
+    assert_true(s.is_contiguous() and s.offset() == 0)
+    s[[0]] = Scalar[dtype](9.0)
+    assert_true(g[[0, 0]] == 2.0)
+    var u = s.unsqueeze(IntArray(0))
+    assert_true(u.shape() == Shape(1, 3))
+    assert_true(u.is_contiguous() and u.offset() == 0)
+    u[[0, 1]] = Scalar[dtype](8.0)
+    assert_true(s[[1]] == 2.0)

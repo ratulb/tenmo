@@ -1,0 +1,263 @@
+"""
+MNIST with quantization-aware training (fake quantization).
+
+A variant of `examples/mnist.mojo` with `FakeQuant` layers inserted after
+each activation, so training sees a simulated int8 grid. The original
+example is untouched.
+
+What this demonstrates, and what it does not:
+
+  - It DOES show the straight-through estimator working end to end: the
+    model trains normally through a quantizer whose true derivative is
+    zero, and reaches a normal MNIST accuracy.
+  - It does NOT save memory or time. Fake quantization simulates the grid
+    while storage stays float32, so this model occupies exactly as many
+    bytes as the baseline. Quantization only pays off once you swap the
+    storage for int8, which Tenmo does not do yet.
+
+Run directly:
+    ./fire.sh examples/mnist_quant.mojo
+"""
+
+from tenmo.tensor import Tensor
+from tenmo.optim import SGD
+from tenmo.net import Linear, ReLU, FakeQuant, Sequential
+from tenmo.crossentropy import CrossEntropyLoss
+from std.python import Python
+from tenmo.numpy_interop import from_ndarray, numpy_dtype
+from tenmo.dataloader import NumpyDataset, MNIST_MEAN, MNIST_STD
+from std.time import perf_counter_ns
+from tenmo.accuracy import Accuracy
+from tenmo.shared.mnemonics import DEFAULT_INDEX_DTYPE as LABEL_DTYPE
+
+
+def train_mnist() raises:
+    """Train the same MLP as examples/mnist.mojo, with FakeQuant layers."""
+    print("=" * 80)
+    print("MNIST Training (quantization-aware, fake quantization)")
+    print("=" * 80 + "\n")
+
+    # ========== Data Loading ==========
+    print("Loading MNIST dataset...")
+    var mnist = Python.import_module("mnist_datasets")
+    var loader = mnist.MNISTLoader(folder="/tmp")
+
+    var train_data = loader.load()
+    var train_images = train_data[0]
+    var train_labels = train_data[1]
+
+    var test_data = loader.load(train=False)
+    var test_images = test_data[0]
+    var test_labels = test_data[1]
+
+    print("  Train samples:", len(train_images))
+    print("  Test samples:", len(test_images), "\n")
+
+    # ========== Data Preparation ==========
+    comptime FEATURE_DTYPE = DType.float32
+
+    train_images = train_images.astype(numpy_dtype(FEATURE_DTYPE))
+    train_labels = train_labels.astype(numpy_dtype(LABEL_DTYPE))
+    test_images = test_images.astype(numpy_dtype(FEATURE_DTYPE))
+    test_labels = test_labels.astype(numpy_dtype(LABEL_DTYPE))
+
+    var X_train = from_ndarray[FEATURE_DTYPE](train_images, copy=True)
+    var y_train = from_ndarray[LABEL_DTYPE](train_labels, copy=True)
+    var X_test = from_ndarray[FEATURE_DTYPE](test_images, copy=True)
+    var y_test = from_ndarray[LABEL_DTYPE](test_labels, copy=True)
+
+    X_train = X_train / 255.0
+    X_test = X_test / 255.0
+
+    print("Data shapes:")
+    print("  X_train:", X_train.shape())
+    print("  y_train:", y_train.shape())
+    print("  X_test:", X_test.shape())
+    print("  y_test:", y_test.shape(), "\n")
+
+    # ========== DataLoaders ==========
+    var train_batch_size = 64
+    var test_batch_size = 64
+
+    var train_dataset = NumpyDataset[FEATURE_DTYPE, LABEL_DTYPE](
+        X_train, y_train
+    )
+    var test_dataset = NumpyDataset[FEATURE_DTYPE, LABEL_DTYPE](X_test, y_test)
+
+    var train_loader = train_dataset.into_loader(
+        batch_size=train_batch_size,
+        shuffle=True,
+        drop_last=False,
+        normalize_mean=Float32(MNIST_MEAN),
+        normalize_std=Float32(MNIST_STD),
+    )
+    var test_loader = test_dataset.into_loader(
+        batch_size=test_batch_size,
+        shuffle=False,
+        drop_last=False,
+        normalize_mean=Float32(MNIST_MEAN),
+        normalize_std=Float32(MNIST_STD),
+    )
+
+    print("DataLoaders:")
+    print("  Train batches:", len(train_loader))
+    print("  Test batches:", len(test_loader), "\n")
+
+    # ========== Quantizer setup ==========
+    # The grid must be chosen per tensor, from the magnitude of the values it
+    # will see. ReLU outputs are non-negative, so the useful levels are
+    # [0, 127] and the step is (observed max) / 127.
+    #
+    # A too-coarse grid here is the whole ballgame: s = 0.5 on a layer whose
+    # activations run to ~10 would collapse most of them onto a handful of
+    # levels and accuracy would fall off a cliff. The steps below were picked
+    # by measuring activation ranges, and they are exposed as constants so you
+    # can sweep them.
+    comptime QMIN = Scalar[FEATURE_DTYPE](0.0)  # ReLU is non-negative
+    comptime QMAX = Scalar[FEATURE_DTYPE](127.0)  # int8 upper level
+    comptime SCALE_H1 = Scalar[FEATURE_DTYPE](0.05)  # after ReLU(128)
+    comptime SCALE_H2 = Scalar[FEATURE_DTYPE](0.05)  # after ReLU(32)
+
+    print("Quantizers (simulated int8):")
+    print("  hidden1: step", SCALE_H1, "levels [", QMIN, ",", QMAX, "]")
+    print("  hidden2: step", SCALE_H2, "levels [", QMIN, ",", QMAX, "]")
+    print("  -> storage stays float32; no memory is saved\n")
+
+    # ========== Model Architecture ==========
+    # Identical to the baseline, with a FakeQuant after each ReLU so the
+    # activations the next Linear sees are grid-aligned.
+    print("Building model...")
+    var model = Sequential[FEATURE_DTYPE]()
+    model.append(
+        Linear[FEATURE_DTYPE](
+            784, 128, init_method="he", bias_zero=True
+        ).into(),
+        ReLU[FEATURE_DTYPE]().into(),
+        FakeQuant[FEATURE_DTYPE](SCALE_H1, QMIN, QMAX).into(),
+        Linear[FEATURE_DTYPE](128, 32, init_method="he", bias_zero=True).into(),
+        ReLU[FEATURE_DTYPE]().into(),
+        FakeQuant[FEATURE_DTYPE](SCALE_H2, QMIN, QMAX).into(),
+        Linear[FEATURE_DTYPE](32, 10, init_method="he", bias_zero=True).into(),
+    )
+    print("  Architecture: 784 -> 128 -> 32 -> 10 (ReLU+FakeQuant x2)")
+    print("  Total parameters:", model.num_parameters(), "\n")
+
+    # ========== Training Setup ==========
+    # Same hyperparameters as the baseline, so the only difference is the
+    # quantizers.
+    var num_epochs = 15
+    var learning_rate = Scalar[FEATURE_DTYPE](0.01)
+    var momentum = Scalar[FEATURE_DTYPE](0.9)
+    var weight_decay = Scalar[FEATURE_DTYPE](1e-4)
+    var clip_norm = Scalar[FEATURE_DTYPE](1)
+    var clip_value = Scalar[FEATURE_DTYPE](0.5)
+
+    var criterion = CrossEntropyLoss[FEATURE_DTYPE]()
+    var optimizer = SGD[FEATURE_DTYPE](
+        model.parameters(),
+        lr=learning_rate,
+        momentum=momentum,
+        weight_decay=weight_decay,
+        clip_norm=clip_norm,
+        clip_value=clip_value,
+    )
+
+    print("Training configuration:")
+    print("  Epochs:", num_epochs)
+    print("  Batch size:", train_batch_size)
+    print("  Learning rate:", learning_rate)
+    print("  Momentum:", momentum, "\n")
+
+    print("=" * 80)
+    var training_start = perf_counter_ns()
+
+    # ========== Training Loop ==========
+    for epoch in range(num_epochs):
+        var epoch_start = perf_counter_ns()
+
+        if epoch == 10:
+            optimizer.set_lr(optimizer.lr / 10)
+        if epoch == 15:
+            optimizer.set_lr(optimizer.lr / 10)
+
+        # --- Training Phase ---
+        model.train()
+        criterion.train()
+        var train_loss = Scalar[FEATURE_DTYPE](0.0)
+        var train_correct = Float64(0.0)
+        var train_total = 0
+
+        train_loader.reset()
+        while train_loader.__has_next__():
+            ref batch = train_loader.__next__()
+            var pred = model(batch.features)
+            var loss = criterion(pred, batch.labels)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            train_loss += loss.item() * Float32(batch.batch_size)
+            train_correct += Accuracy[FEATURE_DTYPE].compute(
+                pred, batch.labels
+            ) * Float64(batch.labels.shape()[0])
+            train_total += batch.batch_size
+
+        # --- Validation Phase ---
+        # NOTE: `model.eval()` would switch the FakeQuant layers to
+        # track_grad=False, but they would still QUANTIZE (eval only stops
+        # gradient tracking, not the grid). That is correct for QAT: the
+        # deployed model is quantized, so validation should be too.
+        model.eval()
+        criterion.eval()
+        var val_loss = Scalar[FEATURE_DTYPE](0.0)
+        var val_correct = Float64(0.0)
+        var val_total = 0
+
+        test_loader.reset()
+        while test_loader.__has_next__():
+            ref batch = test_loader.__next__()
+            var pred = model(batch.features)
+            var loss = criterion(pred, batch.labels)
+
+            val_loss += loss.item() * Float32(batch.batch_size)
+            val_correct += Accuracy[FEATURE_DTYPE].compute(
+                pred, batch.labels
+            ) * Float64(batch.labels.shape()[0])
+            val_total += batch.batch_size
+
+        # --- Epoch Report ---
+        var epoch_time = Float64(perf_counter_ns() - epoch_start) / 1e9
+        var avg_train_loss = train_loss / Float32(train_total)
+        var train_acc = 100.0 * train_correct / Float64(train_total)
+        var avg_val_loss = val_loss / Float32(val_total)
+        var val_acc = 100.0 * val_correct / Float64(val_total)
+
+        print(
+            "Epoch",
+            epoch + 1,
+            "/",
+            num_epochs,
+            "| Time:",
+            epoch_time,
+            "s",
+            "| Train Loss:",
+            avg_train_loss,
+            "Acc:",
+            train_acc,
+            "%",
+            "| Val Loss:",
+            avg_val_loss,
+            "Acc:",
+            val_acc,
+            "%",
+        )
+
+    var total_time = Float64(perf_counter_ns() - training_start) / 1e9
+    print("=" * 80)
+    print("Training completed in", total_time, "seconds")
+    print("=" * 80)
+
+
+def main() raises:
+    train_mnist()

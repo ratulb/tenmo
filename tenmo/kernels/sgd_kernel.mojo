@@ -1,62 +1,67 @@
-from std.gpu import thread_idx, block_idx, block_dim, grid_dim
+from max.gpu import thread_idx, block_idx, block_dim, grid_dim
 from std.sys import simd_width_of
-from tenmo.ndbuffer import NDBuffer
+from ..shared.layout import Layout
+from ..gpu.device import DeviceState
 from .kernel_helpers import elementwise_launch_config
 
 
 def sgd_step_no_momentum_kernel[
     dtype: DType,
 ](
-    param: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    grad: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    num_elements: Int,
+    param: Pointer[Scalar[dtype], MutAnyOrigin],
+    grad: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    num_elements_: Int64,
     lr: Scalar[dtype],
     weight_decay: Scalar[dtype],
 ):
+    var num_elements = Int(num_elements_)
     var gtid = Int(thread_idx.x) + Int(block_idx.x) * Int(block_dim.x)
     var stride = Int(block_dim.x) * Int(grid_dim.x)
     var i = gtid
     while i < num_elements:
-        var p = param[i]
-        var g = grad[i]
+        var p = param[unsafe_offset=i]
+        var g = grad[unsafe_offset=i]
         if weight_decay > 0:
             g += p * weight_decay
-        param[i] = p - lr * g
+        param[unsafe_offset=i] = p - lr * g
         i += stride
 
 
 def sgd_step_momentum_kernel[
     dtype: DType,
 ](
-    param: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    grad: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    vel: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    num_elements: Int,
+    param: Pointer[Scalar[dtype], MutAnyOrigin],
+    grad: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    vel: Pointer[Scalar[dtype], MutAnyOrigin],
+    num_elements_: Int64,
     lr: Scalar[dtype],
     momentum: Scalar[dtype],
     weight_decay: Scalar[dtype],
 ):
+    var num_elements = Int(num_elements_)
     var gtid = Int(thread_idx.x) + Int(block_idx.x) * Int(block_dim.x)
     var stride = Int(block_dim.x) * Int(grid_dim.x)
     var i = gtid
     while i < num_elements:
-        var p = param[i]
-        var g = grad[i]
-        var v = vel[i]
+        var p = param[unsafe_offset=i]
+        var g = grad[unsafe_offset=i]
+        var v = vel[unsafe_offset=i]
         if weight_decay > 0:
             g += p * weight_decay
         v = momentum * v + g
-        vel[i] = v
-        param[i] = p - lr * v
+        vel[unsafe_offset=i] = v
+        param[unsafe_offset=i] = p - lr * v
         i += stride
 
 
 @fieldwise_init
-struct SGDStep[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct SGDKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def launch_no_momentum(
-        param_ndb: NDBuffer[Self.dtype],
-        grad_ndb: NDBuffer[Self.dtype],
+        param_layout: Layout,
+        param_device_state: DeviceState[Self.dtype],
+        grad_layout: Layout,
+        grad_device_state: DeviceState[Self.dtype],
         num_elements: Int,
         lr: Scalar[Self.dtype],
         weight_decay: Scalar[Self.dtype],
@@ -64,21 +69,20 @@ struct SGDStep[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ) raises:
         comptime simdwidth = simd_width_of[Self.dtype]()
         var (blocks, tpb) = elementwise_launch_config(num_elements, simdwidth)
-        ref param_ds = param_ndb.device_state.value()
+        ref param_ds = param_device_state
         ref gpu = param_ds.get_gpu()
         var ctx = gpu[]
         ref param_buf = param_ds.device_buffer()
-        ref grad_ds = grad_ndb.device_state.value()
+        ref grad_ds = grad_device_state
         ref grad_buf = grad_ds.device_buffer()
         var compiled = ctx.compile_function[
-            sgd_step_no_momentum_kernel[Self.dtype],
             sgd_step_no_momentum_kernel[Self.dtype],
         ]()
         ctx.enqueue_function(
             compiled,
             param_buf,
             grad_buf,
-            num_elements,
+            Int64(num_elements),
             lr,
             weight_decay,
             grid_dim=blocks,
@@ -89,9 +93,12 @@ struct SGDStep[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     def launch_momentum(
-        param_ndb: NDBuffer[Self.dtype],
-        grad_ndb: NDBuffer[Self.dtype],
-        vel_ndb: NDBuffer[Self.dtype],
+        param_layout: Layout,
+        param_device_state: DeviceState[Self.dtype],
+        grad_layout: Layout,
+        grad_device_state: DeviceState[Self.dtype],
+        vel_layout: Layout,
+        vel_device_state: DeviceState[Self.dtype],
         num_elements: Int,
         lr: Scalar[Self.dtype],
         momentum: Scalar[Self.dtype],
@@ -100,16 +107,15 @@ struct SGDStep[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ) raises:
         comptime simdwidth = simd_width_of[Self.dtype]()
         var (blocks, tpb) = elementwise_launch_config(num_elements, simdwidth)
-        ref param_ds = param_ndb.device_state.value()
+        ref param_ds = param_device_state
         ref gpu = param_ds.get_gpu()
         var ctx = gpu[]
         ref param_buf = param_ds.device_buffer()
-        ref grad_ds = grad_ndb.device_state.value()
+        ref grad_ds = grad_device_state
         ref grad_buf = grad_ds.device_buffer()
-        ref vel_ds = vel_ndb.device_state.value()
+        ref vel_ds = vel_device_state
         ref vel_buf = vel_ds.device_buffer()
         var compiled = ctx.compile_function[
-            sgd_step_momentum_kernel[Self.dtype],
             sgd_step_momentum_kernel[Self.dtype],
         ]()
         ctx.enqueue_function(
@@ -117,7 +123,7 @@ struct SGDStep[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             param_buf,
             grad_buf,
             vel_buf,
-            num_elements,
+            Int64(num_elements),
             lr,
             momentum,
             weight_decay,

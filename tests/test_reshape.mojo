@@ -1,6 +1,7 @@
-from tenmo.strides import Strides
+from tenmo.shared.strides import Strides
 from std.testing import assert_true, TestSuite
-from tenmo import Tensor, Shape
+from tenmo.tensor import Tensor
+from tenmo.shared.shapes import Shape
 from std.sys import has_accelerator
 
 
@@ -8,97 +9,119 @@ from std.sys import has_accelerator
 
 
 def test_reshape_scalar_to_1d() raises:
-    var x = Tensor.scalar(2.0, requires_grad=True)
+    var x = Tensor[DType.float32].scalar(2.0, requires_grad=True)
     var y = x.reshape(1)
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(1))
-    assert_true(y.all_close(Tensor.d1([2.0])))
+    assert_true(y.all_close(Tensor[DType.float32].d1([2.0])))
     assert_true(x.grad().item() == 1.0)
 
 
 def test_reshape_scalar_to_2d() raises:
-    var x = Tensor.scalar(3.0, requires_grad=True)
+    var x = Tensor[DType.float32].scalar(3.0, requires_grad=True)
     var y = x.reshape(1, 1)
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(1, 1))
-    assert_true(y.all_close(Tensor.d2([[3.0]])))
+    assert_true(y.all_close(Tensor[DType.float32].d2([[3.0]])))
     assert_true(x.grad().item() == 1.0)
 
 
 def test_reshape_1d_to_1d_same_size() raises:
-    var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var x = Tensor[DType.float32].d1([1.0, 2.0, 3.0], requires_grad=True)
     var y = x.reshape(3)
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(3))
-    assert_true(y.all_close(Tensor.d1([1.0, 2.0, 3.0])))
-    assert_true(x.grad().all_close(Tensor.d1([1.0, 1.0, 1.0])))
+    assert_true(y.all_close(Tensor[DType.float32].d1([1.0, 2.0, 3.0])))
+    assert_true(x.grad().all_close(Tensor[DType.float32].d1([1.0, 1.0, 1.0])))
 
 
 def test_reshape_1d_to_2d() raises:
-    var x = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
+    var x = Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var y = x.reshape(2, 2)
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(2, 2))
-    assert_true(y.all_close(Tensor.d2([[1.0, 2.0], [3.0, 4.0]])))
-    assert_true(x.grad().all_close(Tensor.d1([1.0, 1.0, 1.0, 1.0])))
+    assert_true(y.all_close(Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]])))
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d1([1.0, 1.0, 1.0, 1.0]))
+    )
 
 
 def test_reshape_1d_to_3d() raises:
-    var x = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], requires_grad=True)
-    var y = x.reshape(1, 2, 3)
-    var loss = y.sum()
-    loss.backward()
-
-    assert_true(y.shape() == Shape(1, 2, 3))
-    assert_true(x.grad().all_close(Tensor.d1([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])))
-
-
-def test_reshape_2d_to_1d() raises:
-    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
-    var y = x.reshape(4)
-    var loss = y.sum()
-    loss.backward()
-
-    assert_true(y.shape() == Shape(4))
-    assert_true(y.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0])))
-    assert_true(x.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
-
-
-def test_reshape_2d_to_3d() raises:
-    var x = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var x = Tensor[DType.float32].d1(
+        [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], requires_grad=True
+    )
     var y = x.reshape(1, 2, 3)
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(1, 2, 3))
     assert_true(
-        x.grad().all_close(Tensor.d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]))
+        x.grad().all_close(
+            Tensor[DType.float32].d1([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+        )
+    )
+
+
+def test_reshape_2d_to_1d() raises:
+    var x = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
+    var y = x.reshape(4)
+    var loss = y.sum()
+    loss.backward()
+
+    assert_true(y.shape() == Shape(4))
+    assert_true(y.all_close(Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0])))
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d2([[1.0, 1.0], [1.0, 1.0]]))
+    )
+
+
+def test_reshape_2d_to_3d() raises:
+    var x = Tensor[DType.float32].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
+    var y = x.reshape(1, 2, 3)
+    var loss = y.sum()
+    loss.backward()
+
+    assert_true(y.shape() == Shape(1, 2, 3))
+    assert_true(
+        x.grad().all_close(
+            Tensor[DType.float32].d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
+        )
     )
 
 
 def test_reshape_3d_to_2d() raises:
-    var x = Tensor.d3([[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True)
+    var x = Tensor[DType.float32].d3(
+        [[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True
+    )
     var y = x.reshape(2, 2)
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(2, 2))
-    assert_true(x.grad().all_close(Tensor.d3([[[1.0, 1.0], [1.0, 1.0]]])))
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d3([[[1.0, 1.0], [1.0, 1.0]]]))
+    )
 
 
 # ===== RESHAPE WITH STRICT DIMENSION VALIDATION =====
 
 
 def test_reshape_strict_validation_success() raises:
-    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var x = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
 
     # These should work (repeat dims >= tensor rank)
     var y1 = x.reshape(2, 2)  # Exact match
@@ -111,7 +134,7 @@ def test_reshape_strict_validation_success() raises:
 
 
 def test_reshape_strict_validation_failure() raises:
-    var _x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
+    var _x = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]])
 
     # These should PANIC due to strict PyTorch rules
     # Uncomment to test - they should cause panics
@@ -123,29 +146,33 @@ def test_reshape_strict_validation_failure() raises:
 
 
 def test_reshape_gradient_preservation() raises:
-    var x = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
+    var x = Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var y = x.reshape(2, 2)
     var z = y * 2.0
     var loss = z.sum()
     loss.backward()
 
     # Gradient should flow back through reshape
-    assert_true(x.grad().all_close(Tensor.d1([2.0, 2.0, 2.0, 2.0])))
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d1([2.0, 2.0, 2.0, 2.0]))
+    )
 
 
 def test_reshape_gradient_accumulation() raises:
-    var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var x = Tensor[DType.float32].d1([1.0, 2.0, 3.0], requires_grad=True)
     var y1 = x.reshape(3, 1)
     var y2 = x.reshape(1, 3)
     var loss = y1.sum() + y2.sum()
     loss.backward()
 
     # Each element appears in both reshapes
-    assert_true(x.grad().all_close(Tensor.d1([2.0, 2.0, 2.0])))
+    assert_true(x.grad().all_close(Tensor[DType.float32].d1([2.0, 2.0, 2.0])))
 
 
 def test_reshape_chain_gradient_flow() raises:
-    var x = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var x = Tensor[DType.float32].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
     var y = x.reshape(3, 2)
     var z = y.reshape(6)
     var loss = z.sum()
@@ -153,7 +180,9 @@ def test_reshape_chain_gradient_flow() raises:
 
     # Gradient should flow back through reshape chain
     assert_true(
-        x.grad().all_close(Tensor.d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]))
+        x.grad().all_close(
+            Tensor[DType.float32].d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
+        )
     )
 
 
@@ -161,8 +190,8 @@ def test_reshape_chain_gradient_flow() raises:
 
 
 def test_reshape_in_complex_graph() raises:
-    var a = Tensor.d1([1.0, 2.0], requires_grad=True)
-    var b = Tensor.d1([3.0, 4.0], requires_grad=True)
+    var a = Tensor[DType.float32].d1([1.0, 2.0], requires_grad=True)
+    var b = Tensor[DType.float32].d1([3.0, 4.0], requires_grad=True)
 
     var c = a * b  # [3.0, 8.0]
     var d = c.reshape(2, 1)  # [[3.0], [8.0]]
@@ -170,13 +199,19 @@ def test_reshape_in_complex_graph() raises:
     var loss = e.sum()
     loss.backward()
 
-    assert_true(a.grad().all_close(Tensor.d1([3.0, 4.0])))  # from b values
-    assert_true(b.grad().all_close(Tensor.d1([1.0, 2.0])))  # from a values
+    assert_true(
+        a.grad().all_close(Tensor[DType.float32].d1([3.0, 4.0]))
+    )  # from b values
+    assert_true(
+        b.grad().all_close(Tensor[DType.float32].d1([1.0, 2.0]))
+    )  # from a values
 
 
 def test_reshape_with_arithmetic_ops() raises:
-    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
-    var y = Tensor.d1([5.0, 6.0], requires_grad=True)
+    var x = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
+    var y = Tensor[DType.float32].d1([5.0, 6.0], requires_grad=True)
 
     var x_flat = x.reshape(4)
     var _tmp0 = y.reshape(2, 1)
@@ -190,13 +225,17 @@ def test_reshape_with_arithmetic_ops() raises:
     # x.grad = [[5, 5], [6, 6]]
     # y.grad = [1+2, 3+4] = [3, 7]
 
-    assert_true(x.grad().all_close(Tensor.d2([[5.0, 5.0], [6.0, 6.0]])))
-    assert_true(y.grad().all_close(Tensor.d1([3.0, 7.0])))
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d2([[5.0, 5.0], [6.0, 6.0]]))
+    )
+    assert_true(y.grad().all_close(Tensor[DType.float32].d1([3.0, 7.0])))
 
 
 def test_reshape_with_arithmetic_ops_repeat() raises:
-    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
-    var y = Tensor.d1([5.0, 6.0], requires_grad=True)
+    var x = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
+    var y = Tensor[DType.float32].d1([5.0, 6.0], requires_grad=True)
 
     var x_flat = x.reshape(4)
     var y_repeated = y.repeat[](2)  # Make y same shape as x_flat: [5, 6, 5, 6]
@@ -208,15 +247,19 @@ def test_reshape_with_arithmetic_ops_repeat() raises:
     # x.grad = y_repeated reshaped = [[5, 6], [5, 6]]
     # y.grad = [1+3, 2+4] = [4, 6]
 
-    assert_true(x.grad().all_close(Tensor.d2([[5.0, 6.0], [5.0, 6.0]])))
-    assert_true(y.grad().all_close(Tensor.d1([4.0, 6.0])))  # Corrected!
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d2([[5.0, 6.0], [5.0, 6.0]]))
+    )
+    assert_true(
+        y.grad().all_close(Tensor[DType.float32].d1([4.0, 6.0]))
+    )  # Corrected!
 
 
 # ===== RESHAPE EDGE CASES =====
 
 
 def test_reshape_singleton_expansion() raises:
-    var x = Tensor.d1([5.0], requires_grad=True)
+    var x = Tensor[DType.float32].d1([5.0], requires_grad=True)
     var y = x.reshape(1, 1, 1)
     var loss = y.sum()
     loss.backward()
@@ -226,23 +269,29 @@ def test_reshape_singleton_expansion() raises:
 
 
 def test_reshape_singleton_removal() raises:
-    var x = Tensor.d3([[[1.0]], [[2.0]]], requires_grad=True)
+    var x = Tensor[DType.float32].d3([[[1.0]], [[2.0]]], requires_grad=True)
     var y = x.reshape(2)
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(2))
-    assert_true(x.grad().all_close(Tensor.d3([[[1.0]], [[1.0]]])))
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d3([[[1.0]], [[1.0]]]))
+    )
 
 
 def test_reshape_identity() raises:
-    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var x = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var y = x.reshape(2, 2)  # Same shape
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.all_close(x))
-    assert_true(x.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d2([[1.0, 1.0], [1.0, 1.0]]))
+    )
 
 
 def test_reshape_large_tensor() raises:
@@ -252,7 +301,7 @@ def test_reshape_large_tensor() raises:
     for i in range(1024):
         data.append(Scalar[dtype](i))
 
-    var x = Tensor.d1(data, requires_grad=True)
+    var x = Tensor[DType.float32].d1(data, requires_grad=True)
     var y = x.reshape(8, 8, 8, 2)
     var z = y.reshape(4, 4, 4, 2, 2, 2, 2)
     var loss = z.sum()
@@ -266,7 +315,9 @@ def test_reshape_large_tensor() raises:
 
 
 def test_reshape_after_view_creates_copy_1() raises:
-    var x = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var x = Tensor[DType.float32].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
 
     # Create a valid view (2x2 subset)
     var v = x.view(shape=Shape(2, 2), strides=Strides(3, 1), offset=1)
@@ -282,7 +333,9 @@ def test_reshape_after_view_creates_copy_1() raises:
 
 
 def test_reshape_after_view_creates_copy_2() raises:
-    var x = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var x = Tensor[DType.float32].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
 
     # Create a transposed-like view
     var v = x.view(shape=Shape(3, 2), strides=Strides(1, 3), offset=0)
@@ -297,7 +350,9 @@ def test_reshape_after_view_creates_copy_2() raises:
 
 
 def test_reshape_after_view_creates_copy_3() raises:
-    var x = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var x = Tensor[DType.float32].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
 
     # Simple row slice view
     var v = x.view(shape=Shape(1, 3), strides=Strides(3, 1), offset=3)
@@ -313,8 +368,8 @@ def test_reshape_after_view_creates_copy_3() raises:
 
 
 def test_reshape_preserves_requires_grad() raises:
-    var x1 = Tensor.d1([1.0, 2.0], requires_grad=True)
-    var x2 = Tensor.d1([3.0, 4.0], requires_grad=False)
+    var x1 = Tensor[DType.float32].d1([1.0, 2.0], requires_grad=True)
+    var x2 = Tensor[DType.float32].d1([3.0, 4.0], requires_grad=False)
 
     var y1 = x1.reshape(2, 1)
     var y2 = x2.reshape(2, 1)

@@ -1160,16 +1160,16 @@ assert_true(a[1] == 88.0)""",
 # ============================================================
 
 GPU_IMPORTS = """from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
-from tenmo.strides import Strides
+from tenmo.shared.shapes import Shape
+from tenmo.shared.strides import Strides
 from std.testing import (
     assert_true,
     assert_false,
     TestSuite,
 )
 from std.sys import has_accelerator
-from tenmo.device import GPU
-from tenmo.common_utils import i, newaxis, s
+from tenmo.gpu.device import GPU
+from tenmo.shared.indexhelper import i, newaxis, s
 
 
 """

@@ -1,12 +1,9 @@
-# =============================================================================
 # reduction_kernel.mojo
-# =============================================================================
 #
 # GPU reduction kernels for sum, mean, and product operations.
 #
 # DESIGN OVERVIEW
-# ───────────────
-# Three kernel functions, one unified launcher (Reduction.launch[op_code]):
+# Three kernel functions, one unified launcher (ReductionKernel.launch[op_code]):
 #
 #   reduce[dtype, max_block_size, op_code]
 #       Handles SUM and MEAN.
@@ -35,7 +32,6 @@
 #       Kept as dtype-specialised functions (f32/f64) matching existing design.
 #
 # BACKWARD SUPPORT (product only)
-# ────────────────────────────────
 # Product backward requires per-element "product of all others in slice".
 # This is stored or recomputed depending on a comptime flag:
 #
@@ -47,7 +43,7 @@
 #       Only the input buffer and zero_counts are stored.
 #       Backward recomputes excl_product via a second kernel launch.
 #
-# ProductArg (stored in BackwardFnArg via ArgumentType):
+# ProductArg (defined in product_reduction.mojo — consumer side):
 #   var input:          NDBuffer[dtype]          — original input, always stored
 #   var excl_product:   Optional[NDBuffer[dtype]] — None if recompute=True
 #   var zero_counts:    NDBuffer[DType.int32]     — per output: zeros in slice
@@ -55,8 +51,10 @@
 #   var keepdims:       Bool
 #   var reduced_volume: Int
 #
+# The kernel returns raw (Layout, Storage) pairs; the consumer assembles
+# ProductArg via NDBuffer.with_layout_storage.
+#
 # ZERO HANDLING IN PRODUCT BACKWARD
-# ───────────────────────────────────
 # For a reduction slice:
 #   zero_count == 0  → grad_x[i] = grad_out * excl_product[i]   (standard)
 #   zero_count == 1  → grad_x[i] = grad_out * excl_product[i]   (only the
@@ -71,18 +69,19 @@
 # grad = 0 (correct). No special-casing needed in backward.
 #
 # LAUNCHER API
-# ─────────────
-# Reduction[dtype].launch[op_code](A, axes, keepdims)
-#     → NDBuffer[dtype]   for SUM / MEAN
-#     → Tuple[NDBuffer[dtype], ProductArg[dtype]]  for PRODUCT
+# ReductionKernel[dtype].launch[op_code](A_layout, A_device_state, axes, keepdims)
+#     → (Layout, DeviceState[dtype])   for SUM / MEAN
+# ReductionKernel[dtype].launch_product[store_excl_product](A_layout, A_device_state, ...)
+#     → (out_pair, zero_counts_pair, excl_optional_pair)  for PRODUCT
+#     (consumer assembles ProductArg — moved to product_reduction.mojo)
 #
 # NDBuffer public API (CPU + GPU unified):
 #     ndb.sum(axes, keepdims)      → NDBuffer
 #     ndb.mean(axes, keepdims)     → NDBuffer
 #     ndb.product(axes, keepdims)  → NDBuffer   (grad arg handled at Tensor level)
+#     (GPU branch dispatches through Reduction launchers above.)
 #
 # CHANGE MAP (vs previous reduction_kernel.mojo)
-# ────────────────────────────────────────────────
 # kernels:
 #   reduce[mean: Bool]  →  reduce[op_code: Int]   (SUM=mnemonics.SUM, MEAN=mnemonics.MEAN)
 #   NEW: product_reduce[dtype, max_block_size]     (PRODUCT, all dtypes, log-space)
@@ -97,54 +96,45 @@
 #
 # backward arg:
 #   NEW: ProductArg[dtype]  (implements ArgumentType)
+#   MOVED: ProductArg definition → product_reduction.mojo (consumer side),
+#   because NDBuffer.storage() pairs are only valid for the enclosing call.
+#   The kernel returns raw (Layout, Storage) pairs; launch_product now returns
+#   (out_pair, zero_counts_pair, excl_optional_pair).
 #
-# =============================================================================
 
-from std.gpu import thread_idx, block_dim, grid_dim, block_idx, barrier
+from max.gpu import thread_idx, block_dim, grid_dim, block_idx
+from max.gpu import barrier
 from std.memory import AddressSpace, stack_allocation
-from std.sys import simd_width_of, has_accelerator
-from std.math import log, exp, abs, max, round
+from std.sys import simd_width_of
+from std.math import log, exp, max, round
 
-from tenmo.ndbuffer import NDBuffer
-from tenmo.device import DeviceState
-from tenmo.common_utils import panic, Epsilon
-from tenmo.shapes import Shape
-from tenmo.buffers import Buffer
-from tenmo.mnemonics import SUM, MEAN, PRODUCT
-from tenmo.backpropagation import ArgumentType
-from tenmo.array import Array
-from tenmo.intarray import IntArray
+from ..shared.layout import Layout
+from ..gpu.device import DeviceState
+from ..shared.constants import Epsilon
+from ..shared.panic import panic
+from ..shared.shapes import Shape
+from ..shared.mnemonics import SUM, MEAN, PRODUCT
+from ..shared.array import RankArray
+from ..shared.intarray import IntArray
 
-from . import output_to_input_base, rank_to_reduced_offset
-
-# =============================================================================
-# SECTION 2 — reduce kernel: SUM and MEAN
-# =============================================================================
-#
-# op_code replaces the old mean: Bool flag.
-# No dtype constraint — integer and floating point types both supported.
-# Behaviour:
-#   SUM  → smem[0] written directly
-#   MEAN → smem[0] / reduced_volume written
-#
-# PRODUCT is NOT handled here — see product_reduce below.
-# Mixing log/exp into this kernel would impose a floating point constraint
-# on the entire kernel, breaking integer sum/mean.
-# =============================================================================
-
+from .kernel_helpers import (
+    output_to_input_base,
+    rank_to_reduced_offset,
+    reduction_launch_config,
+)
 
 def reduce[
     dtype: DType,
     max_block_size: Int = 512,
     op_code: Int = SUM,
 ](
-    out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    in_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    in_shape: Array,
-    in_strides: Array,
-    reduction_axes: Array,
-    total_output: Int,
-    reduced_volume: Int,
+    out_buffer: Pointer[Scalar[dtype], MutAnyOrigin],
+    in_buffer: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    in_shape: RankArray,
+    in_strides: RankArray,
+    reduction_axes: RankArray,
+    total_output_: Int64,
+    reduced_volume_: Int64,
 ):
     """Sum / mean reduction kernel.
 
@@ -158,12 +148,24 @@ def reduce[
     Args:
         out_buffer:      Output pointer (total_output elements).
         in_buffer:       Input pointer (contiguous, strided via in_strides).
-        in_shape:        Shape of input as Array.
-        in_strides:      Strides of input as Array.
-        reduction_axes:  Axes being reduced as Array.
-        total_output:    Number of output elements (== grid_dim).
-        reduced_volume:  Number of elements reduced per output element.
+        in_shape:        Shape of input as RankArray.
+        in_strides:      Strides of input as RankArray.
+        reduction_axes:  Axes being reduced as RankArray.
+        total_output_:   Number of output elements (== grid_dim).
+        reduced_volume_: Number of elements reduced per output element.
+
+    SECTION 2 — reduce kernel: SUM and MEAN
+    op_code replaces the old mean: Bool flag.
+    No dtype constraint — integer and floating point types both supported.
+    Behaviour:
+      SUM  → smem[0] written directly
+      MEAN → smem[0] / reduced_volume written
+    PRODUCT is NOT handled here — see product_reduce below.
+    Mixing log/exp into this kernel would impose a floating point constraint
+    on the entire kernel, breaking integer sum/mean.
     """
+    var total_output = Int(total_output_)
+    var reduced_volume = Int(reduced_volume_)
     comptime assert (
         max_block_size.is_power_of_two() and max_block_size < 1024
     ), "max_block_size must be a power of 2 less than 1024"
@@ -172,14 +174,14 @@ def reduce[
         max_block_size, Scalar[dtype], address_space=AddressSpace.SHARED
     ]()
 
-    var tid = Int(thread_idx.x)
-    var block_size = Int(block_dim.x)
-    var out_idx = Int(block_idx.x)
+    var tid = thread_idx.x
+    var block_size = block_dim.x
+    var out_idx = block_idx.x
 
     if out_idx >= total_output:
         return
 
-    smem[tid] = Scalar[dtype](0)
+    smem[unsafe_offset=tid] = Scalar[dtype](0)
 
     var input_base = output_to_input_base(
         out_idx, in_shape, in_strides, reduction_axes
@@ -190,83 +192,42 @@ def reduce[
     while rank < reduced_volume:
         local += (
             in_buffer
-            + input_base
-            + rank_to_reduced_offset(rank, in_shape, in_strides, reduction_axes)
+            .unsafe_offset(input_base
+            + rank_to_reduced_offset(rank, in_shape, in_strides, reduction_axes))
         )[]
         rank += block_size
 
-    smem[tid] = local
+    smem[unsafe_offset=tid] = local
     barrier()
 
     var stride = block_size >> 1
     while stride > 0:
         if tid < stride:
-            smem[tid] += smem[tid + stride]
+            smem[unsafe_offset=tid] += smem[unsafe_offset=tid + stride]
         barrier()
         stride >>= 1
 
     if tid == 0:
         comptime if op_code == MEAN:
-            (out_buffer + out_idx)[] = smem[0] / Scalar[dtype](
+            (out_buffer .unsafe_offset(out_idx))[] = smem[unsafe_offset=0] / Scalar[dtype](
                 max(reduced_volume, 1)
             )
         else:  # SUM
-            (out_buffer + out_idx)[] = smem[0]
-
-
-# =============================================================================
-# SECTION 3 — product_reduce kernel
-# =============================================================================
-#
-# Handles PRODUCT for ALL numeric dtypes without a floating point constraint
-# on the kernel signature. The launcher calls this for any dtype — clean.
-#
-# Strategy: accumulate in float64 log-space, cast back to dtype at write.
-#
-# Why log-space for all dtypes:
-#   Direct integer multiply overflows silently (e.g. int8 wraps at 128).
-#   NumPy does this and it is a constant source of user confusion.
-#   float64 log-space gives overflow safety for all practical inputs.
-#
-# Precision contract:
-#   int8, int16, int32, uint8, uint16, uint32:
-#       All representable values fit exactly in float64 mantissa (< 2^53).
-#       Results are exact.
-#   int64, uint64:
-#       Values beyond 2^53 (~9 * 10^15) lose mantissa precision in float64.
-#       Results for such inputs are approximate. This is documented and
-#       unavoidable without arbitrary precision arithmetic.
-#   float32:
-#       Accumulated in float64, cast back. More precise than direct float32
-#       accumulation would be.
-#   float64:
-#       Native — no precision loss.
-#
-# Three shared memory arrays (all float64 or int32 — never dtype):
-#   smem_log:  accumulated log(abs(x)) per thread
-#   smem_neg:  count of negative elements per thread
-#   smem_zero: count of zero elements per thread
-#
-# Final write (thread 0 only):
-#   zero_count > 0  → output = 0
-#   else            → output = sign * exp(log_abs_sum), cast to dtype
-#
-# Zero count is also written to zero_counts_buffer for use in backward.
-# =============================================================================
+            (out_buffer .unsafe_offset(out_idx))[] = smem[unsafe_offset=0]
 
 
 def product_reduce[
     dtype: DType,
     max_block_size: Int = 512,
 ](
-    out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    zero_counts_buffer: UnsafePointer[Scalar[DType.int32], MutAnyOrigin],
-    in_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    in_shape: Array,
-    in_strides: Array,
-    reduction_axes: Array,
-    total_output: Int,
-    reduced_volume: Int,
+    out_buffer: Pointer[Scalar[dtype], MutAnyOrigin],
+    zero_counts_buffer: Pointer[Scalar[DType.int32], MutAnyOrigin],
+    in_buffer: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    in_shape: RankArray,
+    in_strides: RankArray,
+    reduction_axes: RankArray,
+    total_output_: Int64,
+    reduced_volume_: Int64,
 ):
     """Product reduction kernel — all dtypes, float64 log-space accumulation.
 
@@ -287,12 +248,44 @@ def product_reduce[
         out_buffer:         Output pointer (total_output elements).
         zero_counts_buffer: Zero count per output element (int32).
         in_buffer:          Input pointer (strided via in_strides).
-        in_shape:           Shape of input as Array.
-        in_strides:         Strides of input as Array.
+        in_shape:           Shape of input as RankArray.
+        in_strides:         Strides of input as RankArray.
         reduction_axes:     Axes being reduced.
-        total_output:       Number of output elements.
-        reduced_volume:     Elements reduced per output element.
+        total_output_:     Number of output elements.
+        reduced_volume_:   Elements reduced per output element.
+
+    SECTION 3 — product_reduce kernel
+    Handles PRODUCT for ALL numeric dtypes without a floating point constraint
+    on the kernel signature. The launcher calls this for any dtype — clean.
+    Strategy: accumulate in float64 log-space, cast back to dtype at write.
+    Why log-space for all dtypes:
+      Direct integer multiply overflows silently (e.g. int8 wraps at 128).
+      NumPy does this and it is a constant source of user confusion.
+      float64 log-space gives overflow safety for all practical inputs.
+    Precision contract:
+      int8, int16, int32, uint8, uint16, uint32:
+          All representable values fit exactly in float64 mantissa (< 2^53).
+          Results are exact.
+      int64, uint64:
+          Values beyond 2^53 (~9 * 10^15) lose mantissa precision in float64.
+          Results for such inputs are approximate. This is documented and
+          unavoidable without arbitrary precision arithmetic.
+      float32:
+          Accumulated in float64, cast back. More precise than direct float32
+          accumulation would be.
+      float64:
+          Native — no precision loss.
+    Three shared memory arrays (all float64 or int32 — never dtype):
+      smem_log:  accumulated log(abs(x)) per thread
+      smem_neg:  count of negative elements per thread
+      smem_zero: count of zero elements per thread
+    Final write (thread 0 only):
+      zero_count > 0  → output = 0
+      else            → output = sign * exp(log_abs_sum), cast to dtype
+    Zero count is also written to zero_counts_buffer for use in backward.
     """
+    var total_output = Int(total_output_)
+    var reduced_volume = Int(reduced_volume_)
     comptime assert (
         max_block_size.is_power_of_two() and max_block_size < 1024
     ), "max_block_size must be a power of 2 less than 1024"
@@ -308,16 +301,16 @@ def product_reduce[
         max_block_size, Scalar[DType.int32], address_space=AddressSpace.SHARED
     ]()
 
-    var tid = Int(thread_idx.x)
-    var block_size = Int(block_dim.x)
-    var out_idx = Int(block_idx.x)
+    var tid = thread_idx.x
+    var block_size = block_dim.x
+    var out_idx = block_idx.x
 
     if out_idx >= total_output:
         return
 
-    smem_log[tid] = Scalar[DType.float64](0)
-    smem_neg[tid] = Scalar[DType.int32](0)
-    smem_zero[tid] = Scalar[DType.int32](0)
+    smem_log[unsafe_offset=tid] = Scalar[DType.float64](0)
+    smem_neg[unsafe_offset=tid] = Scalar[DType.int32](0)
+    smem_zero[unsafe_offset=tid] = Scalar[DType.int32](0)
 
     var input_base = output_to_input_base(
         out_idx, in_shape, in_strides, reduction_axes
@@ -335,8 +328,8 @@ def product_reduce[
         # Cast to float64 here — the only place dtype touches float64
         var val = (
             in_buffer
-            + input_base
-            + rank_to_reduced_offset(rank, in_shape, in_strides, reduction_axes)
+            .unsafe_offset(input_base
+            + rank_to_reduced_offset(rank, in_shape, in_strides, reduction_axes))
         )[].cast[DType.float64]()
 
         if val == f64_zero:
@@ -345,13 +338,15 @@ def product_reduce[
             if val < f64_zero:
                 local_neg += Scalar[DType.int32](1)
             # log(abs(val)) — safe since val != 0
-            local_log += log(abs(val))
+            # max(x, -x) instead of abs(): abs() lowers to the llvm.nvvm.fabs
+            # intrinsic, which this toolchain's NVPTX backend cannot select.
+            local_log += log(max(val, -val))
 
         rank += block_size
 
-    smem_log[tid] = local_log
-    smem_neg[tid] = local_neg
-    smem_zero[tid] = local_zero
+    smem_log[unsafe_offset=tid] = local_log
+    smem_neg[unsafe_offset=tid] = local_neg
+    smem_zero[unsafe_offset=tid] = local_zero
 
     barrier()
 
@@ -359,68 +354,43 @@ def product_reduce[
     var stride = block_size >> 1
     while stride > 0:
         if tid < stride:
-            smem_log[tid] += smem_log[tid + stride]
-            smem_neg[tid] += smem_neg[tid + stride]
-            smem_zero[tid] += smem_zero[tid + stride]
+            smem_log[unsafe_offset=tid] += smem_log[unsafe_offset=tid + stride]
+            smem_neg[unsafe_offset=tid] += smem_neg[unsafe_offset=tid + stride]
+            smem_zero[unsafe_offset=tid] += smem_zero[unsafe_offset=tid + stride]
         barrier()
         stride >>= 1
 
     if tid == 0:
         # Write zero count for backward regardless of output value
-        (zero_counts_buffer + out_idx)[] = smem_zero[0]
+        (zero_counts_buffer .unsafe_offset(out_idx))[] = smem_zero[unsafe_offset=0]
 
-        if smem_zero[0] > Scalar[DType.int32](0):
+        if smem_zero[unsafe_offset=0] > Scalar[DType.int32](0):
             # Any zero in slice → product is zero
-            (out_buffer + out_idx)[] = Scalar[dtype](0)
+            (out_buffer .unsafe_offset(out_idx))[] = Scalar[dtype](0)
         else:
             # sign: odd number of negatives → negative result
             var sign = Scalar[DType.float64](
-                -1 if smem_neg[0] % Scalar[DType.int32](2)
+                -1 if smem_neg[unsafe_offset=0] % Scalar[DType.int32](2)
                 == Scalar[DType.int32](1) else 1
             )
             # Cast back to dtype — the only other place dtype is named
             # (out_buffer + out_idx)[] = (sign * exp(smem_log[0])).cast[dtype]()
-            (out_buffer + out_idx)[] = _cast_result[dtype](
-                sign * exp(smem_log[0])
+            (out_buffer .unsafe_offset(out_idx))[] = _cast_result[dtype](
+                sign * exp(smem_log[unsafe_offset=0])
             )
-
-
-# =============================================================================
-# SECTION 4 — excl_product_kernel (for backward)
-# =============================================================================
-#
-# Computes the "product of all others" for each element in the input,
-# within its reduction slice. This is the gradient multiplier for product
-# backward when there are no zeros in the slice (or exactly one zero).
-#
-# Algorithm: prefix × suffix product along each reduction axis.
-# One block per output element (same as product_reduce).
-# Threads stripe across reduced_volume.
-#
-# Output buffer is input-shaped: excl_product[i] = product of all elements
-# in i's reduction slice except element i itself.
-#
-# For the single-zero case:
-#   excl_product[zero_pos]  = product of all non-zero elements (correct grad)
-#   excl_product[non_zero]  = 0 (contains the zero — correct, grad = 0)
-# No special-casing needed in backward — zero handling falls out naturally.
-#
-# Accumulates in float64 log-space (same rationale as product_reduce).
-# Sign tracked separately per element.
-# =============================================================================
 
 
 def excl_product_kernel[
     dtype: DType,
     max_block_size: Int = 512,
 ](
-    excl_out: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    in_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    in_shape: Array,
-    in_strides: Array,
-    reduction_axes: Array,
-    total_output: Int,
-    reduced_volume: Int,
+    excl_out: Pointer[Scalar[dtype], MutAnyOrigin],
+    in_buffer: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    in_shape: RankArray,
+    in_strides: RankArray,
+    reduction_axes: RankArray,
+    total_output_: Int64,
+    reduced_volume_: Int64,
 ):
     """Compute product-of-all-others for each input element.
 
@@ -440,16 +410,34 @@ def excl_product_kernel[
         in_shape:       Input shape.
         in_strides:     Input strides.
         reduction_axes: Axes being reduced.
-        total_output:   Number of output elements (== number of slices).
-        reduced_volume: Elements per slice.
+        total_output_:  Number of output elements (== number of slices).
+        reduced_volume_: Elements per slice.
+
+    SECTION 4 — excl_product_kernel (for backward)
+    Computes the "product of all others" for each element in the input,
+    within its reduction slice. This is the gradient multiplier for product
+    backward when there are no zeros in the slice (or exactly one zero).
+    Algorithm: prefix × suffix product along each reduction axis.
+    One block per output element (same as product_reduce).
+    Threads stripe across reduced_volume.
+    Output buffer is input-shaped: excl_product[i] = product of all elements
+    in i's reduction slice except element i itself.
+    For the single-zero case:
+      excl_product[zero_pos]  = product of all non-zero elements (correct grad)
+      excl_product[non_zero]  = 0 (contains the zero — correct, grad = 0)
+    No special-casing needed in backward — zero handling falls out naturally.
+    Accumulates in float64 log-space (same rationale as product_reduce).
+    Sign tracked separately per element.
     """
+    var total_output = Int(total_output_)
+    var reduced_volume = Int(reduced_volume_)
     comptime assert (
         max_block_size.is_power_of_two() and max_block_size < 1024
     ), "max_block_size must be a power of 2 less than 1024"
 
-    var tid = Int(thread_idx.x)
-    var block_size = Int(block_dim.x)
-    var out_idx = Int(block_idx.x)
+    var tid = thread_idx.x
+    var block_size = block_dim.x
+    var out_idx = block_idx.x
 
     if out_idx >= total_output:
         return
@@ -473,9 +461,9 @@ def excl_product_kernel[
         max_block_size, Scalar[DType.int32], address_space=AddressSpace.SHARED
     ]()
 
-    smem_log[tid] = f64_zero
-    smem_neg[tid] = Scalar[DType.int32](0)
-    smem_zero[tid] = Scalar[DType.int32](0)
+    smem_log[unsafe_offset=tid] = f64_zero
+    smem_neg[unsafe_offset=tid] = Scalar[DType.int32](0)
+    smem_zero[unsafe_offset=tid] = Scalar[DType.int32](0)
 
     var local_log = f64_zero
     var local_neg = Scalar[DType.int32](0)
@@ -486,7 +474,7 @@ def excl_product_kernel[
         var offset = rank_to_reduced_offset(
             rank, in_shape, in_strides, reduction_axes
         )
-        var val = (in_buffer + input_base + offset)[].cast[DType.float64]()
+        var val = (in_buffer .unsafe_offset(input_base + offset))[].cast[DType.float64]()
         if val == f64_zero:
             local_zero += Scalar[DType.int32](1)
         else:
@@ -495,17 +483,17 @@ def excl_product_kernel[
             local_log += log(abs(val))
         rank += block_size
 
-    smem_log[tid] = local_log
-    smem_neg[tid] = local_neg
-    smem_zero[tid] = local_zero
+    smem_log[unsafe_offset=tid] = local_log
+    smem_neg[unsafe_offset=tid] = local_neg
+    smem_zero[unsafe_offset=tid] = local_zero
     barrier()
 
     var stride = block_size >> 1
     while stride > 0:
         if tid < stride:
-            smem_log[tid] += smem_log[tid + stride]
-            smem_neg[tid] += smem_neg[tid + stride]
-            smem_zero[tid] += smem_zero[tid + stride]
+            smem_log[unsafe_offset=tid] += smem_log[unsafe_offset=tid + stride]
+            smem_neg[unsafe_offset=tid] += smem_neg[unsafe_offset=tid + stride]
+            smem_zero[unsafe_offset=tid] += smem_zero[unsafe_offset=tid + stride]
         barrier()
         stride >>= 1
 
@@ -516,9 +504,9 @@ def excl_product_kernel[
     # In log-space: log_excl[i] = total_log - log(abs(x[i]))
     #               neg_excl[i] = total_neg - (1 if x[i] < 0 else 0)
 
-    var total_log = smem_log[0]
-    var total_neg = smem_neg[0]
-    var total_zero = smem_zero[0]
+    var total_log = smem_log[unsafe_offset=0]
+    var total_neg = smem_neg[unsafe_offset=0]
+    var total_zero = smem_zero[unsafe_offset=0]
 
     rank = tid
     while rank < reduced_volume:
@@ -526,7 +514,7 @@ def excl_product_kernel[
             rank, in_shape, in_strides, reduction_axes
         )
         var flat_input_idx = input_base + offset
-        var val = (in_buffer + flat_input_idx)[].cast[DType.float64]()
+        var val = (in_buffer .unsafe_offset(flat_input_idx))[].cast[DType.float64]()
 
         var excl: Scalar[dtype]
 
@@ -555,7 +543,7 @@ def excl_product_kernel[
                 excl = Scalar[dtype](0)
             else:
                 var val_neg = Scalar[DType.int32](1 if val < f64_zero else 0)
-                var excl_log = total_log - log(abs(val))
+                var excl_log = total_log - log(max(val, -val))
                 var excl_neg = total_neg - val_neg
                 var sign = Scalar[DType.float64](
                     -1 if excl_neg % Scalar[DType.int32](2)
@@ -564,7 +552,7 @@ def excl_product_kernel[
                 # excl = (sign * exp(excl_log)).cast[dtype]()
                 excl = _cast_result[dtype](sign * exp(excl_log))
 
-        (excl_out + flat_input_idx)[] = excl
+        (excl_out .unsafe_offset(flat_input_idx))[] = excl
         rank += block_size
 
 
@@ -581,9 +569,7 @@ def _cast_result[dtype: DType](val: Scalar[DType.float64]) -> Scalar[dtype]:
         return val.cast[dtype]()
 
 
-# =============================================================================
 # SECTION 5 — log_sum_exp kernels (unchanged)
-# =============================================================================
 
 
 def log_sum_exp_f32[
@@ -591,14 +577,16 @@ def log_sum_exp_f32[
     max_block_size: Int = 512,
     epsilon: Scalar[DType.float32] = Epsilon[DType.float32].value(),
 ](
-    out_buffer: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    in_buffer: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
-    in_shape: Array,
-    in_strides: Array,
-    reduction_axes: Array,
-    total_output: Int,
-    reduced_volume: Int,
+    out_buffer: Pointer[Scalar[DType.float32], MutAnyOrigin],
+    in_buffer: Pointer[Scalar[DType.float32], ImmutAnyOrigin],
+    in_shape: RankArray,
+    in_strides: RankArray,
+    reduction_axes: RankArray,
+    total_output_: Int64,
+    reduced_volume_: Int64,
 ):
+    var total_output = Int(total_output_)
+    var reduced_volume = Int(reduced_volume_)
     comptime assert (
         max_block_size.is_power_of_two() and max_block_size < 1024
     ), "max_block_size must be a power of 2 less than 1024"
@@ -607,14 +595,14 @@ def log_sum_exp_f32[
         max_block_size, Scalar[DType.float32], address_space=AddressSpace.SHARED
     ]()
 
-    var tid = Int(thread_idx.x)
-    var block_size = Int(block_dim.x)
-    var out_idx = Int(block_idx.x)
+    var tid = thread_idx.x
+    var block_size = block_dim.x
+    var out_idx = block_idx.x
 
     if out_idx >= total_output:
         return
 
-    smem[tid] = Scalar[DType.float32](0)
+    smem[unsafe_offset=tid] = Scalar[DType.float32](0)
     var input_base = output_to_input_base(
         out_idx, in_shape, in_strides, reduction_axes
     )
@@ -625,26 +613,26 @@ def log_sum_exp_f32[
         local += exp(
             (
                 in_buffer
-                + input_base
+                .unsafe_offset(input_base
                 + rank_to_reduced_offset(
                     rank, in_shape, in_strides, reduction_axes
-                )
+                ))
             )[]
         )
         rank += block_size
 
-    smem[tid] = local
+    smem[unsafe_offset=tid] = local
     barrier()
 
     var stride = block_size >> 1
     while stride > 0:
         if tid < stride:
-            smem[tid] += smem[tid + stride]
+            smem[unsafe_offset=tid] += smem[unsafe_offset=tid + stride]
         barrier()
         stride >>= 1
 
     if tid == 0:
-        (out_buffer + out_idx)[] = log(max(smem[0], epsilon))
+        (out_buffer .unsafe_offset(out_idx))[] = log(max(smem[unsafe_offset=0], epsilon))
 
 
 def log_sum_exp_f64[
@@ -652,14 +640,16 @@ def log_sum_exp_f64[
     max_block_size: Int = 512,
     epsilon: Scalar[DType.float64] = Epsilon[DType.float64].value(),
 ](
-    out_buffer: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
-    in_buffer: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
-    in_shape: Array,
-    in_strides: Array,
-    reduction_axes: Array,
-    total_output: Int,
-    reduced_volume: Int,
+    out_buffer: Pointer[Scalar[DType.float64], MutAnyOrigin],
+    in_buffer: Pointer[Scalar[DType.float64], ImmutAnyOrigin],
+    in_shape: RankArray,
+    in_strides: RankArray,
+    reduction_axes: RankArray,
+    total_output_: Int64,
+    reduced_volume_: Int64,
 ):
+    var total_output = Int(total_output_)
+    var reduced_volume = Int(reduced_volume_)
     comptime assert (
         max_block_size.is_power_of_two() and max_block_size < 1024
     ), "max_block_size must be a power of 2 less than 1024"
@@ -668,14 +658,14 @@ def log_sum_exp_f64[
         max_block_size, Scalar[DType.float64], address_space=AddressSpace.SHARED
     ]()
 
-    var tid = Int(thread_idx.x)
-    var block_size = Int(block_dim.x)
-    var out_idx = Int(block_idx.x)
+    var tid = thread_idx.x
+    var block_size = block_dim.x
+    var out_idx = block_idx.x
 
     if out_idx >= total_output:
         return
 
-    smem[tid] = Scalar[DType.float64](0)
+    smem[unsafe_offset=tid] = Scalar[DType.float64](0)
     var input_base = output_to_input_base(
         out_idx, in_shape, in_strides, reduction_axes
     )
@@ -686,141 +676,42 @@ def log_sum_exp_f64[
         local += exp(
             (
                 in_buffer
-                + input_base
+                .unsafe_offset(input_base
                 + rank_to_reduced_offset(
                     rank, in_shape, in_strides, reduction_axes
-                )
+                ))
             )[]
         )
         rank += block_size
 
-    smem[tid] = local
+    smem[unsafe_offset=tid] = local
     barrier()
 
     var stride = block_size >> 1
     while stride > 0:
         if tid < stride:
-            smem[tid] += smem[tid + stride]
+            smem[unsafe_offset=tid] += smem[unsafe_offset=tid + stride]
         barrier()
         stride >>= 1
 
     if tid == 0:
-        (out_buffer + out_idx)[] = log(max(smem[0], epsilon))
+        (out_buffer .unsafe_offset(out_idx))[] = log(max(smem[unsafe_offset=0], epsilon))
 
 
-# =============================================================================
-# SECTION 6 — ProductArg: backward argument struct
-# =============================================================================
-#
-# Stored in BackwardFnArg via ArgumentType.
-# Implements ArgumentType trait (ImplicitlyCopyable & Movable).
-#
-# excl_product is Optional:
-#   Some(ndb) → store_excl_product=True  — backward uses it directly
-#   None      → store_excl_product=False — backward recomputes via kernel
-#
-# zero_counts is always stored (int32, input-shape agnostic — one per output).
-# input is always stored — needed for recompute path and zero detection.
-# =============================================================================
-
-
-@fieldwise_init
-struct ProductArg[dtype: DType](ArgumentType):
-    """Backward argument for product reduction.
-
-    Always stored:
-        input        — original forward input (needed for recompute path)
-        zero_counts  — per-output-element zero count (int32, on same device)
-        axes         — reduction axes
-        keepdims     — keepdims flag from forward
-        reduced_volume — elements per slice (for excl recompute)
-
-    Conditionally stored (store_excl_product comptime flag):
-        excl_product — input-shaped buffer of per-element exclusive products
-                       None if store_excl_product=False (recomputed in backward)
-    """
-
-    var input: NDBuffer[Self.dtype]
-    var excl_product: Optional[NDBuffer[Self.dtype]]
-    var zero_counts: NDBuffer[DType.int32]
-    var axes: IntArray
-    var keepdims: Bool
-    var reduced_volume: Int
-
-    @staticmethod
-    def Empty() -> ProductArg[Self.dtype]:
-        return ProductArg[Self.dtype](
-            NDBuffer[Self.dtype].Empty(),
-            None,
-            NDBuffer[DType.int32].Empty(),
-            IntArray(),
-            False,
-            0,
-        )
-
-
-# =============================================================================
-# SECTION 4 — Welford kernel
-# =============================================================================
-
-# =============================================================================
-# DESIGN NOTES
-# =============================================================================
-#
-# Welford online algorithm — single pass, numerically stable:
-#
-#   M_0 = 0, S_0 = 0
-#   for k = 1..n:
-#       delta  = x_k - M_{k-1}
-#       M_k    = M_{k-1} + delta / k
-#       delta2 = x_k - M_k
-#       S_k    = S_{k-1} + delta * delta2
-#
-#   mean     = M_n
-#   var_pop  = S_n / n          (biased)
-#   var_samp = S_n / (n - 1)    (unbiased)
-#
-# Welford parallel merge of two accumulators (a, b):
-#
-#   combined.count = a.count + b.count
-#   delta          = b.mean - a.mean
-#   combined.mean  = a.mean + delta * b.count / combined.count
-#   combined.M2    = a.M2 + b.M2 + delta^2 * a.count * b.count / combined.count
-#
-# GPU kernel:
-#   One block per output element (same as reduce).
-#   Threads stripe across reduced_volume — each thread runs serial Welford.
-#   Three shared memory arrays: smem_mean, smem_M2, smem_count.
-#   Tree reduction using Welford merge — NOT simple addition.
-#   Returns two output buffers: mean and M2 (unscaled).
-#   Caller divides M2 by n or n-1 for variance.
-#   Std: caller takes sqrt of variance output.
-#
-# No dtype constraint at kernel level — consistent with reduce kernel.
-# Floating point arithmetic is inherent to Welford math, not enforced here.
-#
-# Index helpers reused verbatim:
-#   output_to_input_base
-#   rank_to_reduced_offset
-#
-# Launcher returns Tuple[NDBuffer, NDBuffer] — (mean_ndb, M2_ndb).
-# NDBuffer.welford() divides M2 by n/n-1 and optionally sqrts for std.
-#
-# =============================================================================
-
+# SECTION 7 — Welford kernel
 
 def welford_reduce[
     dtype: DType,
     max_block_size: Int = 512,
 ](
-    mean_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    M2_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    in_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    in_shape: Array,
-    in_strides: Array,
-    reduction_axes: Array,
-    total_output: Int,
-    reduced_volume: Int,
+    mean_buffer: Pointer[Scalar[dtype], MutAnyOrigin],
+    M2_buffer: Pointer[Scalar[dtype], MutAnyOrigin],
+    in_buffer: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    in_shape: RankArray,
+    in_strides: RankArray,
+    reduction_axes: RankArray,
+    total_output_: Int64,
+    reduced_volume_: Int64,
 ):
     """Welford online mean + M2 reduction kernel.
 
@@ -838,12 +729,46 @@ def welford_reduce[
         mean_buffer:     Output pointer for mean (total_output elements).
         M2_buffer:       Output pointer for M2 (total_output elements).
         in_buffer:       Input pointer (strided via in_strides).
-        in_shape:        Shape of input as Array.
-        in_strides:      Strides of input as Array.
-        reduction_axes:  Axes being reduced as Array.
-        total_output:    Number of output elements (== grid_dim).
-        reduced_volume:  Number of elements reduced per output element.
+        in_shape:        Shape of input as RankArray.
+        in_strides:      Strides of input as RankArray.
+        reduction_axes:  Axes being reduced as RankArray.
+        total_output_:   Number of output elements (== grid_dim).
+        reduced_volume_: Number of elements reduced per output element.
+
+    DESIGN NOTES
+    Welford online algorithm — single pass, numerically stable:
+      M_0 = 0, S_0 = 0
+      for k = 1..n:
+          delta  = x_k - M_{k-1}
+          M_k    = M_{k-1} + delta / k
+          delta2 = x_k - M_k
+          S_k    = S_{k-1} + delta * delta2
+      mean     = M_n
+      var_pop  = S_n / n          (biased)
+      var_samp = S_n / (n - 1)    (unbiased)
+    Welford parallel merge of two accumulators (a, b):
+      combined.count = a.count + b.count
+      delta          = b.mean - a.mean
+      combined.mean  = a.mean + delta * b.count / combined.count
+      combined.M2    = a.M2 + b.M2 + delta^2 * a.count * b.count / combined.count
+    GPU kernel:
+      One block per output element (same as reduce).
+      Threads stripe across reduced_volume — each thread runs serial Welford.
+      Three shared memory arrays: smem_mean, smem_M2, smem_count.
+      Tree reduction using Welford merge — NOT simple addition.
+      Returns two output buffers: mean and M2 (unscaled).
+      Caller divides M2 by n or n-1 for variance.
+      Std: caller takes sqrt of variance output.
+    No dtype constraint at kernel level — consistent with reduce kernel.
+    Floating point arithmetic is inherent to Welford math, not enforced here.
+    Index helpers reused verbatim:
+      output_to_input_base
+      rank_to_reduced_offset
+    Launcher returns (mean pair, M2 pair).
+    Consumer divides M2 by n/n-1 and optionally sqrts for std.
     """
+    var total_output = Int(total_output_)
+    var reduced_volume = Int(reduced_volume_)
     comptime assert (
         max_block_size.is_power_of_two() and max_block_size < 1024
     ), "max_block_size must be a power of 2 less than 1024"
@@ -859,17 +784,17 @@ def welford_reduce[
         max_block_size, Scalar[DType.int32], address_space=AddressSpace.SHARED
     ]()
 
-    var tid = Int(thread_idx.x)
-    var block_size = Int(block_dim.x)
-    var out_idx = Int(block_idx.x)
+    var tid = thread_idx.x
+    var block_size = block_dim.x
+    var out_idx = block_idx.x
 
     if out_idx >= total_output:
         return
 
     # Initialize shared memory
-    smem_mean[tid] = Scalar[dtype](0)
-    smem_M2[tid] = Scalar[dtype](0)
-    smem_count[tid] = Int32(0)
+    smem_mean[unsafe_offset=tid] = Scalar[dtype](0)
+    smem_M2[unsafe_offset=tid] = Scalar[dtype](0)
+    smem_count[unsafe_offset=tid] = Int32(0)
 
     var input_base = output_to_input_base(
         out_idx, in_shape, in_strides, reduction_axes
@@ -884,8 +809,8 @@ def welford_reduce[
     while rank < reduced_volume:
         var x = (
             in_buffer
-            + input_base
-            + rank_to_reduced_offset(rank, in_shape, in_strides, reduction_axes)
+            .unsafe_offset(input_base
+            + rank_to_reduced_offset(rank, in_shape, in_strides, reduction_axes))
         )[]
         local_count += Int32(1)
         var delta = x - local_mean
@@ -894,29 +819,29 @@ def welford_reduce[
         local_M2 += delta * delta2
         rank += block_size
 
-    smem_mean[tid] = local_mean
-    smem_M2[tid] = local_M2
-    smem_count[tid] = local_count
+    smem_mean[unsafe_offset=tid] = local_mean
+    smem_M2[unsafe_offset=tid] = local_M2
+    smem_count[unsafe_offset=tid] = local_count
     barrier()
 
     # Tree reduction via Welford parallel merge
     var stride = block_size >> 1
     while stride > 0:
         if tid < stride:
-            var a_mean = smem_mean[tid]
-            var a_M2 = smem_M2[tid]
-            var a_count = smem_count[tid]
-            var b_mean = smem_mean[tid + stride]
-            var b_M2 = smem_M2[tid + stride]
-            var b_count = smem_count[tid + stride]
+            var a_mean = smem_mean[unsafe_offset=tid]
+            var a_M2 = smem_M2[unsafe_offset=tid]
+            var a_count = smem_count[unsafe_offset=tid]
+            var b_mean = smem_mean[unsafe_offset=tid + stride]
+            var b_M2 = smem_M2[unsafe_offset=tid + stride]
+            var b_count = smem_count[unsafe_offset=tid + stride]
 
             var combined_count = a_count + b_count
             if combined_count > Int32(0):
                 var delta = b_mean - a_mean
                 var b_count_f = Scalar[dtype](Int(b_count))
                 var combined_count_f = Scalar[dtype](Int(combined_count))
-                smem_mean[tid] = a_mean + delta * b_count_f / combined_count_f
-                smem_M2[tid] = (
+                smem_mean[unsafe_offset=tid] = a_mean + delta * b_count_f / combined_count_f
+                smem_M2[unsafe_offset=tid] = (
                     a_M2
                     + b_M2
                     + delta
@@ -925,64 +850,63 @@ def welford_reduce[
                     * b_count_f
                     / combined_count_f
                 )
-                smem_count[tid] = combined_count
+                smem_count[unsafe_offset=tid] = combined_count
         barrier()
         stride >>= 1
 
     if tid == 0:
-        (mean_buffer + out_idx)[] = smem_mean[0]
-        (M2_buffer + out_idx)[] = smem_M2[0]
-
-
-# =============================================================================
-# SECTION 8 — Reduction launcher
-# =============================================================================
-#
-# Unified launcher for SUM, MEAN, PRODUCT via op_code.
-#
-# launch[op_code]  → NDBuffer  (SUM / MEAN — returns result only)
-# launch_product   → Tuple[NDBuffer, ProductArg]  (PRODUCT — result + bwd arg)
-# launch_log_sum   → NDBuffer  (log-sum-exp — unchanged)
-#
-# Sum/mean call sites:
-#   BEFORE: Reduction.launch[mean=False](A, axes, keepdims)
-#           Reduction.launch[mean=True](A, axes, keepdims)
-#   AFTER:  Reduction.launch[SUM](A, axes, keepdims)
-#           Reduction.launch[MEAN](A, axes, keepdims)
-# =============================================================================
+        (mean_buffer .unsafe_offset(out_idx))[] = smem_mean[unsafe_offset=0]
+        (M2_buffer .unsafe_offset(out_idx))[] = smem_M2[unsafe_offset=0]
 
 
 @fieldwise_init
-struct Reduction[dtype: DType = DType.float32](
+struct ReductionKernel[dtype: DType = DType.float32](
     ImplicitlyCopyable, RegisterPassable
 ):
-    # ── SUM / MEAN ────────────────────────────────────────────────────────────
+    """SECTION 8 — Reduction launcher
+    Unified launcher for SUM, MEAN, PRODUCT via op_code.
+    launch[op_code]  → (Layout, Storage)  (SUM / MEAN — result only)
+    launch_product   → (out_pair, zero_pair, excl_optional_pair)  (PRODUCT)
+    launch_log_sum   → (Layout, Storage)  (log-sum-exp)
+    Sum/mean call sites:
+      BEFORE: Reduction.launch[mean=False](A, axes, keepdims)
+              Reduction.launch[mean=True](A, axes, keepdims)
+      AFTER:  Reduction.launch[SUM](A, axes, keepdims)
+              Reduction.launch[MEAN](A, axes, keepdims)
+    """
+    # SUM / MEAN
 
     @staticmethod
     def launch[
         op_code: Int = SUM,
         max_block_width: Int = 512,
     ](
-        A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool, sync: Bool = False
-    ) raises -> NDBuffer[Self.dtype]:
+        A_layout: Layout,
+        A_device_state: DeviceState[Self.dtype],
+        normalized_axes: IntArray,
+        keepdims: Bool,
+        sync: Bool = False,
+    ) raises -> Tuple[Layout, DeviceState[Self.dtype]]:
         """Launch sum or mean reduction.
 
         op_code must be SUM or MEAN. For PRODUCT use launch_product.
 
         Args:
-            A:               Input NDBuffer. Must be on GPU.
+            A_layout:         Input layout.
+            A_device_state:        Input storage. Must be on GPU.
             normalized_axes: Validated, normalised reduction axes.
             keepdims:        Whether to keep reduced dimensions.
+            sync:            Whether to sync GPU after operation.
 
         Returns:
-            NDBuffer with reduction applied.
+            (Layout, Storage) — result with reduction applied.
         """
         comptime assert op_code == SUM or op_code == MEAN, (
             "launch[op_code] only accepts SUM or MEAN — use launch_product for"
             " PRODUCT"
         )
-        var shape_A = A.shape
-        var strides_A = A.strides
+        var shape_A = A_layout.shape
+        var strides_A = A_layout.strides
         var output_shape = shape_A.compute_output_shape(
             normalized_axes, keepdims, validated=True
         )
@@ -993,10 +917,10 @@ struct Reduction[dtype: DType = DType.float32](
             for i in range(len(shape_A)):
                 normalized_axes_copy[i] = i
 
-        var reduction_axes: Array = Array(normalized_axes_copy)
+        var reduction_axes: RankArray = RankArray(normalized_axes_copy)
         var reduced_shape = shape_A.reduced_shape(normalized_axes)
-        var in_shape: Array = shape_A.array()
-        var in_strides: Array = strides_A.array()
+        var in_shape: RankArray = shape_A.array()
+        var in_strides: RankArray = strides_A.array()
         var total_output: Int = output_shape.product()
         var reduced_volume: Int = reduced_shape.product()
 
@@ -1004,7 +928,6 @@ struct Reduction[dtype: DType = DType.float32](
             max_block_width
         ](total_output, reduced_volume)
 
-        ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu[]
         var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
@@ -1015,7 +938,6 @@ struct Reduction[dtype: DType = DType.float32](
 
         var compiled_func = device_context.compile_function[
             reduce[Self.dtype, max_block_width, op_code],
-            reduce[Self.dtype, max_block_width, op_code],
         ]()
 
         device_context.enqueue_function(
@@ -1025,27 +947,37 @@ struct Reduction[dtype: DType = DType.float32](
             in_shape,
             in_strides,
             reduction_axes,
-            total_output,
-            reduced_volume,
+            Int64(total_output),
+            Int64(reduced_volume),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
-        return NDBuffer[Self.dtype].with_device_state(
-            device_state^, output_shape
+        return (
+            Layout(output_shape),
+            device_state^,
         )
 
-    # ── PRODUCT ───────────────────────────────────────────────────────────────
+    # PRODUCT
 
     @staticmethod
     def launch_product[
         store_excl_product: Bool = True,
         max_block_width: Int = 512,
     ](
-        A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool, sync: Bool = False
-    ) raises -> Tuple[NDBuffer[Self.dtype], ProductArg[Self.dtype]]:
+        A_layout: Layout,
+        A_device_state: DeviceState[Self.dtype],
+        normalized_axes: IntArray,
+        keepdims: Bool,
+        sync: Bool = False,
+    ) raises -> Tuple[
+        Tuple[Layout, DeviceState[Self.dtype]],
+        Tuple[Layout, DeviceState[DType.int32]],
+        Optional[Tuple[Layout, DeviceState[Self.dtype]]],
+    ]:
         """Launch product reduction.
 
         Runs product_reduce kernel (log-space, all dtypes, overflow-safe).
@@ -1053,25 +985,30 @@ struct Reduction[dtype: DType = DType.float32](
 
         store_excl_product=True  (default):
             Runs excl_product_kernel immediately after product_reduce.
-            Stores result in ProductArg.excl_product.
+            Returns it as Some(pair).
             Backward uses it directly — no second kernel launch needed.
             Memory cost: one input-shaped buffer of dtype.
 
         store_excl_product=False:
-            Only stores input and zero_counts.
+            Returns None for excl_product.
             Backward recomputes excl_product via excl_product_kernel.
             No extra memory cost, but backward is slower.
 
         Args:
-            A:               Input NDBuffer. Must be on GPU.
+            A_layout:         Input layout.
+            A_device_state:        Input storage. Must be on GPU.
             normalized_axes: Validated, normalised reduction axes.
             keepdims:        Whether to keep reduced dimensions.
+            sync:            Whether to sync GPU after operation.
 
         Returns:
-            Tuple of (output NDBuffer, ProductArg for backward).
+            (out_pair, zero_counts_pair, excl_optional_pair) where out is
+            output-shaped, zero_counts is int32 output-shaped (always stored
+            for backward), and excl_product is input-shaped (Some iff
+            store_excl_product=True). The consumer assembles ProductArg.
         """
-        var shape_A = A.shape
-        var strides_A = A.strides
+        var shape_A = A_layout.shape
+        var strides_A = A_layout.strides
         var output_shape = shape_A.compute_output_shape(
             normalized_axes, keepdims, validated=True
         )
@@ -1082,19 +1019,18 @@ struct Reduction[dtype: DType = DType.float32](
             for i in range(len(shape_A)):
                 normalized_axes_copy[i] = i
 
-        var reduction_axes: Array = Array(normalized_axes_copy)
+        var reduction_axes: RankArray = RankArray(normalized_axes_copy)
         var reduced_shape = shape_A.reduced_shape(normalized_axes)
-        var in_shape: Array = shape_A.array()
-        var in_strides: Array = strides_A.array()
+        var in_shape: RankArray = shape_A.array()
+        var in_strides: RankArray = strides_A.array()
         var total_output: Int = output_shape.product()
         var reduced_volume: Int = reduced_shape.product()
-        var input_numels: Int = A.numels()
+        var input_numels: Int = A_layout.numel()
 
         var (threads_per_block, num_blocks) = Self.launch_config[
             max_block_width
         ](total_output, reduced_volume)
 
-        ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu[]
 
@@ -1109,9 +1045,8 @@ struct Reduction[dtype: DType = DType.float32](
 
         ref A_buffer = A_device_state.device_buffer()
 
-        # ── Kernel 1: product_reduce ──────────────────────────────────────────
+        # Kernel 1: product_reduce
         var compiled_product = device_context.compile_function[
-            product_reduce[Self.dtype, max_block_width],
             product_reduce[Self.dtype, max_block_width],
         ]()
 
@@ -1123,28 +1058,29 @@ struct Reduction[dtype: DType = DType.float32](
             in_shape,
             in_strides,
             reduction_axes,
-            total_output,
-            reduced_volume,
+            Int64(total_output),
+            Int64(reduced_volume),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
-        # Wrap output
         var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
-        var out_ndb = NDBuffer[Self.dtype].with_device_state(
-            result_state^, output_shape
+        var out_pair = (
+            Layout(output_shape),
+            result_state^,
         )
 
-        # Wrap zero counts
         var zero_state = DeviceState[DType.int32](zero_counts_buffer^, gpu)
-        var zero_ndb = NDBuffer[DType.int32].with_device_state(
-            zero_state^, output_shape
+        var zero_pair = (
+            Layout(output_shape),
+            zero_state^,
         )
 
-        # ── Kernel 2: excl_product (only if store_excl_product=True) ─────────
-        var excl_optional: Optional[NDBuffer[Self.dtype]] = None
+        # Kernel 2: excl_product (only if store_excl_product=True)
+        var excl_optional: Optional[Tuple[Layout, DeviceState[Self.dtype]]] = None
 
         comptime if store_excl_product:
             var excl_buffer = device_context.enqueue_create_buffer[Self.dtype](
@@ -1158,7 +1094,6 @@ struct Reduction[dtype: DType = DType.float32](
 
             var compiled_excl = device_context.compile_function[
                 excl_product_kernel[Self.dtype, max_block_width],
-                excl_product_kernel[Self.dtype, max_block_width],
             ]()
 
             device_context.enqueue_function(
@@ -1168,41 +1103,35 @@ struct Reduction[dtype: DType = DType.float32](
                 in_shape,
                 in_strides,
                 reduction_axes,
-                total_output,
-                reduced_volume,
+            Int64(total_output),
+            Int64(reduced_volume),
                 grid_dim=excl_blocks,
                 block_dim=excl_threads,
             )
 
-            if sync: device_context.synchronize()
+            if sync:
+                device_context.synchronize()
 
             var excl_state = DeviceState[Self.dtype](excl_buffer^, gpu)
-            var excl_ndb = NDBuffer[Self.dtype].with_device_state(
-                excl_state^, shape_A  # input-shaped
+            excl_optional = Optional(
+                (
+                    Layout(shape_A),
+                    excl_state^,
+                )
             )
-            excl_optional = Optional(excl_ndb^)
 
-        # ── Build ProductArg ──────────────────────────────────────────────────
-        var arg = ProductArg[Self.dtype](
-            input=A,  # original input — always stored
-            excl_product=excl_optional^,
-            zero_counts=zero_ndb^,
-            axes=normalized_axes,
-            keepdims=keepdims,
-            reduced_volume=reduced_volume,
-        )
-
-        return (out_ndb^, arg^)
+        return (out_pair, zero_pair, excl_optional^)
 
     @staticmethod
     def compute_excl_product(
-        A: NDBuffer[Self.dtype],
+        A_layout: Layout,
+        A_device_state: DeviceState[Self.dtype],
         normalized_axes: IntArray,
         keepdims: Bool,
         sync: Bool = False,
-    ) raises -> NDBuffer[Self.dtype]:
-        var shape_A = A.shape
-        var strides_A = A.strides
+    ) raises -> Tuple[Layout, DeviceState[Self.dtype]]:
+        var shape_A = A_layout.shape
+        var strides_A = A_layout.strides
         var output_shape = shape_A.compute_output_shape(
             normalized_axes, keepdims, validated=True
         )
@@ -1212,20 +1141,19 @@ struct Reduction[dtype: DType = DType.float32](
             for i in range(len(shape_A)):
                 normalized_axes_copy[i] = i
 
-        var reduction_axes: Array = Array(normalized_axes_copy)
-        var in_shape: Array = shape_A.array()
-        var in_strides: Array = strides_A.array()
+        var reduction_axes: RankArray = RankArray(normalized_axes_copy)
+        var in_shape: RankArray = shape_A.array()
+        var in_strides: RankArray = strides_A.array()
         var total_output: Int = output_shape.product()
         var reduced_volume: Int = shape_A.reduced_shape(
             normalized_axes
         ).product()
-        var input_numels: Int = A.numels()
+        var input_numels: Int = A_layout.numel()
 
         var (threads_per_block, num_blocks) = Self.launch_config[512](
             total_output, reduced_volume
         )
 
-        ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu[]
 
@@ -1236,7 +1164,6 @@ struct Reduction[dtype: DType = DType.float32](
 
         var compiled = device_context.compile_function[
             excl_product_kernel[Self.dtype, 512],
-            excl_product_kernel[Self.dtype, 512],
         ]()
 
         device_context.enqueue_function(
@@ -1246,28 +1173,36 @@ struct Reduction[dtype: DType = DType.float32](
             in_shape,
             in_strides,
             reduction_axes,
-            total_output,
-            reduced_volume,
+            Int64(total_output),
+            Int64(reduced_volume),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var excl_state = DeviceState[Self.dtype](excl_buffer^, gpu)
-        return NDBuffer[Self.dtype].with_device_state(excl_state^, shape_A)
+        return (
+            Layout(shape_A),
+            excl_state^,
+        )
 
-    # ── LOG SUM EXP (unchanged) ───────────────────────────────────────────────
+    # LOG SUM EXP (unchanged)
 
     @staticmethod
     def launch_log_sum[
         max_block_width: Int = 512,
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](
-            A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool, sync: Bool = False,
-    ) raises -> NDBuffer[Self.dtype]:
-        var shape_A = A.shape
-        var strides_A = A.strides
+        A_layout: Layout,
+        A_device_state: DeviceState[Self.dtype],
+        normalized_axes: IntArray,
+        keepdims: Bool,
+        sync: Bool = False,
+    ) raises -> Tuple[Layout, DeviceState[Self.dtype]]:
+        var shape_A = A_layout.shape
+        var strides_A = A_layout.strides
         var output_shape = shape_A.compute_output_shape(
             normalized_axes, keepdims, validated=True
         )
@@ -1278,10 +1213,10 @@ struct Reduction[dtype: DType = DType.float32](
             for i in range(len(shape_A)):
                 normalized_axes_copy[i] = i
 
-        var reduction_axes: Array = Array(normalized_axes_copy)
+        var reduction_axes: RankArray = RankArray(normalized_axes_copy)
         var reduced_shape = shape_A.reduced_shape(normalized_axes)
-        var in_shape: Array = shape_A.array()
-        var in_strides: Array = strides_A.array()
+        var in_shape: RankArray = shape_A.array()
+        var in_strides: RankArray = strides_A.array()
         var total_output: Int = output_shape.product()
         var reduced_volume: Int = reduced_shape.product()
 
@@ -1289,7 +1224,6 @@ struct Reduction[dtype: DType = DType.float32](
             max_block_width
         ](total_output, reduced_volume)
 
-        ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu[]
         var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
@@ -1303,10 +1237,6 @@ struct Reduction[dtype: DType = DType.float32](
                     max_block_size=max_block_width,
                     epsilon=epsilon.cast[DType.float32](),
                 ],
-                log_sum_exp_f32[
-                    max_block_size=max_block_width,
-                    epsilon=epsilon.cast[DType.float32](),
-                ],
             ]()
             device_context.enqueue_function(
                 compiled_func,
@@ -1315,8 +1245,8 @@ struct Reduction[dtype: DType = DType.float32](
                 in_shape,
                 in_strides,
                 reduction_axes,
-                total_output,
-                reduced_volume,
+            Int64(total_output),
+            Int64(reduced_volume),
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
@@ -1326,10 +1256,6 @@ struct Reduction[dtype: DType = DType.float32](
                     max_block_size=max_block_width,
                     epsilon=epsilon.cast[DType.float64](),
                 ],
-                log_sum_exp_f64[
-                    max_block_size=max_block_width,
-                    epsilon=epsilon.cast[DType.float64](),
-                ],
             ]()
             device_context.enqueue_function(
                 compiled_func,
@@ -1338,8 +1264,8 @@ struct Reduction[dtype: DType = DType.float32](
                 in_shape,
                 in_strides,
                 reduction_axes,
-                total_output,
-                reduced_volume,
+            Int64(total_output),
+            Int64(reduced_volume),
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
@@ -1348,36 +1274,44 @@ struct Reduction[dtype: DType = DType.float32](
                 "Reduction.launch_log_sum: only float32 and float64 supported"
             )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
-        return NDBuffer[Self.dtype].with_device_state(
-            device_state^, output_shape
+        return (
+            Layout(output_shape),
+            device_state^,
         )
 
     @staticmethod
     def launch_welford[
         max_block_width: Int = 512,
     ](
-        A: NDBuffer[Self.dtype],
+        A_layout: Layout,
+        A_device_state: DeviceState[Self.dtype],
         normalized_axes: IntArray,
         keepdims: Bool,
         sync: Bool = False,
-    ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+    ) raises -> Tuple[
+        Tuple[Layout, DeviceState[Self.dtype]], Tuple[Layout, DeviceState[Self.dtype]]
+    ]:
         """Launch Welford mean + M2 reduction on GPU.
 
-        Returns (mean_ndb, M2_ndb). M2 is the unscaled sum of squared
-        deviations. Divide by n for population variance, n-1 for sample.
+        Returns ((mean_layout, mean_storage), (M2_layout, M2_storage)). M2 is
+        the unscaled sum of squared deviations. Divide by n for population
+        variance, n-1 for sample.
 
         Args:
-            A:               Input NDBuffer. Must be on GPU.
+            A_layout:         Input layout.
+            A_device_state:        Input storage. Must be on GPU.
             normalized_axes: Validated, normalised reduction axes.
             keepdims:        Whether to keep reduced dimensions.
+            sync:            Whether to sync GPU after operation.
 
         Returns:
-            Tuple of (mean NDBuffer, M2 NDBuffer), same shape as sum/mean output.
+            (mean pair, M2 pair), same shape as sum/mean output.
         """
-        var shape_A = A.shape
-        var strides_A = A.strides
+        var shape_A = A_layout.shape
+        var strides_A = A_layout.strides
         var output_shape = shape_A.compute_output_shape(
             normalized_axes, keepdims, validated=True
         )
@@ -1388,10 +1322,10 @@ struct Reduction[dtype: DType = DType.float32](
             for i in range(len(shape_A)):
                 normalized_axes_copy[i] = i
 
-        var reduction_axes: Array = Array(normalized_axes_copy)
+        var reduction_axes: RankArray = RankArray(normalized_axes_copy)
         var reduced_shape = shape_A.reduced_shape(normalized_axes)
-        var in_shape: Array = shape_A.array()
-        var in_strides: Array = strides_A.array()
+        var in_shape: RankArray = shape_A.array()
+        var in_strides: RankArray = strides_A.array()
         var total_output: Int = output_shape.product()
         var reduced_volume: Int = reduced_shape.product()
 
@@ -1399,7 +1333,6 @@ struct Reduction[dtype: DType = DType.float32](
             max_block_width
         ](total_output, reduced_volume)
 
-        ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu[]
 
@@ -1415,7 +1348,6 @@ struct Reduction[dtype: DType = DType.float32](
 
         var compiled_func = device_context.compile_function[
             welford_reduce[Self.dtype, max_block_width],
-            welford_reduce[Self.dtype, max_block_width],
         ]()
 
         device_context.enqueue_function(
@@ -1426,36 +1358,33 @@ struct Reduction[dtype: DType = DType.float32](
             in_shape,
             in_strides,
             reduction_axes,
-            total_output,
-            reduced_volume,
+            Int64(total_output),
+            Int64(reduced_volume),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var mean_state = DeviceState[Self.dtype](mean_buffer^, gpu)
         var M2_state = DeviceState[Self.dtype](M2_buffer^, gpu)
 
-        var mean_ndb = NDBuffer[Self.dtype].with_device_state(
-            mean_state^, output_shape
-        )
-        var M2_ndb = NDBuffer[Self.dtype].with_device_state(
-            M2_state^, output_shape
+        return (
+            (
+                Layout(output_shape),
+                mean_state^,
+            ),
+            (
+                Layout(output_shape),
+                M2_state^,
+            ),
         )
 
-        return (mean_ndb^, M2_ndb^)
-
-    # ── launch_config ─────────────────────────────────────────────
+    # launch_config
 
     @staticmethod
     def launch_config[
         max_block_size: Int
     ](total_output: Int, reduced_volume: Int) -> Tuple[Int, Int]:
-        var block_size = 1
-        while block_size < reduced_volume:
-            block_size <<= 1
-            if block_size >= max_block_size:
-                block_size = max_block_size
-                break
-        return (block_size, total_output)
+        return reduction_launch_config[max_block_size](total_output, reduced_volume)

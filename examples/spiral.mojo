@@ -14,7 +14,7 @@ Network Architecture:
     Output: 1 neuron with Sigmoid activation (binary classification).
 
 Key Features Demonstrated:
-     Mini-batch training with DataLoader.
+     Mini-batch training with NativeLoader.
      Train/Validation split.
      Train/Eval mode switching.
      Binary Cross-Entropy loss.
@@ -40,13 +40,20 @@ from tenmo.net import (
     Linear,
     ReLU,
     Sigmoid,
-    BCELoss,
 )
-from tenmo.dataloader import TensorDataset, DataLoader, Batch
+from tenmo.bceloss import BCELoss
+from tenmo.dataloader import TensorDataset, NativeLoader, Batch
 from std.time import perf_counter_ns
 from std.math import sqrt, cos, sin, pi
 from std.random import randn_float64
-from tenmo.intarray import IntArray
+from tenmo.shared.intarray import IntArray
+
+
+def _trunc(s: String, n: Int) -> String:
+    """Truncate a string to at most n bytes (safe for short strings)."""
+    if s.byte_length() > n:
+        return String(s[byte=0:n])
+    return s
 
 
 def generate_spiral_data(
@@ -114,7 +121,7 @@ def train_spiral_classifier():
     """Train a neural network to classify spiral dataset with mini-batch training.
 
     This example demonstrates:
-    1. DataLoader for mini-batch training.
+    1. NativeLoader for mini-batch training.
     2. Train/validation split for generalization monitoring.
     3. Train/eval mode for proper gradient tracking.
     4. Accuracy and loss tracking.
@@ -248,6 +255,7 @@ def train_spiral_classifier():
     print()
 
     var start_time = perf_counter_ns()
+    var curr_lr = optimizer.lr
 
     for epoch in range(num_epochs):
         if epoch == 2500:
@@ -323,22 +331,28 @@ def train_spiral_classifier():
         if epoch % log_interval == 0 or epoch == num_epochs - 1:
             # Calculate average metrics
             var avg_train_loss = epoch_train_loss / Float64(epoch_train_total)
-            var train_accuracy = 100.0 * Float64(epoch_train_correct) / Float64(epoch_train_total)
+            var train_accuracy = (
+                100.0
+                * Float64(epoch_train_correct)
+                / Float64(epoch_train_total)
+            )
             var avg_val_loss = epoch_val_loss / Float64(epoch_val_total)
-            var val_accuracy = 100.0 * Float64(epoch_val_correct) / Float64(epoch_val_total)
+            var val_accuracy = (
+                100.0 * Float64(epoch_val_correct) / Float64(epoch_val_total)
+            )
 
             print(
                 "Epoch",
                 String(epoch).ascii_rjust(5),
                 "| Train Loss:",
-                String(avg_train_loss)[byte=0:7].ascii_rjust(7),
+                _trunc(String(avg_train_loss), 7).ascii_rjust(7),
                 "Acc:",
-                String(train_accuracy)[byte=0:6].ascii_rjust(6),
+                _trunc(String(train_accuracy), 6).ascii_rjust(6),
                 "%",
                 "| Val Loss:",
-                String(avg_val_loss)[byte=0:7].ascii_rjust(7),
+                _trunc(String(avg_val_loss), 7).ascii_rjust(7),
                 "Acc:",
-                String(val_accuracy)[byte=0:6].ascii_rjust(6),
+                _trunc(String(val_accuracy), 6).ascii_rjust(6),
                 "%",
             )
 
@@ -380,7 +394,9 @@ def train_spiral_classifier():
         final_val_total += val_batch.batch_size
 
     var final_avg_val_loss = final_val_loss / Float64(final_val_total)
-    var final_val_accuracy = 100.0 * Float64(final_val_correct) / Float64(final_val_total)
+    var final_val_accuracy = (
+        100.0 * Float64(final_val_correct) / Float64(final_val_total)
+    )
 
     print("Final Validation Loss:", final_avg_val_loss)
     print("Final Validation Accuracy:", final_val_accuracy, "%")
@@ -392,7 +408,9 @@ def train_spiral_classifier():
 
     var batches_per_epoch = len(train_loader)
     var total_batches = num_epochs * batches_per_epoch
-    var ms_per_batch = (training_time_minutes * 60 * 1000) / Float64(total_batches)
+    var ms_per_batch = (training_time_minutes * 60 * 1000) / Float64(
+        total_batches
+    )
 
     print("=" * 80)
     print("Performance Summary")
@@ -400,7 +418,11 @@ def train_spiral_classifier():
     print("Total epochs:", num_epochs)
     print("Total batches processed:", total_batches)
     print("Average time per batch:", ms_per_batch, "ms")
-    print("Average time per epoch:", ms_per_batch * Float64(batches_per_epoch), "ms")
+    print(
+        "Average time per epoch:",
+        ms_per_batch * Float64(batches_per_epoch),
+        "ms",
+    )
     print()
 
     # Determine if training was successful
@@ -410,8 +432,7 @@ def train_spiral_classifier():
         print(" Training good! Model mostly learned the pattern.")
     elif final_val_accuracy > 80.0:
         print(
-            "Training okay. Consider more epochs or different"
-            " hyperparameters."
+            "Training okay. Consider more epochs or different hyperparameters."
         )
     else:
         print(

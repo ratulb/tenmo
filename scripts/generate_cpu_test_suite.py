@@ -27,15 +27,16 @@ OUTPUT = os.path.join(TESTS_DIR, "test_cpu_all.mojo")
 # Files to skip entirely
 SKIP_FILES = {
     "test_gpu_all.mojo",
-    "test_mnist.mojo",       # old import pattern, 0 tests
-    "test_synthetic_mnist.mojo",  # 0 tests
     "test_relu.mojo",        # from tenmo.relu import ReLU causes ambiguity
                              # when tenmo.net is loaded via other imports
     "test_data.mojo",        # from bpe import BasicTokenizer (blocked module)
                              # + Int(ptr) pre-existing bug in 9+ locations
 }
 
-ALLOWED_MODULES = {"tenmo.", "std.", "python."}
+# `bpe.` submodules (e.g. bpe.tokenizer) are safe to inline; bare `bpe`
+# stays blocked (test_data's `from bpe import BasicTokenizer`). The
+# prefix check runs before BLOCKED, so only the bare root is rejected.
+ALLOWED_MODULES = {"tenmo.", "std.", "python.", "bpe."}
 ALLOWED_MODULES_EXACT = {"tenmo", "std"}
 BLOCKED_MODULES = {"tensors", "layers", "bpe", "python"}
 
@@ -336,15 +337,6 @@ def rename_test_function(func_name: str, func_text: str, file_prefix: str, used_
     return new_name, new_text, used_names
 
 
-def rename_alias(alias_line: str, alias_name: str, file_prefix: str) -> str:
-    """Prefix a comptime alias with the file name to avoid collisions.
-
-    comptime SMALL_SIZE = 7  ->  comptime buffers_SMALL_SIZE = 7
-    """
-    new_name = f"{file_prefix}_{alias_name}"
-    return alias_line.replace(alias_name, new_name, 1)
-
-
 def rename_alias_usages_in_text(text: str, old_name: str, new_name: str) -> str:
     """Replace all occurrences of old_name as a whole word in the given text.
 
@@ -557,11 +549,14 @@ def write_chunk(
 
             f.write(f"# === From {bname} ===\n\n")
 
-            # Write per-file aliases (prefixed with file name), skip duplicates
+            # Write per-file aliases (prefixed with file name), skip duplicates.
+            # Apply the alias map to the whole line: values may reference
+            # other aliases from the same file (e.g. `comptime QMIN =
+            # Scalar[F32]`), which must be renamed along with the def.
             if data["aliases"]:
                 first = True
                 for alias_line, alias_name in data["aliases"]:
-                    renamed = rename_alias(alias_line, alias_name, prefix)
+                    renamed = _apply_alias_renames(alias_line)
                     renamed_name = f"{prefix}_{alias_name}"
                     if renamed_name not in seen_aliases:
                         seen_aliases.add(renamed_name)

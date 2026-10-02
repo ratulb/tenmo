@@ -25,13 +25,27 @@ def test_maxmin_cpu_max_1d_backward() raises:
 
 def test_maxmin_cpu_max_1d_boundary() raises:
     comptime dtype = DType.float32
-    # Value exactly equal to scalar — grad should be zero (not strictly greater)
+    # Value exactly equal to scalar — torch.maximum tie convention
+    # (verified torch 2.11.0+cpu): tied elements split upstream 50/50
+    # with the scalar, so a tracked x gets 0.5 here.
     var a = Tensor[dtype].d1([4.0, 4.0, 5.0], requires_grad=True)
     var b = a.max(4.0)
     assert_true(b.all_close(Tensor[dtype].d1([4.0, 4.0, 5.0])))
     var loss = b.sum()
     loss.backward()
-    assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 1.0])))
+    assert_true(a.grad().all_close(Tensor[dtype].d1([0.5, 0.5, 1.0])))
+
+
+def test_maxmin_cpu_max_tie_weighted_matches_torch() raises:
+    comptime dtype = DType.float32
+    # Mirrors torch probe B: maximum([1,2,2], 2.0) weighted by [10,20,30]
+    # gives grad [0, 10, 15] — ties get exactly half upstream.
+    var a = Tensor[dtype].d1([1.0, 2.0, 2.0], requires_grad=True)
+    var b = a.max(2.0)
+    var w = Tensor[dtype].d1([10.0, 20.0, 30.0])
+    var loss = (b * w).sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 10.0, 15.0])))
 
 
 def test_maxmin_cpu_max_2d_forward() raises:
@@ -75,10 +89,11 @@ def test_maxmin_cpu_max_3d_backward() raises:
     var b = a.max(4.0)
     var loss = b.sum()
     loss.backward()
+    # [1][1][0] == scalar: torch.maximum tie → 0.5 upstream.
     assert_true(
         a.grad().all_close(
             Tensor[dtype].d3(
-                [[[0.0, 1.0], [0.0, 1.0]], [[1.0, 0.0], [0.0, 1.0]]]
+                [[[0.0, 1.0], [0.0, 1.0]], [[1.0, 0.0], [0.5, 1.0]]]
             )
         )
     )
@@ -138,13 +153,26 @@ def test_maxmin_cpu_min_1d_backward() raises:
 
 def test_maxmin_cpu_min_1d_boundary() raises:
     comptime dtype = DType.float32
-    # Value exactly equal to scalar — grad should be zero (not strictly less)
+    # Value exactly equal to scalar — torch.minimum tie convention
+    # (verified torch 2.11.0+cpu): tied elements get 0.5 upstream.
     var a = Tensor[dtype].d1([4.0, 4.0, 3.0], requires_grad=True)
     var b = a.min(4.0)
     assert_true(b.all_close(Tensor[dtype].d1([4.0, 4.0, 3.0])))
     var loss = b.sum()
     loss.backward()
-    assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 1.0])))
+    assert_true(a.grad().all_close(Tensor[dtype].d1([0.5, 0.5, 1.0])))
+
+
+def test_maxmin_cpu_min_tie_weighted_matches_torch() raises:
+    comptime dtype = DType.float32
+    # Mirrors torch probe C2: minimum([2,2,3], 2.0) weighted by [10,20,30]
+    # gives grad [5, 10, 0] — ties get exactly half upstream.
+    var a = Tensor[dtype].d1([2.0, 2.0, 3.0], requires_grad=True)
+    var b = a.min(2.0)
+    var w = Tensor[dtype].d1([10.0, 20.0, 30.0])
+    var loss = (b * w).sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d1([5.0, 10.0, 0.0])))
 
 
 def test_maxmin_cpu_min_2d_forward() raises:
@@ -188,10 +216,11 @@ def test_maxmin_cpu_min_3d_backward() raises:
     var b = a.min(4.0)
     var loss = b.sum()
     loss.backward()
+    # [1][1][0] == scalar: torch.minimum tie → 0.5 upstream.
     assert_true(
         a.grad().all_close(
             Tensor[dtype].d3(
-                [[[1.0, 0.0], [1.0, 0.0]], [[0.0, 1.0], [0.0, 0.0]]]
+                [[[1.0, 0.0], [1.0, 0.0]], [[0.0, 1.0], [0.5, 0.0]]]
             )
         )
     )

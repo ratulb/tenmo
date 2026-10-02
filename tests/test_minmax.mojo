@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
-from tenmo.intarray import IntArray
-from tenmo.shapes import Shape
+from tenmo.shared.intarray import IntArray
+from tenmo.shared.shapes import Shape
 from std.sys import has_accelerator
 
 
@@ -48,6 +48,28 @@ def test_mmrev_cpu_max_1d_backward_tied() raises:
     var loss = m.sum()
     loss.backward()
     assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.5, 0.0, 0.5])))
+
+
+def test_mmrev_cpu_max_1d_backward_three_way_tie_matches_torch() raises:
+    comptime dtype = DType.float32
+    # Mirrors torch probe D1: amax([3,3,3]).sum() gives grad 1/3 each —
+    # the 1/tie_count convention (not first-max-wins).
+    var a = Tensor[dtype].d1([3.0, 3.0, 3.0], requires_grad=True)
+    var m = a.max()
+    var loss = m.sum()
+    loss.backward()
+    var third = Tensor[dtype].d1([1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0])
+    assert_true(a.grad().all_close(third))
+
+
+def test_mmrev_cpu_max_1d_backward_partial_tie_matches_torch() raises:
+    comptime dtype = DType.float32
+    # Mirrors torch probe D2: amax([1,3,3,2])*5 gives [0, 2.5, 2.5, 0].
+    var a = Tensor[dtype].d1([1.0, 3.0, 3.0, 2.0], requires_grad=True)
+    var m = a.max()
+    var loss = (m * 5.0).sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 2.5, 2.5, 0.0])))
 
 
 # ── 2D ────────────────────────────────────────────────────────────────────────
@@ -908,6 +930,29 @@ def test_scalar_input() raises:
     assert_true(scalar_b.grad().all_close(Tensor[dtype].scalar(1.0)))
 
 
+def test_scalar_input_clears_intermediate_grad() raises:
+    """Rank-0 MinMaxBackward must clear the output grad.
+    Regression: the rank-0 early return never cleared, so stale grad
+    persisted on the output."""
+    comptime dtype = DType.float32
+    var scalar_a = Tensor[dtype].scalar(42.0, requires_grad=True)
+    var max_scalar = scalar_a.max()
+    max_scalar.backward()
+    assert_true(scalar_a.grad().all_close(Tensor[dtype].scalar(1.0)))
+    assert_true(max_scalar.grad().all_close(Tensor[dtype].scalar(0.0)))
+
+
+def test_scalar_input_scales_upstream_grad() raises:
+    """Rank-0 out == x (single element), so dx must equal the upstream grad.
+    (regression: the rank-0 path fed the all-ones mask unscaled — dx was
+    always 1 regardless of upstream)."""
+    comptime dtype = DType.float32
+    var scalar_a = Tensor[dtype].scalar(42.0, requires_grad=True)
+    var max_scalar = scalar_a.max()
+    max_scalar.backward(start_grad=Scalar[dtype](2.0))
+    assert_true(scalar_a.grad().all_close(Tensor[dtype].scalar(2.0)))
+
+
 # ============================================================================
 # TEST GROUP 2: FULL REDUCTION TO SCALAR (vectorized path)
 # ============================================================================
@@ -1099,7 +1144,7 @@ def test_max_min_mixed() raises:
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
 
-    var max_axes_01 = b.max(IntArray([0, 1]))
+    var max_axes_01 = b.max(IntArray(0, 1))
     assert_true(max_axes_01.all_close(Tensor[dtype].d1([7.0, 8.0])))
     max_axes_01.backward()
     assert_true(
@@ -1139,13 +1184,13 @@ def test_max_min_mixed() raises:
 
 def test_max_min() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].d2(
+    var a = Tensor[dtype].d2(
         [[42.0, 0.0, -5.0], [0.0, 35.0, 0.0], [51.0, 0.0, 51.0]],
         requires_grad=True,
     )
 
-    max_result = a.max(IntArray(1))
-    expected = Tensor[dtype].d1([42.0, 35.0, 51.0])
+    var max_result = a.max(IntArray(1))
+    var expected = Tensor[dtype].d1([42.0, 35.0, 51.0])
     assert_true(max_result.all_close(expected))
 
     max_result.backward()
@@ -1156,7 +1201,7 @@ def test_max_min() raises:
             )
         )
     )
-    min_result = a.min([1])
+    var min_result = a.min([1])
     assert_true(min_result.all_close(Tensor[dtype].d1([-5.0, 0.0, 0.0])))
     min_result.backward()
 
@@ -1313,7 +1358,7 @@ def test_partial_reduction_multiple_axes() raises:
     var a = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
-    var max_axes_01 = a.max(IntArray([0, 1]))
+    var max_axes_01 = a.max(IntArray(0, 1))
     assert_true(max_axes_01.all_close(Tensor[dtype].d1([7.0, 8.0])))
     max_axes_01.backward()
     var expected = Tensor[dtype].d3(
@@ -1323,7 +1368,7 @@ def test_partial_reduction_multiple_axes() raises:
 
     # Test 2: Reduce axes [0, 2] on 3D tensor
     a.zero_grad()
-    var max_axes_02 = a.max(IntArray([0, 2]))
+    var max_axes_02 = a.max(IntArray(0, 2))
     assert_true(max_axes_02.all_close(Tensor[dtype].d1([6.0, 8.0])))
     max_axes_02.backward()
     expected = Tensor[dtype].d3(
@@ -1333,7 +1378,7 @@ def test_partial_reduction_multiple_axes() raises:
 
     # Test 3: Reduce axes [1, 2] on 3D tensor
     a.zero_grad()
-    var max_axes_12 = a.max(IntArray([1, 2]))
+    var max_axes_12 = a.max(IntArray(1, 2))
     assert_true(max_axes_12.all_close(Tensor[dtype].d1([4.0, 8.0])))
     max_axes_12.backward()
     expected = Tensor[dtype].d3(
@@ -1375,7 +1420,7 @@ def test_keepdims() raises:
     var b = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
-    var max_keepdim_multi = b.max(IntArray([0, 2]), keepdims=True)
+    var max_keepdim_multi = b.max(IntArray(0, 2), keepdims=True)
     assert_true(max_keepdim_multi.all_close(Tensor[dtype].d3([[[6.0], [8.0]]])))
     assert_true(max_keepdim_multi.shape() == Shape(1, 2, 1))
     max_keepdim_multi.backward()
@@ -1659,7 +1704,7 @@ def test_negative_axis_indexing() raises:
 
     # Test 3: Multiple negative axes
     b.zero_grad()
-    var max_multi_neg = b.max(IntArray([-2, -1]))
+    var max_multi_neg = b.max(IntArray(-2, -1))
     assert_true(max_multi_neg.all_close(Tensor[dtype].d1([4.0, 8.0])))
     max_multi_neg.backward()
     expected = Tensor[dtype].d3(
@@ -1695,7 +1740,7 @@ def test_high_dimensional_tensors() raises:
 
     # Test 2: 4D tensor, reduce multiple axes
     a.zero_grad()
-    var max_spatial = a.max(IntArray([2, 3]))  # Reduce height and width
+    var max_spatial = a.max(IntArray(2, 3))  # Reduce height and width
     assert_true(max_spatial.shape() == Shape(2, 3))
     assert_true(max_spatial[IntArray(0, 1)] == 100.0)
     assert_true(max_spatial[IntArray(1, 2)] == 200.0)

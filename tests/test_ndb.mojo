@@ -1,13 +1,14 @@
 from std.testing import assert_true, assert_false, TestSuite
-from tenmo.buffers import Buffer
-from tenmo.intarray import IntArray
-from tenmo.shapes import Shape
-from tenmo.common_utils import i, s
-from tenmo.strides import Strides
+from std.python import Python, PythonObject
+from std.sys.defines import get_defined_string
+from tenmo.shared.buffers import Buffer
+from tenmo.shared.intarray import IntArray
+from tenmo.shared.shapes import Shape
+from tenmo.shared.indexhelper import i, s
+from tenmo.shared.strides import Strides
 from tenmo.ndbuffer import NDBuffer
 from tenmo.sum_mean_reduction import SumMeanReduction
-from tenmo.mnemonics import *
-from std.sys import has_accelerator
+from tenmo.shared.mnemonics import *
 from tenmo.tensor import Tensor
 
 # ============================================
@@ -1453,7 +1454,7 @@ def test_ndbuffer_to_dtype() raises:
 def test_ndbuffer_share() raises:
     try:
         var ndb = NDBuffer[DType.int32].full(Shape(2, 3), 42)
-        assert_true(not ndb.is_shared(), "Initially not shared")
+        assert_true(ndb.is_shared(), "Owned buffers shared from birth")
 
         var view = ndb.share()
         assert_true(ndb.is_shared(), "Now shared")
@@ -1495,43 +1496,43 @@ def main() raises:
 
 def test_buffer_sum() raises:
     comptime dtype = DType.int32
-    size = 21
-    l = List[Scalar[dtype]](capacity=size)
+    var size = 21
+    var l = List[Scalar[dtype]](capacity=size)
     for i in range(size):
         l.append(Int32(i))
 
-    buffer = Buffer[dtype](l)
-    ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
-    result = SumMeanReduction[dtype].reduce(ndb, IntArray(0), True)
+    var buffer = Buffer[dtype](l)
+    var ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
+    var result = SumMeanReduction[dtype].reduce(ndb, IntArray(0), True)
     assert_true(
-        result.data_buffer() == Buffer[dtype]([21, 24, 27, 30, 33, 36, 39])
+        result.data_buffer() == Buffer[dtype](21, 24, 27, 30, 33, 36, 39)
     )
 
     result = SumMeanReduction[dtype].reduce(ndb, IntArray(0), False)
     assert_true(
-        result.data_buffer() == Buffer[dtype]([21, 24, 27, 30, 33, 36, 39])
+        result.data_buffer() == Buffer[dtype](21, 24, 27, 30, 33, 36, 39)
     )
 
     result = SumMeanReduction[dtype].reduce(ndb, IntArray(0, 1), True)
-    assert_true(result.data_buffer() == Buffer[dtype]([210]))
+    assert_true(result.data_buffer() == Buffer[dtype](Scalar[dtype](210)))
 
     result = SumMeanReduction[dtype].reduce(ndb, IntArray(1), True)
-    assert_true(result.data_buffer() == Buffer[dtype]([21, 70, 119]))
+    assert_true(result.data_buffer() == Buffer[dtype](21, 70, 119))
 
 
 def test_buffer_sum_all() raises:
     try:
         comptime dtype = DType.int32
-        size = 21
-        l = List[Scalar[dtype]](capacity=size)
+        var size = 21
+        var l = List[Scalar[dtype]](capacity=size)
         for i in range(size):
             l.append(Int32(i))
 
-        buffer = Buffer[dtype](l)
-        ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
+        var buffer = Buffer[dtype](l)
+        var ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
 
         assert_true(SumMeanReduction[dtype].sum_all(ndb) == 210)
-        shared = ndb.share(Shape(5, 2), offset=1, strides=Strides(2, 2))
+        var shared = ndb.share(Shape(5, 2), offset=1, strides=Strides(2, 2))
         assert_true(SumMeanReduction[dtype].sum_all(shared) == 60)
         # Scalar
         ndb = NDBuffer[dtype](Shape())
@@ -1563,275 +1564,342 @@ def test_buffer_sum_all() raises:
 
 def test_buffer_overwrite() raises:
     comptime dtype = DType.int32
-    size = 21
-    l = List[Scalar[dtype]](capacity=size)
+    var size = 21
+    var l = List[Scalar[dtype]](capacity=size)
     for i in range(size):
         l.append(Int32(i))
 
-    buffer = Buffer[dtype](l)
-    ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
-    result = Buffer[dtype]([42, 42, 42])
+    var buffer = Buffer[dtype](l)
+    var ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
+    var result = Buffer[dtype](42, 42, 42)
     ndb.data_buffer().overwrite(result, 3, 6)
 
 
 def test_compare_buffer() raises:
     comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
-    ndb2 = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 3, 4, 6]), Shape(2, 3))
-    result = ndb.compare[GreaterThan](ndb2)
+    var ndb = NDBuffer[dtype](Buffer[dtype](1, 2, 3, 4, 5, 6), Shape(2, 3))
+    var ndb2 = NDBuffer[dtype](Buffer[dtype](1, 2, 3, 3, 4, 6), Shape(2, 3))
+    var result = ndb.compare[GreaterThan](ndb2)
     assert_true(
         result.data_buffer()
-        == Buffer[DType.bool]([False, False, False, True, True, False])
+        == Buffer[DType.bool](False, False, False, True, True, False)
     )
 
 
 def test_compare_scalar() raises:
     comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
-    result = ndb.compare_scalar[GreaterThan](3)
+    var ndb = NDBuffer[dtype](Buffer[dtype](1, 2, 3, 4, 5, 6), Shape(2, 3))
+    var result = ndb.compare_scalar[GreaterThan](3)
     assert_true(
         result.data_buffer()
-        == Buffer[DType.bool]([False, False, False, True, True, True])
+        == Buffer[DType.bool](False, False, False, True, True, True)
     )
 
-    shared = ndb.share(Shape(1, 3), strides=Strides(1, 2), offset=1)
+    var shared = ndb.share(Shape(1, 3), strides=Strides(1, 2), offset=1)
     result = shared.compare_scalar[Equal](4)
-    assert_true(
-        result.data_buffer() == Buffer[DType.bool]([False, True, False])
-    )
+    assert_true(result.data_buffer() == Buffer[DType.bool](False, True, False))
 
 
 def test_inplace_broadcast_operations() raises:
     comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
-    ndb2 = NDBuffer[dtype](Buffer[dtype]([1, 2, 3]), Shape(3))
+    var ndb = NDBuffer[dtype](Buffer[dtype](1, 2, 3, 4, 5, 6), Shape(2, 3))
+    var ndb2 = NDBuffer[dtype](Buffer[dtype](1, 2, 3), Shape(3))
     ndb += ndb2
-    assert_true(ndb.data_buffer() == Buffer[dtype]([2, 4, 6, 5, 7, 9]))
+    assert_true(ndb.data_buffer() == Buffer[dtype](2, 4, 6, 5, 7, 9))
 
     ndb -= ndb2
-    assert_true(ndb.data_buffer() == Buffer[dtype]([1, 2, 3, 4, 5, 6]))
+    assert_true(ndb.data_buffer() == Buffer[dtype](1, 2, 3, 4, 5, 6))
 
-    ndb_shared = ndb.share()
-    ndb2_shared = ndb2.share()
+    var ndb_shared = ndb.share()
+    var ndb2_shared = ndb2.share()
 
     ndb_shared += ndb2_shared
-    assert_true(ndb.data_buffer() == Buffer[dtype]([2, 4, 6, 5, 7, 9]))
+    assert_true(ndb.data_buffer() == Buffer[dtype](2, 4, 6, 5, 7, 9))
 
     ndb_shared -= ndb2_shared
-    assert_true(ndb.data_buffer() == Buffer[dtype]([1, 2, 3, 4, 5, 6]))
+    assert_true(ndb.data_buffer() == Buffer[dtype](1, 2, 3, 4, 5, 6))
 
 
 def test_inplace_operations() raises:
     comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](
-        Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9]), Shape(3, 3)
-    )
-    ndb2 = NDBuffer[dtype](
-        Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9]), Shape(3, 3)
+    var ndb = NDBuffer[dtype](Buffer[dtype](1, 2, 3, 4, 5, 6, 7, 8, 9), Shape(3, 3))
+    var ndb2 = NDBuffer[dtype](
+        Buffer[dtype](1, 2, 3, 4, 5, 6, 7, 8, 9), Shape(3, 3)
     )
     ndb += ndb2
     assert_true(
-        ndb.data_buffer() == Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9]) * 2
+        ndb.data_buffer() == Buffer[dtype](1, 2, 3, 4, 5, 6, 7, 8, 9) * 2
     )
     ndb -= ndb2
-    assert_true(ndb.data_buffer() == Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9]))
+    assert_true(ndb.data_buffer() == Buffer[dtype](1, 2, 3, 4, 5, 6, 7, 8, 9))
     ndb *= ndb2
     assert_true(
-        ndb.data_buffer() == Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9]) ** 2
+        ndb.data_buffer() == Buffer[dtype](1, 2, 3, 4, 5, 6, 7, 8, 9) ** 2
     )
     ndb /= ndb2
-    assert_true(ndb.data_buffer() == Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9]))
+    assert_true(ndb.data_buffer() == Buffer[dtype](1, 2, 3, 4, 5, 6, 7, 8, 9))
 
-    shared = ndb.share()
+    var shared = ndb.share()
 
     ndb += ndb2
     assert_true(
-        shared.data_buffer() == Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9]) * 2
+        shared.data_buffer() == Buffer[dtype](1, 2, 3, 4, 5, 6, 7, 8, 9) * 2
     )
     ndb -= ndb2
     assert_true(
-        shared.data_buffer() == Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9])
+        shared.data_buffer() == Buffer[dtype](1, 2, 3, 4, 5, 6, 7, 8, 9)
     )
     ndb *= ndb2
     assert_true(
-        shared.data_buffer() == Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9]) ** 2
+        shared.data_buffer() == Buffer[dtype](1, 2, 3, 4, 5, 6, 7, 8, 9) ** 2
     )
     ndb /= ndb2
     assert_true(
-        shared.data_buffer() == Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9])
+        shared.data_buffer() == Buffer[dtype](1, 2, 3, 4, 5, 6, 7, 8, 9)
     )
 
-    shared2 = ndb.share(Shape(2, 3), offset=3)
-    ndb2_shared = ndb2.share(Shape(2, 3))
+    var shared2 = ndb.share(Shape(2, 3), offset=3)
+    var ndb2_shared = ndb2.share(Shape(2, 3))
 
     shared2 += ndb2_shared
 
     assert_true(
-        ndb.data_buffer() == Buffer[dtype]([1, 2, 3, 5, 7, 9, 11, 13, 15])
+        ndb.data_buffer() == Buffer[dtype](1, 2, 3, 5, 7, 9, 11, 13, 15)
     )
     shared2 -= ndb2_shared
 
-    assert_true(ndb.data_buffer() == Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9]))
+    assert_true(ndb.data_buffer() == Buffer[dtype](1, 2, 3, 4, 5, 6, 7, 8, 9))
 
-    shared3 = ndb.share(Shape(1, 3), offset=3, strides=Strides(1, 2))
-    shared4 = ndb2.share(Shape(1, 3), strides=Strides(1, 3))
+    var shared3 = ndb.share(Shape(1, 3), offset=3, strides=Strides(1, 2))
+    var shared4 = ndb2.share(Shape(1, 3), strides=Strides(1, 3))
 
     shared3 += shared4
 
-    assert_true(
-        ndb.data_buffer() == Buffer[dtype]([1, 2, 3, 5, 5, 10, 7, 15, 9])
-    )
+    assert_true(ndb.data_buffer() == Buffer[dtype](1, 2, 3, 5, 5, 10, 7, 15, 9))
 
 
 def test_unique() raises:
     comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](Buffer[dtype]([2, 2, 3, 4, 2, 6]), Shape(2, 3))
-    assert_true(ndb.unique().data_buffer() == Buffer[dtype]([2, 3, 4, 6]))
+    var ndb = NDBuffer[dtype](Buffer[dtype](2, 2, 3, 4, 2, 6), Shape(2, 3))
+    assert_true(ndb.unique().data_buffer() == Buffer[dtype](2, 3, 4, 6))
 
 
 def test_count() raises:
     comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](Buffer[dtype]([2, 2, 3, 4, 2, 6]), Shape(2, 3))
+    var ndb = NDBuffer[dtype](Buffer[dtype](2, 2, 3, 4, 2, 6), Shape(2, 3))
     assert_true(ndb.count(2) == 3)
-    shared = ndb.share()
+    var shared = ndb.share()
     assert_true(
         shared.count(2) == 3 and ndb.count(2) == 3 and ndb.count(3) == 1
     )
-    share2 = shared.share(Shape(5, 1), offset=1)
+    var share2 = shared.share(Shape(5, 1), offset=1)
     assert_true(share2.count(2) == 2)
-    share3 = ndb.share(Shape(2))
+    var share3 = ndb.share(Shape(2))
     assert_true(share3.count(2) == 2)
-    share4 = ndb.share(Shape(1))
+    var share4 = ndb.share(Shape(1))
     assert_true(share4.count(2) == 1)
 
 
 def test_scalar_inplace_update() raises:
     comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
+    var ndb = NDBuffer[dtype](Buffer[dtype](1, 2, 3, 4, 5, 6), Shape(2, 3))
     ndb.inplace_scalar_ops[Add](99)
     assert_true(
-        ndb.data_buffer() == Buffer[dtype]([100, 101, 102, 103, 104, 105])
+        ndb.data_buffer() == Buffer[dtype](100, 101, 102, 103, 104, 105)
     )
-    shared = ndb.share(Shape(3, 1), offset=3)
+    var shared = ndb.share(Shape(3, 1), offset=3)
     shared.inplace_scalar_ops[Add](10)
     assert_true(
-        ndb.data_buffer() == Buffer[dtype]([100, 101, 102, 113, 114, 115])
+        ndb.data_buffer() == Buffer[dtype](100, 101, 102, 113, 114, 115)
     )
 
-    shared2 = ndb.share(Shape(1, 3), offset=0, strides=Strides(1, 2))
+    var shared2 = ndb.share(Shape(1, 3), offset=0, strides=Strides(1, 2))
     shared2.inplace_scalar_ops[Add](100)
     assert_true(
-        ndb.data_buffer() == Buffer[dtype]([200, 101, 202, 113, 214, 115])
+        ndb.data_buffer() == Buffer[dtype](200, 101, 202, 113, 214, 115)
     )
 
 
 def test_element_at() raises:
     comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
-    shared = ndb.share(Shape(3, 1), offset=3)
-    assert_true(shared.max_index() == 5 and shared.get(shared.max_index()) == 6)
+    var ndb = NDBuffer[dtype](Buffer[dtype](1, 2, 3, 4, 5, 6), Shape(2, 3))
+    var shared = ndb.share(Shape(3, 1), offset=3)
+    assert_true(
+        shared.max_storage_index() == 5
+        and shared.max_index() == 2
+        and shared.get(2) == 6
+        and shared.storage_get(5) == 6
+    )
+
+
+def test_storage_get_set_negative_wrap() raises:
+    comptime dtype = DType.float32
+    # Contiguous buffer: -1 wraps to the last address.
+    var ndb = NDBuffer[dtype](
+        Buffer[dtype](10, 20, 30, 40, 50, 60), Shape(2, 3)
+    )
+    assert_true(ndb.storage_get(-1) == 60)
+    ndb.storage_set(-1, 61)
+    assert_true(ndb.storage_get(5) == 61)
+    assert_true(ndb.get(-1) == 61)
+
+    # Offset view: -1 wraps to the last TOUCHED address (5).
+    var ndb2 = NDBuffer[dtype](
+        Buffer[dtype](1, 2, 3, 4, 5, 6), Shape(2, 3)
+    )
+    var shared = ndb2.share(Shape(3, 1), offset=3)
+    assert_true(shared.storage_get(-1) == 6)
+    shared.storage_set(-1, 60)
+    assert_true(ndb2.storage_get(5) == 60)
+    assert_true(shared.get(-1) == 60)
+
+    # Negative-stride view: -1 honors strides (last touched is address 4).
+    var buf3 = Buffer[dtype](1, 2, 3, 4, 5)
+    var ndb3 = NDBuffer[dtype](buf3^, Shape(5), Strides(-1), offset=4)
+    assert_true(ndb3.min_storage_index() == 0)
+    assert_true(ndb3.max_storage_index() == 4)
+    assert_true(ndb3.storage_get(-1) == 5)
+    assert_true(ndb3.get(-1) == 1)
+
+
+def _spawn_storage_probe(name: String) raises -> PythonObject:
+    """Run storage probe `name` from the minimal probe harness in a child."""
+    var script = (
+        "__import__('subprocess').run("
+        + "['pixi', 'run', 'mojo', '-I', '.', "
+        + "'tests/test_ndb_storage_probes.mojo', "
+        + "'--probe-" + name + "'], "
+        + "capture_output=True, text=True, timeout=1200)"
+    )
+    return Python.evaluate(script)
+
+
+def test_storage_get_set_floor_panics() raises:
+    # NOTE: children execute only under -D subprocess=1 (else vacuous
+    # pass) — e.g. `pixi run mojo -I . -D subprocess=1 tests/test_ndb.mojo`.
+    comptime subprocess = get_defined_string["subprocess", ""]()
+    comptime if not subprocess == "":
+        var get_probe = _spawn_storage_probe("get-floor")
+        var get_out = String(get_probe.stdout) + String(get_probe.stderr)
+        assert_true(
+            String(get_probe.returncode) != "0",
+            "storage_get below min_storage_index exits non-zero",
+        )
+        assert_true(
+            get_out.find("NDBuffer → storage_get: index out of bounds") >= 0,
+            "storage_get floor panic reports a precise diagnostic",
+        )
+
+        var set_probe = _spawn_storage_probe("set-floor")
+        var set_out = String(set_probe.stdout) + String(set_probe.stderr)
+        assert_true(
+            String(set_probe.returncode) != "0",
+            "storage_set below min_storage_index exits non-zero",
+        )
+        assert_true(
+            set_out.find("NDBuffer → storage_set: index out of bounds") >= 0,
+            "storage_set floor panic reports a precise diagnostic",
+        )
 
 
 def test_scalar_ops() raises:
     comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
-    ndb_shared = ndb.share(Shape(1, 3), offset=3)
-    result = ndb_shared.scalar_ops[Add](42)
-    assert_true(result.data_buffer() == Buffer[dtype]([46, 47, 48]))
+    var ndb = NDBuffer[dtype](Buffer[dtype](1, 2, 3, 4, 5, 6), Shape(2, 3))
+    var ndb_shared = ndb.share(Shape(1, 3), offset=3)
+    var result = ndb_shared.scalar_ops[Add](42)
+    assert_true(result.data_buffer() == Buffer[dtype](46, 47, 48))
 
 
 def test_dtype_conversion() raises:
     comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
-    ndb_shared = ndb.share(Shape(1, 3), offset=3)
-    converted = ndb_shared.to_dtype[DType.float64]()
+    var ndb = NDBuffer[dtype](Buffer[dtype](1, 2, 3, 4, 5, 6), Shape(2, 3))
+    var ndb_shared = ndb.share(Shape(1, 3), offset=3)
+    var converted = ndb_shared.to_dtype[DType.float64]()
 
     assert_true(
-        converted.data_buffer() == Buffer[DType.float64]([4, 5, 6])
-        and not converted.is_shared()
+        converted.data_buffer() == Buffer[DType.float64](4, 5, 6)
+        and converted.is_shared()
         and converted.strides == Strides(3, 1)
-        and converted._contiguous
+        and converted.is_contiguous()
     )
 
 
 def test_equal() raises:
     comptime dtype = DType.float32
-    ndb1 = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
-    ndb1_shared = ndb1.share(Shape(1, 3), offset=3)
-    ndb2 = NDBuffer[dtype](Buffer[dtype]([4, 10, 6]), Shape(1, 3))
-    result = ndb1_shared.compare[Equal](ndb2)
-    assert_true(result.data_buffer() == Buffer[DType.bool]([True, False, True]))
+    var ndb1 = NDBuffer[dtype](Buffer[dtype](1, 2, 3, 4, 5, 6), Shape(2, 3))
+    var ndb1_shared = ndb1.share(Shape(1, 3), offset=3)
+    var ndb2 = NDBuffer[dtype](Buffer[dtype](4, 10, 6), Shape(1, 3))
+    var result = ndb1_shared.compare[Equal](ndb2)
+    assert_true(result.data_buffer() == Buffer[DType.bool](True, False, True))
 
 
 def test_add() raises:
     comptime dtype = DType.float32
-    ndb1 = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
-    ndb1_shared = ndb1.share(Shape(1, 3), offset=3)
-    ndb2 = NDBuffer[dtype](Buffer[dtype]([10, 20, 30]), Shape(1, 3))
+    var ndb1 = NDBuffer[dtype](Buffer[dtype](1, 2, 3, 4, 5, 6), Shape(2, 3))
+    var ndb1_shared = ndb1.share(Shape(1, 3), offset=3)
+    var ndb2 = NDBuffer[dtype](Buffer[dtype](10, 20, 30), Shape(1, 3))
 
-    result = ndb1_shared + ndb2
+    var result = ndb1_shared + ndb2
     assert_true(
-        result.data_buffer() == Buffer[dtype]([14, 25, 36])
-        and result.is_shared() == False
+        result.data_buffer() == Buffer[dtype](14, 25, 36)
+        and result.is_shared()
     )
 
 
 def test_zero() raises:
     comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](Shape(2, 3))
+    var ndb = NDBuffer[dtype](Shape(2, 3))
     ndb.fill(42)
-    shared = ndb.share(Shape(3), offset=3)
+    var shared = ndb.share(Shape(3), offset=3)
     shared.zero()
-    assert_true(ndb.data_buffer() == Buffer[dtype]([42, 42, 42, 0, 0, 0]))
+    assert_true(ndb.data_buffer() == Buffer[dtype](42, 42, 42, 0, 0, 0))
 
 
 def test_broadcast_fill() raises:
     comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](Shape(2, 3))
-    filler = NDBuffer[dtype](Shape(2, 1))
+    var ndb = NDBuffer[dtype](Shape(2, 3))
+    var filler = NDBuffer[dtype](Shape(2, 1))
     filler.fill(42)
     ndb.fill(filler)
-    assert_true(ndb.data_buffer() == Buffer[dtype]([42, 42, 42, 42, 42, 42]))
+    assert_true(ndb.data_buffer() == Buffer[dtype](42, 42, 42, 42, 42, 42))
 
     filler.fill(89)
-    shared = filler.share()
+    var shared = filler.share()
     ndb.fill(shared)
-    assert_true(ndb.data_buffer() == Buffer[dtype]([89, 89, 89, 89, 89, 89]))
+    assert_true(ndb.data_buffer() == Buffer[dtype](89, 89, 89, 89, 89, 89))
 
 
 def test_fill_2() raises:
     comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](Shape(2, 3))
-    filler = NDBuffer[dtype](Shape(2, 3))
+    var ndb = NDBuffer[dtype](Shape(2, 3))
+    var filler = NDBuffer[dtype](Shape(2, 3))
     filler.fill(91)
     ndb.fill(filler)
     assert_true(ndb.data_buffer() == Buffer[dtype].full(91, 6))
 
-    shared1 = ndb.share(Shape(3), offset=3)
+    var shared1 = ndb.share(Shape(3), offset=3)
     filler = NDBuffer[dtype](Shape(3))
     filler.fill(92)
     shared1.fill(filler)
 
-    assert_true(
-        shared1.data_buffer() == Buffer[dtype]([91, 91, 91, 92, 92, 92])
-    )
-    assert_true(ndb.data_buffer() == Buffer[dtype]([91, 91, 91, 92, 92, 92]))
+    assert_true(shared1.data_buffer() == Buffer[dtype](91, 91, 91, 92, 92, 92))
+    assert_true(ndb.data_buffer() == Buffer[dtype](91, 91, 91, 92, 92, 92))
 
     # Left contiguous, right non-contiguous
     ndb = NDBuffer[dtype](Shape(2, 2))
     filler = NDBuffer[dtype](Shape(2, 1, 4))
     filler.fill(102)
-    filler_shared = filler.share(Shape(2, 2), offset=4)
+    var filler_shared = filler.share(Shape(2, 2), offset=4)
     ndb.fill(filler_shared)
 
-    assert_true(ndb.data_buffer() == Buffer[dtype]([102, 102, 102, 102]))
+    assert_true(ndb.data_buffer() == Buffer[dtype](102, 102, 102, 102))
     # Both shared
     ndb = NDBuffer[dtype](Shape(2, 2))
     filler_shared.fill(31)
-    ndb_shared = ndb.share()
+    var ndb_shared = ndb.share()
     ndb_shared.fill(filler_shared)
 
-    assert_true(ndb.data_buffer() == Buffer[dtype]([31, 31, 31, 31]))
+    assert_true(ndb.data_buffer() == Buffer[dtype](31, 31, 31, 31))
 
     filler = NDBuffer[dtype](Shape(2, 1, 4))
     filler.fill(1919)
@@ -1841,21 +1909,19 @@ def test_fill_2() raises:
     ndb_shared.fill(filler_shared)
 
     assert_true(
-        ndb.data_buffer() == Buffer[dtype]([1919, 1919, 1919, 1919])
-        and not filler_shared._contiguous,
+        ndb.data_buffer() == Buffer[dtype](1919, 1919, 1919, 1919)
+        and not filler_shared.is_contiguous(),
     )
     # Left non-contiguous and right contiguous
-    filler1 = NDBuffer[dtype](Shape(2, 2))
+    var filler1 = NDBuffer[dtype](Shape(2, 2))
     filler1.fill(47)
 
-    ndb1 = NDBuffer[dtype](Shape(2, 1, 4))
+    var ndb1 = NDBuffer[dtype](Shape(2, 1, 4))
     ndb1.fill(1)
-    ndb_shared1 = ndb1.share(Shape(2, 2), strides=Strides(1, 2), offset=1)
+    var ndb_shared1 = ndb1.share(Shape(2, 2), strides=Strides(1, 2), offset=1)
     ndb_shared1.fill(filler1)
 
-    assert_true(
-        ndb1.data_buffer() == Buffer[dtype]([1, 47, 47, 47, 47, 1, 1, 1])
-    )
+    assert_true(ndb1.data_buffer() == Buffer[dtype](1, 47, 47, 47, 47, 1, 1, 1))
 
     # left and right No contiguous
 
@@ -1885,64 +1951,62 @@ def test_fill_2() raises:
         22,
         23,
     )
-    ndb1_shared = ndb1.share(Shape(2, 3), strides=Strides(1, 2), offset=12)
+    var ndb1_shared = ndb1.share(Shape(2, 3), strides=Strides(1, 2), offset=12)
 
-    ndb2 = NDBuffer[dtype](
+    var ndb2 = NDBuffer[dtype](
         10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160
     )
-    ndb2_shared = ndb2.share(Shape(2, 3), strides=Strides(1, 3), offset=0)
+    var ndb2_shared = ndb2.share(Shape(2, 3), strides=Strides(1, 3), offset=0)
 
     ndb1_shared.fill(ndb2_shared)
     assert_true(
         ndb1.data_buffer()
         == Buffer[dtype](
-            [
-                0,
-                1,
-                2,
-                3,
-                4,
-                5,
-                6,
-                7,
-                8,
-                9,
-                10,
-                11,
-                10,
-                20,
-                40,
-                50,
-                70,
-                80,
-                18,
-                19,
-                20,
-                21,
-                22,
-                23,
-            ]
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            10,
+            20,
+            40,
+            50,
+            70,
+            80,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
         )
     )
 
-    ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8]))
+    ndb = NDBuffer[dtype](Buffer[dtype](1, 2, 3, 4, 5, 6, 7, 8))
     ndb_shared = ndb.share(Shape(3), offset=2)
     ndb_shared.fill(42)
     assert_true(
-        ndb_shared.data_buffer() == Buffer[dtype]([1, 2, 42, 42, 42, 6, 7, 8])
+        ndb_shared.data_buffer() == Buffer[dtype](1, 2, 42, 42, 42, 6, 7, 8)
     )
 
 
 def test_ndbuffer_fill_orig() raises:
     comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](Shape(8))
+    var ndb = NDBuffer[dtype](Shape(8))
     ndb.fill(42)
-    expected = Buffer[dtype].full(42, 8)
+    var expected = Buffer[dtype].full(42, 8)
     assert_true(
         ndb.data_buffer() == expected, "NDBuffer fill assertion 1 failed"
     )
-    assert_false(ndb.is_shared(), "NDBuffer not shared assertion failed")
-    shared = ndb.share()
+    assert_true(ndb.is_shared(), "NDBuffer shared-from-birth assertion failed")
+    var shared = ndb.share()
     assert_true(
         ndb.is_shared(), "NDBuffer shared assertion failed - post sharing"
     )
@@ -1951,7 +2015,7 @@ def test_ndbuffer_fill_orig() raises:
     assert_true(
         ndb.data_buffer() == expected, "NDBuffer fill assertion 2 failed"
     )
-    share2 = ndb.share(Shape(3), Strides(2), offset=2)
+    var share2 = ndb.share(Shape(3), Strides(2), offset=2)
     share2.fill(81)
     var l: List[Scalar[dtype]] = [91, 91, 81, 91, 81, 91, 81, 91]
 
@@ -1963,7 +2027,7 @@ def test_ndbuffer_fill_orig() raises:
         "Fill via shape, strides and offset failed",
     )
     ndb = NDBuffer[dtype](Shape(1))
-    filler = NDBuffer[dtype](Shape(1))
+    var filler = NDBuffer[dtype](Shape(1))
     filler.fill(39)
     ndb.fill(filler)
     assert_true(ndb.item() == 39)
@@ -1981,7 +2045,7 @@ def test_ndbuffer_fill_orig() raises:
 
     comptime _Bool = Scalar[DType.bool]
 
-    _list = List[Scalar[DType.bool]](
+    var _list = List[Scalar[DType.bool]](
         [
             _Bool(True),
             _Bool(True),
@@ -1994,9 +2058,9 @@ def test_ndbuffer_fill_orig() raises:
             _Bool(True),
         ]
     )
-    buff = Buffer[DType.bool](_list.copy())
-    ndb_bool = NDBuffer[DType.bool](buff.copy())
-    ndb_bool_shared = ndb_bool.share(Shape(5), offset=1)
+    var buff = Buffer[DType.bool](_list.copy())
+    var ndb_bool = NDBuffer[DType.bool](buff.copy())
+    var ndb_bool_shared = ndb_bool.share(Shape(5), offset=1)
     ndb_bool_shared.fill(False)
     assert_true(
         ndb_bool.data_buffer()
@@ -2008,48 +2072,48 @@ def test_ndbuffer_fill_orig() raises:
 
 def test_ndbuffer_broadcast_ops() raises:
     comptime dtype = DType.float32
-    buffer1 = Buffer[dtype]([42, 42, 42, 42, 42, 42])
-    shape1 = Shape(2, 3)
-    ndbuffer1 = NDBuffer[dtype](buffer1^, shape1)
+    var buffer1 = Buffer[dtype](42, 42, 42, 42, 42, 42)
+    var shape1 = Shape(2, 3)
+    var ndbuffer1 = NDBuffer[dtype](buffer1^, shape1)
 
-    buffer2 = Buffer[dtype]([3, 3, 3])
-    shape2 = Shape(3)
-    ndbuffer2 = NDBuffer[dtype](buffer2^, shape2)
+    var buffer2 = Buffer[dtype](3, 3, 3)
+    var shape2 = Shape(3)
+    var ndbuffer2 = NDBuffer[dtype](buffer2^, shape2)
 
-    result = ndbuffer1.arithmetic_ops[Add](ndbuffer2)
+    var result = ndbuffer1.arithmetic_ops[Add](ndbuffer2)
     assert_true(
-        result.data_buffer() == (Buffer[dtype]([42, 42, 42, 42, 42, 42]) + 3)
+        result.data_buffer() == (Buffer[dtype](42, 42, 42, 42, 42, 42) + 3)
     )
 
     result = result.arithmetic_ops[Subtract](ndbuffer2)
-    assert_true(result.data_buffer() == Buffer[dtype]([42, 42, 42, 42, 42, 42]))
+    assert_true(result.data_buffer() == Buffer[dtype](42, 42, 42, 42, 42, 42))
 
 
 def test_ndbuffer_inplace_ops() raises:
     comptime dtype = DType.float32
-    buffer1 = Buffer[dtype](30)
+    var buffer1 = Buffer[dtype](30)
     buffer1.fill(42)
-    shape = Shape(5, 6)
-    ndbuffer1 = NDBuffer[dtype](buffer1^, shape, None)
-    index1 = IntArray(4, 5)
+    var shape = Shape(5, 6)
+    var ndbuffer1 = NDBuffer[dtype](buffer1^, shape, None)
+    var index1 = IntArray(4, 5)
     assert_true(ndbuffer1[index1] == 42, "NDBuffer get failed")
 
-    buffer2 = Buffer[dtype](30)
+    var buffer2 = Buffer[dtype](30)
     buffer2.fill(24)
-    shape1 = Shape(5, 6)
-    ndbuffer2 = NDBuffer[dtype](buffer2^, shape1, None)
+    var shape1 = Shape(5, 6)
+    var ndbuffer2 = NDBuffer[dtype](buffer2^, shape1, None)
 
-    _shared = ndbuffer1.share(shape1)
+    var _shared = ndbuffer1.share(shape1)
     ndbuffer1 += ndbuffer2
     # ndbuffer1.__iadd__[check_contiguity=False](ndbuffer2)
 
-    expected = Buffer[dtype].full(66, 30)
+    var expected = Buffer[dtype].full(66, 30)
 
     assert_true(
         ndbuffer1.data_buffer() == expected, "In place add failed for NDBuffer"
     )
 
-    shared_buffer = ndbuffer1.share(shape1)
+    var shared_buffer = ndbuffer1.share(shape1)
     assert_true(
         shared_buffer.data_buffer() == expected, "NDBuffer sharing failed"
     )
@@ -2058,10 +2122,10 @@ def test_ndbuffer_inplace_ops() raises:
 
 def test_ndbuffer_set_get() raises:
     comptime dtype = DType.float32
-    buffer = Buffer[dtype](1)
+    var buffer = Buffer[dtype](1)
     buffer[0] = 42
-    shape = Shape()
-    ndbuffer = NDBuffer[dtype](buffer.copy(), shape, None)
+    var shape = Shape()
+    var ndbuffer = NDBuffer[dtype](buffer.copy(), shape, None)
     assert_true(ndbuffer[IntArray()] == 42, "NDBuffer get failed")
     ndbuffer[IntArray()] = 97
     assert_true(ndbuffer[IntArray()] == 97, "NDBuffer get failed post update")
@@ -2070,7 +2134,7 @@ def test_ndbuffer_set_get() raises:
 
 
 # ============================================================
-# max_index / min_index Tests
+# max_storage_index / min_storage_index Tests
 # Prefix: ndb_minmax_
 # ============================================================
 
@@ -2083,8 +2147,9 @@ def ndb_minmax_1d_contiguous() raises:
     # min = 0, max = 0 + 4*1 = 4
     var buf = Buffer[DType.float32](5)
     var ndb = NDBuffer[DType.float32](buf^, Shape(5), Strides(1), offset=0)
-    assert_true(ndb.min_index() == 0, "1d_contiguous: min_index should be 0")
-    assert_true(ndb.max_index() == 4, "1d_contiguous: max_index should be 4")
+    assert_true(ndb.min_storage_index() == 0, "1d_contiguous: min_storage_index should be 0")
+    assert_true(ndb.max_storage_index() == 4, "1d_contiguous: max_storage_index should be 4")
+    assert_true(ndb.max_index() == 4, "1d_contiguous: logical max_index should be 4")
 
 
 def ndb_minmax_1d_with_offset() raises:
@@ -2092,8 +2157,9 @@ def ndb_minmax_1d_with_offset() raises:
     # min = 3, max = 3 + 4*1 = 7
     var buf = Buffer[DType.float32](10)
     var ndb = NDBuffer[DType.float32](buf^, Shape(5), Strides(1), offset=3)
-    assert_true(ndb.min_index() == 3, "1d_with_offset: min_index should be 3")
-    assert_true(ndb.max_index() == 7, "1d_with_offset: max_index should be 7")
+    assert_true(ndb.min_storage_index() == 3, "1d_with_offset: min_storage_index should be 3")
+    assert_true(ndb.max_storage_index() == 7, "1d_with_offset: max_storage_index should be 7")
+    assert_true(ndb.max_index() == 4, "1d_with_offset: logical max_index should be 4")
 
 
 def ndb_minmax_1d_negative_stride() raises:
@@ -2103,11 +2169,12 @@ def ndb_minmax_1d_negative_stride() raises:
     var buf = Buffer[DType.float32](10)
     var ndb = NDBuffer[DType.float32](buf^, Shape(5), Strides(-2), offset=8)
     assert_true(
-        ndb.min_index() == 0, "1d_negative_stride: min_index should be 0"
+        ndb.min_storage_index() == 0, "1d_negative_stride: min_storage_index should be 0"
     )
     assert_true(
-        ndb.max_index() == 8, "1d_negative_stride: max_index should be 8"
+        ndb.max_storage_index() == 8, "1d_negative_stride: max_storage_index should be 8"
     )
+    assert_true(ndb.max_index() == 4, "1d_negative_stride: logical max_index should be 4")
 
 
 def ndb_minmax_1d_stride_gt1() raises:
@@ -2116,8 +2183,8 @@ def ndb_minmax_1d_stride_gt1() raises:
     # min = 0, max = 0 + 3*3 = 9
     var buf = Buffer[DType.float32](10)
     var ndb = NDBuffer[DType.float32](buf^, Shape(4), Strides(3), offset=0)
-    assert_true(ndb.min_index() == 0, "1d_stride_gt1: min_index should be 0")
-    assert_true(ndb.max_index() == 9, "1d_stride_gt1: max_index should be 9")
+    assert_true(ndb.min_storage_index() == 0, "1d_stride_gt1: min_storage_index should be 0")
+    assert_true(ndb.max_storage_index() == 9, "1d_stride_gt1: max_storage_index should be 9")
 
 
 def ndb_minmax_1d_single_element() raises:
@@ -2125,10 +2192,10 @@ def ndb_minmax_1d_single_element() raises:
     var buf = Buffer[DType.float32](10)
     var ndb = NDBuffer[DType.float32](buf^, Shape(1), Strides(5), offset=4)
     assert_true(
-        ndb.min_index() == 4, "1d_single_element: min_index should be 4"
+        ndb.min_storage_index() == 4, "1d_single_element: min_storage_index should be 4"
     )
     assert_true(
-        ndb.max_index() == 4, "1d_single_element: max_index should be 4"
+        ndb.max_storage_index() == 4, "1d_single_element: max_storage_index should be 4"
     )
 
 
@@ -2142,8 +2209,8 @@ def ndb_minmax_2d_contiguous() raises:
     var ndb = NDBuffer[DType.float32](
         buf^, Shape(3, 4), Strides(4, 1), offset=0
     )
-    assert_true(ndb.min_index() == 0, "2d_contiguous: min_index should be 0")
-    assert_true(ndb.max_index() == 11, "2d_contiguous: max_index should be 11")
+    assert_true(ndb.min_storage_index() == 0, "2d_contiguous: min_storage_index should be 0")
+    assert_true(ndb.max_storage_index() == 11, "2d_contiguous: max_storage_index should be 11")
 
 
 def ndb_minmax_2d_transposed() raises:
@@ -2153,8 +2220,8 @@ def ndb_minmax_2d_transposed() raises:
     var ndb = NDBuffer[DType.float32](
         buf^, Shape(4, 3), Strides(1, 4), offset=0
     )
-    assert_true(ndb.min_index() == 0, "2d_transposed: min_index should be 0")
-    assert_true(ndb.max_index() == 11, "2d_transposed: max_index should be 11")
+    assert_true(ndb.min_storage_index() == 0, "2d_transposed: min_storage_index should be 0")
+    assert_true(ndb.max_storage_index() == 11, "2d_transposed: max_storage_index should be 11")
 
 
 def ndb_minmax_2d_negative_row_stride() raises:
@@ -2167,10 +2234,10 @@ def ndb_minmax_2d_negative_row_stride() raises:
         buf^, Shape(3, 4), Strides(-4, 1), offset=8
     )
     assert_true(
-        ndb.min_index() == 0, "2d_neg_row_stride: min_index should be 0"
+        ndb.min_storage_index() == 0, "2d_neg_row_stride: min_storage_index should be 0"
     )
     assert_true(
-        ndb.max_index() == 11, "2d_neg_row_stride: max_index should be 11"
+        ndb.max_storage_index() == 11, "2d_neg_row_stride: max_storage_index should be 11"
     )
 
 
@@ -2184,10 +2251,10 @@ def ndb_minmax_2d_negative_col_stride() raises:
         buf^, Shape(3, 4), Strides(4, -1), offset=3
     )
     assert_true(
-        ndb.min_index() == 0, "2d_neg_col_stride: min_index should be 0"
+        ndb.min_storage_index() == 0, "2d_neg_col_stride: min_storage_index should be 0"
     )
     assert_true(
-        ndb.max_index() == 11, "2d_neg_col_stride: max_index should be 11"
+        ndb.max_storage_index() == 11, "2d_neg_col_stride: max_storage_index should be 11"
     )
 
 
@@ -2200,8 +2267,8 @@ def ndb_minmax_2d_both_negative_strides() raises:
     var ndb = NDBuffer[DType.float32](
         buf^, Shape(3, 4), Strides(-4, -1), offset=11
     )
-    assert_true(ndb.min_index() == 0, "2d_both_neg: min_index should be 0")
-    assert_true(ndb.max_index() == 11, "2d_both_neg: max_index should be 11")
+    assert_true(ndb.min_storage_index() == 0, "2d_both_neg: min_storage_index should be 0")
+    assert_true(ndb.max_storage_index() == 11, "2d_both_neg: max_storage_index should be 11")
 
 
 def ndb_minmax_2d_with_offset() raises:
@@ -2211,8 +2278,8 @@ def ndb_minmax_2d_with_offset() raises:
     var ndb = NDBuffer[DType.float32](
         buf^, Shape(2, 3), Strides(4, 1), offset=5
     )
-    assert_true(ndb.min_index() == 5, "2d_with_offset: min_index should be 5")
-    assert_true(ndb.max_index() == 11, "2d_with_offset: max_index should be 11")
+    assert_true(ndb.min_storage_index() == 5, "2d_with_offset: min_storage_index should be 5")
+    assert_true(ndb.max_storage_index() == 11, "2d_with_offset: max_storage_index should be 11")
 
 
 # ── 3D Tests ─────────────────────────────────────────────────
@@ -2225,8 +2292,8 @@ def ndb_minmax_3d_contiguous() raises:
     var ndb = NDBuffer[DType.float32](
         buf^, Shape(2, 3, 4), Strides(12, 4, 1), offset=0
     )
-    assert_true(ndb.min_index() == 0, "3d_contiguous: min_index should be 0")
-    assert_true(ndb.max_index() == 23, "3d_contiguous: max_index should be 23")
+    assert_true(ndb.min_storage_index() == 0, "3d_contiguous: min_storage_index should be 0")
+    assert_true(ndb.max_storage_index() == 23, "3d_contiguous: max_storage_index should be 23")
 
 
 def ndb_minmax_3d_mixed_strides() raises:
@@ -2241,8 +2308,8 @@ def ndb_minmax_3d_mixed_strides() raises:
     var ndb = NDBuffer[DType.float32](
         buf^, Shape(2, 3, 4), Strides(-12, 4, -1), offset=15
     )
-    assert_true(ndb.min_index() == 0, "3d_mixed: min_index should be 0")
-    assert_true(ndb.max_index() == 23, "3d_mixed: max_index should be 23")
+    assert_true(ndb.min_storage_index() == 0, "3d_mixed: min_storage_index should be 0")
+    assert_true(ndb.max_storage_index() == 23, "3d_mixed: max_storage_index should be 23")
 
 
 def ndb_minmax_3d_all_negative_strides() raises:
@@ -2254,8 +2321,8 @@ def ndb_minmax_3d_all_negative_strides() raises:
     var ndb = NDBuffer[DType.float32](
         buf^, Shape(2, 3, 4), Strides(-12, -4, -1), offset=23
     )
-    assert_true(ndb.min_index() == 0, "3d_all_neg: min_index should be 0")
-    assert_true(ndb.max_index() == 23, "3d_all_neg: max_index should be 23")
+    assert_true(ndb.min_storage_index() == 0, "3d_all_neg: min_storage_index should be 0")
+    assert_true(ndb.max_storage_index() == 23, "3d_all_neg: max_storage_index should be 23")
 
 
 def ndb_minmax_3d_with_offset() raises:
@@ -2266,16 +2333,16 @@ def ndb_minmax_3d_with_offset() raises:
     var ndb = NDBuffer[DType.float32](
         buf^, Shape(2, 2, 2), Strides(6, 2, 1), offset=3
     )
-    assert_true(ndb.min_index() == 3, "3d_with_offset: min_index should be 3")
-    assert_true(ndb.max_index() == 12, "3d_with_offset: max_index should be 12")
+    assert_true(ndb.min_storage_index() == 3, "3d_with_offset: min_storage_index should be 3")
+    assert_true(ndb.max_storage_index() == 12, "3d_with_offset: max_storage_index should be 12")
     # shape=[2,2,2,2], strides=[8,4,2,1], offset=0
     # min = 0, max = 0 + 1*8 + 1*4 + 1*2 + 1*1 = 15
     buf = Buffer[DType.float32](16)
     ndb = NDBuffer[DType.float32](
         buf^, Shape(2, 2, 2, 2), Strides(8, 4, 2, 1), offset=0
     )
-    assert_true(ndb.min_index() == 0, "4d_contiguous: min_index should be 0")
-    assert_true(ndb.max_index() == 15, "4d_contiguous: max_index should be 15")
+    assert_true(ndb.min_storage_index() == 0, "4d_contiguous: min_storage_index should be 0")
+    assert_true(ndb.max_storage_index() == 15, "4d_contiguous: max_storage_index should be 15")
 
 
 def ndb_minmax_4d_mixed_strides() raises:
@@ -2290,126 +2357,8 @@ def ndb_minmax_4d_mixed_strides() raises:
     var ndb = NDBuffer[DType.float32](
         buf^, Shape(2, 2, 2, 2), Strides(-8, 4, -2, 1), offset=11
     )
-    assert_true(ndb.min_index() == 1, "4d_mixed: min_index should be 1")
-    assert_true(ndb.max_index() == 16, "4d_mixed: max_index should be 16")
-
-
-# ── GPU Tests ────────────────────────────────────────────────
-
-
-def ndb_minmax_gpu_1d_contiguous() raises:
-    comptime if has_accelerator():
-        comptime dtype = DType.float32
-        var t = Tensor[dtype].arange(0, 5).to_gpu()
-        var ndb = t.buffer
-        assert_true(
-            ndb.min_index() == 0, "gpu_1d_contiguous: min_index should be 0"
-        )
-        assert_true(
-            ndb.max_index() == 4, "gpu_1d_contiguous: max_index should be 4"
-        )
-
-
-def ndb_minmax_gpu_2d_contiguous() raises:
-    comptime if has_accelerator():
-        comptime dtype = DType.float32
-        var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
-        var ndb = t.buffer
-        # shape=[2,3], strides=[3,1], offset=0 → max=5
-        assert_true(
-            ndb.min_index() == 0, "gpu_2d_contiguous: min_index should be 0"
-        )
-        assert_true(
-            ndb.max_index() == 5, "gpu_2d_contiguous: max_index should be 5"
-        )
-
-
-def ndb_minmax_gpu_2d_transposed() raises:
-    comptime if has_accelerator():
-        comptime dtype = DType.float32
-        var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
-        var t_T = t.transpose()
-        var ndb = t_T.buffer
-        # shape=[3,2], strides=[1,3], offset=0
-        # max = 0 + 2*1 + 1*3 = 5
-        assert_true(
-            ndb.min_index() == 0, "gpu_2d_transposed: min_index should be 0"
-        )
-        assert_true(
-            ndb.max_index() == 5, "gpu_2d_transposed: max_index should be 5"
-        )
-
-
-def ndb_minmax_gpu_2d_flipped_axis0() raises:
-    comptime if has_accelerator():
-        comptime dtype = DType.float32
-        _ = """var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
-        var t_flip = t.flip(axis=0)
-        var ndb = t_flip.buffer
-        # shape=[2,3], strides=[-3,1], offset=3
-        # min = 3 + 1*(-3) + 0 = 0
-        # max = 3 + 0      + 2 = 5
-        assert_true(ndb.min_index() == 0, "gpu_flip_axis0: min_index should be 0")
-        assert_true(ndb.max_index() == 5, "gpu_flip_axis0: max_index should be 5")"""
-
-
-def ndb_minmax_gpu_2d_flipped_axis1() raises:
-    comptime if has_accelerator():
-        comptime dtype = DType.float32
-        _ = """var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
-        var t_flip = t.flip(axis=1)
-        var ndb = t_flip.buffer
-        # shape=[2,3], strides=[3,-1], offset=2
-        # min = 2 + 0 + 1*(-1) = ... wait: min contrib from dim1: (3-1)*(-1)= -2 → 2-2=0
-        # max = 2 + 1*3 + 0    = 5
-        assert_true(ndb.min_index() == 0, "gpu_flip_axis1: min_index should be 0")
-        assert_true(ndb.max_index() == 5, "gpu_flip_axis1: max_index should be 5")"""
-
-
-def ndb_minmax_gpu_3d_contiguous() raises:
-    comptime if has_accelerator():
-        comptime dtype = DType.float32
-        var _tmp0 = Tensor[dtype].arange(0, 24)
-        var _tmp1 = _tmp0.reshape(Shape(2, 3, 4))
-        var t = _tmp1.to_gpu()
-        var ndb = t.buffer
-        # shape=[2,3,4], strides=[12,4,1], offset=0
-        # min=0, max=23
-        assert_true(
-            ndb.min_index() == 0, "gpu_3d_contiguous: min_index should be 0"
-        )
-        assert_true(
-            ndb.max_index() == 23, "gpu_3d_contiguous: max_index should be 23"
-        )
-
-
-def ndb_minmax_gpu_3d_flipped_all_axes() raises:
-    comptime if has_accelerator():
-        comptime dtype = DType.float32
-        _ = """var t = Tensor[dtype].arange(0, 24).reshape(Shape(2, 3, 4)).to_gpu()
-        var t_flip = t.flip(axis=0).flip(axis=1).flip(axis=2)
-        var ndb = t_flip.buffer
-        # All strides negative — offset at last element (23), min=0, max=23
-        assert_true(ndb.min_index() == 0,  "gpu_3d_flip_all: min_index should be 0")
-        assert_true(ndb.max_index() == 23, "gpu_3d_flip_all: max_index should be 23")"""
-        print("ndb_minmax_gpu_3d_flipped_all_axes passed")
-
-
-def ndb_minmax_gpu_4d_contiguous() raises:
-    comptime if has_accelerator():
-        comptime dtype = DType.float32
-        var _tmp0 = Tensor[dtype].arange(0, 16)
-        var _tmp1 = _tmp0.reshape(Shape(2, 2, 2, 2))
-        var t = _tmp1.to_gpu()
-        var ndb = t.buffer
-        # shape=[2,2,2,2], strides=[8,4,2,1], offset=0
-        # min=0, max=15
-        assert_true(
-            ndb.min_index() == 0, "gpu_4d_contiguous: min_index should be 0"
-        )
-        assert_true(
-            ndb.max_index() == 15, "gpu_4d_contiguous: max_index should be 15"
-        )
+    assert_true(ndb.min_storage_index() == 1, "4d_mixed: min_storage_index should be 1")
+    assert_true(ndb.max_storage_index() == 16, "4d_mixed: max_storage_index should be 16")
 
 
 # ── Main ─────────────────────────────────────────────────────

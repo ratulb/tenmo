@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
 from tenmo.gradbox import Gradbox
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 from tenmo.ndbuffer import NDBuffer

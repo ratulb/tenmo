@@ -1,10 +1,10 @@
 from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
-from tenmo.device import GPU, has_accelerator
+from tenmo.gpu.device import GPU
 from std.sys import has_accelerator
-from tenmo.common_utils import now
-from tenmo.shapes import Shape
-from tenmo.intarray import IntArray
+from tenmo.shared.timing import now
+from tenmo.shared.shapes import Shape
+from tenmo.shared.intarray import IntArray
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. BASIC TESTS - 1D
@@ -340,7 +340,7 @@ def test_sum_multiple_backward_cpu() raises:
 
     var loss1 = a.sum()
     loss1.backward()
-    var grad_after_first = a.grad().copy()
+    var grad_after_first = a.grad().clone()
 
     var loss2 = (a * 2.0).sum()
     loss2.backward()
@@ -358,7 +358,7 @@ def test_sum_multiple_backward_gpu() raises:
 
         var loss1 = a_gpu.sum()
         loss1.backward()
-        var grad_after_first = a.grad().copy()
+        var grad_after_first = a.grad().clone()
 
         var a_gpu2 = a.to_gpu()  # Re-get with accumulated grad
         var loss2 = (a_gpu2 * 2.0).sum()

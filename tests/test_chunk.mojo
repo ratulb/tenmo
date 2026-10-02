@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
-from tenmo.common_utils import s, i
+from tenmo.shared.indexhelper import i, s
 
 # ============================================================================
 # 1D TENSOR chunking TESTS

@@ -1,7 +1,7 @@
-from tenmo.shapes import Shape
-from tenmo.strides import Strides
+from tenmo.shared.shapes import Shape
+from tenmo.shared.strides import Strides
 from std.testing import assert_true, TestSuite
-from tenmo.intarray import IntArray
+from tenmo.shared.intarray import IntArray
 
 # ============================================
 # STRIDES TESTS
@@ -137,8 +137,8 @@ def test_strides_with_capacity() raises:
 
 
 def test_compute_default_strides() raises:
-    shape = Shape(2, 3, 4)
-    strides = Strides.default(shape)
+    var shape = Shape(2, 3, 4)
+    var strides = Strides.default(shape)
     assert_true(
         strides == Strides(12, 4, 1),
         "stride compute assertion 1 failed",

@@ -1,9 +1,10 @@
 from tenmo.tensor import Tensor
-from tenmo.net import Linear, ReLU, Sequential, BCELoss, Sigmoid
+from tenmo.net import Linear, ReLU, Sequential, Sigmoid
+from tenmo.bceloss import BCELoss
 from tenmo.optim import SGD
 from std.python import Python, PythonObject
 from tenmo.numpy_interop import from_ndarray
-from tenmo.common_utils import now
+from tenmo.shared.timing import now
 from tenmo.dataloader import *
 
 
@@ -56,7 +57,7 @@ def train_mnist_binary() raises:
     )
 
     var criterion = BCELoss[dtype]()
-    var optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
+    var optimizer = SGD[dtype](model.parameters(), lr=0.01, momentum=0.9)
 
     # Training
     for epoch in range(10):
@@ -85,9 +86,13 @@ def train_mnist_binary() raises:
 
         var epoch_time = now() - epoch_start
         print("\n" + "=" * 80)
-        print("EPOCH", epoch+1, "COMPLETED")
+        print("EPOCH", epoch + 1, "COMPLETED")
         print("Total epoch time:", epoch_time, "seconds")
-        print("Avg time per batch:", Float64(epoch_time) / Float64(batch_num), "seconds")
+        print(
+            "Avg time per batch:",
+            Float64(epoch_time) / Float64(batch_num),
+            "seconds",
+        )
         print(
             "Loss:",
             epoch_loss / Scalar[dtype](epoch_total),

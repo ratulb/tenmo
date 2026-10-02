@@ -1,8 +1,8 @@
 from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
-from tenmo.common_utils import i, s
+from tenmo.shared.indexhelper import i, s
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 
 # ====== Complex and edge cases =======
 

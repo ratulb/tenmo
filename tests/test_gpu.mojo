@@ -1,14 +1,14 @@
 from tenmo.tensor import Tensor
 from tenmo.ndbuffer import NDBuffer
 from tenmo.sum_mean_reduction import SumMeanReduction
-from tenmo.intarray import IntArray
-from tenmo.shapes import Shape
+from tenmo.shared.intarray import IntArray
+from tenmo.shared.shapes import Shape
 from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
-from tenmo.mnemonics import vm, mv
+from tenmo.shared.mnemonics import vm, mv
 from tenmo.gradbox import Gradbox
-from tenmo.kernels.matmul_kernel import MatmulNdGpu
-from tenmo.mnemonics import MEAN, SUM
+from tenmo.kernels.matmul_kernel import MatmulKernel
+from tenmo.shared.mnemonics import MEAN, SUM
 
 comptime dtype = DType.float32
 
@@ -511,7 +511,7 @@ def test_cpu_grad_flow() raises:
     var C = A_reshaped.matmul(B_reshaped)
 
     C.backward()
-    var A_grad = A.grad().copy()
+    var A_grad = A.grad().clone()
 
     var grad_out = Gradbox[dtype].full(C.shape(), 1)
     # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
@@ -537,7 +537,7 @@ def test_gpu_grad_flow() raises:
         var C_gpu = A_gpu_reshaped.matmul(B_gpu)
 
         C_gpu.backward()
-        var A_grad = A.grad().copy()
+        var A_grad = A.grad().clone()
 
         var grad_out = Gradbox[dtype].full(C_gpu.shape(), 1)
         # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
@@ -1628,13 +1628,18 @@ def test_transposed_matmul_fidelity() raises:
 
         var grad_A_cpu = grad_out.matmul(BT_cpu)
 
-        var grad_A_ndb = MatmulNdGpu[dtype].launch[tile_size=32](
-            grad_out_gpu.buffer, BT_gpu
+        var (grad_A_layout, grad_A_device_state) = MatmulKernel[dtype].launch[
+            tile_size=32
+        ](
+            grad_out_gpu.buffer.layout(),
+            grad_out_gpu.buffer.device_state.value(),
+            BT_gpu.layout(),
+            BT_gpu.device_state.value(),
+        )
+        var grad_A_ndb = NDBuffer[dtype].with_layout_device_state(
+            grad_A_layout, grad_A_device_state
         )
         var grad_A_GPU = Tensor[dtype](grad_A_ndb^)
         var grad_A_gpu = grad_A_GPU.to_cpu()
 
         assert_true(grad_A_cpu.all_close(grad_A_gpu))
-
-
-

@@ -1,0 +1,550 @@
+"""
+Consolidated test-suite skeleton for Tenmo's Python bindings.
+
+Organized by functional category. Every test name is written to be
+self-explanatory -- a failing test should tell you what broke without
+opening the file. Bodies are stubs (`pass`) -- fill in as each area of
+the binding surface gets implemented.
+
+Suggested constants to define once real fixtures exist:
+
+    DTYPES        = ["float16", "float32", "float64", "int32", "int64", "bool"]
+    DEVICES       = ["cpu", "gpu"]              # skip gpu params if unavailable
+    SHAPES_1D     = [(0,), (1,), (5,), (1000,)]
+    SHAPES_ND     = [(2, 3), (4, 4, 4), (1, 1, 5), (2, 3, 4, 5)]
+"""
+
+import pytest
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 1. Construction & Initialization
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestConstruction:
+    def test_from_python_list_1d(self): pass
+    def test_from_python_nested_list_nd(self): pass
+    def test_from_python_scalar(self): pass
+    def test_from_numpy_array_shares_or_copies_as_documented(self): pass
+    def test_from_numpy_array_all_dtypes(self): pass
+    def test_zeros_creates_correct_shape_and_dtype(self): pass
+    def test_ones_creates_correct_shape_and_dtype(self): pass
+    def test_full_fills_with_given_value(self): pass
+    def test_empty_returns_uninitialized_correct_shape(self): pass
+    def test_eye_creates_identity_matrix(self): pass
+    def test_arange_matches_expected_sequence(self): pass
+    def test_arange_with_step_and_negative_step(self): pass
+    def test_linspace_matches_expected_sequence(self): pass
+    def test_random_uniform_within_bounds(self): pass
+    def test_random_normal_statistical_sanity(self): pass
+    def test_zeros_like_matches_input_shape_dtype_device(self): pass
+    def test_ones_like_matches_input_shape_dtype_device(self): pass
+    def test_full_like_matches_input_shape_dtype_device(self): pass
+    def test_construction_infers_dtype_from_python_data(self): pass
+    def test_construction_respects_explicit_dtype_override(self): pass
+    def test_construction_rejects_ragged_nested_list(self): pass
+    def test_construction_rejects_negative_shape(self): pass
+    def test_construction_of_zero_size_tensor(self): pass
+    def test_construction_of_scalar_zero_dim_tensor(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 2. Dtype & Casting
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestDtypeAndCasting:
+    def test_dtype_property_matches_construction_dtype(self): pass
+    def test_to_dtype_all_pairwise_conversions(self): pass
+    def test_to_dtype_int_to_float_preserves_value(self): pass
+    def test_to_dtype_float_to_int_truncates_correctly(self): pass
+    def test_to_dtype_narrowing_float_loses_precision_as_expected(self): pass
+    def test_to_dtype_widening_float_is_lossless(self): pass
+    def test_to_dtype_to_bool_nonzero_is_true(self): pass
+    def test_to_dtype_from_bool_true_is_one_false_is_zero(self): pass
+    def test_to_dtype_is_noop_when_target_matches_current(self): pass
+    def test_to_dtype_preserves_shape(self): pass
+    def test_dtype_promotion_rules_for_mixed_binary_ops(self): pass
+    def test_dtype_mismatch_raises_when_promotion_undefined(self): pass
+    def test_to_dtype_gradient_matches_numerical(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 3. Shape & Metadata
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestShapeAndMetadata:
+    def test_shape_property_matches_construction(self): pass
+    def test_ndim_matches_number_of_dimensions(self): pass
+    def test_numel_matches_total_element_count(self): pass
+    def test_itemsize_matches_dtype_byte_width(self): pass
+    def test_nbytes_matches_numel_times_itemsize(self): pass
+    def test_strides_match_expected_contiguous_layout(self): pass
+    def test_is_contiguous_true_for_fresh_tensor(self): pass
+    def test_is_contiguous_false_after_transpose(self): pass
+    def test_is_contiguous_true_after_explicit_contiguous_call(self): pass
+    def test_device_property_matches_construction_device(self): pass
+    def test_repr_contains_shape_dtype_device(self): pass
+    def test_str_formats_small_tensor_readably(self): pass
+    def test_str_truncates_large_tensor_readably(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 4. Indexing & Slicing
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestIndexingAndSlicing:
+    def test_single_int_index_1d(self): pass
+    def test_single_int_index_negative(self): pass
+    def test_single_int_index_out_of_bounds_raises(self): pass
+    def test_basic_slice_start_stop(self): pass
+    def test_basic_slice_with_step(self): pass
+    def test_basic_slice_with_negative_step_reverses(self): pass
+    def test_slice_beyond_bounds_clamps_like_python(self): pass
+    def test_multi_dim_index_tuple(self): pass
+    def test_multi_dim_mixed_int_and_slice(self): pass
+    def test_ellipsis_expands_correctly(self): pass
+    def test_newaxis_inserts_dimension(self): pass
+    def test_boolean_mask_indexing_selects_correct_elements(self): pass
+    def test_boolean_mask_shape_mismatch_raises(self): pass
+    def test_integer_array_fancy_indexing(self): pass
+    def test_fancy_indexing_with_repeated_indices(self): pass
+    def test_contiguous_slice_returns_zero_copy_view(self): pass
+    def test_strided_slice_returns_copy_not_view(self): pass
+    def test_index_assignment_basic(self): pass
+    def test_index_assignment_via_boolean_mask(self): pass
+    def test_index_assignment_via_slice_broadcasts_scalar(self): pass
+    def test_view_mutation_reflects_in_base_tensor(self): pass
+    def test_base_tensor_mutation_reflects_in_view(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 5. Views & Reshaping
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestViewsAndReshaping:
+    def test_reshape_preserves_element_order(self): pass
+    def test_reshape_rejects_mismatched_total_size(self): pass
+    def test_reshape_with_inferred_dimension_negative_one(self): pass
+    def test_reshape_is_zero_copy_when_contiguous(self): pass
+    def test_reshape_copies_when_input_non_contiguous(self): pass
+    def test_view_shares_memory_with_original(self): pass
+    def test_flatten_produces_1d_in_row_major_order(self): pass
+    def test_ravel_matches_flatten_semantics(self): pass
+    def test_squeeze_removes_all_size_one_dims(self): pass
+    def test_squeeze_with_explicit_axis(self): pass
+    def test_squeeze_rejects_axis_with_size_not_one(self): pass
+    def test_unsqueeze_inserts_size_one_dim_at_axis(self): pass
+    def test_transpose_2d_matches_expected_layout(self): pass
+    def test_permute_nd_arbitrary_axis_order(self): pass
+    def test_permute_rejects_invalid_axis_permutation(self): pass
+    def test_swapaxes_matches_expected_layout(self): pass
+    def test_T_property_matches_full_reverse_transpose(self): pass
+    def test_contiguous_returns_self_if_already_contiguous(self): pass
+    def test_contiguous_returns_new_buffer_if_not(self): pass
+    def test_expand_broadcasts_size_one_dims_without_copy(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 6. Broadcasting
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestBroadcasting:
+    def test_broadcast_scalar_against_tensor(self): pass
+    def test_broadcast_row_against_matrix(self): pass
+    def test_broadcast_column_against_matrix(self): pass
+    def test_broadcast_size_one_dims_both_operands(self): pass
+    def test_broadcast_incompatible_shapes_raises(self): pass
+    def test_broadcast_to_explicit_shape(self): pass
+    def test_broadcast_to_rejects_non_broadcastable_target(self): pass
+    def test_broadcast_result_shape_matches_numpy_rules(self): pass
+    def test_broadcast_preserves_correct_values_not_just_shape(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 7. Elementwise Arithmetic
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestElementwiseArithmetic:
+    def test_add_tensor_tensor(self): pass
+    def test_add_tensor_scalar(self): pass
+    def test_radd_scalar_tensor(self): pass
+    def test_sub_tensor_tensor(self): pass
+    def test_rsub_scalar_tensor(self): pass
+    def test_mul_tensor_tensor(self): pass
+    def test_rmul_scalar_tensor(self): pass
+    def test_truediv_tensor_tensor(self): pass
+    def test_rtruediv_scalar_tensor(self): pass
+    def test_floordiv_tensor_tensor(self): pass
+    def test_mod_tensor_tensor(self): pass
+    def test_pow_tensor_tensor(self): pass
+    def test_pow_tensor_scalar_exponent(self): pass
+    def test_neg_unary_minus(self): pass
+    def test_abs_returns_magnitude(self): pass
+    def test_reciprocal_matches_one_over_x(self): pass
+    def test_iadd_inplace_mutates_and_returns_self(self): pass
+    def test_isub_inplace_mutates_and_returns_self(self): pass
+    def test_imul_inplace_mutates_and_returns_self(self): pass
+    def test_itruediv_inplace_mutates_and_returns_self(self): pass
+    def test_inplace_op_on_view_mutates_base_tensor(self): pass
+    def test_inplace_op_rejects_when_shapes_incompatible(self): pass
+    def test_div_by_zero_matches_ieee_754_semantics(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 8. Comparison Operators
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestComparisonOperators:
+    def test_eq_elementwise_returns_bool_tensor(self): pass
+    def test_ne_elementwise_returns_bool_tensor(self): pass
+    def test_lt_elementwise_returns_bool_tensor(self): pass
+    def test_le_elementwise_returns_bool_tensor(self): pass
+    def test_gt_elementwise_returns_bool_tensor(self): pass
+    def test_ge_elementwise_returns_bool_tensor(self): pass
+    def test_comparison_against_scalar(self): pass
+    def test_comparison_broadcasts_correctly(self): pass
+    def test_tensor_equal_all_helper_matches_full_equality(self): pass
+    def test_allclose_respects_rtol_and_atol(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 9. Logical & Bitwise Operators
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestLogicalAndBitwise:
+    def test_logical_and_on_bool_tensors(self): pass
+    def test_logical_or_on_bool_tensors(self): pass
+    def test_logical_xor_on_bool_tensors(self): pass
+    def test_logical_not_on_bool_tensor(self): pass
+    def test_bitwise_and_on_int_tensors(self): pass
+    def test_bitwise_or_on_int_tensors(self): pass
+    def test_bitwise_xor_on_int_tensors(self): pass
+    def test_bitwise_not_on_int_tensor(self): pass
+    def test_left_shift_on_int_tensor(self): pass
+    def test_right_shift_on_int_tensor(self): pass
+    def test_bitwise_ops_reject_float_dtype(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 10. Unary Math Functions
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestUnaryMathFunctions:
+    def test_exp_matches_reference(self): pass
+    def test_log_matches_reference(self): pass
+    def test_log_of_zero_or_negative_matches_ieee_754(self): pass
+    def test_log2_matches_reference(self): pass
+    def test_log10_matches_reference(self): pass
+    def test_sqrt_matches_reference(self): pass
+    def test_sqrt_of_negative_matches_ieee_754_nan(self): pass
+    def test_sin_matches_reference(self): pass
+    def test_cos_matches_reference(self): pass
+    def test_tan_matches_reference(self): pass
+    def test_tanh_matches_reference(self): pass
+    def test_floor_matches_reference(self): pass
+    def test_ceil_matches_reference(self): pass
+    def test_round_matches_reference_banker_or_standard_rounding(self): pass
+    def test_sign_matches_reference(self): pass
+    def test_clamp_clips_values_to_bounds(self): pass
+    def test_clamp_with_only_min_bound(self): pass
+    def test_clamp_with_only_max_bound(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 11. Activation Functions
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestActivationFunctions:
+    def test_relu_zeroes_negative_values(self): pass
+    def test_relu_preserves_positive_values(self): pass
+    def test_sigmoid_matches_reference(self): pass
+    def test_sigmoid_output_bounded_zero_one(self): pass
+    def test_gelu_matches_reference(self): pass
+    def test_softmax_sums_to_one_along_axis(self): pass
+    def test_softmax_numerically_stable_for_large_inputs(self): pass
+    def test_softmax_default_axis_matches_documented_behavior(self): pass
+    def test_log_softmax_matches_log_of_softmax(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 12. Reduction Operations
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestReductions:
+    def test_sum_full_reduction_scalar_result(self): pass
+    def test_sum_along_single_axis(self): pass
+    def test_sum_along_multiple_axes(self): pass
+    def test_sum_keepdims_preserves_rank(self): pass
+    def test_mean_full_reduction(self): pass
+    def test_mean_along_axis(self): pass
+    def test_max_full_reduction(self): pass
+    def test_max_along_axis(self): pass
+    def test_min_full_reduction(self): pass
+    def test_min_along_axis(self): pass
+    def test_argmax_returns_correct_index(self): pass
+    def test_argmax_along_axis(self): pass
+    def test_argmax_tie_breaking_matches_documented_rule(self): pass
+    def test_argmin_returns_correct_index(self): pass
+    def test_prod_full_reduction(self): pass
+    def test_prod_along_axis(self): pass
+    def test_std_matches_reference(self): pass
+    def test_var_matches_reference(self): pass
+    def test_var_respects_ddof_parameter(self): pass
+    def test_all_returns_true_when_all_nonzero(self): pass
+    def test_any_returns_true_when_any_nonzero(self): pass
+    def test_reduction_over_empty_axis_matches_documented_identity(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 13. Linear Algebra
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestLinearAlgebra:
+    def test_matmul_2d_by_2d(self): pass
+    def test_matmul_batched_nd(self): pass
+    def test_matmul_broadcasts_batch_dimensions(self): pass
+    def test_matmul_shape_mismatch_raises(self): pass
+    def test_matmul_matches_reference_for_random_inputs(self): pass
+    def test_matmul_via_at_operator(self): pass
+    def test_dot_1d_vectors_returns_scalar(self): pass
+    def test_outer_product_shape_and_values(self): pass
+    def test_norm_l2_matches_reference(self): pass
+    def test_norm_l1_matches_reference(self): pass
+    def test_norm_along_axis(self): pass
+    def test_transpose_interaction_with_matmul(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 14. Autograd — Core Mechanics
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestAutogradCoreMechanics:
+    def test_requires_grad_defaults_to_false(self): pass
+    def test_requires_grad_can_be_set_explicitly(self): pass
+    def test_leaf_tensor_grad_is_none_before_backward(self): pass
+    def test_backward_populates_grad_on_leaf_tensors(self): pass
+    def test_backward_on_non_scalar_requires_explicit_grad_output(self): pass
+    def test_backward_accumulates_across_multiple_calls(self): pass
+    def test_zero_grad_resets_accumulated_gradient(self): pass
+    def test_no_grad_context_disables_graph_construction(self): pass
+    def test_detach_returns_leaf_with_no_grad_history(self): pass
+    def test_detach_shares_underlying_data(self): pass
+    def test_second_backward_call_reruns_without_retain_flag(self): pass
+    def test_backward_without_retain_clears_intermediate_grads(self): pass
+    def test_backward_with_retain_preserves_intermediate_grads(self): pass
+    def test_is_leaf_true_for_user_created_tensor(self): pass
+    def test_is_leaf_false_for_tensor_produced_by_op(self): pass
+    def test_grad_fn_present_on_non_leaf_result(self): pass
+    def test_grad_fn_absent_on_leaf_tensor(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 15. Autograd — Per-Op Gradient Correctness
+#     (numerical gradient check vs analytic, per op family)
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestAutogradGradientCorrectness:
+    def test_add_gradient_matches_numerical(self): pass
+    def test_sub_gradient_matches_numerical(self): pass
+    def test_mul_gradient_matches_numerical(self): pass
+    def test_div_gradient_matches_numerical(self): pass
+    def test_pow_gradient_matches_numerical(self): pass
+    def test_neg_gradient_matches_numerical(self): pass
+    def test_to_dtype_widening_gradient_matches_numerical(self): pass
+    def test_to_dtype_narrowing_gradient_matches_numerical(self): pass
+    def test_exp_gradient_matches_numerical(self): pass
+    def test_log_gradient_matches_numerical(self): pass
+    def test_sqrt_gradient_matches_numerical(self): pass
+    def test_sin_gradient_matches_numerical(self): pass
+    def test_cos_gradient_matches_numerical(self): pass
+    def test_tanh_gradient_matches_numerical(self): pass
+    def test_relu_gradient_matches_numerical(self): pass
+    def test_relu_gradient_at_exact_zero_matches_documented_convention(self): pass
+    def test_sigmoid_gradient_matches_numerical(self): pass
+    def test_softmax_gradient_matches_numerical(self): pass
+    def test_sum_gradient_broadcasts_ones_correctly(self): pass
+    def test_mean_gradient_scales_by_element_count(self): pass
+    def test_max_gradient_routes_only_to_argmax_element(self): pass
+    def test_min_gradient_routes_only_to_argmin_element(self): pass
+    def test_matmul_gradient_matches_numerical(self): pass
+    def test_reshape_gradient_passes_through_unchanged(self): pass
+    def test_transpose_gradient_passes_through_transposed(self): pass
+    def test_broadcast_gradient_sums_over_broadcast_dims(self): pass
+    def test_indexing_gradient_scatters_to_correct_positions(self): pass
+    def test_slice_gradient_scatters_to_correct_positions(self): pass
+    def test_cross_entropy_loss_gradient_matches_numerical(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 16. Autograd — Graph & Cross-Dtype Edge Cases
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestAutogradGraphEdgeCases:
+    def test_deep_chain_of_ops_backward_completes(self): pass
+    def test_diamond_shaped_graph_accumulates_gradient_correctly(self): pass
+    def test_reused_tensor_in_multiple_ops_accumulates_correctly(self): pass
+    def test_to_dtype_gradient_flows_through_cast_in_chain(self): pass
+    def test_to_dtype_narrowing_gradient_underflow_behavior_documented(self): pass
+    def test_parent_node_tag_mismatch_traps_in_debug_build(self): pass
+    def test_cross_dtype_backward_get_erased_and_as_pairing_correct(self): pass
+    def test_inplace_op_on_tensor_with_grad_history_matches_documented_behavior(self): pass
+    def test_backward_through_view_updates_original_leaf_grad(self): pass
+    def test_backward_on_disconnected_subgraph_raises_or_noops_as_documented(self): pass
+    def test_gradient_of_constant_wrt_itself_is_none_or_zero_as_documented(self): pass
+    def test_mixed_requires_grad_operands_only_tracks_true_side(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 17. Memory & Reference Counting
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestMemoryAndRefcounting:
+    def test_tensor_deallocates_when_last_reference_dropped(self): pass
+    def test_view_keeps_base_tensor_alive(self): pass
+    def test_del_base_before_view_does_not_corrupt_view(self): pass
+    def test_repeated_op_loop_does_not_leak_memory(self): pass
+    def test_repeated_backward_loop_does_not_leak_memory(self): pass
+    def test_gradbox_refcount_increments_on_share(self): pass
+    def test_gradbox_refcount_decrements_on_release(self): pass
+    def test_ancestors_copy_is_o1_refcount_bump_not_deep_node_copy(self): pass
+    def test_circular_reference_via_graph_does_not_leak(self): pass
+    def test_large_tensor_allocation_and_free_does_not_fragment_excessively(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 18. Device & GPU
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestDeviceAndGPU:
+    def test_to_device_cpu_to_gpu_transfers_correctly(self): pass
+    def test_to_device_gpu_to_cpu_transfers_correctly(self): pass
+    def test_to_device_is_noop_when_already_on_target(self): pass
+    def test_op_between_mismatched_devices_raises(self): pass
+    def test_gpu_result_matches_cpu_result_numerically(self): pass
+    def test_device_property_propagates_through_op_chain(self): pass
+    def test_gpu_unavailable_raises_clear_error_not_silent_fallback(self): pass
+    def test_autograd_works_identically_on_gpu_and_cpu(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 19. NumPy Interop
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestNumpyInterop:
+    def test_to_numpy_matches_values(self): pass
+    def test_to_numpy_matches_dtype(self): pass
+    def test_to_numpy_matches_shape(self): pass
+    def test_to_numpy_shares_memory_when_documented_as_zero_copy(self): pass
+    def test_from_numpy_round_trip_preserves_values(self): pass
+    def test_from_numpy_non_contiguous_array_handled_correctly(self): pass
+    def test_from_numpy_all_supported_dtypes(self): pass
+    def test_buffer_protocol_supports_memoryview(self): pass
+    def test_array_ufunc_or_array_interface_cooperates_with_numpy(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 20. Python Protocol Compliance
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestPythonProtocolCompliance:
+    def test_len_returns_size_of_first_dimension(self): pass
+    def test_iteration_yields_first_dimension_slices(self): pass
+    def test_bool_conversion_of_single_element_tensor(self): pass
+    def test_bool_conversion_of_multi_element_tensor_raises(self): pass
+    def test_int_conversion_of_scalar_tensor(self): pass
+    def test_float_conversion_of_scalar_tensor(self): pass
+    def test_equality_operator_returns_tensor_not_python_bool(self): pass
+    def test_hash_raises_or_is_explicitly_unsupported(self): pass
+    def test_deepcopy_produces_independent_tensor(self): pass
+    def test_context_manager_protocol_if_applicable(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 21. Serialization & Persistence
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestSerialization:
+    def test_save_and_load_round_trip_preserves_values(self): pass
+    def test_save_and_load_round_trip_preserves_dtype(self): pass
+    def test_save_and_load_round_trip_preserves_shape(self): pass
+    def test_pickle_round_trip_preserves_values(self): pass
+    def test_pickle_round_trip_preserves_requires_grad_flag(self): pass
+    def test_load_rejects_corrupted_file_with_clear_error(self): pass
+    def test_load_rejects_incompatible_format_version(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 22. Error Handling & Edge Cases
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestErrorHandlingAndEdgeCases:
+    def test_shape_mismatch_error_message_is_descriptive(self): pass
+    def test_dtype_mismatch_error_message_is_descriptive(self): pass
+    def test_operation_on_empty_tensor_matches_documented_behavior(self): pass
+    def test_operation_on_single_element_tensor(self): pass
+    def test_nan_propagates_through_arithmetic(self): pass
+    def test_inf_propagates_through_arithmetic(self): pass
+    def test_nan_comparison_matches_ieee_754_semantics(self): pass
+    def test_overflow_behavior_matches_dtype_semantics(self): pass
+    def test_underflow_behavior_matches_dtype_semantics(self): pass
+    def test_very_large_tensor_construction_does_not_crash(self): pass
+    def test_zero_dimensional_tensor_ops_behave_like_scalar(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 23. Training-Loop Building Blocks
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestTrainingBuildingBlocks:
+    def test_embedding_lookup_returns_correct_rows(self): pass
+    def test_embedding_lookup_gradient_matches_numerical(self): pass
+    def test_embedding_bag_sum_mode_matches_reference(self): pass
+    def test_embedding_bag_mean_mode_matches_reference(self): pass
+    def test_embedding_bag_gradient_matches_numerical(self): pass
+    def test_multinomial_sampling_respects_probability_distribution(self): pass
+    def test_multinomial_sampling_reproducible_with_fixed_seed(self): pass
+    def test_multinomial_sampling_on_gpu_matches_cpu_distribution(self): pass
+    def test_cross_entropy_loss_matches_reference(self): pass
+    def test_cross_entropy_loss_handles_class_index_and_one_hot_targets(self): pass
+    def test_gradient_clipping_by_norm_matches_reference(self): pass
+    def test_gradient_clipping_by_value_matches_reference(self): pass
+    def test_optimizer_step_updates_parameters_correctly(self): pass
+    def test_optimizer_zero_grad_clears_all_parameter_grads(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 24. Numerical Stability & Special Values
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestNumericalStability:
+    def test_softmax_stable_for_large_positive_inputs(self): pass
+    def test_softmax_stable_for_large_negative_inputs(self): pass
+    def test_log_sum_exp_matches_reference_and_is_stable(self): pass
+    def test_layernorm_stable_for_near_zero_variance(self): pass
+    def test_low_precision_dtype_accumulation_error_within_documented_tolerance(self): pass
+    def test_repeated_small_additions_match_expected_precision_loss(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 25. Cross-Library Parity (vs NumPy / PyTorch reference)
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestCrossLibraryParity:
+    def test_elementwise_ops_match_numpy_for_random_inputs(self): pass
+    def test_reductions_match_numpy_for_random_inputs(self): pass
+    def test_matmul_matches_numpy_for_random_inputs(self): pass
+    def test_broadcasting_rules_match_numpy_exactly(self): pass
+    def test_autograd_gradients_match_pytorch_for_shared_op_set(self): pass
+    def test_random_generation_statistically_matches_reference_distribution(self): pass
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 26. Stress & Large-Scale Stability
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestStressAndScale:
+    def test_large_batch_matmul_completes_without_error(self): pass
+    def test_deep_model_forward_backward_completes_without_error(self): pass
+    def test_long_training_loop_gradient_values_remain_finite(self): pass
+    def test_repeated_save_load_cycle_does_not_degrade_values(self): pass
+    def test_many_small_tensors_allocation_does_not_exhaust_memory(self): pass

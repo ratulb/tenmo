@@ -1,13 +1,15 @@
 from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
-from tenmo.shapes import Shape
-from tenmo.strides import Strides
+from tenmo.shared.shapes import Shape
+from tenmo.shared.strides import Strides
 from std.sys import has_accelerator
+from std.sys.defines import get_defined_string
+from std.python import Python, PythonObject
 
 
 # Old tests
 def test_flatten_scalar() raises:
-    var a = Tensor.scalar(5.0, requires_grad=True)
+    var a = Tensor[DType.float32].scalar(5.0, requires_grad=True)
     var f = a.flatten()
     assert_true(f.shape() == Shape())
     assert_true(f.item() == 5.0)
@@ -16,62 +18,70 @@ def test_flatten_scalar() raises:
 
 
 def test_flatten_1d() raises:
-    var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var a = Tensor[DType.float32].d1([1.0, 2.0, 3.0], requires_grad=True)
     var f = a.flatten()
     assert_true(f.shape() == Shape(3))
     assert_true((f == a))
-    s = f.sum()
+    var s = f.sum()
     s.backward()
-    assert_true(a.grad().all_close(Tensor.d1([1.0, 1.0, 1.0])))
+    assert_true(a.grad().all_close(Tensor[DType.float32].d1([1.0, 1.0, 1.0])))
 
 
 def test_flatten_2d() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var f = a.flatten()
     assert_true(f.shape() == Shape(4))
-    assert_true(f.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0])))
-    s = f.sum()
+    assert_true(f.all_close(Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0])))
+    var s = f.sum()
     s.backward()
-    assert_true(a.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(
+        a.grad().all_close(Tensor[DType.float32].d2([[1.0, 1.0], [1.0, 1.0]]))
+    )
 
 
 def test_flatten_3d() raises:
-    var a = Tensor.d3(
+    var a = Tensor[DType.float32].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )  # shape (2,2,2)
     var f = a.flatten()
     assert_true(f.shape() == Shape(8))
-    expected_flat = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
+    var expected_flat = Tensor[DType.float32].d1(
+        [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    )
     assert_true(f.all_close(expected_flat))
-    s = f.sum()
+    var s = f.sum()
     s.backward()
-    expected_grad = Tensor.d3(
+    var expected_grad = Tensor[DType.float32].d3(
         [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]]
     )
     assert_true(a.grad().all_close(expected_grad))
 
 
 def test_flatten_keep_grad_chain() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var b = a.flatten()
     var c = b * 2.0
     var d = c.sum()
     d.backward()
     # d = sum(2 * a) → grad(a) = 2
-    expected_grad = Tensor.d2([[2.0, 2.0], [2.0, 2.0]])
+    var expected_grad = Tensor[DType.float32].d2([[2.0, 2.0], [2.0, 2.0]])
     assert_true(a.grad().all_close(expected_grad))
 
 
 def test_flatten_partial_axes() raises:
-    var a = Tensor.d3(
+    var a = Tensor[DType.float32].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )  # shape (2,2,2)
     # Flatten from axis=1 → shape becomes (2,4)
     var f = a.flatten(start_dim=1)
     assert_true(f.shape() == Shape(2, 4))
-    s = f.sum()
+    var s = f.sum()
     s.backward()
-    expected_grad = Tensor.d3(
+    var expected_grad = Tensor[DType.float32].d3(
         [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]]
     )
     assert_true(a.grad().all_close(expected_grad))
@@ -81,78 +91,98 @@ def test_flatten_partial_axes() raises:
 
 
 def test_flatten_1d_to_1d() raises:
-    var a = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
+    var a = Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var b = a.flatten()
-    s = b.sum()
+    var s = b.sum()
     s.backward()
 
     assert_true(b.shape() == Shape(4))
-    assert_true(b.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0])))
-    assert_true(a.grad().all_close(Tensor.d1([1.0, 1.0, 1.0, 1.0])))
+    assert_true(b.all_close(Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0])))
+    assert_true(
+        a.grad().all_close(Tensor[DType.float32].d1([1.0, 1.0, 1.0, 1.0]))
+    )
 
 
 def test_flatten_2d_to_1d() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var b = a.flatten()
-    s = b.sum()
+    var s = b.sum()
     s.backward()
 
     assert_true(b.shape() == Shape(4))
-    assert_true(b.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0])))
-    assert_true(a.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(b.all_close(Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0])))
+    assert_true(
+        a.grad().all_close(Tensor[DType.float32].d2([[1.0, 1.0], [1.0, 1.0]]))
+    )
 
 
 def test_flatten_3d_to_1d() raises:
-    var a = Tensor.d3(
+    var a = Tensor[DType.float32].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
     var b = a.flatten()
-    s = b.sum()
+    var s = b.sum()
     s.backward()
 
     assert_true(b.shape() == Shape(8))
     assert_true(
-        b.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]))
+        b.all_close(
+            Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
+        )
     )
-    var expected_grad = Tensor.d3(
+    var expected_grad = Tensor[DType.float32].d3(
         [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]]
     )
     assert_true(a.grad().all_close(expected_grad))
 
 
 def test_flatten_2d_partial_start_dim() raises:
-    var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
     var b = a.flatten(start_dim=1)  # Should keep first dimension
-    s = b.sum()
+    var s = b.sum()
     s.backward()
 
     assert_true(b.shape() == Shape(2, 3))
-    assert_true(b.all_close(Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])))
     assert_true(
-        a.grad().all_close(Tensor.d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]))
+        b.all_close(
+            Tensor[DType.float32].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        )
+    )
+    assert_true(
+        a.grad().all_close(
+            Tensor[DType.float32].d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
+        )
     )
 
 
 def test_flatten_3d_partial_dims() raises:
-    var a = Tensor.d3(
+    var a = Tensor[DType.float32].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
     var b = a.flatten(start_dim=1, end_dim=2)  # Flatten last two dimensions
-    s = b.sum()
+    var s = b.sum()
     s.backward()
 
     assert_true(b.shape() == Shape(2, 4))
     assert_true(
-        b.all_close(Tensor.d2([[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]]))
+        b.all_close(
+            Tensor[DType.float32].d2(
+                [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]]
+            )
+        )
     )
-    var expected_grad = Tensor.d3(
+    var expected_grad = Tensor[DType.float32].d3(
         [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]]
     )
     assert_true(a.grad().all_close(expected_grad))
 
 
 def test_flatten_4d_complex() raises:
-    var a = Tensor.d4(
+    var a = Tensor[DType.float32].d4(
         [
             [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
             [[[9.0, 10.0], [11.0, 12.0]], [[13.0, 14.0], [15.0, 16.0]]],
@@ -160,11 +190,11 @@ def test_flatten_4d_complex() raises:
         requires_grad=True,
     )
     var b = a.flatten()
-    s = b.sum()
+    var s = b.sum()
     s.backward()
 
     assert_true(b.shape() == Shape(16))
-    var expected_data = Tensor.d1(
+    var expected_data = Tensor[DType.float32].d1(
         [
             1.0,
             2.0,
@@ -185,7 +215,7 @@ def test_flatten_4d_complex() raises:
         ]
     )
     assert_true(b.all_close(expected_data))
-    var expected_grad = Tensor.d4(
+    var expected_grad = Tensor[DType.float32].d4(
         [
             [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]],
             [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]],
@@ -195,94 +225,120 @@ def test_flatten_4d_complex() raises:
 
 
 def test_flatten_no_grad() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=False
+    )
     var b = a.flatten()
 
     assert_true(b.shape() == Shape(4))
-    assert_true(b.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0])))
+    assert_true(b.all_close(Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0])))
     assert_true(not b.requires_grad)
 
 
 def test_flatten_with_grad_computation() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var b = a.flatten()
     var c = b * 2.0  # Additional operation after flatten
-    s = c.sum()
+    var s = c.sum()
     s.backward()
 
     assert_true(b.shape() == Shape(4))
-    assert_true(b.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0])))
-    assert_true(c.all_close(Tensor.d1([2.0, 4.0, 6.0, 8.0])))
-    assert_true(a.grad().all_close(Tensor.d2([[2.0, 2.0], [2.0, 2.0]])))
+    assert_true(b.all_close(Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0])))
+    assert_true(c.all_close(Tensor[DType.float32].d1([2.0, 4.0, 6.0, 8.0])))
+    assert_true(
+        a.grad().all_close(Tensor[DType.float32].d2([[2.0, 2.0], [2.0, 2.0]]))
+    )
 
 
 def test_flatten_requires_grad_false() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var b = a.flatten(requires_grad=False)
 
     assert_true(b.shape() == Shape(4))
-    assert_true(b.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0])))
+    assert_true(b.all_close(Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0])))
     assert_true(not b.requires_grad)
 
 
 def test_flatten_requires_grad_true() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=False
+    )
     var b = a.flatten(requires_grad=True)
 
     assert_true(b.shape() == Shape(4))
-    assert_true(b.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0])))
+    assert_true(b.all_close(Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0])))
     assert_true(b.requires_grad)
 
 
 def test_flatten_grad_accumulation() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var b = a.flatten()
 
     # First backward pass
-    s = b.sum()
+    var s = b.sum()
     s.backward()
-    assert_true(a.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(
+        a.grad().all_close(Tensor[DType.float32].d2([[1.0, 1.0], [1.0, 1.0]]))
+    )
 
     # Second backward pass (should accumulate)
     b.zero_grad()
     s = b.sum()
     s.backward()
-    assert_true(a.grad().all_close(Tensor.d2([[2.0, 2.0], [2.0, 2.0]])))
+    assert_true(
+        a.grad().all_close(Tensor[DType.float32].d2([[2.0, 2.0], [2.0, 2.0]]))
+    )
 
 
 def test_flatten_view_2d_to_1d() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     # Create flatten view manually using view API
     var flattened = a.view(shape=Shape(4), strides=Strides(1), offset=0)
-    s = flattened.sum()
+    var s = flattened.sum()
     s.backward()
 
     assert_true(flattened.shape() == Shape(4))
-    assert_true(flattened.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0])))
-    assert_true(a.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(
+        flattened.all_close(Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0]))
+    )
+    assert_true(
+        a.grad().all_close(Tensor[DType.float32].d2([[1.0, 1.0], [1.0, 1.0]]))
+    )
 
 
 def test_flatten_view_3d_to_1d() raises:
-    var a = Tensor.d3(
+    var a = Tensor[DType.float32].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
     # Flatten 3D to 1D: shape (2, 2, 2) -> (8)
     var flattened = a.view(shape=Shape(8), strides=Strides(1), offset=0)
-    s = flattened.sum()
+    var s = flattened.sum()
     s.backward()
 
     assert_true(flattened.shape() == Shape(8))
     assert_true(
-        flattened.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]))
+        flattened.all_close(
+            Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
+        )
     )
-    var expected_grad = Tensor.d3(
+    var expected_grad = Tensor[DType.float32].d3(
         [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]]
     )
     assert_true(a.grad().all_close(expected_grad))
 
 
 def test_flatten_view_with_strides() raises:
-    var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
     # Create a strided view then flatten it
     var strided_view = a.view(
         shape=Shape(2, 2), strides=Strides(3, 1), offset=0
@@ -290,18 +346,24 @@ def test_flatten_view_with_strides() raises:
     var flattened = strided_view.view(
         shape=Shape(4), strides=Strides(1), offset=0
     )
-    s = flattened.sum()
+    var s = flattened.sum()
     s.backward()
 
     assert_true(flattened.shape() == Shape(4))
-    assert_true(flattened.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0])))
     assert_true(
-        a.grad().all_close(Tensor.d2([[1.0, 1.0, 0.0], [1.0, 0.0, 0.0]]))
+        flattened.all_close(Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0]))
+    )
+    assert_true(
+        a.grad().all_close(
+            Tensor[DType.float32].d2([[1.0, 1.0, 0.0], [1.0, 0.0, 0.0]])
+        )
     )
 
 
 def test_flatten_view_partial_tensor() raises:
-    var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
     # Create view of a subset then flatten
     var subset_view = a.view(
         shape=Shape(2, 2), strides=Strides(3, 1), offset=1
@@ -311,17 +373,21 @@ def test_flatten_view_partial_tensor() raises:
         shape=Shape(4), strides=Strides(1), offset=0
     )
 
-    s = flattened.sum()
+    var s = flattened.sum()
     s.backward()
     assert_true(flattened.shape() == Shape(4))
-    assert_true(flattened.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0])))
     assert_true(
-        a.grad().all_close(Tensor.d2([[0.0, 1.0, 1.0], [0.0, 0.0, 0.0]]))
+        flattened.all_close(Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0]))
+    )
+    assert_true(
+        a.grad().all_close(
+            Tensor[DType.float32].d2([[0.0, 1.0, 1.0], [0.0, 0.0, 0.0]])
+        )
     )
 
 
 def test_flatten_view_complex_chain() raises:
-    var a = Tensor.d3(
+    var a = Tensor[DType.float32].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
 
@@ -336,64 +402,80 @@ def test_flatten_view_complex_chain() raises:
         shape=Shape(8), strides=Strides(1), offset=0
     )  # Final flatten
 
-    s = flattened.sum()
+    var s = flattened.sum()
     s.backward()
 
     assert_true(flattened.shape() == Shape(8))
     assert_true(
-        flattened.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]))
+        flattened.all_close(
+            Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
+        )
     )
-    var expected_grad = Tensor.d3(
+    var expected_grad = Tensor[DType.float32].d3(
         [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]]
     )
     assert_true(a.grad().all_close(expected_grad))
 
 
 def test_flatten_view_grad_accumulation() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var flattened = a.view(shape=Shape(4), strides=Strides(1), offset=0)
 
     # First backward pass
-    s = flattened.sum()
+    var s = flattened.sum()
     s.backward()
-    assert_true(a.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(
+        a.grad().all_close(Tensor[DType.float32].d2([[1.0, 1.0], [1.0, 1.0]]))
+    )
 
     # Second backward pass (should accumulate)
     s = flattened.sum()
     s.backward()
-    assert_true(a.grad().all_close(Tensor.d2([[2.0, 2.0], [2.0, 2.0]])))
+    assert_true(
+        a.grad().all_close(Tensor[DType.float32].d2([[2.0, 2.0], [2.0, 2.0]]))
+    )
 
 
 def test_flatten_basic_forward() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
+    var a = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]])
     var f = a.flatten()
     assert_true(f.shape() == Shape(4))
-    assert_true(f.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0])))
+    assert_true(f.all_close(Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0])))
 
 
 def test_flatten_start_dim() raises:
-    var a = Tensor.d3(
+    var a = Tensor[DType.float32].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
     )  # shape (2, 2, 2)
     var f = a.flatten(start_dim=1)
     # flatten dims 1 and 2 → (2, 4)
     assert_true(f.shape() == Shape(2, 4))
     assert_true(
-        f.all_close(Tensor.d2([[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]]))
+        f.all_close(
+            Tensor[DType.float32].d2(
+                [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]]
+            )
+        )
     )
 
 
 def test_flatten_full_grad() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var f = a.flatten()
     var y = f.sum()
     y.backward()
     # Each element contributes equally (1.0)
-    assert_true(a.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(
+        a.grad().all_close(Tensor[DType.float32].d2([[1.0, 1.0], [1.0, 1.0]]))
+    )
 
 
 def test_flatten_partial_grad() raises:
-    var a = Tensor.d3(
+    var a = Tensor[DType.float32].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )  # shape (2, 2, 2)
     var f = a.flatten(start_dim=1)  # → shape (2, 4)
@@ -402,19 +484,25 @@ def test_flatten_partial_grad() raises:
     # Gradient should be ones in original shape
     assert_true(
         a.grad().all_close(
-            Tensor.d3([[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]])
+            Tensor[DType.float32].d3(
+                [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]]
+            )
         )
     )
 
 
 def test_flatten_no_grad_required() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=False
+    )
     var f = a.flatten()
     assert_true(f.requires_grad == False)
 
 
 def test_flatten_does_not_alias_input() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var f = a.flatten()
     f[0] = 999.0
     # Because flatten allocates new buffer, a is unchanged
@@ -425,17 +513,21 @@ def test_flatten_does_not_alias_input() raises:
 
 
 def test_flatten_after_expand() raises:
-    var base = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var base = Tensor[DType.float32].d1([1.0, 2.0, 3.0], requires_grad=True)
     var exp = base.expand(Shape(2, 3))  # shape (2,3)
     var f = exp.flatten()
     var y = f.sum()
     y.backward()
     # Each base element was repeated twice in expand
-    assert_true(base.grad().all_close(Tensor.d1([2.0, 2.0, 2.0])))
+    assert_true(
+        base.grad().all_close(Tensor[DType.float32].d1([2.0, 2.0, 2.0]))
+    )
 
 
 def test_flatten_after_contiguous() raises:
-    var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
     var trans = a.transpose()
     var cont = trans.contiguous()  # makes it a dense contiguous copy
     var f = cont.flatten()
@@ -446,7 +538,7 @@ def test_flatten_after_contiguous() raises:
 
 
 def test_flatten_view_chain() raises:
-    var a = Tensor.d2(
+    var a = Tensor[DType.float32].d2(
         [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]], requires_grad=True
     )
     var v1 = a.view(Shape(4, 2))  # (4,2)
@@ -458,7 +550,9 @@ def test_flatten_view_chain() raises:
 
 
 def test_flatten_after_expand_contiguous_view_chain() raises:
-    var base = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var base = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var exp = base.expand(Shape(3, 2, 2))  # (3,2,2)
     var cont = exp.contiguous()  # full copy
     var v = cont.view(Shape(3, 4))  # (3,4)
@@ -466,7 +560,11 @@ def test_flatten_after_expand_contiguous_view_chain() raises:
     var y = f.sum()
     y.backward()
     # expand → contiguous → view → flatten should trace correctly
-    assert_true(base.grad().all_close(Tensor.d2([[3.0, 3.0], [3.0, 3.0]])))
+    assert_true(
+        base.grad().all_close(
+            Tensor[DType.float32].d2([[3.0, 3.0], [3.0, 3.0]])
+        )
+    )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1033,7 +1131,7 @@ def test_flat_parity_using_zero_grad() raises:
 
         var loss_cpu = a_cpu.flatten().sum()
         loss_cpu.backward()
-        var cpu_grad = a_cpu.grad().copy()
+        var cpu_grad = a_cpu.grad().clone()
 
         a_cpu.zero_grad()
 
@@ -1042,6 +1140,114 @@ def test_flat_parity_using_zero_grad() raises:
 
         assert_true(cpu_grad.all_close(a_gpu.grad().to_cpu()))
         assert_true(cpu_grad.all_close(a_cpu.grad()))
+
+
+def test_flatten_negative_start_dim() raises:
+    # flatten(x, -2) on (2,2,2) == flatten(x, 1) -> (2,4).
+    var a = Tensor[DType.float32].d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+    )
+    var f = a.flatten(start_dim=-2)
+    assert_true(f.shape() == Shape(2, 4))
+    assert_true(
+        f.all_close(
+            Tensor[DType.float32].d2(
+                [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]]
+            )
+        )
+    )
+
+
+def test_flatten_negative_start_and_end_dim() raises:
+    # flatten(x, 0, -1) on (2,2,2) flattens everything -> (8,).
+    var a = Tensor[DType.float32].d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+    )
+    var f = a.flatten(start_dim=0, end_dim=-1)
+    assert_true(f.shape() == Shape(8))
+    assert_true(
+        f.all_close(
+            Tensor[DType.float32].d1(
+                [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+            )
+        )
+    )
+
+
+def test_flatten_negative_dims_backward() raises:
+    # Non-uniform loss through a negative-dim flatten: grads must route
+    # back to exact input positions.
+    var a = Tensor[DType.float32].d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+        requires_grad=True,
+    )
+    var f = a.flatten(start_dim=-2)
+    var w = Tensor[DType.float32].d2(
+        [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]]
+    )
+    var loss = (f * w).sum()
+    loss.backward()
+    assert_true(
+        a.grad().all_close(
+            Tensor[DType.float32].d3(
+                [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+            )
+        )
+    )
+
+
+# ============================================================================
+# Out-of-range dim probes live in the MINIMAL harness
+# tests/test_negdim_probes.mojo: the child performs exactly one invalid
+# call and dies by the guard under test; we assert non-zero exit plus the
+# exact diagnostic text. If the guard ever stops firing, the child reaches
+# its own trailing panic instead and the message assertion fails. The
+# harness is a separate MINIMAL file because the child JIT runs alongside
+# this resident process — re-executing a full suite file risks OOM.
+# Children are warm-cache recompiles; the mojo cache this process just
+# built is shared.
+# ============================================================================
+
+
+def _spawn_negdim_probe(name: String) raises -> PythonObject:
+    """Run guard probe `name` from the minimal probe harness in a child."""
+    var script = (
+        "__import__('subprocess').run("
+        + "['pixi', 'run', 'mojo', '-I', '.', "
+        + "'tests/test_negdim_probes.mojo', "
+        + "'--probe-" + name + "'], "
+        + "capture_output=True, text=True, timeout=1200)"
+    )
+    return Python.evaluate(script)
+
+
+def test_flatten_dim_guards_abort_with_clear_messages() raises:
+    # NOTE: children execute only under -D subprocess=1 (else vacuous
+    # pass) — e.g. `pixi run mojo -I . -D subprocess=1 tests/test_flatten.mojo`.
+    comptime subprocess = get_defined_string["subprocess", ""]()
+    comptime if not subprocess == "":
+        var start = _spawn_negdim_probe("flatten-bad-start")
+        var start_out = String(start.stdout) + String(start.stderr)
+        assert_true(
+            String(start.returncode) != "0",
+            "Flatten: bad-start probe exits non-zero",
+        )
+        assert_true(
+            start_out.find("NDBuffer → flatten: start_dim") >= 0,
+            "Flatten: bad start_dim reports a precise diagnostic",
+        )
+        var end = _spawn_negdim_probe("flatten-bad-end")
+        var end_out = String(end.stdout) + String(end.stderr)
+        assert_true(
+            String(end.returncode) != "0",
+            "Flatten: bad-end probe exits non-zero",
+        )
+        assert_true(
+            end_out.find("NDBuffer → flatten: end_dim") >= 0,
+            "Flatten: bad end_dim reports a precise diagnostic",
+        )
+    else:
+        pass
 
 
 # ═════════════════════════════════════════════════════════════════════════════

@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from tenmo.argminmax import Argmin, Argmax
-from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
+from tenmo.shared.mnemonics import DEFAULT_INDEX_DTYPE
 from std.sys import has_accelerator
 
 
@@ -72,7 +72,7 @@ def test_tensor_argmax_3d_axis_and_neg() raises:
     print("test_tensor_argmax_3d_axis_and_neg")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(0, 24)
-    t = a.reshape(Shape(2, 3, 4))
+    var t = a.reshape(Shape(2, 3, 4))
     var a0 = t.argmax(axis=0)
     var a1 = t.argmax(axis=1)
     var a2 = t.argmax(axis=2)
@@ -88,7 +88,7 @@ def test_tensor_argmax_keepdims_true_false_3d() raises:
     print("test_tensor_argmax_keepdims_true_false_3d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(0, 24)
-    t = a.reshape(Shape(2, 3, 4))
+    var t = a.reshape(Shape(2, 3, 4))
     var a_no = t.argmax(axis=1, keepdims=False)
     var a_yes = t.argmax(axis=1, keepdims=True)
     assert_true(a_no.shape() == Shape(2, 4))
@@ -141,7 +141,7 @@ def test_tensor_argmin_3d_axis_and_neg() raises:
     print("test_tensor_argmin_3d_axis_and_neg")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(10, 34)
-    t = a.reshape(Shape(2, 3, 4))
+    var t = a.reshape(Shape(2, 3, 4))
     var a0 = t.argmin(axis=0)
     var a1 = t.argmin(axis=1)
     var a2 = t.argmin(axis=2)
@@ -157,7 +157,7 @@ def test_tensor_argmin_keepdims_true_false_3d() raises:
     print("test_tensor_argmin_keepdims_true_false_3d")
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(10, 34)
-    t = a.reshape(Shape(2, 3, 4))
+    var t = a.reshape(Shape(2, 3, 4))
     var a_no = t.argmin(axis=1, keepdims=False)
     var a_yes = t.argmin(axis=1, keepdims=True)
     assert_true(a_no.shape() == Shape(2, 4))

@@ -1,23 +1,27 @@
 from .tensor import Tensor
-from .intarray import IntArray
-from .mnemonics import AddTensor, MEAN
-from .shapes import Shape
-from .backpropagation import BackwardFnArg, BACKWARD_MEAN
+from .shared.intarray import IntArray
+from .shared.mnemonics import AddTensor, MEAN
+from .shared.shapes import Shape
+from .backpropagation import BackwardFn, BackwardFnType
+
 from .validators import Validator
 from .sum_mean_reduction import ReductionArg, SumMeanReduction
 from .gradbox import Gradbox
-from .common_utils import panic
 from .ancestry import Ancestor
 
 
-struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+@fieldwise_init
+struct MeanBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
-        var bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
+        var bwd_arg = output.ancestry().backward_fn().get[ReductionArg]()
         ref gradbox = output.gradients()
         var gradbox_shape = gradbox.shape()
         var ancestor = output.ancestry().get(0)
@@ -25,13 +29,12 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         var grad_contrib: Gradbox[Self.dtype]
         if gradbox_shape == Shape():
-            scalar_grad = gradbox.item() / Scalar[Self.dtype](
+            var scalar_grad = gradbox.item() / Scalar[Self.dtype](
                 ancestor_shape.num_elements()
             )
             grad_contrib = Gradbox[Self.dtype].full(
                 ancestor_shape,
                 scalar_grad,
-                
                 device=gradbox.device(),
             )
         else:
@@ -53,8 +56,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if ancestor.requires_grad:
             ancestor.update_grad(grad_contrib, AddTensor, None)
         parent_ids.append(ancestor._id)
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -70,22 +72,25 @@ struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
-        normalized_axes = Validator.validate_and_normalize_axes(
+        var normalized_axes = Validator.validate_and_normalize_axes(
             tensor.shape(), axes
         )
-        var ndb = SumMeanReduction[Self.dtype].reduce[op_code=MEAN](tensor.buffer, normalized_axes, keepdims)
+        var ndb = SumMeanReduction[Self.dtype].reduce[op_code=MEAN](
+            tensor.buffer, normalized_axes, keepdims, sync=sync
+        )
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         comptime if track_grad:
-            grad_required = requires_grad.or_else(tensor.requires_grad)
+            var grad_required = requires_grad.or_else(tensor.requires_grad)
 
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_MEAN, ReductionArg(normalized_axes, keepdims)
+                var backwardFn = BackwardFn(
+                    ReductionArg(normalized_axes, keepdims),
+                    MeanBackward[Self.dtype](),
                 )
-                backwardFnArg.needs_parent_data = True
-                out.add_ancestry(backwardFnArg^, tensor)
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, tensor)
 
         return out^
 
@@ -95,12 +100,15 @@ struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         gradbox: Gradbox[Self.dtype],
         axes: IntArray,
         keepdims: Bool = False,
+        sync: Bool = False,
     ) -> Gradbox[Self.dtype]:
         var gradbox_shape = gradbox.shape()
-        normalized_axes = Validator.validate_and_normalize_axes(
+        var normalized_axes = Validator.validate_and_normalize_axes(
             gradbox_shape, axes
         )
-        var ndb = SumMeanReduction[Self.dtype].reduce[op_code=MEAN](gradbox.buffer(), normalized_axes, keepdims)
+        var ndb = SumMeanReduction[Self.dtype].reduce[op_code=MEAN](
+            gradbox.buffer(), normalized_axes, keepdims, sync=sync
+        )
         var out = Gradbox[Self.dtype](ndb^)
 
         return out^

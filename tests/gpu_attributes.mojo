@@ -1,4 +1,4 @@
-from std.gpu.host import DeviceContext, DeviceAttribute
+from max.gpu.host import DeviceContext, DeviceAttribute
 
 
 def main() raises:

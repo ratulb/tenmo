@@ -14,19 +14,19 @@ Phases:
   3. Normalize softmax, compute per-sample loss, atomic-accumulate scalar loss
 """
 
-from std.gpu import thread_idx, block_dim, grid_dim, block_idx, barrier
+from max.gpu import thread_idx, block_dim, grid_dim, block_idx
+from max.gpu import barrier
 from std.math import exp, log
-from std.atomic import Atomic, Ordering
+from std.atomic import Atomic
 from std.memory import stack_allocation, AddressSpace
-from std.sys import simd_width_of
 
-from tenmo.ndbuffer import NDBuffer
-from tenmo.device import DeviceState
-from tenmo.common_utils import panic
-from tenmo.shapes import Shape
-from tenmo.intarray import IntArray
-from tenmo.shared import Reduction
-from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
+from ..shared.layout import Layout
+from ..gpu.transfer import materialize_contiguous
+from ..gpu.device import DeviceState
+from ..shared.panic import panic
+from ..shared.shapes import Shape
+from ..shared import Reduction
+from ..shared.mnemonics import DEFAULT_INDEX_DTYPE
 
 
 comptime MAX_BLOCK_SIZE: Int = 256
@@ -41,17 +41,20 @@ def fused_ce_class_indices_forward_kernel[
     target_dtype: DType = DEFAULT_INDEX_DTYPE,
     max_block_size: Int = MAX_BLOCK_SIZE,
 ](
-    logits: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    target: UnsafePointer[Scalar[target_dtype], ImmutAnyOrigin],
-    softmax_out: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    per_sample_loss: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    scalar_loss: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    valid_count_out: UnsafePointer[Scalar[DType.int32], MutAnyOrigin],
-    M: Int,
-    C: Int,
-    ignore_index: Int,
+    logits: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    target: Pointer[Scalar[target_dtype], ImmutAnyOrigin],
+    softmax_out: Pointer[Scalar[dtype], MutAnyOrigin],
+    per_sample_loss: Pointer[Scalar[dtype], MutAnyOrigin],
+    scalar_loss: Pointer[Scalar[dtype], MutAnyOrigin],
+    valid_count_out: Pointer[Scalar[DType.int32], MutAnyOrigin],
+    M_: Int64,
+    C_: Int64,
+    ignore_index_: Int64,
     label_smoothing: Scalar[dtype],
 ) where dtype.is_floating_point():
+    var M = Int(M_)
+    var C = Int(C_)
+    var ignore_index = Int(ignore_index_)
     var row = block_idx.x
     if row >= M:
         return
@@ -60,11 +63,11 @@ def fused_ce_class_indices_forward_kernel[
     var block = block_dim.x
     var base = row * C
 
-    # ── Phase 1: Find max along C ──
+    # Phase 1: Find max along C
     var local_max = Scalar[dtype](MAX_INIT)
     if tid < C:
         for c in range(tid, C, block):
-            local_max = max(local_max, logits[base + c])
+            local_max = max(local_max, logits[unsafe_offset=base + c])
 
     # Tree-reduce max in shared memory
     var smem = stack_allocation[
@@ -72,76 +75,76 @@ def fused_ce_class_indices_forward_kernel[
         Scalar[dtype],
         address_space=AddressSpace.SHARED,
     ]()
-    smem[tid] = local_max
+    smem[unsafe_offset=tid] = local_max
     barrier()
 
     var stride = block // 2
     while stride > 0:
         if tid < stride:
-            smem[tid] = max(smem[tid], smem[tid + stride])
+            smem[unsafe_offset=tid] = max(smem[unsafe_offset=tid], smem[unsafe_offset=tid + stride])
         barrier()
         stride //= 2
 
-    var max_val = smem[0]
+    var max_val = smem[unsafe_offset=0]
     barrier()
 
-    # ── Phase 2: Compute exp + sum_exp + optional sum_logits ──
+    # Phase 2: Compute exp + sum_exp + optional sum_logits
     var local_sum_exp = Scalar[dtype](0)
     var local_sum_logits = Scalar[dtype](0)
     var has_ls = label_smoothing > Scalar[dtype](0)
 
     if tid < C:
         for c in range(tid, C, block):
-            var val = logits[base + c]
+            var val = logits[unsafe_offset=base + c]
             var e = exp(val - max_val)
-            softmax_out[base + c] = e  # raw exp — normalized in Phase 3
+            softmax_out[unsafe_offset=base + c] = e  # raw exp — normalized in Phase 3
             local_sum_exp += e
             if has_ls:
                 local_sum_logits += val
 
     # Tree-reduce sum_exp
-    smem[tid] = local_sum_exp
+    smem[unsafe_offset=tid] = local_sum_exp
     barrier()
 
     stride = block // 2
     while stride > 0:
         if tid < stride:
-            smem[tid] += smem[tid + stride]
+            smem[unsafe_offset=tid] += smem[unsafe_offset=tid + stride]
         barrier()
         stride //= 2
 
-    var sum_exp = smem[0]
+    var sum_exp = smem[unsafe_offset=0]
     var log_sum_exp = log(sum_exp)
     barrier()
 
     # If label smoothing: tree-reduce sum_logits
     var sum_logits = Scalar[dtype](0)
     if has_ls:
-        smem[tid] = local_sum_logits
+        smem[unsafe_offset=tid] = local_sum_logits
         barrier()
         stride = block // 2
         while stride > 0:
             if tid < stride:
-                smem[tid] += smem[tid + stride]
+                smem[unsafe_offset=tid] += smem[unsafe_offset=tid + stride]
             barrier()
             stride //= 2
-        sum_logits = smem[0]
+        sum_logits = smem[unsafe_offset=0]
         barrier()
 
-    # ── Phase 3: Normalize softmax + compute loss ──
+    # Phase 3: Normalize softmax + compute loss
     var inv_sum_exp = Scalar[dtype](1) / sum_exp
     if tid < C:
         for c in range(tid, C, block):
-            softmax_out[base + c] = softmax_out[base + c] * inv_sum_exp
+            softmax_out[unsafe_offset=base + c] = softmax_out[unsafe_offset=base + c] * inv_sum_exp
 
     # Thread 0 computes per-sample loss and atomics
     if tid == 0:
-        var tgt = target[row]
+        var tgt = target[unsafe_offset=row]
         var is_valid = tgt != Scalar[target_dtype](ignore_index)
         var loss = Scalar[dtype](0)
 
         if is_valid:
-            var logit_tgt = logits[base + tgt.__int__()]
+            var logit_tgt = logits[unsafe_offset=base + tgt.__int__()]
             var log_softmax_tgt = (logit_tgt - max_val) - log_sum_exp
             loss = -log_softmax_tgt
 
@@ -154,39 +157,13 @@ def fused_ce_class_indices_forward_kernel[
                     Scalar[dtype](1) - label_smoothing
                 ) * loss - label_smoothing * mean_log_softmax
 
-        per_sample_loss[row] = loss
+        per_sample_loss[unsafe_offset=row] = loss
         _ = Atomic.fetch_add(scalar_loss, loss)
         if is_valid:
             _ = Atomic.fetch_add(valid_count_out, Scalar[DType.int32](1))
 
 
-def onehot_fill_kernel[
-    dtype: DType,
-    target_dtype: DType = DEFAULT_INDEX_DTYPE,
-](
-    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    indices: UnsafePointer[Scalar[target_dtype], ImmutAnyOrigin],
-    M: Int,
-    C: Int,
-    ignore_index: Int,
-):
-    """Fill result[row * C + target[row]] = 1 for each valid row.
-
-    One block per row — only thread 0 does work per block.
-    Rows where target[row] == ignore_index are skipped (left as zeros).
-    """
-    var row = block_idx.x
-    if row >= M:
-        return
-    var tgt = indices[row]
-    if tgt == Scalar[target_dtype](ignore_index):
-        return
-    var c = tgt.__int__()
-    if 0 <= c < C:
-        result[row * C + c] = Scalar[dtype](1)
-
-
-# ── Fused Backward Kernel ──────────────────────────────────────────────────────
+# Fused Backward Kernel
 
 
 def fused_ce_class_indices_backward_kernel[
@@ -194,16 +171,16 @@ def fused_ce_class_indices_backward_kernel[
     target_dtype: DType = DEFAULT_INDEX_DTYPE,
     max_block_size: Int = MAX_BLOCK_SIZE,
 ](
-    softmax: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    target: UnsafePointer[Scalar[target_dtype], ImmutAnyOrigin],
-    upstream: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    grad_out: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    M: Int,
-    C: Int,
-    ignore_index: Int,
+    softmax: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    target: Pointer[Scalar[target_dtype], ImmutAnyOrigin],
+    upstream: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    grad_out: Pointer[Scalar[dtype], MutAnyOrigin],
+    M_: Int64,
+    C_: Int64,
+    ignore_index_: Int64,
     label_smoothing: Scalar[dtype],
-    reduction: Int,
-    valid_count: Int,
+    reduction_: Int64,
+    valid_count_: Int64,
 ) where dtype.is_floating_point():
     """One block per row. Computes the full CE class-indices backward in one pass.
 
@@ -212,10 +189,20 @@ def fused_ce_class_indices_backward_kernel[
                   * ignore_mask[m] * upstream_scaled[m]
 
     reduction: 0=none, 1=sum, 2=mean
-    - none: upstream is (M,) — each row reads its own upstream[row]
-    - sum/mean: upstream is scalar — all rows read upstream[0]
+    - none: upstream is (M,)
+    - sum/mean: upstream is scalar
       mean further divides by valid_count
     """
+    var M = Int(M_)
+    var C = Int(C_)
+    var ignore_index = Int(ignore_index_)
+    var reduction = Int(reduction_)
+    var valid_count = Int(valid_count_)
+    comptime if not dtype.is_floating_point():
+        panic(
+            "fused_ce_class_indices_backward_kernel requires a floating point"
+            " dtype"
+        )
     var row = block_idx.x
     if row >= M:
         return
@@ -227,9 +214,9 @@ def fused_ce_class_indices_backward_kernel[
     # Get upstream value for this row
     var up_val: Scalar[dtype]
     if reduction == 0:  # none
-        up_val = upstream[row]
+        up_val = upstream[unsafe_offset=row]
     else:
-        up_val = upstream[0]
+        up_val = upstream[unsafe_offset=0]
 
     # Apply reduction scaling
     var scale: Scalar[dtype]
@@ -240,7 +227,7 @@ def fused_ce_class_indices_backward_kernel[
         scale = up_val
 
     # Determine target class and validity for this row
-    var tgt_scalar = target[row]
+    var tgt_scalar = target[unsafe_offset=row]
     var is_valid = tgt_scalar != Scalar[target_dtype](ignore_index)
     var tgt_class: Int
     if is_valid:
@@ -258,7 +245,7 @@ def fused_ce_class_indices_backward_kernel[
             var g: Scalar[dtype]
 
             if is_valid:
-                g = softmax[idx]
+                g = softmax[unsafe_offset=idx]
                 if c == tgt_class:
                     # Subtract onehot
                     g = g - Scalar[dtype](1)
@@ -272,41 +259,45 @@ def fused_ce_class_indices_backward_kernel[
             else:
                 g = Scalar[dtype](0)
 
-            grad_out[idx] = g * scale
+            grad_out[unsafe_offset=idx] = g * scale
 
 
-# ── Launcher ──────────────────────────────────────────────────────────────────
+# Launcher
 
 
 struct CrossEntropyFusedKernel[
     dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE
-](ImplicitlyCopyable & Movable):
+](ImplicitlyCopyable):
     @staticmethod
     def launch(
-        logits_2d: NDBuffer[Self.dtype],
-        target_1d: NDBuffer[Self.target_dtype],
+        logits_2d_layout: Layout,
+        logits_2d_device_state: DeviceState[Self.dtype],
+        target_1d_layout: Layout,
+        target_1d_device_state: DeviceState[Self.target_dtype],
         reduction: Reduction,
         ignore_index: Int,
         label_smoothing: Scalar[Self.dtype],
     ) raises -> Tuple[
-        NDBuffer[Self.dtype],  # softmax_probs (M, C)
-        NDBuffer[Self.dtype],  # per_sample_loss (M,)
+        Tuple[Layout, DeviceState[Self.dtype]],  # softmax_probs (M, C)
+        Tuple[Layout, DeviceState[Self.dtype]],  # per_sample_loss (M,)
         Scalar[Self.dtype],  # scalar_loss (sum of all per-sample losses)
         Int,  # valid_count (non-ignored rows)
     ] where Self.dtype.is_floating_point():
-        debug_assert(logits_2d.is_on_gpu())
-        debug_assert(target_1d.is_on_gpu())
 
-        var M = logits_2d.shape[0]
-        var C = logits_2d.shape[1]
+        var M = logits_2d_layout.shape[0]
+        var C = logits_2d_layout.shape[1]
         var numels = M * C
 
-        ref device_state = logits_2d.device_state.value()
-        var device_context = device_state.gpu[]
+        ref gpu = logits_2d_device_state.get_gpu()
+        var device_context = gpu[]
 
         # Make contiguous copies for kernel (no-op if already contiguous)
-        var contig_logits = logits_2d.contiguous_device_state()
-        var contig_target = target_1d.contiguous_device_state()
+        var contig_logits = materialize_contiguous(
+            logits_2d_device_state, logits_2d_layout
+        )
+        var contig_target = materialize_contiguous(
+            target_1d_device_state, target_1d_layout
+        )
 
         # Allocate output buffers
         var softmax_buffer = device_context.enqueue_create_buffer[Self.dtype](
@@ -333,11 +324,6 @@ struct CrossEntropyFusedKernel[
                 target_dtype=Self.target_dtype,
                 max_block_size=MAX_BLOCK_SIZE,
             ],
-            fused_ce_class_indices_forward_kernel[
-                dtype=Self.dtype,
-                target_dtype=Self.target_dtype,
-                max_block_size=MAX_BLOCK_SIZE,
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -348,9 +334,9 @@ struct CrossEntropyFusedKernel[
             loss_buffer,
             scalar_buffer,
             valid_buffer,
-            M,
-            C,
-            ignore_index,
+            Int64(M),
+            Int64(C),
+            Int64(ignore_index),
             label_smoothing,
             grid_dim=num_blocks,
             block_dim=block_size,
@@ -361,10 +347,10 @@ struct CrossEntropyFusedKernel[
 
         # Read back scalar_loss and valid_count from GPU
         var scalar_state = DeviceState[Self.dtype](
-            scalar_buffer^, device_state.gpu
+            scalar_buffer^, gpu
         )
         var valid_state = DeviceState[DType.int32](
-            valid_buffer^, device_state.gpu
+            valid_buffer^, gpu
         )
 
         var scalar_val: Scalar[Self.dtype]
@@ -374,110 +360,74 @@ struct CrossEntropyFusedKernel[
         with valid_state.buffer.map_to_host() as host_valid:
             valid_cnt = host_valid[0].__int__()
 
-        # Wrap results as NDBuffers
+        # Wrap results as (Layout, Storage) pairs
         var softmax_state = DeviceState[Self.dtype](
-            softmax_buffer^, device_state.gpu
+            softmax_buffer^, gpu
         )
-        var loss_state = DeviceState[Self.dtype](loss_buffer^, device_state.gpu)
+        var loss_state = DeviceState[Self.dtype](loss_buffer^, gpu)
 
-        var softmax_ndb = NDBuffer[Self.dtype].with_device_state(
-            softmax_state^, logits_2d.shape
+        var softmax_pair = (
+            Layout(logits_2d_layout.shape),
+            softmax_state^,
         )
-        var loss_ndb = NDBuffer[Self.dtype].with_device_state(
-            loss_state^, Shape(M)
-        )
-
-        return (softmax_ndb^, loss_ndb^, scalar_val, valid_cnt)
-
-    @staticmethod
-    def launch_onehot(
-        target_1d: NDBuffer[Self.target_dtype],
-        num_classes: Int,
-        ignore_index: Int,
-    ) raises -> NDBuffer[Self.dtype]:
-        """Fill a (M, C) GPU buffer with onehot encoding of target_1d.
-
-        One block per row. Each block sets element (row, target[row]) to 1.
-        Rows where target[row] == ignore_index stay all zeros.
-        """
-        debug_assert(target_1d.is_on_gpu())
-        var M = target_1d.shape[0]
-        var C = num_classes
-
-        ref device_state = target_1d.device_state.value()
-        var ctx = device_state.gpu[]
-
-        var contig_target = target_1d.contiguous_device_state()
-
-        var result_buffer = ctx.enqueue_create_buffer[Self.dtype](M * C)
-        result_buffer.enqueue_fill(0)
-
-        var compiled = ctx.compile_function[
-            onehot_fill_kernel[Self.dtype, Self.target_dtype],
-            onehot_fill_kernel[Self.dtype, Self.target_dtype],
-        ]()
-
-        ctx.enqueue_function(
-            compiled,
-            result_buffer,
-            contig_target.device_buffer(),
-            M,
-            C,
-            ignore_index,
-            grid_dim=M,
-            block_dim=1,
+        var loss_pair = (
+            Layout(Shape(M)),
+            loss_state^,
         )
 
-        var result_state = DeviceState[Self.dtype](
-            result_buffer^, device_state.gpu
-        )
-        return NDBuffer[Self.dtype].with_device_state(
-            result_state^, Shape(M, C)
-        )
+        return (softmax_pair, loss_pair, scalar_val, valid_cnt)
 
     @staticmethod
     def launch_backward(
-        softmax_ndb: NDBuffer[Self.dtype],
-        target_ndb: NDBuffer[Self.target_dtype],
-        upstream_ndb: NDBuffer[Self.dtype],
+        softmax_layout: Layout,
+        softmax_device_state: DeviceState[Self.dtype],
+        target_layout: Layout,
+        target_device_state: DeviceState[Self.target_dtype],
+        upstream_layout: Layout,
+        upstream_device_state: DeviceState[Self.dtype],
         reduction: Reduction,
         valid_count: Int,
         M: Int,
         C: Int,
         ignore_index: Int,
         label_smoothing: Scalar[Self.dtype],
-    ) raises -> NDBuffer[Self.dtype]:
+    ) raises -> Tuple[Layout, DeviceState[Self.dtype]]:
         """Fused backward: onehot + smoothing + ignore_mask + scaling in one launch.
 
         Args:
-            softmax_ndb: (M, C) — softmax probabilities on GPU
-            target_ndb:  (M,) — class indices on GPU
-            upstream_ndb: upstream gradient buffer
-                For none reduction: shape (M,) — must be on GPU
-                For sum/mean reduction: shape () — can be CPU, auto-transferred
-            reduction: none/sum/mean enum
-            valid_count: number of non-ignored rows (for mean scaling)
+            softmax_layout: Layout of the softmax probabilities.
+            softmax_device_state: (M, C) softmax probabilities on GPU.
+            target_layout: Layout of the target tensor.
+            target_device_state: (M,) class indices on GPU.
+            upstream_layout: Layout of the upstream gradient.
+            upstream_device_state: Upstream gradient.
+                For none reduction: shape (M,) — must be on GPU.
+                For sum/mean reduction: shape () — can be CPU, auto-transferred.
+            reduction:     None/sum/mean enum.
+            valid_count:   Number of non-ignored rows (for mean scaling).
+            M:             Number of rows.
+            C:             Number of classes.
+            ignore_index:  Class index to ignore in loss.
+            label_smoothing: Label smoothing factor.
 
         Returns:
-            (M, C) NDBuffer with the full gradient w.r.t. logits
+            ((M, C) Layout, DeviceState) pair with the full gradient w.r.t. logits.
         """
-        debug_assert(softmax_ndb.is_on_gpu())
-        debug_assert(target_ndb.is_on_gpu())
 
-        ref device_state = softmax_ndb.device_state.value()
-        var ctx = device_state.gpu[]
+        ref gpu = softmax_device_state.get_gpu()
+        var ctx = gpu[]
 
-        # Ensure upstream is on GPU (mean/sum upstream is a CPU scalar)
-        var upstream_gpu: NDBuffer[Self.dtype]
-        if upstream_ndb.is_on_gpu():
-            upstream_gpu = upstream_ndb
-        else:
-            # Transfer CPU scalar to GPU — single-element buffer
-            var cpu_val = upstream_ndb.buffer[0]
-            var ubuf = ctx.enqueue_create_buffer[Self.dtype](1)
-            ubuf.enqueue_fill(cpu_val)
-            var ust = DeviceState[Self.dtype](ubuf^, device_state.gpu)
-            upstream_gpu = NDBuffer[Self.dtype].with_device_state(ust^, Shape())
+        var contig_softmax = materialize_contiguous(
+            softmax_device_state, softmax_layout
+        )
+        var contig_target = materialize_contiguous(
+            target_device_state, target_layout
+        )
+
+        # Ensure upstream is contiguous on GPU
+        var contig_upstream = materialize_contiguous(
+            upstream_device_state, upstream_layout
+        )
 
         var numels = M * C
         var result_buffer = ctx.enqueue_create_buffer[Self.dtype](numels)
@@ -490,47 +440,49 @@ struct CrossEntropyFusedKernel[
         block_size = block_pow2
         var num_blocks = M
 
-        var compiled = ctx.compile_function[
-            fused_ce_class_indices_backward_kernel[
-                dtype=Self.dtype,
-                target_dtype=Self.target_dtype,
-                max_block_size=MAX_BLOCK_SIZE,
-            ],
-            fused_ce_class_indices_backward_kernel[
-                dtype=Self.dtype,
-                target_dtype=Self.target_dtype,
-                max_block_size=MAX_BLOCK_SIZE,
-            ],
-        ]()
+        comptime if Self.dtype.is_floating_point():
+            var compiled = ctx.compile_function[
+                fused_ce_class_indices_backward_kernel[
+                    dtype=Self.dtype,
+                    target_dtype=Self.target_dtype,
+                    max_block_size=MAX_BLOCK_SIZE,
+                ],
+            ]()
 
-        # Convert reduction to integer for kernel dispatch
-        var reduction_int: Int
-        if reduction.is_none():
-            reduction_int = 0
-        elif reduction.is_sum():
-            reduction_int = 1
+            # Convert reduction to integer for kernel dispatch
+            var reduction_int: Int
+            if reduction.is_none():
+                reduction_int = 0
+            elif reduction.is_sum():
+                reduction_int = 1
+            else:
+                reduction_int = 2
+
+            ctx.enqueue_function(
+                compiled,
+                contig_softmax.device_buffer(),
+                contig_target.device_buffer(),
+                contig_upstream.device_buffer(),
+                result_buffer,
+                Int64(M),
+                Int64(C),
+                Int64(ignore_index),
+                label_smoothing,
+                Int64(reduction_int),
+                Int64(valid_count),
+                grid_dim=num_blocks,
+                block_dim=block_size,
+            )
         else:
-            reduction_int = 2
-
-        ctx.enqueue_function(
-            compiled,
-            softmax_ndb.contiguous_device_state().device_buffer(),
-            target_ndb.contiguous_device_state().device_buffer(),
-            upstream_gpu.contiguous_device_state().device_buffer(),
-            result_buffer,
-            M,
-            C,
-            ignore_index,
-            label_smoothing,
-            reduction_int,
-            valid_count,
-            grid_dim=num_blocks,
-            block_dim=block_size,
-        )
+            panic(
+                "CrossEntropyFusedKernel.launch_backward: "
+                "requires a floating point dtype"
+            )
 
         var result_state = DeviceState[Self.dtype](
-            result_buffer^, device_state.gpu
+            result_buffer^, gpu
         )
-        return NDBuffer[Self.dtype].with_device_state(
-            result_state^, Shape(M, C)
+        return (
+            Layout(Shape(M, C)),
+            result_state^,
         )

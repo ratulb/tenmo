@@ -24,7 +24,7 @@ from std.sys import has_accelerator
 from std.testing import assert_true, TestSuite, assert_equal
 from tenmo.tensor import Tensor
 from std.math import abs
-from tenmo.intarray import IntArray
+from tenmo.shared.intarray import IntArray
 
 
 # =============================================================================

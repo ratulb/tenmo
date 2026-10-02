@@ -1,9 +1,9 @@
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
-from tenmo.common_utils import panic
+from tenmo.shared.shapes import Shape
+from tenmo.shared.panic import panic
 from std.sys import simd_width_of
 from std.testing import assert_true, TestSuite
-from tenmo.strides import Strides
+from tenmo.shared.strides import Strides
 
 
 def matmul_naive[
@@ -98,6 +98,50 @@ def validate_matmul_2d_grads[
         print("Skipping B.grad validation (requires_grad == False)")
 
     print("Matmul_2d gradient validation passed for all applicable tensors")
+
+
+def test_matmul_2d_strided_b_panel() raises:
+    """2D strided-B vs naive triple-loop oracle + grad validation."""
+    comptime dtype = DType.float32
+    var A = Tensor[dtype].randn(256, 128, init_seed=7)
+    var W = Tensor[dtype].randn(256, 128, init_seed=8)
+    var B_view = W.transpose[track_grad=False]()
+    var B_contig = W.transpose[track_grad=False]().contiguous()
+    assert_true(B_view.shape() == Shape(128, 256))
+    var y_view = A.matmul[track_grad=False](B_view)
+    var y_ref = matmul_naive(A, B_contig)
+    assert_true(y_view.num_elements() == y_ref.num_elements())
+    var max_diff: Float32 = 0.0
+    for i in range(y_view.num_elements()):
+        var d = abs(y_view.get(i) - y_ref.get(i))
+        if d > max_diff:
+            max_diff = d
+    print("  2d panel max abs diff vs naive:", max_diff)
+    assert_true(max_diff < 1e-4, "2d strided-B disagrees with naive")
+
+    var a = Tensor[dtype].randn(256, 128, init_seed=7, requires_grad=True)
+    var w = Tensor[dtype].randn(256, 128, init_seed=8, requires_grad=True)
+    var b = w.transpose()
+    var c = a.matmul(b)
+    validate_matmul_2d_grads(a, b, c)
+
+
+def test_matmul_2d_strided_b_panel_tails() raises:
+    """2D strided-B with p-tail (p=70) vs naive oracle."""
+    comptime dtype = DType.float32
+    var A = Tensor[dtype].randn(40, 48, init_seed=7)
+    var W = Tensor[dtype].randn(70, 48, init_seed=8)
+    var B_view = W.transpose[track_grad=False]()
+    var B_contig = W.transpose[track_grad=False]().contiguous()
+    var y_view = A.matmul[track_grad=False](B_view)
+    var y_ref = matmul_naive(A, B_contig)
+    var max_diff: Float32 = 0.0
+    for i in range(y_view.num_elements()):
+        var d = abs(y_view.get(i) - y_ref.get(i))
+        if d > max_diff:
+            max_diff = d
+    print("  2d tails max abs diff vs naive:", max_diff)
+    assert_true(max_diff < 1e-4, "2d strided-B tails disagree with naive")
 
 
 def main() raises:

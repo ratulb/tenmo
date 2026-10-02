@@ -1,5 +1,7 @@
 from tenmo.tensor import Tensor
-from std.testing import assert_true, TestSuite
+from std.testing import assert_true, assert_false, TestSuite
+from std.python import Python, PythonObject
+from std.sys.defines import get_defined_string
 
 # ============================================================================
 # FORWARD PASS TESTS - BASIC CONCATENATION
@@ -799,6 +801,86 @@ def test_concat_view_contiguous_mix() raises:
     assert_true(A.grad().all_close[atol=1e-6](expected_grad_A))
 
 
+def test_concat_single_requires_grad_override() raises:
+    """Single-tensor concat is an alias path, but the explicit.
+    requires_grad=True must still produce a tracked output. (Parent is
+    untracked, so no grad accumulates there — the pin is requires_grad
+    plus a clean backward through the wired single)."""
+    comptime dtype = DType.float32
+    var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+
+    var tensors = List[Tensor[dtype]]()
+    tensors.append(A)
+
+    var result = Tensor[dtype].concat(tensors, axis=0, requires_grad=True)
+    assert_true(result.requires_grad)
+    var loss = result.sum()
+    loss.backward()
+
+
+def test_concat_single_requires_grad_override_false_untracks() raises:
+    """Explicit requires_grad=False on a tracked single input must yield.
+    an untracked output (previously the tracked alias leaked through)."""
+    comptime dtype = DType.float32
+    var A = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
+
+    var tensors = List[Tensor[dtype]]()
+    tensors.append(A)
+
+    var result = Tensor[dtype].concat(tensors, axis=0, requires_grad=False)
+    assert_false(result.requires_grad)
+
+
+# ============================================================================
+# Runtime validation-guard probes.
+#
+# Concate.forward validates axis up front and reports violations via
+# panic → abort() — fatal, and uncatchable in-process (assert_raises sees
+# raised Errors, not aborts). To prove the guard fires with a clear
+# message, the test below spawns the minimal probe harness
+# tests/test_concate_probes.mojo: the child performs exactly one invalid
+# call and dies by the guard under test; we assert non-zero exit plus the
+# exact diagnostic text. If the guard ever stops firing, the child reaches
+# its own trailing panic instead and the message assertion fails. The
+# harness is a separate MINIMAL file because the child JIT runs alongside
+# this resident process — re-executing a full suite file risks OOM.
+# Children are warm-cache recompiles; the mojo cache this process just
+# built is shared.
+# ============================================================================
+
+
+def _spawn_concate_probe(name: String) raises -> PythonObject:
+    """Run guard probe `name` from the minimal probe harness in a child."""
+    var script = (
+        "__import__('subprocess').run("
+        + "['pixi', 'run', 'mojo', '-I', '.', "
+        + "'tests/test_concate_probes.mojo', "
+        + "'--probe-" + name + "'], "
+        + "capture_output=True, text=True, timeout=1200)"
+    )
+    return Python.evaluate(script)
+
+
+def test_concate_validation_guards_abort_with_clear_messages() raises:
+    # NOTE: children execute only under -D subprocess=1 (else vacuous
+    # pass) — e.g. `pixi run mojo -I . -D subprocess=1 tests/test_concat.mojo`.
+    comptime subprocess = get_defined_string["subprocess", ""]()
+    comptime if not subprocess == "":
+        var axis = _spawn_concate_probe("single-bad-axis")
+        var axis_out = String(axis.stdout) + String(axis.stderr)
+        assert_true(
+            String(axis.returncode) != "0",
+            "Concate: single-tensor bad-axis probe exits non-zero",
+        )
+        assert_true(
+            axis_out.find("Concate → forward: axis out of bounds") >= 0,
+            "Concate: bad axis reports a precise diagnostic",
+        )
+    else:
+        pass
+
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
@@ -1172,7 +1254,7 @@ def test_concat_nested_views_ct() raises:
     comptime dtype = DType.float32
 
     var base = Tensor[dtype].arange(0.0, 24.0, 1.0, requires_grad=True)
-    r = base.reshape(4, 6)
+    var r = base.reshape(4, 6)
 
     # Create view of first 3 rows
     var view1 = r.view([3, 6], offset=0)
@@ -1259,7 +1341,7 @@ def test_concat_scalar_views_ct() raises:
     var t_a = view_a.contiguous()
     var t_a_r = t_a.reshape(1)
     var t_b = view_b.contiguous()
-    t_b_r = t_b.reshape(1)
+    var t_b_r = t_b.reshape(1)
 
     var tensors = List[Tensor[dtype]]()
     tensors.append(t_a_r)
@@ -1347,6 +1429,3 @@ def test_concat_preserves_values_ct() raises:
     assert_true(abs(result[1, 1] - 4.5) < 1e-6)
     assert_true(abs(result[2, 0] - 5.5) < 1e-6)
     assert_true(abs(result[2, 1] - 6.5) < 1e-6)
-
-
-

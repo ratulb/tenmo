@@ -1,11 +1,13 @@
-from tenmo.shapes import Shape
-from tenmo.strides import Strides
-from tenmo.common_utils import now
-from tenmo.buffers import Buffer
-from tenmo.intarray import IntArray
+from tenmo.shared.shapes import Shape
+from tenmo.shared.strides import Strides
+from tenmo.shared.timing import now
+from tenmo.shared.buffers import Buffer
+from tenmo.shared.intarray import IntArray
 from std.testing import assert_equal, assert_true, assert_false, TestSuite
-from tenmo.indexhelper import IndexIterator
-from tenmo.indexhelper import IndexCalculator
+from tenmo.shared.indexhelper import IndexIterator
+from tenmo.shared.indexhelper import LayoutIndexIterator
+from tenmo.shared.indexhelper import IndexCalculator
+from tenmo.shared.layout import Layout
 
 # from inline_index_iterator import IndexIterator
 
@@ -36,7 +38,7 @@ def benchmark_contiguous_iteration() raises:
     print("\nMethod 2: for offset in IndexIterator")
     var new_start = now()
     for offset in IndexIterator(
-        Pointer(to=shape).get_immutable(), Pointer(to=strides).get_immutable()
+        Pointer(to=shape).as_imm(), Pointer(to=strides).as_imm()
     ):
         buffer[offset] = 1.0
     var new_end = now()
@@ -75,7 +77,7 @@ def benchmark_strided_iteration() raises:
     print("\nMethod 2: for offset in IndexIterator")
     var new_start = now()
     for offset in IndexIterator(
-        Pointer(to=shape).get_immutable(), Pointer(to=strides).get_immutable()
+        Pointer(to=shape).as_imm(), Pointer(to=strides).as_imm()
     ):
         buffer[offset] = 1.0
     var new_end = now()
@@ -508,6 +510,264 @@ def test_no_allocation_overhead() raises:
     print("  ✓ No allocation overhead detected")
 
 
+# ========== LAYOUT INDEX ITERATOR TESTS ==========
+
+
+def test_layout_iterator_contiguous() raises:
+    """Test iteration over a contiguous Layout."""
+    print("test_layout_iterator_contiguous")
+
+    var shape = Shape(10, 20)
+    var strides = Strides(20, 1)  # Row-major contiguous
+    var layout = Layout(shape, strides)
+
+    var offsets = List[Int]()
+    for offset in LayoutIndexIterator(Pointer(to=layout)):
+        offsets.append(offset)
+
+    # Should produce 0, 1, 2, ..., 199
+    assert_equal(len(offsets), 200)
+    assert_equal(offsets[0], 0)
+    assert_equal(offsets[1], 1)
+    assert_equal(offsets[199], 199)
+
+    # Contiguity must be read from the Layout, not recomputed
+    var iter = LayoutIndexIterator(Pointer(to=layout))
+    assert_true(iter.contiguous)
+
+    print("  ✓ LayoutIterator contiguous produces sequential offsets")
+
+
+def test_layout_iterator_strided() raises:
+    """Test iteration over a strided Layout (e.g., transpose)."""
+    print("test_layout_iterator_strided")
+
+    var shape = Shape(3, 4)  # 3 rows, 4 cols
+    var strides = Strides(1, 3)  # Column-major (transposed)
+    var layout = Layout(shape, strides)
+
+    var offsets = List[Int]()
+    for offset in LayoutIndexIterator(Pointer(to=layout)):
+        offsets.append(offset)
+
+    # Column-major order: [0,3,6,9], [1,4,7,10], [2,5,8,11]
+    assert_equal(len(offsets), 12)
+    assert_equal(offsets[0], 0)  # (0,0)
+    assert_equal(offsets[1], 3)  # (0,1)
+    assert_equal(offsets[2], 6)  # (0,2)
+    assert_equal(offsets[3], 9)  # (0,3)
+    assert_equal(offsets[4], 1)  # (1,0)
+
+    var iter = LayoutIndexIterator(Pointer(to=layout))
+    assert_false(iter.contiguous)
+
+    print("  ✓ LayoutIterator strided respects stride pattern")
+
+
+def test_layout_iterator_matches_index_iterator() raises:
+    """Verify LayoutIndexIterator produces same offsets as IndexIterator."""
+    print("test_layout_iterator_matches_index_iterator")
+
+    var shape = Shape(5, 6, 7)
+    var strides = Strides(42, 7, 1)  # Row-major
+
+    # Method 1: IndexIterator (existing, two-pointer form)
+    var offsets_old = List[Int]()
+    for offset in IndexIterator(Pointer(to=shape), Pointer(to=strides)):
+        offsets_old.append(offset)
+
+    # Method 2: LayoutIndexIterator (single Layout pointer form)
+    var layout = Layout(shape, strides)
+    var offsets_new = List[Int]()
+    for offset in LayoutIndexIterator(Pointer(to=layout)):
+        offsets_new.append(offset)
+
+    # They should match exactly
+    assert_equal(len(offsets_new), len(offsets_old))
+    for i in range(len(offsets_new)):
+        assert_equal(
+            offsets_new[i],
+            offsets_old[i],
+            "Offset mismatch at index " + String(i),
+        )
+
+    print("  ✓ LayoutIterator matches IndexIterator exactly")
+
+
+def test_layout_iterator_strided_matches_index_iterator() raises:
+    """Verify LayoutIndexIterator matches IndexIterator for strided layouts."""
+    print("test_layout_iterator_strided_matches_index_iterator")
+
+    var shape = Shape(3, 4, 5)
+    var strides = Strides(1, 3, 12)  # reversed order
+
+    var offsets_old = List[Int]()
+    for offset in IndexIterator(Pointer(to=shape), Pointer(to=strides)):
+        offsets_old.append(offset)
+
+    var layout = Layout(shape, strides)
+    var offsets_new = List[Int]()
+    for offset in LayoutIndexIterator(Pointer(to=layout)):
+        offsets_new.append(offset)
+
+    assert_equal(len(offsets_new), len(offsets_old))
+    for i in range(len(offsets_new)):
+        assert_equal(
+            offsets_new[i],
+            offsets_old[i],
+            "Offset mismatch at index " + String(i),
+        )
+
+    print("  ✓ LayoutIterator strided matches IndexIterator")
+
+
+def test_layout_iterator_with_offset() raises:
+    """Test LayoutIndexIterator honors the Layout's base offset."""
+    print("test_layout_iterator_with_offset")
+
+    var shape = Shape(5, 5)
+    var strides = Strides(5, 1)
+    var layout = Layout(shape, strides, offset=100)
+
+    var offsets = List[Int]()
+    for offset in LayoutIndexIterator(Pointer(to=layout)):
+        offsets.append(offset)
+        if len(offsets) >= 5:
+            break
+
+    # Should start at 100, 101, 102, ...
+    assert_equal(offsets[0], 100)
+    assert_equal(offsets[1], 101)
+    assert_equal(offsets[4], 104)
+
+    # Strided with offset: first element at base offset
+    var layout2 = Layout(Shape(3, 4), Strides(1, 3), offset=50)
+    var iter2 = LayoutIndexIterator(Pointer(to=layout2))
+    assert_equal(iter2.__next__(), 50)
+
+    print("  ✓ LayoutIterator honors Layout offset")
+
+
+def test_layout_iterator_has_next_and_len() raises:
+    """Test __has_next__ and __len__ on the Layout iterator."""
+    print("test_layout_iterator_has_next_and_len")
+
+    var shape = Shape(3, 4)
+    var strides = Strides(4, 1)
+    var layout = Layout(shape, strides)
+    var iter = LayoutIndexIterator(Pointer(to=layout))
+
+    assert_true(iter.__has_next__())
+    assert_equal(iter.__len__(), 12)
+
+    # Consume 5 elements
+    for _ in range(5):
+        _ = iter.__next__()
+
+    assert_true(iter.__has_next__())
+    assert_equal(iter.__len__(), 7)
+
+    # Consume rest
+    for _ in range(7):
+        _ = iter.__next__()
+
+    assert_false(iter.__has_next__())
+    assert_equal(iter.__len__(), 0)
+
+    print("  ✓ LayoutIterator __has_next__ and __len__ work")
+
+
+def test_layout_iterator_skip() raises:
+    """Test skip() on the Layout iterator (contiguous + strided)."""
+    print("test_layout_iterator_skip")
+
+    # Contiguous case
+    var layout1 = Layout(Shape(100), Strides(1))
+    var iter1 = LayoutIndexIterator(Pointer(to=layout1))
+    iter1.skip(10)
+    assert_equal(iter1.__next__(), 10)
+    print("  ✓ Skip works for contiguous")
+
+    # Strided case: skip forward, must match IndexIterator
+    var shape2 = Shape(5, 6)
+    var strides2 = Strides(6, 1)
+    var layout2 = Layout(shape2, strides2)
+
+    var iter2 = LayoutIndexIterator(Pointer(to=layout2))
+    iter2.skip(7)  # Skip to element 7 (row 1, col 1)
+    assert_equal(iter2.__next__(), 7)
+
+    # Large skip (direct path)
+    var iter3 = LayoutIndexIterator(Pointer(to=layout2))
+    iter3.skip(17)  # large skip path
+    assert_equal(iter3.__next__(), 17)
+
+    # Skip to end
+    var iter4 = LayoutIndexIterator(Pointer(to=layout2))
+    iter4.skip(30)
+    assert_false(iter4.__has_next__())
+
+    print("  ✓ Skip works for strided Layout")
+
+    # Strided skip must equal IndexIterator.skip
+    var strides_s = Strides(1, 3)
+    var shape_s = Shape(3, 4)
+    var layout_s = Layout(shape_s, strides_s)
+    var a = LayoutIndexIterator(Pointer(to=layout_s))
+    var b = IndexIterator(Pointer(to=shape_s), Pointer(to=strides_s))
+    a.skip(5)
+    b.skip(5)
+    assert_equal(a.__next__(), b.__next__())
+
+    print("  ✓ Strided LayoutIterator skip matches IndexIterator")
+
+
+def test_layout_iterator_reset_and_peek() raises:
+    """Test reset() and peek() on the Layout iterator."""
+    print("test_layout_iterator_reset_and_peek")
+
+    var layout = Layout(Shape(3, 4), Strides(1, 3), offset=10)
+    var iter = LayoutIndexIterator(Pointer(to=layout))
+
+    assert_equal(iter.peek(), 10)
+    _ = iter.__next__()
+    assert_equal(iter.peek(), 13)  # next strided element
+
+    iter.reset()
+    assert_equal(iter.peek(), 10)
+
+    print("  ✓ LayoutIterator reset and peek work")
+
+
+def test_layout_iterator_edge_cases() raises:
+    """Test edge cases: 1D, scalar, high rank via Layout."""
+    print("test_layout_iterator_edge_cases")
+
+    # 1D tensor
+    var layout1d = Layout(Shape(100), Strides(1))
+    var count1d = 0
+    for _ in LayoutIndexIterator(Pointer(to=layout1d)):
+        count1d += 1
+    assert_equal(count1d, 100)
+
+    # Scalar (0D tensor)
+    var layout0d = Layout(Shape(), Strides())
+    var count0d = 0
+    for _ in LayoutIndexIterator(Pointer(to=layout0d)):
+        count0d += 1
+    assert_equal(count0d, 1)
+
+    # High rank (5D)
+    var shape_high = Shape(2, 3, 4, 5, 6)
+    var strides_high = Strides(360, 120, 30, 6, 1)
+    var layout_high = Layout(shape_high, strides_high)
+    var count_high = 0
+    for _ in LayoutIndexIterator(Pointer(to=layout_high)):
+        count_high += 1
+    assert_equal(count_high, 720)  # 2*3*4*5*6
+
+    print("  ✓ LayoutIterator handles 1D, scalar, and 5D layouts")
+
 
 # ========== INDEX CALCULATOR TESTS ==========
 
@@ -592,22 +852,22 @@ def test_index_to_coord() raises:
     print("  ✓ index_to_coord works")
 
 
-def test_max_index() raises:
-    """Test max_index calculation."""
-    print("test_max_index")
+def test_max_storage_index() raises:
+    """Test max_storage_index calculation."""
+    print("test_max_storage_index")
 
     var shape = Shape(3, 4, 5)
     var strides = Strides(20, 5, 1)
     var offset = 10
-    var max_idx = IndexCalculator.max_index(shape, strides, offset)
+    var max_idx = IndexCalculator.max_storage_index(shape, strides, offset)
     # max at (2, 3, 4): 2*20 + 3*5 + 4*1 + 10 = 69
     assert_equal(max_idx, 69)
 
     # Edge case: offset=0
-    var max_idx2 = IndexCalculator.max_index(shape, strides, 0)
+    var max_idx2 = IndexCalculator.max_storage_index(shape, strides, 0)
     assert_equal(max_idx2, 59)
 
-    print("  ✓ max_index works")
+    print("  ✓ max_storage_index works")
 
 
 def test_index_calculator_edge_cases() raises:
@@ -648,7 +908,7 @@ def run_all_index_calculator_tests() raises:
     test_flatten_index_from_list_conversion()
     test_flatten_index_from_variadic_conversion()
     test_index_to_coord()
-    test_max_index()
+    test_max_storage_index()
     test_index_calculator_edge_cases()
 
     print("\n✅ All IndexCalculator Tests Passed!\n")
@@ -841,7 +1101,6 @@ def test_skip_consistency_idx() raises:
     var offset2 = iter2.__next__()
 
     assert_true(offset1 == offset2, "Skip doesn't match repeated __next__")
-
 
 
 def main() raises:

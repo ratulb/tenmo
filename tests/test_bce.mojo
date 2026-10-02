@@ -1,6 +1,11 @@
 from std.testing import assert_true, TestSuite
-from tenmo import Tensor, Shape, Reduction, IntArray
+from tenmo.tensor import Tensor
+from tenmo.shared.shapes import Shape
+from tenmo.shared import Reduction
+from tenmo.shared.intarray import IntArray
 from std.sys import has_accelerator
+from std.python import Python, PythonObject
+from std.sys.defines import get_defined_string
 import std.math
 
 
@@ -538,9 +543,7 @@ def test_bce_gpu_1d_mean_stop_grad() raises:
         var loss = Tensor[dtype].binary_cross_entropy(pred_gpu, target_gpu)
         loss.backward()
         # pred2 on CPU must NOT have received any grad (grad values stay zero)
-        assert_true(
-            pred2.grad().all_close(Tensor[dtype].zeros(pred2.shape()))
-        )
+        assert_true(pred2.grad().all_close(Tensor[dtype].zeros(pred2.shape())))
 
 
 def test_bce_gpu_2d_mean_stop_grad() raises:
@@ -555,9 +558,7 @@ def test_bce_gpu_2d_mean_stop_grad() raises:
         var target_gpu = target.to_gpu()
         var loss = Tensor[dtype].binary_cross_entropy(pred_gpu, target_gpu)
         loss.backward()
-        assert_true(
-            pred2.grad().all_close(Tensor[dtype].zeros(pred2.shape()))
-        )
+        assert_true(pred2.grad().all_close(Tensor[dtype].zeros(pred2.shape())))
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -844,6 +845,78 @@ def test_bwl_gpu_bce_matches_bwl() raises:
             logits2_gpu, target_gpu
         )
         assert_true(loss_bce.to_cpu().all_close[atol=1e-4](loss_bwl.to_cpu()))
+
+
+# ============================================================================
+# Runtime shape-guard probes.
+#
+# Both BCE forwards validate pred/logits vs target shapes up front and
+# report mismatches via panic → abort() — fatal, and uncatchable
+# in-process (assert_raises sees raised Errors, not aborts). Before the
+# guard, same-numels/different-shape silently computed with mispaired
+# elements and different-numels OOB-read the shorter buffer in the
+# BceBuffer SIMD loops. To prove the guards fire with clear messages, the
+# test below spawns the minimal probe harness
+# tests/test_bce_shape_probes.mojo: each child invocation performs exactly
+# one mismatched call and dies by the guard under test; we assert
+# non-zero exit plus the exact diagnostic text. If a guard ever stops
+# firing, the child reaches its own trailing panic instead and the message
+# assertion fails. The harness is a separate MINIMAL file because the
+# child JIT runs alongside this resident process — re-executing a full
+# suite file risks OOM (see tests/test_mixed_seq_annotation_probes.mojo
+# precedent). Children are warm-cache recompiles; the mojo cache this
+# process just built is shared.
+# ============================================================================
+
+
+def _spawn_bce_shape_probe(name: String) raises -> PythonObject:
+    """Run guard probe `name` from the minimal probe harness in a child."""
+    var script = (
+        "__import__('subprocess').run("
+        + "['pixi', 'run', 'mojo', '-I', '.', "
+        + "'tests/test_bce_shape_probes.mojo', "
+        + "'--probe-" + name + "'], "
+        + "capture_output=True, text=True, timeout=1200)"
+    )
+    return Python.evaluate(script)
+
+
+def test_bce_shape_guards_abort_with_clear_messages() raises:
+    # NOTE: children execute only under -D subprocess=1 (else vacuous
+    # pass) — e.g. `pixi run mojo -I . -D subprocess=1 tests/test_bce.mojo`.
+    comptime subprocess = get_defined_string["subprocess", ""]()
+    comptime if not subprocess == "":
+        var numels = _spawn_bce_shape_probe("logits-numels")
+        var numels_out = String(numels.stdout) + String(numels.stderr)
+        assert_true(
+            String(numels.returncode) != "0",
+            "BCE: logits/target numels-mismatch probe exits non-zero",
+        )
+        assert_true(
+            numels_out.find(
+                "BCEWithLogitsLoss dimension mismatch: logits and target"
+                " shapes must match"
+            )
+            >= 0,
+            "BCE: numels mismatch reports a precise diagnostic",
+        )
+
+        var shape = _spawn_bce_shape_probe("bce-shape")
+        var shape_out = String(shape.stdout) + String(shape.stderr)
+        assert_true(
+            String(shape.returncode) != "0",
+            "BCE: pred/target shape-mismatch probe exits non-zero",
+        )
+        assert_true(
+            shape_out.find(
+                "BCELoss dimension mismatch: pred and target shapes must"
+                " match"
+            )
+            >= 0,
+            "BCE: shape mismatch reports a precise diagnostic",
+        )
+    else:
+        pass
 
 
 def main() raises:

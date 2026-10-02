@@ -1,21 +1,23 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor
-from .backpropagation import BackwardFnArg, BACKWARD_STD
+from .shared.mnemonics import AddTensor, Add, Multiply, SQRT
+from .backpropagation import BackwardFn, ArgumentType, BackwardFnType
+
 from .gradbox import Gradbox
 from .ancestry import Ancestor
-from tenmo.common_utils import Epsilon
+from .shared.constants import Epsilon
+from .shared.panic import panic
+from .shared.intarray import IntArray
+from .ndbuffer import NDBuffer
 from .variance import Variance
 from .welford import Welford
 from std.sys import has_accelerator
 
-# =============================================================================
-# Updated StdBwdArg — goes in std.mojo
-# =============================================================================
+# Std backward argument
 
 
 @fieldwise_init
 struct StdBwdArg[dtype: DType](ArgumentType):
-    var mean: NDBuffer[Self.dtype]  # saved from Welford forward — free
+    var mean: NDBuffer[Self.dtype]  # saved from Welford forward — unsafe_free
     var std: NDBuffer[Self.dtype]  # saved from forward — already computed
     var axis: Int
     var unbiased: Bool
@@ -23,25 +25,25 @@ struct StdBwdArg[dtype: DType](ArgumentType):
     var n: Int
 
 
-# =============================================================================
-# Uses std_backward_normalize — 2 passes over (*, D) instead of 3.
-# x_ndb accessed via parent.buffer() — strides preserved, kernel handles them.
-# mean_ndb, std_ndb from StdBwdArg — keepdims=True (*, 1), contiguous.
-# denom = (std + eps) * divisor computed over (*, 1) buffer — negligible cost.
-# Epsilon[Self.dtype].value() used as numerical guard — type's machine epsilon.
-# =============================================================================
-
-
 @fieldwise_init
-struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct StdBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    """Uses std_backward_normalize — 2 passes over (*, D) instead of 3.
+    x_ndb accessed via parent.buffer() — strides preserved, kernel handles them.
+    mean_ndb, std_ndb from StdBwdArg — keepdims=True (*, 1), contiguous.
+    denom = (std + eps) * divisor computed over (*, 1) buffer — negligible cost.
+    Epsilon[Self.dtype].value() used as numerical guard — type's machine epsilon.
+    """
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         var bwd_arg = (
-            output.ancestry().backward_fn_arg().get[StdBwdArg[Self.dtype]]()
+            output.ancestry().backward_fn().get[StdBwdArg[Self.dtype]]()
         )
         var axis = bwd_arg.axis
         var unbiased = bwd_arg.unbiased
@@ -59,24 +61,24 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var divisor = Scalar[Self.dtype](n - 1 if unbiased and n > 1 else n)
         var last_axis = x_ndb.rank() - 1
 
-        # ── denom = (std + eps) * divisor — over (*, 1), negligible cost ─
+        # denom = (std + eps) * divisor — over (*, 1), negligible cost ─
         # Epsilon[Self.dtype].value() — machine epsilon, numerical guard only.
         # std was computed as sqrt(var) with no eps in forward,
         # so a near-zero std is theoretically possible for constant inputs.
         if axis == -100 or axis == last_axis:
-            # ── fused path — only valid for last-dim or global reduction ────
+            # fused path — only valid for last-dim or global reduction
             var denom_ndb = std_ndb.scalar_ops[Add](
                 Epsilon[Self.dtype].value()
             ).scalar_ops[Multiply](divisor)
 
-            # ── Pass 1: fused (x - mean) / denom — stride-aware ─────────────
+            # Pass 1: fused (x - mean) / denom — stride-aware
             # Produces contiguous (*, D) output regardless of x layout
             var normed_ndb = Variance[Self.dtype].std_backward_normalize(
-                x_ndb, mean_ndb, denom_ndb
+                x_ndb, mean_ndb, denom_ndb, sync=False
             )
             local_grad = Tensor[Self.dtype](normed_ndb^)
         else:
-            # ── fallback — non-last axis, use original ops ───────────────────
+            # fallback — non-last axis, use original ops
             var mean_tensor = Tensor[Self.dtype](mean_ndb)
             var std_tensor = Tensor[Self.dtype](std_ndb)
             var input_tensor = Tensor[Self.dtype](x_ndb)
@@ -86,7 +88,7 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             ).__mul__[track_grad=False](divisor)
             local_grad = diff.__truediv__[track_grad=False](denom)
 
-        # ── Gradbox shaping ──────────────────────────────────────────────
+        # Gradbox shaping
         var gradbox_ancestor: Gradbox[Self.dtype]
         if not keepdims:
             if axis != -100:
@@ -97,26 +99,18 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 gradbox_ancestor = Gradbox[Self.dtype].full(
                     x_ndb.shape,
                     scalar_grad,
-                    
                     device=gradbox.device(),
                 )
         else:
             gradbox_ancestor = gradbox
 
-        # ── Pass 2: multiply by upstream ────────────────────────────────
+        # Pass 2: multiply by upstream
         gradbox_ancestor = local_grad * gradbox_ancestor
 
         parent.update_grad(gradbox_ancestor^, AddTensor, None)
         parent_ids.append(parent._id)
 
-        if not retain_graph:
-            gradbox.zero_grad()
-
-
-# =============================================================================
-# Updated StdDev.forward — goes in std.mojo
-# replaces current forward body
-# =============================================================================
+        gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -147,14 +141,14 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             0, self.rank()
         ) if normalized_axis == -100 else IntArray(normalized_axis)
         var (mean_ndb, var_ndb) = Welford[Self.dtype].forward(
-            self.buffer, axes, unbiased, keepdims=True, sync=False
+            self.buffer, axes, unbiased, keepdims=True, sync=sync
         )
 
         # std from var — keepdims=True shape preserved
-        var std_ndb_keepdims = var_ndb.unary_ops[SQRT](sync=False)
+        var std_ndb_keepdims = var_ndb.unary_ops[SQRT](sync=sync)
 
         comptime if has_accelerator():
-            if std_ndb_keepdims.is_on_gpu():
+            if sync and std_ndb_keepdims.is_on_gpu():
                 std_ndb_keepdims.sync()
 
         # Output: squeeze if user requested keepdims=False
@@ -174,8 +168,7 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     n = self.shape()[normalized_axis]
                 else:
                     n = self.numels()
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_STD,
+                var backwardFn = BackwardFn(
                     StdBwdArg[Self.dtype](
                         mean_ndb^,  # keepdims=True — correct for broadcast
                         std_ndb_keepdims
@@ -185,8 +178,9 @@ struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                         keepdims,  # original user request — for gradbox handling
                         n,
                     ),
+                    StdBackward[Self.dtype](),
                 )
-                backwardFnArg.needs_parent_data = True
-                result.add_ancestry(backwardFnArg^, self)
+                backwardFn.needs_parent_data = True
+                result.add_ancestry(backwardFn^, self)
 
         return result^

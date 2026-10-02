@@ -1,4 +1,3 @@
-# =============================================================================
 # layernorm_kernel.mojo
 #
 # Fused LayerNorm normalize kernel — Pass 2 of the two-pass forward.
@@ -23,34 +22,30 @@
 # CPU path:
 #   Serial loop over rows, element-wise per row.
 #   NDBuffer.layernorm_normalize() handles CPU + GPU dispatch.
-# =============================================================================
 
-from std.gpu import thread_idx, block_dim, grid_dim, block_idx
-from std.sys import simd_width_of
+from max.gpu import thread_idx, block_dim, grid_dim, block_idx
 from std.math import rsqrt
 
-from tenmo.ndbuffer import NDBuffer
-from tenmo.buffers import Buffer
-from tenmo.device import DeviceState
-from tenmo.common_utils import panic
-from tenmo.shapes import Shape
-from tenmo.array import Array
+from ..shared.layout import Layout
+from ..gpu.transfer import materialize_contiguous
+from ..gpu.device import DeviceState
+from ..shared.shapes import Shape
 
 
 def layernorm_normalize[
     dtype: DType,
     max_block_size: Int = 512,
 ](
-    out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    x_hat_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    rstd_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    x_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    mean_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    var_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    gamma_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    beta_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    D: Int,
-    outer_size: Int,
+    out_buffer: Pointer[Scalar[dtype], MutAnyOrigin],
+    x_hat_buffer: Pointer[Scalar[dtype], MutAnyOrigin],
+    rstd_buffer: Pointer[Scalar[dtype], MutAnyOrigin],
+    x_buffer: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    mean_buffer: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    var_buffer: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    gamma_buffer: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    beta_buffer: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    D_: Int64,
+    outer_size_: Int64,
     eps: Scalar[dtype],
 ):
     """Fused LayerNorm normalize kernel.
@@ -71,14 +66,16 @@ def layernorm_normalize[
         var_buffer:   Per-row variance (*, 1) — from Welford.
         gamma_buffer: Scale (D,).
         beta_buffer:  Shift (D,).
-        D:            Last dimension size.
-        outer_size:   Number of independent rows.
+        D_:            Last dimension size.
+        outer_size_:   Number of independent rows.
         eps:          Numerical stability constant.
     """
     comptime assert (
         max_block_size.is_power_of_two() and max_block_size < 1024
     ), "max_block_size must be a power of 2 less than 1024"
 
+    var D = Int(D_)
+    var outer_size = Int(outer_size_)
     var bid = Int(block_idx.x)
     var tid = Int(thread_idx.x)
     var block_size = Int(block_dim.x)
@@ -86,8 +83,8 @@ def layernorm_normalize[
     if bid >= outer_size:
         return
 
-    var row_var = var_buffer[bid]
-    var row_mean = mean_buffer[bid]
+    var row_var = var_buffer[unsafe_offset=bid]
+    var row_mean = mean_buffer[unsafe_offset=bid]
 
     # rsqrt(var + eps) = 1/sqrt(var + eps)  — rstd directly, no inversion needed
     var safe_var = row_var + eps
@@ -97,16 +94,16 @@ def layernorm_normalize[
 
     # Thread 0 writes rstd once per row — cheap, one write per block
     if tid == 0:
-        rstd_buffer[bid] = rstd
+        rstd_buffer[unsafe_offset=bid] = rstd
 
     var row_base = bid * D
     var i = tid
     while i < D:
-        var x_i = x_buffer[row_base + i]
+        var x_i = x_buffer[unsafe_offset=row_base + i]
         var x_hat_i = (x_i - row_mean) * rstd
-        var out_i = gamma_buffer[i] * x_hat_i + beta_buffer[i]
-        x_hat_buffer[row_base + i] = x_hat_i
-        out_buffer[row_base + i] = out_i
+        var out_i = gamma_buffer[unsafe_offset=i] * x_hat_i + beta_buffer[unsafe_offset=i]
+        x_hat_buffer[unsafe_offset=row_base + i] = x_hat_i
+        out_buffer[unsafe_offset=row_base + i] = out_i
         i += block_size
 
 
@@ -114,50 +111,65 @@ def layernorm_normalize[
 struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def launch(
-        x: NDBuffer[Self.dtype],  # (*, D) contiguous GPU
-        mean: NDBuffer[Self.dtype],  # (*, 1) from Welford
-        var_: NDBuffer[Self.dtype],  # (*, 1) from Welford
-        gamma: NDBuffer[Self.dtype],  # (D,)
-        beta: NDBuffer[Self.dtype],  # (D,)
+        x_layout: Layout,  # (*, D) contiguous GPU
+        x_device_state: DeviceState[Self.dtype],
+        mean_layout: Layout,  # (*, 1) from Welford
+        mean_device_state: DeviceState[Self.dtype],
+        var__layout: Layout,  # (*, 1) from Welford
+        var__device_state: DeviceState[Self.dtype],
+        gamma_layout: Layout,  # (D,)
+        gamma_device_state: DeviceState[Self.dtype],
+        beta_layout: Layout,  # (D,)
+        beta_device_state: DeviceState[Self.dtype],
         eps: Scalar[Self.dtype],
         sync: Bool = False,
     ) raises -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+        Tuple[Layout, DeviceState[Self.dtype]],
+        Tuple[Layout, DeviceState[Self.dtype]],
+        Tuple[Layout, DeviceState[Self.dtype]],
     ]:
         """Launch fused LayerNorm normalize kernel.
 
-        Returns (out_ndb, x_hat_ndb, rstd_ndb).
-        All three are free — written in the same pass.
+        Returns ((out_layout, out_storage), (x_hat_layout, x_hat_storage),
+                 (rstd_layout, rstd_storage)).
+        All three are unsafe_free — written in the same pass.
         x_hat and rstd saved for backward at zero extra cost.
 
         Args:
-            x:     Input NDBuffer. Must be on GPU and contiguous.
-            mean:  Per-row mean from Welford. Shape (*, 1).
-            var_:  Per-row variance from Welford. Shape (*, 1).
-            gamma: Scale parameters. Shape (D,).
-            beta:  Shift parameters. Shape (D,).
-            eps:   Numerical stability constant.
+            x_layout:          Input layout. Must be on GPU and contiguous.
+            x_device_state:    Input device state on GPU.
+            mean_layout:       Per-row mean layout from Welford. Shape (*, 1).
+            mean_device_state: Per-row mean device state on GPU.
+            var__layout:       Per-row variance layout from Welford. Shape (*, 1).
+            var__device_state: Per-row variance device state on GPU.
+            gamma_layout:      Scale parameters layout. Shape (D,).
+            gamma_device_state: Scale parameters device state on GPU.
+            beta_layout:       Shift parameters layout. Shape (D,).
+            beta_device_state: Shift parameters device state on GPU.
+            eps:               Numerical stability constant.
+            sync:              Whether to sync GPU after operation.
 
         Returns:
-            Tuple of (output, x_hat, rstd) NDBuffers.
+            ((out_layout, out_storage), (x_hat_layout, x_hat_storage),
+             (rstd_layout, rstd_storage)).
             output and x_hat are shape (*, D).
             rstd is shape (*, 1) — one per row.
         """
-        debug_assert(x.is_on_gpu())
-        debug_assert(x.is_contiguous())
+        debug_assert(x_layout.is_contiguous())
 
-        var out_shape = x.shape
+        var out_shape = x_layout.shape
         var D = out_shape[-1]
-        var outer_size = x.numels() // D
-        var numels = x.numels()
+        var outer_size = x_layout.numel() // D
+        var numels = x_layout.numel()
 
         var (threads_per_block, num_blocks) = Self.launch_config(D, outer_size)
 
-        ref x_device_state = x.device_state.value()
         ref gpu = x_device_state.get_gpu()
         var device_context = gpu[]
 
-        var contig_x = x.contiguous_device_state()
+        var contig_x = materialize_contiguous(
+            x_device_state, x_layout
+        )
 
         var out_buffer = device_context.enqueue_create_buffer[Self.dtype](
             numels
@@ -169,14 +181,13 @@ struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             outer_size
         )
 
-        ref mean_state = mean.device_state.value()
-        ref var_state = var_.device_state.value()
-        ref gamma_state = gamma.device_state.value()
-        ref beta_state = beta.device_state.value()
+        ref mean_state = mean_device_state
+        ref var_state = var__device_state
+        ref gamma_state = gamma_device_state
+        ref beta_state = beta_device_state
 
         comptime max_block = 512
         var compiled = device_context.compile_function[
-            layernorm_normalize[Self.dtype, max_block],
             layernorm_normalize[Self.dtype, max_block],
         ]()
 
@@ -190,14 +201,15 @@ struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var_state.device_buffer(),
             gamma_state.device_buffer(),
             beta_state.device_buffer(),
-            D,
-            outer_size,
+            Int64(D),
+            Int64(outer_size),
             eps,
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         # rstd shape is (*, 1) — same as mean/var from Welford
         var rstd_shape = out_shape[0:-1] + [1]
@@ -206,17 +218,20 @@ struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var x_hat_state = DeviceState[Self.dtype](x_hat_buffer^, gpu)
         var rstd_state = DeviceState[Self.dtype](rstd_buffer^, gpu)
 
-        var out_ndb = NDBuffer[Self.dtype].with_device_state(
-            out_state^, out_shape
+        var out_pair = (
+            Layout(out_shape),
+            out_state^,
         )
-        var x_hat_ndb = NDBuffer[Self.dtype].with_device_state(
-            x_hat_state^, out_shape
+        var x_hat_pair = (
+            Layout(out_shape),
+            x_hat_state^,
         )
-        var rstd_ndb = NDBuffer[Self.dtype].with_device_state(
-            rstd_state^, rstd_shape
+        var rstd_pair = (
+            Layout(rstd_shape),
+            rstd_state^,
         )
 
-        return (out_ndb^, x_hat_ndb^, rstd_ndb^)
+        return (out_pair, x_hat_pair, rstd_pair)
 
     @staticmethod
     def launch_config(D: Int, outer_size: Int) -> Tuple[Int, Int]:

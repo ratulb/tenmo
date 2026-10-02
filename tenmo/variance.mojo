@@ -1,45 +1,43 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor
-from .backpropagation import BackwardFnArg, ArgumentType, BACKWARD_VARIANCE
+from .shared.mnemonics import AddTensor
+from .backpropagation import BackwardFn, ArgumentType, BackwardFnType
+
 from .gradbox import Gradbox
-from .common_utils import panic
+from .shared.panic import panic
 from .ancestry import Ancestor
-from tenmo.intarray import IntArray
+from .shared.intarray import IntArray
 from .ndbuffer import NDBuffer
-from .buffers import Buffer
-from .device import DeviceState
-from .shapes import Shape
+from .shared.buffers import Buffer
 from .welford import Welford
-from tenmo.kernels.std_variance_backward_kernel import StdVarianceBackwardKernel
+from .kernels.std_variance_backward_kernel import StdVarianceBackwardKernel
 from std.sys.info import has_accelerator
 
 
 @fieldwise_init
 struct VarianceBwdArg[dtype: DType](ArgumentType):
-    var mean: NDBuffer[Self.dtype]  # saved from Welford forward — free
+    var mean: NDBuffer[Self.dtype]  # saved from Welford forward — unsafe_free
     var axis: Int
     var unbiased: Bool
     var keepdims: Bool
     var n: Int  # saved — avoids shape lookup in backward
 
 
-# =============================================================================
 # Updated VarianceBackward — goes in variance.mojo
-# =============================================================================
 
 
 @fieldwise_init
-struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct VarianceBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         var bwd_arg = (
-            output.ancestry()
-            .backward_fn_arg()
-            .get[VarianceBwdArg[Self.dtype]]()
+            output.ancestry().backward_fn().get[VarianceBwdArg[Self.dtype]]()
         )
         var axis = bwd_arg.axis
         var unbiased = bwd_arg.unbiased
@@ -58,10 +56,10 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var local_grad: Tensor[Self.dtype]
 
         if axis == -100 or axis == last_axis:
-            # ── Pass 1: fused (x - mean) * scale — stride-aware ─────────────
+            # Pass 1: fused (x - mean) * scale — stride-aware
             # Produces contiguous (*, D) output regardless of x layout
             var normed_ndb = Variance[Self.dtype].variance_backward_normalize(
-                x_ndb, mean_ndb, scale
+                x_ndb, mean_ndb, scale, sync=False
             )
             local_grad = Tensor[Self.dtype](normed_ndb^)
 
@@ -84,7 +82,6 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 gradbox_ancestor = Gradbox[Self.dtype].full(
                     x_ndb.shape,
                     scalar_grad,
-                    
                     device=gradbox.device(),
                 )
         else:
@@ -94,14 +91,7 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         parent.update_grad(gradbox_ancestor^, AddTensor, None)
         parent_ids.append(parent._id)
 
-        if not retain_graph:
-            gradbox.zero_grad()
-
-
-# =============================================================================
-# Updated Variance.forward — goes in variance.mojo
-# replaces the current forward body
-# =============================================================================
+        gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -130,15 +120,13 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             panic("Invalid axis specified for variance")
 
         # Single Welford pass — returns (mean_ndb, var_ndb)
-        # mean is free — Welford computes it anyway
-        # var (mean_ndb, var_ndb) = self.buffer.welford(axis, unbiased, keepdims)
-        # var result = Tensor[Self.dtype](var_ndb^, requires_grad=False)
+        # mean is unsafe_free — Welford computes it anyway
         # Always save mean with keepdims=True for correct backward broadcasting
         var axes = IntArray.range(
             0, self.rank()
         ) if normalized_axis == -100 else IntArray(normalized_axis)
         var (mean_ndb, var_ndb) = Welford[Self.dtype].forward(
-            self.buffer, axes, unbiased, keepdims=True
+            self.buffer, axes, unbiased, keepdims=True, sync=sync
         )
         # For the output, squeeze if user requested keepdims=False
         var result_ndb = var_ndb
@@ -156,18 +144,18 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     n = self.shape()[normalized_axis]
                 else:
                     n = self.numels()
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_VARIANCE,
+                var backwardFn = BackwardFn(
                     VarianceBwdArg[Self.dtype](
-                        mean_ndb^,  # saved — free from Welford
+                        mean_ndb^,  # saved — unsafe_free from Welford
                         normalized_axis,
                         unbiased,
                         keepdims,
                         n,
                     ),
+                    VarianceBackward[Self.dtype](),
                 )
-                backwardFnArg.needs_parent_data = True
-                result.add_ancestry(backwardFnArg^, self)
+                backwardFn.needs_parent_data = True
+                result.add_ancestry(backwardFn^, self)
 
         return result^
 
@@ -182,9 +170,22 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         comptime if has_accelerator():
             if x.is_on_gpu():
                 try:
-                    return StdVarianceBackwardKernel[
+                    var (
+                        result_layout,
+                        result_storage,
+                    ) = StdVarianceBackwardKernel[
                         Self.dtype
-                    ].launch_variance_backward(x, mean, scale, sync=sync)
+                    ].launch_variance_backward(
+                        x.layout(),
+                        x.device_state.value(),
+                        mean.layout(),
+                        mean.device_state.value(),
+                        scale,
+                        sync=sync,
+                    )
+                    return NDBuffer[Self.dtype].with_layout_device_state(
+                        result_layout, result_storage
+                    )
                 except e:
                     print(e)
                     panic(
@@ -227,9 +228,23 @@ struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         comptime if has_accelerator():
             if x.is_on_gpu():
                 try:
-                    return StdVarianceBackwardKernel[
+                    var (
+                        result_layout,
+                        result_storage,
+                    ) = StdVarianceBackwardKernel[
                         Self.dtype
-                    ].launch_std_backward(x, mean, denom, sync=sync)
+                    ].launch_std_backward(
+                        x.layout(),
+                        x.device_state.value(),
+                        mean.layout(),
+                        mean.device_state.value(),
+                        denom.layout(),
+                        denom.device_state.value(),
+                        sync=sync,
+                    )
+                    return NDBuffer[Self.dtype].with_layout_device_state(
+                        result_layout, result_storage
+                    )
                 except e:
                     print(e)
                     panic("VarStdBackward std_backward_normalize → GPU failed")

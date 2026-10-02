@@ -1,13 +1,15 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor, Multiply, Subtract
-from .backpropagation import ArgumentType, BackwardFnArg, BACKWARD_WHERE
+from .shared.mnemonics import AddTensor, Multiply, ReverseSubtract
+from .backpropagation import ArgumentType, BackwardFn, BackwardFnType
+
 from .gradbox import Gradbox
 from .ancestry import Ancestor
 from .ndbuffer import NDBuffer
-from .common_utils import panic
+from .shared.shapes import Shape
 from std.sys import has_accelerator
-from .kernels.where_kernel import WhereGpuKernel
-from .broadcasthelper import ShapeBroadcaster
+from .kernels.where_kernel import WhereKernel
+from .shared.broadcasthelper import ShapeBroadcaster
+from .shared.panic import panic
 
 
 @fieldwise_init
@@ -15,17 +17,27 @@ struct WhereArg[dtype: DType](ArgumentType):
     var condition: NDBuffer[Self.dtype]
     var a_requires_grad: Bool
     var b_requires_grad: Bool
+    # Parent shapes at forward time: backward reduces each side's
+    # output-shaped grad back to these (torch-style un-broadcast).
+    # Stored (not read from ancestors) so needs_parent_data stays False.
+    var a_shape: Shape
+    var b_shape: Shape
 
 
 @fieldwise_init
-struct WhereBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct WhereBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
-        ref bwd_arg = output.ancestry().backward_fn_arg().get[WhereArg[Self.dtype]]()
+        ref bwd_arg = (
+            output.ancestry().backward_fn().get[WhereArg[Self.dtype]]()
+        )
         ref condition = bwd_arg.condition
         var a_requires_grad = bwd_arg.a_requires_grad
         var b_requires_grad = bwd_arg.b_requires_grad
@@ -35,8 +47,7 @@ struct WhereBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         var num_parents = len(output.ancestry())
         if num_parents == 0:
-            if not retain_graph:
-                gradbox.zero_grad()
+            gradbox.zero_grad()
             return
 
         var ancestor_index = 0
@@ -46,6 +57,16 @@ struct WhereBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             if parent.requires_grad:
                 var grad_a_ndb = grad_ndb.arithmetic_ops[Multiply](condition)
                 var grad_a = Gradbox[Self.dtype](grad_a_ndb^)
+                # Un-broadcast: grad is at output shape; the parent may be
+                # smaller (forward broadcasts a/b/cond). Mirror
+                # BroadcastToBackward: sum over broadcast axes, reshape rest.
+                if grad_a.shape() != bwd_arg.a_shape:
+                    var axes = ShapeBroadcaster.broadcast_mask(
+                        bwd_arg.a_shape, grad_a.shape()
+                    ).indices_of(1)
+                    grad_a = grad_a.sum(axes=axes, keepdims=True)
+                    if grad_a.shape() != bwd_arg.a_shape:
+                        grad_a = grad_a.reshape(bwd_arg.a_shape)
                 parent.update_grad(grad_a^, AddTensor, None)
             parent_ids.append(parent._id)
             ancestor_index += 1
@@ -53,38 +74,32 @@ struct WhereBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if b_requires_grad:
             var parent = output.ancestry().get(ancestor_index)
             if parent.requires_grad:
-                var cond_shape = condition.shape
-                var ones: NDBuffer[Self.dtype]
-                comptime if has_accelerator():
-                    if condition.is_on_gpu():
-                        var gpu = condition.device_state.value().get_gpu()
-                        ones = NDBuffer[Self.dtype].full(
-                            cond_shape, Scalar[Self.dtype](1.0),
-                            device=gpu.into(),
-                        )
-                    else:
-                        ones = NDBuffer[Self.dtype].full(
-                            cond_shape, Scalar[Self.dtype](1.0)
-                        )
-                else:
-                    ones = NDBuffer[Self.dtype].full(
-                        cond_shape, Scalar[Self.dtype](1.0)
-                    )
-                var one_minus_cond = ones.arithmetic_ops[Subtract](condition)
-                var grad_b_ndb = grad_ndb.arithmetic_ops[Multiply](one_minus_cond^)
+                # 1 - condition without a full-ones alloc: scalar reverse
+                # subtract computes it elementwise in one pass.
+                var one_minus_cond = condition.scalar_ops[ReverseSubtract](
+                    Scalar[Self.dtype](1.0), sync=False
+                )
+                var grad_b_ndb = grad_ndb.arithmetic_ops[Multiply](
+                    one_minus_cond^
+                )
                 var grad_b = Gradbox[Self.dtype](grad_b_ndb^)
+                # Un-broadcast (see a-branch above).
+                if grad_b.shape() != bwd_arg.b_shape:
+                    var axes_b = ShapeBroadcaster.broadcast_mask(
+                        bwd_arg.b_shape, grad_b.shape()
+                    ).indices_of(1)
+                    grad_b = grad_b.sum(axes=axes_b, keepdims=True)
+                    if grad_b.shape() != bwd_arg.b_shape:
+                        grad_b = grad_b.reshape(bwd_arg.b_shape)
                 parent.update_grad(grad_b^, AddTensor, None)
             parent_ids.append(parent._id)
 
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()
 
 
 def bool_to_float_ndb[
     dtype: DType,
-](
-    cond_ndb: NDBuffer[DType.bool],
-) raises -> NDBuffer[dtype]:
+](cond_ndb: NDBuffer[DType.bool],) raises -> NDBuffer[dtype]:
     var shape = cond_ndb.shape
     var numels = cond_ndb.numels()
     var out = NDBuffer[dtype].zeros(shape)
@@ -95,21 +110,22 @@ def bool_to_float_ndb[
             var src = cpu_ndb.data_ptr().unsafe_mut_cast[True]()
             var dst = out.data_ptr().unsafe_mut_cast[True]()
             for i in range(numels):
-                dst[i] = Scalar[dtype](1.0) if src[i] else Scalar[dtype](0.0)
+                dst[unsafe_offset=i] = Scalar[dtype](1.0) if src[
+                    unsafe_offset=i
+                ] else Scalar[dtype](0.0)
             return out.to_gpu(gpu)
     var src = cond_ndb.data_ptr().unsafe_mut_cast[True]()
     var dst = out.data_ptr().unsafe_mut_cast[True]()
     for i in range(numels):
-        dst[i] = Scalar[dtype](1.0) if src[i] else Scalar[dtype](0.0)
+        dst[unsafe_offset=i] = Scalar[dtype](1.0) if src[
+            unsafe_offset=i
+        ] else Scalar[dtype](0.0)
     return out^
 
 
 def expand_to_shape[
     dtype: DType,
-](
-    ndb: NDBuffer[dtype],
-    target: Shape,
-) raises -> NDBuffer[dtype]:
+](ndb: NDBuffer[dtype], target: Shape,) -> NDBuffer[dtype]:
     if ndb.shape == target:
         return ndb.contiguous() if ndb.is_on_gpu() else ndb.copy()
     var expanded = ndb.broadcast_to(target)
@@ -131,7 +147,9 @@ def cpu_where[
     var b = b_ndb.data_ptr().unsafe_mut_cast[True]()
     var o = out.data_ptr().unsafe_mut_cast[True]()
     for i in range(numels):
-        o[i] = a[i] if c[i] else b[i]
+        o[unsafe_offset=i] = a[unsafe_offset=i] if c[unsafe_offset=i] else b[
+            unsafe_offset=i
+        ]
     return out^
 
 
@@ -147,30 +165,60 @@ struct Where[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         a_requires_grad_flag: Bool,
         b_requires_grad_flag: Bool,
         sync: Bool = True,
-    ) raises -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype]:
         var cond_shape = condition.buffer.shape
         var a_shape = a_tensor.buffer.shape
         var b_shape = b_tensor.buffer.shape
         var ab_shape = ShapeBroadcaster.broadcast_shape(a_shape, b_shape)
-        var output_shape = ShapeBroadcaster.broadcast_shape(ab_shape, cond_shape)
+        var output_shape = ShapeBroadcaster.broadcast_shape(
+            ab_shape, cond_shape
+        )
 
         var cond_ndb = expand_to_shape(condition.buffer, output_shape)
         var a_ndb = expand_to_shape(a_tensor.buffer, output_shape)
         var b_ndb = expand_to_shape(b_tensor.buffer, output_shape)
 
         var out_ndb: NDBuffer[Self.dtype]
+        # Mixed-device guard: a CPU condition with GPU operands would
+        # silently read device memory as host in cpu_where below. (The
+        # reverse mix is fine — the GPU branch transfers operands.)
+        if (
+            not cond_ndb.is_on_gpu()
+            and (a_ndb.is_on_gpu() or b_ndb.is_on_gpu())
+        ):
+            panic(
+                "Where — mixed devices: CPU condition with GPU operands."
+                " Move the condition to GPU (or all inputs to CPU)."
+            )
         comptime if has_accelerator():
             if cond_ndb.is_on_gpu():
-                var gpu = cond_ndb.device_state.value().gpu
-                if not a_ndb.is_on_gpu():
-                    a_ndb = a_ndb.to_gpu(gpu)
-                if not b_ndb.is_on_gpu():
-                    b_ndb = b_ndb.to_gpu(gpu)
-                out_ndb = WhereGpuKernel[Self.dtype].launch_forward(
-                    a_ndb, b_ndb, cond_ndb, False, False,
-                    Scalar[Self.dtype](0), Scalar[Self.dtype](0),
-                    sync=sync,
-                )
+                # GPU device errors (transfer/compile/launch) surface as raises
+                # from the host API; follow the SumMeanReduction protocol and
+                # convert them into a panic, keeping where non-raising. The
+                # `.Empty()` assignment is unreachable — it only satisfies the
+                # compiler's definite-assignment check after the panic.
+                try:
+                    var gpu = cond_ndb.device_state.value().gpu
+                    if not a_ndb.is_on_gpu():
+                        a_ndb = a_ndb.to_gpu(gpu)
+                    if not b_ndb.is_on_gpu():
+                        b_ndb = b_ndb.to_gpu(gpu)
+                    var result = WhereKernel[Self.dtype].launch_forward(
+                        a_ndb.layout(),
+                        a_ndb.device_state.value(),
+                        b_ndb.layout(),
+                        b_ndb.device_state.value(),
+                        cond_ndb.layout(),
+                        cond_ndb.device_state.value(),
+                        sync=sync,
+                    )
+                    out_ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        result[0], result[1]
+                    )
+                except e:
+                    print(e)
+                    panic("Where — GPU operation failed in `where`.")
+                    out_ndb = NDBuffer[Self.dtype].Empty()
             else:
                 out_ndb = cpu_where(cond_ndb, a_ndb, b_ndb)
         else:
@@ -182,21 +230,35 @@ struct Where[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = a_requires_grad_flag or b_requires_grad_flag
             if grad_required:
                 out.requires_grad_(True)
-                var cond_float = bool_to_float_ndb[Self.dtype](cond_ndb)
+                var cond_float: NDBuffer[Self.dtype]
+                try:
+                    cond_float = bool_to_float_ndb[Self.dtype](cond_ndb)
+                except e:
+                    print(e)
+                    panic(
+                        "Where — GPU gradient-flag preparation failed in"
+                        " `where`."
+                    )
+                    cond_float = NDBuffer[Self.dtype].Empty()
                 var where_arg = WhereArg[Self.dtype](
-                    cond_float^, a_requires_grad_flag, b_requires_grad_flag
+                    cond_float^,
+                    a_requires_grad_flag,
+                    b_requires_grad_flag,
+                    a_tensor.buffer.shape,
+                    b_tensor.buffer.shape,
                 )
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_WHERE, where_arg^
+                var backwardFn = BackwardFn(
+                    where_arg^,
+                    WhereBackward[Self.dtype](),
                 )
-                backwardFnArg.needs_parent_data = False
+                backwardFn.needs_parent_data = False
 
                 if a_requires_grad_flag and b_requires_grad_flag:
-                    out.add_ancestry(backwardFnArg^, a_tensor, b_tensor)
+                    out.add_ancestry(backwardFn^, a_tensor, b_tensor)
                 elif a_requires_grad_flag:
-                    out.add_ancestry(backwardFnArg^, a_tensor)
+                    out.add_ancestry(backwardFn^, a_tensor)
                 elif b_requires_grad_flag:
-                    out.add_ancestry(backwardFnArg^, b_tensor)
+                    out.add_ancestry(backwardFn^, b_tensor)
 
         return out^
 
@@ -209,7 +271,7 @@ struct Where[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         b: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
-    ) raises -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype]:
         var a_rg = requires_grad.or_else(a.requires_grad)
         var b_rg = requires_grad.or_else(b.requires_grad)
         return Where[Self.dtype]._compute_forward[track_grad](
@@ -225,11 +287,9 @@ struct Where[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         b: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
-    ) raises -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype]:
         var b_shape = b.buffer.shape
-        var a_tensor = Tensor[Self.dtype].full(
-            b_shape, a, requires_grad=False
-        )
+        var a_tensor = Tensor[Self.dtype].full(b_shape, a, requires_grad=False)
         var b_rg = requires_grad.or_else(b.requires_grad)
         return Where[Self.dtype]._compute_forward[track_grad](
             condition, a_tensor, b, False, b_rg, sync=sync
@@ -244,11 +304,9 @@ struct Where[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         b: Scalar[Self.dtype],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
-    ) raises -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype]:
         var a_shape = a.buffer.shape
-        var b_tensor = Tensor[Self.dtype].full(
-            a_shape, b, requires_grad=False
-        )
+        var b_tensor = Tensor[Self.dtype].full(a_shape, b, requires_grad=False)
         var a_rg = requires_grad.or_else(a.requires_grad)
         return Where[Self.dtype]._compute_forward[track_grad](
             condition, a, b_tensor, a_rg, False, sync=sync
@@ -263,7 +321,7 @@ struct Where[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         b: Scalar[Self.dtype],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
-    ) raises -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype]:
         _ = requires_grad
         var cond_shape = condition.buffer.shape
         var a_tensor = Tensor[Self.dtype].full(

@@ -1,8 +1,8 @@
 from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
-from tenmo.shapes import Shape
-from tenmo.mnemonics import (
+from tenmo.shared.shapes import Shape
+from tenmo.shared.mnemonics import (
     Equal,
     NotEqual,
     LessThan,

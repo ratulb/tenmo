@@ -1,14 +1,16 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor
-from .shapes import Shape
-from .backpropagation import ArgumentType, BackwardFnArg, BACKWARD_MINMAX
+from .shared.mnemonics import AddTensor
+from .shared.shapes import Shape
+from .backpropagation import ArgumentType, BackwardFn, BackwardFnType
+
 from .validators import Validator
-from .intarray import IntArray
+from .shared.intarray import IntArray
 from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
 from .ancestry import Ancestor
-from tenmo.kernels.minmax_kernel import ReductionMinMax
-from .common_utils import panic
+from .kernels.minmax_kernel import MinMaxKernel
+from .shared.panic import panic
+from .minmax_reducer import MinMaxReducer
 from std.sys.info import has_accelerator
 
 
@@ -20,29 +22,39 @@ struct MinMaxArg[dtype: DType](ArgumentType):
 
 
 @fieldwise_init
-struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
+struct MinMaxBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         var bwd_arg = (
-            output.ancestry().backward_fn_arg().get[MinMaxArg[Self.dtype]]()
+            output.ancestry().backward_fn().get[MinMaxArg[Self.dtype]]()
         )
         var (axes, keepdims, mask) = (
             bwd_arg.axes,
             bwd_arg.keepdims,
             bwd_arg.mask,
         )
-        var gradbox = output.gradients()
+        ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
         var shape = ancestor.shape()
         var mask_grad = Gradbox[Self.dtype](mask)
 
         if shape.rank() == 0:
-            ancestor.update_grad(mask_grad^, AddTensor, None)
+            # Rank-0 out == x (single element): dx = upstream * mask. The
+            # mask is all-ones here, but upstream scaling still applies —
+            # without it dx is always 1 (e.g. (2*x.max()).sum() must give
+            # dx=2). Mirrors the main path's grad_expanded * mask_grad.
+            var grad_contrib = gradbox * mask_grad
+            ancestor.update_grad(grad_contrib^, AddTensor, None)
             parent_ids.append(ancestor._id)
+            # Mirror the main path: clear the consumed grad unless the
+            # caller retains intermediates, else stale grad persists on
+            # the output across repeat backward() calls.
+            gradbox.zero_grad()
             return
 
         var grad_expanded: Gradbox[Self.dtype]
@@ -52,7 +64,7 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
             )
         elif not keepdims:
             grad_expanded = gradbox.unsqueeze(axes).broadcast_to(
-                shape, 
+                shape,
             )
         else:
             grad_expanded = gradbox.broadcast_to(shape)
@@ -60,8 +72,7 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var grad_contrib = grad_expanded * mask_grad
         ancestor.update_grad(grad_contrib^, AddTensor, None)
         parent_ids.append(ancestor._id)
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -82,7 +93,7 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             self.requires_grad
         )
         var (result_ndb, mask_ndb) = Self.minmax[is_max=max](
-            self.buffer, normalized_axes, keepdims, tracking_grad
+            self.buffer, normalized_axes, keepdims, tracking_grad, sync=sync
         )
         var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
 
@@ -90,12 +101,12 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_MINMAX,
+                var backwardFn = BackwardFn(
                     MinMaxArg[Self.dtype](normalized_axes, keepdims, mask_ndb^),
+                    MinMaxBackward[Self.dtype](),
                 )
-                backwardFnArg.needs_parent_data = True
-                out.add_ancestry(backwardFnArg^, self)
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, self)
 
         return out^
 
@@ -116,9 +127,21 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         comptime if has_accelerator():
             if ndb.is_on_gpu():
                 try:
-                    var (result_ndb, mask_ndb) = ReductionMinMax[
+                    var (result_pair, mask_pair) = MinMaxKernel[
                         Self.dtype
-                    ].launch[is_max=is_max](ndb, normalized_axes, keepdims, sync=sync)
+                    ].launch[is_max=is_max](
+                        ndb.layout(),
+                        ndb.device_state.value(),
+                        normalized_axes,
+                        keepdims,
+                        sync=sync,
+                    )
+                    var result_ndb = NDBuffer[
+                        Self.dtype
+                    ].with_layout_device_state(result_pair[0], result_pair[1])
+                    var mask_ndb = NDBuffer[
+                        Self.dtype
+                    ].with_layout_device_state(mask_pair[0], mask_pair[1])
                     return result_ndb, mask_ndb
                 except e:
                     print(e)

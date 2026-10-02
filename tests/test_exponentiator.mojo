@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 
 
 # ── CPU Forward Tests ─────────────────────────────────────────────────────────
@@ -466,7 +466,7 @@ def test_exp_parity_using_zero_grad() raises:
         var loss_cpu = (a_cpu**2.0).sum()
         loss_cpu.backward()
         # Save CPU grad
-        var cpu_grad = a_cpu.grad().copy()
+        var cpu_grad = a_cpu.grad().clone()
 
         # Clear retained grad before second pass
         a_cpu.zero_grad()

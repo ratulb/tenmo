@@ -15,7 +15,6 @@ def test_tensor_slice_1d_basic() raises:
     assert_true(slice2 == Tensor[dtype].d1([1, 3, 5, 7]))
 
 
-
 def test_tensor_slice_1d_negative_indices() raises:
     comptime dtype = DType.float32
 
@@ -30,7 +29,6 @@ def test_tensor_slice_1d_negative_indices() raises:
     assert_true(slice2 == Tensor[dtype].d1([1, 2, 3, 4]))
 
 
-
 def test_tensor_slice_1d_step_sizes() raises:
     comptime dtype = DType.float32
 
@@ -43,7 +41,6 @@ def test_tensor_slice_1d_step_sizes() raises:
     # Test step size 3: equivalent to x[0:10:3]
     var slice2 = x.slice(axis=0, start=0, end=10, step=3)
     assert_true(slice2 == Tensor[dtype].d1([0, 3, 6, 9]))
-
 
 
 def test_tensor_slice_2d_rows() raises:
@@ -62,7 +59,6 @@ def test_tensor_slice_2d_rows() raises:
     assert_true(single_row == expected_single)
 
 
-
 def test_tensor_slice_2d_columns() raises:
     comptime dtype = DType.float32
 
@@ -79,7 +75,6 @@ def test_tensor_slice_2d_columns() raises:
     assert_true(single_col == expected_single_col)
 
 
-
 def test_tensor_slice_2d_both_dims() raises:
     comptime dtype = DType.float32
 
@@ -90,7 +85,6 @@ def test_tensor_slice_2d_both_dims() raises:
     slice1 = slice1.slice(axis=1, start=1, end=3)
     var expected = Tensor[dtype].d2([[2, 3], [6, 7]])
     assert_true(slice1 == expected)
-
 
 
 def test_tensor_slice_3d_basic() raises:
@@ -127,7 +121,6 @@ def test_tensor_slice_3d_basic() raises:
     assert_true(slice_dim2 == expected_dim2)
 
 
-
 def test_tensor_slice_with_gradients() raises:
     comptime dtype = DType.float32
 
@@ -145,7 +138,6 @@ def test_tensor_slice_with_gradients() raises:
     assert_true(x.grad().all_close(expected_grad))
 
 
-
 def test_tensor_nested_slice_with_gradients() raises:
     comptime dtype = DType.float32
 
@@ -156,13 +148,12 @@ def test_tensor_nested_slice_with_gradients() raises:
     # Slice and use in computation
     var sliced = x.slice(axis=1, start=0, end=2)  # First two columns
     var nested = sliced.slice(axis=0, start=1, end=2)
-    s = nested.sum()
+    var s = nested.sum()
     s.backward(42)
 
     # Gradients should flow only to sliced elements
     var expected_grad = Tensor[dtype].d2([[0.0, 0.0, 0.0], [42.0, 42.0, 0.0]])
     assert_true(x.grad().all_close(expected_grad))
-
 
 
 def test_tensor_slice_edge_cases() raises:
@@ -183,7 +174,6 @@ def test_tensor_slice_edge_cases() raises:
     assert_true(full_slice == x)
 
 
-
 def test_tensor_slice_step_edge_cases() raises:
     comptime dtype = DType.float32
 
@@ -197,6 +187,35 @@ def test_tensor_slice_step_edge_cases() raises:
     var reverse_slice = x.slice(axis=0, start=5, end=0, step=-1)
     assert_true(reverse_slice == Tensor[dtype].d1([5, 4, 3, 2, 1]))
 
+
+def test_slice_get_set_logical_indexing() raises:
+    """Get/set use logical (C-order) indexing on views, not storage."""
+
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d1([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+
+    # Offset view: get(i) is the i-th LOGICAL element, not storage[i].
+    var s = x.slice(axis=0, start=2, end=7)  # [2, 3, 4, 5, 6]
+    for i in range(5):
+        assert_true(s.get(i) == Scalar[dtype](i + 2))
+    assert_true(s.get(-1) == Scalar[dtype](6))
+
+    # set writes through the view (aliasing, no copy).
+    s.set(0, Scalar[dtype](100))
+    assert_true(s[0] == Scalar[dtype](100))
+    assert_true(x.get(2) == Scalar[dtype](100))
+
+    # Strided view.
+    var x2 = Tensor[dtype].d1([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    var st = x2.slice(axis=0, start=1, end=8, step=2)  # [1, 3, 5, 7]
+    for i in range(4):
+        assert_true(st.get(i) == Scalar[dtype](1 + 2 * i))
+
+    # 2-D slice with a row offset.
+    var m = Tensor[dtype].d2([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
+    var rows = m.slice(axis=0, start=1, end=3)
+    for i in range(8):
+        assert_true(rows.get(i) == Scalar[dtype](5 + i))
 
 
 # Consolidated test function
@@ -762,6 +781,3 @@ def test_slice_backward_multiple_paths() raises:
     # x[3]: in slice2 only → grad = 1
     var expected_grad = Tensor[dtype].d1([1.0, 2.0, 2.0, 1.0])
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
-
-
-

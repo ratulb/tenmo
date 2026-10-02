@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "tenmo"
+version = "0.1.0"
+description = "Python bindings for Tenmo — a Mojo ML framework"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.package-data]
+tenmo = ["_tenmo.so"]

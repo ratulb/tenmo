@@ -13,30 +13,27 @@ Reduction modes:
   none:          per-element loss and gradient (upstream is per-element)
 """
 
-from tenmo.tensor import Tensor
-from tenmo.ndbuffer import NDBuffer
-from tenmo.buffers import Buffer
-from tenmo.shapes import Shape
-from tenmo.kernels.bce_kernel import BceKernel
-from tenmo.backpropagation import (
+from .tensor import Tensor
+from .ndbuffer import NDBuffer
+from .shared.buffers import Buffer
+from .shared.shapes import Shape
+from .kernels.bce_kernel import BceKernel
+from .backpropagation import (
+    BackwardFnType,
     ArgumentType,
-    BackwardFnArg,
-    BACKWARD_BCE_WITH_LOGITS,
-    BACKWARD_BCE,
+    BackwardFn,
 )
-from tenmo.gradbox import Gradbox
-from tenmo.ancestry import Ancestor
-from tenmo.mnemonics import AddTensor
-from tenmo.common_utils import Epsilon
-from tenmo.shared import Reduction
-from tenmo.common_utils import panic
+from .gradbox import Gradbox
+from .ancestry import Ancestor
+from .shared.mnemonics import AddTensor
+from .shared.constants import Epsilon
+from .shared import Reduction
+from .shared.panic import panic
 from std.sys import simd_width_of, has_accelerator
 from std.math import exp, log
 
 
-# =============================================================================
 # Backward argument types
-# =============================================================================
 
 
 @fieldwise_init
@@ -55,13 +52,11 @@ struct BCELossBwdArg[dtype: DType](ArgumentType):
     var numels: Int
 
 
-# =============================================================================
 # Scalar element functions — pure Scalar[dtype] transformations
-# =============================================================================
 
 
 @fieldwise_init
-struct BceElement[dtype: DType](ImplicitlyCopyable & Movable):
+struct BceElement[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     def sigmoid_fn(
         x: Scalar[Self.dtype],
@@ -121,13 +116,11 @@ struct BceElement[dtype: DType](ImplicitlyCopyable & Movable):
         return -(target / safe - one_minus_target / one_minus_safe) * grad
 
 
-# =============================================================================
 # Buffer-level SIMD kernels (contiguous CPU, same-size buffers)
-# =============================================================================
 
 
 @fieldwise_init
-struct BceBuffer[dtype: DType](ImplicitlyCopyable & Movable):
+struct BceBuffer[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     def forward_with_logits(
         logits: Buffer[Self.dtype],
@@ -569,13 +562,11 @@ struct BceBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         return grad_out^
 
 
-# =============================================================================
 # NDBuffer-level dispatch — GPU → BceKernel, CPU → BceBuffer / strided fallback
-# =============================================================================
 
 
 @fieldwise_init
-struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
+struct BceNdBuffer[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     def forward_with_logits(
         logits: NDBuffer[Self.dtype],
@@ -598,9 +589,20 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                 try:
                     var result = BceKernel[
                         Self.dtype
-                    ].launch_forward_with_logits(logits, target, epsilon, sync=sync)
-                    loss_ndb = result[0]
-                    bw_ndb = result[1]
+                    ].launch_forward_with_logits(
+                        logits.layout(),
+                        logits.device_state.value(),
+                        target.layout(),
+                        target.device_state.value(),
+                        epsilon,
+                        sync=sync,
+                    )
+                    loss_ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        result[0][0], result[0][1]
+                    )
+                    bw_ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        result[1][0], result[1][1]
+                    )
                 except e:
                     print(e)
                     panic(
@@ -631,7 +633,9 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
             var result = BceBuffer[Self.dtype].forward_with_logits(
                 logits.buffer, target.buffer, epsilon
             )
-            var loss_ndb = NDBuffer[Self.dtype](result[0], logits.shape)
+            var loss_ndb = NDBuffer[Self.dtype](
+                result[0], logits.shape
+            )
             var bw_ndb = NDBuffer[Self.dtype](result[1], logits.shape)
             return (loss_ndb^, bw_ndb^)
         else:
@@ -641,7 +645,9 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
             var idx = 0
             for coord in logits.index_iterator():
                 loss_buf[idx] = BceElement[Self.dtype].with_logits_element(
-                    logits.buffer[coord], target.buffer[coord], epsilon
+                    logits.buffer[coord],
+                    target.buffer[coord],
+                    epsilon,
                 )
                 sig_buf[idx] = BceElement[Self.dtype].sigmoid_fn(
                     logits.buffer[coord]
@@ -677,10 +683,20 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                     var result = BceKernel[
                         Self.dtype
                     ].launch_forward_with_logits_reduce(
-                        logits, target, epsilon, is_mean, sync=sync
+                        logits.layout(),
+                        logits.device_state.value(),
+                        target.layout(),
+                        target.device_state.value(),
+                        epsilon,
+                        is_mean,
+                        sync=sync,
                     )
-                    scalar_ndb = result[0]
-                    sig_ndb = result[1]
+                    scalar_ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        result[0][0], result[0][1]
+                    )
+                    sig_ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        result[1][0], result[1][1]
+                    )
                 except e:
                     print(e)
                     panic(
@@ -727,7 +743,9 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                 var s = BceElement[Self.dtype].sigmoid_fn(logits.buffer[coord])
                 sig_buf[idx] = s
                 total += BceElement[Self.dtype].with_logits_element(
-                    logits.buffer[coord], target.buffer[coord], epsilon
+                    logits.buffer[coord],
+                    target.buffer[coord],
+                    epsilon,
                 )
                 idx += 1
             if is_mean:
@@ -760,10 +778,19 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
             if pred.is_on_gpu():
                 try:
                     var result = BceKernel[Self.dtype].launch_forward(
-                        pred, target, epsilon, sync=sync
+                        pred.layout(),
+                        pred.device_state.value(),
+                        target.layout(),
+                        target.device_state.value(),
+                        epsilon,
+                        sync=sync,
                     )
-                    loss_ndb = result[0]
-                    bw_ndb = result[1]
+                    loss_ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        result[0][0], result[0][1]
+                    )
+                    bw_ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        result[1][0], result[1][1]
+                    )
                 except e:
                     print(e)
                     panic("BceNdBuffer forward → GPU operation failed")
@@ -802,7 +829,9 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
             var idx = 0
             for coord in pred.index_iterator():
                 loss_buf[idx] = BceElement[Self.dtype].element(
-                    pred.buffer[coord], target.buffer[coord], epsilon
+                    pred.buffer[coord],
+                    target.buffer[coord],
+                    epsilon,
                 )
                 safe_buf[idx] = BceElement[Self.dtype].clip_fn(
                     pred.buffer[coord], epsilon
@@ -836,10 +865,20 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
             if pred.is_on_gpu():
                 try:
                     var result = BceKernel[Self.dtype].launch_forward_reduce(
-                        pred, target, epsilon, is_mean, sync=sync
+                        pred.layout(),
+                        pred.device_state.value(),
+                        target.layout(),
+                        target.device_state.value(),
+                        epsilon,
+                        is_mean,
+                        sync=sync,
                     )
-                    scalar_ndb = result[0]
-                    safe_ndb = result[1]
+                    scalar_ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        result[0][0], result[0][1]
+                    )
+                    safe_ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        result[1][0], result[1][1]
+                    )
                 except e:
                     print(e)
                     panic("BceNdBuffer forward_reduce → GPU operation failed")
@@ -883,7 +922,9 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                 )
                 safe_buf[idx] = safe
                 total += BceElement[Self.dtype].element(
-                    pred.buffer[coord], target.buffer[coord], epsilon
+                    pred.buffer[coord],
+                    target.buffer[coord],
+                    epsilon,
                 )
                 idx += 1
             if is_mean:
@@ -907,7 +948,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         Device-aware: GPU → BceKernel.launch_bce_with_logits_backward.
         CPU → BceBuffer.backward_with_logits (contiguous) or scalar fallback.
         """
-        result: NDBuffer[Self.dtype]
+        var result: NDBuffer[Self.dtype]
         comptime if has_accelerator():
             if sigmoid.is_on_gpu():
                 try:
@@ -921,10 +962,19 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                     )[
                         1
                     ]
-                    result = BceKernel[
+                    var (result_layout, result_storage) = BceKernel[
                         Self.dtype
                     ].launch_bce_with_logits_backward(
-                        sigmoid, gpu_target, gpu_grad, sync=sync
+                        sigmoid.layout(),
+                        sigmoid.device_state.value(),
+                        gpu_target.layout(),
+                        gpu_target.device_state.value(),
+                        gpu_grad.layout(),
+                        gpu_grad.device_state.value(),
+                        sync=sync,
+                    )
+                    result = NDBuffer[Self.dtype].with_layout_device_state(
+                        result_layout, result_storage
                     )
                 except e:
                     print(e)
@@ -951,7 +1001,9 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         if sigmoid.is_contiguous():
             var buf = BceBuffer[Self.dtype].backward_with_logits(
-                sigmoid.buffer, target.buffer, grad_output.buffer
+                sigmoid.buffer,
+                target.buffer,
+                grad_output.buffer,
             )
             return NDBuffer[Self.dtype](buf^, sigmoid.shape)
         else:
@@ -982,14 +1034,22 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         Device-aware: GPU → BceKernel.launch_bce_with_logits_backward_scaled.
         CPU → BceBuffer.backward_with_logits_scaled (contiguous) or scalar fallback.
         """
-        result: NDBuffer[Self.dtype]
+        var result: NDBuffer[Self.dtype]
         comptime if has_accelerator():
             if sigmoid.is_on_gpu():
                 try:
-                    result = BceKernel[
+                    var (result_layout, result_storage) = BceKernel[
                         Self.dtype
                     ].launch_bce_with_logits_backward_scaled(
-                        sigmoid, target, scalar_grad, sync=sync
+                        sigmoid.layout(),
+                        sigmoid.device_state.value(),
+                        target.layout(),
+                        target.device_state.value(),
+                        scalar_grad,
+                        sync=sync,
+                    )
+                    result = NDBuffer[Self.dtype].with_layout_device_state(
+                        result_layout, result_storage
                     )
                 except e:
                     print(e)
@@ -1046,7 +1106,7 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         Device-aware: GPU → BceKernel.launch_bce_backward.
         CPU → BceBuffer.backward (contiguous) or scalar fallback.
         """
-        result: NDBuffer[Self.dtype]
+        var result: NDBuffer[Self.dtype]
         comptime if has_accelerator():
             if safe.is_on_gpu():
                 try:
@@ -1060,8 +1120,19 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
                     )[
                         1
                     ]
-                    result = BceKernel[Self.dtype].launch_bce_backward(
-                        safe, gpu_target, gpu_grad, sync=sync
+                    var (result_layout, result_storage) = BceKernel[
+                        Self.dtype
+                    ].launch_bce_backward(
+                        safe.layout(),
+                        safe.device_state.value(),
+                        gpu_target.layout(),
+                        gpu_target.device_state.value(),
+                        gpu_grad.layout(),
+                        gpu_grad.device_state.value(),
+                        sync=sync,
+                    )
+                    result = NDBuffer[Self.dtype].with_layout_device_state(
+                        result_layout, result_storage
                     )
                 except e:
                     print(e)
@@ -1085,7 +1156,9 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         if safe.is_contiguous():
             var buf = BceBuffer[Self.dtype].backward(
-                safe.buffer, target.buffer, grad_output.buffer
+                safe.buffer,
+                target.buffer,
+                grad_output.buffer,
             )
             return NDBuffer[Self.dtype](buf^, safe.shape)
         else:
@@ -1114,12 +1187,22 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
         Device-aware: GPU → BceKernel.launch_bce_backward_scaled.
         CPU → BceBuffer.backward_scaled (contiguous) or scalar fallback.
         """
-        result: NDBuffer[Self.dtype]
+        var result: NDBuffer[Self.dtype]
         comptime if has_accelerator():
             if safe.is_on_gpu():
                 try:
-                    result = BceKernel[Self.dtype].launch_bce_backward_scaled(
-                        safe, target, scalar_grad, sync=sync
+                    var (result_layout, result_storage) = BceKernel[
+                        Self.dtype
+                    ].launch_bce_backward_scaled(
+                        safe.layout(),
+                        safe.device_state.value(),
+                        target.layout(),
+                        target.device_state.value(),
+                        scalar_grad,
+                        sync=sync,
+                    )
+                    result = NDBuffer[Self.dtype].with_layout_device_state(
+                        result_layout, result_storage
                     )
                 except e:
                     print(e)
@@ -1160,15 +1243,19 @@ struct BceNdBuffer[dtype: DType](ImplicitlyCopyable & Movable):
             return NDBuffer[Self.dtype](grad_buf^, safe.shape)
 
 
-# =============================================================================
 # Forward structs
-# =============================================================================
 
 
 @fieldwise_init
-struct BCEWithLogitsLoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
+struct BCEWithLogitsLoss[dtype: DType](Writable, ImplicitlyCopyable & RegisterPassable):
     var training: Bool
     var epsilon: Scalar[Self.dtype]
+
+    def write_to[W: Writer](self, mut writer: W):
+        writer.write("BCEWithLogitsLoss")
+
+    def write_repr_to[W: Writer](self, mut writer: W):
+        writer.write("BCEWithLogitsLoss")
 
     def __init__(
         out self, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
@@ -1177,12 +1264,19 @@ struct BCEWithLogitsLoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
         self.epsilon = epsilon
 
     def __call__(
-        self, logits: Tensor[Self.dtype], target: Tensor[Self.dtype], sync: Bool = True
+        mut self,
+        logits: Tensor[Self.dtype],
+        target: Tensor[Self.dtype],
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
-            return Self.forward[track_grad=True](logits, target, self.epsilon, sync=sync)
+            return Self.forward[track_grad=True](
+                logits, target, self.epsilon, sync=sync
+            )
         else:
-            return Self.forward[track_grad=False](logits, target, self.epsilon, sync=sync)
+            return Self.forward[track_grad=False](
+                logits, target, self.epsilon, sync=sync
+            )
 
     @staticmethod
     def forward[
@@ -1194,14 +1288,22 @@ struct BCEWithLogitsLoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
         reduction: Reduction = Reduction("mean"),
         sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-
+        if logits.shape() != target.shape():
+            panic(
+                "BCEWithLogitsLoss dimension mismatch: logits and target"
+                " shapes must match, got "
+                + String(logits.shape())
+                + " vs "
+                + String(target.shape()),
+                "at BCEWithLogitsLoss → forward",
+            )
         var numels = logits.numels()
         var out: Tensor[Self.dtype]
         var sigmoid_ndb: NDBuffer[Self.dtype]
 
         if reduction.is_none():
             var (loss_ndb, bw) = BceNdBuffer[Self.dtype].forward_with_logits(
-                logits.buffer, target.buffer, epsilon
+                logits.buffer, target.buffer, epsilon, sync=sync
             )
             out = Tensor[Self.dtype](loss_ndb^, requires_grad=False)
             sigmoid_ndb = bw^
@@ -1210,7 +1312,7 @@ struct BCEWithLogitsLoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
             var (scalar_ndb, bw) = BceNdBuffer[
                 Self.dtype
             ].forward_with_logits_reduce(
-                logits.buffer, target.buffer, epsilon, is_mean
+                logits.buffer, target.buffer, epsilon, is_mean, sync=sync
             )
             out = Tensor[Self.dtype](scalar_ndb^, requires_grad=False)
             sigmoid_ndb = bw^
@@ -1220,13 +1322,13 @@ struct BCEWithLogitsLoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
             if grad_required:
                 out.requires_grad_(True)
                 var target_copy = target.buffer.copy()
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_BCE_WITH_LOGITS,
+                var backwardFn = BackwardFn(
                     BCEWithLogitsBwdArg[Self.dtype](
                         sigmoid_ndb^, target_copy^, reduction, numels
                     ),
+                    BCEWithLogitsBackward[Self.dtype](),
                 )
-                out.add_ancestry(backwardFnArg^, logits)
+                out.add_ancestry(backwardFn^, logits)
 
         return out^
 
@@ -1238,9 +1340,15 @@ struct BCEWithLogitsLoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
 
 
 @fieldwise_init
-struct BCELoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
+struct BCELoss[dtype: DType](Writable, ImplicitlyCopyable & RegisterPassable):
     var training: Bool
     var epsilon: Scalar[Self.dtype]
+
+    def write_to[W: Writer](self, mut writer: W):
+        writer.write("BCELoss")
+
+    def write_repr_to[W: Writer](self, mut writer: W):
+        writer.write("BCELoss")
 
     def __init__(
         out self, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
@@ -1249,12 +1357,19 @@ struct BCELoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
         self.epsilon = epsilon
 
     def __call__(
-        self, pred: Tensor[Self.dtype], target: Tensor[Self.dtype], sync: Bool = True
+        mut self,
+        pred: Tensor[Self.dtype],
+        target: Tensor[Self.dtype],
+        sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
-            return Self.forward[track_grad=True](pred, target, self.epsilon, sync=sync)
+            return Self.forward[track_grad=True](
+                pred, target, self.epsilon, sync=sync
+            )
         else:
-            return Self.forward[track_grad=False](pred, target, self.epsilon, sync=sync)
+            return Self.forward[track_grad=False](
+                pred, target, self.epsilon, sync=sync
+            )
 
     @staticmethod
     def forward[
@@ -1266,20 +1381,29 @@ struct BCELoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
         reduction: Reduction = Reduction("mean"),
         sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+        if pred.shape() != target.shape():
+            panic(
+                "BCELoss dimension mismatch: pred and target shapes must"
+                " match, got "
+                + String(pred.shape())
+                + " vs "
+                + String(target.shape()),
+                "at BCELoss → forward",
+            )
         var numels = pred.numels()
         var out: Tensor[Self.dtype]
         var safe_ndb: NDBuffer[Self.dtype]
 
         if reduction.is_none():
             var (loss_ndb, bw) = BceNdBuffer[Self.dtype].forward(
-                pred.buffer, target.buffer, epsilon
+                pred.buffer, target.buffer, epsilon, sync=sync
             )
             out = Tensor[Self.dtype](loss_ndb^, requires_grad=False)
             safe_ndb = bw^
         else:
             var is_mean = reduction.is_mean()
             var (scalar_ndb, bw) = BceNdBuffer[Self.dtype].forward_reduce(
-                pred.buffer, target.buffer, epsilon, is_mean
+                pred.buffer, target.buffer, epsilon, is_mean, sync=sync
             )
             out = Tensor[Self.dtype](scalar_ndb^, requires_grad=False)
             safe_ndb = bw^
@@ -1289,13 +1413,13 @@ struct BCELoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
             if grad_required:
                 out.requires_grad_(True)
                 var target_copy = target.buffer.copy()
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_BCE,
+                var backwardFn = BackwardFn(
                     BCELossBwdArg[Self.dtype](
                         safe_ndb^, target_copy^, reduction, numels
                     ),
+                    BCELossBackward[Self.dtype](),
                 )
-                out.add_ancestry(backwardFnArg^, pred)
+                out.add_ancestry(backwardFn^, pred)
 
         return out^
 
@@ -1306,80 +1430,86 @@ struct BCELoss[dtype: DType](ImplicitlyCopyable & RegisterPassable):
         self.training = False
 
 
-# =============================================================================
 # Backward handlers
-# =============================================================================
 
 
 @fieldwise_init
-struct BCEWithLogitsBackward[dtype: DType](ImplicitlyCopyable & Movable):
+struct BCEWithLogitsBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
-    ) where Self.dtype.is_floating_point():
-        var bwd_arg = (
-            output.ancestry()
-            .backward_fn_arg()
-            .get[BCEWithLogitsBwdArg[Self.dtype]]()
-        )
-        var sigmoid = bwd_arg.sigmoid
-        var target = bwd_arg.target
-        ref gradbox = output.gradients()
-        var parent = output.ancestry().get(0)
+    ):
+        comptime if Self.dtype.is_floating_point():
+            var bwd_arg = (
+                output.ancestry()
+                .backward_fn()
+                .get[BCEWithLogitsBwdArg[Self.dtype]]()
+            )
+            var sigmoid = bwd_arg.sigmoid
+            var target = bwd_arg.target
+            ref gradbox = output.gradients()
+            var parent = output.ancestry().get(0)
 
-        if bwd_arg.reduction.is_none():
-            var grad_ndb = BceNdBuffer[Self.dtype].backward_with_logits(
-                sigmoid, target, gradbox.buffer(), sync=False
-            )
-            var grad_parent = Gradbox[Self.dtype](grad_ndb^)
-            parent.update_grad(grad_parent^, AddTensor, None)
-        else:
-            var multiplier = gradbox.item()
-            if bwd_arg.reduction.is_mean():
-                multiplier /= Scalar[Self.dtype](bwd_arg.numels)
-            var grad_ndb = BceNdBuffer[Self.dtype].backward_with_logits_scaled(
-                sigmoid, target, multiplier, sync=False
-            )
-            var grad_parent = Gradbox[Self.dtype](grad_ndb^)
-            parent.update_grad(grad_parent^, AddTensor, None)
-        parent_ids.append(parent._id)
-        if not retain_graph:
+            if bwd_arg.reduction.is_none():
+                var grad_ndb = BceNdBuffer[Self.dtype].backward_with_logits(
+                    sigmoid, target, gradbox.buffer(), sync=False
+                )
+                var grad_parent = Gradbox[Self.dtype](grad_ndb^)
+                parent.update_grad(grad_parent^, AddTensor, None)
+            else:
+                var multiplier = gradbox.item()
+                if bwd_arg.reduction.is_mean():
+                    multiplier /= Scalar[Self.dtype](bwd_arg.numels)
+                var grad_ndb = BceNdBuffer[
+                    Self.dtype
+                ].backward_with_logits_scaled(
+                    sigmoid, target, multiplier, sync=False
+                )
+                var grad_parent = Gradbox[Self.dtype](grad_ndb^)
+                parent.update_grad(grad_parent^, AddTensor, None)
+            parent_ids.append(parent._id)
             gradbox.zero_grad()
+        else:
+            panic("BCEWithLogitsBackward requires a floating-point dtype")
 
 
 @fieldwise_init
-struct BCELossBackward[dtype: DType](ImplicitlyCopyable & Movable):
+struct BCELossBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
-    ) where Self.dtype.is_floating_point():
-        var bwd_arg = (
-            output.ancestry().backward_fn_arg().get[BCELossBwdArg[Self.dtype]]()
-        )
-        var safe = bwd_arg.clipped_pred
-        var target = bwd_arg.target
-        ref gradbox = output.gradients()
-        var parent = output.ancestry().get(0)
+    ):
+        comptime if Self.dtype.is_floating_point():
+            var bwd_arg = (
+                output.ancestry().backward_fn().get[BCELossBwdArg[Self.dtype]]()
+            )
+            var safe = bwd_arg.clipped_pred
+            var target = bwd_arg.target
+            ref gradbox = output.gradients()
+            var parent = output.ancestry().get(0)
 
-        if bwd_arg.reduction.is_none():
-            var grad_ndb = BceNdBuffer[Self.dtype].backward(
-                safe, target, gradbox.buffer(), sync=False
-            )
-            var grad_parent = Gradbox[Self.dtype](grad_ndb^)
-            parent.update_grad(grad_parent^, AddTensor, None)
-        else:
-            var multiplier = gradbox.item()
-            if bwd_arg.reduction.is_mean():
-                multiplier /= Scalar[Self.dtype](bwd_arg.numels)
-            var grad_ndb = BceNdBuffer[Self.dtype].backward_scaled(
-                safe, target, multiplier, sync=False
-            )
-            var grad_parent = Gradbox[Self.dtype](grad_ndb^)
-            parent.update_grad(grad_parent^, AddTensor, None)
-        parent_ids.append(parent._id)
-        if not retain_graph:
+            if bwd_arg.reduction.is_none():
+                var grad_ndb = BceNdBuffer[Self.dtype].backward(
+                    safe, target, gradbox.buffer(), sync=False
+                )
+                var grad_parent = Gradbox[Self.dtype](grad_ndb^)
+                parent.update_grad(grad_parent^, AddTensor, None)
+            else:
+                var multiplier = gradbox.item()
+                if bwd_arg.reduction.is_mean():
+                    multiplier /= Scalar[Self.dtype](bwd_arg.numels)
+                var grad_ndb = BceNdBuffer[Self.dtype].backward_scaled(
+                    safe, target, multiplier, sync=False
+                )
+                var grad_parent = Gradbox[Self.dtype](grad_ndb^)
+                parent.update_grad(grad_parent^, AddTensor, None)
+            parent_ids.append(parent._id)
             gradbox.zero_grad()
+        else:
+            panic("BCELossBackward requires a floating-point dtype")

@@ -1,13 +1,13 @@
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from std.testing import assert_true, assert_raises, TestSuite
-from tenmo.broadcasthelper import ShapeBroadcaster
-from tenmo.intarray import IntArray
+from tenmo.shared.broadcasthelper import ShapeBroadcaster
+from tenmo.shared.intarray import IntArray
 
 
 def test_empty_shape_broadcastable() raises:
     print("test_empty_shape_broadcastable")
-    shape = Shape()
+    var shape = Shape()
     assert_true(
         ShapeBroadcaster.broadcastable(shape, Shape(1)),
         "broadcastable assertion 1 failed for empty shape",
@@ -16,7 +16,7 @@ def test_empty_shape_broadcastable() raises:
         ShapeBroadcaster.broadcastable(Shape(1), shape),
         "broadcastable assertion 2 failed for empty shape",
     )
-    broadcast_shape = ShapeBroadcaster.broadcast_shape(shape, Shape(1))
+    var broadcast_shape = ShapeBroadcaster.broadcast_shape(shape, Shape(1))
     assert_true(
         broadcast_shape == Shape(1),
         "Empty shape broadcast to Shape(1) assertion failed",
@@ -27,7 +27,7 @@ def test_empty_shape_broadcastable() raises:
         broadcast_shape == Shape(1),
         "Shape(1) broadcast with empty shape assertion failed",
     )
-    broadcast_mask = ShapeBroadcaster.broadcast_mask(shape, Shape(1))
+    var broadcast_mask = ShapeBroadcaster.broadcast_mask(shape, Shape(1))
     assert_true(
         IntArray(1) == broadcast_mask,
         "Empty shape broadcast mask assertion failed",
@@ -36,11 +36,11 @@ def test_empty_shape_broadcastable() raises:
 
 def test_broadcast_shape() raises:
     print("test_broadcast_shape")
-    shape1 = Shape(32, 16)
-    shape2 = Shape(
+    var shape1 = Shape(32, 16)
+    var shape2 = Shape(
         16,
     )
-    result = ShapeBroadcaster.broadcast_shape(shape1, shape2)
+    var result = ShapeBroadcaster.broadcast_shape(shape1, shape2)
     assert_true(result == Shape(32, 16), "Shape broadcast 1 assertion failed")
 
     shape1 = Shape(4, 16, 32)
@@ -92,8 +92,8 @@ def test_broadcastable() raises:
         ShapeBroadcaster.broadcastable(Shape(2, 3, 5), Shape(3, 5)),
         "broadcastable assertion 4 failed",
     )
-    tensor1 = Tensor[dtype].d1([1, 2, 3, 4, 5])
-    tensor2 = Tensor[dtype].d1([6])
+    var tensor1 = Tensor[dtype].d1([1, 2, 3, 4, 5])
+    var tensor2 = Tensor[dtype].d1([6])
     assert_true(
         tensor1.broadcastable(tensor2) and tensor2.broadcastable(tensor1),
         "Tensor shape broadcastable assertion failed",
@@ -102,11 +102,11 @@ def test_broadcastable() raises:
 
 def test_pad_shapes() raises:
     print("test_pad_shapes")
-    shape1 = Shape(3, 4)
-    shape2 = Shape(
+    var shape1 = Shape(3, 4)
+    var shape2 = Shape(
         4,
     )
-    padded1, padded2 = ShapeBroadcaster.pad_shapes(shape1, shape2)
+    var padded1, padded2 = ShapeBroadcaster.pad_shapes(shape1, shape2)
     assert_true(
         padded1 == shape1 and padded2 == Shape(1, 4),
         "Padding of shapes (3,4) and (4,) assertion failed",

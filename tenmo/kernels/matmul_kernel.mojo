@@ -1,60 +1,63 @@
-from std.gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
-from std.gpu.host import Dim
+from max.gpu import thread_idx, block_idx, block_dim, grid_dim
+from max.gpu import barrier
+from max.gpu.host import Dim
 from std.memory import AddressSpace, stack_allocation
-from tenmo.shapes import Shape
-from tenmo.device import DeviceState
-from tenmo.ndbuffer import NDBuffer
-from tenmo.broadcasthelper import ShapeBroadcaster
-
-
-# 2D Tiled Core Kernel
-#
-# Computes C = A @ B for a batch of 2D matrix multiplications.
-#
-# Launch config (set by host):
-#   grid_dim.x  = ceil(n / TILE_SIZE)   — tiles across output columns
-#   grid_dim.y  = ceil(m / TILE_SIZE)   — tiles across output rows
-#   grid_dim.z  = total_batch           — one z-slice per batch element
-#   block_dim.x = TILE_SIZE
-#   block_dim.y = TILE_SIZE
-#
-# A_batch_offsets[b] and B_batch_offsets[b] are flat element offsets into
-# A_buffer and B_buffer for batch element b, precomputed on the host.
-# Output batch b starts at out_buffer + b * m * n (always contiguous).
-#
-# Shared memory:
-#   smem_A: [TILE_SIZE, TILE_SIZE]  — tile of A rows
-#   smem_B: [TILE_SIZE, TILE_SIZE]  — tile of B cols
-#
-# Each thread (ty, tx) owns output element (row, col) = (block_row + ty, block_col + tx).
-# It steps over k in chunks of TILE_SIZE, accumulating the dot product.
-# TILE SIZE — 32x32 = 1024 threads per block
-# Each thread computes one output element
-# smem_A: 32*32*4 = 4096 bytes
-# smem_B: 32*32*4 = 4096 bytes
-# Total smem: 8192 bytes — well within 48KB limit
+from ..shared.shapes import Shape
+from ..gpu.device import DeviceState
+from ..shared.layout import Layout
+from ..shared.broadcasthelper import ShapeBroadcaster
 
 
 def matmul_2d_tiled[
     dtype: DType,
     TILE_SIZE: Int = 32,
 ](
-    A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    C: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    A_batch_offsets: UnsafePointer[Scalar[DType.int64], ImmutAnyOrigin],
-    B_batch_offsets: UnsafePointer[Scalar[DType.int64], ImmutAnyOrigin],
-    m: Int,
-    n: Int,
-    k: Int,
-    A_row_stride: Int,
-    A_col_stride: Int,
-    B_row_stride: Int,
-    B_col_stride: Int,
+    A: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    B: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    C: Pointer[Scalar[dtype], MutAnyOrigin],
+    A_batch_offsets: Pointer[Scalar[DType.int64], ImmutAnyOrigin],
+    B_batch_offsets: Pointer[Scalar[DType.int64], ImmutAnyOrigin],
+    m_: Int64,
+    n_: Int64,
+    k_: Int64,
+    A_row_stride_: Int64,
+    A_col_stride_: Int64,
+    B_row_stride_: Int64,
+    B_col_stride_: Int64,
 ):
+    """2D Tiled Core Kernel.
+    Computes C = A @ B for a batch of 2D matrix multiplications.
+    Launch config (set by host):
+      grid_dim.x  = ceil(n / TILE_SIZE)   — tiles across output columns
+      grid_dim.y  = ceil(m / TILE_SIZE)   — tiles across output rows
+      grid_dim.z  = total_batch           — one z-slice per batch element
+      block_dim.x = TILE_SIZE
+      block_dim.y = TILE_SIZE
+    A_batch_offsets[b] and B_batch_offsets[b] are flat element offsets into
+    A_buffer and B_buffer for batch element b, precomputed on the host.
+    Output batch b starts at out_buffer + b * m * n (always contiguous).
+    Shared memory:
+      smem_A: [TILE_SIZE, TILE_SIZE]  — tile of A rows
+      smem_B: [TILE_SIZE, TILE_SIZE]  — tile of B cols
+    Each thread (ty, tx) owns output element (row, col) = (block_row + ty, block_col + tx).
+    It steps over k in chunks of TILE_SIZE, accumulating the dot product.
+    TILE SIZE — 32x32 = 1024 threads per block
+    Each thread computes one output element
+    smem_A: 32*32*4 = 4096 bytes
+    smem_B: 32*32*4 = 4096 bytes
+    Total smem: 8192 bytes — well within 48KB limit
+    """
     comptime assert (
         TILE_SIZE == 16 or TILE_SIZE == 32
     ), "TILE_SIZE must be 16 or 32"
+
+    var m = Int(m_)
+    var n = Int(n_)
+    var k = Int(k_)
+    var A_row_stride = Int(A_row_stride_)
+    var A_col_stride = Int(A_col_stride_)
+    var B_row_stride = Int(B_row_stride_)
+    var B_col_stride = Int(B_col_stride_)
 
     # Shared memory tiles
     var smem_A = stack_allocation[
@@ -68,19 +71,19 @@ def matmul_2d_tiled[
         address_space=AddressSpace.SHARED,
     ]()
 
-    var tx = Int(thread_idx.x)  # col within tile
-    var ty = Int(thread_idx.y)  # row within tile
+    var tx = thread_idx.x  # col within tile
+    var ty = thread_idx.y  # row within tile
 
-    var batch = Int(block_idx.z)
-    var block_col = Int(block_idx.x) * TILE_SIZE
-    var block_row = Int(block_idx.y) * TILE_SIZE
+    var batch = block_idx.z
+    var block_col = block_idx.x * TILE_SIZE
+    var block_row = block_idx.y * TILE_SIZE
 
     var row = block_row + ty  # global output row
     var col = block_col + tx  # global output col
 
-    # A_base/B_base are pointers offset from A/B ────────────────────
-    var A_base = A + A_batch_offsets[batch]
-    var B_base = B + B_batch_offsets[batch]
+    # A_base/B_base are pointers offset from A/B
+    var A_base = A.unsafe_offset(A_batch_offsets[unsafe_offset=batch])
+    var B_base = B.unsafe_offset(B_batch_offsets[unsafe_offset=batch])
     var out_base = batch * m * n
 
     var acc = Scalar[dtype](0)
@@ -93,60 +96,60 @@ def matmul_2d_tiled[
         # Load tile of A
         var a_col = k_offset + tx
         if row < m and a_col < k:
-            smem_A[ty * TILE_SIZE + tx] = A_base[
+            smem_A[unsafe_offset=ty * TILE_SIZE + tx] = A_base[unsafe_offset=
                 row * A_row_stride + a_col * A_col_stride
             ]
         else:
-            smem_A[ty * TILE_SIZE + tx] = 0
+            smem_A[unsafe_offset=ty * TILE_SIZE + tx] = 0
 
         # Load tile of B
         var b_row = k_offset + ty
         if b_row < k and col < n:
-            smem_B[ty * TILE_SIZE + tx] = B_base[
+            smem_B[unsafe_offset=ty * TILE_SIZE + tx] = B_base[unsafe_offset=
                 b_row * B_row_stride + col * B_col_stride
             ]
         else:
-            smem_B[ty * TILE_SIZE + tx] = 0
+            smem_B[unsafe_offset=ty * TILE_SIZE + tx] = 0
 
         barrier()
 
         for kk in range(TILE_SIZE):
-            acc += smem_A[ty * TILE_SIZE + kk] * smem_B[kk * TILE_SIZE + tx]
+            acc += smem_A[unsafe_offset=ty * TILE_SIZE + kk] * smem_B[unsafe_offset=kk * TILE_SIZE + tx]
 
         barrier()
 
     # use C not out_buffer
     if row < m and col < n:
-        C[out_base + row * n + col] = acc
+        C[unsafe_offset=out_base + row * n + col] = acc
 
 
 @fieldwise_init
-struct MatmulNdGpu[dtype: DType = DType.float32](
+struct MatmulKernel[dtype: DType = DType.float32](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
     def launch[
         tile_size: Int = 32,
     ](
-        A: NDBuffer[Self.dtype],
-        B: NDBuffer[Self.dtype],
+        A_layout: Layout,
+        A_device_state: DeviceState[Self.dtype],
+        B_layout: Layout,
+        B_device_state: DeviceState[Self.dtype],
         sync: Bool = False,
-    ) raises -> NDBuffer[
-        Self.dtype
-    ]:
+    ) raises -> Tuple[Layout, DeviceState[Self.dtype]]:
         """ND batched matrix multiply with broadcasting.
 
         A: [..., m, k]
         B: [..., k, n]
         out: [..., m, n]
         """
-        var A_shape = A.shape
-        var B_shape = B.shape
+        var A_shape = A_layout.shape
+        var B_shape = B_layout.shape
 
         if A_shape.rank() < 2:
-            raise Error("MatmulNdGpu: A must have rank >= 2")
+            raise Error("MatmulKernel: A must have rank >= 2")
         if B_shape.rank() < 2:
-            raise Error("MatmulNdGpu: B must have rank >= 2")
+            raise Error("MatmulKernel: B must have rank >= 2")
 
         var m = A_shape[-2]
         var k_A = A_shape[-1]
@@ -155,7 +158,7 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
 
         if k_A != k_B:
             raise Error(
-                "MatmulNdGpu: inner dims must match, got "
+                "MatmulKernel: inner dims must match, got "
                 + String(k_A)
                 + " and "
                 + String(k_B)
@@ -177,8 +180,8 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
         var out_shape = batch_shape + Shape(m, n)
         var total_output = total_batch * m * n
 
-        var A_batch_strides_obj = A.strides[:-2]
-        var B_batch_strides_obj = B.strides[:-2]
+        var A_batch_strides_obj = A_layout.strides[:-2]
+        var B_batch_strides_obj = B_layout.strides[:-2]
 
         var A_batch_rank = A_batch_shape.rank()
         var B_batch_rank = B_batch_shape.rank()
@@ -216,7 +219,6 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
             A_offsets.append(A_off)
             B_offsets.append(B_off)
 
-        ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu[]
 
@@ -239,20 +241,18 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
                 h[b] = Int64(B_offsets[b])
 
         ref A_buf = A_device_state.device_buffer()
-        ref B_buf = B.device_state.value().device_buffer()
+        ref B_buf = B_device_state.device_buffer()
 
         var A_rank = A_shape.rank()
         var B_rank = B_shape.rank()
-        var A_row_stride = A.strides[A_rank - 2]
-        var A_col_stride = A.strides[A_rank - 1]
-        var B_row_stride = B.strides[B_rank - 2]
-        var B_col_stride = B.strides[B_rank - 1]
+        var A_row_stride = A_layout.strides[A_rank - 2]
+        var A_col_stride = A_layout.strides[A_rank - 1]
+        var B_row_stride = B_layout.strides[B_rank - 2]
+        var B_col_stride = B_layout.strides[B_rank - 1]
 
         var (grid, block) = Self.launch_config[tile_size](m, n, total_batch)
 
-        # Single template arg for compile_function
         var compiled_func = device_context.compile_function[
-            matmul_2d_tiled[Self.dtype, tile_size],
             matmul_2d_tiled[Self.dtype, tile_size],
         ]()
 
@@ -263,24 +263,22 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
             result_buffer,
             A_offsets_buf,
             B_offsets_buf,
-            m,
-            n,
-            k,
-            A_row_stride,
-            A_col_stride,
-            B_row_stride,
-            B_col_stride,
+            Int64(m),
+            Int64(n),
+            Int64(k),
+            Int64(A_row_stride),
+            Int64(A_col_stride),
+            Int64(B_row_stride),
+            Int64(B_col_stride),
             grid_dim=grid,
             block_dim=block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
-        var out = NDBuffer[Self.dtype].with_device_state(
-            device_state^, out_shape
-        )
-        return out^
+        return (Layout(out_shape), device_state^)
 
     @staticmethod
     def launch_config[

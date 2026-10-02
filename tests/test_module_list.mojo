@@ -1,7 +1,6 @@
 from tenmo.tensor import Tensor
 from tenmo.net import ModuleList, Sequential, Linear, ReLU, Sigmoid
-from tenmo.shapes import Shape
-from tenmo.mnemonics import LINEAR
+from tenmo.shared.shapes import Shape
 from std.sys import has_accelerator
 from std.testing import assert_true, assert_equal, TestSuite
 
@@ -22,9 +21,7 @@ def test_append() raises:
 
 def test_extend() raises:
     var ml = ModuleList[DType.float32]()
-    ml.extend(
-        Linear[DType.float32](10, 5).into(), ReLU[DType.float32]().into()
-    )
+    ml.extend(Linear[DType.float32](10, 5).into(), ReLU[DType.float32]().into())
     assert_equal(len(ml), 2)
     assert_equal(ml.num_parameters(), 55)
 
@@ -40,7 +37,7 @@ def test_insert() raises:
 def test_module_access() raises:
     var ml = ModuleList[DType.float32]()
     ml.append(Linear[DType.float32](10, 5).into())
-    assert_equal(ml.modules[0].tag, LINEAR)
+    assert_true(ml.modules[0].layer.isa[Linear[DType.float32]]())
 
 
 def test_module_mutation() raises:
@@ -183,7 +180,10 @@ def test_for_loop_iterator() raises:
     var count = 0
     for m in it:
         count += 1
-        assert_true(m.tag >= 0)
+        assert_true(
+            m.layer.isa[Linear[DType.float32]]()
+            or m.layer.isa[ReLU[DType.float32]]()
+        )
     assert_equal(count, 2)
 
 

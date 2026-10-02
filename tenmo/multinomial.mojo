@@ -1,10 +1,15 @@
-from tenmo.tensor import Tensor
-from tenmo.ndbuffer import NDBuffer
-from tenmo.buffers import Buffer
-from tenmo.shapes import Shape
+from .tensor import Tensor
+from .ndbuffer import NDBuffer
+from .shared.buffers import Buffer
+from .shared.shapes import Shape
 from std.sys import has_accelerator
-from tenmo.kernels.multinomial_kernel import MultinomialGpuKernel
-from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
+from std.math import log
+from std.random.philox import Random as PhiloxRandom
+from std.utils.numerics import neg_inf
+from std.sys.info import num_physical_cores
+from max.algorithm import parallelize
+from .kernels.multinomial_kernel import MultinomialKernel
+from .shared.mnemonics import DEFAULT_INDEX_DTYPE
 
 
 @fieldwise_init
@@ -44,7 +49,7 @@ struct Multinomial[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:
 
         var B = 1 if rank == 1 else probs.shape()[0]
 
-        # ── GPU path ──────────────────────────────────────────────────────────
+        # GPU path
         comptime if has_accelerator():
             if p.buffer.is_on_gpu():
                 var seed_val: UInt64 = 42
@@ -58,75 +63,78 @@ struct Multinomial[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:
                 var out_shape = Shape(num_samples) if rank == 1 else Shape(
                     B, num_samples
                 )
-                var out_ndb = MultinomialGpuKernel[
+                var (out_layout, out_storage) = MultinomialKernel[
                     Self.dtype, Self.index_dtype
                 ].launch(
-                    p_log.buffer,
+                    p_log.buffer.layout(),
+                    p_log.buffer.device_state.value(),
                     out_shape,
                     num_samples,
                     seed_val,
                     replacement,
                     sync=True,
                 )
+                var out_ndb = NDBuffer[
+                    Self.index_dtype
+                ].with_layout_device_state(out_layout, out_storage)
                 return Tensor[Self.index_dtype](out_ndb^, requires_grad=False)
 
-        # ── CPU path ──────────────────────────────────────────────────────────
+        # CPU path
+        # Fused Gumbel-max sampler mirroring MultinomialKernel. One pass over
+        # (B, N) per sample with per-class Philox noise; without replacement the
+        # selected class's log-prob is zeroed to -inf (no renormalisation needed
+        # — the Gumbel-max conditional distribution handles it), and the row
+        # loop is parallelized across batch rows.
+        var p_log = p.log[track_grad=False]()
+        var plog_buf = p_log.buffer.data_buffer()
         var out_buf = Buffer[Self.index_dtype](B * num_samples)
+        var seed_val: UInt64 = 42
+        if init_seed:
+            seed_val = UInt64(init_seed.value())
 
-        for s in range(num_samples):
-            var seed: Optional[Int] = None
-            if init_seed:
-                seed = Optional[Int](init_seed.value() + s)
+        var n_threads = num_physical_cores()
 
-            var u = Tensor[Self.dtype].rand(p.shape(), init_seed=seed)
-            var g = -(u + Scalar[Self.dtype](1e-7)).log[track_grad=False]()
-            g = -g.log[track_grad=False]()
-
-            var p_log = p.log[track_grad=False]()
-            var scores = p_log + g
-            var idx = scores.argmax(-1)
-
-            if rank == 1:
-                out_buf[s] = Scalar[Self.index_dtype](idx.item())
-            else:
-                for b in range(B):
-                    out_buf[b * num_samples + s] = Scalar[Self.index_dtype](
-                        idx[b]
+        def sample_row(b: Int) {imm}:
+            var row_base = b * N
+            for s in range(num_samples):
+                var best_val = neg_inf[Self.dtype]()
+                var best_idx = 0
+                var c = 0
+                while c < N:
+                    # One Philox call feeds 4 consecutive classes (SIMD-wide).
+                    var rng = PhiloxRandom(
+                        seed=seed_val,
+                        subsequence=UInt64(b),
+                        offset=UInt64(s * N + c),
                     )
+                    var u4 = rng.step_uniform()
+                    var remaining = N - c
+                    for lane in range(4):
+                        if lane >= remaining:
+                            break
+                        var u = max(u4[lane], 1e-10)
+                        var gumbel_f32 = -log(-log(u))
+                        var gumbel = Scalar[Self.dtype](gumbel_f32)
+                        var idx = c + lane
+                        var score = plog_buf[row_base + idx] + gumbel
+                        if score > best_val:
+                            best_val = score
+                            best_idx = idx
+                    c += 4
+                out_buf[b * num_samples + s] = Scalar[Self.index_dtype](
+                    best_idx
+                )
+                if not replacement and s < num_samples - 1:
+                    plog_buf[row_base + best_idx] = neg_inf[Self.dtype]()
 
-            if s < num_samples - 1 and not replacement:
-                p = Multinomial[Self.dtype]._zero_out(p, idx, B, N, rank)
+        if B >= n_threads and B * N * num_samples >= n_threads * 32768:
+            parallelize(sample_row, B, n_threads)
+        else:
+            for b in range(B):
+                sample_row(b)
 
         var out_shape = Shape(num_samples) if rank == 1 else Shape(
             B, num_samples
         )
         var out_ndb = NDBuffer[Self.index_dtype](out_buf^, out_shape^)
         return Tensor[Self.index_dtype](out_ndb^, requires_grad=False)
-
-    @staticmethod
-    def _zero_out(
-        p: Tensor[Self.dtype],
-        idx: Tensor[Self.index_dtype],
-        B: Int,
-        N: Int,
-        rank: Int,
-    ) raises -> Tensor[Self.dtype]:
-        var mask_buf = Buffer[DType.bool](B * N)
-        if rank == 1:
-            var sel = idx.item().__int__()
-            for i in range(N):
-                mask_buf[i] = i == sel
-        else:
-            for b in range(B):
-                var sel = idx[b].__int__()
-                for i in range(N):
-                    mask_buf[b * N + i] = i == sel
-        var mask_shape = Shape(N) if rank == 1 else Shape(B, N)
-        var mask_ndb = NDBuffer[DType.bool](mask_buf^, mask_shape^)
-        var mask = Tensor[DType.bool](mask_ndb^, requires_grad=False)
-        var result = p.masked_fill[track_grad=False](
-            mask, Scalar[Self.dtype](0.0)
-        )
-        var last_axis = List[Int]()
-        last_axis.append(rank - 1)
-        return result / result.sum[track_grad=False](last_axis, keepdims=True)

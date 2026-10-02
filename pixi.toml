@@ -1,23 +1,27 @@
 [workspace]
-channels = ["https://conda.modular.com/max-nightly", "conda-forge"]
+channels = ["https://conda.modular.com/max", "conda-forge", "https://repo.prefix.dev/modular-community"]
 name = "tenmo"
 platforms = ["linux-64"]
 version = "0.1.0"
 preview = ["pixi-build"]
 
 [dependencies]
-python = ">=3.10,<3.13"
-mojo = "==1.0.0b1"
+python = ">=3.14.6,<3.15"
+mojo = "==1.1.0"
 tiktoken = "==0.12.0"
 openblas = ">=0.3.33,<0.4"
+max = ">=26.5,<=26.6"
+mbpe = ">=0.1.1,<0.2"
 [pypi-dependencies]
-mnist-datasets = ">=0.14, <0.15"
+mnist-datasets = ">=0.15, <0.16"
 pure-cifar-10 = ">=0.1.1"
 
 [feature.dev.dependencies]
 mojodoc = { git = "https://github.com/ratulb/mojodoc.git", branch = "main" }
-#bpe = { git = "https://github.com/ratulb/bpe.mojo" }
-#bpe = { path = "../bpe.mojo" }
+
+[feature.dev.pypi-dependencies]
+pytest = ">=9.1.1"
+pytest-cov = ">=7.1.0"
 
 [environments]
 default = { features = ["dev"], solve-group = "default" }
@@ -26,3 +30,33 @@ dev     = { features = ["dev"], solve-group = "default" }
 [tasks]
 docs = "mojodoc ./tenmo --open"
 docs-build = "mojodoc ./tenmo --out-dir target/doc --base-url /tenmo/"
+# Import-DAG guardrails (scripts/check_import_dag.py).
+#   check         — full-library acyclicity; RED today (documented SCC: the
+#                    tensor<->common_utils<->gradbox<->ndbuffer interlock + the
+#                    forwards hub + nlp<->tokenizer). Turns green when the
+#                    the host-side launch-buffer reuse work
+#                    restructure breaks the cycle.
+#   check_layers  — Layer-0 purity: tenmo/shared and tenmo/gpu must not import
+#                    upward. Also red until Phase 1 (shared/ currently imports
+#                    common_utils); mnemonics is the first clean rootset.
+check = "python3 scripts/check_import_dag.py"
+check_layers = "python3 scripts/check_import_dag.py --rootset tenmo.shared --rootset tenmo.gpu --rootset-imports tenmo.gpu:tenmo.shared"
+
+# LayerTrait probe suite (scripts/check_trait_probes.py).
+#   check_probes     — positive probes only (~2 min, no tenmo imports)
+#   check_probes_all — + the negative probes, which assert the compiler
+#                      REJECTS bad dtype declarations. Add --no-tenmo to skip
+#                      the one that imports tenmo (~5 min library compile).
+# The runner is withheld alongside the probe files it drives, so guard the
+# tasks: a trimmed distribution gets a clear notice instead of a traceback.
+check_probes = "_r=scripts/check_trait_probes.py; test -f $_r && python3 $_r || echo 'check_probes: probe runner not in this distribution (skipped)'"
+check_probes_all = "_r=scripts/check_trait_probes.py; test -f $_r && python3 $_r --all --no-tenmo || echo 'check_probes_all: probe runner not in this distribution (skipped)'"
+
+# LayerTrait dtype conformance (scripts/check_layer_dtypes.py). Catches the
+# two defects the COMPILER cannot, since it pins a layer's signature but not
+# its declared-vs-intended semantics:
+#   - the float-carrier convention adopted without being declared
+#   - a struct dtype param that is never read (inert, like Linear's old InT)
+# Currently reports clean: Linear's dead InT was collapsed into Linear[dtype,
+# mode], and the one remaining float-carrier layer (Embedding) is declared.
+check_layer_dtypes = "python3 scripts/check_layer_dtypes.py"

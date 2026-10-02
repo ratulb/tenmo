@@ -1,118 +1,73 @@
-from tenmo.shapes import Shape
-from tenmo.mnemonics import *
-from tenmo.validators import Validator
-from tenmo.tensor import Tensor
-from tenmo.intarray import IntArray
-from tenmo.ndbuffer import NDBuffer
-from tenmo.broadcasthelper import ShapeBroadcaster
-from tenmo.strides import Strides
-from std.sys import simd_width_of, size_of, has_accelerator
-from std.random import seed, random_float64
-from tenmo.buffers import Buffer
-from tenmo.indexhelper import IndexIterator
-from tenmo.filler import Filler
-from tenmo.sum_mean_reduction import SumMeanReduction
-from tenmo.common_utils import Idx, panic, print_buffer
-from tenmo.device import Device, CPU, GPU
-from std.memory import UnsafePointer, alloc, memcpy
-from std.atomic import Atomic, Ordering, fence
+from .shared.shapes import Shape
+from .shared.mnemonics import *
+from .validators import Validator
+from .tensor import Tensor
+from .shared.intarray import IntArray
+from .ndbuffer import NDBuffer, NDBufferLite, print_buffer
+from .shared.broadcasthelper import ShapeBroadcaster
+from .shared.strides import Strides
+from std.sys import simd_width_of, has_accelerator
+from .shared.indexhelper import IndexIterator
+from .shared.constants import CloseTol
+from .filler import Filler
+from .sum_mean_reduction import SumMeanReduction
+from .shared.indexhelper import Idx
+from .shared.panic import panic
+from .gpu.device import Device, CPU, GPU
+from std.memory import Pointer
 
 
 struct Gradbox[dtype: DType](
-    ImplicitlyCopyable & Movable & Sized & Writable & Equatable & Absable
+    ImplicitlyCopyable & Sized & Writable & Equatable & Absable
 ):
-    """Refcounted handle to gradient storage. Buffer-like lifecycle.
+    """Refcounted-handle wrapper over an NDBuffer.
+    The gradient storage lives in the NDBuffer, whose Buffer refcount
+    provides the shared lifecycle.
 
-    Single combined heap allocation: [Atomic | NDBuffer].
-    Copies share the allocation via atomic refcount bump.
+    The NDBuffer descriptor itself (Shape/Strides/offset) is kept behind a
+    shared ``NDBufferLite`` handle so copying a Gradbox is an O(1) refcount
+    bump instead of a per-copy deep copy of the descriptor (which allocates
+    Shape/Strides dims arrays). ``Gradbox(shape)`` allocates own storage
+    (shared-from-birth). ``var b = a`` is an alias operator — the copy shares
+    the same gradient storage (Buffer refcount bump); ``clone()`` materialises
+    an independent deep copy.
     """
 
-    var _ndb_ptr: Optional[UnsafePointer[NDBuffer[Self.dtype], MutAnyOrigin]]
-    var _refcount: Optional[UnsafePointer[Atomic[DType.uint64], MutAnyOrigin]]
+    var handle: NDBufferLite[Self.dtype]
 
     def __init__(out self, shape: Shape):
-        """Initialize with given shape. Combined allocation: [Atomic | NDBuffer].
+        """Initialize with given shape (fresh owned, shared-from-birth storage).
         """
-        var ref_size = size_of[Atomic[DType.uint64]]()
-        var ndb_size = size_of[NDBuffer[Self.dtype]]()
-        var alloc_base = alloc[UInt8](ref_size + ndb_size)
-        var ref_ptr = alloc_base.bitcast[Atomic[DType.uint64]]()
-        ref_ptr[] = Atomic[DType.uint64](1)
-        var ndb_ptr = (alloc_base + ref_size).bitcast[NDBuffer[Self.dtype]]()
-        ndb_ptr.init_pointee_move(NDBuffer[Self.dtype].shared(shape))
-        self._ndb_ptr = ndb_ptr
-        self._refcount = ref_ptr
+        self.handle = NDBufferLite[Self.dtype](NDBuffer[Self.dtype](shape))
 
     def __init__(out self, var buffer: NDBuffer[Self.dtype]):
-        """Initialize from an existing NDBuffer."""
-        var ref_size = size_of[Atomic[DType.uint64]]()
-        var ndb_size = size_of[NDBuffer[Self.dtype]]()
-        var alloc_base = alloc[UInt8](ref_size + ndb_size)
-        var ref_ptr = alloc_base.bitcast[Atomic[DType.uint64]]()
-        ref_ptr[] = Atomic[DType.uint64](1)
-        var ndb_ptr = (alloc_base + ref_size).bitcast[NDBuffer[Self.dtype]]()
-        comptime if has_accelerator():
-            if buffer.is_on_gpu():
-                ndb_ptr.init_pointee_copy(buffer)
-            else:
-                if buffer.is_shared():
-                    ndb_ptr.init_pointee_copy(buffer)
-                else:
-                    var shape = buffer.shape
-                    var strides = buffer.strides
-                    var offset = buffer.offset
-                    ndb_ptr.init_pointee_copy(
-                        buffer.share(shape, strides, offset)
-                    )
-        else:
-            if buffer.is_shared():
-                ndb_ptr.init_pointee_copy(buffer)
-            else:
-                var shape = buffer.shape
-                var strides = buffer.strides
-                var offset = buffer.offset
-                ndb_ptr.init_pointee_copy(buffer.share(shape, strides, offset))
-        self._ndb_ptr = ndb_ptr
-        self._refcount = ref_ptr
+        """Initialize from an existing NDBuffer (adopt ownership/move)."""
+        self.handle = NDBufferLite[Self.dtype](buffer^)
 
-    def __init__(out self, *, deinit take: Self):
+    def __init__(out self, *, deinit move: Self):
         """Move constructor — transfer ownership without copying."""
-        self._ndb_ptr = take._ndb_ptr
-        self._refcount = take._refcount
-        _ = take._ndb_ptr = {}
-        _ = take._refcount = {}
+        self.handle = move.handle^
 
     def __init__(out self, *, copy: Self):
-        """Copy constructor — bump refcount."""
-        self._ndb_ptr = copy._ndb_ptr
-        self._refcount = copy._refcount
-        if copy._refcount:
-            _ = copy._refcount.unsafe_value()[].fetch_add[
-                ordering=Ordering.RELAXED
-            ](1)
+        """Copy constructor — share storage (O(1) NDBufferLite refcount bump).
+        """
+        self.handle = copy.handle
 
-    def __del__(deinit self):
-        """Destroy — decrement refcount, free if last."""
-        if self._refcount == None or self._ndb_ptr == None:
-            return
-        if (
-            self._refcount.unsafe_value()[].fetch_sub[
-                ordering=Ordering.RELEASE
-            ](1)
-            != 1
-        ):
-            return
-        fence[ordering=Ordering.ACQUIRE]()
-        self._ndb_ptr.unsafe_value().destroy_pointee()
-        var alloc_start = self._refcount.unsafe_value().bitcast[UInt8]()
-        alloc_start.free()
-        _ = self._refcount = {}
-        _ = self._ndb_ptr = {}
+    def clone(self) -> Gradbox[Self.dtype]:
+        """Independent deep copy: fresh refcount and fresh storage.
+
+        Unlike copy-init (``var gb2 = gb1``), which aliases the same gradient
+        storage, ``clone`` materialises fresh, independent storage — later
+        gradient accumulation through one never affects the other. GPU storage
+        is cloned as an independent device buffer.
+        """
+        var buf_clone = self.buffer().clone()
+        return Gradbox[Self.dtype](buf_clone^)
 
     @always_inline
-    def buffer(ref self) -> ref[self] NDBuffer[Self.dtype]:
+    def buffer(ref self) -> ref[self.handle.value()] NDBuffer[Self.dtype]:
         """Get reference to the underlying NDBuffer."""
-        return self._ndb_ptr.unsafe_value()[]
+        return self.handle.value()
 
     @always_inline
     def as_tensor(
@@ -178,9 +133,8 @@ struct Gradbox[dtype: DType](
         Returns:
             A new contiguous Gradbox with transposed axes.
         """
-        var owned_buffer = self.buffer().copy()
-        var nd_buffer = owned_buffer.transpose(axes, shared=True)
-        return Gradbox[Self.dtype](nd_buffer^)
+        var view = self.buffer().transpose(axes)
+        return Gradbox[Self.dtype](view.contiguous(owned=True))
 
     def __abs__(self) -> Gradbox[Self.dtype]:
         """Compute element-wise absolute value.
@@ -221,9 +175,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             A Gradbox containing the norm(s).
-
-        Raises:
-            Panic if p is not 2.0.
         """
         if p == 2.0:
             # L2 norm: sqrt(sum(x²))
@@ -242,12 +193,12 @@ struct Gradbox[dtype: DType](
         """Create a 1D Gradbox with evenly spaced values.
 
         Args:
-            *args: Start, stop, and optionally step values.
+            args: Start, stop, and optionally step values.
 
         Returns:
             A 1D Gradbox with values from start to stop.
         """
-        nd_buffer = NDBuffer[Self.dtype].arange(args)
+        var nd_buffer = NDBuffer[Self.dtype].arange(args)
         return Gradbox[Self.dtype](nd_buffer^)
 
     def flatten(
@@ -262,7 +213,7 @@ struct Gradbox[dtype: DType](
         Returns:
             A flattened Gradbox.
         """
-        flattened_buffer = self.buffer().flatten(start_dim, end_dim)
+        var flattened_buffer = self.buffer().flatten(start_dim, end_dim)
         return Gradbox[Self.dtype](flattened_buffer^)
 
     def squeeze(self, axes: IntArray) -> Gradbox[Self.dtype]:
@@ -272,11 +223,10 @@ struct Gradbox[dtype: DType](
             axes: The axes to squeeze.
 
         Returns:
-            A new Gradbox with squeezed dimensions.
+            A new contiguous Gradbox with squeezed dimensions.
         """
-        var buffer = self.buffer().copy()
-        var ndb = buffer.squeeze(axes, shared=False)
-        return Gradbox[Self.dtype](ndb^)
+        var view = self.buffer().squeeze(axes)
+        return Gradbox[Self.dtype](view.contiguous(owned=True))
 
     def squeeze(self, axes: List[Int] = []) -> Gradbox[Self.dtype]:
         """Remove dimensions of size 1.
@@ -296,11 +246,10 @@ struct Gradbox[dtype: DType](
             axes: The axes to unsqueeze.
 
         Returns:
-            A new Gradbox with unsqueezed dimensions.
+            A new contiguous Gradbox with unsqueezed dimensions.
         """
-        var buffer = self.buffer().copy()
-        var ndb = buffer.unsqueeze(axes, shared=False)
-        return Gradbox[Self.dtype](ndb^)
+        var view = self.buffer().unsqueeze(axes)
+        return Gradbox[Self.dtype](view.contiguous(owned=True))
 
     def unsqueeze(self, axes: List[Int]) -> Gradbox[Self.dtype]:
         """Add dimensions of size 1.
@@ -320,11 +269,10 @@ struct Gradbox[dtype: DType](
             axes: The new order of axes.
 
         Returns:
-            A new owned contiguous Gradbox with permuted axes.
+            A new contiguous Gradbox with permuted axes.
         """
-        var self_buffer = self.buffer().copy()
-        var result_ndb = self_buffer.permute(axes, shared=False)
-        return Gradbox[Self.dtype](result_ndb^)
+        var view = self.buffer().permute(axes)
+        return Gradbox[Self.dtype](view.contiguous(owned=True))
 
     @staticmethod
     @always_inline
@@ -364,14 +312,17 @@ struct Gradbox[dtype: DType](
         )
 
     @staticmethod
+    @always_inline
     def rand(
         shape: Shape,
         min: Scalar[Self.dtype] = 0,
         max: Scalar[Self.dtype] = 1,
         init_seed: Optional[Int] = None,
-        requires_grad: Bool = False,
     ) -> Gradbox[Self.dtype]:
-        """Create a Gradbox with uniform random values.
+        """Create a Gradbox with uniform random values in [min, max).
+
+        CPU-only (gradboxes are gradient storage; device-side RNG belongs to
+        ``Tensor.rand``). Delegates to ``NDBuffer.rand``.
 
         Args:
             shape: The tensor shape.
@@ -382,27 +333,11 @@ struct Gradbox[dtype: DType](
         Returns:
             A new Gradbox with random values in [min, max).
         """
-        if init_seed:
-            seed(init_seed.value())
-        else:
-            seed()
-        numels = shape.num_elements()
-        buffer = Buffer[Self.dtype](numels)
-        for i in range(numels):
-            buffer[i] = random_float64(
-                min.cast[Self.dtype.float64](), max.cast[DType.float64]()
-            ).cast[Self.dtype]()
-
-        return Gradbox[Self.dtype](NDBuffer[Self.dtype](buffer^, shape))
-
-    @always_inline
-    def is_shared(self) -> Bool:
-        """Check if the underlying buffer is shared.
-
-        Returns:
-            True if the buffer is shared.
-        """
-        return self.buffer().is_shared()
+        return Gradbox[Self.dtype](
+            NDBuffer[Self.dtype].rand(
+                shape, min=min, max=max, init_seed=init_seed
+            )
+        )
 
     @always_inline
     def sum(
@@ -453,7 +388,6 @@ struct Gradbox[dtype: DType](
         """Sum over broadcasted axes to match target shape.
 
         Args:
-            extended_grad: The gradient that was broadcasted.
             target_shape: The shape to expand to.
 
         Returns:
@@ -472,9 +406,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             A new Gradbox with the target shape.
-
-        Raises:
-            Panic if the shapes are not broadcastable.
         """
         if not ShapeBroadcaster.broadcastable(self.shape(), target_shape):
             panic(
@@ -485,14 +416,16 @@ struct Gradbox[dtype: DType](
             )
 
         var broadcasted_buffer = self.buffer().broadcast_to(target_shape)
-        var out = Gradbox[Self.dtype](broadcasted_buffer^)
-        return out^
+        comptime if has_accelerator():
+            if broadcasted_buffer.is_on_gpu():
+                return Gradbox[Self.dtype](broadcasted_buffer^)
+        return Gradbox[Self.dtype](broadcasted_buffer.contiguous(owned=True))
 
-    def __getitem__(mut self, *indices: Idx) -> Gradbox[Self.dtype]:
+    def __getitem__(self, *indices: Idx) -> Gradbox[Self.dtype]:
         """Index the Gradbox with Idx objects (integers or slices).
 
         Args:
-            *indices: One index per axis — either an integer or a Slice.
+            indices: One index per axis — either an integer or a Slice.
 
         Returns:
             A new Gradbox view over the indexed region.
@@ -532,7 +465,7 @@ struct Gradbox[dtype: DType](
             strides=slice_strides^,
             offset=abs_offset,
         )
-        # ── Propagate device_state for GPU gradboxes ──────────────────────────
+        # Propagate device_state for GPU gradboxes
         # On GPU the CPU Buffer is empty — the actual data lives in DeviceState.
         # The sliced view must share the same DeviceState so get/set route
         # correctly to GPU memory using abs_offset and slice_strides.
@@ -550,9 +483,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             The scalar value at the specified coordinates.
-
-        Raises:
-            Panic if called on a scalar Gradbox with non-empty indices.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -571,9 +501,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             The scalar value at the specified coordinates.
-
-        Raises:
-            Panic if called on a scalar Gradbox with non-empty indices.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -588,13 +515,10 @@ struct Gradbox[dtype: DType](
         """Index the Gradbox with variadic integer indices.
 
         Args:
-            *indices: One index per axis.
+            indices: One index per axis.
 
         Returns:
             The scalar value at the specified coordinates.
-
-        Raises:
-            Panic if called on a scalar Gradbox.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -611,9 +535,6 @@ struct Gradbox[dtype: DType](
         Args:
             indices: List of axis indices.
             value: The value to write.
-
-        Raises:
-            Panic if called on a scalar Gradbox with non-empty indices.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -630,9 +551,6 @@ struct Gradbox[dtype: DType](
         Args:
             indices: IntArray of axis indices.
             value: The value to write.
-
-        Raises:
-            Panic if called on a scalar Gradbox with non-empty indices.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -646,11 +564,8 @@ struct Gradbox[dtype: DType](
         """Set a scalar value at given coordinates.
 
         Args:
-            *indices: One index per axis.
+            indices: One index per axis.
             value: The value to write.
-
-        Raises:
-            Panic if called on a scalar Gradbox with non-empty indices.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -690,9 +605,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             The scalar value.
-
-        Raises:
-            Panic if the Gradbox is not a scalar.
         """
         return self.buffer().item()
 
@@ -739,7 +651,7 @@ struct Gradbox[dtype: DType](
         Returns:
             True if stored in row-major order without gaps.
         """
-        return self.strides().is_contiguous(self.shape())
+        return self.buffer().is_contiguous()
 
     @always_inline
     def rank(self) -> Int:
@@ -777,25 +689,16 @@ struct Gradbox[dtype: DType](
         """
         return self.buffer().strides
 
-    def data_buffer(ref self) -> ref[self] NDBuffer[Self.dtype]:
-        """Get the underlying NDBuffer.
-
-        Returns:
-            Reference to the NDBuffer.
-        """
-        return self.buffer()
-
     def get(self, index: Int) -> Scalar[Self.dtype]:
-        """Get element at a flat index with bounds checking.
+        """Get element at a logical flat index with bounds checking.
+
+        C-order over this view: `get(i)` is the i-th logical element.
 
         Args:
-            index: Flat (linear) index into the gradbox's memory.
+            index: Logical flat index (< `numels()` after wrapping).
 
         Returns:
             The scalar value at that index.
-
-        Raises:
-            Panic if index is out of bounds.
         """
         return self.buffer().get(index)
 
@@ -820,9 +723,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             True if all elements are equal.
-
-        Raises:
-            Panic if shapes don't match.
         """
         if self.shape() != other.shape():
             panic(
@@ -841,9 +741,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             True if any elements differ.
-
-        Raises:
-            Panic if shapes don't match.
         """
         if self.shape() != other.shape():
             panic(
@@ -854,9 +751,7 @@ struct Gradbox[dtype: DType](
             )
         return self.buffer().compare[NotEqual](other.buffer()).buffer.all_true()
 
-    def to_dtype[
-        NewType: DType
-    ](self) -> Gradbox[NewType]:
+    def to_dtype[NewType: DType](self) -> Gradbox[NewType]:
         """Convert Gradbox to a different data type.
 
         Returns:
@@ -943,8 +838,8 @@ struct Gradbox[dtype: DType](
         Returns:
             A string showing the Gradbox type, shape, dtype, and device.
         """
-        rank = self.rank()
-        s = String("[")
+        var rank = self.rank()
+        var s = String("[")
         if rank == 1:
             s += "1D Gradbox"
         elif rank == 2:
@@ -959,7 +854,6 @@ struct Gradbox[dtype: DType](
             s += "Gradbox"
         s += String(self.shape())
         s += ", Type: " + String(Self.dtype)
-        s += ", Shared : " + String(self.is_shared())
         s += ", Strides : " + String(self.strides())
         s += ", Offset : " + String(self.offset())
         s += (
@@ -1010,7 +904,7 @@ struct Gradbox[dtype: DType](
     @always_inline
     def zero_grad(self):
         """Zero out all gradients."""
-        ref ndb = self._ndb_ptr.unsafe_value()[]
+        ref ndb = self.buffer()
         comptime if has_accelerator():
             if ndb.is_on_gpu():
                 ndb.zero()
@@ -1022,7 +916,7 @@ struct Gradbox[dtype: DType](
 
         Args:
             value: The value to write.
-            *indices: Idx objects defining the region.
+            indices: Idx objects defining the region.
         """
         Filler[Self.dtype].fill(self.buffer(), value, indices)
 
@@ -1031,7 +925,7 @@ struct Gradbox[dtype: DType](
 
         Args:
             tensor: The tensor to copy from.
-            *indices: Idx objects defining the destination region.
+            indices: Idx objects defining the destination region.
         """
         Filler[Self.dtype].fill(self.buffer(), tensor.buffer, indices)
 
@@ -1040,7 +934,7 @@ struct Gradbox[dtype: DType](
 
         Args:
             gradbox: The Gradbox to copy from.
-            *indices: Idx objects defining the destination region.
+            indices: Idx objects defining the destination region.
         """
         Filler[Self.dtype].fill(self.buffer(), gradbox.buffer(), indices)
 
@@ -1174,9 +1068,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             A new Gradbox with the result.
-
-        Raises:
-            Panic if scalar is zero.
         """
         if scalar == Scalar[Self.dtype](0):
             panic("Gradbox → __truediv__(scalar): can not divide by zero")
@@ -1233,7 +1124,6 @@ struct Gradbox[dtype: DType](
         """Matrix multiplication.
 
         Args:
-            A: Left operand.
             B: Right operand.
 
         Returns:
@@ -1382,21 +1272,17 @@ struct Gradbox[dtype: DType](
         self.buffer().inplace_ops[Divide](incoming.buffer(), sync=sync)
 
     def all_close[
-        rtol: Scalar[Self.dtype] = 1e-5,
-        atol: Scalar[Self.dtype] = 1e-8,
+        rtol: Scalar[Self.dtype] = Scalar[Self.dtype](1e-5),
+        atol: Scalar[Self.dtype] = Scalar[Self.dtype](1e-8) if Self.dtype
+        == DType.float64 else Scalar[Self.dtype](1e-5),
     ](self, other: Self) -> Bool:
         """Check if all elements are close to another Gradbox.
 
         Args:
-            rtol: Relative tolerance.
-            atol: Absolute tolerance.
             other: The Gradbox to compare with.
 
         Returns:
             True if all elements are within tolerance.
-
-        Raises:
-            Panic if shapes differ or dtype is not floating point.
         """
         comptime assert (
             Self.dtype.is_floating_point()
@@ -1412,21 +1298,16 @@ struct Gradbox[dtype: DType](
         return self.buffer().all_close[rtol=rtol, atol=atol](other.buffer())
 
     def all_close[
-        rtol: Scalar[Self.dtype] = 1e-5,
-        atol: Scalar[Self.dtype] = 1e-8,
+        rtol: Scalar[Self.dtype] = CloseTol[Self.dtype].rtol(),
+        atol: Scalar[Self.dtype] = CloseTol[Self.dtype].atol(),
     ](self, other: Tensor[Self.dtype]) -> Bool:
         """Check if all elements are close to a Tensor.
 
         Args:
-            rtol: Relative tolerance.
-            atol: Absolute tolerance.
             other: The Tensor to compare with.
 
         Returns:
             True if all elements are within tolerance.
-
-        Raises:
-            Panic if shapes differ or dtype is not floating point.
         """
         comptime assert (
             Self.dtype.is_floating_point()
@@ -1447,9 +1328,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             A scalar Gradbox.
-
-        Raises:
-            Panic if the Gradbox has more than one element.
         """
         if self.numels() != 1:
             panic(
@@ -1469,10 +1347,16 @@ struct Gradbox[dtype: DType](
             validated: If True, skip validation (caller guarantees validity).
 
         Returns:
-            A new Gradbox with the reshaped buffer.
+            A new contiguous Gradbox with the reshaped buffer.
+
+            NOTE: reshape forwards NDBuffer.reshape as-is — a view when the
+            source is contiguous (torch-like write-through; see
+            test_gradbox_reshape), freshly materialised otherwise (GPU and
+            non-contiguous / unshared sources). This is the documented
+            exception to the Gradbox independence rule. Need a decoupled
+            buffer? reshape then clone().
         """
         var nd_buffer = self.buffer().reshape(new_shape, validated)
-
         return Gradbox[Self.dtype](nd_buffer^)
 
     def __eq__(self, tensor: Tensor[Self.dtype]) -> Bool:
@@ -1483,9 +1367,6 @@ struct Gradbox[dtype: DType](
 
         Returns:
             True if all elements are equal.
-
-        Raises:
-            Panic if shapes differ.
         """
         if self.shape() != tensor.shape():
             panic(
@@ -1508,7 +1389,7 @@ struct Gradbox[dtype: DType](
             String(self),
             end="\n",
         )
-        empty = List[Int]()
+        var empty = List[Int]()
         print_buffer(
             self.buffer(),
             empty,
@@ -1517,7 +1398,7 @@ struct Gradbox[dtype: DType](
             num_last=num_last,
         )
 
-    def data_ptr(ref self) -> UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]:
+    def data_ptr(ref self) -> Pointer[Scalar[Self.dtype], MutAnyOrigin]:
         """Get a pointer to the data.
 
         Returns:

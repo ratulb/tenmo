@@ -1,22 +1,25 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor
-from .intarray import IntArray
-from .backpropagation import BackwardFnArg, BACKWARD_SQUEEZE
+from .shared.mnemonics import AddTensor
+from .shared.intarray import IntArray
+from .backpropagation import BackwardFn, BackwardFnType
+
 from .gradbox import Gradbox
-from .shapes import Shape
-from .common_utils import panic
+from .shared.shapes import Shape
 from .ancestry import Ancestor
 
 
 @fieldwise_init
-struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct SqueezeBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
-        ref ancestor = output.ancestry().get(0)
+        var ancestor = output.ancestry().get(0)
         ref gradbox = output.gradients()
         var ancestor_gradbox: Gradbox[Self.dtype]
         var original_shape = ancestor.shape()
@@ -25,13 +28,13 @@ struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 ancestor_gradbox = Gradbox[Self.dtype].full(
                     original_shape,
                     gradbox.item(),
-                    
                     device=gradbox.device(),
                 )
             else:
                 ancestor_gradbox = gradbox.reshape(original_shape)
             ancestor.update_grad(ancestor_gradbox^, AddTensor, None)
         parent_ids.append(ancestor._id)
+        # View conduit: always cleared.
         gradbox.zero_grad()
 
 
@@ -42,17 +45,22 @@ struct Squeeze[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def forward[
         track_grad: Bool = True
     ](
-        mut tensor: Tensor[Self.dtype],
+        tensor: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var shape = tensor.shape()
-        if shape.count_axes_of_size(1) == 0:
+        # Honor an explicit requires_grad override even on these no-op
+        # paths: a disagreeing override needs the normal wiring below
+        # (tracked view + backward), not these raw aliases. The alias
+        # itself is intentional identity (shared storage/_id, zero-copy).
+        var tracked = requires_grad.or_else(tensor.requires_grad)
+        if shape.count_axes_of_size(1) == 0 and tracked == tensor.requires_grad:
             return tensor
 
-        var squeezed_ndb = tensor.buffer.squeeze(axes, shared=True)
-        if squeezed_ndb.shape == tensor.buffer.shape:
+        var squeezed_ndb = tensor.buffer.squeeze(axes)
+        if squeezed_ndb.shape == tensor.buffer.shape and tracked == tensor.requires_grad:
             return tensor
 
         var out = Tensor[Self.dtype](squeezed_ndb^, requires_grad=False)
@@ -61,10 +69,10 @@ struct Squeeze[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
-                    BACKWARD_SQUEEZE
+                var backwardFn = BackwardFn.null_arg[Self.dtype](
+                    SqueezeBackward[Self.dtype]()
                 )
-                backwardFnArg.needs_parent_data = True
-                out.add_ancestry(backwardFnArg^, tensor)
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, tensor)
 
         return out^

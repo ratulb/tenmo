@@ -1,7 +1,7 @@
 from std.testing import assert_true, TestSuite
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from tenmo.tensor import Tensor
-from tenmo.common_utils import *
+from tenmo.shared.indexhelper import i, s
 
 comptime dtype = DType.float32
 

@@ -1,29 +1,30 @@
 from .tensor import Tensor
-from .backpropagation import BackwardFnArg, BACKWARD_VECTOR_MATMUL
-from .mnemonics import AddTensor
+from .backpropagation import BackwardFn, BackwardFnType
+
+from .shared.mnemonics import AddTensor
 from .gradbox import Gradbox
-from .broadcasthelper import ShapeBroadcaster
-from .common_utils import panic
+from .shared.broadcasthelper import ShapeBroadcaster
+from .shared.panic import panic
 from std.sys import simd_width_of, has_accelerator
 from .ndbuffer import NDBuffer
-from tenmo.kernels.vectormatrix_kernel import VectorMatmulNdGpu
+from .kernels.vectormatrix_kernel import VectorMatmulKernel
 from .ancestry import Ancestor
 
 
 @fieldwise_init
 struct VectorMatmulNdBackward[dtype: DType](
-    ImplicitlyCopyable, RegisterPassable
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
 ):
+    comptime datatype = Self.dtype
+
     @staticmethod
-    def backward[
-        simdwidth: Int = simd_width_of[Self.dtype]()
-    ](
+    def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
+        comptime simdwidth = simd_width_of[Self.dtype]()
         ref grad_out = output.gradients()
-        ref v_ref = output.ancestry().get(0)
+        var v_ref = output.ancestry().get(0)
         var v = Tensor[Self.dtype](
             v_ref.buffer(), requires_grad=v_ref.requires_grad
         )
@@ -53,8 +54,9 @@ struct VectorMatmulNdBackward[dtype: DType](
             var grad_out_stride = grad_out.strides()[-1]
             var grad_out_data = grad_out.data_ptr()
 
-            var M_stride0 = M.buffer.strides[-2]
-            var M_stride1 = M.buffer.strides[-1]
+            var M_strides = M.buffer.strides
+            var M_stride0 = M_strides[-2]
+            var M_stride1 = M_strides[-1]
             var M_offset = M.buffer.offset
             var M_data = M.data_ptr()
 
@@ -77,7 +79,7 @@ struct VectorMatmulNdBackward[dtype: DType](
 
                 var M_base = M_offset
                 for i in range(len(M_indices)):
-                    M_base += M_indices[i] * M.buffer.strides[i]
+                    M_base += M_indices[i] * M_strides[i]
 
                 var grad_v_base = grad_v_offset
                 for i in range(len(v_indices)):
@@ -89,15 +91,15 @@ struct VectorMatmulNdBackward[dtype: DType](
 
                     for j in range(n):
                         var grad_val = grad_out_data[
-                            grad_out_base + j * grad_out_stride
+                            unsafe_offset=grad_out_base + j * grad_out_stride
                         ]
                         var m_val = M_data[
-                            M_base + i * M_stride0 + j * M_stride1
+                            unsafe_offset=M_base + i * M_stride0 + j * M_stride1
                         ]
                         accumulator += grad_val * m_val
 
                     var grad_v_addr = grad_v_base + i * grad_v_stride
-                    grad_v_data[grad_v_addr] += accumulator
+                    grad_v_data[unsafe_offset=grad_v_addr] += accumulator
 
             v_ref.update_grad(grad_v^, AddTensor, None)
             parent_ids.append(v_ref._id)
@@ -107,7 +109,8 @@ struct VectorMatmulNdBackward[dtype: DType](
             var grad_M = Gradbox[Self.dtype].zeros(M_shape)
 
             # Hoist metadata
-            var v_stride = v.buffer.strides[-1]
+            var v_strides = v.buffer.strides
+            var v_stride = v_strides[-1]
             var v_offset = v.buffer.offset
             var v_data = v.data_ptr()
 
@@ -132,7 +135,7 @@ struct VectorMatmulNdBackward[dtype: DType](
 
                 var v_base = v_offset
                 for i in range(len(v_indices)):
-                    v_base += v_indices[i] * v.buffer.strides[i]
+                    v_base += v_indices[i] * v_strides[i]
 
                 var grad_out_base = 0
                 for i in range(len(indices)):
@@ -150,7 +153,7 @@ struct VectorMatmulNdBackward[dtype: DType](
                     var remainder = n % simd_width
 
                     for i in range(k):
-                        var v_val = v_data[v_base + i * v_stride]
+                        var v_val = v_data[unsafe_offset=v_base + i * v_stride]
                         var grad_M_row_base = grad_M_base + i * grad_M_stride0
 
                         # Process full SIMD vectors
@@ -159,17 +162,17 @@ struct VectorMatmulNdBackward[dtype: DType](
                             var grad_out_addr = (
                                 grad_out_base + j * grad_out_stride
                             )
-                            var grad_out_vec = grad_out_data.load[
+                            var grad_out_vec = grad_out_data.unsafe_load[
                                 width=simd_width
                             ](grad_out_addr)
 
                             var grad_M_addr = (
                                 grad_M_row_base + j * grad_M_stride1
                             )
-                            var current = grad_M_data.load[width=simd_width](
-                                grad_M_addr
-                            )
-                            grad_M_data.store[width=simd_width](
+                            var current = grad_M_data.unsafe_load[
+                                width=simd_width
+                            ](grad_M_addr)
+                            grad_M_data.unsafe_store[width=simd_width](
                                 grad_M_addr, current + v_val * grad_out_vec
                             )
 
@@ -178,32 +181,20 @@ struct VectorMatmulNdBackward[dtype: DType](
                             var j = num_full_vectors * simd_width
                             for offset in range(remainder):
                                 var grad_out_val = grad_out_data[
-                                    grad_out_base
+                                    unsafe_offset=grad_out_base
                                     + (j + offset) * grad_out_stride
                                 ]
                                 var grad_M_addr = (
                                     grad_M_row_base
                                     + (j + offset) * grad_M_stride1
                                 )
-                                grad_M_data[grad_M_addr] += v_val * grad_out_val
-                else:
-                    for i in range(k):
-                        var v_val = v_data[v_base + i * v_stride]
-                        for j in range(n):
-                            var grad_out_val = grad_out_data[
-                                grad_out_base + j * grad_out_stride
-                            ]
-                            var grad_M_addr = (
-                                grad_M_base
-                                + i * grad_M_stride0
-                                + j * grad_M_stride1
-                            )
-                            grad_M_data[grad_M_addr] += v_val * grad_out_val
+                                grad_M_data[unsafe_offset=grad_M_addr] += (
+                                    v_val * grad_out_val
+                                )
 
             M_ref.update_grad(grad_M^, AddTensor, None)
             parent_ids.append(M_ref._id)
-        if not retain_graph:
-            grad_out.zero_grad()
+        grad_out.zero_grad()
 
 
 @fieldwise_init
@@ -239,23 +230,24 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var result = NDBuffer[Self.dtype].zeros(out_shape)
 
         # Hoist metadata for vector and matrix
-        var v_stride = v.strides[-1]
+        var v_strides = v.strides
+        var v_stride = v_strides[-1]
         var v_offset = v.offset
         var v_data = v.data_ptr()
 
-        var M_stride0 = M.strides[-2]
-        var M_stride1 = M.strides[-1]
+        var M_strides = M.strides
+        var M_stride0 = M_strides[-2]
+        var M_stride1 = M_strides[-1]
         var M_offset = M.offset
         var M_data = M.data_ptr()
         var M_contiguous = M.is_contiguous()
 
-        var result_stride = result.strides[-1]
+        var result_strides = result.strides
+        var result_stride = result_strides[-1]
         var result_offset = result.offset
-        var result_data = (
-            result.data_ptr()
-            .unsafe_mut_cast[True]()
-            .unsafe_origin_cast[MutAnyOrigin]()
-        )
+        # Plain data_ptr: NDBuffer already yields a mutable-origin pointer;
+        # the old unsafe_mut_cast/unsafe_origin_cast chain was a no-op.
+        var result_data = result.data_ptr()
 
         # Process each batch element
         for indices in batch_shape:
@@ -269,15 +261,15 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             # Calculate base offsets for this batch
             var v_base = v_offset
             for i in range(len(v_indices)):
-                v_base += v_indices[i] * v.strides[i]
+                v_base += v_indices[i] * v_strides[i]
 
             var M_base = M_offset
             for i in range(len(M_indices)):
-                M_base += M_indices[i] * M.strides[i]
+                M_base += M_indices[i] * M_strides[i]
 
             var result_base = result_offset
             for i in range(len(indices)):
-                result_base += indices[i] * result.strides[i]
+                result_base += indices[i] * result_strides[i]
 
             # Optimized vector-matrix multiply: result[n] = v[k] @ M[k, n]
             if M_contiguous:
@@ -293,13 +285,13 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
                     # Dot product: sum over k
                     for i in range(k):
-                        var v_val = v_data[v_base + i * v_stride]
+                        var v_val = v_data[unsafe_offset=v_base + i * v_stride]
                         var m_addr = M_base + i * M_stride0 + j * M_stride1
-                        var m_vec = M_data.load[width=simd_width](m_addr)
+                        var m_vec = M_data.unsafe_load[width=simd_width](m_addr)
                         accumulator += v_val * m_vec
 
                     var result_addr = result_base + j * result_stride
-                    result_data.store[width=simd_width](
+                    result_data.unsafe_store[width=simd_width](
                         result_addr, accumulator
                     )
 
@@ -310,16 +302,19 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                         var accumulator: Scalar[Self.dtype] = 0
 
                         for i in range(k):
-                            var v_val = v_data[v_base + i * v_stride]
+                            var v_val = v_data[
+                                unsafe_offset=v_base + i * v_stride
+                            ]
                             var m_val = M_data[
-                                M_base
+                                unsafe_offset=M_base
                                 + i * M_stride0
                                 + (j + offset) * M_stride1
                             ]
                             accumulator += v_val * m_val
 
                         result_data[
-                            result_base + (j + offset) * result_stride
+                            unsafe_offset=result_base
+                            + (j + offset) * result_stride
                         ] = accumulator
             else:
                 # Slow path: non-contiguous M
@@ -327,27 +322,40 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     var accumulator: Scalar[Self.dtype] = 0
 
                     for i in range(k):
-                        var v_val = v_data[v_base + i * v_stride]
+                        var v_val = v_data[unsafe_offset=v_base + i * v_stride]
                         var m_val = M_data[
-                            M_base + i * M_stride0 + j * M_stride1
+                            unsafe_offset=M_base + i * M_stride0 + j * M_stride1
                         ]
                         accumulator += v_val * m_val
 
-                    result_data[result_base + j * result_stride] = accumulator
+                    result_data[
+                        unsafe_offset=result_base + j * result_stride
+                    ] = accumulator
 
         return result
 
     @staticmethod
     def forward[
         track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
-    ](v: Tensor[Self.dtype], M: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
+    ](
+        v: Tensor[Self.dtype], M: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         var out: NDBuffer[Self.dtype]
 
         comptime if has_accelerator():
             if v.is_on_gpu() and M.is_on_gpu():
                 try:
-                    out = VectorMatmulNdGpu[Self.dtype].launch[block_size=256](
-                        v.buffer, M.buffer, sync=sync
+                    var result = VectorMatmulKernel[Self.dtype].launch[
+                        block_size=256
+                    ](
+                        v.buffer.layout(),
+                        v.buffer.device_state.value(),
+                        M.buffer.layout(),
+                        M.buffer.device_state.value(),
+                        sync=sync,
+                    )
+                    out = NDBuffer[Self.dtype].with_layout_device_state(
+                        result[0], result[1]
                     )
                 except e:
                     print(e)
@@ -366,10 +374,10 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var requires_grad = v.requires_grad or M.requires_grad
             if requires_grad:
                 result.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
-                    BACKWARD_VECTOR_MATMUL
+                var backwardFn = BackwardFn.null_arg[Self.dtype](
+                    VectorMatmulNdBackward[Self.dtype](),
                 )
-                backwardFnArg.needs_parent_data = True
-                result.add_ancestry(backwardFnArg^, v, M)
+                backwardFn.needs_parent_data = True
+                result.add_ancestry(backwardFn^, v, M)
 
         return result^

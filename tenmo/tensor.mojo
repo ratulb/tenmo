@@ -1,50 +1,59 @@
 from std.math import exp, log, sqrt
-from std.random import seed, random_float64
 from std.sys import simd_width_of
 from std.utils.numerics import min_finite
-from std.memory import memcpy, memset, memset_zero
-from .shapes import Shape, ShapeIndexIterator
+from std.memory import unsafe_memcpy
+from .shared.shapes import Shape, ShapeIndexIterator
 from .ancestry import Ancestors, Ancestor
-from .strides import Strides
+from .shared.strides import Strides
 
-from .common_utils import (
-    IDGen,
-    log_warning,
-    now,
-    Idx,
-    print_buffer,
-    panic,
-    Epsilon,
-    One,
-    i,
-    s,
+from .shared.mnemonics import (
+    AddTensor,
+    SubtractTensor,
+    ZeroGrad,
+    ScatterAddTensor,
+    MulTensor,
+    Equal,
+    NotEqual,
+    LessThan,
+    GreaterThan,
+    LessThanEqual,
+    GreaterThanEqual,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    INVERT,
+    DEFAULT_INDEX_DTYPE,
 )
-from .mnemonics import *
-from .indexhelper import IndexIterator
-from .backpropagation import Backward, BackwardFnArg
+from .shared.constants import Epsilon, One, CloseTol
+from .shared.idgen import IDGen
+from .shared.indexhelper import Idx, i, s
+from .shared.logging import log_warning
+from .shared.panic import panic
+from .shared.timing import now
+from .shared.indexhelper import IndexIterator
+from .backpropagation import Backward, BackwardFn
+from .cast import ToDtypeBackward
+
 from .forwards import *
-from .buffers import Buffer
+from .shared.buffers import Buffer
 from .validators import Validator
 from std.collections import Set, Deque
 from .gradbox import Gradbox
-from .intarray import IntArray
-from .broadcasthelper import ShapeBroadcaster
-from .ndbuffer import NDBuffer
-from std.gpu.host import DeviceBuffer, DeviceContext
-from .device import Device, CPU, GPU
-from tenmo.shared import Reduction
-from tenmo.sum_mean_reduction import SumMeanReduction
+from .shared.intarray import IntArray
+from .shared.broadcasthelper import ShapeBroadcaster
+from .ndbuffer import NDBuffer, print_buffer, NDBufferLite
+from max.gpu.host import DeviceBuffer, DeviceContext
+from .gpu.device import Device, CPU, GPU
+from .shared import Reduction
+from .sum_mean_reduction import SumMeanReduction
 from std.sys.info import has_accelerator
+
+from .shared import mnemonics
 
 
 struct Tensor[dtype: DType](
-    ImplicitlyCopyable
-    & Movable
-    & Sized
-    & Writable
-    & Absable
-    & Equatable
-    & Iterable
+    ImplicitlyCopyable & Sized & Writable & Absable & Equatable & Iterable
 ):
 
     """A multi-dimensional array with automatic differentiation support.
@@ -75,7 +84,7 @@ struct Tensor[dtype: DType](
     var ancestors: Optional[Ancestors[Self.dtype]]
 
     def __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
-        shape = Shape(axes_spans)
+        var shape = Shape(axes_spans)
         self = Self(shape, requires_grad)
 
     def __init__(out self, row: Self.Row, requires_grad: Bool = False):
@@ -90,7 +99,7 @@ struct Tensor[dtype: DType](
         self.init_gradbox()
 
     def __init__(out self):
-        self._id = 0
+        self._id = IDGen.generate_id()
         self.buffer = NDBuffer[Self.dtype].Empty()
         self.requires_grad = False
         self.gradbox = {}
@@ -98,7 +107,7 @@ struct Tensor[dtype: DType](
 
     def __init__(
         out self,
-        ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
         shape: Shape,
         strides: Optional[Strides] = None,
         offset: Int = 0,
@@ -108,9 +117,10 @@ struct Tensor[dtype: DType](
     ):
         self._id = IDGen.generate_id()
         var num_elements = shape.num_elements()
+        var ptr_cast = ptr.unsafe_origin_cast[MutUntrackedOrigin]()
         var buffer = Buffer[Self.dtype](
-            num_elements, ptr + offset, copy=True
-        ) if copy else Buffer[Self.dtype](num_elements, ptr, copy=False)
+            num_elements, ptr_cast.unsafe_offset(offset), copy=True
+        ) if copy else Buffer[Self.dtype](num_elements, ptr_cast, copy=False)
         var offset_adjusted = 0 if copy else offset
         self.buffer = NDBuffer[Self.dtype](
             buffer^, shape, strides, offset_adjusted
@@ -156,29 +166,44 @@ struct Tensor[dtype: DType](
         """
         return self.buffer.tolist()
 
-    def __init__(out self, *, deinit take: Self):
-        self._id = take._id
-        self.buffer = take.buffer^
-        self.requires_grad = take.requires_grad
-        self.gradbox = take.gradbox
-        self.ancestors = take.ancestors^
+    def __init__(out self, *, deinit move: Self):
+        self._id = move._id
+        self.buffer = move.buffer^
+        self.requires_grad = move.requires_grad
+        self.gradbox = move.gradbox
+        self.ancestors = move.ancestors^
 
     def __init__(out self, *, copy: Self):
+        """Copy-init — ALIASES the source's storage by design (PyTorch parity).
+
+        ``var b = a`` shares storage with ``a``: the underlying buffer is
+        refcounted (shared-from-birth), the ``Gradbox``/``Ancestors`` handles
+        are shared, and ``_id`` is inherited. Mutations through one alias are
+        visible through the other. To opt out of sharing, use ``clone()``.
+        """
         self._id = copy._id
         self.buffer = copy.buffer.copy()
         self.requires_grad = copy.requires_grad
         self.gradbox = copy.gradbox
         self.ancestors = copy.ancestors.copy()
 
-    def shallow_copy(self) -> Tensor[Self.dtype]:
-        """Create a shallow copy with the underlying buffer.
+    def clone(self, requires_grad: Optional[Bool] = None) -> Self:
+        """Clone this tensor into an independent, deep copy (opt-out of sharing).
 
-        Returns:
-            A new tensor with its which just copies the buffer.
+        Unlike the copy-init / assignment (``var b = a``), which aliases the
+        source's storage, ``clone`` materialises fresh storage — the result
+        shares no memory with the source, so mutations through one never affect
+        the other. Layout (shape, strides, offset) is preserved. The clone is a
+        fresh leaf: new ``_id``, no ancestry, and (if the source tracks
+        gradients) a fresh zero gradbox. On GPU the clone is materialised as an
+        independent device buffer.
+
+        ``requires_grad`` is preserved on both CPU and GPU (NDBuffer.clone
+        handles the GPU round-trip internally).
         """
-        var out = Tensor[Self.dtype]()
-        out._id = IDGen.generate_id()
-        out.buffer = self.buffer.copy()
+        var out = Tensor[Self.dtype](
+            self.buffer.clone(), requires_grad=requires_grad.or_else(self.requires_grad)
+        )
         return out^
 
     @always_inline
@@ -218,11 +243,9 @@ struct Tensor[dtype: DType](
                             Shape()
                         )  # unreachable, satisfies compiler
                 else:
-                    gradbox = Gradbox[Self.dtype](self.shape())
-                    gradbox.zero_grad()
+                    gradbox = Gradbox[Self.dtype].zeros(self.shape())
             else:
-                gradbox = Gradbox[Self.dtype](self.shape())
-                gradbox.zero_grad()
+                gradbox = Gradbox[Self.dtype].zeros(self.shape())
             self.gradbox = gradbox^
 
     @always_inline
@@ -321,14 +344,24 @@ struct Tensor[dtype: DType](
 
     @always_inline
     def max_index(self) -> Int:
-        """Get the highest valid memory offset.
+        """Highest valid LOGICAL flat index (C-order over this view).
 
-        Returns:
-            The maximum flat index accessible in this tensor.
+        Always `numels() - 1`. Use with `get`/`set`; for the highest
+        touched buffer address use `max_storage_index` with
+        `storage_get`/`storage_set`.
         """
-        return self.buffer.max_index()
+        return self.numels() - 1
 
-    def detach(mut self) -> Tensor[Self.dtype]:
+    @always_inline
+    def max_storage_index(self) -> Int:
+        """Highest touched buffer address (storage space).
+
+        Use with `storage_get`/`storage_set`; for logical indexing use
+        `max_index` with `get`/`set`.
+        """
+        return self.buffer.max_storage_index()
+
+    def detach(self) -> Tensor[Self.dtype]:
         """Create a new tensor sharing the same data but detached from the
         computation graph.
 
@@ -357,7 +390,6 @@ struct Tensor[dtype: DType](
             ),
             requires_grad=False,
         )
-        # No add_ancestry call — graph connection severed
         return out^
 
     @always_inline
@@ -382,9 +414,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             Scalar value at the specified coordinates.
-
-        Raises:
-            Panic if tensor is scalar but indices are provided.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -402,9 +431,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             Scalar value at the specified coordinates.
-
-        Raises:
-            Panic if tensor is scalar but indices are provided.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -418,13 +444,10 @@ struct Tensor[dtype: DType](
         """Index tensor with variadic integer indices.
 
         Args:
-            *indices: One index per axis.
+            indices: One index per axis.
 
         Returns:
             Scalar value at the specified coordinates.
-
-        Raises:
-            Panic if tensor is scalar or if index count is unsupported.
         """
         if self.rank() == 0:
             panic(
@@ -436,11 +459,12 @@ struct Tensor[dtype: DType](
 
     def __getitem__[
         track_grad: Bool = True,
-    ](mut self, *slices: Slice, sync: Bool = True) -> Tensor[Self.dtype]:
+    ](self, *slices: Slice, sync: Bool = True) -> Tensor[Self.dtype]:
         """Slice tensor using Slice objects along each axis.
 
         Args:
-            *slices: One Slice per axis, specifying start, stop, step.
+            slices: One Slice per axis, specifying start, stop, step.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A view tensor with computed shape, strides, and offset.
@@ -463,7 +487,7 @@ struct Tensor[dtype: DType](
         Allocates a new buffer — gradients do not flow back to the source.
 
         Args:
-            *indices: Indices along the first axis to extract.
+            indices: Indices along the first axis to extract.
             requires_grad: Whether the result tracks gradients.
 
         Returns:
@@ -474,12 +498,13 @@ struct Tensor[dtype: DType](
 
     def __getitem__[
         track_grad: Bool = True,
-    ](mut self, *indices: Idx, sync: Bool = True) -> Tensor[Self.dtype]:
+    ](self, *indices: Idx, sync: Bool = True) -> Tensor[Self.dtype]:
         """Advanced indexing with Idx objects (integers or slices).
 
         Args:
-            *indices: Idx per axis — either an integer or a Slice.
+            indices: Idx per axis — either an integer or a Slice.
                 Missing axes default to full slices.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A view tensor over the indexed region.
@@ -527,15 +552,13 @@ struct Tensor[dtype: DType](
                      which are normalized to axis_dim + index.
             axis:    Axis to gather along. May be negative. Defaults to 0.
             reduction: How to reduce gathered rows (NONE/SUM/MEAN).
+            padding_idx: Index to use for padding out-of-bounds indices.
+            requires_grad: Whether the result tracks gradients.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A new contiguous tensor with shape identical to self except
             axis dimension is replaced by len(indices).
-
-        Panics:
-            - axis out of bounds
-            - indices is empty
-            - any index out of bounds after normalization
         """
 
         return Gather[Self.dtype].forward[track_grad=track_grad](
@@ -564,6 +587,7 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Second tensor. Will be flattened to 1-D.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             2-D tensor of shape (self.numels(), other.numels()).
@@ -592,11 +616,8 @@ struct Tensor[dtype: DType](
         """Set a scalar value at given coordinates.
 
         Args:
-            *indices: One index per axis.
+            indices: One index per axis.
             value: Scalar value to write.
-
-        Raises:
-            Panic if tensor is scalar.
         """
         if self.rank() == 0:
             panic(
@@ -612,9 +633,6 @@ struct Tensor[dtype: DType](
         Args:
             indices: List of axis indices.
             value: Scalar value to write.
-
-        Raises:
-            Panic if tensor is scalar but indices are provided.
         """
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -628,11 +646,8 @@ struct Tensor[dtype: DType](
         """Set a scalar value at given coordinates.
 
         Args:
-            coord: IntArray of axis indices.
+            coord: IntArray of coordinates.
             value: Scalar value to write.
-
-        Raises:
-            Panic if tensor is scalar but indices are provided.
         """
         if self.rank() == 0 and len(coord) != 0:
             panic(
@@ -647,7 +662,7 @@ struct Tensor[dtype: DType](
 
         Args:
             value: Scalar value to write.
-            *indices: Idx objects (integers or slices) defining the region.
+            indices: Idx objects (integers or slices) defining the region.
         """
         Filler[Self.dtype].fill(self.buffer, value, indices)
 
@@ -656,7 +671,7 @@ struct Tensor[dtype: DType](
 
         Args:
             tensor: Source tensor to copy from.
-            *indices: Idx objects (integers or slices) defining the destination region.
+            indices: Idx objects (integers or slices) defining the destination region.
         """
         Filler[Self.dtype].fill(self.buffer, tensor.buffer, indices)
 
@@ -665,17 +680,27 @@ struct Tensor[dtype: DType](
 
         Args:
             gradbox: Source Gradbox to copy from.
-            *indices: Idx objects (integers or slices) defining the destination region.
+            indices: Idx objects (integers or slices) defining the destination region.
         """
         Filler[Self.dtype].fill(self.buffer, gradbox.buffer(), indices)
+
+    def fill(self, value: Scalar[Self.dtype], indices: List[Idx]):
+        """List[Idx]-based scalar fill — non-variadic twin of fill(value, *idx).
+        """
+        Filler[Self.dtype].fill_list(self.buffer, value, indices)
+
+    def fill(self, tensor: Tensor[Self.dtype], indices: List[Idx]):
+        """List[Idx]-based buffer fill — non-variadic twin of fill(tensor, *idx).
+        """
+        Filler[Self.dtype].fill_list(self.buffer, tensor.buffer, indices)
 
     def item(self) -> Scalar[Self.dtype]:
         return self.buffer.item()
 
     @no_inline
     def __str__(self) -> String:
-        rank = self.rank()
-        s = String("[")
+        var rank = self.rank()
+        var s = String("[")
         if rank == 1:
             s += "1D Tensor"
         elif rank == 2:
@@ -694,6 +719,7 @@ struct Tensor[dtype: DType](
             s += ", offset: " + String(self.offset())
         s += ", Type: " + String(Self.dtype)
         s += ", requires_grad: " + String(self.requires_grad)
+        s += ", outstanding: " + String(self.ref_count())
         s += (
             ", Device : "
             + "gpu: "
@@ -713,12 +739,26 @@ struct Tensor[dtype: DType](
     def write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
+    @no_inline
+    def write_repr_to[W: Writer](self, mut writer: W):
+        writer.write(
+            "Tensor(shape=",
+            self.shape(),
+            ", dtype=",
+            Self.dtype,
+            ", requires_grad=",
+            self.requires_grad,
+            ", device=",
+            "gpu" if self.is_on_gpu() else "cpu",
+            ")",
+        )
+
     def write_to(self, buffer: DeviceBuffer[Self.dtype]) raises:
         with buffer.map_to_host() as host_buffer:
             if self.is_contiguous():
-                memcpy(
+                unsafe_memcpy(
                     dest=host_buffer.unsafe_ptr(),
-                    src=self.data_ptr() + self.offset(),
+                    src=self.data_ptr().unsafe_offset(self.offset()),
                     count=self.numels(),
                 )
             else:
@@ -726,7 +766,7 @@ struct Tensor[dtype: DType](
                 ref data_buffer = self.buffer.data_buffer()
                 var offset = 0
                 for index in self.index_iterator():
-                    (ptr + offset)[] = data_buffer[index]
+                    ptr.unsafe_offset(offset)[] = data_buffer[index]
                     offset += 1
 
     def to_gpu(
@@ -740,6 +780,8 @@ struct Tensor[dtype: DType](
 
         Args:
             gpu: Target GPU. Uses default GPU if None.
+            requires_grad: If provided, overrides the requires_grad flag
+                on the returned tensor.
             stop_grad: If True, gradient stops at this GPU tensor —
                        no DeviceTransferBackward registered. Use for
                        permanent GPU residents (model weights).
@@ -838,9 +880,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             Reference to the Gradbox storing accumulated gradients.
-
-        Raises:
-            Panic if called on a tensor that does not require grad or has no gradient.
         """
         if not self.requires_grad or not self.has_grad():
             panic(
@@ -855,9 +894,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             The Gradbox containing accumulated gradients.
-
-        Raises:
-            Panic if called on a tensor that does not require grad or has no gradient.
         """
         if not self.requires_grad or not self.has_grad():
             panic(
@@ -983,6 +1019,11 @@ struct Tensor[dtype: DType](
     ](self, requires_grad: Optional[Bool] = None) -> Tensor[NewType]:
         """Convert tensor to a different data type.
 
+        When the dtype actually changes and gradient tracking is on for a
+        floating-point conversion, the result registers `ToDtypeBackward`
+        (tenmo/cast.mojo) so gradients flow back across the cast. Same-dtype
+        calls and non-float targets return a leaf as before.
+
         Args:
             requires_grad: If provided, overrides the requires_grad flag
                 on the returned tensor.
@@ -991,40 +1032,84 @@ struct Tensor[dtype: DType](
             A new tensor with the specified dtype.
         """
         var new_type_buffer = self.buffer.to_dtype[NewType]()
-        var grad_required = requires_grad.or_else(self.requires_grad)
-        return Tensor[NewType](new_type_buffer^, requires_grad=grad_required)
+        # Gradient tracking is only meaningful for float→float conversions;
+        # int targets always come back as leaves.
+        var trackable = (
+            Self.dtype.is_floating_point() and NewType.is_floating_point()
+        )
+        var grad_required = (
+            requires_grad.or_else(self.requires_grad) and trackable
+        )
+        var out = Tensor[NewType](new_type_buffer^, requires_grad=grad_required)
+
+        comptime if NewType != Self.dtype:
+            if grad_required:
+                # No requires_grad_(True): the constructor above already
+                # set the flag and initialized the gradbox.
+                var backwardFn = BackwardFn.null_arg[NewType](
+                    ToDtypeBackward[Self.dtype, NewType]()
+                )
+                out.add_ancestry_erased[Self.dtype](backwardFn^, self)
+
+        return out^
+
+    def add_ancestry_erased[
+        pdtype: DType
+    ](mut self, var backwardFn: BackwardFn, parent: Tensor[pdtype],):
+        """[A]add_ancestry for the one edge where parent dtype ≠ self dtype.
+
+        The cast op and Seq's seams use this: storage is dtype-erased, so
+        an f32 parent can live under an f64 output node. Single parent by
+        design (a cast consumes exactly one input) and no ndb snapshot —
+        dtype backward never needs forward values. See tenmo/cast.mojo.
+        """
+        if not self.ancestors:
+            self.ancestors = Optional(Ancestors[Self.dtype](backwardFn^))
+        else:
+            self.ancestors.value().set_backward_fn(backwardFn^)
+
+        ref ancestors = self.ancestors.value()
+        var ancestor = parent.to_ancestor()
+        ancestors.append_erased[pdtype](ancestor^)
 
     def to_ancestor(ref self) -> Ancestor[Self.dtype]:
         var out = Ancestor[Self.dtype]()
         out._id = self._id
         out.requires_grad = self.requires_grad
         if self.ancestors:
-            out.parents = self.ancestors.copy()
+            out.parents = self.ancestors
         if self.gradbox:
             out.gradbox = self.gradbox
         return out^
 
     def add_ancestry(
         mut self,
-        var backwardFnArg: BackwardFnArg[Self.dtype],
+        var backwardFn: BackwardFn,
         *parents: Tensor[Self.dtype],
     ):
-        var needs_data = backwardFnArg.needs_parent_data
+        var needs_data = backwardFn.needs_parent_data
 
         if not self.ancestors:
-            self.ancestors = Optional(Ancestors[Self.dtype](backwardFnArg^))
+            self.ancestors = Optional(Ancestors[Self.dtype](backwardFn^))
         else:
-            self.ancestors.value().set_backward_fn_arg(backwardFnArg^)
+            self.ancestors.value().set_backward_fn(backwardFn^)
 
         ref ancestors = self.ancestors.value()
 
         for parent in parents:
             var ancestor = parent.to_ancestor()
             if needs_data:
-                var nd_buffer = parent.buffer.copy()
-                if not nd_buffer.is_shared():
-                    nd_buffer.buffer.shared()
-                ancestor.ndb = nd_buffer^
+                var nd_buffer: NDBuffer[Self.dtype]
+                if parent.buffer.is_shared():
+                    # Owned buffers are shared-from-birth — alias via copy-init
+                    # (refcount bump keeps the forward storage alive in the graph;
+                    # no full deep copy, and nothing about the user's tensor changes).
+                    nd_buffer = parent.buffer.copy()
+                else:
+                    # External-backed parent: external memory can't be refcounted,
+                    # so clone its data into owned storage for the graph.
+                    nd_buffer = parent.buffer.clone()
+                ancestor.ndb = NDBufferLite[Self.dtype](nd_buffer^)
             ancestors.append(ancestor^)
 
     def has_ancestry(self) -> Bool:
@@ -1036,14 +1121,13 @@ struct Tensor[dtype: DType](
         return self.ancestors != None
 
     @always_inline
-    def ancestry(ref self) -> ref[self.ancestors.value()] Ancestors[Self.dtype]:
+    def ancestry(
+        ref self,
+    ) -> ref[self.ancestors.value()] Ancestors[Self.dtype]:
         """Get the ancestry graph for backward pass traversal.
 
         Returns:
             Reference to the Ancestors containing parent dependencies.
-
-        Raises:
-            Panic if ancestry has not been initialized.
         """
         if self.ancestors == None:
             panic("Tensor → ancestry: ancestry not initialized")
@@ -1076,14 +1160,12 @@ struct Tensor[dtype: DType](
         )
 
     def all_close[
-        rtol: Scalar[Self.dtype] = 1e-5,
-        atol: Scalar[Self.dtype] = 1e-8,
+        rtol: Scalar[Self.dtype] = CloseTol[Self.dtype].rtol(),
+        atol: Scalar[Self.dtype] = CloseTol[Self.dtype].atol(),
     ](self, other: Self,) -> Bool:
         """Check if two tensors are element-wise close within tolerance.
 
         Args:
-            rtol: Relative tolerance.
-            atol: Absolute tolerance.
             other: Tensor to compare against.
 
         Returns:
@@ -1103,7 +1185,7 @@ struct Tensor[dtype: DType](
         """
         return self.buffer.map_to_bool(pred).any_true()
 
-    def all_true(self: Tensor[DType.bool]) -> Bool:
+    def all_true(self) -> Bool where Self.dtype == DType.bool:
         """Returns True if all elements are True.
         GPU path: NDBuffer.all_true → DeviceState.all_true (maps to host).
         CPU path: NDBuffer.all_true → Buffer.all_true.
@@ -1111,17 +1193,20 @@ struct Tensor[dtype: DType](
 
         return self.buffer.all_true()
 
-    def any_true(self: Tensor[DType.bool]) -> Bool:
+    def any_true(self) -> Bool where Self.dtype == DType.bool:
         """Returns True if any element is True.
         GPU path: NDBuffer.any_true → DeviceState.any_true (maps to host).
         CPU path: NDBuffer.any_true → Buffer.any_true.
         """
         return self.buffer.any_true()
 
-    def unsafe_ptr(ref self) -> UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]:
-        return UnsafePointer(to=self).unsafe_mut_cast[True]()
+    def unsafe_ptr(ref self) -> Pointer[Tensor[Self.dtype], MutAnyOrigin]:
+        return Pointer(to=self).as_unsafe_any_origin().unsafe_mut_cast[True]()
 
-    def data_ptr(ref self) -> UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]:
+    def ref_count(self) -> Int:
+        return self.buffer.ref_count()
+
+    def data_ptr(ref self) -> Pointer[Scalar[Self.dtype], MutAnyOrigin]:
         return self.buffer.data_ptr()
 
     def seed_grad(mut self, with_tensor: Tensor[Self.dtype]):
@@ -1142,8 +1227,11 @@ struct Tensor[dtype: DType](
         Args:
             value: Scalar gradient value to seed with.
         """
-        with_tensor = Tensor[Self.dtype].full(self.shape(), value)
-        self.seed_grad(with_tensor)
+        if not self.requires_grad:
+            return
+        if not self.has_grad():
+            self.requires_grad_()
+        self.gradbox.value().seed_grad(value)
 
     @always_inline
     def fill(self, value: Scalar[Self.dtype]):
@@ -1260,20 +1348,16 @@ struct Tensor[dtype: DType](
         high: Scalar[Self.dtype] = 1,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
-        """Create a tensor with uniform random values in [low, high).
-
-        Args:
-            *dims: Shape dimensions as variadic ints.
-            low: Lower bound (inclusive).
-            high: Upper bound (exclusive).
-            init_seed: Random seed. If None, randomizes each call.
-            requires_grad: Whether to track gradients.
-
-        Returns:
-            A tensor of given shape with uniform random values.
-        """
-        return Self.rand(Shape(dims), low, high, init_seed, requires_grad)
+        return Self.rand(
+            Shape(dims),
+            min=low,
+            max=high,
+            init_seed=init_seed,
+            requires_grad=requires_grad,
+            device=device,
+        )
 
     @staticmethod
     def rand(
@@ -1282,20 +1366,16 @@ struct Tensor[dtype: DType](
         high: Scalar[Self.dtype] = 1,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
-        """Create a tensor with uniform random values in [low, high).
-
-        Args:
-            shape: Shape as a list of ints.
-            low: Lower bound (inclusive).
-            high: Upper bound (exclusive).
-            init_seed: Random seed. If None, randomizes each call.
-            requires_grad: Whether to track gradients.
-
-        Returns:
-            A tensor of given shape with uniform random values.
-        """
-        return Self.rand(Shape(shape), low, high, init_seed, requires_grad)
+        return Self.rand(
+            Shape(shape),
+            min=low,
+            max=high,
+            init_seed=init_seed,
+            requires_grad=requires_grad,
+            device=device,
+        )
 
     @staticmethod
     def rand(
@@ -1304,35 +1384,17 @@ struct Tensor[dtype: DType](
         max: Scalar[Self.dtype] = 1,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
-        """Create a tensor with uniform random values in [min, max).
-
-        Args:
-            shape: Tensor shape.
-            min: Lower bound (inclusive).
-            max: Upper bound (exclusive).
-            init_seed: Random seed. If None, randomizes each call.
-            requires_grad: Whether to track gradients.
-
-        Returns:
-            A tensor of given shape with uniform random values.
-        """
-        if init_seed:
-            seed(init_seed.value())
-        else:
-            seed()
-
-        var numels = shape.num_elements()
-        var buffer = Buffer[Self.dtype](numels)
-
-        var min_f64 = min.cast[DType.float64]()
-        var max_f64 = max.cast[DType.float64]()
-
-        for i in range(numels):
-            buffer[i] = random_float64(min_f64, max_f64).cast[Self.dtype]()
-
-        var nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
-        return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
+        var target_device = device.or_else(CPU().into())
+        var ndb = NDBuffer[Self.dtype].rand(
+            shape,
+            min=min,
+            max=max,
+            init_seed=init_seed,
+            device=target_device,
+        )
+        return Tensor[Self.dtype](ndb^, requires_grad=requires_grad)
 
     @staticmethod
     def randn(
@@ -1341,20 +1403,16 @@ struct Tensor[dtype: DType](
         std: Float64 = 1.0,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
-        """Create a tensor with values from a normal distribution.
-
-        Args:
-            *dims: Shape dimensions as variadic ints.
-            mean: Distribution mean.
-            std: Distribution standard deviation.
-            init_seed: Random seed. If None, randomizes each call.
-            requires_grad: Whether to track gradients.
-
-        Returns:
-            A tensor of given shape with normally distributed values.
-        """
-        return Self.randn(Shape(dims), mean, std, init_seed, requires_grad)
+        return Self.randn(
+            Shape(dims),
+            mean=mean,
+            std=std,
+            init_seed=init_seed,
+            requires_grad=requires_grad,
+            device=device,
+        )
 
     @staticmethod
     def randn(
@@ -1363,22 +1421,17 @@ struct Tensor[dtype: DType](
         std: Float64 = 1.0,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
-        """Create a tensor with values from a normal distribution.
-
-        Args:
-            shape: Tensor shape.
-            mean: Distribution mean.
-            std: Distribution standard deviation.
-            init_seed: Random seed. If None, randomizes each call.
-            requires_grad: Whether to track gradients.
-
-        Returns:
-            A tensor of given shape with normally distributed values.
-        """
-
-        var nd_buffer = NDBuffer[Self.dtype].randn(shape, mean, std, init_seed)
-        return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
+        var target_device = device.or_else(CPU().into())
+        var ndb = NDBuffer[Self.dtype].randn(
+            shape,
+            mean=mean,
+            std=std,
+            init_seed=init_seed,
+            device=target_device,
+        )
+        return Tensor[Self.dtype](ndb^, requires_grad=requires_grad)
 
     @staticmethod
     def arange(
@@ -1388,7 +1441,7 @@ struct Tensor[dtype: DType](
         """Create a 1D tensor with evenly spaced values.
 
         Args:
-            *args: Start, stop, and optionally step values.
+            args: Start, stop, and optionally step values.
             requires_grad: Whether to track gradients.
 
         Returns:
@@ -1400,8 +1453,8 @@ struct Tensor[dtype: DType](
             Tensor[DType.float32].arange(0, 10, 2)  # [0, 2, 4, 6, 8]
             ```
         """
-        nd_buffer = NDBuffer[Self.dtype].arange(args)
-        tensor = Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
+        var nd_buffer = NDBuffer[Self.dtype].arange(args)
+        var tensor = Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
         return tensor^
 
     @staticmethod
@@ -1422,8 +1475,8 @@ struct Tensor[dtype: DType](
         Returns:
             A 1D tensor with steps values from start to end (inclusive).
         """
-        nd_buffer = NDBuffer[Self.dtype].linspace(start, end, steps)
-        tensor = Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
+        var nd_buffer = NDBuffer[Self.dtype].linspace(start, end, steps)
+        var tensor = Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
         return tensor^
 
     @staticmethod
@@ -1485,7 +1538,7 @@ struct Tensor[dtype: DType](
         """Create a tensor of zeros.
 
         Args:
-            *axes_spans: Shape dimensions as variadic ints.
+            axes_spans: Shape dimensions as variadic ints.
             requires_grad: Whether to track gradients.
             device: Target device. Defaults to CPU.
 
@@ -1504,6 +1557,7 @@ struct Tensor[dtype: DType](
         """Create a zeros tensor matching another tensor's shape.
 
         Args:
+            self: Reference tensor whose shape to match.
             requires_grad: If provided, overrides requires_grad.
             device: Target device. Defaults to self's device.
 
@@ -1567,6 +1621,7 @@ struct Tensor[dtype: DType](
         """Create a ones tensor matching another tensor's shape.
 
         Args:
+            self: Reference tensor whose shape to match.
             requires_grad: If provided, overrides requires_grad.
             device: Target device. Defaults to self's device.
 
@@ -1595,6 +1650,7 @@ struct Tensor[dtype: DType](
         num_classes: Int,
         device: Optional[Device] = None,
         ignore_index: Optional[Int] = None,
+        sync: Bool = False,
     ) -> Tensor[Self.dtype]:
         """Convert tensor of class indices to one-hot encoding.
         Args:
@@ -1602,12 +1658,31 @@ struct Tensor[dtype: DType](
             num_classes: Number of classes.
             device: Target device.
             ignore_index: If provided, rows where index == ignore_index become all zeros.
+            sync: If True, synchronize GPU after kernel launch.
         Returns: Tensor of shape (..., num_classes).
         """
         var onehot_ndb = NDBuffer[Self.dtype].onehot(
-            indices.buffer, num_classes, device, ignore_index
+            indices.buffer, num_classes, device, ignore_index, sync=sync
         )
         return Tensor[Self.dtype](onehot_ndb^, requires_grad=False)
+
+    @staticmethod
+    def d1(
+        var *row: Scalar[Self.dtype], requires_grad: Bool = False
+    ) -> Tensor[Self.dtype]:
+        """Create a 1D tensor from a variadic list of scalar values.
+
+        Args:
+            row: Scalar values forming the single dimension.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A 1D tensor with len(row) elements.
+        """
+        var row_list = List[Scalar[Self.dtype]]()
+        for v in row:
+            row_list.append(v)
+        return Tensor[Self.dtype].d1(row_list^)
 
     @staticmethod
     def d1(row: Self.Row, requires_grad: Bool = False) -> Tensor[Self.dtype]:
@@ -1620,30 +1695,32 @@ struct Tensor[dtype: DType](
         Returns:
             A 1D tensor with len(row) elements.
         """
-        Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d1")
         if len(row) == 0:
             return Tensor[Self.dtype].scalar(
                 min_finite[Self.dtype](), requires_grad=requires_grad
             )
-        numels = len(row)
-        shape = Shape(IntArray(numels))
-        buffer = Buffer[Self.dtype](numels)
-        memcpy(dest=buffer.data, src=row.unsafe_ptr(), count=numels)
-        nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
+        var numels = len(row)
+        var shape = Shape(IntArray(numels))
+        var buffer = Buffer[Self.dtype](numels)
+        unsafe_memcpy(
+            dest=buffer.data.value(), src=row.unsafe_ptr(), count=numels
+        )
+        var nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
-    
     @staticmethod
     def from_list[
-        mut: Bool, //, origin: Origin[mut=mut], src_dtype: DType
+        src_dtype: DType
     ](
-        values: Span[Scalar[src_dtype], origin],
+        values: List[Scalar[src_dtype]],
         requires_grad: Bool = False,
-    ) -> Tensor[Self.dtype]:
-        """Create a 1D tensor from a span of scalar values.
+    ) -> Tensor[
+        Self.dtype
+    ]:
+        """Create a 1D tensor from a list of scalar values.
 
         Args:
-            values: Span of scalar values (e.g. from ``List[Scalar[dtype]]`` slicing).
+            values: List of scalar values.
             requires_grad: Whether to track gradients.
 
         Returns:
@@ -1653,13 +1730,13 @@ struct Tensor[dtype: DType](
             return Tensor[Self.dtype].scalar(
                 min_finite[Self.dtype](), requires_grad=requires_grad
             )
-        numels = len(values)
-        shape = Shape(IntArray(numels))
-        buffer = Buffer[Self.dtype](numels)
+        var numels = len(values)
+        var shape = Shape(IntArray(numels))
+        var buffer = Buffer[Self.dtype](numels)
         var data = buffer.data.unsafe_value()
         for i in range(numels):
-            data[i] = Scalar[Self.dtype](values[i])
-        nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
+            data[unsafe_offset=i] = Scalar[Self.dtype](values[i])
+        var nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
     @staticmethod
@@ -1674,22 +1751,22 @@ struct Tensor[dtype: DType](
 
         Returns:
             A 2D tensor of shape (len(rows), len(rows[0])).
-
-        Raises:
-            Panic if rows have inconsistent lengths.
         """
-        Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d2")
-        dims = IntArray(len(rows), len(rows[0]))
-        flattened = List[Scalar[Self.dtype]](capacity=dims.product())
+        var dims = IntArray(len(rows), len(rows[0]))
+        var flattened = List[Scalar[Self.dtype]](capacity=dims.product())
         for row in rows:
             if len(row) != dims[1]:
                 panic("Tensor → d2 → not all rows equal in length")
             flattened.extend(row.copy())
-        shape = Shape(dims)
-        numels = shape.num_elements()
-        buffer = Buffer[Self.dtype](numels)
-        memcpy(dest=buffer.data, src=flattened.unsafe_ptr(), count=numels)
-        nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
+        var shape = Shape(dims)
+        var numels = shape.num_elements()
+        var buffer = Buffer[Self.dtype](numels)
+        unsafe_memcpy(
+            dest=buffer.data.unsafe_value(),
+            src=flattened.unsafe_ptr(),
+            count=numels,
+        )
+        var nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad)
 
     @staticmethod
@@ -1704,13 +1781,9 @@ struct Tensor[dtype: DType](
 
         Returns:
             A 3D tensor.
-
-        Raises:
-            Panic if blocks have inconsistent dimensions.
         """
-        Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d3")
-        dims = IntArray(len(blocks), len(blocks[0]), len(blocks[0][0]))
-        flattened = List[Scalar[Self.dtype]](capacity=dims.product())
+        var dims = IntArray(len(blocks), len(blocks[0]), len(blocks[0][0]))
+        var flattened = List[Scalar[Self.dtype]](capacity=dims.product())
         for block in blocks:
             if len(block) != dims[1]:
                 panic("Tensor → d3 → not all blocks equal in length")
@@ -1719,11 +1792,15 @@ struct Tensor[dtype: DType](
                     panic("Tensor → d3 → not all rows equal in length")
 
                 flattened.extend(row.copy())
-        shape = Shape(dims)
-        numels = shape.num_elements()
-        buffer = Buffer[Self.dtype](numels)
-        memcpy(dest=buffer.data, src=flattened.unsafe_ptr(), count=numels)
-        nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
+        var shape = Shape(dims)
+        var numels = shape.num_elements()
+        var buffer = Buffer[Self.dtype](numels)
+        unsafe_memcpy(
+            dest=buffer.data.unsafe_value(),
+            src=flattened.unsafe_ptr(),
+            count=numels,
+        )
+        var nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
     @staticmethod
@@ -1738,18 +1815,14 @@ struct Tensor[dtype: DType](
 
         Returns:
             A 4D tensor.
-
-        Raises:
-            Panic if blockgrid has inconsistent dimensions.
         """
-        Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d4")
-        dims = IntArray(
+        var dims = IntArray(
             len(blockgrid),
             len(blockgrid[0]),
             len(blockgrid[0][0]),
             len(blockgrid[0][0][0]),
         )
-        flattened = List[Scalar[Self.dtype]](capacity=dims.product())
+        var flattened = List[Scalar[Self.dtype]](capacity=dims.product())
         for block in blockgrid:
             if len(block) != dims[1]:
                 panic(
@@ -1769,11 +1842,15 @@ struct Tensor[dtype: DType](
                             " matrix"
                         )
                     flattened.extend(row.copy())
-        shape = Shape(dims)
-        numels = shape.num_elements()
-        buffer = Buffer[Self.dtype](numels)
-        memcpy(dest=buffer.data, src=flattened.unsafe_ptr(), count=numels)
-        nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
+        var shape = Shape(dims)
+        var numels = shape.num_elements()
+        var buffer = Buffer[Self.dtype](numels)
+        unsafe_memcpy(
+            dest=buffer.data.unsafe_value(),
+            src=flattened.unsafe_ptr(),
+            count=numels,
+        )
+        var nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
     @staticmethod
@@ -1788,19 +1865,15 @@ struct Tensor[dtype: DType](
 
         Returns:
             A 5D tensor.
-
-        Raises:
-            Panic if blockhive has inconsistent dimensions.
         """
-        Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d5")
-        dims = IntArray(
+        var dims = IntArray(
             len(blockhive),
             len(blockhive[0]),
             len(blockhive[0][0]),
             len(blockhive[0][0][0]),
             len(blockhive[0][0][0][0]),
         )
-        flattened = List[Scalar[Self.dtype]](capacity=dims.product())
+        var flattened = List[Scalar[Self.dtype]](capacity=dims.product())
         for blocks in blockhive:
             if len(blocks) != dims[1]:
                 panic(
@@ -1823,11 +1896,15 @@ struct Tensor[dtype: DType](
                                 " in matrix"
                             )
                         flattened.extend(row.copy())
-        shape = Shape(dims)
-        numels = shape.num_elements()
-        buffer = Buffer[Self.dtype](numels)
-        memcpy(dest=buffer.data, src=flattened.unsafe_ptr(), count=numels)
-        nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
+        var shape = Shape(dims)
+        var numels = shape.num_elements()
+        var buffer = Buffer[Self.dtype](numels)
+        unsafe_memcpy(
+            dest=buffer.data.unsafe_value(),
+            src=flattened.unsafe_ptr(),
+            count=numels,
+        )
+        var nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
     @staticmethod
@@ -1843,7 +1920,7 @@ struct Tensor[dtype: DType](
         Returns:
             A scalar tensor containing val.
         """
-        result = Tensor[Self.dtype](Shape(), requires_grad=requires_grad)
+        var result = Tensor[Self.dtype](Shape(), requires_grad=requires_grad)
         result[IntArray()] = val
         return result^
 
@@ -1856,7 +1933,7 @@ struct Tensor[dtype: DType](
         """Create a tensor of ones.
 
         Args:
-            *axes_spans: Shape dimensions as variadic ints.
+            axes_spans: Shape dimensions as variadic ints.
             requires_grad: Whether to track gradients.
             device: Target device. Defaults to CPU.
 
@@ -1901,12 +1978,10 @@ struct Tensor[dtype: DType](
         Args:
             target_shape: Shape to broadcast to.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with the target shape.
-
-        Raises:
-            Panic if current shape cannot broadcast to target_shape.
         """
         if not ShapeBroadcaster.broadcastable(self.shape(), target_shape):
             panic(
@@ -1961,6 +2036,7 @@ struct Tensor[dtype: DType](
             start_dim: First dimension to flatten (default: 0).
             end_dim: Last dimension to flatten (default: last).
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with flattened dimensions.
@@ -1972,7 +2048,7 @@ struct Tensor[dtype: DType](
     def repeat[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         repeat: List[Int],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -1982,6 +2058,7 @@ struct Tensor[dtype: DType](
         Args:
             repeat: Number of repeats per dimension.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with repeated data.
@@ -1993,7 +2070,7 @@ struct Tensor[dtype: DType](
     def repeat[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         *repeat: Int,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -2001,8 +2078,9 @@ struct Tensor[dtype: DType](
         """Repeat tensor along each axis.
 
         Args:
-            *repeat: Number of repeats per dimension as variadic ints.
+            repeat: Number of repeats per dimension as variadic ints.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with repeated data.
@@ -2014,7 +2092,7 @@ struct Tensor[dtype: DType](
     def tile[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         repeat: List[Int],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -2024,6 +2102,7 @@ struct Tensor[dtype: DType](
         Args:
             repeat: Number of tiles per dimension.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tiled tensor.
@@ -2035,7 +2114,7 @@ struct Tensor[dtype: DType](
     def tile[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         *repeat: Int,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -2043,8 +2122,9 @@ struct Tensor[dtype: DType](
         """Tile the tensor by repeating it along each axis.
 
         Args:
-            *repeat: Number of tiles per dimension as variadic ints.
+            repeat: Number of tiles per dimension as variadic ints.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tiled tensor.
@@ -2055,26 +2135,35 @@ struct Tensor[dtype: DType](
 
     def contiguous[
         track_grad: Bool = True,
-    ](self, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[
+    ](self, requires_grad: Optional[Bool] = None, owned: Bool = True, sync: Bool = True) -> Tensor[
         Self.dtype
     ]:
         """Return a contiguous copy of the tensor.
 
+        Unlike torch, this ALWAYS materializes an owned copy — even when the
+        source is already contiguous. This is deliberate: callers rely on the
+        result being isolated (gradbox segmentation, data_buffer() access with
+        zero offset). View ops (transpose/reshape/expand) are the way to share.
+
         Args:
             requires_grad: If provided, overrides requires_grad.
+            owned: If False, allow returning an alias when the source is
+                already contiguous+shared with unchanged shape (fast path,
+                no copy). Default True preserves the isolation guarantee.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A contiguous tensor with the same data.
         """
         return Contiguous[Self.dtype].forward[track_grad](
-            self, requires_grad, sync=sync
+            self, requires_grad, owned=owned, sync=sync
         )
 
     def reshape[
         track_grad: Bool = True,
-    ](
-        mut self, requires_grad: Optional[Bool] = None, sync: Bool = True
-    ) -> Tensor[Self.dtype]:
+    ](self, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[
+        Self.dtype
+    ]:
         if self.numels() != 1:
             panic(
                 "Tensor → reshape: only tensor with single element can be"
@@ -2087,7 +2176,7 @@ struct Tensor[dtype: DType](
     def reshape[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         *newdims: Int,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -2096,7 +2185,7 @@ struct Tensor[dtype: DType](
             return self.reshape[track_grad](
                 requires_grad=requires_grad, sync=sync
             )
-        shape = Validator.validate_and_construct_new_shape(
+        var shape = Validator.validate_and_construct_new_shape(
             self.shape(), IntArray(newdims)
         )
         return self.reshape[track_grad](
@@ -2106,12 +2195,12 @@ struct Tensor[dtype: DType](
     def reshape[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         shape: List[Int],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
-        new_shape = Validator.validate_and_construct_new_shape(
+        var new_shape = Validator.validate_and_construct_new_shape(
             self.shape(), IntArray(shape)
         )
         return self.reshape[track_grad](
@@ -2121,7 +2210,7 @@ struct Tensor[dtype: DType](
     def reshape[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         new_shape: Shape,
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
@@ -2130,46 +2219,6 @@ struct Tensor[dtype: DType](
         return Reshape[Self.dtype].forward[track_grad](
             self, new_shape, requires_grad, validated, sync=sync
         )
-
-    def upstream_grad_share[
-        augment: Bool
-    ](
-        self,
-        other: Tensor[Self.dtype],
-        upstream_grad: Gradbox[Self.dtype],
-    ) -> Gradbox[Self.dtype]:
-        """Handle gradient broadcasting and augmentation during backprop.
-
-        Args:
-            augment: If True, multiplies upstream_grad by other before accumulating.
-            other: The other tensor involved in the operation.
-            upstream_grad: Incoming gradient to be processed.
-
-        Returns:
-            Processed Gradbox compatible with self's shape for accumulation.
-        """
-        var grad_contrib: Gradbox[Self.dtype]
-        if upstream_grad.shape() == Shape():
-            grad_contrib = Gradbox[Self.dtype].full(
-                self.shape(),
-                upstream_grad.item(),
-                device=upstream_grad.device(),
-            )
-        else:
-            comptime if augment:
-                grad_contrib = upstream_grad * other
-            else:
-                grad_contrib = upstream_grad.copy()
-
-            if grad_contrib.shape() != self.shape():
-                axes = ShapeBroadcaster.broadcast_mask(
-                    self.shape(), grad_contrib.shape()
-                ).indices_of(1)
-                grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
-            if grad_contrib.shape() != self.shape():
-                grad_contrib = grad_contrib.reshape(self.shape())
-
-        return grad_contrib^
 
     def sum[
         track_grad: Bool = True,
@@ -2186,6 +2235,7 @@ struct Tensor[dtype: DType](
             axes: Axes along which to sum.
             keepdims: If True, keep reduced axes with size 1.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with summed values along the specified axes.
@@ -2209,6 +2259,7 @@ struct Tensor[dtype: DType](
             axes: Axes along which to sum.
             keepdims: If True, keep reduced axes with size 1.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with summed values along the specified axes.
@@ -2234,6 +2285,7 @@ struct Tensor[dtype: DType](
             axes: Axes along which to compute product.
             keepdims: If True, keep reduced axes with size 1.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with product values along the specified axes.
@@ -2258,6 +2310,7 @@ struct Tensor[dtype: DType](
             axes: Axes along which to compute product.
             keepdims: If True, keep reduced axes with size 1.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with product values along the specified axes.
@@ -2277,8 +2330,10 @@ struct Tensor[dtype: DType](
         """Element-wise square root.
 
         Args:
-            epsilon: Small value added for numerical stability.
+            epsilon: Stability floor used by the backward pass (forward
+                computes the plain sqrt).
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with square root of each element.
@@ -2302,6 +2357,7 @@ struct Tensor[dtype: DType](
             axes: Axes along which to compute mean.
             keepdims: If True, keep reduced axes with size 1.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with mean values along the specified axes.
@@ -2325,6 +2381,7 @@ struct Tensor[dtype: DType](
             axes: Axes along which to compute mean.
             keepdims: If True, keep reduced axes with size 1.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with mean values along the specified axes.
@@ -2344,6 +2401,7 @@ struct Tensor[dtype: DType](
 
         Args:
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with reciprocal values of the elements.
@@ -2369,6 +2427,7 @@ struct Tensor[dtype: DType](
             keepdims: If True, keep reduced axis with size 1.
             unbiased: If True, use n-1 (sample variance). If False, use n (population).
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with variance along the specified axis.
@@ -2394,6 +2453,7 @@ struct Tensor[dtype: DType](
             keepdims: If True, keep reduced axis with size 1.
             unbiased: If True, use n-1. If False, use n.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with std deviation along the specified axis.
@@ -2417,9 +2477,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             Tensor with the Lp norm value.
-
-        Raises:
-            Panic if p != 2.0 (only L2 norm supported).
         """
         if p == 2.0:
             var squared = self.__mul__[track_grad=False](self)
@@ -2433,7 +2490,7 @@ struct Tensor[dtype: DType](
     def __rtruediv__[
         track_grad: Bool = True, sync: Bool = True
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
-        return DivideScalar[Self.dtype].forward[track_grad](
+        return DivideFromScalar[Self.dtype].forward[track_grad](
             self, scalar, sync=sync
         )
 
@@ -2454,9 +2511,6 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Tensor to add.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -2470,9 +2524,6 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Tensor to subtract.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -2495,9 +2546,6 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Tensor to multiply by.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -2512,9 +2560,6 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Tensor to divide by.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -2575,6 +2620,7 @@ struct Tensor[dtype: DType](
 
         Args:
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with exponential of each element.
@@ -2588,9 +2634,6 @@ struct Tensor[dtype: DType](
     ](self) -> Tensor[Self.dtype]:
         """Negate all elements.
 
-        Args:
-            track_grad: Whether to track gradients.
-
         Returns:
             Tensor with negated values.
         """
@@ -2598,10 +2641,7 @@ struct Tensor[dtype: DType](
             Self.dtype.is_numeric()
         ), "Tensor → __neg__ is for numeric data types only"
 
-        var zeros = Tensor[Self.dtype].zeros_like(self, requires_grad=False)
-        return Subtractor[Self.dtype].forward[track_grad=track_grad](
-            zeros, self, sync=sync
-        )
+        return Negate[Self.dtype].forward[track_grad](self, sync=sync)
 
     def __invert__[
         sync: Bool = True
@@ -2680,7 +2720,7 @@ struct Tensor[dtype: DType](
         b: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
-    ) raises -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype]:
         return Where[Self.dtype].forward[track_grad](
             condition, a, b, requires_grad=requires_grad, sync=sync
         )
@@ -2694,7 +2734,7 @@ struct Tensor[dtype: DType](
         b: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
-    ) raises -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype]:
         return Where[Self.dtype].forward[track_grad](
             condition, a, b, requires_grad=requires_grad, sync=sync
         )
@@ -2708,7 +2748,7 @@ struct Tensor[dtype: DType](
         b: Scalar[Self.dtype],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
-    ) raises -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype]:
         return Where[Self.dtype].forward[track_grad](
             condition, a, b, requires_grad=requires_grad, sync=sync
         )
@@ -2722,7 +2762,7 @@ struct Tensor[dtype: DType](
         b: Scalar[Self.dtype],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
-    ) raises -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype]:
         return Where[Self.dtype].forward[track_grad](
             condition, a, b, requires_grad=requires_grad, sync=sync
         )
@@ -2770,7 +2810,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value on the left.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with scalar added to all elements.
@@ -2784,7 +2823,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value to add.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with scalar added to all elements.
@@ -2808,7 +2846,7 @@ struct Tensor[dtype: DType](
             Tensor with max(self, scalar) for each element.
         """
         return MaxScalar[Self.dtype].forward[track_grad](
-            self, scalar, requires_grad
+            self, scalar, requires_grad, sync
         )
 
     def min[
@@ -2826,7 +2864,7 @@ struct Tensor[dtype: DType](
             Tensor with min(self, scalar) for each element.
         """
         return MinScalar[Self.dtype].forward[track_grad](
-            self, scalar, requires_grad
+            self, scalar, requires_grad, sync
         )
 
     def __add__[
@@ -2836,7 +2874,6 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Tensor to add.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with element-wise sum.
@@ -2850,7 +2887,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value on the left.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with scalar minus each element.
@@ -2866,7 +2902,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value to subtract.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with scalar subtracted from each element.
@@ -2882,7 +2917,6 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Tensor to subtract.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with element-wise difference.
@@ -2911,7 +2945,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value on the left.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with each element multiplied by scalar.
@@ -2925,7 +2958,6 @@ struct Tensor[dtype: DType](
 
         Args:
             factor: Scalar value to multiply by.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with each element multiplied by factor.
@@ -2941,7 +2973,6 @@ struct Tensor[dtype: DType](
 
         Args:
             other: Tensor to multiply by.
-            track_grad: Whether to track gradients.
 
         Returns:
             Tensor with element-wise product.
@@ -3014,9 +3045,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value to add.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -3030,9 +3058,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value to subtract.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -3046,9 +3071,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value to multiply by.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -3062,9 +3084,6 @@ struct Tensor[dtype: DType](
 
         Args:
             scalar: Scalar value to divide by.
-
-        Raises:
-            Panic if called on a leaf tensor that requires gradients.
         """
         if self.is_leaf():
             panic(
@@ -3085,7 +3104,7 @@ struct Tensor[dtype: DType](
             String(self),
             end="\n",
         )
-        empty = List[Int]()
+        var empty = List[Int]()
         print_buffer(
             self.buffer,
             empty,
@@ -3094,7 +3113,7 @@ struct Tensor[dtype: DType](
             num_last=num_last,
         )
 
-    def __del__(deinit self):
+    def __deinit__(deinit self):
         # Gradbox is Optional[Gradbox] — auto-managed by Mojo lifecycle
         pass
 
@@ -3107,7 +3126,7 @@ struct Tensor[dtype: DType](
 
         Args:
             target: Target tensor to compare against.
-            track_grad: Whether to track gradients.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Scalar tensor with the MSE loss value.
@@ -3134,22 +3153,27 @@ struct Tensor[dtype: DType](
     ](
         mut output: Tensor[Self.dtype],
         start_grad: Scalar[Self.dtype] = 1.0,
-        retain_graph: Bool = False,
         sync: Bool = True,
-    ) where Self.dtype.is_floating_point():
+    ):
         """Run backward pass to compute gradients.
+
+        The ancestry DAG is never freed by backward: every call re-derives
+        the traversal (DFS + fanin + ready queue) from the ancestry stored
+        on the tensors, so backward() stays re-runnable and leaf grads
+        accumulate across calls. Intermediate (non-leaf) grads are always
+        cleared once consumed; view-family nodes (reshape/transpose/permute/
+        slice/unsqueeze/squeeze/expand) clear as layout conduits and transfer
+        nodes never clear.
 
         Args:
             start_grad: Initial gradient value (default: 1.0).
-            graph_size: Maximum graph size for traversal.
-            retain_graph: If True, intermediate gradients are preserved.
             sync: If True, synchronize GPU before backward.
         """
         if not output.requires_grad:
             return
         output.seed_grad(start_grad)
         # We have already seeded, pass None
-        output.backward[graph_size](None, retain_graph=retain_graph, sync=sync)
+        output.backward[graph_size](None, sync=sync)
 
     def backward[
         graph_size: Int = 50,
@@ -3157,14 +3181,18 @@ struct Tensor[dtype: DType](
         mut output: Tensor[Self.dtype],
         seed_tensor: Optional[Tensor[Self.dtype]],
         *,
-        retain_graph: Bool = False,
         sync: Bool = True,
-    ) where Self.dtype.is_floating_point():
+    ):
         """Run backward pass with a specific seed tensor.
+
+        The ancestry DAG is never freed by backward: every call re-derives
+        the traversal from the ancestry stored on the tensors, so backward()
+        stays re-runnable and leaf grads accumulate across calls.
+        Intermediate grads are always cleared once consumed; view-family
+        nodes always clear; transfer nodes never do.
 
         Args:
             seed_tensor: Tensor containing initial gradients - if None, assumed to be already seeded.
-            retain_graph: If True, intermediate gradients are preserved.
             sync: If True, synchronize GPU before backward.
         """
         if not output.requires_grad:
@@ -3184,7 +3212,17 @@ struct Tensor[dtype: DType](
             var id_to_index = Dict[UInt, Int]()
 
             var root = output.to_ancestor()
-            root.ndb = output.buffer.copy()
+            var root_ndb: NDBuffer[Self.dtype]
+            if output.buffer.is_shared():
+                root_ndb = output.buffer.copy()
+            else:
+                root_ndb = NDBuffer[Self.dtype](
+                    output.buffer.buffer.clone(),
+                    shape=output.buffer.shape,
+                    strides=output.buffer.strides,
+                    offset=output.buffer.offset,
+                )
+            root.ndb = NDBufferLite[Self.dtype](root_ndb^)
             dfs_stack.append(root._id)
             node_list.append(root.copy())
             id_to_index[root._id] = 0
@@ -3202,13 +3240,18 @@ struct Tensor[dtype: DType](
                 ref node = node_list[node_idx]
 
                 if node.has_ancestry():
+                    # Snapshot parents first: `node` borrows `node_list`,
+                    # so the list cannot grow while iterating the borrow.
+                    var pending = List[Ancestor[Self.dtype]]()
                     for parent in node.ancestry():
-                        var parent_id = parent._id
+                        pending.append(parent.copy())
+                    for k in range(len(pending)):
+                        var parent_id = pending[k]._id
                         fanin[parent_id] = fanin.get(parent_id, 0) + 1
 
                         if parent_id not in id_to_index:
                             var new_idx = len(node_list)
-                            node_list.append(parent.copy())
+                            node_list.append(pending[k].copy())
                             id_to_index[parent_id] = new_idx
                             dfs_stack.append(parent_id)
 
@@ -3229,9 +3272,7 @@ struct Tensor[dtype: DType](
                 if node.has_ancestry():
                     parent_ids.clear()
                     try:
-                        Backward[Self.dtype].invoke(
-                            node, parent_ids, retain_graph
-                        )
+                        Backward[Self.dtype].invoke(node, parent_ids)
                     except e:
                         print("Backward invoke error: ", e)
                     for i in range(len(parent_ids)):
@@ -3246,55 +3287,61 @@ struct Tensor[dtype: DType](
         except e:
             print(e)
 
-    def update_grad[opcode: Int](mut self, incoming: Gradbox[Self.dtype]):
-        if not self.requires_grad:
-            print("Tensor update_grad -> does not require grad")
-            return
-        ref gradbox = self.gradbox.value()
-        if opcode == MulTensor:
-            gradbox *= incoming
-        elif opcode == AddTensor:
-            gradbox += incoming
-        elif opcode == SubtractTensor:
-            gradbox -= incoming
-        elif opcode == ZeroGrad:
-            self.zero_grad()
-
     comptime IteratorType[
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
     ]: Iterator = ElemIterator[Self.dtype, iterable_origin]
 
     def __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
-        return {Pointer(to=self).get_immutable()}
+        return {Pointer(to=self).as_imm()}
 
     def get(self, index: Int) -> Scalar[Self.dtype]:
-        """Get element at a flat index with bounds checking.
+        """Get element at a logical flat index with bounds checking.
+
+        C-order over this view: respects slice/transpose offsets and
+        strides, so `view.get(i)` is the i-th logical element. Negative
+        indices wrap from the end.
 
         Args:
-            index: Flat (linear) index into the tensor's memory.
+            index: Logical flat index (< `numels()` after wrapping).
 
         Returns:
             The scalar value at that index.
-
-        Raises:
-            Panic if index is out of bounds.
         """
         return self.buffer.get(index)
 
     def set(self, index: Int, scalar: Scalar[Self.dtype]):
-        """Set element at a flat index with bounds checking.
+        """Set element at a logical flat index with bounds checking.
+
+        Mirror of `get`: honors view offset/strides, so writes through a
+        view land on the viewed element (aliasing the parent).
 
         Args:
-            index: Flat (linear) index into the tensor's memory.
-
-            Panic if index is out of bounds.
+            index: Logical flat index (< `numels()` after wrapping).
+            scalar: Scalar value to write.
         """
         self.buffer.set(index, scalar)
+
+    def storage_get[checked: Bool = True](
+        self, index: Int
+    ) -> Scalar[Self.dtype]:
+        """Raw storage read: `index` is a buffer address, no view mapping.
+
+        Internal use only — mirrors `NDBuffer.storage_get` for call sites
+        holding addresses from `index_iterator()` or `flatten_index(...,
+        offset)`. Prefer `get` for logical indexing.
+        """
+        return self.buffer.storage_get[checked](index)
+
+    def storage_set[checked: Bool = True](
+        self, index: Int, scalar: Scalar[Self.dtype]
+    ):
+        """Raw storage write (mirror of `storage_get`)."""
+        self.buffer.storage_set[checked](index, scalar)
 
     def view[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         shape: Shape,
         strides: Strides,
         offset: Int = 0,
@@ -3310,6 +3357,7 @@ struct Tensor[dtype: DType](
             offset: Base memory offset.
             requires_grad: If provided, overrides requires_grad.
             validated: If True, skips validation.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A view tensor over the same buffer.
@@ -3321,7 +3369,7 @@ struct Tensor[dtype: DType](
     def view[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         shape: List[Int],
         strides: List[Int],
         offset: Int = 0,
@@ -3335,11 +3383,12 @@ struct Tensor[dtype: DType](
             strides: Memory strides as a list.
             offset: Base memory offset.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A view tensor over the same buffer.
         """
-        view_shape, view_strides = Shape(shape), Strides(strides)
+        var view_shape, view_strides = Shape(shape), Strides(strides)
         return View[Self.dtype].forward[track_grad](
             self,
             view_shape,
@@ -3353,7 +3402,7 @@ struct Tensor[dtype: DType](
     def view[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         *shape_dims: Int,
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
@@ -3362,15 +3411,16 @@ struct Tensor[dtype: DType](
         """Create a contiguous view with the given shape.
 
         Args:
-            *shape_dims: Target shape as variadic ints.
+            shape_dims: Target shape as variadic ints.
             offset: Base memory offset.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A contiguous view tensor.
         """
-        shape = Shape(shape_dims)
-        strides = Strides.default(shape)
+        var shape = Shape(shape_dims)
+        var strides = Strides.default(shape)
         return View[Self.dtype].forward[track_grad](
             self, shape, strides, offset, requires_grad, False, sync=sync
         )
@@ -3378,7 +3428,7 @@ struct Tensor[dtype: DType](
     def view[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         shape: List[Int],
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
@@ -3390,12 +3440,13 @@ struct Tensor[dtype: DType](
             shape: Target shape as a list of ints.
             offset: Base memory offset.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A contiguous view tensor.
         """
-        view_shape = Shape(shape)
-        strides = Strides.default(view_shape)
+        var view_shape = Shape(shape)
+        var strides = Strides.default(view_shape)
         return View[Self.dtype].forward[track_grad](
             self, view_shape, strides, offset, requires_grad, False, sync=sync
         )
@@ -3403,7 +3454,7 @@ struct Tensor[dtype: DType](
     def view[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         shape: Shape,
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
@@ -3415,6 +3466,7 @@ struct Tensor[dtype: DType](
             shape: Target shape.
             offset: Base memory offset.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A contiguous view tensor.
@@ -3431,7 +3483,7 @@ struct Tensor[dtype: DType](
 
     def into_view[
         track_grad: Bool = True, sync: Bool = True
-    ](mut self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
+    ](self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
         """Convert this tensor into a shared view.
 
         Args:
@@ -3441,7 +3493,7 @@ struct Tensor[dtype: DType](
             A view tensor sharing the underlying buffer.
         """
         var shape, strides, offset = self.shape(), self.strides(), self.offset()
-        grad_required = requires_grad.or_else(self.requires_grad)
+        var grad_required = requires_grad.or_else(self.requires_grad)
         return View[Self.dtype].forward[track_grad](
             self, shape, strides, offset, grad_required, validated=True
         )
@@ -3449,7 +3501,7 @@ struct Tensor[dtype: DType](
     def transpose[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         *axes: Int,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -3457,8 +3509,9 @@ struct Tensor[dtype: DType](
         """Transpose tensor by reversing or permuting axes.
 
         Args:
-            *axes: Axes to permute. If empty, reverses all axes.
+            axes: Axes to permute. If empty, reverses all axes.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A transposed view tensor.
@@ -3470,7 +3523,7 @@ struct Tensor[dtype: DType](
     def transpose[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         axes: List[Int] = [],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -3480,6 +3533,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Axes to permute as a list.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A transposed view tensor.
@@ -3491,7 +3545,7 @@ struct Tensor[dtype: DType](
     def transpose[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -3501,6 +3555,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Axes to permute as an IntArray.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A transposed view tensor.
@@ -3511,7 +3566,7 @@ struct Tensor[dtype: DType](
 
     def slice[
         track_grad: Bool = True, sync: Bool = True
-    ](mut self, start: Int, end: Int, step: Int = 1, axis: Int = 0) -> Tensor[
+    ](self, start: Int, end: Int, step: Int = 1, axis: Int = 0) -> Tensor[
         Self.dtype
     ]:
         """Slice tensor along a single axis with start, end, and step.
@@ -3544,7 +3599,7 @@ struct Tensor[dtype: DType](
     def slice[
         track_grad: Bool = True, sync: Bool = True
     ](
-        mut self,
+        self,
         axes: List[Int],
         starts: List[Int],
         ends: List[Int],
@@ -3561,7 +3616,7 @@ struct Tensor[dtype: DType](
         Returns:
             A view tensor over the sliced region.
         """
-        step_sizes = IntArray(steps) if steps else IntArray.filled(len(axes), 1)
+        var step_sizes = IntArray(steps) if steps else IntArray.filled(len(axes), 1)
         if len(step_sizes) != len(axes):
             panic("Tensor → slice: length of steps must match axes length")
 
@@ -3589,7 +3644,7 @@ struct Tensor[dtype: DType](
     def expand[
         track_grad: Bool = True,
     ](
-        mut self: Tensor[Self.dtype],
+        self: Tensor[Self.dtype],
         target: Shape,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -3599,6 +3654,7 @@ struct Tensor[dtype: DType](
         Args:
             target: Shape to broadcast to.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor broadcasted to the target shape.
@@ -3610,7 +3666,7 @@ struct Tensor[dtype: DType](
     def expand[
         track_grad: Bool = True,
     ](
-        mut self: Tensor[Self.dtype],
+        self: Tensor[Self.dtype],
         *target_dims: Int,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -3618,8 +3674,9 @@ struct Tensor[dtype: DType](
         """Broadcast tensor to a target shape.
 
         Args:
-            *target_dims: Target shape as variadic ints.
+            target_dims: Target shape as variadic ints.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor broadcasted to the target shape.
@@ -3631,7 +3688,7 @@ struct Tensor[dtype: DType](
     def squeeze[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         axes: List[Int] = [],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -3641,6 +3698,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Axes to squeeze. If empty, removes all size-1 axes.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with size-1 axes removed.
@@ -3652,7 +3710,7 @@ struct Tensor[dtype: DType](
     def squeeze[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         *axes: Int,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -3660,8 +3718,9 @@ struct Tensor[dtype: DType](
         """Remove axes of size 1.
 
         Args:
-            *axes: Axes to squeeze as variadic ints.
+            axes: Axes to squeeze as variadic ints.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with size-1 axes removed.
@@ -3673,7 +3732,7 @@ struct Tensor[dtype: DType](
     def unsqueeze[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         *axes: Int,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -3681,8 +3740,9 @@ struct Tensor[dtype: DType](
         """Insert axes of size 1.
 
         Args:
-            *axes: Axes at which to insert size-1 dimensions.
+            axes: Axes at which to insert size-1 dimensions.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with size-1 axes inserted.
@@ -3694,7 +3754,7 @@ struct Tensor[dtype: DType](
     def unsqueeze[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         axes: List[Int] = [],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -3704,6 +3764,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Axes at which to insert size-1 dimensions.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with size-1 axes inserted.
@@ -3715,7 +3776,7 @@ struct Tensor[dtype: DType](
     def unsqueeze[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -3725,6 +3786,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Axes at which to insert size-1 dimensions.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with size-1 axes inserted.
@@ -3736,7 +3798,7 @@ struct Tensor[dtype: DType](
     def permute[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         axes: List[Int],
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -3746,6 +3808,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Permutation order (e.g. [2, 0, 1] for 3D).
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with axes permuted.
@@ -3757,7 +3820,7 @@ struct Tensor[dtype: DType](
     def permute[
         track_grad: Bool = True,
     ](
-        mut self,
+        self,
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
@@ -3767,6 +3830,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Permutation order as IntArray.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A tensor with axes permuted.
@@ -3884,6 +3948,7 @@ struct Tensor[dtype: DType](
             perm: Permutation indices for the given axis.
             axis: Axis along which to shuffle.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A shuffled tensor.
@@ -3901,11 +3966,34 @@ struct Tensor[dtype: DType](
 
         Args:
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with ReLU applied element-wise.
         """
         return ReLU[Self.dtype].forward[track_grad](self, requires_grad, sync)
+
+    def gelu[
+        track_grad: Bool = True,
+    ](self, requires_grad: Optional[Bool] = None, sync: Bool = True) -> Tensor[
+        Self.dtype
+    ]:
+        """Gaussian Error Linear Unit.
+
+        Args:
+            requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
+
+        Returns:
+            Tensor with GeLU applied element-wise.
+        """
+        comptime if Self.dtype.is_floating_point():
+            return GeLU[Self.dtype].forward[track_grad](
+                self, requires_grad, sync
+            )
+        else:
+            panic("GeLU requires dtype to be floating point")
+            return Tensor[Self.dtype].scalar(42)
 
     def clip[
         track_grad: Bool = True,
@@ -3922,6 +4010,7 @@ struct Tensor[dtype: DType](
             min_val: Minimum value.
             max_val: Maximum value.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with values clipped to [min_val, max_val].
@@ -3929,6 +4018,93 @@ struct Tensor[dtype: DType](
         return Clip[Self.dtype].forward[track_grad](
             self, min_val, max_val, requires_grad, sync
         )
+
+    def fake_quant[
+        track_grad: Bool = True,
+    ](
+        self,
+        scale: Tensor[Self.dtype],
+        qmin: Scalar[Self.dtype],
+        qmax: Scalar[Self.dtype],
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+        """Fake quantization with a straight-through estimator.
+
+            out = scale * clamp(round(x / scale), qmin, qmax)
+
+        The quantizer is a staircase, so the TRUE derivative w.r.t. the input
+        is 0 almost everywhere. This op overrides it to **1** (that is the
+        "straight-through" part) while leaving `d/d(scale)` at its true value
+        `k = clamp(round(x/scale), qmin, qmax)`. Training through it therefore
+        moves, which plain `round`-then-multiply cannot do.
+
+        Must be a single op rather than a composition: wiring ancestry per
+        sub-op would hand back zeros, because `round` is non-differentiable by
+        design. See `tenmo/fakequant.mojo`.
+
+        Uses half-to-even rounding (Mojo's `round`), not `floor(x + 0.5)` —
+        the substitution rounds half *up* and disagrees on every tie, and a
+        dyadic scale puts `x / scale` on a `.5` exactly.
+
+        Args:
+            scale: Quantization step. A tensor, so it can be a learnable
+                parameter (LSQ-style) — its gradient is `upstream * k`.
+            qmin: Lowest representable level (e.g. -128.0).
+            qmax: Highest representable level (e.g. 127.0).
+            requires_grad: Override gradient tracking (default: inherit).
+            sync: Whether to synchronize the GPU operation.
+
+        Returns:
+            Dequantized tensor of the same dtype. CPU only for now.
+        """
+        return FakeQuant[Self.dtype].forward[track_grad](
+            self, scale, qmin, qmax, requires_grad, sync
+        )
+
+    def round(
+        self,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+        """Round to the nearest integer level, **ties to even**.
+
+        NOT differentiable: the true derivative is 0 almost everywhere, so the
+        result is always a leaf and never carries a gradient. Deliberately has
+        no `track_grad` parameter -- a silently-ignored flag is worse than a
+        compile error when a caller expects a graph edge.
+
+        Ties are not a corner case: with a dyadic scale, `x / scale` lands on a
+        `.5` exactly, which is why quantization must use this and not
+        `floor(x + 0.5)` (that rounds half *up* and disagrees on every tie).
+        Note `round(-0.5) = -0.0`, so signed zero can reach the output.
+
+        Args:
+            sync: Whether to synchronize the GPU operation (CPU-only op; the
+                flag is accepted for signature symmetry).
+
+        Returns:
+            Tensor with values rounded to integer levels. Always a leaf.
+        """
+        return Round[Self.dtype].forward(self, sync)
+
+    def floor(
+        self,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+        """Truncate toward negative infinity.
+
+        NOT differentiable: the true derivative is 0 almost everywhere, so the
+        result is always a leaf and never carries a gradient. No `track_grad`
+        parameter, for the same reason as `round`.
+
+        Args:
+            sync: Whether to synchronize the GPU operation (CPU-only op; the
+                flag is accepted for signature symmetry).
+
+        Returns:
+            Tensor with values floored. Always a leaf.
+        """
+        return Floor[Self.dtype].forward(self, sync)
 
     def tanh[
         track_grad: Bool = True,
@@ -3943,6 +4119,7 @@ struct Tensor[dtype: DType](
 
         Args:
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with tanh applied element-wise.
@@ -3962,6 +4139,7 @@ struct Tensor[dtype: DType](
 
         Args:
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with sigmoid applied element-wise.
@@ -3983,6 +4161,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Axes along which to apply softmax.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with softmax probabilities. Use log=True for log-softmax.
@@ -4009,6 +4188,7 @@ struct Tensor[dtype: DType](
         Args:
             axes: Axes along which to apply softmax.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Tensor with softmax probabilities. Use log=True for log-softmax.
@@ -4034,10 +4214,10 @@ struct Tensor[dtype: DType](
         """Binary cross entropy loss.
 
         Args:
-            pred: Predicted probabilities.
             target: Ground truth labels (0 or 1).
             epsilon: Small value for numerical stability.
             reduction: "mean", "sum", or "none".
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Scalar tensor with the BCE loss (mean/sum) or per-element (none).
@@ -4058,10 +4238,10 @@ struct Tensor[dtype: DType](
         """BCE loss with logits (sigmoid applied internally).
 
         Args:
-            logits: Raw unnormalized predictions.
             target: Ground truth labels (0 or 1).
             epsilon: Small value for numerical stability.
             reduction: "mean", "sum", or "none".
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Scalar tensor with the BCE loss (mean/sum) or per-element (none).
@@ -4146,10 +4326,8 @@ struct Tensor[dtype: DType](
         """Matrix multiplication of two tensors.
 
         Args:
-            A: Left-hand tensor.
             B: Right-hand tensor.
-            track_grad: Whether to track gradients.
-            mode: Matrix multiplication mode (default: mm).
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Result of matrix multiplication.
@@ -4164,7 +4342,6 @@ struct Tensor[dtype: DType](
         """Matrix multiplication with a Gradbox.
 
         Args:
-            A: Left-hand tensor.
             B: Right-hand Gradbox.
 
         Returns:
@@ -4187,6 +4364,7 @@ struct Tensor[dtype: DType](
             tensors: List of tensors to concatenate.
             axis: Axis along which to concatenate.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A single concatenated tensor.
@@ -4210,6 +4388,7 @@ struct Tensor[dtype: DType](
             tensors: List of tensors to stack.
             axis: Axis at which to insert the new dimension.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             A stacked tensor with shape extended by one dimension.
@@ -4231,6 +4410,7 @@ struct Tensor[dtype: DType](
         Args:
             tensors: List of 1D tensors to stack vertically.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Stacked tensor.
@@ -4252,6 +4432,7 @@ struct Tensor[dtype: DType](
         Args:
             tensors: List of 1D tensors to stack horizontally.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Stacked tensor.
@@ -4279,6 +4460,7 @@ struct Tensor[dtype: DType](
             mode: Padding mode ("constant", etc.).
             value: Fill value for constant mode.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Padded tensor.
@@ -4304,6 +4486,7 @@ struct Tensor[dtype: DType](
             pad: List of (before, after) padding pairs per axis.
             value: Fill value (default: 0.0).
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Padded tensor.
@@ -4337,6 +4520,7 @@ struct Tensor[dtype: DType](
             mode: Padding mode.
             value: Fill value for constant mode.
             requires_grad: If provided, overrides requires_grad.
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             2D-padded tensor.
@@ -4365,9 +4549,6 @@ struct Tensor[dtype: DType](
 
         Returns:
             Padded 4D tensor.
-
-        Raises:
-            Panic if tensor is not 4D.
         """
         var x_shape = x.shape()
         if x_shape.rank() != 4:
@@ -4388,7 +4569,7 @@ struct Tensor[dtype: DType](
 
 
 @fieldwise_init
-struct ElemIterator[dtype: DType, origin: ImmutOrigin](
+struct ElemIterator[dtype: DType, origin: ImmOrigin](
     RegisterPassable & ImplicitlyCopyable & Iterable & Iterator & Sized
 ):
     """Iterator over (coordinate, value) pairs in a tensor.
@@ -4402,7 +4583,7 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
     ]: Iterator = Self
 
     var src: Pointer[Tensor[Self.dtype], Self.origin]
-    var index_itr: ShapeIndexIterator[ImmutAnyOrigin]
+    var index_itr: ShapeIndexIterator[Self.origin]
 
     def __init__(out self, src: Pointer[Tensor[Self.dtype], Self.origin]):
         """Initialize iterator over a tensor.
@@ -4411,7 +4592,7 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
             src: Pointer to the tensor to iterate over.
         """
         self.src = src
-        self.index_itr = rebind[ShapeIndexIterator[ImmutAnyOrigin]](
+        self.index_itr = rebind[ShapeIndexIterator[Self.origin]](
             src[].shape().__iter__()
         )
 
@@ -4427,7 +4608,7 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
         Raises:
             StopIteration: When all elements have been visited.
         """
-        next = self.index_itr.__next__()
+        var next = self.index_itr.__next__()
         return next, self.src[][next]
 
     def __len__(self) -> Int:
@@ -4456,7 +4637,7 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
 
 
 @fieldwise_init
-struct SliceIterator[dtype: DType, origin: ImmutOrigin](
+struct SliceIterator[dtype: DType, origin: ImmOrigin](
     RegisterPassable & ImplicitlyCopyable & Iterable & Iterator & Sized
 ):
     """Iterates over first dimension slices.

@@ -1,7 +1,7 @@
 from std.time import perf_counter_ns
 from std.random import random_float64
 from .tensor import Tensor
-from .shapes import Shape
+from .shared.shapes import Shape
 
 
 # ============================================
@@ -15,7 +15,7 @@ def matmul_naive[
     var n = A.shape()[1]
     var p = B.shape()[1]
 
-    var C = Tensor[dtype].zeros(Shape([m, p]))
+    var C = Tensor[dtype].zeros(Shape(m, p))
 
     # Pure scalar triple loop - i-j-k order
     for i in range(m):
@@ -55,8 +55,8 @@ def benchmark_matmul():
         print("─" * 60)
 
         # Create test matrices
-        var A = Tensor[dtype].rand(Shape([size, size]))
-        var B = Tensor[dtype].rand(Shape([size, size]))
+        var A = Tensor[dtype].rand(Shape(size, size))
+        var B = Tensor[dtype].rand(Shape(size, size))
 
         # Warm-up (important for cache/CPU frequency scaling)
         _ = matmul_naive(A, B)
@@ -96,8 +96,8 @@ def benchmark_matmul():
         # ========================================
         print("\n[3] Optimized Matmul + Backward")
 
-        var A_grad = Tensor[dtype].rand(Shape([size, size]))
-        var B_grad = Tensor[dtype].rand(Shape([size, size]))
+        var A_grad = Tensor[dtype].rand(Shape(size, size))
+        var B_grad = Tensor[dtype].rand(Shape(size, size))
         A_grad.requires_grad_(True)
         B_grad.requires_grad_(True)
 
@@ -151,8 +151,8 @@ def benchmark_backward_breakdown():
     print("BACKWARD PASS DETAILED BREAKDOWN")
     print("=" * 60)
 
-    var A = Tensor[dtype].rand(Shape([size, size]))
-    var B = Tensor[dtype].rand(Shape([size, size]))
+    var A = Tensor[dtype].rand(Shape(size, size))
+    var B = Tensor[dtype].rand(Shape(size, size))
     A.requires_grad_(True)
     B.requires_grad_(True)
 
@@ -190,7 +190,7 @@ def benchmark_memory_bandwidth():
     print("MEMORY BANDWIDTH TEST")
     print("=" * 60)
 
-    var A = Tensor[dtype].rand(Shape([size, size]))
+    var A = Tensor[dtype].rand(Shape(size, size))
 
     # Measure pure memory copy speed
     var t0 = perf_counter_ns()

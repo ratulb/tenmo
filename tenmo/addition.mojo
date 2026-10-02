@@ -1,38 +1,36 @@
 from .tensor import Tensor
 from .backpropagation import (
-    BackwardFnArg,
-    BACKWARD_ADD,
-    BACKWARD_ADD_SCALAR,
-    BACKWARD_ADD_BROADCAST,
+    BackwardFnType,
+    BackwardFn,
 )
-from .mnemonics import AddTensor, Add
-from .common_utils import panic
-from .gradbox import Gradbox
+from .shared.mnemonics import AddTensor, Add
+from .shared.panic import panic
 from .broadcast import BroadcastBackward
 from .ancestry import Ancestor
 
 
 @fieldwise_init
-struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct AddBackwardScalar[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         if not output.parents:
             panic("Addition add scalar backward: parent_refs is None!")
-        ref parent = output.ancestry().get(0)
+        var parent = output.ancestry().get(0)
         if parent.requires_grad:
             ref gradbox = output.gradients()
-            if parent.shape() != gradbox.shape():
-                var reshaped = gradbox.reshape(parent.shape())
-                parent.update_grad(reshaped, AddTensor, None)
-            else:
-                parent.update_grad(gradbox, AddTensor, None)
+            # No reshape: scalar-add preserves shape exactly, and every
+            # shape-changing downstream backward restores out-shape before
+            # accumulating (same contract as AddBackward's count==1 path).
+            parent.update_grad(gradbox, AddTensor, None)
         parent_ids.append(parent._id)
-        if not retain_graph:
-            output.gradients().zero_grad()
+        output.gradients().zero_grad()
 
 
 comptime AddBroadcastBackward[dtype: DType] = BroadcastBackward[
@@ -48,9 +46,9 @@ struct AddScalar[dtype: DType](Copyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True) -> Tensor[
-        Self.dtype
-    ]:
+    ](
+        self: Tensor[Self.dtype], scalar: Scalar[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         var out = Tensor[Self.dtype](
             self.buffer.scalar_ops[Add](scalar, sync=sync), requires_grad=False
         )
@@ -58,11 +56,11 @@ struct AddScalar[dtype: DType](Copyable, RegisterPassable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
-                    BACKWARD_ADD_SCALAR
+                var backwardFn = BackwardFn.null_arg[Self.dtype](
+                    AddBackwardScalar[Self.dtype](),
                 )
-                backwardFnArg.needs_parent_data = True
-                out.add_ancestry(backwardFnArg^, self)
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, self)
         return out^
 
 
@@ -72,9 +70,9 @@ struct Adder[dtype: DType](Copyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype], sync: Bool = True) -> Tensor[
-        Self.dtype
-    ]:
+    ](
+        self: Tensor[Self.dtype], other: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         if not self.broadcastable(other):
             panic(
                 "Tensor addition dimension mismatch: cannot broadcast shape "
@@ -93,35 +91,41 @@ struct Adder[dtype: DType](Copyable, RegisterPassable):
             if self.requires_grad or other.requires_grad:
                 out.requires_grad_(True)
                 if self.shape() == other.shape():
-                    var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
-                        BACKWARD_ADD
+                    var backwardFn = BackwardFn.null_arg[Self.dtype](
+                        AddBackward[Self.dtype]()
                     )
                     if self.requires_grad and other.requires_grad:
-                        out.add_ancestry(backwardFnArg^, self, other)
+                        out.add_ancestry(backwardFn^, self, other)
                     elif self.requires_grad:
-                        out.add_ancestry(backwardFnArg^, self)
+                        out.add_ancestry(backwardFn^, self)
                     else:
-                        out.add_ancestry(backwardFnArg^, other)
+                        out.add_ancestry(backwardFn^, other)
                 else:
-                    var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
-                        BACKWARD_ADD_BROADCAST
+                    var backwardFn = BackwardFn.null_arg[Self.dtype](
+                        AddBroadcastBackward[Self.dtype](),
                     )
-                    backwardFnArg.needs_parent_data = True
-                    out.add_ancestry(backwardFnArg^, self, other)
+                    backwardFn.needs_parent_data = True
+                    # Both parents: BroadcastBackward unconditionally gets
+                    # ancestry(0) and ancestry(1); per-parent compute is
+                    # already guarded on requires_grad inside.
+                    out.add_ancestry(backwardFn^, self, other)
 
         return out^
 
 
 @fieldwise_init
-struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct AddBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         var gradbox = output.gradients()
-        count = len(output.ancestry())
+        var count = len(output.ancestry())
 
         if count == 1:
             var ancestor = output.ancestry().get(0)
@@ -130,8 +134,8 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         else:
             var ancestor_lhs = output.ancestry().get(0)
             var ancestor_rhs = output.ancestry().get(1)
-            lhs_requires_grad = ancestor_lhs.requires_grad
-            rhs_requires_grad = ancestor_rhs.requires_grad
+            var lhs_requires_grad = ancestor_lhs.requires_grad
+            var rhs_requires_grad = ancestor_rhs.requires_grad
 
             if lhs_requires_grad and rhs_requires_grad:
                 ancestor_lhs.update_grad(gradbox, AddTensor, None)
@@ -149,5 +153,4 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             else:
                 pass
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()

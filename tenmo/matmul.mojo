@@ -1,57 +1,103 @@
 from .tensor import Tensor
-from std.sys import simd_width_of
-from .matrixshapevalidator import MatrixShapeValidator
 from .backpropagation import (
-    BackwardFnArg,
-    BACKWARD_MATMUL_ND,
-    BACKWARD_MATMUL_2D,
+    BackwardFnType,
+    BackwardFn,
 )
-from .mnemonics import AddTensor, mm, vm, mv, dot, invalid
+from .shared.mnemonics import AddTensor, mm, vm, mv, dot, invalid
 from .gradbox import Gradbox
-from .shapes import Shape
-from .common_utils import panic
+from .shared.shapes import Shape
+from .shared.panic import panic
 from .vectormatrix import VectorMatmulNd
 from .matrixvector import MatrixVectorMulNd
-from std.algorithm import parallelize
-from std.sys.info import num_physical_cores
-from .intarray import IntArray
+from .multiplication import Multiplicator
+from .shared.intarray import IntArray
 from .ancestry import Ancestor
+from .ndbuffer import NDBuffer
+from .blas_ndbuffer import blas_matmul, BLASCache
+
+
+def _blas_eligible[dtype: DType](
+    A: NDBuffer[dtype], B: NDBuffer[dtype]
+) -> Bool:
+    """True iff the 2D operands can use the forward-only BLAS GEMM.
+
+    Requires: BLAS opt-in (-D BLAS) + library loaded, dtype float32/float64,
+    both on CPU, contiguous, and zero-offset (BLAS reads the base buffer
+    pointer).
+    """
+    if not BLASCache.is_enabled():
+        return False
+    if not BLASCache.is_available():
+        return False
+    var ok_dtype = False
+    comptime if dtype == DType.float32:
+        ok_dtype = True
+    elif dtype == DType.float64:
+        ok_dtype = True
+    if not ok_dtype:
+        return False
+    var a = A
+    var b = B
+    return (
+        not a.is_on_gpu()
+        and not b.is_on_gpu()
+        and a.is_contiguous()
+        and b.is_contiguous()
+        and a.offset == 0
+        and b.offset == 0
+    )
 
 
 @fieldwise_init
-struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct Matmul2dBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         ref grad_out = output.gradients()
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
 
-        # GRADIENT FOR A: dL/dA = grad_out × B^T
+        # GRADIENT FOR A: dL/dA = grad_out × B^T (computed only if
+        # needed; the id is always appended — parent_ids is the engine's
+        # fanin-completion signal and must cover every ancestry parent).
         if A.requires_grad:
             var B_buffer = B.buffer()
-            var ndb = grad_out.buffer().matmul_2d(
-                B_buffer.transpose(IntArray(-1, -2))
-            )
+            var ndb: NDBuffer[Self.dtype]
+            if _blas_eligible(grad_out.buffer(), B_buffer):
+                ndb = blas_matmul[Self.dtype](
+                    grad_out.buffer(), B_buffer, transpose_B=True
+                )
+            else:
+                ndb = grad_out.buffer().matmul_2d(
+                    B_buffer.transpose(IntArray(-1, -2))
+                )
             var grad_A = Gradbox[Self.dtype](ndb^)
 
             A.update_grad(grad_A^, AddTensor, None)
-            parent_ids.append(A._id)
+        parent_ids.append(A._id)
 
-        # GRADIENT FOR B: dL/dB = A^T × grad_out
+        # GRADIENT FOR B: dL/dB = A^T × grad_out (same contract).
         if B.requires_grad:
             var A_buffer = A.buffer()
-            var A_buffer_transposed = A_buffer.transpose(IntArray(-1, -2))
-            var ndb = A_buffer_transposed.matmul_2d(grad_out.buffer())
+            var ndb: NDBuffer[Self.dtype]
+            if _blas_eligible(A_buffer, grad_out.buffer()):
+                ndb = blas_matmul[Self.dtype](
+                    A_buffer, grad_out.buffer(), transpose_A=True
+                )
+            else:
+                var A_buffer_transposed = A_buffer.transpose(IntArray(-1, -2))
+                ndb = A_buffer_transposed.matmul_2d(grad_out.buffer())
             var grad_B = Gradbox[Self.dtype](ndb^)
 
             B.update_grad(grad_B^, AddTensor, None)
-            parent_ids.append(B._id)
-        if not retain_graph:
-            grad_out.zero_grad()
+        parent_ids.append(B._id)
+        grad_out.zero_grad()
 
 
 @fieldwise_init
@@ -60,19 +106,25 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     def forward[
         track_grad: Bool = True,
-    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
-        var ndb = A.buffer.matmul_2d(B.buffer)
+    ](
+        A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
+        var ndb: NDBuffer[Self.dtype]
+        if _blas_eligible(A.buffer, B.buffer):
+            ndb = blas_matmul[Self.dtype](A.buffer, B.buffer, sync=sync)
+        else:
+            ndb = A.buffer.matmul_2d(B.buffer, sync=sync)
         var C = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         comptime if track_grad:
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
-                    BACKWARD_MATMUL_2D
+                var backwardFn = BackwardFn.null_arg[Self.dtype](
+                    Matmul2dBackward[Self.dtype]()
                 )
-                backwardFnArg.needs_parent_data = True
-                C.add_ancestry(backwardFnArg^, A, B)
+                backwardFn.needs_parent_data = True
+                C.add_ancestry(backwardFn^, A, B)
 
         return C^
 
@@ -81,7 +133,11 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def forward(
         A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
-        var ndb = A.buffer.matmul_2d(B.buffer())
+        var ndb: NDBuffer[Self.dtype]
+        if _blas_eligible(A.buffer, B.buffer()):
+            ndb = blas_matmul[Self.dtype](A.buffer, B.buffer())
+        else:
+            ndb = A.buffer.matmul_2d(B.buffer())
         var C = Gradbox[Self.dtype](ndb^)
         return C^
 
@@ -90,18 +146,25 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def forward(
         A: Gradbox[Self.dtype], B: Tensor[Self.dtype]
     ) -> Gradbox[Self.dtype]:
-        var ndb = A.buffer().matmul_2d(B.buffer)
+        var ndb: NDBuffer[Self.dtype]
+        if _blas_eligible(A.buffer(), B.buffer):
+            ndb = blas_matmul[Self.dtype](A.buffer(), B.buffer)
+        else:
+            ndb = A.buffer().matmul_2d(B.buffer)
         var C = Gradbox[Self.dtype](ndb^)
         return C^
 
 
 @fieldwise_init
-struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct MatmulNdBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         ref grad_out = output.gradients()
         var A = output.ancestry().get(0)
@@ -121,7 +184,7 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var final_grad_A = A_batch_grad^.sum_over_broadcasted_axes(A_shape)
 
             A.update_grad(final_grad_A^, AddTensor, None)
-            parent_ids.append(A._id)
+        parent_ids.append(A._id)
 
         if B.requires_grad:
             var A_transposed = A_buffer.transpose(axes=IntArray(-1, -2))
@@ -132,9 +195,8 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var final_grad_B = B_batch_grad^.sum_over_broadcasted_axes(B_shape)
 
             B.update_grad(final_grad_B^, AddTensor, None)
-            parent_ids.append(B._id)
-        if not retain_graph:
-            grad_out.zero_grad()
+        parent_ids.append(B._id)
+        grad_out.zero_grad()
 
 
 @fieldwise_init
@@ -143,7 +205,9 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True
-    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
+    ](
+        A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         ref A_shape = A.shape()
         ref B_shape = B.shape()
 
@@ -151,18 +215,18 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if A_shape.rank() == 2 and B_shape.rank() == 2:
             return Matmul2d[Self.dtype].forward[track_grad](A, B, sync=sync)
 
-        var ndb = A.buffer.matmul_nd(B.buffer)
+        var ndb = A.buffer.matmul_nd(B.buffer, sync=sync)
         var C = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         comptime if track_grad:
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
-                    BACKWARD_MATMUL_ND
+                var backwardFn = BackwardFn.null_arg[Self.dtype](
+                    MatmulNdBackward[Self.dtype]()
                 )
-                backwardFnArg.needs_parent_data = True
-                C.add_ancestry(backwardFnArg^, A, B)
+                backwardFn.needs_parent_data = True
+                C.add_ancestry(backwardFn^, A, B)
 
         return C^
 
@@ -204,9 +268,26 @@ struct Matmul[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def forward[
         track_grad: Bool = True, mode: Int = mm
-    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
+    ](
+        A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
         comptime if mode == mm:
             # Step 1: Pure analysis - get the opcode
+            # Scalar generosity (mirrors Dot.forward, same numels()==1
+            # predicate): a lone scalar operand scales the other side
+            # instead of panicking in classify_matmul. Routes through
+            # elementwise * (full autograd + GPU + broadcast support), so
+            # dL/dM = s·upstream and dL/ds = sum(M·upstream). Both-scalar
+            # still falls through to dot below; (1,1)x(1,1) still takes
+            # the mm path.
+            if A.numels() == 1 and B.numels() > 1:
+                return Multiplicator[Self.dtype].forward[track_grad](
+                    A, B, sync=sync
+                )
+            if B.numels() == 1 and A.numels() > 1:
+                return Multiplicator[Self.dtype].forward[track_grad](
+                    A, B, sync=sync
+                )
             var opcode = classify_matmul(A.shape(), B.shape())
 
             # Step 2: Simple dispatch based on opcode
@@ -215,10 +296,14 @@ struct Matmul[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 return A.dot[track_grad](B, sync=sync)
 
             if vm == opcode:
-                return VectorMatmulNd[Self.dtype].forward[track_grad](A, B, sync=sync)
+                return VectorMatmulNd[Self.dtype].forward[track_grad](
+                    A, B, sync=sync
+                )
 
             if mv == opcode:
-                return MatrixVectorMulNd[Self.dtype].forward[track_grad](A, B, sync=sync)
+                return MatrixVectorMulNd[Self.dtype].forward[track_grad](
+                    A, B, sync=sync
+                )
 
             if mm == opcode:
                 return MatmulNd[Self.dtype].forward[track_grad](A, B, sync=sync)
@@ -231,10 +316,14 @@ struct Matmul[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             return A.dot[track_grad](B, sync=sync)
 
         elif mode == vm:
-            return VectorMatmulNd[Self.dtype].forward[track_grad](A, B, sync=sync)
+            return VectorMatmulNd[Self.dtype].forward[track_grad](
+                A, B, sync=sync
+            )
 
         elif mode == mv:
-            return MatrixVectorMulNd[Self.dtype].forward[track_grad](A, B, sync=sync)
+            return MatrixVectorMulNd[Self.dtype].forward[track_grad](
+                A, B, sync=sync
+            )
         else:
             # Invalid case
             panic("Matmul: incompatible shapes")

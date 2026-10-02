@@ -1,4 +1,4 @@
-from std.memory import UnsafePointer, memcpy
+from std.memory import Pointer, unsafe_memcpy
 from std.python import Python, PythonObject
 from .tensor import Tensor
 from std.utils import StaticTuple, Variant
@@ -44,7 +44,7 @@ struct Weights:
                 axes_dims1 = StaticTuple[Int, 1](np_tensor_shape[0])
                 tensor1 = Tensor[1, DType.float32](axes_dims1)
                 tensor_ptr1 = tensor1.unsafe_ptr()
-                memcpy(tensor_ptr1, np_weights_ptr, np_weights.size)
+                unsafe_memcpy(tensor_ptr1, np_weights_ptr, np_weights.size)
                 return Optional(TensorVariant(tensor1))
             elif dimension == 2:
                 axes_dims2 = StaticTuple[Int, 2](
@@ -52,7 +52,7 @@ struct Weights:
                 )
                 tensor2 = Tensor[2, DType.float32](axes_dims2)
                 tensor_ptr2 = tensor2.unsafe_ptr()
-                memcpy(tensor_ptr2, np_weights_ptr, np_weights.size)
+                unsafe_memcpy(tensor_ptr2, np_weights_ptr, np_weights.size)
                 return Optional(TensorVariant(tensor2))
             elif dimension == 3:
                 axes_dims3 = StaticTuple[Int, 3](
@@ -60,7 +60,7 @@ struct Weights:
                 )
                 tensor3 = Tensor[3, DType.float32](axes_dims3)
                 tensor_ptr3 = tensor3.unsafe_ptr()
-                memcpy(tensor_ptr3, np_weights_ptr, np_weights.size)
+                unsafe_memcpy(tensor_ptr3, np_weights_ptr, np_weights.size)
                 return Optional(TensorVariant(tensor3))
             elif dimension == 4:
                 axes_dims4 = StaticTuple[Int, 4](
@@ -71,7 +71,7 @@ struct Weights:
                 )
                 tensor4 = Tensor[4, DType.float32](axes_dims4)
                 tensor_ptr4 = tensor4.unsafe_ptr()
-                memcpy(tensor_ptr4, np_weights_ptr, np_weights.size)
+                unsafe_memcpy(tensor_ptr4, np_weights_ptr, np_weights.size)
                 return Optional(TensorVariant(tensor4))
             else:
                 print("Unsupported dimension")
@@ -84,7 +84,7 @@ struct Weights:
     @staticmethod
     def ndarray_ptr[
         dtype: DType
-    ](ndarray: PythonObject) raises -> UnsafePointer[Scalar[dtype]]:
+    ](ndarray: PythonObject) raises -> Pointer[Scalar[dtype]]:
         return ndarray.__array_interface__["data"][0].unsafe_get_as_pointer[
             dtype
         ]()

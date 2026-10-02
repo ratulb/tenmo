@@ -1,8 +1,8 @@
 from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from std.sys import has_accelerator
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from std.math import log, exp
 
 
@@ -32,7 +32,7 @@ def test_softmax_1d_basic() raises:
     assert_true(output.all_close(expected))
 
     # Test backward pass
-    s = output.sum()
+    var s = output.sum()
     s.backward()
     assert_true(input_data.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 0.0])))
 
@@ -44,7 +44,7 @@ def test_softmax_1d_with_grad_validation() raises:
 
     # Create a loss and compute gradients
     var target = Tensor[dtype].d1([0.0, 1.0, 0.0])
-    mse_loss = output.mse(target)
+    var mse_loss = output.mse(target)
     mse_loss.backward()
 
     assert_true(
@@ -74,9 +74,9 @@ def test_softmax_2d_axis_0() raises:
     )
     assert_true(output.all_close(expected))
 
-    target = Tensor[dtype].d2([[0, 1.5], [2.5, 0.0]])
+    var target = Tensor[dtype].d2([[0, 1.5], [2.5, 0.0]])
     # Test backward
-    loss = output.mse(target)
+    var loss = output.mse(target)
     loss.backward()
 
     assert_true(
@@ -110,7 +110,7 @@ def test_softmax_2d_axis_1() raises:
     assert_true(output.all_close(expected))
 
     var target = Tensor[dtype].d2([[0.0, 1.9], [2.9, 0.0]])
-    loss = output.mse(target)
+    var loss = output.mse(target)
     loss.backward()
     assert_true(
         input_data.grad().all_close(
@@ -142,7 +142,7 @@ def test_softmax_2d_multiple_axes() raises:
     )
     assert_true(output.all_close(expected))
     var target = Tensor[dtype].d2([[0.0, 1.9], [2.9, 0.0]])
-    loss = output.mse(target)
+    var loss = output.mse(target)
     loss.backward()
 
     assert_true(
@@ -189,7 +189,7 @@ def test_softmax_3d_axis_2() raises:
     var target = Tensor[dtype].d3(
         [[[1.0, 1.0], [3.0, 2.0]], [[3.0, 4.0], [5.0, 6.0]]]
     )
-    loss = output.mse(target)
+    var loss = output.mse(target)
     loss.backward()
 
     expected = (
@@ -219,7 +219,7 @@ def test_softmax_gradient_validation_1d() raises:
     var output = input_data.softmax(axes=[0])
 
     # For softmax, the gradient should satisfy: sum(grad) = 0 when output is used in loss
-    s = output.sum()
+    var s = output.sum()
     s.backward()
     var grad_sum = input_data.grad().sum().item()
     assert_true(abs(grad_sum) < 1e-6)  # Should be very close to 0
@@ -236,7 +236,7 @@ def test_softmax_gradient_validation_2d() raises:
     var target = Tensor[dtype].d2([[1.0, 0.0], [0.0, 1.0]])
     var loss = (output * target).sum()
     loss.backward()
-    expected = (
+    var expected = (
         Tensor[dtype]
         .d2(
             [
@@ -277,7 +277,7 @@ def test_softmax_negative_values() raises:
     var output_sum = output.sum().item()
     assert_true(abs(output_sum - 1.0) < 1e-6)
 
-    s = output.sum()
+    var s = output.sum()
     s.backward()
 
 
@@ -877,7 +877,7 @@ def test_softmax_parity_using_zero_grad() raises:
         var a_gpu = a_cpu.to_gpu()
         var loss_cpu = a_cpu.softmax().sum()
         loss_cpu.backward()
-        var cpu_grad = a_cpu.grad().copy()
+        var cpu_grad = a_cpu.grad().clone()
         a_cpu.zero_grad()
         var loss_gpu = a_gpu.softmax().sum()
         loss_gpu.backward()
@@ -892,7 +892,7 @@ def test_log_softmax_parity_using_zero_grad() raises:
         var a_gpu = a_cpu.to_gpu()
         var loss_cpu = a_cpu.softmax[log=True]().sum()
         loss_cpu.backward()
-        var cpu_grad = a_cpu.grad().copy()
+        var cpu_grad = a_cpu.grad().clone()
         a_cpu.zero_grad()
         var loss_gpu = a_gpu.softmax[log=True]().sum()
         loss_gpu.backward()

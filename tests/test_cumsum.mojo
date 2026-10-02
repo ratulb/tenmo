@@ -1,6 +1,7 @@
 from tenmo.tensor import Tensor
-from tenmo.common_utils import i
-from std.testing import assert_true, TestSuite
+from tenmo.cumsum import cumsum_backward_cpu
+from tenmo.shared.indexhelper import i
+from std.testing import assert_true, assert_false, TestSuite
 from std.sys import has_accelerator
 
 comptime F32 = DType.float32
@@ -124,6 +125,22 @@ def test_cumsum_backward_3d_axis1() raises:
         ]
     )
     assert_true(x.grad().all_close(expected_grad))
+
+
+def test_cumsum_backward_cpu_strided_grad() raises:
+    # Direct unit test of cumsum_backward_cpu's strided branch: no
+    # Tensor-level graph route delivers a strided gradbox (update_grad
+    # accumulates into contiguous storage), so the strided input is built
+    # explicitly as a transposed view.
+    var g = Tensor[F32].d2([[1.0, 2.0], [3.0, 4.0]])
+    var gs = g.transpose()  # logical [[1,3],[2,4]] on strided storage
+    assert_false(gs.is_contiguous())
+    var out_ndb = cumsum_backward_cpu(gs.buffer, 0)
+    var out = Tensor[F32](out_ndb^, requires_grad=False)
+    # Suffix sums along axis 0: row 0 = [1+2, 3+4], row 1 passes through.
+    var expected = Tensor[F32].d2([[3.0, 7.0], [2.0, 4.0]])
+    assert_true(out.all_close(expected))
+    _ = g
 
 
 # ===----------------------------------------------------------------------=== #
