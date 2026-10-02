@@ -1,19 +1,25 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor, TANH_BACKWARD
-from .backpropagation import BackwardFnArg, NDBufferArg, BACKWARD_TANH
+from .shared.mnemonics import AddTensor, TANH_BACKWARD
+from .backpropagation import BackwardFn, NDBufferArg, BackwardFnType
+
 from .gradbox import Gradbox
 from .ancestry import Ancestor
 
 
 @fieldwise_init
-struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct TanhBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
-        ref bwd_arg = output.ancestry().backward_fn_arg().get[NDBufferArg[Self.dtype]]()
+        ref bwd_arg = (
+            output.ancestry().backward_fn().get[NDBufferArg[Self.dtype]]()
+        )
         var out_ndb = bwd_arg.ndb
         ref gradbox = output.gradients()
         ref parent = output.ancestry().get(0)
@@ -23,8 +29,7 @@ struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         parent.update_grad(gradbox_ancestor^, AddTensor, None)
 
         parent_ids.append(parent._id)
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -46,9 +51,9 @@ struct Tanh[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             if grad_required:
                 out.requires_grad_(True)
                 var out_ndb = out.buffer.copy()
-                var backwardFnArg = BackwardFnArg[Self.dtype].from_ndbuffer(
-                    BACKWARD_TANH, out_ndb^
+                var backwardFn = BackwardFn.from_ndbuffer[Self.dtype](
+                    out_ndb^, TanhBackward[Self.dtype]()
                 )
-                out.add_ancestry(backwardFnArg^, self)
+                out.add_ancestry(backwardFn^, self)
 
         return out^

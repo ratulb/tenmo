@@ -1,6 +1,6 @@
-from .shapes import Shape
-from .broadcasthelper import ShapeBroadcaster
-from .common_utils import panic
+from .shared.shapes import Shape
+from .shared.broadcasthelper import ShapeBroadcaster
+from .shared.panic import panic
 
 
 @fieldwise_init
@@ -33,8 +33,8 @@ struct MatrixShapeValidator(ImplicitlyCopyable, RegisterPassable):
                 + String(B_shape)
             )
 
-        A_batch = A_shape[0:-2]
-        B_batch = B_shape[0:-2]
+        var A_batch = A_shape[0:-2]
+        var B_batch = B_shape[0:-2]
         _ = ShapeBroadcaster.broadcast_shape(
             A_batch, B_batch
         )  # will panic internally if not compatible

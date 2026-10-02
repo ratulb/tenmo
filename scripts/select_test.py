@@ -129,6 +129,7 @@ def _get_global_lines(lines: list[str], def_spans: set[int]) -> list[str]:
     """Return indent-0 lines that are not imports and not inside definitions."""
     result: list[str] = []
     in_string: str | None = None  # '"""' or "'''" when inside triple-quoted string
+    import_paren_depth = 0  # inside a parenthesized import block (collector emits it)
     for i, line in enumerate(lines):
         stripped = line.strip()
         if not stripped:
@@ -146,7 +147,13 @@ def _get_global_lines(lines: list[str], def_spans: set[int]) -> list[str]:
                 in_string = delim
             continue
 
+        # Skip parenthesized import continuations — the import collector
+        # already emits them (a lone `)` would otherwise leak in as a global).
+        if import_paren_depth > 0:
+            import_paren_depth += stripped.count('(') - stripped.count(')')
+            continue
         if stripped.startswith('from ') or stripped.startswith('import '):
+            import_paren_depth += stripped.count('(') - stripped.count(')')
             continue
         if i in def_spans:
             continue
@@ -176,14 +183,18 @@ def main() -> None:
     # --- 1. Imports (deduplicated, preserving order) ---
     imports: list[str] = []
     seen_imports: set[str] = set()
+    paren_depth = 0
     for l in lines:
         sl = l.strip()
-        if sl.startswith('from ') or sl.startswith('import '):
+        # Track parenthesized continuation lines (e.g. `from x import (\n a,\n)`).
+        is_import_start = sl.startswith('from ') or sl.startswith('import ')
+        if is_import_start or paren_depth > 0:
             normalized = sl.replace('(', '').replace(')', '').replace(',', '').strip()
             key = re.sub(r'\s+', ' ', normalized)
             if key not in seen_imports:
                 seen_imports.add(key)
                 imports.append(l.rstrip())
+            paren_depth += sl.count('(') - sl.count(')')
 
     # --- 2. Definitions ---
     functions, structs, def_spans = _find_definitions(lines)

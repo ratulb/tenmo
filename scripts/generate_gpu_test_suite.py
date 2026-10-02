@@ -33,7 +33,10 @@ NO_GPU = {
     "test_views.mojo", "test_where.mojo",
 }
 
-ALLOWED_MODULES = {"tenmo.", "std.", "python."}
+# `bpe.` submodules (e.g. bpe.tokenizer) are safe to inline; bare `bpe`
+# stays blocked. The prefix check runs before BLOCKED, so only the
+# bare root is rejected.
+ALLOWED_MODULES = {"tenmo.", "std.", "python.", "bpe."}
 ALLOWED_MODULES_EXACT = {"tenmo", "std"}
 BLOCKED_MODULES = {"tensors", "layers", "bpe", "python"}
 

@@ -1,26 +1,26 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor, SQRT, SQRT_BACKWARD
-from .backpropagation import BackwardFnArg, ScalarArg, BACKWARD_SQRT
+from .shared.mnemonics import AddTensor, SQRT, SQRT_BACKWARD
+from .backpropagation import BackwardFn, ScalarArg, BackwardFnType
+
 from .gradbox import Gradbox
-from std.math import sqrt
 from .ndbuffer import NDBuffer
-from .common_utils import Epsilon
+from .shared.constants import Epsilon
 from .ancestry import Ancestor
 
 
 @fieldwise_init
-struct SqrtBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct SqrtBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         var epsilon = (
-            output.ancestry()
-            .backward_fn_arg()
-            .get[ScalarArg[Self.dtype]]()
-            .value
+            output.ancestry().backward_fn().get[ScalarArg[Self.dtype]]().value
         )
         ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
@@ -33,8 +33,7 @@ struct SqrtBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         parent_ids.append(parent._id)
 
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -52,22 +51,21 @@ struct Sqrt[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         comptime if track_grad:
-            grad_required = requires_grad.or_else(self.requires_grad)
+            var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
-                    BACKWARD_SQRT, epsilon
+                var backwardFn = BackwardFn.scalar_arg[Self.dtype](
+                    epsilon, SqrtBackward[Self.dtype]()
                 )
-                backwardFnArg.needs_parent_data = True
-                out.add_ancestry(backwardFnArg^, self)
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, self)
 
         return out^
 
     @staticmethod
-    def forward(
-        self: Gradbox[Self.dtype],
-        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
-    ) -> Gradbox[Self.dtype]:
+    def forward(self: Gradbox[Self.dtype]) -> Gradbox[Self.dtype]:
+        # No epsilon: pure forward with no backward wiring, so there is
+        # nothing to stabilize.
         var out: Gradbox[Self.dtype]
         var shape = self.shape()
 

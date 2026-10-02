@@ -1,16 +1,15 @@
-# =============================================================================
 # argminmax_kernel.mojo — GPU argmin/argmax kernel
-# =============================================================================
 
-from std.gpu import thread_idx, block_idx, block_dim, barrier
+from max.gpu import thread_idx, block_idx, block_dim
+from max.gpu import barrier
 from std.memory import AddressSpace, stack_allocation
 from std.utils.numerics import max_finite, min_finite
-from tenmo.array import Array
-from tenmo.device import DeviceState
-from tenmo.ndbuffer import NDBuffer
-from tenmo.shapes import Shape
-from tenmo.common_utils import panic
-from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
+from ..shared.array import RankArray
+from ..gpu.device import DeviceState
+from ..shared.layout import Layout
+from ..shared.shapes import Shape
+from ..shared.mnemonics import DEFAULT_INDEX_DTYPE
+from .kernel_helpers import reduction_launch_config
 
 
 def reduce_argminmax[
@@ -19,17 +18,21 @@ def reduce_argminmax[
     max_block_size: Int = 512,
     is_max: Bool = True,
 ](
-    out_buffer: UnsafePointer[Scalar[index_dtype], MutAnyOrigin],
-    in_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    in_shape: Array,
-    in_strides: Array,
-    reduction_axis: Int,
-    total_output: Int,
-    reduced_volume: Int,
+    out_buffer: Pointer[Scalar[index_dtype], MutAnyOrigin],
+    in_buffer: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    in_shape: RankArray,
+    in_strides: RankArray,
+    reduction_axis_: Int64,
+    total_output_: Int64,
+    reduced_volume_: Int64,
 ):
     comptime assert (
         max_block_size.is_power_of_two() and max_block_size < 1024
     ), "Invalid max_block_size"
+
+    var reduction_axis = Int(reduction_axis_)
+    var total_output = Int(total_output_)
+    var reduced_volume = Int(reduced_volume_)
 
     var smem_val = stack_allocation[
         max_block_size, Scalar[dtype], address_space=AddressSpace.SHARED
@@ -68,7 +71,7 @@ def reduce_argminmax[
 
     var r = tid
     while r < reduced_volume:
-        var val = (in_buffer + input_base + r * axis_stride)[]
+        var val = (in_buffer .unsafe_offset(input_base + r * axis_stride))[]
 
         comptime if is_max:
             if val > local_val:
@@ -81,31 +84,31 @@ def reduce_argminmax[
 
         r += block_size
 
-    smem_val[tid] = local_val
-    smem_idx[tid] = local_idx
+    smem_val[unsafe_offset=tid] = local_val
+    smem_idx[unsafe_offset=tid] = local_idx
     barrier()
 
     var stride = block_size >> 1
     while stride > 0:
         if tid < stride:
             comptime if is_max:
-                if smem_val[tid + stride] > smem_val[tid]:
-                    smem_val[tid] = smem_val[tid + stride]
-                    smem_idx[tid] = smem_idx[tid + stride]
+                if smem_val[unsafe_offset=tid + stride] > smem_val[unsafe_offset=tid]:
+                    smem_val[unsafe_offset=tid] = smem_val[unsafe_offset=tid + stride]
+                    smem_idx[unsafe_offset=tid] = smem_idx[unsafe_offset=tid + stride]
             else:
-                if smem_val[tid + stride] < smem_val[tid]:
-                    smem_val[tid] = smem_val[tid + stride]
-                    smem_idx[tid] = smem_idx[tid + stride]
+                if smem_val[unsafe_offset=tid + stride] < smem_val[unsafe_offset=tid]:
+                    smem_val[unsafe_offset=tid] = smem_val[unsafe_offset=tid + stride]
+                    smem_idx[unsafe_offset=tid] = smem_idx[unsafe_offset=tid + stride]
 
         barrier()
         stride >>= 1
 
     if tid == 0:
-        (out_buffer + out_idx)[] = smem_idx[0]
+        (out_buffer .unsafe_offset(out_idx))[] = smem_idx[unsafe_offset=0]
 
 
 @fieldwise_init
-struct ArgMinMaxGpu[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
+struct ArgMinMaxKernel[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
@@ -113,20 +116,20 @@ struct ArgMinMaxGpu[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
         is_max: Bool,
         max_block_size: Int,
     ](
-        A: NDBuffer[Self.dtype],
+        A_layout: Layout,
+        A_device_state: DeviceState[Self.dtype],
         ax: Int,
         keepdims: Bool,
         out_shape: Shape,
         total_output: Int,
         reduced_volume: Int,
         sync: Bool = False,
-    ) raises -> NDBuffer[Self.index_dtype]:
-        ref A_device_state = A.device_state.value()
+    ) raises -> Tuple[Layout, DeviceState[Self.index_dtype]]:
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu[]
 
-        var in_shape: Array = A.shape.array()
-        var in_strides: Array = A.strides.array()
+        var in_shape: RankArray = A_layout.shape.array()
+        var in_strides: RankArray = A_layout.strides.array()
 
         var (threads_per_block, num_blocks) = Self._launch_config[
             max_block_size
@@ -140,9 +143,6 @@ struct ArgMinMaxGpu[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             reduce_argminmax[
                 Self.dtype, Self.index_dtype, max_block_size, is_max
             ],
-            reduce_argminmax[
-                Self.dtype, Self.index_dtype, max_block_size, is_max
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -151,9 +151,9 @@ struct ArgMinMaxGpu[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             A_device_state.device_buffer(),
             in_shape,
             in_strides,
-            ax,
-            total_output,
-            reduced_volume,
+            Int64(ax),
+            Int64(total_output),
+            Int64(reduced_volume),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
@@ -161,18 +161,13 @@ struct ArgMinMaxGpu[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             device_context.synchronize()
 
         var out_state = DeviceState[Self.index_dtype](out_device_buf^, gpu)
-        return NDBuffer[Self.index_dtype].with_device_state(
-            out_state^, out_shape
+        return (
+            Layout(out_shape),
+            out_state^,
         )
 
     @staticmethod
     def _launch_config[
         max_block_size: Int
     ](total_output: Int, reduced_volume: Int) -> Tuple[Int, Int]:
-        var block_size = 1
-        while block_size < reduced_volume:
-            block_size <<= 1
-            if block_size >= max_block_size:
-                block_size = max_block_size
-                break
-        return (block_size, total_output)
+        return reduction_launch_config[max_block_size](total_output, reduced_volume)

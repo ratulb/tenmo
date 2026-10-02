@@ -1,15 +1,16 @@
 from .tensor import Tensor
-from .backpropagation import ArgumentType, BackwardFnArg, BACKWARD_STACK
-from .mnemonics import AddTensor
-from .common_utils import panic
+from .backpropagation import ArgumentType, BackwardFn, BackwardFnType
+
+from .shared.mnemonics import AddTensor
+from .shared.panic import panic
 from .gradbox import Gradbox
-from .intarray import IntArray
-from .indexhelper import IndexCalculator
-from .shapes import Shape
-from .forwards import Concate
+from .shared.indexhelper import IndexCalculator
+from .shared.shapes import Shape
+from .concate import Concate
 from .ancestry import Ancestor
 from std.sys import has_accelerator
-from tenmo.kernels.concate_kernel import ConcateGpuKernel
+from std.memory import unsafe_memcpy
+from .kernels.concate_kernel import ConcatKernel
 
 
 @fieldwise_init
@@ -19,27 +20,28 @@ struct StackArg(ArgumentType):
 
 
 @fieldwise_init
-struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct StackBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
     """Backward pass for stack operation."""
 
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         """
-        Split gradient and squeeze the stacked dimension.
+                Split gradient and squeeze the stacked dimension.
 
         Forward:  stack([A, B, C], axis=1) → Result(d0, 3, d1, d2)
         Backward: grad_Result(d0, 3, d1, d2) → [grad_A(d0, d1, d2),
                                                   grad_B(d0, d1, d2),
                                                   grad_C(d0, d1, d2)]
         """
-        var bwd_arg = output.ancestry().backward_fn_arg().get[StackArg]()
+        var bwd_arg = output.ancestry().backward_fn().get[StackArg]()
         var (axis, num_tensors) = bwd_arg.axis, bwd_arg.num_tensors
         ref grad_output = output.gradients()
-        # var grad_data = grad_output.buffer.buffer.data
         var grad_data = grad_output.data_ptr()
         var grad_shape = grad_output.shape()
         var grad_strides = grad_output.strides()
@@ -56,7 +58,7 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 String(stack_size),
             )
 
-        # ===== GPU BACKWARD PATH =====
+        # GPU BACKWARD PATH
         comptime if has_accelerator():
             if grad_output.is_on_gpu():
                 try:
@@ -67,89 +69,121 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
                     for tensor_idx in range(count):
                         var ancestor_ref = output.ancestry().get(tensor_idx)
-                        if not ancestor_ref.requires_grad:
-                            continue
+                        # Grad is built only if needed, but the id is ALWAYS
+                        # appended: parent_ids is the engine's
+                        # fanin-completion signal (appended set must equal
+                        # ancestry set), and skipping a non-requiring
+                        # interior parent starves its subtree.
+                        if ancestor_ref.requires_grad:
+                            # Build unsqueezed shape: insert dim of size 1 at axis
+                            var unsqueezed_dims = List[Int]()
+                            for d in range(grad_shape.rank()):
+                                unsqueezed_dims.append(
+                                    grad_shape[d] if d != axis else 1
+                                )
+                            var unsqueezed_shape = Shape(unsqueezed_dims)
 
-                        # Build unsqueezed shape: insert dim of size 1 at axis
-                        var unsqueezed_dims = List[Int]()
-                        for d in range(grad_shape.rank()):
-                            unsqueezed_dims.append(
-                                grad_shape[d] if d != axis else 1
+                            # Create temp gradbox with unsqueezed shape on GPU
+                            var grad_temp = Gradbox[Self.dtype].zeros(
+                                unsqueezed_shape, device=gpu_device
                             )
-                        var unsqueezed_shape = Shape(unsqueezed_dims)
 
-                        # Create temp gradbox with unsqueezed shape on GPU
-                        var grad_temp = Gradbox[Self.dtype].zeros(
-                            unsqueezed_shape, device=gpu_device
-                        )
+                            # Extract slice at tensor_idx along axis
+                            ConcatKernel[Self.dtype].launch_backward(
+                                grad_output.buffer().layout(),
+                                grad_output.buffer().device_state.value(),
+                                grad_temp.buffer().layout(),
+                                grad_temp.buffer().device_state.value(),
+                                1,
+                                stack_size,
+                                stride_axis,
+                                tensor_idx,
+                            )
 
-                        # Extract slice at tensor_idx along axis
-                        ConcateGpuKernel[Self.dtype].launch_backward(
-                            grad_output.buffer(),
-                            grad_temp.buffer(),
-                            1,
-                            stack_size,
-                            stride_axis,
-                            tensor_idx,
-                        )
-
-                        # Squeeze via contiguous copy with parent shape
-                        var grad_input_ndb = grad_temp.buffer().contiguous(
-                            ancestor_ref.shape()
-                        )
-                        ancestor_ref.update_grad(
-                            Gradbox[Self.dtype](grad_input_ndb^),
-                            AddTensor,
-                            None,
-                        )
+                            # Squeeze via contiguous copy with parent shape
+                            var grad_input_ndb = grad_temp.buffer().contiguous(
+                                ancestor_ref.shape()
+                            )
+                            ancestor_ref.update_grad(
+                                Gradbox[Self.dtype](grad_input_ndb^),
+                                AddTensor,
+                                None,
+                            )
                         parent_ids.append(ancestor_ref._id)
 
-                    if not retain_graph:
-                        grad_output.zero_grad()
+                    grad_output.zero_grad()
                 except e:
-                    panic(
-                        "StackBackward GPU backward failed: " + String(e)
-                    )
+                    panic("StackBackward GPU backward failed: " + String(e))
                 return
 
-        # ===== CPU BACKWARD PATH =====
+        # CPU BACKWARD PATH
         for tensor_idx in range(count):
             var ancestor_ref = output.ancestry().get(tensor_idx)
 
-            if not ancestor_ref.requires_grad:
-                continue
+            # Grad is built only if needed; the id is ALWAYS appended
+            # (engine fanin-completion contract — see GPU leg above).
+            if ancestor_ref.requires_grad:
+                # Build grad_input shape (without the stacked dimension)
+                var grad_input_shape_dims = List[Int]()
+                for d in range(grad_shape.rank()):
+                    if d != axis:
+                        grad_input_shape_dims.append(grad_shape[d])
 
-            # Build grad_input shape (without the stacked dimension)
-            var grad_input_shape_dims = List[Int]()
-            for d in range(grad_shape.rank()):
-                if d != axis:
-                    grad_input_shape_dims.append(grad_shape[d])
+                var grad_input_shape = Shape(grad_input_shape_dims)
+                var grad_input = Gradbox[Self.dtype].zeros(grad_input_shape)
+                var grad_input_data = grad_input.data_ptr()
 
-            var grad_input_shape = Shape(grad_input_shape_dims)
-            var grad_input = Gradbox[Self.dtype].zeros(grad_input_shape)
-            var grad_input_data = grad_input.data_ptr()
-
-            # ===== EXTRACT SLICE: grad_output[..., tensor_idx, ...] =====
-            var elem_idx = 0
-
-            # Iterate over all elements in the OUTPUT gradient shape
-            for coord in grad_shape:
-                # Only process elements where coord[self.axis] == tensor_idx
-                if coord[axis] == tensor_idx:
-                    # Get flat index in grad_output
-                    var src_idx = IndexCalculator.flatten_index(
-                        grad_shape, coord, grad_strides, 0
+                # EXTRACT SLICE: grad_output[..., tensor_idx, ...]
+                # Contiguous grad_output (common case): this parent's
+                # elements form runs of `inner` along a `count * inner`
+                # period — bulk-copy each run instead of filtering every
+                # element through coord alloc + flatten_index. Strided
+                # grad_output keeps the scalar path.
+                var gout_buf = grad_output.buffer()
+                if gout_buf.is_contiguous():
+                    var ax = axis
+                    if ax < 0:
+                        ax += grad_shape.rank()
+                    var inner = 1
+                    for d in range(ax + 1, grad_shape.rank()):
+                        inner *= grad_shape[d]
+                    var total = grad_shape.num_elements()
+                    var period = count * inner
+                    var src_ptr = grad_data.unsafe_offset(
+                        grad_output.offset()
                     )
+                    var o = 0
+                    var b = tensor_idx * inner
+                    while b < total:
+                        unsafe_memcpy(
+                            dest=grad_input_data.unsafe_offset(o),
+                            src=src_ptr.unsafe_offset(b),
+                            count=inner,
+                        )
+                        o += inner
+                        b += period
+                else:
+                    var elem_idx = 0
 
-                    # Copy to grad_input (contiguous)
-                    grad_input_data[elem_idx] = grad_data[src_idx]
-                    elem_idx += 1
+                    # Iterate over all elements in the OUTPUT gradient shape
+                    for coord in grad_shape:
+                        # Only process elements where coord[self.axis] == tensor_idx
+                        if coord[axis] == tensor_idx:
+                            # Get flat index in grad_output
+                            var src_idx = IndexCalculator.flatten_index(
+                                grad_shape, coord, grad_strides, 0
+                            )
 
-            ancestor_ref.update_grad(grad_input^, AddTensor, None)
+                            # Copy to grad_input (contiguous)
+                            grad_input_data[unsafe_offset=elem_idx] = grad_data[
+                                unsafe_offset=src_idx
+                            ]
+                            elem_idx += 1
+
+                ancestor_ref.update_grad(grad_input^, AddTensor, None)
             parent_ids.append(ancestor_ref._id)
 
-        if not retain_graph:
-            grad_output.zero_grad()
+        grad_output.zero_grad()
 
 
 @fieldwise_init
@@ -165,12 +199,13 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """
-        Stack tensors along a new axis.
+                Stack tensors along a new axis.
 
         Args:
             tensors: List of tensors to stack (must have identical shapes).
             axis: Position where new dimension is inserted.
             requires_grad: Whether to track gradients.
+            sync: Whether to sync GPU after operation.
 
         Returns:
             Stacked tensor with new dimension at position 'axis'.
@@ -186,7 +221,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         var grad_required = requires_grad.or_else(False)
 
-        # ===== 1. VALIDATE: All tensors must have same shape =====
+        # 1. VALIDATE: All tensors must have same shape
         var first_shape = tensors[0].shape()
         var ndim = first_shape.rank()
 
@@ -203,32 +238,32 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if stack_axis < 0 or stack_axis > ndim:
             panic("Axis out of bounds for stack")
 
-        # ===== 2. UNSQUEEZE: Add dimension at stack_axis to each tensor =====
+        # 2. UNSQUEEZE: Add dimension at stack_axis to each tensor
         var expanded_tensors = List[Tensor[Self.dtype]]()
 
         for i in range(len(tensors)):
             var to_be_expanded = tensors[i]
             grad_required = grad_required or to_be_expanded.requires_grad
-            expanded = to_be_expanded.unsqueeze[track_grad=False]([stack_axis])
-            # expanded = to_be_expanded.unsqueeze([stack_axis])
+            var expanded = to_be_expanded.unsqueeze[track_grad=False]([stack_axis])
             expanded_tensors.append(expanded^)
 
-        # ===== 3. CONCATENATE: Along the new dimension =====
+        # 3. CONCATENATE: Along the new dimension
         var result = Concate[Self.dtype].forward[track_grad=False](
             expanded_tensors^, axis=stack_axis, requires_grad=False
         )
 
-        # ===== 4. SETUP AUTOGRAD =====
+        # 4. SETUP AUTOGRAD
         comptime if track_grad:
             if grad_required:
                 result.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_STACK, StackArg(stack_axis, len(tensors))
+                var backwardFn = BackwardFn(
+                    StackArg(stack_axis, len(tensors)),
+                    StackBackward[Self.dtype](),
                 )
 
                 # Add original tensors (not expanded) to ancestry
                 for i in range(len(tensors)):
-                    result.add_ancestry(backwardFnArg, tensors[i])
+                    result.add_ancestry(backwardFn, tensors[i])
 
         return result^
 
@@ -242,7 +277,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """
-        Stack tensors vertically (row-wise).
+                Stack tensors vertically (row-wise).
 
         For 2D+ tensors: equivalent to concat(axis=0).
         For 1D tensors: reshapes to 2D then stacks.
@@ -270,18 +305,39 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # Special case: 1D tensors
         if first_ndim == 1:
-            # Reshape each (N,) → (1, N) then concatenate
+            # Reshape each (N,) → (1, N) then concatenate. Mirrors the
+            # fused forward above: untracked intermediates + one
+            # StackBackward (axis=0) wired straight to the originals —
+            # no tracked reshape nodes in the graph.
             var reshaped = List[Tensor[Self.dtype]]()
             for i in range(len(tensors)):
                 var tensor = tensors[i]
                 var size = tensor.shape()[0]
-                # var reshaped_tensor = tensor.reshape[track_grad=False](1, size)
-                var reshaped_tensor = tensor.reshape(1, size)
+                var reshaped_tensor = tensor.reshape[track_grad=False](
+                    1, size
+                )
                 reshaped.append(reshaped_tensor^)
 
-            return Concate[Self.dtype].forward[track_grad](
-                reshaped, axis=0, requires_grad=requires_grad, sync=sync
+            var result = Concate[Self.dtype].forward[track_grad=False](
+                reshaped^, axis=0, requires_grad=False, sync=sync
             )
+
+            comptime if track_grad:
+                var grad_required = requires_grad.or_else(False)
+                for i in range(len(tensors)):
+                    grad_required = (
+                        grad_required or tensors[i].requires_grad
+                    )
+                if grad_required:
+                    result.requires_grad_(True)
+                    var backwardFn = BackwardFn(
+                        StackArg(0, len(tensors)),
+                        StackBackward[Self.dtype](),
+                    )
+                    for i in range(len(tensors)):
+                        result.add_ancestry(backwardFn, tensors[i])
+
+            return result^
 
         # For 2D+: use CONCATENATION along axis 0, not STACKING
         # All tensors must have same number of columns (all dimensions except axis 0)
@@ -313,7 +369,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """
-        Stack tensors horizontally (column-wise).
+                Stack tensors horizontally (column-wise).
 
         For 1D tensors: equivalent to concat(axis=0).
         For 2D+ tensors: equivalent to concat(axis=1).

@@ -1,5 +1,7 @@
 from std.time import perf_counter
-from tenmo import NDBuffer, Shape, Tensor
+from tenmo.ndbuffer import NDBuffer
+from tenmo.shared.shapes import Shape
+from tenmo.tensor import Tensor
 from tenmo.ndbuffer import MmCpu2d
 from std.sys import argv
 from std.python import Python

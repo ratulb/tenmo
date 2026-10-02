@@ -1,31 +1,30 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor, MAX, MIN
+from .shared.mnemonics import AddTensor, MAX, MIN
 from .backpropagation import (
-    BackwardFnArg,
+    BackwardFnType,
+    BackwardFn,
     ScalarArg,
-    BACKWARD_MAX_SCALAR,
-    BACKWARD_MIN_SCALAR,
 )
 from .gradbox import Gradbox
 from std.sys import has_accelerator
 from .ndbuffer import NDBuffer
-from .mnemonics import GreaterThan, LessThan
+from .shared.mnemonics import GreaterThan, LessThan, Equal, Add, Multiply
 from .ancestry import Ancestor
 
 
 @fieldwise_init
-struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct MaxBackwardScalar[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         var scalar = (
-            output.ancestry()
-            .backward_fn_arg()
-            .get[ScalarArg[Self.dtype]]()
-            .value
+            output.ancestry().backward_fn().get[ScalarArg[Self.dtype]]().value
         )
         ref gradbox = output.gradients()
         var parent_ref = output.ancestry().get(0)
@@ -34,44 +33,54 @@ struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         )
 
         # Work at NDBuffer level — avoids pulling in GPU kernel launchers
-        var mask_bool: NDBuffer[DType.bool]
+        # Tie convention mirrors torch.maximum with an untracked scalar
+        # operand (verified torch 2.11.0+cpu): grad 1 where x > s, 0.5
+        # where x == s (the other half flows to the scalar), 0 below.
+        var gt_bool: NDBuffer[DType.bool]
+        var eq_bool: NDBuffer[DType.bool]
 
         comptime if has_accelerator():
             if parent.is_on_gpu():
-                mask_bool = parent.buffer.compare_scalar[GreaterThan](scalar)
+                gt_bool = parent.buffer.compare_scalar[GreaterThan](scalar)
+                eq_bool = parent.buffer.compare_scalar[Equal](scalar)
             else:
-                mask_bool = parent.buffer.compare_scalar_cpu[GreaterThan](
+                gt_bool = parent.buffer.compare_scalar_cpu[GreaterThan](
                     scalar
                 )
+                eq_bool = parent.buffer.compare_scalar_cpu[Equal](scalar)
         else:
-            mask_bool = parent.buffer.compare_scalar_cpu[GreaterThan](scalar)
+            gt_bool = parent.buffer.compare_scalar_cpu[GreaterThan](scalar)
+            eq_bool = parent.buffer.compare_scalar_cpu[Equal](scalar)
 
-        var mask_float = mask_bool.to_dtype[Self.dtype]()
-        # wrap mask_float as Gradbox and multiply
+        var mask_gt = gt_bool.to_dtype[Self.dtype]()
+        var mask_eq = eq_bool.to_dtype[Self.dtype]()
+        var mask = mask_gt.arithmetic_ops[Add](
+            mask_eq.scalar_ops[Multiply](Scalar[Self.dtype](0.5))
+        )
+        # wrap mask as Gradbox and multiply
         var grad_input = Gradbox[Self.dtype](
-            mask_float.arithmetic_ops[Multiply](gradbox.buffer()), 
+            mask.arithmetic_ops[Multiply](gradbox.buffer()),
         )
 
         parent_ref.update_grad(grad_input^, AddTensor, None)
         parent_ids.append(parent_ref._id)
 
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()
 
 
 @fieldwise_init
-struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct MinBackwardScalar[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         var scalar = (
-            output.ancestry()
-            .backward_fn_arg()
-            .get[ScalarArg[Self.dtype]]()
-            .value
+            output.ancestry().backward_fn().get[ScalarArg[Self.dtype]]().value
         )
         ref gradbox = output.gradients()
         var parent_ref = output.ancestry().get(0)
@@ -79,25 +88,35 @@ struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             parent_ref.buffer(), requires_grad=parent_ref.requires_grad
         )
 
-        var mask_bool: NDBuffer[DType.bool]
+        # Tie convention mirrors torch.minimum with an untracked scalar
+        # operand (verified torch 2.11.0+cpu): grad 1 where x < s, 0.5
+        # where x == s, 0 above.
+        var lt_bool: NDBuffer[DType.bool]
+        var eq_bool: NDBuffer[DType.bool]
 
         comptime if has_accelerator():
             if parent.is_on_gpu():
-                mask_bool = parent.buffer.compare_scalar[LessThan](scalar)
+                lt_bool = parent.buffer.compare_scalar[LessThan](scalar)
+                eq_bool = parent.buffer.compare_scalar[Equal](scalar)
             else:
-                mask_bool = parent.buffer.compare_scalar_cpu[LessThan](scalar)
+                lt_bool = parent.buffer.compare_scalar_cpu[LessThan](scalar)
+                eq_bool = parent.buffer.compare_scalar_cpu[Equal](scalar)
         else:
-            mask_bool = parent.buffer.compare_scalar_cpu[LessThan](scalar)
+            lt_bool = parent.buffer.compare_scalar_cpu[LessThan](scalar)
+            eq_bool = parent.buffer.compare_scalar_cpu[Equal](scalar)
 
-        var mask_float = mask_bool.to_dtype[Self.dtype]()
+        var mask_lt = lt_bool.to_dtype[Self.dtype]()
+        var mask_eq = eq_bool.to_dtype[Self.dtype]()
+        var mask = mask_lt.arithmetic_ops[Add](
+            mask_eq.scalar_ops[Multiply](Scalar[Self.dtype](0.5))
+        )
         var grad_input = Gradbox[Self.dtype](
-            mask_float.arithmetic_ops[Multiply](gradbox.buffer()), 
+            mask.arithmetic_ops[Multiply](gradbox.buffer()),
         )
         parent_ref.update_grad(grad_input^, AddTensor, None)
         parent_ids.append(parent_ref._id)
 
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -112,18 +131,18 @@ struct MaxScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var out = Tensor[Self.dtype](
-            self.buffer.scalar_ops[MAX](scalar), requires_grad=False
+            self.buffer.scalar_ops[MAX](scalar, sync=sync), requires_grad=False
         )
 
         comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
-                    BACKWARD_MAX_SCALAR, scalar
+                var backwardFn = BackwardFn.scalar_arg[Self.dtype](
+                    scalar, MaxBackwardScalar[Self.dtype]()
                 )
-                backwardFnArg.needs_parent_data = True
-                out.add_ancestry(backwardFnArg^, self)
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, self)
 
         return out^
 
@@ -140,17 +159,17 @@ struct MinScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         var out = Tensor[Self.dtype](
-            self.buffer.scalar_ops[MIN](scalar), requires_grad=False
+            self.buffer.scalar_ops[MIN](scalar, sync=sync), requires_grad=False
         )
 
         comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
-                    BACKWARD_MIN_SCALAR, scalar
+                var backwardFn = BackwardFn.scalar_arg[Self.dtype](
+                    scalar, MinBackwardScalar[Self.dtype]()
                 )
-                backwardFnArg.needs_parent_data = True
-                out.add_ancestry(backwardFnArg^, self)
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, self)
 
         return out^

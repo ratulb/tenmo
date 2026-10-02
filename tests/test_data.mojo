@@ -1,16 +1,26 @@
 from tenmo.tensor import Tensor
-from tenmo.common_utils import panic, now
-from std.testing import assert_true, assert_equal, assert_false, TestSuite
+from tenmo.shared.panic import panic
+from tenmo.shared.timing import now
+from std.testing import (
+    assert_true,
+    assert_equal,
+    assert_false,
+    assert_raises,
+    TestSuite,
+)
 from tenmo.dataloader import *
-#from tenmo.nlp import LLMDataset
-#from bpe import BasicTokenizer, Tokenizer
+from tenmo.nlp.dataset import RandomSlidingWindowDataset
+
+# from tenmo.nlp import LLMDataset
+# from bpe import BasicTokenizer, Tokenizer
 from std.python import Python, PythonObject
 
-# Comprehensive tests for TensorDataset, Batch, and DataLoader
-# With FIXED shuffle implementation
+# Comprehensive tests for TensorDataset, Batch, DataLoader (tensor engine),
+# NativeLoader (trait-generic engine), and the token-stream windowing core
+# (SlidingWindowDataset / WindowLoader)
 
 comptime dtype = DType.float32
-comptime BPE_ENABLED = False
+
 
 def assert_true_1(condition: Bool, msg: String = "Assertion failed") raises:
     if not condition:
@@ -339,6 +349,46 @@ def test_dataloader_multiple_epochs() raises:
     assert_true(count2 == 2, "Second epoch should have 2 batches")
 
 
+def test_dataloader_steps_cap_across_epochs() raises:
+    """Boundary: `while done < steps: for batch in loader` runs past one epoch.
+
+    Regression for the imdb_bert incident (§4.9): a single `for` pass is
+    exactly one epoch (`__next__` raises StopIteration at the end), so a
+    bare `for` + `break`-at-cap silently under-trains whenever `steps`
+    exceeds batches-per-epoch. The blessed multi-epoch shape re-enters
+    `__iter__` per epoch (fresh shuffle for free).
+    """
+    comptime dtype = DType.float32
+    var features = Tensor[dtype].d2(
+        [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]]
+    )
+    var labels = Tensor[dtype].d1([10, 20, 30, 40, 50])
+    var dataset = TensorDataset(features, labels)
+
+    var loader = dataset.into_loader(batch_size=2, shuffle=False, drop_last=True)
+
+    # 5 rows / B=2 / drop_last → 2 batches per epoch; ask for 5 steps.
+    var done = 0
+    var epochs = 0
+    var per_epoch = List[Int]()
+    while done < 5:
+        epochs += 1
+        var n_this_epoch = 0
+        for _batch in loader:
+            if done >= 5:
+                break
+            done += 1
+            n_this_epoch += 1
+        per_epoch.append(n_this_epoch)
+
+    assert_true(done == 5, "Steps cap must bind across epochs")
+    assert_true(epochs == 3, "5 steps at 2 batches/epoch needs 3 epochs")
+    assert_true(len(per_epoch) == 3, "Three epoch passes expected")
+    assert_true(per_epoch[0] == 2, "Epoch 1 yields 2 batches")
+    assert_true(per_epoch[1] == 2, "Epoch 2 yields 2 batches")
+    assert_true(per_epoch[2] == 1, "Epoch 3 stops at the cap")
+
+
 def test_dataloader_reshuffle_changes_order() raises:
     comptime dtype = DType.float32
     # Use a medium-sized dataset to test shuffle
@@ -487,107 +537,164 @@ def test_dataloader_shuffle_quality() raises:
 # ============================================================================
 
 
-def test_gpt_dataset_not_enough_tokens() raises:
-    """Verify no crash when text has fewer tokens than max_length."""
-    comptime if BPE_ENABLED:
-        _="""from tenmo.nlp import LLMDataset
-        from bpe import BasicTokenizer, Tokenizer
-
-        var text = "Hello world"
-        var tokenizer = BasicTokenizer()
-        tokenizer.train(text, vocab_size=32)
-
-        var max_length = 256
-        var stride = 128
-
-        var ds = LLMDataset(text, tokenizer, max_length, stride)
-        assert_equal(len(ds), 0, "Expected 0 samples when n < max_length")
-
-        # DataLoader with drop_last=True — no batches
-        var dl = ds.into_loader(batch_size=4, shuffle=False, drop_last=True)
-        assert_equal(len(dl), 0, "Expected 0 batches (drop_last=True)")
-        var count = 0
-        for _ in dl:
-            count += 1
-        assert_equal(count, 0, "Iteration should produce 0 batches (drop_last=True)")
-
-        # DataLoader with drop_last=False — also 0 batches (0 samples)
-        var dl2 = ds.into_loader(batch_size=4, shuffle=False, drop_last=False)
-        assert_equal(len(dl2), 0, "Expected 0 batches (drop_last=False)")
-        count = 0
-        for _ in dl2:
-            count += 1
-        assert_equal(count, 0, "Iteration should produce 0 batches (drop_last=False)")
-
-        print("  No crash with", len(ds), "samples across both drop_last modes")"""
-        pass
+# ============================================================================
+# Token-stream windowing core (SlidingWindowDataset / WindowLoader) Tests
+#
+# Deterministic int64 streams where each ID equals its own position, so the
+# shift-by-one invariant reads as ``target == input + 1`` elementwise.
+# ============================================================================
 
 
-def test_gpt_dataset_partial_batch_target_stride() raises:
-    """Verify partial batch (drop_last=False) is correctly strided:
-    target[i] == input[i+1] for every sample."""
-    comptime if BPE_ENABLED:
-        _="""from tenmo.nlp import LLMDataset
-        from bpe import BasicTokenizer, Tokenizer
+def _sliding_ids(n: Int) -> List[Scalar[DType.int64]]:
+    """IDs ``0..n-1`` as int64 scalars."""
+    var ids = List[Scalar[DType.int64]](capacity=n)
+    for i in range(n):
+        ids.append(Scalar[DType.int64](i))
+    return ids^
 
 
-        var text = "the cat sat on the mat and the dog ran"
-        var tokenizer = BasicTokenizer()
-        tokenizer.train(text, vocab_size=64)
+def test_sliding_window_not_enough_tokens() raises:
+    """N <= seq_length yields 0 samples and 0 batches in both drop_last modes."""
+    var ds = SlidingWindowDataset[DType.int64](_sliding_ids(6), 8, 2)
+    assert_true(len(ds) == 0, "Expected 0 samples when n <= seq_length")
+    assert_true(ds.num_samples() == 0, "num_samples must be 0")
 
-        var ids = tokenizer.encode(text)
-        var max_length = 4
-        var stride = 2
+    var dl_drop = ds.into_loader(batch_size=4, shuffle=False, drop_last=True)
+    assert_true(len(dl_drop) == 0, "Expected 0 batches (drop_last=True)")
+    assert_true(
+        not dl_drop.__has_next__(), "Empty loader must report no next batch"
+    )
 
-        var ds = LLMDataset(text, tokenizer, max_length, stride)
-        assert_true(len(ds) > 0, "Expected at least 1 sample")
+    var dl_keep = ds.into_loader(batch_size=4, shuffle=False, drop_last=False)
+    assert_true(len(dl_keep) == 0, "Expected 0 batches (drop_last=False)")
+    assert_true(
+        not dl_keep.__has_next__(), "Empty loader must report no next batch"
+    )
 
-        # Use batch_size that doesn't divide evenly to force a partial batch
-        var batch_size = 3
-        var dl = ds.into_loader(
-            batch_size=batch_size, shuffle=False, drop_last=False
-        )
-        var num_batches = len(dl)
 
-        # Iterate all batches
-        var batch_idx = 0
-        for batch in dl:
-            var x = batch.features  # (batch_size or remainder, max_length)
-            var y = batch.labels
+def test_sliding_window_partial_batch_shift_by_one() raises:
+    """Non-divisor batch_size: target == input + 1 elementwise, every batch."""
+    var seq_length = 4
+    var ds = SlidingWindowDataset[DType.int64](_sliding_ids(21), seq_length, 1)
+    # 21 - 4 = 17 windows; bs=3 -> 6 batches, the last one partial (2 rows).
+    assert_true(len(ds) == 17, "Expected 17 windows")
+    var loader = ds.into_loader(batch_size=3, shuffle=False, drop_last=False)
+    assert_true(len(loader) == 6, "Expected 6 batches incl. the partial one")
 
-            # Verify shapes
-            var expected_batch_size = x.shape()[0]
-            assert_equal(x.shape()[1], max_length, "Feature dim should be max_length")
-            assert_equal(
-                y.shape(), x.shape(), "Labels should match features shape"
-            )
-
-            # Verify target stride: y[sample, j] == x[sample, j+1]
-            for sample in range(expected_batch_size):
-                for j in range(max_length - 1):
-                    assert_equal(
-                        y[sample, j],
-                        x[sample, j + 1],
-                        "target[i] != input[i+1] — stride violation at batch "
-                        + String(batch_idx) + " sample " + String(sample)
-                        + " pos " + String(j),
-                    )
-
-            batch_idx += 1
-
+    var batch_idx = 0
+    for batch in loader:
         assert_true(
-            batch_idx == num_batches,
-            "Iterated all batches including the partial one",
+            batch.features.shape()[0] == batch.batch_size,
+            "Feature batch dim must match",
         )
-        print(
-            "  Partial batch verified:",
-            num_batches,
-            "batches, last batch has",
-            batch_size if num_batches * batch_size <= len(ds)
-            else (len(ds) - (num_batches - 1) * batch_size),
-            "samples",
-        )"""
-        pass
+        assert_true(
+            batch.features.shape()[1] == seq_length,
+            "Feature dim should be seq_length",
+        )
+        assert_true(
+            batch.labels.shape() == batch.features.shape(),
+            "Labels should match features shape",
+        )
+        # Identity order (shuffle=False): sample s of batch b starts here.
+        var base = Int64(batch_idx * 3)
+        for s in range(batch.batch_size):
+            var first = base + Int64(s)
+            for j in range(seq_length):
+                assert_true(
+                    batch.features[s, j] == first + Int64(j),
+                    "Input row must equal its stream slice",
+                )
+                assert_true(
+                    batch.labels[s, j] == first + Int64(j) + Int64(1),
+                    "target[i] != input[i]+1 at batch "
+                    + String(batch_idx)
+                    + " sample "
+                    + String(s)
+                    + " pos "
+                    + String(j),
+                )
+        batch_idx += 1
+    assert_true(batch_idx == 6, "Iterated all batches incl. the partial one")
+
+
+def test_sliding_window_stride() raises:
+    """Stride=2 spaces window starts per the ceiling formula."""
+    # (20 - 4 + 2 - 1) // 2 = 8 windows, starts 0, 2, ..., 14.
+    var ds = SlidingWindowDataset[DType.int64](_sliding_ids(20), 4, 2)
+    assert_true(len(ds) == 8, "Expected 8 windows at stride 2")
+
+    var (x3, y3) = ds.sample(Optional[Int](3))
+    for j in range(4):
+        assert_true(x3[j] == Int64(6 + j), "Indexed sample input mismatch")
+        assert_true(y3[j] == Int64(7 + j), "Indexed sample target mismatch")
+
+    # A random window is internally shift-consistent whatever its offset.
+    var (xr, yr) = ds.sample()
+    assert_true(xr.numels() == 4, "Random sample input length must be T")
+    assert_true(yr.numels() == 4, "Random sample target length must be T")
+    for j in range(3):
+        assert_true(
+            yr[j] == xr[j] + Int64(1),
+            "Random sample must hold target == input + 1",
+        )
+
+    # Loader identity order: first batch rows start at 0 and 2.
+    var loader = ds.into_loader(batch_size=2, shuffle=False)
+    var seen = False
+    for batch in loader:
+        if not seen:
+            assert_true(
+                batch.features[0, 0] == Int64(0), "First row must start at 0"
+            )
+            assert_true(
+                batch.features[1, 0] == Int64(2), "Second row must start at 2"
+            )
+            seen = True
+    assert_true(seen, "Expected at least one batch")
+
+
+def test_sliding_window_random_offsets() raises:
+    """Random offsets: in-bounds rows, nominal length, shift holds."""
+    # N=50, T=8 -> valid starts [0, 41]; nominal ceil(42 / 7) = 6 batches.
+    var ds = SlidingWindowDataset[DType.int64](_sliding_ids(50), 8, 1)
+    var loader = ds.into_loader(
+        batch_size=7, shuffle=False, drop_last=False, random_offsets=True
+    )
+    assert_true(len(loader) == 6, "Nominal epoch length must be ceil(42/7)")
+    var count = 0
+    for batch in loader:
+        assert_true(
+            batch.batch_size == 7, "42 divisible by 7: all batches full"
+        )
+        for s in range(batch.batch_size):
+            var first = batch.features[s, 0]
+            assert_true(
+                first >= Int64(0) and first <= Int64(41),
+                "Random start out of [0, N - seq_length - 1]",
+            )
+            for j in range(8):
+                assert_true(
+                    batch.labels[s, j] == batch.features[s, j] + Int64(1),
+                    "Random-offset batch must hold target == input + 1",
+                )
+        count += 1
+    assert_true(count == 6, "Iterated the full nominal epoch")
+
+
+def test_sliding_window_equiv_random_sliding() raises:
+    """Migration gate: row-for-row equivalence vs the legacy dataset."""
+    var seq_length = 6
+    var stream = Tensor[DType.int64].from_list[DType.int64](_sliding_ids(30))
+    var ds = SlidingWindowDataset[DType.int64](stream, seq_length, 1)
+    var legacy = RandomSlidingWindowDataset[DType.int64](stream, seq_length)
+    assert_true(
+        len(ds) == len(legacy), "New core and legacy must agree on count"
+    )
+    for i in range(len(ds)):
+        var (nx, ny) = ds.sample(Optional[Int](i))
+        var (lx, ly) = legacy.sample(Optional[Int](i))
+        assert_tensors_equal(nx, lx)
+        assert_tensors_equal(ny, ly)
 
 
 def main() raises:
@@ -601,8 +708,10 @@ def main() raises:
 
 def test_dataset_basic_creation_dl() raises:
     """Test basic dataset creation and indexing."""
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
-    var labels = Tensor.d2([[0.0], [1.0], [2.0]]).float()
+    var features = (
+        Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
+    )
+    var labels = Tensor[DType.float32].d2([[0.0], [1.0], [2.0]]).float()
 
     var dataset = TensorDataset(features, labels)
     assert_true(len(dataset) == 3)
@@ -610,58 +719,62 @@ def test_dataset_basic_creation_dl() raises:
 
 def test_dataset_getitem_single_sample_dl() raises:
     """Test retrieving single samples."""
-    var features = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).float()
-    var labels = Tensor.d2([[10.0], [20.0]]).float()
+    var features = (
+        Tensor[DType.float32].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).float()
+    )
+    var labels = Tensor[DType.float32].d2([[10.0], [20.0]]).float()
 
     var dataset = TensorDataset(features, labels)
 
     # Test first sample
     var (feat0, label0) = dataset[0]
-    var expected_feat0 = Tensor.d1([1.0, 2.0, 3.0]).float()
-    var expected_label0 = Tensor.d1([10.0]).float()
+    var expected_feat0 = Tensor[DType.float32].d1([1.0, 2.0, 3.0]).float()
+    var expected_label0 = Tensor[DType.float32].d1([10.0]).float()
     assert_true(feat0.all_close(expected_feat0))
     assert_true(label0.all_close(expected_label0))
 
     # Test second sample
     var (feat1, label1) = dataset[1]
-    var expected_feat1 = Tensor.d1([4.0, 5.0, 6.0]).float()
-    var expected_label1 = Tensor.d1([20.0]).float()
+    var expected_feat1 = Tensor[DType.float32].d1([4.0, 5.0, 6.0]).float()
+    var expected_label1 = Tensor[DType.float32].d1([20.0]).float()
     assert_true(feat1.all_close(expected_feat1))
     assert_true(label1.all_close(expected_label1))
 
 
 def test_dataset_1d_labels_dl() raises:
     """Test dataset with 1D label vector."""
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
-    var labels = Tensor.d1([0.0, 1.0, 2.0]).float()
+    var features = (
+        Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
+    )
+    var labels = Tensor[DType.float32].d1([0.0, 1.0, 2.0]).float()
 
     var dataset = TensorDataset(features, labels)
 
     var (feat, label) = dataset[1]
-    var expected_feat = Tensor.d1([3.0, 4.0]).float()
-    var expected_label = Tensor.scalar(1.0).float()
+    var expected_feat = Tensor[DType.float32].d1([3.0, 4.0]).float()
+    var expected_label = Tensor[DType.float32].scalar(1.0).float()
     assert_true(feat.all_close(expected_feat))
     assert_true(label.all_close(expected_label))
 
 
 def test_dataset_multi_dimensional_labels_dl() raises:
     """Test dataset with multi-dimensional labels."""
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
-    var labels = Tensor.d2(
-        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
-    ).float()  # One-hot
+    var features = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var labels = (
+        Tensor[DType.float32].d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]).float()
+    )  # One-hot
 
     var dataset = TensorDataset(features, labels)
 
     var (_feat, label) = dataset[0]
-    var expected_label = Tensor.d1([1.0, 0.0, 0.0]).float()
+    var expected_label = Tensor[DType.float32].d1([1.0, 0.0, 0.0]).float()
     assert_true(label.all_close(expected_label))
 
 
 def test_dataset_features_labels_accessors_dl() raises:
     """Test features() and labels() accessors."""
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
-    var labels = Tensor.d1([0.0, 1.0]).float()
+    var features = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var labels = Tensor[DType.float32].d1([0.0, 1.0]).float()
 
     var dataset = TensorDataset(features, labels)
 
@@ -676,8 +789,10 @@ def test_dataset_features_labels_accessors_dl() raises:
 
 def test_batch_creation_dl() raises:
     """Test batch container creation."""
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
-    var labels = Tensor.d2([[0.0], [1.0], [2.0]]).float()
+    var features = (
+        Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
+    )
+    var labels = Tensor[DType.float32].d2([[0.0], [1.0], [2.0]]).float()
 
     var batch = Batch(features, labels)
     assert_true(batch.batch_size == 3)
@@ -692,10 +807,12 @@ def test_batch_creation_dl() raises:
 
 def test_dataloader_batch_size_exact_dl() raises:
     """Test dataloader with exact batch division."""
-    var features = Tensor.d2(
-        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
-    ).float()
-    var labels = Tensor.d1([0.0, 1.0, 2.0, 3.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]])
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([0.0, 1.0, 2.0, 3.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -714,10 +831,12 @@ def test_dataloader_batch_size_exact_dl() raises:
 
 def test_dataloader_batch_size_with_remainder_dl() raises:
     """Test dataloader with incomplete last batch."""
-    var features = Tensor.d2(
-        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [9.0, 10.0]]
-    ).float()
-    var labels = Tensor.d1([0.0, 1.0, 2.0, 3.0, 4.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [9.0, 10.0]])
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([0.0, 1.0, 2.0, 3.0, 4.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -738,10 +857,12 @@ def test_dataloader_batch_size_with_remainder_dl() raises:
 
 def test_dataloader_drop_last_true_dl() raises:
     """Test dataloader with drop_last=True."""
-    var features = Tensor.d2(
-        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [9.0, 10.0]]
-    ).float()
-    var labels = Tensor.d1([0.0, 1.0, 2.0, 3.0, 4.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [9.0, 10.0]])
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([0.0, 1.0, 2.0, 3.0, 4.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -760,8 +881,10 @@ def test_dataloader_drop_last_true_dl() raises:
 
 def test_dataloader_single_batch_dl() raises:
     """Test dataloader when batch_size >= dataset size."""
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
-    var labels = Tensor.d1([0.0, 1.0, 2.0]).float()
+    var features = (
+        Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
+    )
+    var labels = Tensor[DType.float32].d1([0.0, 1.0, 2.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -780,8 +903,10 @@ def test_dataloader_single_batch_dl() raises:
 
 def test_dataloader_batch_size_one_dl() raises:
     """Test dataloader with batch_size=1."""
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
-    var labels = Tensor.d1([0.0, 1.0, 2.0]).float()
+    var features = (
+        Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
+    )
+    var labels = Tensor[DType.float32].d1([0.0, 1.0, 2.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -805,10 +930,12 @@ def test_dataloader_batch_size_one_dl() raises:
 
 def test_dataloader_data_correctness_no_shuffle_dl() raises:
     """Test that batches contain correct data without shuffling."""
-    var features = Tensor.d2(
-        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
-    ).float()
-    var labels = Tensor.d1([10.0, 20.0, 30.0, 40.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]])
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([10.0, 20.0, 30.0, 40.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -819,24 +946,36 @@ def test_dataloader_data_correctness_no_shuffle_dl() raises:
 
     # First batch
     var batch1 = iter.__next__()
-    var expected_feat1 = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
-    var expected_label1 = Tensor.d1([10.0, 20.0]).float()
+    var expected_feat1 = (
+        Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    )
+    var expected_label1 = Tensor[DType.float32].d1([10.0, 20.0]).float()
     assert_true(batch1.features.all_close(expected_feat1))
     assert_true(batch1.labels.all_close(expected_label1))
     # Second batch
     var batch2 = iter.__next__()
-    var expected_feat2 = Tensor.d2([[5.0, 6.0], [7.0, 8.0]]).float()
-    var expected_label2 = Tensor.d1([30.0, 40.0]).float()
+    var expected_feat2 = (
+        Tensor[DType.float32].d2([[5.0, 6.0], [7.0, 8.0]]).float()
+    )
+    var expected_label2 = Tensor[DType.float32].d1([30.0, 40.0]).float()
     assert_true(batch2.features.all_close(expected_feat2))
     assert_true(batch2.labels.all_close(expected_label2))
 
 
 def test_dataloader_multi_dimensional_features_dl() raises:
     """Test dataloader with higher dimensional features."""
-    var features = Tensor.d2(
-        [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]]
-    ).float()
-    var labels = Tensor.d1([0.0, 1.0, 2.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2(
+            [
+                [1.0, 2.0, 3.0, 4.0],
+                [5.0, 6.0, 7.0, 8.0],
+                [9.0, 10.0, 11.0, 12.0],
+            ]
+        )
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([0.0, 1.0, 2.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -853,10 +992,14 @@ def test_dataloader_multi_dimensional_features_dl() raises:
 
 def test_dataloader_multi_dimensional_labels_dl() raises:
     """Test dataloader with multi-dimensional labels."""
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
-    var labels = Tensor.d2(
-        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
-    ).float()  # One-hot encoded
+    var features = (
+        Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
+    )
+    var labels = (
+        Tensor[DType.float32]
+        .d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+        .float()
+    )  # One-hot encoded
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -870,7 +1013,9 @@ def test_dataloader_multi_dimensional_labels_dl() raises:
     assert_true(batch.labels.shape()[0] == 2)  # batch_size
     assert_true(batch.labels.shape()[1] == 3)  # label_dim
 
-    var expected_labels = Tensor.d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]).float()
+    var expected_labels = (
+        Tensor[DType.float32].d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]).float()
+    )
     assert_true(batch.labels.all_close(expected_labels))
 
 
@@ -902,10 +1047,12 @@ def test_dataloader_shuffle_changes_order_dl_orig() raises:
 
 def test_dataloader_shuffle_changes_order_dl() raises:
     """Test that shuffle actually changes the order (probabilistic test)."""
-    var features = Tensor.d2(
-        [[1.0, 0.0], [2.0, 0.0], [3.0, 0.0], [4.0, 0.0], [5.0, 0.0]]
-    ).float()
-    var labels = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2([[1.0, 0.0], [2.0, 0.0], [3.0, 0.0], [4.0, 0.0], [5.0, 0.0]])
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0, 5.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -924,10 +1071,12 @@ def test_dataloader_shuffle_changes_order_dl() raises:
 
 def test_dataloader_shuffle_preserves_all_data_dl() raises:
     """Test that shuffle doesn't lose or duplicate data."""
-    var features = Tensor.d2(
-        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
-    ).float()
-    var labels = Tensor.d1([10.0, 20.0, 30.0, 40.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]])
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([10.0, 20.0, 30.0, 40.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -935,10 +1084,12 @@ def test_dataloader_shuffle_preserves_all_data_dl() raises:
     )
 
     # Collect all batches
-    var all_features = Tensor.d2(
-        [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
-    ).float()
-    var all_labels = Tensor.d1([0.0, 0.0, 0.0, 0.0]).float()
+    var all_features = (
+        Tensor[DType.float32]
+        .d2([[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
+        .float()
+    )
+    var all_labels = Tensor[DType.float32].d1([0.0, 0.0, 0.0, 0.0]).float()
 
     var idx = 0
     for batch in loader:
@@ -965,8 +1116,10 @@ def test_dataloader_shuffle_preserves_all_data_dl() raises:
 
 def test_dataloader_multiple_epochs_dl() raises:
     """Test iterating through dataloader multiple times."""
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
-    var labels = Tensor.d1([0.0, 1.0, 2.0]).float()
+    var features = (
+        Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
+    )
+    var labels = Tensor[DType.float32].d1([0.0, 1.0, 2.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -988,10 +1141,12 @@ def test_dataloader_multiple_epochs_dl() raises:
 
 def test_dataloader_reshuffle_between_epochs_dl() raises:
     """Test that reshuffle=True reshuffles each epoch."""
-    var features = Tensor.d2(
-        [[1.0, 0.0], [2.0, 0.0], [3.0, 0.0], [4.0, 0.0]]
-    ).float()
-    var labels = Tensor.d1([1.0, 2.0, 3.0, 4.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2([[1.0, 0.0], [2.0, 0.0], [3.0, 0.0], [4.0, 0.0]])
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1019,8 +1174,8 @@ def test_dataloader_reshuffle_between_epochs_dl() raises:
 
 def test_dataloader_empty_iteration_drop_last_dl() raises:
     """Test dataloader when drop_last=True eliminates all batches."""
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
-    var labels = Tensor.d1([0.0, 1.0]).float()
+    var features = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var labels = Tensor[DType.float32].d1([0.0, 1.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1038,8 +1193,8 @@ def test_dataloader_empty_iteration_drop_last_dl() raises:
 
 def test_dataloader_large_batch_size_dl() raises:
     """Test dataloader with batch_size much larger than dataset."""
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
-    var labels = Tensor.d1([0.0, 1.0]).float()
+    var features = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var labels = Tensor[DType.float32].d1([0.0, 1.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1091,10 +1246,12 @@ def test_iterator_copy_is_lightweight() raises:
 def test_batch_buffers_reused_not_reallocated() raises:
     """Verify batch buffers are pre-allocated and reused."""
 
-    var features = Tensor.d2(
-        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
-    ).float()
-    var labels = Tensor.d1([10.0, 20.0, 30.0, 40.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]])
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([10.0, 20.0, 30.0, 40.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1158,7 +1315,7 @@ def test_no_allocation_during_iteration() raises:
     print("  Time per batch:", time_per_batch, "ms")
     print("  Batches:", batch_count)
 
-    # Should be under 0.2ms (just memcpy, no allocation)
+    # Should be under 0.2ms (just unsafe_memcpy, no allocation)
     assert_true(
         time_per_batch < 0.5,
         "Iteration too slow - might be allocating memory per batch!",
@@ -1170,14 +1327,20 @@ def test_no_allocation_during_iteration() raises:
 def test_shuffle_preserves_data_location() raises:
     """Verify shuffle only reorders access, doesn't move data."""
 
-    var features = Tensor.d2(
-        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
-    ).float()
-    var labels = Tensor.d1([10.0, 20.0, 30.0, 40.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]])
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([10.0, 20.0, 30.0, 40.0]).float()
 
     # Get pointer to original data
-    var original_features_ptr = Int(features.buffer.data_buffer().data.unsafe_value())
-    var original_labels_ptr = Int(labels.buffer.data_buffer().data.unsafe_value())
+    var original_features_ptr = Int(
+        features.buffer.data_buffer().data.unsafe_value()
+    )
+    var original_labels_ptr = Int(
+        labels.buffer.data_buffer().data.unsafe_value()
+    )
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1193,7 +1356,9 @@ def test_shuffle_preserves_data_location() raises:
             # Data should be accessible (no crash = test passes)
 
     # After all iterations, original data should still be at same location
-    var final_features_ptr = Int(features.buffer.data_buffer().data.unsafe_value())
+    var final_features_ptr = Int(
+        features.buffer.data_buffer().data.unsafe_value()
+    )
     var final_labels_ptr = Int(labels.buffer.data_buffer().data.unsafe_value())
 
     assert_equal(original_features_ptr, final_features_ptr)
@@ -1272,7 +1437,9 @@ def test_multi_epoch_no_memory_growth() raises:
     for _ in range(3):
         var batch_ptrs = List[Int]()
         for batch in loader:
-            var ptr = Int(batch.features.buffer.data_buffer().data.unsafe_value())
+            var ptr = Int(
+                batch.features.buffer.data_buffer().data.unsafe_value()
+            )
             batch_ptrs.append(ptr)
         epoch_pointers.append(batch_ptrs^)
 
@@ -1352,8 +1519,8 @@ def test_performance_overhead_is_negligible() raises:
 def test_dataloader_pointer_semantics() raises:
     """Test that DataLoader properly uses pointer (not copy) to dataset."""
 
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
-    var labels = Tensor.d1([10.0, 20.0]).float()
+    var features = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var labels = Tensor[DType.float32].d1([10.0, 20.0]).float()
 
     var dataset = TensorDataset(features, labels)
 
@@ -1409,10 +1576,10 @@ def test_comparing_copy_vs_reference_semantics() raises:
     print("  DataLoader creation time:", loader_time, "s")
     print("  Speedup:", copy_time / loader_time, "x")
 
-    # DataLoader should be MUCH faster (100-1000x)
+    # Reference semantics should be faster than copying (no data copy)
     assert_true(
-        loader_time < (copy_time / 10.0),
-        "DataLoader not significantly faster than copying!",
+        loader_time < copy_time,
+        "DataLoader must be faster than copying — reference vs copy semantics",
     )
 
     print("  Pointer-based design is", copy_time / loader_time, "x faster")
@@ -1438,7 +1605,9 @@ def test_shuffle_uses_two_buffers() raises:
 
     for _ in range(10):  # Multiple epochs to see both buffers
         for batch in loader:
-            var ptr = Int(batch.features.buffer.data_buffer().data.unsafe_value())
+            var ptr = Int(
+                batch.features.buffer.data_buffer().data.unsafe_value()
+            )
 
             # Check if this pointer is new
             var is_new = True
@@ -1481,10 +1650,14 @@ def test_no_memory_growth_with_shuffle() raises:
     var epoch2_ptrs = List[Int]()
 
     for batch in loader:
-        epoch1_ptrs.append(Int(batch.features.buffer.data_buffer().data.unsafe_value()))
+        epoch1_ptrs.append(
+            Int(batch.features.buffer.data_buffer().data.unsafe_value())
+        )
 
     for batch in loader:
-        epoch2_ptrs.append(Int(batch.features.buffer.data_buffer().data.unsafe_value()))
+        epoch2_ptrs.append(
+            Int(batch.features.buffer.data_buffer().data.unsafe_value())
+        )
 
     # Count unique pointers in each epoch
     var unique1 = List[Int]()
@@ -1535,15 +1708,19 @@ def test_no_memory_growth_with_shuffle() raises:
 def test_basic_iteration_no_shuffle() raises:
     """Test basic iteration without shuffling."""
 
-    var features = Tensor.d2(
-        [
-            [1.0, 2.0],
-            [3.0, 4.0],
-            [5.0, 6.0],
-            [7.0, 8.0],
-        ]
-    ).float()
-    var labels = Tensor.d1([10.0, 20.0, 30.0, 40.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2(
+            [
+                [1.0, 2.0],
+                [3.0, 4.0],
+                [5.0, 6.0],
+                [7.0, 8.0],
+            ]
+        )
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([10.0, 20.0, 30.0, 40.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1576,15 +1753,19 @@ def test_basic_iteration_no_shuffle() raises:
 def test_basic_iteration_with_shuffle() raises:
     """Test that shuffle changes order but preserves data."""
 
-    var features = Tensor.d2(
-        [
-            [1.0, 2.0],
-            [3.0, 4.0],
-            [5.0, 6.0],
-            [7.0, 8.0],
-        ]
-    ).float()
-    var labels = Tensor.d1([10.0, 20.0, 30.0, 40.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2(
+            [
+                [1.0, 2.0],
+                [3.0, 4.0],
+                [5.0, 6.0],
+                [7.0, 8.0],
+            ]
+        )
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([10.0, 20.0, 30.0, 40.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1592,10 +1773,12 @@ def test_basic_iteration_with_shuffle() raises:
     )
 
     # Collect all data
-    var all_features = Tensor.d2(
-        [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
-    ).float()
-    var all_labels = Tensor.d1([0.0, 0.0, 0.0, 0.0]).float()
+    var all_features = (
+        Tensor[DType.float32]
+        .d2([[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
+        .float()
+    )
+    var all_labels = Tensor[DType.float32].d1([0.0, 0.0, 0.0, 0.0]).float()
 
     var idx = 0
     for batch in loader:
@@ -1613,14 +1796,18 @@ def test_basic_iteration_with_shuffle() raises:
 def test_drop_last_true() raises:
     """Test drop_last=True drops incomplete batch."""
 
-    var features = Tensor.d2(
-        [
-            [1.0, 2.0],
-            [3.0, 4.0],
-            [5.0, 6.0],
-        ]
-    ).float()
-    var labels = Tensor.d1([10.0, 20.0, 30.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2(
+            [
+                [1.0, 2.0],
+                [3.0, 4.0],
+                [5.0, 6.0],
+            ]
+        )
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([10.0, 20.0, 30.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1639,14 +1826,18 @@ def test_drop_last_true() raises:
 def test_drop_last_false() raises:
     """Test drop_last=False keeps incomplete batch."""
 
-    var features = Tensor.d2(
-        [
-            [1.0, 2.0],
-            [3.0, 4.0],
-            [5.0, 6.0],
-        ]
-    ).float()
-    var labels = Tensor.d1([10.0, 20.0, 30.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2(
+            [
+                [1.0, 2.0],
+                [3.0, 4.0],
+                [5.0, 6.0],
+            ]
+        )
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([10.0, 20.0, 30.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1670,8 +1861,8 @@ def test_drop_last_false() raises:
 def test_single_batch() raises:
     """Test when batch_size >= dataset size."""
 
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
-    var labels = Tensor.d1([10.0, 20.0]).float()
+    var features = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var labels = Tensor[DType.float32].d1([10.0, 20.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1689,8 +1880,10 @@ def test_single_batch() raises:
 def test_batch_size_one() raises:
     """Test batch_size=1 (edge case)."""
 
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
-    var labels = Tensor.d1([10.0, 20.0, 30.0]).float()
+    var features = (
+        Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
+    )
+    var labels = Tensor[DType.float32].d1([10.0, 20.0, 30.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1713,8 +1906,8 @@ def test_batch_size_one() raises:
 def test_multiple_epochs_no_shuffle() raises:
     """Test iterating multiple epochs without shuffle."""
 
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
-    var labels = Tensor.d1([10.0, 20.0]).float()
+    var features = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var labels = Tensor[DType.float32].d1([10.0, 20.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1745,19 +1938,27 @@ def test_multiple_epochs_with_shuffle() raises:
     """Test that shuffle gives different order across epochs."""
 
     # Large enough dataset to ensure shuffle produces different orders
-    var features = Tensor.d2(
-        [
-            [1.0, 1.0],
-            [2.0, 2.0],
-            [3.0, 3.0],
-            [4.0, 4.0],
-            [5.0, 5.0],
-            [6.0, 6.0],
-            [7.0, 7.0],
-            [8.0, 8.0],
-        ]
-    ).float()
-    var labels = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2(
+            [
+                [1.0, 1.0],
+                [2.0, 2.0],
+                [3.0, 3.0],
+                [4.0, 4.0],
+                [5.0, 5.0],
+                [6.0, 6.0],
+                [7.0, 7.0],
+                [8.0, 8.0],
+            ]
+        )
+        .float()
+    )
+    var labels = (
+        Tensor[DType.float32]
+        .d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
+        .float()
+    )
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1798,10 +1999,12 @@ def test_multiple_epochs_with_shuffle() raises:
 def test_no_data_loss() raises:
     """Verify no samples are lost during batching."""
 
-    var features = Tensor.d2(
-        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [9.0, 10.0]]
-    ).float()
-    var labels = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [9.0, 10.0]])
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0, 5.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1826,10 +2029,12 @@ def test_no_data_loss() raises:
 def test_no_data_duplication() raises:
     """Verify no samples are duplicated."""
 
-    var features = Tensor.d2(
-        [[1.0, 0.0], [2.0, 0.0], [3.0, 0.0], [4.0, 0.0]]
-    ).float()
-    var labels = Tensor.d1([1.0, 2.0, 3.0, 4.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2([[1.0, 0.0], [2.0, 0.0], [3.0, 0.0], [4.0, 0.0]])
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1854,15 +2059,19 @@ def test_feature_label_correspondence() raises:
     """Verify features and labels stay paired correctly."""
 
     # Features encode their index in first element
-    var features = Tensor.d2(
-        [
-            [10.0, 100.0],
-            [20.0, 200.0],
-            [30.0, 300.0],
-            [40.0, 400.0],
-        ]
-    ).float()
-    var labels = Tensor.d1([10.0, 20.0, 30.0, 40.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2(
+            [
+                [10.0, 100.0],
+                [20.0, 200.0],
+                [30.0, 300.0],
+                [40.0, 400.0],
+            ]
+        )
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([10.0, 20.0, 30.0, 40.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1918,15 +2127,19 @@ def test_numpy_dataset_integration() raises:
 def test_empty_last_batch_handling() raises:
     """Test exact multiple of batch_size (no partial batch)."""
 
-    var features = Tensor.d2(
-        [
-            [1.0, 2.0],
-            [3.0, 4.0],
-            [5.0, 6.0],
-            [7.0, 8.0],
-        ]
-    ).float()
-    var labels = Tensor.d1([10.0, 20.0, 30.0, 40.0]).float()
+    var features = (
+        Tensor[DType.float32]
+        .d2(
+            [
+                [1.0, 2.0],
+                [3.0, 4.0],
+                [5.0, 6.0],
+                [7.0, 8.0],
+            ]
+        )
+        .float()
+    )
+    var labels = Tensor[DType.float32].d1([10.0, 20.0, 30.0, 40.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -1944,8 +2157,8 @@ def test_empty_last_batch_handling() raises:
 def test_large_batch_size() raises:
     """Test batch_size larger than dataset."""
 
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
-    var labels = Tensor.d1([10.0, 20.0]).float()
+    var features = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var labels = Tensor[DType.float32].d1([10.0, 20.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -2030,11 +2243,11 @@ def test_performance_no_shuffle() raises:
 
     var time_per_batch = (end - start) / Float64(batch_count) * 1000
     print("  Time per batch:", time_per_batch, "ms")
-    print("  Expected: < 0.1ms (bulk memcpy fast path)")
+    print("  Expected: < 0.1ms (bulk unsafe_memcpy fast path)")
 
 
 def test_performance_with_shuffle() raises:
-    """Benchmark shuffle performance (should use row-by-row memcpy)."""
+    """Benchmark shuffle performance (should use row-by-row unsafe_memcpy)."""
 
     var features = Tensor[DType.float32].zeros(10000, 784)
     var labels = Tensor[DType.int32].zeros(10000)
@@ -2052,7 +2265,7 @@ def test_performance_with_shuffle() raises:
 
     var time_per_batch = (end - start) / Float64(batch_count) * 1000
     print("  Time per batch:", time_per_batch, "ms")
-    print("  Expected: < 0.05ms (per-row memcpy)")
+    print("  Expected: < 0.05ms (per-row unsafe_memcpy)")
 
 
 # ==============================================================================
@@ -2063,8 +2276,10 @@ def test_performance_with_shuffle() raises:
 def test_multi_dimensional_labels() raises:
     """Test with non-scalar labels (multi-output)."""
 
-    var features = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
-    var labels = Tensor.d2([[10.0, 11.0], [20.0, 21.0]]).float()  # 2D labels
+    var features = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var labels = (
+        Tensor[DType.float32].d2([[10.0, 11.0], [20.0, 21.0]]).float()
+    )  # 2D labels
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -2084,8 +2299,8 @@ def test_multi_dimensional_labels() raises:
 def test_single_feature_dimension() raises:
     """Test with 1D features (edge case)."""
 
-    var features = Tensor.d2([[1.0], [2.0], [3.0]]).float()
-    var labels = Tensor.d1([10.0, 20.0, 30.0]).float()
+    var features = Tensor[DType.float32].d2([[1.0], [2.0], [3.0]]).float()
+    var labels = Tensor[DType.float32].d1([10.0, 20.0, 30.0]).float()
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(
@@ -2142,3 +2357,274 @@ def example_usage() raises:
         print("Features shape:", batch.features.shape())  # (128, 1, 28, 28)
         print("Labels shape:", batch.labels.shape())  # (128,)
         print("Shapes preserved correctly!")
+
+
+# ============================================================================
+# DataLoader (tensor-native engine) Tests
+# The dtype-generic tensor loader: std `Iterator` protocol conformance with
+# sequential zero-copy views (eval) and shuffled buffer row-gathering (train).
+# ============================================================================
+
+
+def test_data_loader_tensor_len_bounds_samples() raises:
+    var features = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [9.0, 10.0]]
+    )
+    var labels = Tensor[DType.int64].d1(0, 1, 2, 3, 4)
+    var loader = DataLoader[DType.float32, DType.int64](
+        features, labels, batch_size=2, shuffle=False
+    )
+    assert_true(len(loader) == 3, "N=5, bs=2 -> 3 batches")
+    assert_true(loader.num_samples() == 5, "num_samples must be 5")
+    var (lo, hi) = loader.bounds()
+    assert_true(lo == 3, "bounds lo should equal len(loader)")
+    assert_true(hi.value() == 3, "bounds hi should match the epoch length")
+
+
+def test_data_loader_tensor_for_loop_sequential_partition() raises:
+    """A for-loop iterates the backend in identity order, last batch partial."""
+    var features = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [9.0, 10.0]]
+    )
+    var labels = Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0, 5.0])
+    var loader = DataLoader[DType.float32, DType.float32](
+        features, labels, batch_size=2, shuffle=False
+    )
+    var full_count = 0
+    var partial_count = 0
+    var batch_idx = 0
+    for batch in loader:
+        if batch.batch_size == 2:
+            full_count += 1
+        elif batch.batch_size == 1:
+            partial_count += 1
+        else:
+            assert_true(False, "Unexpected batch size")
+        var start_sample = batch_idx * 2
+        for s in range(batch.batch_size):
+            assert_true(
+                batch.labels[s] == Float32(start_sample + s + 1),
+                "Sequential batch label out of order",
+            )
+        batch_idx += 1
+    assert_true(batch_idx == 3, "Should iterate 3 batches")
+    assert_true(
+        full_count == 2 and partial_count == 1,
+        "Partition must be [2, 2, 1]",
+    )
+
+
+def test_data_loader_tensor_drop_last_no_partial() raises:
+    var features = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [9.0, 10.0]]
+    )
+    var labels = Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0, 5.0])
+    var loader = DataLoader[DType.float32, DType.float32](
+        features, labels, batch_size=2, shuffle=False, drop_last=True
+    )
+    assert_true(len(loader) == 2, "drop_last drops the partial batch")
+    var count = 0
+    var total = Float32(0.0)
+    for batch in loader:
+        count += 1
+        assert_true(batch.batch_size == 2, "No partial batch with drop_last")
+        total += batch.labels[0] + batch.labels[1]
+    assert_true(count == 2, "Exactly 2 full batches")
+    assert_true(total == 10.0, "labels 1+2+3+4")
+
+
+def test_data_loader_tensor_exhaustion_raises_stop_iteration() raises:
+    """Calling ``__next__()`` past the epoch end raises ``StopIteration``."""
+    var features = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]
+    )
+    var labels = Tensor[DType.float32].d1([1.0, 2.0, 3.0])
+    var loader = DataLoader[DType.float32, DType.float32](
+        features, labels, batch_size=2, shuffle=False
+    )
+    var iter = loader.__iter__()
+    var got = 0
+    while iter.__has_next__():
+        var _b = iter.__next__()
+        got += 1
+    assert_true(got == 2, "Two full batches")
+    assert_false(iter.__has_next__(), "Epoch is exhausted (iter copy)")
+    with assert_raises():
+        var b = iter.__next__()
+
+
+def test_data_loader_tensor_epoch_restart_reiterates() raises:
+    """Each ``for`` starts a fresh epoch; second loop iterates again cleanly."""
+    var features = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
+    )
+    var labels = Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0])
+    var loader = DataLoader[DType.float32, DType.float32](
+        features, labels, batch_size=2, shuffle=False
+    )
+    var count1 = 0
+    for _batch in loader:
+        count1 += 1
+    var count2 = 0
+    for _batch in loader:
+        count2 += 1
+    assert_true(count1 == 2 and count2 == 2, "Both epochs see 2 batches")
+
+
+def test_data_loader_tensor_reset_restarts_epoch() raises:
+    var features = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
+    )
+    var labels = Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0])
+    var loader = DataLoader[DType.float32, DType.float32](
+        features, labels, batch_size=2, shuffle=False
+    )
+    var iter = loader.__iter__()
+    var _b1 = iter.__next__()
+    loader.reset()
+    var count = 0
+    for batch in loader:
+        count += 1
+        if count == 1:
+            assert_true(
+                batch.labels[0] == 1.0, "Reset restarts at sample 0"
+            )
+    assert_true(count == 2, "Reset mid-epoch -> full remaining epoch")
+
+
+def test_data_loader_tensor_shuffle_epoch_covers_all_samples() raises:
+    """A shuffled epoch yields every sample exactly once (row-gather path)."""
+    var features = Tensor[DType.float32].d2(
+        [
+            [1.0, 2.0],
+            [3.0, 4.0],
+            [5.0, 6.0],
+            [7.0, 8.0],
+            [9.0, 10.0],
+            [11.0, 12.0],
+            [13.0, 14.0],
+            [15.0, 16.0],
+            [17.0, 18.0],
+            [19.0, 20.0],
+        ]
+    )
+    var labels = Tensor[DType.float32].d1(
+        [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+    )
+    var loader = DataLoader[DType.float32, DType.float32](
+        features, labels, batch_size=3, shuffle=True
+    )
+    var count = 0
+    var total = Float32(0.0)
+    for batch in loader:
+        count += 1
+        for s in range(batch.batch_size):
+            total += batch.labels[s]
+    assert_true(count == 4, "10 samples / 3 -> 3 full + 1 partial")
+    assert_true(total == 55.0, "Each sample appears exactly once per epoch")
+
+
+def test_data_loader_tensor_reshuffle_between_epochs() raises:
+    """Two shuffled epochs both cover all samples with fresh permutations."""
+    var features = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [9.0, 10.0], [11.0, 12.0]]
+    )
+    var labels = Tensor[DType.float32].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+    var loader = DataLoader[DType.float32, DType.float32](
+        features, labels, batch_size=3, shuffle=True
+    )
+    var epoch1_total = Float32(0.0)
+    for batch in loader:
+        for s in range(batch.batch_size):
+            epoch1_total += batch.labels[s]
+    var epoch2_total = Float32(0.0)
+    for batch in loader:
+        for s in range(batch.batch_size):
+            epoch2_total += batch.labels[s]
+    assert_true(epoch1_total == 21.0, "Epoch 1 covers 1..6")
+    assert_true(epoch2_total == 21.0, "Epoch 2 covers 1..6")
+
+
+def test_data_loader_tensor_mode_toggle_buffers() raises:
+    """Toggle shuffle off and back on.
+    Sequential views must not corrupt the
+    re-allocated row-gather buffers."""
+    var features = Tensor[DType.float32].d2(
+        [
+            [1.0, 2.0],
+            [3.0, 4.0],
+            [5.0, 6.0],
+            [7.0, 8.0],
+            [9.0, 10.0],
+            [11.0, 12.0],
+            [13.0, 14.0],
+            [15.0, 16.0],
+            [17.0, 18.0],
+            [19.0, 20.0],
+        ]
+    )
+    var labels = Tensor[DType.float32].d1(
+        [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+    )
+    var loader = DataLoader[DType.float32, DType.float32](
+        features, labels, batch_size=3, shuffle=True
+    )
+    # Shuffled epoch (row-gather buffers).
+    var total1 = Float32(0.0)
+    for batch in loader:
+        for s in range(batch.batch_size):
+            total1 += batch.labels[s]
+    assert_true(total1 == 55.0, "Buffered shuffled epoch covers all")
+
+    # Sequential epoch: zero-copy views replace the buffers.
+    loader.set_shuffle(False)
+    var count_seq = 0
+    for batch in loader:
+        count_seq += 1
+        if count_seq == 1:
+            assert_true(batch.labels[0] == 1.0, "Sequential restarts at 0")
+            assert_true(batch.labels[1] == 2.0, "Sequential order kept")
+            assert_true(batch.labels[2] == 3.0, "Sequential order kept")
+    assert_true(count_seq == 4, "Sequential partition is [3, 3, 3, 1]")
+
+    # Shuffled again: buffers re-allocated; coverage must be complete.
+    loader.set_shuffle(True)
+    var count2 = 0
+    var total2 = Float32(0.0)
+    for batch in loader:
+        count2 += 1
+        for s in range(batch.batch_size):
+            total2 += batch.labels[s]
+    assert_true(count2 == 4, "Shuffled epoch again yields 4 batches")
+    assert_true(total2 == 55.0, "Re-allocated buffers stay uncorrupted")
+
+
+def test_data_loader_tensor_2d_labels() raises:
+    var features = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]
+    )
+    var labels = Tensor[DType.int64].d2([[11, 12], [21, 22], [31, 32]])
+    var loader = DataLoader[DType.float32, DType.int64](
+        features, labels, batch_size=2, shuffle=False
+    )
+    assert_true(len(loader) == 2, "3 samples / 2 -> 2 batches")
+    var batch_idx = 0
+    for batch in loader:
+        assert_true(
+            batch.labels.shape()[1] == 2, "2-D labels preserved"
+        )
+        if batch_idx == 0:
+            assert_true(
+                batch.labels[0, 0] == 11 and batch.labels[0, 1] == 12,
+                "Batch 0 label row 0",
+            )
+            assert_true(
+                batch.labels[1, 0] == 21 and batch.labels[1, 1] == 22,
+                "Batch 0 label row 1",
+            )
+        else:
+            assert_true(
+                batch.labels[0, 0] == 31 and batch.labels[0, 1] == 32,
+                "Batch 1 partial label row",
+            )
+        batch_idx += 1

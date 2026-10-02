@@ -1,8 +1,9 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor, SUM
-from .intarray import IntArray
-from .shapes import Shape
-from .backpropagation import BackwardFnArg, BACKWARD_SUM
+from .shared.mnemonics import AddTensor, SUM
+from .shared.intarray import IntArray
+from .shared.shapes import Shape
+from .backpropagation import BackwardFn, BackwardFnType
+
 from .validators import Validator
 from .sum_mean_reduction import ReductionArg, SumMeanReduction
 from .gradbox import Gradbox
@@ -10,14 +11,17 @@ from .ancestry import Ancestor
 
 
 @fieldwise_init
-struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct SumBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
-        ref bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
+        ref bwd_arg = output.ancestry().backward_fn().get[ReductionArg]()
         var (axes, keepdims) = bwd_arg.axes, bwd_arg.keepdims
         ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
@@ -39,8 +43,8 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                         IntArray.filled(len(axes), 1),
                     )
                 )
-                unsqueezed_shape = Shape(axes)
-                unsqueezed_grad = gradbox.reshape(unsqueezed_shape)
+                var unsqueezed_shape = Shape(axes)
+                var unsqueezed_grad = gradbox.reshape(unsqueezed_shape)
                 grad_contrib = unsqueezed_grad.broadcast_to(shape)
             else:
                 grad_contrib = gradbox.broadcast_to(shape)
@@ -49,8 +53,7 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             ancestor.update_grad(grad_contrib^, AddTensor, None)
 
         parent_ids.append(ancestor._id)
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -67,18 +70,21 @@ struct Summer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ) -> Tensor[Self.dtype]:
         var shape = tensor.shape()
         var reduction_axes = Validator.normalize_reduction_axes(shape, axes)
-        var nd_buffer = SumMeanReduction[Self.dtype].reduce[op_code=SUM](tensor.buffer, reduction_axes, keepdims)
+        var nd_buffer = SumMeanReduction[Self.dtype].reduce[op_code=SUM](
+            tensor.buffer, reduction_axes, keepdims, sync=sync
+        )
         var out = Tensor[Self.dtype](nd_buffer^, requires_grad=False)
 
         comptime if track_grad:
-            grad_required = requires_grad.or_else(tensor.requires_grad)
+            var grad_required = requires_grad.or_else(tensor.requires_grad)
 
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_SUM, ReductionArg(reduction_axes, keepdims)
+                var backwardFn = BackwardFn(
+                    ReductionArg(reduction_axes, keepdims),
+                    SumBackward[Self.dtype](),
                 )
-                backwardFnArg.needs_parent_data = True
-                out.add_ancestry(backwardFnArg^, tensor)
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, tensor)
 
         return out^

@@ -1,33 +1,25 @@
-# from bpe import Tokenizer
-from tenmo.dataloader import Dataset, DataLoader
-from tenmo.shapes import Shape
-from tenmo.common_utils import panic
-from std.memory import memcpy
+from ..tensor import Tensor
+from ..dataloader import Dataset, NativeLoader
+from ..shared.shapes import Shape
+from bpe.tokenizer_trait import Tokenizer
+from std.memory import unsafe_memcpy
 from std.random import random_float64
-
-
-trait Tokenizer:
-    def decode(self, token_ids: List[Int]) raises -> String:
-        ...
-
-    def encode(self, text: String) raises -> List[Int]:
-        ...
 
 
 struct LLMDataset[
     TokType: Tokenizer,
     dtype: DType = DType.int64,
-](Sized & Copyable & Movable & Dataset):
+](Dataset):
     """
-    A sliding-window language modelling dataset.
+        A sliding-window language modelling dataset.
 
     Encodes text with a Tokenizer, then creates input/target pairs
-    using a sliding window. Stores IDs in two flat ``List[Scalar[dtype]]``
-    arrays (input and target) so that ``DataLoader`` can access them via
+    using a sliding window. Stores IDs in two flat 1-D tensors
+    (input and target) so that ``NativeLoader`` can access them via
     fixed-offset pointer arithmetic.
     """
 
-    comptime _feature_dtype = Self.dtype
+    comptime _sample_dtype = Self.dtype
     comptime _label_dtype = Self.dtype
     comptime _TokType = Self.TokType
 
@@ -67,13 +59,13 @@ struct LLMDataset[
 
     def get_features_ptr(
         ref self,
-    ) -> UnsafePointer[Scalar[Self._feature_dtype], ImmutAnyOrigin]:
-        return self._input_data.unsafe_ptr().as_immutable()
+    ) -> Pointer[Scalar[Self._sample_dtype], ImmutAnyOrigin]:
+        return self._input_data.unsafe_ptr().as_unsafe_any_origin().as_imm()
 
     def get_labels_ptr(
         ref self,
-    ) -> UnsafePointer[Scalar[Self._label_dtype], ImmutAnyOrigin]:
-        return self._target_data.unsafe_ptr().as_immutable()
+    ) -> Pointer[Scalar[Self._label_dtype], ImmutAnyOrigin]:
+        return self._target_data.unsafe_ptr().as_unsafe_any_origin().as_imm()
 
     def get_feature_shape(self) -> Shape:
         return Shape(self._max_length)
@@ -90,17 +82,19 @@ struct LLMDataset[
     def sample(
         ref self,
         idx: Optional[Int] = None,
-    ) raises -> Tuple[Tensor[Self._feature_dtype], Tensor[Self._label_dtype]]:
+    ) raises -> Tuple[Tensor[Self._sample_dtype], Tensor[Self._label_dtype]]:
         var index = idx.value() if idx else Int(
             random_float64() * Float64(self._num_samples)
         )
-        var features = Tensor[Self._feature_dtype].zeros(
+        var features = Tensor[Self._sample_dtype].zeros(
             Shape(self._max_length)
         )
         var labels = Tensor[Self._label_dtype].zeros(Shape(self._max_length))
-        var src_feat = self._input_data.unsafe_ptr() + index * self._max_length
-        var src_label = (
-            self._target_data.unsafe_ptr() + index * self._max_length
+        var src_feat = self._input_data.unsafe_ptr().unsafe_offset(
+            index * self._max_length
+        )
+        var src_label = self._target_data.unsafe_ptr().unsafe_offset(
+            index * self._max_length
         )
         var dst_feat = (
             features.data_ptr()
@@ -112,11 +106,11 @@ struct LLMDataset[
             .unsafe_mut_cast[True]()
             .unsafe_origin_cast[MutAnyOrigin]()
         )
-        memcpy(
-            dest=dst_feat, src=src_feat.as_immutable(), count=self._max_length
+        unsafe_memcpy(
+            dest=dst_feat, src=src_feat.as_imm(), count=self._max_length
         )
-        memcpy(
-            dest=dst_label, src=src_label.as_immutable(), count=self._max_length
+        unsafe_memcpy(
+            dest=dst_label, src=src_label.as_imm(), count=self._max_length
         )
         return features^, labels^
 
@@ -125,10 +119,10 @@ struct LLMDataset[
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
-        normalize_mean: Optional[Scalar[Self._feature_dtype]] = None,
-        normalize_std: Optional[Scalar[Self._feature_dtype]] = None,
-    ) -> DataLoader[Self, origin_of(self)]:
-        return DataLoader(
+        normalize_mean: Optional[Scalar[Self._sample_dtype]] = None,
+        normalize_std: Optional[Scalar[Self._sample_dtype]] = None,
+    ) -> NativeLoader[Self, origin_of(self)]:
+        return NativeLoader(
             Pointer(to=self),
             batch_size,
             shuffle,
@@ -141,15 +135,15 @@ struct LLMDataset[
 @fieldwise_init
 struct RandomSlidingWindowDataset[
     dtype: DType = DType.int64,
-](Sized & Copyable & Movable & Dataset):
+](Dataset):
     """Sliding-window dataset from a 1D token tensor.
 
     Given a 1D tensor of token IDs and a window size, pre-computes all
-    overlapping context/target pairs so that ``DataLoader`` can access
+    overlapping context/target pairs so that ``NativeLoader`` can access
     them via fixed-offset pointer arithmetic.
     """
 
-    comptime _feature_dtype = Self.dtype
+    comptime _sample_dtype = Self.dtype
     comptime _label_dtype = Self.dtype
 
     var _input_data: List[Scalar[Self.dtype]]
@@ -180,13 +174,13 @@ struct RandomSlidingWindowDataset[
 
     def get_features_ptr(
         ref self,
-    ) -> UnsafePointer[Scalar[Self._feature_dtype], ImmutAnyOrigin]:
-        return self._input_data.unsafe_ptr().as_immutable()
+    ) -> Pointer[Scalar[Self._sample_dtype], ImmutAnyOrigin]:
+        return self._input_data.unsafe_ptr().as_unsafe_any_origin().as_imm()
 
     def get_labels_ptr(
         ref self,
-    ) -> UnsafePointer[Scalar[Self._label_dtype], ImmutAnyOrigin]:
-        return self._target_data.unsafe_ptr().as_immutable()
+    ) -> Pointer[Scalar[Self._label_dtype], ImmutAnyOrigin]:
+        return self._target_data.unsafe_ptr().as_unsafe_any_origin().as_imm()
 
     def get_feature_shape(self) -> Shape:
         return Shape(self._seq_length)
@@ -203,17 +197,19 @@ struct RandomSlidingWindowDataset[
     def sample(
         ref self,
         idx: Optional[Int] = None,
-    ) raises -> Tuple[Tensor[Self._feature_dtype], Tensor[Self._label_dtype]]:
+    ) raises -> Tuple[Tensor[Self._sample_dtype], Tensor[Self._label_dtype]]:
         var index = idx.value() if idx else Int(
             random_float64() * Float64(self._num_samples)
         )
-        var features = Tensor[Self._feature_dtype].zeros(
+        var features = Tensor[Self._sample_dtype].zeros(
             Shape(self._seq_length)
         )
         var labels = Tensor[Self._label_dtype].zeros(Shape(self._seq_length))
-        var src_feat = self._input_data.unsafe_ptr() + index * self._seq_length
-        var src_label = (
-            self._target_data.unsafe_ptr() + index * self._seq_length
+        var src_feat = self._input_data.unsafe_ptr().unsafe_offset(
+            index * self._seq_length
+        )
+        var src_label = self._target_data.unsafe_ptr().unsafe_offset(
+            index * self._seq_length
         )
         var dst_feat = (
             features.data_ptr()
@@ -225,11 +221,11 @@ struct RandomSlidingWindowDataset[
             .unsafe_mut_cast[True]()
             .unsafe_origin_cast[MutAnyOrigin]()
         )
-        memcpy(
-            dest=dst_feat, src=src_feat.as_immutable(), count=self._seq_length
+        unsafe_memcpy(
+            dest=dst_feat, src=src_feat.as_imm(), count=self._seq_length
         )
-        memcpy(
-            dest=dst_label, src=src_label.as_immutable(), count=self._seq_length
+        unsafe_memcpy(
+            dest=dst_label, src=src_label.as_imm(), count=self._seq_length
         )
         return features^, labels^
 
@@ -238,10 +234,10 @@ struct RandomSlidingWindowDataset[
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
-        normalize_mean: Optional[Scalar[Self._feature_dtype]] = None,
+        normalize_mean: Optional[Scalar[Self._sample_dtype]] = None,
         normalize_std: Optional[Scalar[Self._label_dtype]] = None,
-    ) -> DataLoader[Self, origin_of(self)]:
-        return DataLoader(
+    ) -> NativeLoader[Self, origin_of(self)]:
+        return NativeLoader(
             Pointer(to=self),
             batch_size,
             shuffle,

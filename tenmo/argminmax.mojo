@@ -1,12 +1,16 @@
 from .tensor import Tensor
-from .intarray import IntArray
-from .common_utils import panic
-from .shapes import Shape
+from .shared.intarray import IntArray
+from .shared.panic import panic
+from .shared.shapes import Shape
 from std.utils.numerics import max_finite, min_finite
 from .ndbuffer import NDBuffer
 from std.sys import has_accelerator
-from .kernels.argminmax_kernel import ArgMinMaxGpu
-from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
+from .kernels.argminmax_kernel import ArgMinMaxKernel
+from .shared.mnemonics import DEFAULT_INDEX_DTYPE
+from max.algorithm import parallelize
+from std.sys.info import num_physical_cores
+from .shared.indexhelper import IndexCalculator
+from .shared.reduction_walk import ReductionWalk
 
 
 @fieldwise_init
@@ -14,7 +18,7 @@ struct ArgMinMaxReducer[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
     ImplicitlyCopyable, RegisterPassable
 ):
     """
-    Unified CPU + GPU argmin/argmax on NDBuffer.
+        Unified CPU + GPU argmin/argmax on NDBuffer.
     Returns an NDBuffer[Self.index_dtype] with the output shape.
     """
 
@@ -53,10 +57,11 @@ struct ArgMinMaxReducer[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
 
         comptime if has_accelerator():
             if A.is_on_gpu():
-                return ArgMinMaxGpu[Self.dtype, Self.index_dtype]._gpu_reduce[
-                    is_max, max_block_size
-                ](
-                    A,
+                var result = ArgMinMaxKernel[
+                    Self.dtype, Self.index_dtype
+                ]._gpu_reduce[is_max, max_block_size](
+                    A.layout(),
+                    A.device_state.value(),
                     ax,
                     keepdims,
                     out_shape,
@@ -64,10 +69,13 @@ struct ArgMinMaxReducer[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
                     reduced_volume,
                     sync=sync,
                 )
+                return NDBuffer[Self.index_dtype].with_layout_device_state(
+                    result[0], result[1]
+                )
 
         return Self._cpu_reduce[is_max](A, ax, keepdims, out_shape)
 
-    # ── CPU path ──────────────────────────────────────────────────────────────
+    # CPU path
 
     @staticmethod
     def _cpu_reduce[
@@ -80,8 +88,20 @@ struct ArgMinMaxReducer[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
     ) -> NDBuffer[Self.index_dtype]:
         var shape = A.shape
         var out = NDBuffer[Self.index_dtype].zeros(out_shape)
+        var total_output = out_shape.num_elements()
 
-        for out_idx in out_shape:
+        var A_buf = A.buffer
+        var A_offset = A.offset
+        var walk = ReductionWalk.build(
+            shape, IntArray(ax), A.strides, keepdims
+        )
+
+        def compute_arg(out_flat_idx: Int) {imm}:
+            var out_idx = IndexCalculator.index_to_coord(
+                out_shape, out_flat_idx
+            )
+            var base = walk.base_offset(out_idx, A_offset)
+            var iter = walk.make_odometer(base, 0)
             var best_val: Scalar[Self.dtype]
             var best_pos = 0
 
@@ -90,31 +110,33 @@ struct ArgMinMaxReducer[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             else:
                 best_val = max_finite[Self.dtype]()
 
-            for idx in range(shape[ax]):
-                var full_idx = out_idx.insert(
-                    ax, idx
-                ) if not keepdims else out_idx.replace(ax, idx)
-                var val = A[full_idx]
+            for e in range(shape[ax]):
+                var val = A_buf[iter.off]
 
                 comptime if is_max:
                     if val > best_val:
                         best_val = val
-                        best_pos = idx
+                        best_pos = e
                 else:
                     if val < best_val:
                         best_val = val
-                        best_pos = idx
+                        best_pos = e
+                _ = iter.advance(walk)
 
-            if keepdims:
-                var write_idx = out_idx.replace(ax, 0)
-                out[write_idx] = Scalar[Self.index_dtype](best_pos)
-            else:
-                out[out_idx] = Scalar[Self.index_dtype](best_pos)
+            out.buffer[out_flat_idx] = Scalar[Self.index_dtype](best_pos)
+
+        var total_work = total_output * shape[ax]
+        var n_threads = num_physical_cores()
+        if total_output >= n_threads and total_work >= n_threads * 4096:
+            parallelize(compute_arg, total_output, n_threads)
+        else:
+            for out_flat_idx in range(total_output):
+                compute_arg(out_flat_idx)
 
         return out^
 
 
-# ── Public structs (thin wrappers) ────────────────────────────────────────────
+# Public structs (thin wrappers)
 
 
 struct Argmin[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:

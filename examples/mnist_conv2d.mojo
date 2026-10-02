@@ -1,18 +1,18 @@
 """
-MNIST Training with Mojo with Convolution layers
+MNIST Training with Mojo with Convolution layers.
 A simple neural network implementation for MNIST digit classification.
 """
 
 from tenmo.tensor import Tensor
 from tenmo.optim import SGD
-from tenmo.net import Linear, ReLU, Sequential, Conv2D, Flatten, Dropout
-from tenmo.forwards import MaxPool2d
+from tenmo.net import Linear, ReLU, Sequential, Conv2D, Flatten, Dropout, Module, Layer
+from tenmo.pooling import MaxPool2d
 from tenmo.crossentropy import CrossEntropyLoss
 from std.python import Python
 from tenmo.numpy_interop import from_ndarray, numpy_dtype
 from tenmo.dataloader import NumpyDataset, MNIST_MEAN, MNIST_STD
-from tenmo.forwards import Padding
-from tenmo.common_utils import now
+from tenmo.pad import Padding
+from tenmo.shared.timing import now
 from tenmo.accuracy import Accuracy
 
 
@@ -102,7 +102,7 @@ def train_mnist() raises:
             init_method="he",
         ).into(),
         ReLU[dtype]().into(),
-        MaxPool2d[dtype](kernel_size=2, stride=2).into(),
+        Module[dtype](Layer[dtype](MaxPool2d[dtype](kernel_size=2, stride=2))),
         Conv2D[dtype](
             in_channels=32,
             out_channels=64,
@@ -111,12 +111,12 @@ def train_mnist() raises:
             init_method="he",
         ).into(),
         ReLU[dtype]().into(),
-        MaxPool2d[dtype](kernel_size=2, stride=2).into(),
+        Module[dtype](Layer[dtype](MaxPool2d[dtype](kernel_size=2, stride=2))),
         # Transition from 4D to 2D
         Flatten[dtype]().into(),
         # Fully connected layers
         Linear[dtype](
-            3136, 32, init_method="he", bias_zero=True  # 64 × 28 × 28
+            3136, 32, init_method="he", bias_zero=True  # 64 x 7 x 7
         ).into(),
         ReLU[dtype]().into(),
         Linear[dtype](32, 10, init_method="he", bias_zero=True).into(),
@@ -132,7 +132,7 @@ def train_mnist() raises:
     var clip_value = Scalar[dtype](0.5)
 
     var criterion = CrossEntropyLoss[dtype, label_dtype]()
-    var optimizer = SGD(
+    var optimizer = SGD[dtype](
         model.parameters(),
         lr=learning_rate,
         momentum=momentum,
@@ -160,7 +160,7 @@ def train_mnist() raises:
         model.train()
         criterion.train()
         var train_loss = Scalar[dtype](0.0)
-        var train_correct = 0
+        var train_correct = Float64(0.0)
         var train_total = 0
 
         train_loader.reset()
@@ -176,15 +176,17 @@ def train_mnist() raises:
             optimizer.step()
 
             train_loss += loss.item() * Float32(batch.batch_size)
-            train_correct += Accuracy[dtype, label_dtype].compute(pred, batch.labels)
+            train_correct += Accuracy[dtype, label_dtype].compute(
+                pred, batch.labels
+            ) * Float64(batch.labels.shape()[0])
             train_total += batch.batch_size
             batch_num += 1
 
-       # --- Validation ---
+        # --- Validation ---
         model.eval()
         criterion.eval()
         var val_loss = Scalar[dtype](0.0)
-        var val_correct = 0
+        var val_correct = Float64(0.0)
         var val_total = 0
 
         test_loader.reset()
@@ -195,15 +197,17 @@ def train_mnist() raises:
             var loss = criterion(pred, batch.labels)
 
             val_loss += loss.item() * Float32(batch.batch_size)
-            val_correct += Accuracy[dtype, label_dtype].compute(pred, batch.labels)
+            val_correct += Accuracy[dtype, label_dtype].compute(
+                pred, batch.labels
+            ) * Float64(batch.labels.shape()[0])
             val_total += batch.batch_size
 
         # --- Epoch Report ---
         var epoch_time = now() - epoch_start
         var avg_train_loss = train_loss / Float32(train_total)
-        var train_acc = 100.0 * Float64(train_correct) / Float64(train_total)
+        var train_acc = 100.0 * train_correct / Float64(train_total)
         var avg_val_loss = val_loss / Float32(val_total)
-        var val_acc = 100.0 * Float64(val_correct) / Float64(val_total)
+        var val_acc = 100.0 * val_correct / Float64(val_total)
         print(
             "Epoch",
             epoch + 1,

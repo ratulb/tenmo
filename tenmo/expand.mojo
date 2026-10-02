@@ -1,31 +1,35 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor
-from .backpropagation import BackwardFnArg, BACKWARD_EXPAND
-from .shapes import Shape
-from .intarray import IntArray
-from .strides import Strides
-from .gradbox import Gradbox
-from .broadcasthelper import ShapeBroadcaster
+from .shared.mnemonics import AddTensor
+from .backpropagation import BackwardFn, BackwardFnType
+
+from .shared.shapes import Shape
+from .shared.intarray import IntArray
+from .shared.strides import Strides
+from .shared.broadcasthelper import ShapeBroadcaster
 from .views import View
 from .ancestry import Ancestor
 
 
 @fieldwise_init
-struct ExpandBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct ExpandBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         ref gradbox = output.gradients()
-        ancestor = output.ancestry().get(0)
-        parent_shape = ancestor.shape()
-        gradbox_contracted = gradbox.sum_over_broadcasted_axes(parent_shape)
+        var ancestor = output.ancestry().get(0)
+        var parent_shape = ancestor.shape()
+        var gradbox_contracted = gradbox.sum_over_broadcasted_axes(parent_shape)
 
         ancestor.update_grad(gradbox_contracted^, AddTensor, None)
 
         parent_ids.append(ancestor._id)
+        # View conduit: grad already forwarded to base above; always cleared.
         gradbox.zero_grad()
 
 
@@ -35,24 +39,24 @@ struct Expand[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def forward[
         track_grad: Bool = True
     ](
-        mut tensor: Tensor[Self.dtype],
+        tensor: Tensor[Self.dtype],
         target_shape: Shape,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
-        curr_shape = tensor.shape()
-        shape_expanded = ShapeBroadcaster.broadcast_shape(
+        var curr_shape = tensor.shape()
+        var shape_expanded = ShapeBroadcaster.broadcast_shape(
             curr_shape, target_shape
         )
 
-        extra_dims = len(shape_expanded) - len(curr_shape)
-        unit_shape = Shape.Unit()  # Shape(1)
-        shape_padded = unit_shape * extra_dims + curr_shape
-        padded_strides = (
+        var extra_dims = len(shape_expanded) - len(curr_shape)
+        var unit_shape = Shape.Unit()  # Shape(1)
+        var shape_padded = unit_shape * extra_dims + curr_shape
+        var padded_strides = (
             IntArray.filled(extra_dims, 0) + tensor.strides().intarray()
         )
 
-        strides_expanded = IntArray.with_capacity(len(padded_strides))
+        var strides_expanded = IntArray.with_capacity(len(padded_strides))
         for i in range(len(shape_expanded)):
             if shape_padded[i] == 1 and shape_expanded[i] > 1:
                 # Broadcasted dimension → stride 0
@@ -71,17 +75,18 @@ struct Expand[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             offset,
             requires_grad=False,
             validated=True,
+            sync=sync,
         )
 
         comptime if track_grad:
-            grad_required = requires_grad.or_else(tensor.requires_grad)
+            var grad_required = requires_grad.or_else(tensor.requires_grad)
 
             if grad_required:
                 out.requires_grad_()
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
-                    BACKWARD_EXPAND
+                var backwardFn = BackwardFn.null_arg[Self.dtype](
+                    ExpandBackward[Self.dtype]()
                 )
-                backwardFnArg.needs_parent_data = True
-                out.add_ancestry(backwardFnArg^, tensor)
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, tensor)
 
         return out^

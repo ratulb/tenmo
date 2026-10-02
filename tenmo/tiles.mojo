@@ -1,11 +1,10 @@
 from .tensor import Tensor
-from .backpropagation import ArgumentType, BackwardFnArg, BACKWARD_TILE
-from .intarray import IntArray
-from .mnemonics import AddTensor
-from .shapes import Shape
-from .validators import Validator
+from .backpropagation import ArgumentType, BackwardFn, BackwardFnType
+
+from .shared.intarray import IntArray
+from .shared.mnemonics import AddTensor
+from .shared.shapes import Shape
 from .gradbox import Gradbox
-from .indexhelper import IndexCalculator
 from .ancestry import Ancestor
 
 
@@ -16,14 +15,17 @@ struct TilesArg(ArgumentType):
 
 
 @fieldwise_init
-struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct TileBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
-        var bwd_arg = output.ancestry().backward_fn_arg().get[TilesArg]()
+        var bwd_arg = output.ancestry().backward_fn().get[TilesArg]()
         var (repeat, orig_shape) = bwd_arg.repeat, bwd_arg.orig_shape
         ref grad_out = output.gradients()
         var parent = output.ancestry().get(0)
@@ -35,12 +37,13 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if parent_rank == 0:
             var total_grad = grad_out.sum().item()
             var gradbox_parent = Gradbox[Self.dtype].full(
-                Shape(), total_grad, device=grad_out.device(), 
+                Shape(),
+                total_grad,
+                device=grad_out.device(),
             )
             parent.update_grad(gradbox_parent^, AddTensor, None)
             parent_ids.append(parent._id)
-            if not retain_graph:
-                grad_out.zero_grad()
+            grad_out.zero_grad()
             return
 
         var effective_rank = max(parent_rank, repeat_rank)
@@ -70,8 +73,7 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         parent.update_grad(gradbox_parent^, AddTensor, None)
         parent_ids.append(parent._id)
-        if not retain_graph:
-            grad_out.zero_grad()
+        grad_out.zero_grad()
 
 
 @fieldwise_init
@@ -80,13 +82,13 @@ struct Tile[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def forward[
         track_grad: Bool = True
     ](
-        mut self: Tensor[Self.dtype],
+        self: Tensor[Self.dtype],
         repeat: IntArray,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """
-        Tile — GPU-safe implementation using reshape + expand + reshape.
+                Tile — GPU-safe implementation using reshape + expand + reshape.
 
         Replaces element-by-element CPU loop with GPU-safe ops:
             1. Reshape input to interleaved shape: (M,N) → (1,M,1,N)
@@ -133,16 +135,17 @@ struct Tile[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var expanded = reshaped.expand[track_grad=False](expand_shape)
 
         # Step 3: Reshape to final shape — materialises on GPU via reshape_gpu
+        # (track_grad=False births requires_grad=False; no reset needed)
         var out = expanded.reshape[track_grad=False](out_shape)
-        out.requires_grad_(False)
 
         comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_TILE, TilesArg(repeat, orig_shape)
+                var backwardFn = BackwardFn(
+                    TilesArg(repeat, orig_shape),
+                    TileBackward[Self.dtype](),
                 )
-                out.add_ancestry(backwardFnArg^, self)
+                out.add_ancestry(backwardFn^, self)
 
         return out^

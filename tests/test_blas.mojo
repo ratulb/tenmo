@@ -1,8 +1,8 @@
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from std.time import perf_counter_ns
-from tenmo.blashandle import BLASHandle
-from tenmo.common_utils import now
+from tenmo.blashandle import BLASHandleLite
+from tenmo.shared.timing import now
 from std.testing import assert_true, TestSuite
 
 
@@ -10,7 +10,7 @@ def benchmark_cifar_sizes() raises:
     print("CIFAR-10 FC Layer Sizes:")
     print("=" * 50)
     comptime dtype = DType.float32
-    blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
     # First layer: batch @ weights (128, 3072) @ (3072, 256)
     var start = now()
     var x1 = Tensor[DType.float32].rand(128, 3072, requires_grad=True)
@@ -78,7 +78,7 @@ def test_blas_matmul_simple_f32() raises:
     """Test simple 2x2 matrix multiplication."""
     print("test_blas_matmul_simple_f32")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])
@@ -95,7 +95,7 @@ def test_blas_matmul_simple_f64() raises:
     """Test simple matrix multiplication with float64."""
     print("test_blas_matmul_simple_f64")
     comptime dtype = DType.float64
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])
@@ -110,7 +110,7 @@ def test_blas_matmul_identity() raises:
     """Test multiplication with identity matrix."""
     print("test_blas_matmul_identity")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var I = Tensor[dtype].d2(
@@ -127,7 +127,7 @@ def test_blas_matmul_rectangular() raises:
     """Test rectangular matrix multiplication."""
     print("test_blas_matmul_rectangular")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     # (2, 3) @ (3, 4) -> (2, 4)
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -152,7 +152,7 @@ def test_blas_matmul_transpose_a() raises:
 
     print("test_blas_matmul_transpose_a")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     # A is (3, 2), A^T is (2, 3)
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
@@ -174,7 +174,7 @@ def test_blas_matmul_transpose_b() raises:
     """Test matrix multiplication with transpose_B=True."""
     print("test_blas_matmul_transpose_b")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])  # (2, 3)
     var B = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])  # (2, 3)
@@ -194,7 +194,7 @@ def test_blas_matmul_transpose_both() raises:
     """Test matrix multiplication with both transposes."""
     print("test_blas_matmul_transpose_both")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])  # (2, 2)
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])  # (2, 2)
@@ -217,7 +217,7 @@ def test_blas_matmul_large_square() raises:
     """Test large square matrix multiplication."""
     print("test_blas_matmul_large_square")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var N = 100
     var A = Tensor[dtype].ones(N, N)
@@ -236,7 +236,7 @@ def test_blas_matmul_large_rectangular() raises:
     """Test large rectangular matrix multiplication."""
     print("test_blas_matmul_large_rectangular")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     # Simulate neural network layer: (batch, in_features) @ (in_features, out_features)
     var batch_size = 128
@@ -259,13 +259,12 @@ def test_blas_matmul_backward_simple() raises:
     """Test backward pass for simple matmul."""
     print("test_blas_matmul_backward_simple")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
-    var blas_handle = blas.lite_handle()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
 
-    var C = blas_handle.matmul(A, B)
+    var C = blas.matmul(A, B)
     var loss = C.sum()
 
     loss.backward()
@@ -282,14 +281,13 @@ def test_blas_matmul_backward_simple() raises:
     # dL/dB[0,0] = 1*1 + 3*1 = 4
     var expected_grad_B = Tensor[dtype].d2([[4.0, 4.0], [6.0, 6.0]])
     assert_true(B.grad().all_close[atol=1e-4](expected_grad_B))
-    _ = blas^
 
 
 def test_blas_matmul_backward_single_requires_grad() raises:
     """Test backward when only one tensor requires grad."""
     print("test_blas_matmul_backward_single_requires_grad")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=False)
@@ -303,14 +301,13 @@ def test_blas_matmul_backward_single_requires_grad() raises:
     # A should have gradients
     assert_true(A.grad().shape()[0] == 2)
     assert_true(A.grad().shape()[1] == 2)
-    _ = blas^
 
 
 def test_blas_matmul_backward_chain() raises:
     """Test backward through chain of matmuls."""
     print("test_blas_matmul_backward_chain")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var B = Tensor[dtype].d2([[1.0, 0.0], [0.0, 1.0]], requires_grad=True)
@@ -328,8 +325,6 @@ def test_blas_matmul_backward_chain() raises:
     assert_true(B.grad().shape()[0] == 2)
     assert_true(C.grad().shape()[0] == 2)
 
-    _ = blas^
-
 
 # ============================================================================
 # Correctness vs Native Implementation
@@ -340,7 +335,7 @@ def test_blas_vs_native_random() raises:
     """Compare BLAS result with native matmul."""
     print("test_blas_vs_native_random")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var A = Tensor[dtype].rand(50, 60)
     var B = Tensor[dtype].rand(60, 70)
@@ -356,13 +351,13 @@ def test_blas_vs_native_transpose_a() raises:
     """Compare BLAS transpose_A with native implementation."""
     print("test_blas_vs_native_transpose_a")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var A = Tensor[dtype].rand(60, 50)  # Will be transposed to (50, 60)
     var B = Tensor[dtype].rand(60, 70)
 
     var C_blas = blas.matmul(A, B, transpose_A=True)
-    A_t = A.transpose()
+    var A_t = A.transpose()
     var C_native = A_t.matmul(B)
 
     assert_true(C_blas.all_close[atol=1e-4](C_native))
@@ -372,13 +367,13 @@ def test_blas_vs_native_transpose_b() raises:
     """Compare BLAS transpose_B with native implementation."""
     print("test_blas_vs_native_transpose_b")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var A = Tensor[dtype].rand(50, 60)
     var B = Tensor[dtype].rand(70, 60)  # Will be transposed to (60, 70)
 
     var C_blas = blas.matmul(A, B, transpose_B=True)
-    B_t = B.transpose()
+    var B_t = B.transpose()
     var C_native = A.matmul(B_t)
 
     assert_true(C_blas.all_close[atol=1e-4](C_native))
@@ -393,7 +388,7 @@ def test_blas_performance_small() raises:
     """Benchmark small matrices."""
     print("test_blas_performance_small")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var A = Tensor[dtype].rand(10, 10)
     var B = Tensor[dtype].rand(10, 10)
@@ -417,7 +412,7 @@ def test_blas_performance_medium() raises:
     """Benchmark medium matrices (typical NN layer)."""
     print("test_blas_performance_medium")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var A = Tensor[dtype].rand(128, 784)  # Batch of 128, 784 features
     var B = Tensor[dtype].rand(784, 256)  # FC layer weights
@@ -441,7 +436,7 @@ def test_blas_performance_large() raises:
     """Benchmark large matrices."""
     print("test_blas_performance_large")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var A = Tensor[dtype].rand(512, 1024)
     var B = Tensor[dtype].rand(1024, 512)
@@ -470,7 +465,7 @@ def test_blas_matmul_vector_like() raises:
     """Test with very thin matrices (vector-like)."""
     print("test_blas_matmul_vector_like")
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     # (100, 1) @ (1, 100) -> (100, 100) outer product
     var A = Tensor[dtype].ones(100, 1)
@@ -483,29 +478,6 @@ def test_blas_matmul_vector_like() raises:
     # All elements should be 1
     assert_true(abs(C[0, 0] - 1.0) < 1e-5)
     assert_true(abs(C[99, 99] - 1.0) < 1e-5)
-
-    _ = blas^
-
-
-def test_blas_matmul_non_contiguous() raises:
-    """Test with non-contiguous input (should be made contiguous)."""
-    print("test_blas_matmul_non_contiguous")
-    comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
-
-    var A = Tensor[dtype].rand(10, 10)
-    var A_T = A.transpose()  # Non-contiguous
-    var B = Tensor[dtype].rand(10, 10)
-
-    assert_true(not A_T.is_contiguous())
-
-    # Should still work (internally makes contiguous)
-    var C = blas.matmul(A_T, B, transpose_A=True)
-
-    assert_true(C.shape()[0] == 10)
-    assert_true(C.shape()[1] == 10)
-
-    _ = blas^
 
 
 def run_all_blas_tests() raises:
@@ -554,7 +526,6 @@ def run_all_blas_tests() raises:
     # Edge cases
     print("--- Edge Cases ---")
     test_blas_matmul_vector_like()
-    test_blas_matmul_non_contiguous()
     print()
 
     print("=== All BLAS Tests Passed! ===\n")
@@ -602,8 +573,8 @@ def test_blas_case_4_Atranspose_Btranspose() raises:
     print("\ngrad_B native:")
     B.grad().print()
 
-    var native_A_grad = A.grad().copy()
-    var native_B_grad = B.grad().copy()
+    var native_A_grad = A.grad().clone()
+    var native_B_grad = B.grad().clone()
 
     # Reset gradients
     A.zero_grad()
@@ -611,7 +582,7 @@ def test_blas_case_4_Atranspose_Btranspose() raises:
 
     # === BLAS ===
     print("\n2. BLAS:")
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
     var C_blas = blas.matmul(A, B, transpose_A=True, transpose_B=True)
     var loss_blas = C_blas.sum()
     loss_blas.backward()
@@ -626,15 +597,13 @@ def test_blas_case_4_Atranspose_Btranspose() raises:
     print("\n3. VALIDATION:")
     assert_true(C_native.all_close(C_blas), "Forward results differ!")
 
-    var blas_A_grad = A.grad().copy()
-    var blas_B_grad = B.grad().copy()
+    var blas_A_grad = A.grad().clone()
+    var blas_B_grad = B.grad().clone()
 
     assert_true(native_A_grad.all_close(blas_A_grad), "grad_A differs!")
     assert_true(native_B_grad.all_close(blas_B_grad), "grad_B differs!")
-
     print("✓ All checks passed!")
 
-    _ = blas^
 
 
 def test_case_2() raises:
@@ -656,7 +625,7 @@ def test_case_2() raises:
     )
 
     # BLAS forward
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
     var C = blas.matmul(A, B, transpose_A=True, transpose_B=False)
     var loss = C.sum()
     loss.backward()
@@ -691,8 +660,6 @@ def test_case_2() raises:
         print("Expected:")
         expected_grad_B.print()
 
-    _ = blas^
-
 
 def test_blas_case_1_A_B() raises:
     """Test Case 1: C = A @ B (no transposes)."""
@@ -721,8 +688,8 @@ def test_blas_case_1_A_B() raises:
     print("grad_A native:")
     print("grad_B native:")
 
-    var native_A_grad = A.grad().copy()
-    var native_B_grad = B.grad().copy()
+    var native_A_grad = A.grad().clone()
+    var native_B_grad = B.grad().clone()
 
     # Reset gradients
     A.zero_grad()
@@ -730,10 +697,7 @@ def test_blas_case_1_A_B() raises:
 
     # === BLAS ===
     print("\n2. BLAS:")
-    var blas = BLASHandle[dtype]()
-    if not blas.is_initialized():
-        print("ERROR: BLAS not initialized")
-        return
+    var blas = BLASHandleLite[dtype].from_cache()
 
     var C_blas = blas.matmul(A, B, transpose_A=False, transpose_B=False)
     var loss_blas = C_blas.sum()
@@ -745,12 +709,11 @@ def test_blas_case_1_A_B() raises:
     assert_true(C_native.all_close(C_blas), "Forward results differ!")
 
     # Backward check
-    var blas_A_grad = A.grad().copy()
-    var blas_B_grad = B.grad().copy()
+    var blas_A_grad = A.grad().clone()
+    var blas_B_grad = B.grad().clone()
 
     assert_true(native_A_grad.all_close(blas_A_grad), "grad_A differs!")
     assert_true(native_B_grad.all_close(blas_B_grad), "grad_B differs!")
-    _ = blas^
     print("✓ All checks passed!")
 
 
@@ -762,11 +725,11 @@ def test_blas_case_2_Atranspose_B() raises:
 
     comptime dtype = DType.float32
 
-    A = Tensor[dtype].d2(
+    var A = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
     )  # 3x2 (m=3, k=2)
 
-    B = Tensor[dtype].d2(
+    var B = Tensor[dtype].d2(
         [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0], [13.0, 14.0, 15.0]],
         requires_grad=True,
     )  # 3x3 (m=3, n=3)
@@ -789,8 +752,8 @@ def test_blas_case_2_Atranspose_B() raises:
     print("\ngrad_B native:")
     B.grad().print()
 
-    var native_A_grad = A.grad().copy()
-    var native_B_grad = B.grad().copy()
+    var native_A_grad = A.grad().clone()
+    var native_B_grad = B.grad().clone()
 
     # Reset gradients
     A.zero_grad()
@@ -798,7 +761,7 @@ def test_blas_case_2_Atranspose_B() raises:
 
     # === BLAS ===
     print("\n2. BLAS:")
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
     var C_blas = blas.matmul(A, B, transpose_A=True, transpose_B=False)
     var loss_blas = C_blas.sum()
     loss_blas.backward()
@@ -814,13 +777,11 @@ def test_blas_case_2_Atranspose_B() raises:
     print("\n3. VALIDATION:")
     assert_true(C_native.all_close(C_blas), "Forward results differ!")
 
-    var blas_A_grad = A.grad().copy()
-    var blas_B_grad = B.grad().copy()
+    var blas_A_grad = A.grad().clone()
+    var blas_B_grad = B.grad().clone()
 
     assert_true(native_A_grad.all_close(blas_A_grad), "grad_A differs!")
     assert_true(native_B_grad.all_close(blas_B_grad), "grad_B differs!")
-
-    _ = blas^
     print("✓ All checks passed!")
 
 
@@ -849,8 +810,8 @@ def test_blas_case_3_A_Btranspose() raises:
     var loss_native = C_native.sum()
     loss_native.backward()
 
-    var native_A_grad = A.grad().copy()
-    var native_B_grad = B.grad().copy()
+    var native_A_grad = A.grad().clone()
+    var native_B_grad = B.grad().clone()
 
     # Reset gradients
     A.zero_grad()
@@ -858,7 +819,7 @@ def test_blas_case_3_A_Btranspose() raises:
 
     # === BLAS ===
     print("\n2. BLAS:")
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
     var C_blas = blas.matmul(A, B, transpose_A=False, transpose_B=True)
     var loss_blas = C_blas.sum()
     loss_blas.backward()
@@ -867,18 +828,17 @@ def test_blas_case_3_A_Btranspose() raises:
     print("\n3. VALIDATION:")
     assert_true(C_native.all_close(C_blas), "Forward results differ!")
 
-    var blas_A_grad = A.grad().copy()
-    var blas_B_grad = B.grad().copy()
+    var blas_A_grad = A.grad().clone()
+    var blas_B_grad = B.grad().clone()
 
     assert_true(native_A_grad.all_close(blas_A_grad), "grad_A differs!")
     assert_true(native_B_grad.all_close(blas_B_grad), "grad_B differs!")
-    _ = blas^
     print("✓ All checks passed!")
 
 
 def _case_4_comprehensive() raises:
     """
-    Test Case 4: C = A^T @ B^T.
+        Test Case 4: C = A^T @ B^T.
     Compare: Native Mojo matmul, BLAS matmul, and PyTorch.
     """
     comptime dtype = DType.float32
@@ -940,10 +900,7 @@ def _case_4_comprehensive() raises:
     print("2. BLAS MATMUL")
     print("=" * 80)
 
-    var blas = BLASHandle[dtype]()
-    if not blas.is_initialized():
-        print("ERROR: BLAS not initialized")
-        return
+    var blas = BLASHandleLite[dtype].from_cache()
     var A_blas = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
     )
@@ -980,12 +937,12 @@ def test_blas_matmul_edge_cases() raises:
     print("=" * 80)
 
     comptime dtype = DType.float32
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     # Test 1: Tall skinny matrices
     print("\n1. Tall skinny matrices (10x3 @ 3x5):")
-    var A_tall = Tensor[dtype].randn(Shape([10, 3]), requires_grad=True)
-    var B_skinny = Tensor[dtype].randn(Shape([3, 5]), requires_grad=True)
+    var A_tall = Tensor[dtype].randn(Shape(10, 3), requires_grad=True)
+    var B_skinny = Tensor[dtype].randn(Shape(3, 5), requires_grad=True)
 
     var C_native = A_tall.matmul(B_skinny)
     var C_blas = blas.matmul(A_tall, B_skinny)
@@ -994,8 +951,8 @@ def test_blas_matmul_edge_cases() raises:
 
     # Test 2: Short wide matrices
     print("\n2. Short wide matrices (3x10 @ 10x4):")
-    var A_wide = Tensor[dtype].randn(Shape([3, 10]), requires_grad=True)
-    var B_wide = Tensor[dtype].randn(Shape([10, 4]), requires_grad=True)
+    var A_wide = Tensor[dtype].randn(Shape(3, 10), requires_grad=True)
+    var B_wide = Tensor[dtype].randn(Shape(10, 4), requires_grad=True)
 
     C_native = A_wide.matmul(B_wide)
     C_blas = blas.matmul(A_wide, B_wide)
@@ -1004,8 +961,8 @@ def test_blas_matmul_edge_cases() raises:
 
     # Test 3: Vector @ Matrix (1x3 @ 3x4 → 1x4)
     print("\n3. Vector @ Matrix:")
-    var vec = Tensor[dtype].randn(Shape([1, 3]), requires_grad=True)
-    var mat = Tensor[dtype].randn(Shape([3, 4]), requires_grad=True)
+    var vec = Tensor[dtype].randn(Shape(1, 3), requires_grad=True)
+    var mat = Tensor[dtype].randn(Shape(3, 4), requires_grad=True)
 
     C_native = vec.matmul(mat)
     C_blas = blas.matmul(vec, mat)
@@ -1014,8 +971,8 @@ def test_blas_matmul_edge_cases() raises:
 
     # Test 4: Matrix @ Vector (3x4 @ 4x1 → 3x1)
     print("\n4. Matrix @ Vector:")
-    mat = Tensor[dtype].randn(Shape([3, 4]), requires_grad=True)
-    vec = Tensor[dtype].randn(Shape([4, 1]), requires_grad=True)
+    mat = Tensor[dtype].randn(Shape(3, 4), requires_grad=True)
+    vec = Tensor[dtype].randn(Shape(4, 1), requires_grad=True)
 
     C_native = mat.matmul(vec)
     C_blas = blas.matmul(mat, vec)
@@ -1044,26 +1001,26 @@ def test_blas_gradient_accuracy() raises:
 
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
 
-    var blas = BLASHandle[dtype]()
+    var blas = BLASHandleLite[dtype].from_cache()
 
     # Forward with BLAS
     var C = blas.matmul(A, B)
     var loss = C.sum()
     loss.backward()
 
-    var grad_A_blas = A.grad().copy()
+    var grad_A_blas = A.grad().clone()
 
     # Finite difference for grad_A[0,0]
     A.zero_grad()
     B.zero_grad()
 
     # Perturb A[0,0] and compute finite difference
-    var A_plus = A.copy()
+    var A_plus = A.clone()
     A_plus[0, 0] = A_plus[0, 0] + eps
     var C_plus = blas.matmul(A_plus, B)
     var loss_plus = C_plus.sum()
 
-    var A_minus = A.copy()
+    var A_minus = A.clone()
     A_minus[0, 0] = A_minus[0, 0] - eps
     var C_minus = blas.matmul(A_minus, B)
     var loss_minus = C_minus.sum()

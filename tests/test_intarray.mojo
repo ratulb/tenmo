@@ -1,4 +1,4 @@
-from tenmo.intarray import IntArray
+from tenmo.shared.intarray import IntArray
 from std.testing import assert_equal, assert_true, assert_false, TestSuite
 
 # ========== Construction Tests ==========
@@ -1088,7 +1088,7 @@ def test_data_integrity_after_multiple_ops() raises:
 
 
 def test_prepend_large() raises:
-    """Prepend 10000 elements — triggers SIMD memmove."""
+    """Prepend 10000 elements — triggers SIMD unsafe_memmove."""
     var a = IntArray()
     for i in range(10000):
         a.prepend(i)
@@ -1098,7 +1098,7 @@ def test_prepend_large() raises:
 
 
 def test_prepend_to_existing() raises:
-    """Prepend to non-empty array — memmove with partial shift."""
+    """Prepend to non-empty array — unsafe_memmove with partial shift."""
     var a = IntArray(10, 20, 30)
     a.prepend(0)
     assert_equal(a[0], 0)
@@ -1128,7 +1128,7 @@ def test_prepend_after_append() raises:
 
 
 def test_pop_front() raises:
-    """Pop from front — triggers full memmove of remaining elements."""
+    """Pop from front — triggers full unsafe_memmove of remaining elements."""
     var a = IntArray(10, 20, 30, 40, 50)
     var v = a.pop(0)
     assert_equal(v, 10)
@@ -1141,7 +1141,7 @@ def test_pop_front() raises:
 
 
 def test_pop_back() raises:
-    """Pop from back — no memmove, pure size decrement."""
+    """Pop from back — no unsafe_memmove, pure size decrement."""
     var a = IntArray(1, 2, 3, 4, 5)
     for i in range(5):
         var v = a.pop()
@@ -1150,7 +1150,7 @@ def test_pop_back() raises:
 
 
 def test_pop_middle_large() raises:
-    """Pop from middle of large array — triggers SIMD memmove."""
+    """Pop from middle of large array — triggers SIMD unsafe_memmove."""
     var a = IntArray()
     for i in range(5000):
         a.append(i)
@@ -1164,8 +1164,8 @@ def test_pop_middle_large() raises:
         assert_equal(a[i], i + 1)
 
 
-def test_insert_single_memcpy() raises:
-    """Insert single element — exercises memcpy-based insert."""
+def test_insert_single_unsafe_memcpy() raises:
+    """Insert single element — exercises unsafe_memcpy-based insert."""
     var a = IntArray(10, 20, 40, 50)
     var r = a.insert(2, 30)
     assert_equal(len(r), 5)
@@ -1177,7 +1177,7 @@ def test_insert_single_memcpy() raises:
 
 
 def test_insert_beginning() raises:
-    """Insert at position 0 — full right-shift memcpy."""
+    """Insert at position 0 — full right-shift unsafe_memcpy."""
     var a = IntArray(1, 2, 3)
     var r = a.insert(0, 0)
     assert_equal(len(r), 4)
@@ -1187,7 +1187,7 @@ def test_insert_beginning() raises:
 
 
 def test_insert_end() raises:
-    """Insert at last position — single element memcpy after."""
+    """Insert at last position — single element unsafe_memcpy after."""
     var a = IntArray(1, 2, 3)
     var r = a.insert(3, 4)
     assert_equal(len(r), 4)
@@ -1196,7 +1196,7 @@ def test_insert_end() raises:
 
 
 def test_insert_large_middle() raises:
-    """Insert in middle of large array — triggers SIMD memcpy."""
+    """Insert in middle of large array — triggers SIMD unsafe_memcpy."""
     var a = IntArray()
     for i in range(10000):
         a.append(i)

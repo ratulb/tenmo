@@ -1,22 +1,24 @@
-# =============================================================================
 # Sum / Mean reduction on NDBuffer — tenmo/sum_mean_reduction.mojo
 #
 # Extracted from NDBuffer. CPU + GPU dispatch for SUM and MEAN reductions.
 # Also includes sum_all (CPU scalar sum) and sum_over_broadcasted_axes
 # (broadcast-expansion utility used by backward passes).
 #
-# GPU dispatch goes through Reduction.launch in reduction_kernel.mojo.
-# =============================================================================
+# GPU dispatch goes through ReductionKernel.launch in reduction_kernel.mojo.
 
 from .backpropagation import ArgumentType
+
 from .ndbuffer import NDBuffer
-from .intarray import IntArray
-from .shapes import Shape
-from tenmo.kernels.reduction_kernel import Reduction
-from .common_utils import Epsilon
-from std.algorithm import parallelize
+from .shared.buffers import Buffer
+from .shared.intarray import IntArray
+from .shared.shapes import Shape
+from .shared.reduction_walk import ReductionWalk
+from .shared.indexhelper import IndexCalculator
+from .kernels.reduction_kernel import ReductionKernel
+from .shared.panic import panic
+from max.algorithm import parallelize
 from std.sys.info import num_physical_cores
-from .mnemonics import SUM, MEAN
+from .shared.mnemonics import SUM, MEAN
 from std.sys import has_accelerator
 
 
@@ -30,7 +32,7 @@ struct SumMeanReduction[dtype: DType]:
     """Sum/mean reduction on NDBuffer — device-dispatch + CPU fallback.
 
     Static methods mirror the original NDBuffer instance methods.
-    GPU goes through Reduction.launch; CPU uses reduce_cpu (SIMD suffix
+    GPU goes through ReductionKernel.launch; CPU uses reduce_cpu (SIMD suffix
     fast path + coordinate-by-coordinate fallback).
     """
 
@@ -50,8 +52,17 @@ struct SumMeanReduction[dtype: DType]:
         comptime if has_accelerator():
             if ndb.is_on_gpu():
                 try:
-                    out = Reduction[Self.dtype].launch[op_code](
-                        ndb, normalized_axes, keepdims, sync=sync
+                    var (result_layout, result_storage) = ReductionKernel[
+                        Self.dtype
+                    ].launch[op_code](
+                        ndb.layout(),
+                        ndb.device_state.value(),
+                        normalized_axes,
+                        keepdims,
+                        sync=sync,
+                    )
+                    out = NDBuffer[Self.dtype].with_layout_device_state(
+                        result_layout, result_storage
                     )
                 except e:
                     print(e)
@@ -86,7 +97,9 @@ struct SumMeanReduction[dtype: DType]:
         var reduced_volume = Scalar[Self.dtype](1)
 
         comptime if op_code == MEAN:
-            var volume = ndb.shape.reduced_shape(normalized_axes).product()
+            var volume = (
+                ndb.shape.reduced_shape(normalized_axes).product()
+            )
             reduced_volume = reduced_volume if volume == 0 else Scalar[
                 Self.dtype
             ](volume)
@@ -104,7 +117,9 @@ struct SumMeanReduction[dtype: DType]:
             else:
                 out[IntArray()] = SumMeanReduction[Self.dtype].sum_all(ndb)
         else:
-            var reduction_axes_shape = ndb.shape.reduced_shape(normalized_axes)
+            var reduction_axes_shape = ndb.shape.reduced_shape(
+                normalized_axes
+            )
             # Fast path: contiguous input with suffix-axis reduction —
             # each output element maps to a contiguous block of reduced_volume
             # elements in memory, so we can call Buffer.sum() with SIMD.
@@ -123,37 +138,68 @@ struct SumMeanReduction[dtype: DType]:
                 if is_suffix:
                     var reduced_numels = reduction_axes_shape.product()
                     var num_out = out.numels()
+                    var n_threads = num_physical_cores()
+                    var ndb_offset = ndb.offset
+                    var ndb_buf = ndb.buffer
 
-                    @parameter
-                    def reduce_row(oi: Int):
-                        var base = ndb.offset + oi * reduced_numels
+                    def reduce_row(oi: Int) {imm}:
+                        var base = ndb_offset + oi * reduced_numels
                         comptime if op_code == MEAN:
                             out.buffer[oi] = (
-                                ndb.buffer.sum(base, base + reduced_numels)
+                                ndb_buf.sum(base, base + reduced_numels)
                                 / reduced_volume
                             )
                         else:
-                            out.buffer[oi] = ndb.buffer.sum(
+                            out.buffer[oi] = ndb_buf.sum(
                                 base, base + reduced_numels
                             )
 
-                    parallelize[reduce_row](num_out, num_physical_cores())
+                    # SIMD sum is very cheap per element: parallel only when
+                    # there is enough work to amortize the ~5us launch cost
+                    # (measured crossover ≈ threads * 32768 elements).
+                    if (
+                        num_out >= n_threads
+                        and num_out * reduced_numels >= n_threads * 32768
+                    ):
+                        parallelize(reduce_row, num_out, n_threads)
+                    else:
+                        for oi in range(num_out):
+                            reduce_row(oi)
                     return out^
 
-            # Fallback: coord-by-coord (works for any layout / any axes)
-            for out_coord in out_shape:
+            # Fallback: works for any layout / any axes. Hoists the output
+            # coordinate once per output slot and walks the reduced axes with
+            # stride arithmetic — no per-element IntArray alloc.
+            var ndb_layout = ndb.layout()
+            var ndb_buf = ndb.buffer
+            var ndb_offset = ndb_layout.offset
+            var num_out = out.numels()
+            var n_threads = num_physical_cores()
+            var walk = ReductionWalk.build(
+                ndb_layout.shape, normalized_axes, ndb_layout.strides, keepdims
+            )
+
+            def reduce_worker(oi: Int) {imm}:
+                var out_coord = IndexCalculator.index_to_coord(out_shape, oi)
+                var base = walk.base_offset(out_coord, ndb_offset)
+                var iter = walk.make_odometer(base, 0)
                 var accum = Scalar[Self.dtype](0)
-                for red_coord in reduction_axes_shape:
-                    var self_coord = out_coord.replace(
-                        normalized_axes, red_coord
-                    ) if keepdims else out_coord.insert(
-                        normalized_axes, red_coord
-                    )
-                    accum += ndb[self_coord]
+                for _ in range(walk.volume):
+                    accum += ndb_buf[iter.off]
+                    _ = iter.advance(walk)
                 comptime if op_code == MEAN:
-                    out[out_coord] = accum / reduced_volume
+                    out.buffer[oi] = accum / reduced_volume
                 else:
-                    out[out_coord] = accum
+                    out.buffer[oi] = accum
+
+            if (
+                num_out >= n_threads
+                and num_out * walk.volume >= n_threads * 32768
+            ):
+                parallelize(reduce_worker, num_out, n_threads)
+            else:
+                for oi in range(num_out):
+                    reduce_worker(oi)
 
         return out^
 
@@ -174,6 +220,29 @@ struct SumMeanReduction[dtype: DType]:
         if ndb.is_contiguous():
             var start = ndb.offset
             var end = start + ndb.numels()
+            var total_elements = ndb.numels()
+            var n_threads = num_physical_cores()
+            # Calibrated crossover from reduce_cpu (~5us parallelize launch
+            # amortized at ≈ threads * 32768 elements).
+            if total_elements >= n_threads * 32768:
+                var n_segments = n_threads
+                var partials = Buffer[Self.dtype](n_segments)
+                var partials_data = partials.unsafe_ptr()
+                var ndb_buf = ndb.buffer
+
+                def seg_sum(seg: Int) {imm}:
+                    var r0 = start + seg * total_elements // n_segments
+                    var r1 = start + (seg + 1) * total_elements // n_segments
+                    # Each segment is an independent SIMD range sum.
+                    partials_data.unsafe_store(seg, ndb_buf.sum(r0, r1))
+
+                parallelize(seg_sum, n_segments, n_threads)
+
+                var accum = Scalar[Self.dtype](0)
+                var n_seg = n_segments
+                for seg in range(n_seg):
+                    accum += partials_data.unsafe_load(seg)
+                return accum
             return ndb.buffer.sum(start, end)
         else:
             var accum_sum: Scalar[Self.dtype] = Scalar[Self.dtype](0)

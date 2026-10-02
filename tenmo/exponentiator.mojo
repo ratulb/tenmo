@@ -1,6 +1,7 @@
 from .tensor import Tensor
-from .backpropagation import BackwardFnArg, ScalarArg, BACKWARD_EXPONENTIATION
-from .mnemonics import AddTensor, Multiply
+from .backpropagation import BackwardFn, ScalarArg, BackwardFnType
+
+from .shared.mnemonics import AddTensor, Multiply, POW
 from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
 from .ancestry import Ancestor
@@ -8,29 +9,29 @@ from .ancestry import Ancestor
 
 @fieldwise_init
 struct ExponentiationBackward[dtype: DType](
-    ImplicitlyCopyable, RegisterPassable
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
 ):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         """
-        ∂(x**n)/∂x = n * x**(n-1)
+                ∂(x**n)/∂x = n * x**(n-1).
         All ops at NDBuffer level — GPU safe, no LLVM lowering issues.
         """
         var exponent = (
-            output.ancestry()
-            .backward_fn_arg()
-            .get[ScalarArg[Self.dtype]]()
-            .value
+            output.ancestry().backward_fn().get[ScalarArg[Self.dtype]]().value
         )
         ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
 
         # Step 1: x ** (n-1) — NDBuffer.pow, GPU safe
-        var base_pow = ancestor.buffer().scalar_ops[POW](exponent - Scalar[Self.dtype](1))
+        var base_pow = ancestor.buffer().scalar_ops[POW](
+            exponent - Scalar[Self.dtype](1)
+        )
 
         # Step 2: n * x**(n-1) — scalar_ops[Multiply], GPU safe
         var local_grad = base_pow.scalar_ops[Multiply](exponent)
@@ -43,8 +44,7 @@ struct ExponentiationBackward[dtype: DType](
         ancestor.update_grad(parent_gradbox^, AddTensor, None)
 
         parent_ids.append(ancestor._id)
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -59,7 +59,7 @@ struct Exponentiator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """
-        Element-wise x ** exponent.
+                Element-wise x ** exponent.
         Delegates to NDBuffer.pow — handles GPU and CPU paths.
         """
         var result_ndb = self.buffer.scalar_ops[POW](exponent, sync=sync)
@@ -69,10 +69,11 @@ struct Exponentiator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
-                    BACKWARD_EXPONENTIATION, exponent
+                var backwardFn = BackwardFn.scalar_arg[Self.dtype](
+                    exponent,
+                    ExponentiationBackward[Self.dtype](),
                 )
-                backwardFnArg.needs_parent_data = True
-                out.add_ancestry(backwardFnArg^, self)
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, self)
 
         return out^

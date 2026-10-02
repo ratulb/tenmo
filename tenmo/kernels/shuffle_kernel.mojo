@@ -1,26 +1,25 @@
-# =============================================================================
 # shuffle_kernel.mojo — GPU shuffle kernels
-# =============================================================================
 
-from std.gpu import thread_idx, block_idx, block_dim, grid_dim
-from std.gpu.host import DeviceBuffer
-from std.memory import AddressSpace
-from tenmo.device import DeviceState, GPU
-from tenmo.ndbuffer import NDBuffer
-from tenmo.array import Array
+from max.gpu import thread_idx, block_idx, block_dim, grid_dim
+from max.gpu.host import DeviceBuffer
+from ..gpu.device import DeviceState, GPU
+from ..shared.layout import Layout
+from ..shared.array import RankArray
 
 
 def shuffle_gather[
     dtype: DType
 ](
-    out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    in_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    perm_buffer: UnsafePointer[Int64, ImmutAnyOrigin],
-    in_shape: Array,
-    in_strides: Array,
-    axis: Int,
-    total_elements: Int,
+    out_buffer: Pointer[Scalar[dtype], MutAnyOrigin],
+    in_buffer: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    perm_buffer: Pointer[Int64, ImmutAnyOrigin],
+    in_shape: RankArray,
+    in_strides: RankArray,
+    axis_: Int64,
+    total_elements_: Int64,
 ):
+    var axis = Int(axis_)
+    var total_elements = Int(total_elements_)
     var tid = Int(block_idx.x * block_dim.x + thread_idx.x)
     if tid >= total_elements:
         return
@@ -32,23 +31,25 @@ def shuffle_gather[
     for k in reversed(range(rank)):
         var coord = remaining % in_shape[k]
         remaining //= in_shape[k]
-        var src_coord = Int(perm_buffer[coord]) if k == axis else coord
+        var src_coord = Int(perm_buffer[unsafe_offset=coord]) if k == axis else coord
         src_flat += src_coord * in_strides[k]
 
-    out_buffer[tid] = in_buffer[src_flat]
+    out_buffer[unsafe_offset=tid] = in_buffer[unsafe_offset=src_flat]
 
 
 def shuffle_scatter[
     dtype: DType
 ](
-    out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    in_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    perm_buffer: UnsafePointer[Int64, ImmutAnyOrigin],
-    in_shape: Array,
-    in_strides: Array,
-    axis: Int,
-    total_elements: Int,
+    out_buffer: Pointer[Scalar[dtype], MutAnyOrigin],
+    in_buffer: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    perm_buffer: Pointer[Int64, ImmutAnyOrigin],
+    in_shape: RankArray,
+    in_strides: RankArray,
+    axis_: Int64,
+    total_elements_: Int64,
 ):
+    var axis = Int(axis_)
+    var total_elements = Int(total_elements_)
     var tid = Int(block_idx.x * block_dim.x + thread_idx.x)
     if tid >= total_elements:
         return
@@ -60,14 +61,14 @@ def shuffle_scatter[
     for k in reversed(range(rank)):
         var coord = remaining % in_shape[k]
         remaining //= in_shape[k]
-        var dst_coord = Int(perm_buffer[coord]) if k == axis else coord
+        var dst_coord = Int(perm_buffer[unsafe_offset=coord]) if k == axis else coord
         dst_flat += dst_coord * in_strides[k]
 
-    out_buffer[dst_flat] = in_buffer[tid]
+    out_buffer[unsafe_offset=dst_flat] = in_buffer[unsafe_offset=tid]
 
 
 @fieldwise_init
-struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct ShuffleKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     def _upload_permutation(
         permutation: List[Int],
@@ -83,20 +84,21 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     def launch_gather(
-        A: NDBuffer[Self.dtype],
+        A_layout: Layout,
+        A_device_state: DeviceState[Self.dtype],
         permutation: List[Int],
         axis: Int,
         sync: Bool = False,
-    ) raises -> NDBuffer[Self.dtype]:
-        var shape = A.shape
+    ) raises -> Tuple[Layout, DeviceState[Self.dtype]]:
+        var shape = A_layout.shape
         var total_elements = shape.num_elements()
 
-        ref device_state = A.device_state.value()
+        ref device_state = A_device_state
         ref gpu = device_state.get_gpu()
         var device_context = gpu[]
 
         var in_shape = shape.array()
-        var in_strides = A.strides.array()
+        var in_strides = A_layout.strides.array()
 
         var perm_device = Self._upload_permutation(permutation, gpu)
 
@@ -111,7 +113,6 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         var compiled = device_context.compile_function[
             shuffle_gather[Self.dtype],
-            shuffle_gather[Self.dtype],
         ]()
 
         device_context.enqueue_function(
@@ -121,33 +122,38 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             perm_device,
             in_shape,
             in_strides,
-            axis,
-            total_elements,
+            Int64(axis),
+            Int64(total_elements),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
-        return NDBuffer[Self.dtype].with_device_state(result_state^, shape)
+        return (
+            Layout(shape),
+            result_state^,
+        )
 
     @staticmethod
     def launch_scatter(
-        grad: NDBuffer[Self.dtype],
+        grad_layout: Layout,
+        grad_device_state: DeviceState[Self.dtype],
         permutation: List[Int],
         axis: Int,
         sync: Bool = False,
-    ) raises -> NDBuffer[Self.dtype]:
-        var shape = grad.shape
+    ) raises -> Tuple[Layout, DeviceState[Self.dtype]]:
+        var shape = grad_layout.shape
         var total_elements = shape.num_elements()
 
-        ref device_state = grad.device_state.value()
+        ref device_state = grad_device_state
         ref gpu = device_state.get_gpu()
         var device_context = gpu[]
 
         var in_shape = shape.array()
-        var in_strides = grad.strides.array()
+        var in_strides = grad_layout.strides.array()
 
         var perm_device = Self._upload_permutation(permutation, gpu)
 
@@ -163,7 +169,6 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         var compiled = device_context.compile_function[
             shuffle_scatter[Self.dtype],
-            shuffle_scatter[Self.dtype],
         ]()
 
         device_context.enqueue_function(
@@ -173,13 +178,17 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             perm_device,
             in_shape,
             in_strides,
-            axis,
-            total_elements,
+            Int64(axis),
+            Int64(total_elements),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
-        return NDBuffer[Self.dtype].with_device_state(result_state^, shape)
+        return (
+            Layout(shape),
+            result_state^,
+        )

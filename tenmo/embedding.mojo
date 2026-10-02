@@ -1,17 +1,18 @@
-from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
-from tenmo.intarray import IntArray
-from tenmo.gather import Gather
-from tenmo.net import Module, Layer
-from tenmo.device import Device
-from tenmo.mnemonics import EMBEDDING, DEFAULT_INDEX_DTYPE
-from tenmo.common_utils import i, s
-from tenmo.shared import Reduction
-
+from .tensor import Tensor
+from .shared.intarray import IntArray
+from .named_parameter import NamedParameter
+from .gather import Gather
+from .layer_trait import LayerTrait
+from .gpu.device import GPU
+from .shared.mnemonics import DEFAULT_INDEX_DTYPE
+from .shared.indexhelper import i, s
+from .shared.panic import panic
+from .shared import Reduction
+from .weight_init import Weights
 
 @fieldwise_init
 struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
-    ImplicitlyCopyable & Movable
+    LayerTrait
 ):
     """Lookup table mapping integer indices to dense embedding vectors.
 
@@ -25,7 +26,11 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
     - Standard init methods matching nn.init.*
     """
 
-    comptime TAG = EMBEDDING
+    # Float-carrier convention: the LayerTrait __call__ takes Tensor[dtype]
+    # holding integer-valued data and casts to index_dtype internally
+    # (mirrors PositionalEmbedding.__call__). GPTEmbedding instead declares
+    # InputDType = index_dtype and takes raw index tensors.
+    comptime InputDType = Self.dtype
 
     var weight: Tensor[Self.dtype]  # (num_embeddings, embedding_dim)
     var num_embeddings: Int
@@ -45,7 +50,7 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
         norm_type: Float64 = 2.0,
         init_seed: Optional[Int] = None,
         init_method: String = "normal",
-        freeze: Bool = False,
+        unsafe_freeze: Bool = False,
         reduction: Reduction = Reduction(2),
     ):
         """
@@ -58,13 +63,9 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
                             to have norm <= max_norm (in-place, after lookup).
             norm_type:      Order of norm for max_norm (default L2).
             init_seed:      Random seed.
-            init_method:    Weight init strategy:
-                            "normal"   — N(0, 1) (PyTorch default)
-                            "uniform"  — U(-1, 1)
-                            "xavier"   — Xavier uniform
-                            "kaiming"  — Kaiming normal
-                            "zero"     — all zeros
-            freeze:         If True, requires_grad=False — no gradient.
+            init_method:    Weight init strategy (see Weights.initialize):
+                            "normal", "uniform", "xavier", "kaiming"/"he", "zero"
+            unsafe_freeze:         If True, requires_grad=False — no gradient.
             reduction:      How to reduce gathered rows (NONE=2, SUM=1, MEAN=0).
                             Default NONE preserves standard gather behavior.
                             Set to Reduction(1) for bag-of-words sum.
@@ -77,65 +78,29 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
         self.training = True
         self.reduction = reduction
 
-        var shape = Shape(num_embeddings, embedding_dim)
-        var grad_required = not freeze
-
-        if init_method == "normal":
-            self.weight = Tensor[Self.dtype].randn(
-                shape,
-                mean=0.0,
-                std=1.0,
-                init_seed=init_seed,
-                requires_grad=grad_required,
-            )
-        elif init_method == "uniform":
-            self.weight = Tensor[Self.dtype].rand(
-                shape,
-                min=-1,
-                max=1,
-                init_seed=init_seed,
-                requires_grad=grad_required,
-            )
-        elif init_method == "xavier":
-            var limit = Scalar[Self.dtype](
-                sqrt(6.0 / Float64(num_embeddings + embedding_dim))
-            )
-            self.weight = Tensor[Self.dtype].rand(
-                shape,
-                min=-limit,
-                max=limit,
-                init_seed=init_seed,
-                requires_grad=grad_required,
-            )
-        elif init_method == "kaiming":
-            var std = sqrt(2.0 / Float64(embedding_dim))
-            self.weight = Tensor[Self.dtype].randn(
-                shape,
-                mean=0.0,
-                std=std,
-                init_seed=init_seed,
-                requires_grad=grad_required,
-            )
-        else:  # "zero"
-            self.weight = Tensor[Self.dtype].zeros(
-                shape, requires_grad=grad_required
-            )
+        var grad_required = not unsafe_freeze
+        self.weight, _ = Weights[Self.dtype].initialize(
+            num_embeddings,
+            embedding_dim,
+            init_seed=init_seed,
+            init_method=init_method,
+            requires_grad=grad_required,
+            bias=False,
+            bias_zero=True,
+            device=None,
+        )
 
         # Zero out padding row if set
         if padding_idx:
             self._zero_padding_row()
 
-        # Share weight buffer so ancestry copies are a refcount bump, not 100MB memcpy
-        if self.weight.requires_grad:
-            self.weight.buffer.buffer.shared()
-
-    # ── Forward ───────────────────────────────────────────────────────────────
+    # Forward
     def __call__(
         mut self,
-        xs: Tensor[Self.dtype],
+        x: Tensor[Self.dtype],
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
-        var xs_casted = xs.to_dtype[Self.index_dtype]()
+        var xs_casted = x.to_dtype[Self.index_dtype]()
         return self.__call__(xs_casted, sync=sync)
 
     def __call__(
@@ -159,6 +124,7 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
 
         Args:
             indices:  Token ids to look up. Each must be in [0, num_embeddings).
+            sync:     Whether to synchronize the GPU operation.
 
         Returns:
             (len(indices), embedding_dim) when reduction is NONE.
@@ -229,7 +195,7 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             self._apply_max_norm(result)
         return result^
 
-    # ── Utilities ─────────────────────────────────────────────────────────────
+    # Utilities
 
     def _zero_padding_row(self):
         """Zero out the padding_idx row — called after init and after updates.
@@ -249,19 +215,19 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
                 if norm > mn:
                     result.fill(row * Scalar[Self.dtype](mn / norm), i(k), s())
 
-    def freeze(mut self):
+    def unsafe_freeze(mut self):
         """Freeze all embeddings — no gradient computed."""
         self.weight.requires_grad = False
 
-    def unfreeze(mut self):
-        """Unfreeze embeddings — gradient computed."""
+    def ununsafe_freeze(mut self):
+        """Ununsafe_freeze embeddings — gradient computed."""
         self.weight.requires_grad = True
         if self.padding_idx:
             # padding row must stay frozen even when rest is unfrozen
             # handled in ScatterAddTensor by zeroing that row's grad
             pass
 
-    # ── Pretrained loading ────────────────────────────────────────────────────
+    # Pretrained loading
 
     @staticmethod
     def from_pretrained(
@@ -269,7 +235,7 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
         padding_idx: Optional[Int] = None,
         max_norm: Optional[Float64] = None,
         norm_type: Float64 = 2.0,
-        freeze: Bool = True,  # frozen by default — PyTorch convention
+        unsafe_freeze: Bool = True,  # frozen by default — PyTorch convention
         reduction: Reduction = Reduction(2),
     ) -> Embedding[Self.dtype]:
         """Load pretrained embeddings (GloVe, fastText, word2vec etc.).
@@ -278,7 +244,8 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             weights:     Pretrained weight tensor, shape (vocab_size, dim).
             padding_idx: Row to keep zeroed.
             max_norm:    Renormalisation threshold.
-            freeze:      If True (default), embeddings are not updated during training.
+            norm_type:   Type of norm to use (default: 2.0).
+            unsafe_freeze:      If True (default), embeddings are not updated during training.
                          Set False to fine-tune pretrained embeddings.
             reduction:   How to reduce gathered rows (NONE/SUM/MEAN).
 
@@ -296,7 +263,7 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             max_norm=max_norm,
             norm_type=norm_type,
             init_method="zero",  # allocate, then overwrite
-            freeze=freeze,
+            unsafe_freeze=unsafe_freeze,
             reduction=reduction,
         )
         # Copy pretrained weights in
@@ -305,19 +272,35 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             emb._zero_padding_row()
         return emb^
 
-    # ── Layer protocol ────────────────────────────────────────────────────────
+    # Layer protocol
 
     def parameters(
         ref self,
-    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
-        var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
+    ) -> List[Pointer[Tensor[Self.dtype], MutAnyOrigin]]:
+        var params = List[Pointer[Tensor[Self.dtype], MutAnyOrigin]]()
         if self.weight.requires_grad:
             params.append(
-                UnsafePointer(to=self.weight)
+                Pointer(to=self.weight)
                 .unsafe_mut_cast[True]()
-                .as_any_origin()
+                .as_unsafe_any_origin()
             )
         return params^
+
+    def named_parameters(
+        ref self, prefix: String
+    ) -> List[NamedParameter[Self.dtype]]:
+        var result = List[NamedParameter[Self.dtype]]()
+        if self.weight.requires_grad:
+            result.append(
+                NamedParameter[Self.dtype](
+                    prefix + "weight",
+                    Pointer(to=self.weight)
+                    .unsafe_mut_cast[True]()
+                    .as_unsafe_any_origin()
+                    .unsafe_origin_cast[MutUntrackedOrigin](),
+                )
+            )
+        return result^
 
     def num_parameters(self) -> Int:
         return self.weight.numels()
@@ -328,20 +311,17 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
     def eval(mut self):
         self.training = False
 
-    def into(self) -> Module[Self.dtype]:
-        return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
-
     def to_gpu(
-        deinit self,
+        self,
         gpu: Optional[GPU] = None,
     ) raises -> Embedding[Self.dtype, Self.index_dtype]:
         var weight_gpu = self.weight.to_gpu(gpu=gpu, stop_grad=True)
-        var out = self^
+        var out = self
         out.weight = weight_gpu^
         return out^
 
-    def to_cpu(deinit self) raises -> Embedding[Self.dtype, Self.index_dtype]:
+    def to_cpu(self) raises -> Embedding[Self.dtype, Self.index_dtype]:
         var weight_cpu = self.weight.to_cpu(stop_grad=True)
-        var out = self^
+        var out = self
         out.weight = weight_cpu^
         return out^

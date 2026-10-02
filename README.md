@@ -1,22 +1,21 @@
 # Tenmo
-## Build Status
 
 [![Mojo Tests](https://github.com/ratulb/tenmo/actions/workflows/test.yml/badge.svg)](https://github.com/ratulb/tenmo/actions/workflows/test.yml)
 ![Last Commit](https://img.shields.io/github/last-commit/ratulb/tenmo)
 ![License](https://img.shields.io/github/license/ratulb/tenmo)
-![Language](https://img.shields.io/badge/language-Mojo%20🔥-orange)
+![Language](https://img.shields.io/badge/language-Mojo-orange)
 ![Open Issues](https://img.shields.io/github/issues/ratulb/tenmo)
 
-**A lean tensor library and neural network framework built entirely in Mojo 🔥**
+**A tensor library and neural network framework written entirely in Mojo — from SIMD kernels to transformers.**
 
-Tenmo brings modern, ergonomic ML abstractions to Mojo with automatic differentiation, modular neural networks, and end-to-end training pipelines—aiming for performance competitive with modern ML systems.
+Tenmo provides modern, ergonomic ML abstractions with automatic differentiation, modular neural networks, and end-to-end training pipelines: MLPs and CNNs, a GPT-2-style decoder stack with text generation, and a BERT encoder for classification and masked-language modeling.
 
-> ⚠️ **Development Status**: Tenmo is actively evolving alongside Mojo itself. The API is subject to change as we incorporate improvements from the Mojo ecosystem. Not production-ready yet, but excellent for learning, experimentation, and systems-level exploration.
+> **Development status.** Tenmo is under active development alongside the Mojo toolchain. The API may change between releases; pin a commit for reproducible work. The library is past the experiments stage — core autograd, the transformer stacks, and training loops are covered by extensive pinned test suites — but it is not yet production-hardened.
 
 
 ---
 
-## ⚡︎ Performance
+## Performance
 
 ### MNIST Training Benchmark (15 Epochs, 105K Parameters)
 
@@ -29,13 +28,13 @@ Training the same 4-layer MLP (784→128→32→10) on identical hardware, all r
 | PyTorch | GPU (CUDA) | 14.5s | 217.2s | 98.18% |
 | PyTorch | CPU | 15.4s | 231.5s | 98.12% |
 
-**Key Observations:**
-- ⚡︎ **2.8× faster than PyTorch CPU** & **2.4× faster than PyTorch GPU** — Pure Mojo SIMD on CPU, native kernel compilation on GPU
-- 🎯︎ **98.14% validation accuracy** — Matches PyTorch precision on identical hardware
-- 💡 **CPU beats GPU for this model** — At 104K params the SIMD CPU kernels saturate the machine before GPU launch overhead pays off
-- 📉 **Zero Python overhead** — Runs entirely in compiled Mojo
+**Key observations:**
+- **2.8× faster than PyTorch CPU** and **2.4× faster than PyTorch GPU** — pure Mojo SIMD on CPU, native kernel compilation on GPU
+- **98.14% validation accuracy** — matches PyTorch precision on identical hardware
+- **CPU beats GPU for this model** — At 105K params the SIMD CPU kernels saturate the machine before GPU launch overhead pays off
+- **Zero Python overhead** — runs entirely in compiled Mojo
 
-*Batch_size=64. The MNIST example does not use BLAS — pure Mojo end-to-end.*
+*Batch_size=64. The MNIST example does not use BLAS — pure Mojo end-to-end. Reference snapshot (August 2026): kept as a historical baseline, not re-run per release.*
 
 **Training Progression** (Tenmo CPU):
 ```
@@ -56,17 +55,53 @@ Epoch 15: Loss: 0.006, Train: 99.93%, Val: 98.14%, Time: 5.47s
 
 ## What's New
 
-The library has undergone significant architectural work. The changes prioritize correctness, safety, and GPU support.
+Recent work prioritizes correctness, safety, and GPU support — and builds two complete transformer stacks on top of the tensor core.
 
-### Major Recent Work
+### Autograd Core
 
-**Backward system redesign** — moved from stateful handler instances to pure static methods with a type-erased `BackwardFnArg`. Dispatch is now a direct integer-tag jump table. No variant extraction, no handler instances, no redundant copies.
+**Backward system redesign** — pure static handler methods with a type-erased `BackwardFn`. Dispatch is a direct call: each `BackwardFn` stores a raw function pointer to its own handler, and `Backward.invoke()` calls it directly. No op codes, no dispatch table, no variant extraction, no handler instances, no redundant copies.
 
 **Ancestry redesign** — `Ancestors` no longer stores full `Tensor` copies. Each ancestor is now a lightweight `Ancestor` handle carrying only what backward needs: an id, `requires_grad`, a refcounted gradbox pointer, and a shared `NDBuffer`. The recursive deep-copy explosion on every `add_ancestry` call is gone.
 
-**GPU support** — tensor operations, backward passes, and gradient flow now work on GPU. `DType.bool` is handled correctly via internal `uint8` storage throughout kernels.
+**GPU support** — tensor operations, backward passes, and gradient flow work on GPU, including cross-device grad flow with `stop_grad` transfer control. `DType.bool` is handled via internal `uint8` storage throughout kernels.
 
-> 📖 **Deep Dive**: For a complete explanation of forward and backward pass mechanics, see [`README_AUTOGRAD.md`](README_AUTOGRAD.md).
+### Transformers
+
+**GPT-2-style decoder stack** — `Embedding`, `PositionalEmbedding`, `SelfAttention` (with `qkv_bias` control), `MLP`, `TransformerBlock`, `GPTModel` with optional weight tying, plus text generation with KV-caching (`tenmo/generate.mojo`) and TinyStories pretraining pilots (`./example.sh tinystories_pilot_8k`).
+
+**BERT encoder stack** — `EncoderBlock`, `BertForMLM` (masked-language modeling) and `BertForSequenceClassification`, with IMDB sentiment examples (`./example.sh imdb_bert`, `imdb_bert_pretrain`).
+
+**Training data pipeline** — `SlidingWindowDataset`/`WindowLoader` for language-model windows alongside the vision `DataLoader`.
+
+### Ecosystem
+
+**Python bindings (in progress)** — a CPython extension (`python-binding/`) exposing the Mojo core to Python: tensors, autograd, losses, optimizers, data loading, whole-epoch helpers. See [Python Bindings](#python-bindings-in-progress) below.
+
+**AdamW + demos** — decoupled-weight-decay optimizer with fused CPU kernels; `./example.sh mnist_adamw` and Python-side `examples/mnist_adamw.py`.
+
+**Mixed-dtype models** — grad-tracked `to_dtype` cast, `MixedSequential` + compile-time `Seq` containers (see [Mixed-Dtype Models](#mixed-dtype-models)).
+
+**BLAS opt-in** — matmul-only OpenBLAS routing via `LinearBLAS`/`SequentialBLAS`; native kernels remain the default (see [BLAS Integration](#blas-integration)).
+
+**Toolchain** — Mojo 1.1.0 + MAX 26.5–26.6 (linux-64), `max.gpu.host` device API, zero-warning `mojo precompile`.
+
+> **Deep dive**: for a complete explanation of forward and backward pass mechanics, see [`README_AUTOGRAD.md`](README_AUTOGRAD.md).
+
+---
+
+## Python Bindings (in progress)
+
+Tenmo is growing a CPython extension (`python-binding/`) that exposes the Mojo core to Python — tensors, autograd, losses, optimizers, data loading, and whole-epoch helpers — with identical numerics to the Mojo API.
+
+**Status**: 25 test files / 458 tests green. Bound today: `Tensor` (float32 + float64, int/bool carriers), arithmetic, reductions, shape/view ops, `concat`/`stack`/`where`/`masked_fill`, `matmul`/`dot`/`outer`, activations, `MSELoss`/`CrossEntropyLoss`/`BCELoss`, `SGD`/`AdamW`, tensor-native `DataLoader` (class-index and probability-target variants), `train_epoch`/`eval_epoch` whole-epoch helpers.
+
+```bash
+./scripts/run_python_tests.sh            # builds local _tenmo.so + runs the suite
+pixi run python examples/mnist_sgd.py    # per-batch SGD, 15 epochs → ~98.2% val acc
+pixi run python examples/mnist_adamw.py  # per-batch AdamW, 15 epochs → ~98.1% val acc
+```
+
+**Caveats**: training paths are float32-only; `train_epoch` accepts SGD (AdamW runs in a per-batch loop, as in `mnist_adamw.py`); `_tenmo.so` is a local gitignored build artifact. The API is evolving — expect gaps.
 
 ---
 
@@ -79,18 +114,18 @@ from tenmo.tensor import Tensor
 
 def main() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var x = Tensor[dtype].scalar(2.0, requires_grad=True)
+    var y = x + 1  # 3
+    var z = y * x  # 3 * 2 = 6
+    var w = z + x  # 6 + 2 = 8
 
-    # a is used in two places
-    var b = a * 2  # ∂b/∂a = 2
-    var c = a * 3  # ∂c/∂a = 3
+    w.backward()
 
-    var d = b + c  # ∂d/∂a = ∂b/∂a + ∂c/∂a = 2 + 3 = 5
+    assert_true(w.item() == 8.0, "Value check")
+    # ∂w/∂x = ∂z/∂x + 1
+    # z = (x + 1) * x → ∂z/∂x = (1)*x + (x+1)*1 = x + x + 1 = 2x + 1 = 5
+    assert_true(x.grad().item() == 5 + 1, "∂w/∂x = ∂z/∂x + ∂x/∂x = 6")
 
-    d.backward()
-
-    # Final grad: ∂d/∂a = [5, 5, 5]
-    assert_true(a.grad().all_close(Tensor.d1([5.0, 5.0, 5.0])), "∂d/∂a = 5")
 ```
 #### Broadcast matmul
 ```mojo
@@ -120,7 +155,7 @@ def main() raises:
   ]
 A's gradients
 
- [2D Gradbox(2, 3), Type: float32, Shared : True, Strides : (3, 1), Offset : 0]
+  [2D Gradbox(2, 3), Type: float32, Strides : (3, 1), Offset : 0, Device : cpu]
   [
     [4.0, 4.0, 4.0],
     [4.0, 4.0, 4.0]
@@ -209,7 +244,7 @@ pixi shell
 
 **Performance without compromise**: 2.8× faster than PyTorch CPU and 2.4× faster than PyTorch GPU on MNIST, with zero Python overhead and full SIMD optimization.
 
-**Transparency you can trust**: Every operation is implemented in pure Mojo — no hidden BLAS calls, no opaque kernels. Perfect for learning and optimization.
+**Transparency you can trust**: Every operation is implemented in pure Mojo — no hidden BLAS calls on the default path (BLAS is strict opt-in), no opaque kernels. Perfect for learning and optimization.
 
 **Forward-looking design**: Competitive with PyTorch today; GPU support already benchmarks faster than PyTorch GPU on the same hardware.
 
@@ -221,7 +256,7 @@ pixi shell
 Tenmo provides a broad set of tensor operations. Below is a representative (not exhaustive) selection:
 
 ### Core Tensor Operations
-- **Automatic differentiation** with dynamic computational graph
+- **Automatic differentiation** with dynamic autograd over tensor ancestry (no graph object — each `backward()` traverses parent links)
 - **Broadcasting** for arithmetic operations (`+`, `-`, `*`, `/`)
 - **SIMD-optimized** kernels with manual vectorization
 - **Views and slicing** with zero-copy memory sharing
@@ -237,12 +272,19 @@ Tenmo provides a broad set of tensor operations. Below is a representative (not 
 
 **Layers:**
 - `Linear` - Fully connected with Xavier/He initialization
-- `ReLU`, `Sigmoid`, `Tanh` - Standard activations
+- `LinearBLAS` / `SequentialBLAS` - OpenBLAS-accelerated variant (opt-in)
+- `ReLU`, `GeLU`, `Sigmoid`, `Tanh` - Standard activations
 - `Flatten` - Spatial to vector conversion
 - `MaxPool2d` - 2D max pooling with stride/padding support
-- `Conv2d` - 2D convolution
+- `Conv2D` - 2D convolution
 - `Dropout` - Regularization layer
-- `Sequential` - Layer composition container
+- `LayerNorm` - Layer normalization
+- `Embedding`, `PositionalEmbedding` - Lookup tables (index / float-carrier conventions)
+- `SelfAttention`, `MLP`, `TransformerBlock`, `GPTModel` - GPT-2-style decoder stack (weight tying, `qkv_bias` control)
+- `EncoderBlock`, `BertForMLM`, `BertForSequenceClassification` - BERT encoder stack
+- `Sequential` - Single-dtype layer composition container
+- `MixedSequential` - Mixed-dtype layer chain with grad-tracked boundary casts (see Mixed-Dtype Models below)
+- `ModuleList` - Ordered layer list
 
 **Loss Functions:**
 - `MSELoss` - Mean squared error
@@ -251,23 +293,26 @@ Tenmo provides a broad set of tensor operations. Below is a representative (not 
 
 **Optimizers:**
 - `SGD` - Stochastic gradient descent with momentum
+- `AdamW` - Decoupled weight decay, fused CPU kernels
 
 **Training Utilities:**
 - `.train()` / `.eval()` mode switching
 - `DataLoader` with optimized batching
 - `TensorDataset`, `NumpyDataset` wrappers
+- `SlidingWindowDataset` / `WindowLoader` for language-model windows
+- Checkpointing (`save_state`, `load_state`, `apply_to_model`) and warmup-cosine scheduling
 
 ### BLAS Integration
 
 Tenmo supports configurable BLAS backends for linear algebra operations. Use `SequentialBLAS` with `LinearBLAS` layers for automatic BLAS acceleration:
 
-- **Auto-profiling**: `LinearBLAS` automatically profiles native Mojo vs BLAS matmul at runtime and selects the faster path
-- **Runtime dispatch**: No compile-time configuration needed — profiling happens on first forward calls
+- **Direct routing**: `LinearBLAS` routes to BLAS when a lite is attached and both operands are contiguous, native otherwise — no runtime profiling
+- **Opt-in backend**: BLAS is used only when the library loads (`BLASCache.is_available()`); otherwise layers run native
 - **Gradient-aware**: Full backward pass support through BLAS for training
 
 ```mojo
 var model = SequentialBLAS[dtype]()
-model.append(LinearBLAS[dtype](784, 128, profile_samples=10).into())
+model.append(LinearBLAS[dtype](784, 128).into())
 ```
 
 ### Installation
@@ -287,7 +332,7 @@ mojo -I . -D BLAS_PATH=$(find $CONDA_PREFIX/lib -name "libopenblas.so" | head -1
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 Tenmo's design prioritizes memory efficiency and performance through careful separation of concerns - organized around a few tightly scoped core building blocks:
 
@@ -301,21 +346,19 @@ Tensor[dtype: DType]
 └── ancestors: Optional[Ancestors]         # Computation graph parents
 
 Gradbox[dtype: DType]
-├── _ndb_ptr: Optional[UnsafePointer[NDBuffer]]   # Heap NDBuffer (combined alloc)
-└── _refcount: Optional[UnsafePointer[Atomic]]     # Atomic refcount (combined alloc)
+├── handle: NDBufferLite[dtype]               # Thin gradient-storage wrapper (combined alloc)
 
 Ancestor[dtype: DType]
 ├── _id: UInt                              # Graph traversal key
 ├── requires_grad: Bool                    # Skip gradient update if False
 ├── gradbox: Optional[Gradbox[dtype]]      # Gradient storage (inline via Optional)
-├── ndb: Optional[NDBuffer[dtype]]         # Data+layout (None unless needs_parent_data=True)
+├── ndb: NDBufferLite[dtype]               # Data+layout (populated only if needs_parent_data=True)
 └── parents: Optional[Ancestors[dtype]]    # Recursive ancestry chain
 
 NDBuffer[dtype: DType]
 ├── shape: Shape                           # Tensor dimensions
 ├── strides: Strides                       # Memory layout
 ├── offset: Int                            # View offset
-├── _contiguous: Bool                      # Cached contiguous flag
 ├── buffer: Buffer[dtype]                  # CPU data
 └── device_state: Optional[DeviceState]    # GPU storage
 ```
@@ -324,6 +367,11 @@ NDBuffer[dtype: DType]
 
 **Gradbox is not a Tensor**
 Gradients don't need the full Tensor API. A `Gradbox` encapsulates only an `NDBuffer`, keeping gradient storage minimal and explicit — **70% less code than full Tensors**. Gradbox buffers are always ref-counted — gradients land in the right place regardless of how many tensor copies or views exist.
+
+**Gradbox is allocated upfront**
+- One invariant everywhere — requires_grad ⇒ True, no branch on the accumulation hot path, no allocate-during-backward latency spike.
+- Fully deterministic memory footprint the instant the graph is built — useful for memory budgeting, especially on GPU where you want to know your ceiling before you start.
+- Sidesteps a real thread-safety problem lazy has to solve: if backward parallelism ever lets two branches accumulate into the same tensor concurrently, "allocate-if-absent, else add" is a genuine race (two threads both observe None, both allocate, one write is lost) that needs a CAS or lock. Eager needs synchronization only around the add itself — a much simpler problem.
 
 **`Tensor.grad()` returns an independent deep copy**
 Calling `A.grad()` returns a detached `Gradbox` with its own data via `Gradbox.detach()`, which deep-copies the underlying buffer (CPU: `memcpy`, GPU: `enqueue_copy_to`). The tensor's internal Gradbox is unaffected by subsequent `zero_grad()` or `.backward()` calls on the returned copy — safe to snapshot gradients mid-training.
@@ -341,17 +389,17 @@ Shape, strides, and offset logic is centralized in `NDBuffer`, which serves both
 The gradbox pointer is the single link between the autograd graph and gradient storage. It is refcounted independently of tensor lifetime — gradients flow to the right place regardless of whether the original tensor is still alive.
 
 **Minimal Module System**
-Tenmo includes a minimal neural network module system: `Sequential`, `Linear`, `LinearBLAS`, `ReLU`, `Sigmoid`, `Tanh`, `Dropout`, `Conv2d`, `Flatten`, `MaxPool2d`, and loss functions. Intentionally minimal — build on top as needed.
+Tenmo includes a minimal neural network module system: `Sequential`, `Linear`, `LinearBLAS`, `ReLU`, `Sigmoid`, `Tanh`, `Dropout`, `Conv2D`, `Flatten`, `MaxPool2d`, and loss functions. Intentionally minimal — build on top as needed.
 
 This architecture keeps the system **explicit, predictable, and close to the metal**.
 
 ---
 
-## 📖 Examples
+## Examples
 
 ### Prerequisites
-- Mojo 1.0.0b1 (linux-64 only)
-- Python 3.10-3.14 (for NumPy interop in examples)
+- Mojo `1.1.0` (linux-64 only)
+- Python 3.14 (for NumPy interop in examples)
 
 ### Setup
 ```bash
@@ -362,7 +410,10 @@ cd tenmo
 ./example.sh xor
 ./example.sh mnist
 ./example.sh spiral
+./example.sh word2vec_cbow
 ```
+
+Available examples: `mnist`, `mnist_adamw`, `mnist_native`, `mnist_mixed`, `mnist_mixed_dtypes`, `mnist_unified`, `mnist_gelu`, `mnist_gpu`, `xor`, `spiral`, `gpt_dataset_demo`, `gpt_overfit`, `gpt_epochs`, `gpt_generate`, `tinystories_smoke`, `tinystories_pilot`, `tinystories_pilot_8k`, `tinystories_generate`, `tinystories_vocab`, `imdb_bert`, `imdb_bert_pretrain`. Add a `d` as a second argument for debug mode (e.g. `./example.sh xor d`). Fully comptime-parameterized sequence demos live in `examples/reverse_sequence.mojo` and `examples/sort_sequence.mojo` (run via `pixi run mojo -I . examples/<file>`). Python-side MNIST ports (`examples/mnist.py`, `examples/mnist_sgd.py`, `examples/mnist_dataloader.py`, `examples/mnist_adamw.py`) run via `pixi run python` — see [Python Bindings](#python-bindings-in-progress).
 
 ### 1. XOR Problem
 Binary classification demonstrating non-linear decision boundaries. Perfect separation achieved in ~2000 epochs with a simple 2-layer network.
@@ -410,12 +461,12 @@ Full training pipeline with data loading, batching, and validation:
 **Training**: 15 epochs, batch_size=64, lr=0.01, momentum=0.9
 **Results**: 98.14% validation accuracy in **82 seconds** (CPU) / **90 seconds** (GPU)
 
-See the [Performance section](#-performance) for full CPU & GPU benchmarks vs PyTorch.
+See the [Performance section](#performance) for full CPU & GPU benchmarks vs PyTorch.
 All core tensor operations are in pure Mojo with no external dependencies. NumPy is only used for loading MNIST data in the examples.
 
 ---
 
-## 🔬 Advanced Features
+## Advanced Features
 
 ### Compile-Time Optimization
 
@@ -455,29 +506,42 @@ for batch in train_loader:
 - Built-in shuffling without data movement
 ---
 
-## 🚧 Roadmap
+### Mixed-Dtype Models
+
+Differentiable dtype casting: `to_dtype[T]()` registers a `ToDtypeBackward` node, so gradients flow back through a cast into the parent's original dtype. Mixed-floating-point-type modules are therefore composable in a single autograd graph.
+
+- `MixedSequential` — runtime-erased chain holding layers of different comptime dtypes, alongside the standard single-dtype `Sequential`. A grad-tracked boundary cast is inserted wherever consecutive layers' dtypes differ; homogeneous models are the trivial case (no casts). Compile-time sibling: `Seq`, with seam casts checked by `comptime assert`.
+- Each layer declares its comptime `InputDType` / `OutputDType` (`LayerTrait`); the containers rely on these declarations for blob layout and cast insertion.
+
+Validated end-to-end on real training (MNIST) with no convergence regression. The CPU throughput cost of the cast/erasure path is expected and not yet optimized — this is a correctness milestone, not a performance one.
+
+## Roadmap
 
 ### Near Term
-- [ ] More Optimizers: Adam, RMSprop, AdamW
-- [ ] Aggressive performance optimization of core components
-- [ ] Checkpointing: Model serialization and loading
-- [ ] Additional Layers: BatchNorm, LayerNorm
-- [ ] GPU transfer optimization: pinned memory, async transfers, stream pipelining
-- [ ] GPU synchronization: explicit stream management and async kernel launch
+- [ ] More Optimizers: Adam, RMSprop
+- [x] AdamW
+- [x] Aggressive performance optimization of core components
+- [x] Checkpointing: Model serialization and loading
+- [ ] Additional Layers: BatchNorm
+- [x] LayerNorm
+- [ ] GPU transfer optimization: pinned memory, stream pipelining
+- [x] GPU synchronization: explicit stream management and async kernel launch
 
 ### Medium Term
-- [ ] Transparent GPU Support: Unified CPU/GPU tensor operations
-- [ ] Zero-copy ancestry tracking: eliminate remaining deep copies on forward pass
+- [x] Transparent GPU Support: Unified CPU/GPU tensor operations
+- [x] Zero-copy ancestry tracking: eliminate remaining deep copies on forward pass
+- [x] Transformer stacks: GPT-2 decoder (`GPTModel`, generation) and BERT encoder
+- [x] LLM training pilots: TinyStories pretraining, IMDB fine-tuning
+- [ ] Python bindings GA
 
 ### Long Term
 - [ ] Distributed Training: Multi-device and multi-node support
-- [ ] Advanced Operations: Attention mechanisms, transformer blocks
 - [ ] Model Zoo: Pre-trained models and architectures
 - [ ] Production Readiness: API stabilization and comprehensive testing
 
 ---
 
-## 💡 Inspirations & Acknowledgments
+## Inspirations and Acknowledgments
 
 Tenmo is built with a simple goal: **understand, control, and optimize the full ML stack from the ground up** — from memory layout to backpropagation — while remaining lightweight and ergonomically familiar.
 
@@ -490,7 +554,7 @@ This project stands on the shoulders of giants:
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Tenmo welcomes contributions! Given the experimental nature of both the library and Mojo itself, we particularly value:
 
@@ -503,10 +567,10 @@ Please ensure any contributions maintain API consistency and include appropriate
 
 ---
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**⭐ Building ML systems in Mojo? Star this repo to follow along as we push toward production-grade performance!**
+**If you are building ML systems in Mojo, star this repo to follow development toward production-grade performance.**

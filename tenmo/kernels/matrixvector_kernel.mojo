@@ -1,110 +1,114 @@
-from std.gpu import thread_idx, block_idx, block_dim, barrier
+from max.gpu import thread_idx, block_idx, block_dim
+from max.gpu import barrier
 from std.memory import AddressSpace, stack_allocation
 
-from tenmo.array import Array
-from tenmo.device import DeviceState
-from tenmo.ndbuffer import NDBuffer
-from tenmo.intarray import IntArray
-from tenmo.mnemonics import max_rank
-from tenmo.strides import Strides
-from tenmo.broadcasthelper import ShapeBroadcaster
+from ..shared.array import RankArray
+from ..gpu.device import DeviceState
+from ..shared.layout import Layout
+from ..shared.intarray import IntArray
+from ..shared.constants import MAX_RANK
+from ..shared.strides import Strides
+from ..shared.broadcasthelper import ShapeBroadcaster
 
 
 def matrix_vector_nd[
     dtype: DType,
     block_size: Int = 256,
 ](
-    out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    M_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    v_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    out_buffer: Pointer[Scalar[dtype], MutAnyOrigin],
+    M_buffer: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    v_buffer: Pointer[Scalar[dtype], ImmutAnyOrigin],
     # broadcast-resolved batch space
-    batch_shape: Array,
-    batch_strides: Array,
+    batch_shape: RankArray,
+    batch_strides: RankArray,
     # per-tensor batch shapes and strides (for broadcast clamping)
-    M_batch_shape: Array,
-    M_batch_strides: Array,
-    v_batch_shape: Array,
-    v_batch_strides: Array,
+    M_batch_shape: RankArray,
+    M_batch_strides: RankArray,
+    v_batch_shape: RankArray,
+    v_batch_strides: RankArray,
     # inner dimensions
-    m: Int,  # number of rows  — output width per batch
-    k: Int,  # contraction dim
-    total_output: Int,  # total_batch * m
+    m_: Int64,  # number of rows  — output width per batch
+    k_: Int64,  # contraction dim
+    total_output_: Int64,  # total_batch * m
 ):
+    var m = Int(m_)
+    var k = Int(k_)
+    var total_output = Int(total_output_)
     var tid = Int(thread_idx.x) + Int(block_idx.x) * Int(block_dim.x)
 
     if tid >= total_output:
         return
 
-    # ── Step 1: decompose flat tid → (batch_idx, row_idx) ────────────────────
+    # Step 1: decompose flat tid → (batch_idx, row_idx)
     var batch_idx = tid // m
     var row_idx = tid % m
 
-    # ── Step 2: recover batch coords from batch_idx ───────────────────────────
-    var batch_coords = stack_allocation[max_rank, Int]()
+    # Step 2: recover batch coords from batch_idx
+    var batch_coords = stack_allocation[MAX_RANK, Int]()
     var remaining = batch_idx
     for dim in reversed(range(len(batch_shape))):
-        batch_coords[dim] = remaining % batch_shape[dim]
+        batch_coords[unsafe_offset=dim] = remaining % batch_shape[dim]
         remaining //= batch_shape[dim]
 
-    # ── Step 3: M base offset — right-aligned broadcast clamping ─────────────
+    # Step 3: M base offset — right-aligned broadcast clamping
     # M[..., m, k]: batch dims are all but last 2.
     # Contiguous guarantee: M_row_stride = k, M_col_stride = 1
     var M_base = 0
     var M_rank_off = len(batch_shape) - len(M_batch_shape)
     for i in range(len(M_batch_shape)):
-        var coord = batch_coords[M_rank_off + i] if M_batch_shape[i] > 1 else 0
+        var coord = batch_coords[unsafe_offset=M_rank_off + i] if M_batch_shape[i] > 1 else 0
         M_base += coord * M_batch_strides[i]
 
     # Advance M_base to the correct row for this thread
     M_base += row_idx * k  # M_row_stride = k (contiguous)
 
-    # ── Step 4: v base offset — right-aligned broadcast clamping ─────────────
+    # Step 4: v base offset — right-aligned broadcast clamping
     # v[..., k]: batch dims are all but last 1.
     # Contiguous guarantee: v_k_stride = 1
     var v_base = 0
     var v_rank_off = len(batch_shape) - len(v_batch_shape)
     for i in range(len(v_batch_shape)):
-        var coord = batch_coords[v_rank_off + i] if v_batch_shape[i] > 1 else 0
+        var coord = batch_coords[unsafe_offset=v_rank_off + i] if v_batch_shape[i] > 1 else 0
         v_base += coord * v_batch_strides[i]
 
-    # ── Step 5: dot product over k ────────────────────────────────────────────
+    # Step 5: dot product over k
     # M row j has stride 1 (contiguous), v has stride 1 (contiguous)
     var acc = Scalar[dtype](0)
     for j in range(k):
-        acc += M_buffer[M_base + j] * v_buffer[v_base + j]
+        acc += M_buffer[unsafe_offset=M_base + j] * v_buffer[unsafe_offset=v_base + j]
 
-    # ── Step 6: write result ──────────────────────────────────────────────────
-    out_buffer[tid] = acc
+    # Step 6: write result
+    out_buffer[unsafe_offset=tid] = acc
 
 
 @fieldwise_init
-struct MatrixVectorNdGpu[dtype: DType = DType.float32](
+struct MatrixVectorKernel[dtype: DType = DType.float32](
     ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
     def launch[
         block_size: Int = 256,
     ](
-        M: NDBuffer[Self.dtype],
-        v: NDBuffer[Self.dtype],
+        M_layout: Layout,
+        M_device_state: DeviceState[Self.dtype],
+        v_layout: Layout,
+        v_device_state: DeviceState[Self.dtype],
         sync: Bool = False,
-    ) raises -> NDBuffer[
-        Self.dtype
-    ]:
-        var M_shape = M.shape
-        var v_shape = v.shape
+    ) raises -> Tuple[Layout, DeviceState[Self.dtype]]:
+        var M_shape = M_layout.shape
+        var v_shape = v_layout.shape
 
         if M_shape.rank() < 2:
-            raise Error("MatrixVectorNdGpu: matrix must have rank >= 2")
+            raise Error("MatrixVectorKernel: matrix must have rank >= 2")
         if v_shape.rank() < 1:
-            raise Error("MatrixVectorNdGpu: vector must have rank >= 1")
+            raise Error("MatrixVectorKernel: vector must have rank >= 1")
 
         var k = M_shape[-1]
         var k_v = v_shape[-1]
         var m = M_shape[-2]
 
         if k != k_v:
-            raise Error("MatrixVectorNdGpu: inner dims must match")
+            raise Error("MatrixVectorKernel: inner dims must match")
 
         var M_batch_shape = M_shape[:-2]  # M_shape minus last 2 dims
         var v_batch_shape = v_shape[:-1]  # v_shape minus last dim
@@ -118,17 +122,16 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
         var total_output = total_batch * m
 
         var batch_strides = Strides.default(batch_shape).array()
-        var M_batch_strides = M.strides[:-2].array()  # slice off inner k,n
-        var v_batch_strides = v.strides[:-1].array()  # slice off inner k
+        var M_batch_strides = M_layout.strides[:-2].array()  # slice off inner k,n
+        var v_batch_strides = v_layout.strides[:-1].array()  # slice off inner k
 
-        # Convert batch shapes to Array for kernel
+        # Convert batch shapes to RankArray for kernel
         var batch_shape_arr = batch_shape.array()
         var M_batch_shape_arr = M_batch_shape.array()
         var v_batch_shape_arr = v_batch_shape.array()
 
         var num_blocks = (total_output + block_size - 1) // block_size
 
-        ref M_device_state = M.device_state.value()
         ref gpu = M_device_state.get_gpu()
         var device_context = gpu[]
 
@@ -137,10 +140,9 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
         )
 
         ref M_buf = M_device_state.device_buffer()
-        ref v_buf = v.device_state.value().device_buffer()
+        ref v_buf = v_device_state.device_buffer()
 
         var compiled_func = device_context.compile_function[
-            matrix_vector_nd[Self.dtype, block_size],
             matrix_vector_nd[Self.dtype, block_size],
         ]()
 
@@ -155,17 +157,18 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
             M_batch_strides,
             v_batch_shape_arr,
             v_batch_strides,
-            m,
-            k,
-            total_output,
+            Int64(m),
+            Int64(k),
+            Int64(total_output),
             grid_dim=num_blocks,
             block_dim=block_size,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
-        var out = NDBuffer[Self.dtype].with_device_state(
-            device_state^, out_shape
+        return (
+            Layout(out_shape),
+            device_state^,
         )
-        return out^

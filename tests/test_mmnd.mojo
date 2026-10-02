@@ -1,8 +1,8 @@
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from std.testing import assert_true, TestSuite
-from tenmo.strides import Strides
-from tenmo.common_utils import s, il
+from tenmo.shared.strides import Strides
+from tenmo.shared.indexhelper import il, s
 
 
 def main() raises:
@@ -292,7 +292,6 @@ def test_matmul_nd_mixed_batch_dims_with_grad() raises:
     assert_true(B.grad().shape() == Shape(2, 1, 2, 2))
 
 
-
 def test_matmul_nd_3d_basic() raises:
     comptime dtype = DType.float32
     # Batch of 2 matrices: 2x(2x3) × 2x(3x2) → 2x(2x2)
@@ -492,33 +491,34 @@ def test_matmul_nd_mixed_batch_dims() raises:
     assert_true(C.shape() == Shape(2, 2, 2, 2))
 
 
-
 # ================================================================
 #  Batch MatMul Forward Tests
 # ================================================================
 
 
 def test_matmul2d_basic_case() raises:
-    var A = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
-    var B = Tensor.d2([[5.0, 6.0], [7.0, 8.0]])
+    var A = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]])
+    var B = Tensor[DType.float32].d2([[5.0, 6.0], [7.0, 8.0]])
     var C = A.matmul(B)
-    assert_true(C.all_close(Tensor.d2([[19.0, 22.0], [43.0, 50.0]])))
+    assert_true(
+        C.all_close(Tensor[DType.float32].d2([[19.0, 22.0], [43.0, 50.0]]))
+    )
 
 
 def test_matmul2d_rectangular_case() raises:
-    var A = Tensor.d2([[1.0, 2.0, 3.0]])
-    var B = Tensor.d2([[4.0, 5.0], [6.0, 7.0], [8.0, 9.0]])
+    var A = Tensor[DType.float32].d2([[1.0, 2.0, 3.0]])
+    var B = Tensor[DType.float32].d2([[4.0, 5.0], [6.0, 7.0], [8.0, 9.0]])
     var C = A.matmul(B)
-    assert_true(C.all_close(Tensor.d2([[40.0, 46.0]])))
+    assert_true(C.all_close(Tensor[DType.float32].d2([[40.0, 46.0]])))
 
 
 def test_matmul2d_non_square_large_case() raises:
-    var A = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
-    var B = Tensor.d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])
+    var A = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+    var B = Tensor[DType.float32].d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])
     var C = A.matmul(B)
     assert_true(
         C.all_close(
-            Tensor.d2(
+            Tensor[DType.float32].d2(
                 [[27.0, 30.0, 33.0], [61.0, 68.0, 75.0], [95.0, 106.0, 117.0]]
             )
         )
@@ -526,46 +526,60 @@ def test_matmul2d_non_square_large_case() raises:
 
 
 def test_matmul_batched_basic() raises:
-    var A = Tensor.d3([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
-    var B = Tensor.d3([[[1.0, 0.0], [0.0, 1.0]], [[2.0, 0.0], [0.0, 2.0]]])
+    var A = Tensor[DType.float32].d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+    )
+    var B = Tensor[DType.float32].d3(
+        [[[1.0, 0.0], [0.0, 1.0]], [[2.0, 0.0], [0.0, 2.0]]]
+    )
     var C = A.matmul(B)
     assert_true(
         C.all_close(
-            Tensor.d3([[[1.0, 2.0], [3.0, 4.0]], [[10.0, 12.0], [14.0, 16.0]]])
+            Tensor[DType.float32].d3(
+                [[[1.0, 2.0], [3.0, 4.0]], [[10.0, 12.0], [14.0, 16.0]]]
+            )
         )
     )
 
 
 def test_matmul_batched_broadcast_B() raises:
-    var A = Tensor.d3([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
-    var B = Tensor.d2([[2.0, 0.0], [0.0, 2.0]])
+    var A = Tensor[DType.float32].d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+    )
+    var B = Tensor[DType.float32].d2([[2.0, 0.0], [0.0, 2.0]])
     var C = A.matmul(B)
     assert_true(
         C.all_close(
-            Tensor.d3([[[2.0, 4.0], [6.0, 8.0]], [[10.0, 12.0], [14.0, 16.0]]])
+            Tensor[DType.float32].d3(
+                [[[2.0, 4.0], [6.0, 8.0]], [[10.0, 12.0], [14.0, 16.0]]]
+            )
         )
     )
 
 
 def test_matmul_batched_broadcast_A() raises:
-    var A = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
-    var B = Tensor.d3([[[1.0, 0.0], [0.0, 1.0]], [[2.0, 0.0], [0.0, 2.0]]])
+    var A = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]])
+    var B = Tensor[DType.float32].d3(
+        [[[1.0, 0.0], [0.0, 1.0]], [[2.0, 0.0], [0.0, 2.0]]]
+    )
     var C = A.matmul(B)
     assert_true(
         C.all_close(
-            Tensor.d3([[[1.0, 2.0], [3.0, 4.0]], [[2.0, 4.0], [6.0, 8.0]]])
+            Tensor[DType.float32].d3(
+                [[[1.0, 2.0], [3.0, 4.0]], [[2.0, 4.0], [6.0, 8.0]]]
+            )
         )
     )
 
 
 def test_matmul_batched_3d_input_case() raises:
-    var A = Tensor.d3(
+    var A = Tensor[DType.float32].d3(
         [
             [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
             [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]],
         ]
     )
-    var B = Tensor.d3(
+    var B = Tensor[DType.float32].d3(
         [
             [[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]],
             [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
@@ -574,7 +588,7 @@ def test_matmul_batched_3d_input_case() raises:
     var C = A.matmul(B)
     assert_true(
         C.all_close(
-            Tensor.d3(
+            Tensor[DType.float32].d3(
                 [[[4.0, 5.0], [10.0, 11.0]], [[76.0, 100.0], [103.0, 136.0]]]
             )
         )
@@ -582,32 +596,38 @@ def test_matmul_batched_3d_input_case() raises:
 
 
 def test_matmul_batched_non_contiguous_view_case() raises:
-    var A = Tensor.d3([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
+    var A = Tensor[DType.float32].d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+    )
     # Make a view skipping the first batch
     var A_view = A.view(
         shape=Shape(1, 2, 2), strides=Strides(4, 2, 1), offset=4
     )
-    var B = Tensor.d2([[1.0, 0.0], [0.0, 1.0]])
+    var B = Tensor[DType.float32].d2([[1.0, 0.0], [0.0, 1.0]])
 
     var C = A_view.matmul(B)
-    assert_true(C.all_close(Tensor.d3([[[5.0, 6.0], [7.0, 8.0]]])))
+    assert_true(
+        C.all_close(Tensor[DType.float32].d3([[[5.0, 6.0], [7.0, 8.0]]]))
+    )
 
 
 def test_matmul_batched_result_shape() raises:
-    var A = Tensor.d3([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
-    var B = Tensor.d2([[1.0, 0.0], [0.0, 1.0]])
+    var A = Tensor[DType.float32].d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+    )
+    var B = Tensor[DType.float32].d2([[1.0, 0.0], [0.0, 1.0]])
     var C = A.matmul(B)
     assert_true(C.shape() == Shape(2, 2, 2))
 
 
 def test_matmul_nd_with_higher_dim_batch() raises:
-    var A = Tensor.d4(
+    var A = Tensor[DType.float32].d4(
         [
             [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
             [[[9.0, 10.0], [11.0, 12.0]], [[13.0, 14.0], [15.0, 16.0]]],
         ]
     )
-    var B = Tensor.d2([[1.0, 0.0], [0.0, 1.0]])
+    var B = Tensor[DType.float32].d2([[1.0, 0.0], [0.0, 1.0]])
     var C = A.matmul(B)
     assert_true(C.shape() == Shape(2, 2, 2, 2))
     assert_true(C.all_close(A))  # Identity matrix case

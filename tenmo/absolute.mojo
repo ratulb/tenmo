@@ -1,17 +1,21 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor, ABS_BACKWARD
-from .backpropagation import BackwardFnArg, BACKWARD_ABS
+from .shared.mnemonics import AddTensor, ABS_BACKWARD
+from .backpropagation import BackwardFn, BackwardFnType
+
 from .gradbox import Gradbox
 from .ancestry import Ancestor
 
 
 @fieldwise_init
-struct AbsBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct AbsBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         ref gradbox = output.gradients()
         var parent = output.ancestry().get(0)
@@ -22,8 +26,7 @@ struct AbsBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         parent_ids.append(parent._id)
 
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -43,10 +46,10 @@ struct Absolute[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
-                    BACKWARD_ABS
+                var backwardFn = BackwardFn.null_arg[Self.dtype](
+                    AbsBackward[Self.dtype]()
                 )
-                backwardFnArg.needs_parent_data = True
-                out.add_ancestry(backwardFnArg^, self)
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, self)
 
         return out^

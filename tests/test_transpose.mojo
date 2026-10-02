@@ -1,52 +1,64 @@
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 
 
 def test_2d_transpose_no_axes() raises:
     print("test_2d_transpose_no_axes")
-    var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
     var b = a.transpose()
 
     # Forward pass validation
-    var expected = Tensor.d2([[1.0, 4.0], [2.0, 5.0], [3.0, 6.0]])
+    var expected = Tensor[DType.float32].d2(
+        [[1.0, 4.0], [2.0, 5.0], [3.0, 6.0]]
+    )
     assert_true(b.all_close(expected))
     assert_true(b.shape() == Shape(3, 2))
 
     # Backward pass validation
     var loss = b.sum()
     loss.backward()
-    var expected_grad = Tensor.d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
+    var expected_grad = Tensor[DType.float32].d2(
+        [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]
+    )
     assert_true(a.grad().all_close(expected_grad))
 
 
 def test_2d_transpose_explicit_axes() raises:
     print("test_2d_transpose_explicit_axes")
-    var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
     var b = a.transpose(1, 0)
 
     # Forward pass validation
-    var expected = Tensor.d2([[1.0, 4.0], [2.0, 5.0], [3.0, 6.0]])
+    var expected = Tensor[DType.float32].d2(
+        [[1.0, 4.0], [2.0, 5.0], [3.0, 6.0]]
+    )
     assert_true(b.all_close(expected))
     assert_true(b.shape() == Shape(3, 2))
 
     # Backward pass validation
     var loss = b.sum()
     loss.backward()
-    var expected_grad = Tensor.d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
+    var expected_grad = Tensor[DType.float32].d2(
+        [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]
+    )
     assert_true(a.grad().all_close(expected_grad))
 
 
 def test_3d_transpose_axes_0_1() raises:
     print("test_3d_transpose_axes_0_1")
-    var a = Tensor.d3(
+    var a = Tensor[DType.float32].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
     var b = a.transpose(1, 0)
 
     # Forward pass validation
-    var expected = Tensor.d3(
+    var expected = Tensor[DType.float32].d3(
         [[[1.0, 2.0], [5.0, 6.0]], [[3.0, 4.0], [7.0, 8.0]]]
     )
     assert_true(b.all_close(expected))
@@ -55,7 +67,7 @@ def test_3d_transpose_axes_0_1() raises:
     # Backward pass validation
     var loss = b.sum()
     loss.backward()
-    var expected_grad = Tensor.d3(
+    var expected_grad = Tensor[DType.float32].d3(
         [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]]
     )
     assert_true(a.grad().all_close(expected_grad))
@@ -63,14 +75,14 @@ def test_3d_transpose_axes_0_1() raises:
 
 def test_3d_transpose_axes_1_2() raises:
     print("test_3d_transpose_axes_1_2")
-    var a = Tensor.d3(
+    var a = Tensor[DType.float32].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
     # var b = a.transpose(1, 2)
     var b = a.transpose(2, 1)
 
     # Forward pass validation
-    var expected = Tensor.d3(
+    var expected = Tensor[DType.float32].d3(
         [[[1.0, 3.0], [2.0, 4.0]], [[5.0, 7.0], [6.0, 8.0]]]
     )
     assert_true(b.all_close(expected))
@@ -79,7 +91,7 @@ def test_3d_transpose_axes_1_2() raises:
     # Backward pass validation
     var loss = b.sum()
     loss.backward()
-    var expected_grad = Tensor.d3(
+    var expected_grad = Tensor[DType.float32].d3(
         [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]]
     )
     assert_true(a.grad().all_close(expected_grad))
@@ -87,7 +99,7 @@ def test_3d_transpose_axes_1_2() raises:
 
 def test_4d_transpose_complex_axes() raises:
     print("test_4d_transpose_complex_axes")
-    var a = Tensor.d4(
+    var a = Tensor[DType.float32].d4(
         [
             [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
             [[[9.0, 10.0], [11.0, 12.0]], [[13.0, 14.0], [15.0, 16.0]]],
@@ -102,7 +114,7 @@ def test_4d_transpose_complex_axes() raises:
     # Backward pass validation
     var loss = b.sum()
     loss.backward()
-    var expected_grad = Tensor.d4(
+    var expected_grad = Tensor[DType.float32].d4(
         [
             [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]],
             [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]],
@@ -113,7 +125,9 @@ def test_4d_transpose_complex_axes() raises:
 
 def test_transpose_chain_operations() raises:
     print("test_transpose_chain_operations")
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var b = a.transpose()
     var c = b.transpose()
 
@@ -123,27 +137,31 @@ def test_transpose_chain_operations() raises:
     # Backward pass validation
     var loss = c.sum()
     loss.backward()
-    var expected_grad = Tensor.d2([[1.0, 1.0], [1.0, 1.0]])
+    var expected_grad = Tensor[DType.float32].d2([[1.0, 1.0], [1.0, 1.0]])
     assert_true(a.grad().all_close(expected_grad))
 
 
 def test_transpose_with_matmul() raises:
     print("test_transpose_with_matmul")
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
-    var b = Tensor.d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
+    var a = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
+    var b = Tensor[DType.float32].d2(
+        [[5.0, 6.0], [7.0, 8.0]], requires_grad=True
+    )
 
     var a_t = a.transpose()
     var result = a_t.matmul(b)
 
     # Forward pass validation
-    var expected = Tensor.d2([[26.0, 30.0], [38.0, 44.0]])
+    var expected = Tensor[DType.float32].d2([[26.0, 30.0], [38.0, 44.0]])
     assert_true(result.all_close(expected))
 
     # Backward pass validation
     var loss = result.sum()
     loss.backward()
-    var expected_a_grad = Tensor.d2([[11.0, 11.0], [15.0, 15.0]])
-    var expected_b_grad = Tensor.d2([[3.0, 3.0], [7.0, 7.0]])
+    var expected_a_grad = Tensor[DType.float32].d2([[11.0, 11.0], [15.0, 15.0]])
+    var expected_b_grad = Tensor[DType.float32].d2([[3.0, 3.0], [7.0, 7.0]])
 
     assert_true(a.grad().all_close(expected_a_grad))
     assert_true(b.grad().all_close(expected_b_grad))
@@ -151,7 +169,7 @@ def test_transpose_with_matmul() raises:
 
 def test_transpose_scalar_equivalent() raises:
     print("test_transpose_scalar_equivalent")
-    var a = Tensor.scalar(5.0, requires_grad=True)
+    var a = Tensor[DType.float32].scalar(5.0, requires_grad=True)
     var b = a.transpose()
 
     # Scalar transpose should return same scalar
@@ -165,7 +183,7 @@ def test_transpose_scalar_equivalent() raises:
 
 def test_transpose_1d_no_change() raises:
     print("test_transpose_1d_no_change")
-    var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var a = Tensor[DType.float32].d1([1.0, 2.0, 3.0], requires_grad=True)
     var b = a.transpose()
 
     # 1D transpose should return same tensor
@@ -174,7 +192,7 @@ def test_transpose_1d_no_change() raises:
     # Backward pass
     var loss = b.sum()
     loss.backward()
-    var expected_grad = Tensor.d1([1.0, 1.0, 1.0])
+    var expected_grad = Tensor[DType.float32].d1([1.0, 1.0, 1.0])
     assert_true(a.grad().all_close(expected_grad))
 
 
@@ -885,6 +903,24 @@ def test_trrev_gpu_grad_does_not_accumulate_across_separate_passes() raises:
         loss.backward()
         assert_true(not a.grad().is_on_gpu())
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
+
+
+def test_transpose_get_set_logical_indexing() raises:
+    """Get/set on a transpose view follow logical (C-order) indexing."""
+    print("test_transpose_get_set_logical_indexing")
+
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
+    var t = x.transpose()  # shape (3, 2), logical flat [1, 4, 2, 5, 3, 6]
+    var expected = Tensor[dtype].d1([1, 4, 2, 5, 3, 6])
+    for i in range(6):
+        assert_true(t.get(i) == expected.get(i))
+    assert_true(t.get(-1) == Scalar[dtype](6))
+
+    # Logical (0, 1) of the transpose is parent (1, 0): write-through.
+    t.set(1, Scalar[dtype](40))
+    assert_true(x[1, 0] == Scalar[dtype](40))
+    assert_true(t[0, 1] == Scalar[dtype](40))
 
 
 # ──────────────────────────────────────────────────────────────────────────────

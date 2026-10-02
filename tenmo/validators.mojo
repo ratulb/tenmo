@@ -1,18 +1,9 @@
-from .shapes import Shape
-from .strides import Strides
-from .common_utils import (
-    Slicer,
-    panic,
-    Idx,
-    NewAxis,
-    i,
-    s,
-    il,
-    newaxis,
-    log_warning,
-)
-from .tensor import Tensor
-from .intarray import IntArray
+from .shared.shapes import Shape
+from .shared.strides import Strides
+from .shared.indexhelper import Idx, NewAxis, Slicer, i, il, newaxis, s
+from .shared.logging import log_warning
+from .shared.panic import panic
+from .shared.intarray import IntArray
 
 
 struct Validator:
@@ -62,19 +53,6 @@ struct Validator:
                     " duplicates."
                 )
             seen.append(v)
-
-    @staticmethod
-    def validate_dtype_consistency(
-        dtype: DType, requires_grad: Bool, label: String
-    ):
-        if requires_grad:
-            if not (dtype.is_floating_point()):
-                panic(
-                    "Tensor → "
-                    + label
-                    + " → requires_grad=True is only supported for floating"
-                    " point types. "
-                )
 
     @staticmethod
     def normalize_reduction_axes(shape: Shape, axes: IntArray) -> IntArray:
@@ -206,7 +184,7 @@ struct Validator:
 
         # Add missing axes: insert each missing axis at its own position
         var result = normalized  # Start with specified axes
-        seen = normalized
+        var seen = normalized
         for i in range(rank):
             if i not in seen:
                 result = result.insert(i, i)
@@ -510,19 +488,19 @@ struct Validator:
             Tuple[Shape, Strides, int]: New shape, strides, and offset.
 
         """
-        rank = original_shape.rank()
+        var rank = original_shape.rank()
         if len(slices) != rank:
             panic("Number of slices must match tensor rank")
 
-        new_shape = IntArray.with_capacity(rank)
-        new_strides = IntArray.with_capacity(rank)
-        new_offset = 0
+        var new_shape = IntArray.with_capacity(rank)
+        var new_strides = IntArray.with_capacity(rank)
+        var new_offset = 0
 
         for i in range(rank):
-            axis = original_shape[i]
-            stride = original_strides[i]
+            var axis = original_shape[i]
+            var stride = original_strides[i]
 
-            start, end, step = Slicer.slice(slices[i], axis)
+            var start, end, step = Slicer.slice(slices[i], axis)
 
             # Negative index adjustment
             start = start + axis if start < 0 else start
@@ -533,8 +511,8 @@ struct Validator:
             end = max(0, min(end, axis))
 
             # Calculate length (ceil division)
-            span = end - start
-            length = (span + (step - 1)) // step
+            var span = end - start
+            var length = (span + (step - 1)) // step
 
             new_shape.append(length)
             new_strides.append(stride * step)
@@ -581,10 +559,10 @@ struct Validator:
                 ") mismatch",
             )
 
-        new_shape = IntArray.with_capacity(len(indices))
-        new_strides = IntArray.with_capacity(len(indices))
-        offset = 0
-        dim_counter = 0  # Tracks original tensor dimensions
+        var new_shape = IntArray.with_capacity(len(indices))
+        var new_strides = IntArray.with_capacity(len(indices))
+        var offset = 0
+        var dim_counter = 0  # Tracks original tensor dimensions
 
         for idx in indices:
             if idx.isa[NewAxis]():
@@ -593,9 +571,9 @@ struct Validator:
                 new_strides.append(0)
             elif idx.isa[Int]():
                 # Case 2: Integer indexing (dimension reduction)
-                axis = idx[Int]
-                shape_dim = original_shape[dim_counter]
-                stride_dim = original_strides[dim_counter]
+                var axis = idx[Int]
+                var shape_dim = original_shape[dim_counter]
+                var stride_dim = original_strides[dim_counter]
                 dim_counter += 1
                 if axis < 0:
                     axis += shape_dim
@@ -609,10 +587,10 @@ struct Validator:
                 offset += axis * stride_dim
                 # No shape/strides append (reduces rank)
             elif idx.isa[IntArray]():
-                list = idx[IntArray]
+                var list = idx[IntArray]
                 for t in range(len(list)):
-                    shape_dim = original_shape[dim_counter]
-                    stride_dim = original_strides[dim_counter]
+                    var shape_dim = original_shape[dim_counter]
+                    var stride_dim = original_strides[dim_counter]
                     dim_counter += 1
 
                     var ai = list[t]
@@ -628,14 +606,13 @@ struct Validator:
 
                     offset += ai * stride_dim
                 # Multiple dims consumed; rank reduced by len(list)
-
             elif idx.isa[Slice]():
                 # Case 3: Slicing
-                s = idx[Slice]
-                shape_dim = original_shape[dim_counter]
-                stride_dim = original_strides[dim_counter]
+                var s = idx[Slice]
+                var shape_dim = original_shape[dim_counter]
+                var stride_dim = original_strides[dim_counter]
                 dim_counter += 1
-                start, end, step = Slicer.slice(s, shape_dim)
+                var start, end, step = Slicer.slice(s, shape_dim)
                 if step > 0 and end > start and end < 0:
                     start += shape_dim
                     end += shape_dim
@@ -654,7 +631,100 @@ struct Validator:
                         "]",
                     )
 
-                new_length = (end - start + step - 1) // step
+                var new_length = (end - start + step - 1) // step
+                new_shape.append(new_length)
+                new_strides.append(stride_dim * step)
+                offset += start * stride_dim
+
+        return Shape(new_shape), Strides(new_strides), offset
+
+    @always_inline
+    @staticmethod
+    def validate_and_compute_advanced_indexing_metadata(
+        original_shape: Shape,
+        original_strides: Strides,
+        indices: List[Idx],
+    ) -> Tuple[Shape, Strides, Int]:
+        """
+        Computes view metadata for advanced indexing — List[Idx]-based variant.
+
+        Identical semantics to the VariadicList[Idx] overload; used by the
+        Python bindings to pass a runtime-determined lane list.
+        """
+        # Validate rank vs non-newaxis indices count
+        # Count required rank: Int contributes 1; Slice contributes 1; NewAxis contributes 0
+        var required_rank = 0
+
+        for idx in indices:
+            if idx.isa[NewAxis]():
+                continue
+            elif idx.isa[Int]():
+                required_rank += 1
+            elif idx.isa[Slice]():
+                required_rank += 1
+
+        if required_rank != original_shape.rank():
+            panic(
+                "Tensor indexing: axes count(",
+                String(original_shape.rank()),
+                ") and non-newaxis indices count(",
+                String(required_rank),
+                ") mismatch",
+            )
+
+        var new_shape = IntArray.with_capacity(len(indices))
+        var new_strides = IntArray.with_capacity(len(indices))
+        var offset = 0
+        var dim_counter = 0  # Tracks original tensor dimensions
+
+        for idx in indices:
+            if idx.isa[NewAxis]():
+                # Case 1: NewAxis insertion
+                new_shape.append(1)
+                new_strides.append(0)
+            elif idx.isa[Int]():
+                # Case 2: Integer indexing (dimension reduction)
+                var axis = idx[Int]
+                var shape_dim = original_shape[dim_counter]
+                var stride_dim = original_strides[dim_counter]
+                dim_counter += 1
+                if axis < 0:
+                    axis += shape_dim
+                if not 0 <= axis < shape_dim:
+                    panic(
+                        "Index",
+                        String(axis),
+                        "out of bounds for dimension",
+                        String(shape_dim),
+                    )
+                offset += axis * stride_dim
+                # No shape/strides append (reduces rank)
+            elif idx.isa[Slice]():
+                # Case 3: Slicing
+                var s = idx[Slice]
+                var shape_dim = original_shape[dim_counter]
+                var stride_dim = original_strides[dim_counter]
+                dim_counter += 1
+                var start, end, step = Slicer.slice(s, shape_dim)
+                if step > 0 and end > start and end < 0:
+                    start += shape_dim
+                    end += shape_dim
+                start = max(0, min(start, shape_dim))
+                end = max(0, min(end, shape_dim))
+                if step == 0:
+                    panic("Slice step cannot be zero")
+                if (step > 0 and start >= end) or (step < 0 and start <= end):
+                    panic(
+                        "Invalid slice range [",
+                        String(start),
+                        ":",
+                        String(end),
+                        ":",
+                        String(step),
+                        "]",
+                    )
+
+                var new_length = (end - start + step - 1) // step
                 new_shape.append(new_length)
                 new_strides.append(stride_dim * step)
                 offset += start * stride_dim
@@ -676,18 +746,18 @@ struct Validator:
         Precondition: All shape dimensions are >= 1 (enforced by Shape constructor).
         """
 
-        # --- 1. Validate offset ---
+        # 1. Validate offset
         if offset < 0 or offset >= storage_size:
             print("Offset validation failed:")
             print("  Storage size:", storage_size)
             print("  Offset:", offset)
             panic("Tensor → view: offset out of storage bounds")
 
-        # --- 2. Validate stride rank ---
+        # 2. Validate stride rank
         if shape.rank() != len(strides):
             panic("Tensor → view: stride rank mismatch with shape rank")
 
-        # --- 3. Validate strides & compute memory range ---
+        # 3. Validate strides & compute memory range
         var min_index = offset
         var max_index = offset
 
@@ -711,7 +781,7 @@ struct Validator:
             else:
                 min_index += span
 
-        # --- 4. Validate against storage ---
+        # 4. Validate against storage
         if min_index < 0 or max_index >= storage_size:
             print("Strides validation failed:")
             print("  Storage size:", storage_size)
@@ -722,7 +792,7 @@ struct Validator:
             print("  Max index:", max_index)
             panic("Tensor → view: strides access out of bounds")
 
-        # --- 5. Check for self-overlapping layout ---
+        # 5. Check for self-overlapping layout
         if not Self.is_non_overlapping(shape, strides):
             log_warning("Tensor → view: self-overlapping layout detected")
             log_warning("  Shape:", String(shape))
@@ -734,7 +804,7 @@ struct Validator:
     @always_inline
     def is_non_overlapping(shape: Shape, strides: Strides) -> Bool:
         """Check if view has self-overlapping positions."""
-        rank = shape.rank()
+        var rank = shape.rank()
         if rank == 0:
             return True
 
@@ -745,10 +815,10 @@ struct Validator:
         # Sort by stride ascending
         def comp_fn(
             pair_a: Tuple[Int, Int], pair_b: Tuple[Int, Int]
-        ) capturing -> Bool:
+        ) {imm} -> Bool:
             return pair_a[0] < pair_b[0]
 
-        sort[comp_fn](pairs)  # Sort by stride ascending
+        sort(pairs, comp_fn)  # Sort by stride ascending
 
         var required_stride = 1
         for abs_stride, dim in pairs:

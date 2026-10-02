@@ -1,7 +1,7 @@
 from .tensor import Tensor
-from .intarray import IntArray
-from .common_utils import panic
-from .tiles import TileBackward, Tile
+from .shared.intarray import IntArray
+from .shared.panic import panic
+from .tiles import Tile
 
 
 @fieldwise_init
@@ -10,7 +10,7 @@ struct Repeat[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     def forward[
         track_grad: Bool = True
     ](
-        mut self: Tensor[Self.dtype],
+        self: Tensor[Self.dtype],
         repeat: IntArray,
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,

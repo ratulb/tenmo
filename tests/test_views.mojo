@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
-from tenmo.strides import Strides
+from tenmo.shared.shapes import Shape
+from tenmo.shared.strides import Strides
 from std.testing import (
     assert_true,
     assert_false,
@@ -8,7 +8,7 @@ from std.testing import (
     assert_equal,
     TestSuite,
 )
-from tenmo.common_utils import i, newaxis, s
+from tenmo.shared.indexhelper import i, newaxis, s
 
 
 def main() raises:
@@ -22,7 +22,7 @@ def test_slice_every_second_row_column1() raises:
     var v = r[s(None, None, 2), i(1)]  # Select col 1 of rows 0, 2, 4
     var loss = v.sum()
     loss.backward()
-    grad = a.grad().copy()
+    var grad = a.grad().clone()
     assert_true(grad.shape() == a.shape())
     assert_true(grad[1] == 1)  # r[0,1]
     assert_true(grad[7] == 1)  # r[2,1]
@@ -46,7 +46,6 @@ def test_permute_backward() raises:
 
 
 def test_tensor_permute_flatten_backprop() raises:
-
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(12, requires_grad=True)  # shape: [0..11]
     var v = a.view([3, 4])
@@ -90,7 +89,7 @@ def test_strided_view_chain_2d_to_3d() raises:
     var v2 = v1.view([5, 2, 3])
     var v3 = v2.view([30])
     v3.backward()
-    expected = Tensor[dtype].ones_like(a)
+    var expected = Tensor[dtype].ones_like(a)
     for i in range(30, 60):
         expected[i] = 0
     assert_true((a.grad() == expected))
@@ -160,7 +159,7 @@ def _large_stride_out_of_bounds() raises:
     var shape = Shape(2, 2)
     var strides = Strides(5, 5)
     with assert_raises():
-        _ = t.view(shape, strides)  # max_index = 5 + 5 = 10
+        _ = t.view(shape, strides)  # max_storage_index = 5 + 5 = 10
 
 
 def _invalid_offset() raises:
@@ -180,7 +179,7 @@ def _invalid_stride_overflow() raises:
     var _shape = Shape(2, 2)
     var strides = Strides(4, 3)  # Last access: 0 + (1)*4 + (1)*3 = 7
     # Now bump shape to (2, 3)
-    shape = Shape(2, 3)
+    var shape = Shape(2, 3)
     with assert_raises():
         _ = t.view(shape, strides)  # Accesses up to 0 + 4 + 6 = 10  (== numels)
 
@@ -232,7 +231,7 @@ def test_view_offset_max_boundary() raises:
 def test_view_2d_strides_valid() raises:
     comptime dtype = DType.float32
     var t = Tensor[dtype].arange(12)
-    r = t.reshape(Shape(3, 4))  # 3x4 tensor
+    var r = t.reshape(Shape(3, 4))  # 3x4 tensor
     var shape = Shape(2, 2)
     var strides = Strides(4, 1)  # row-major
     var offset = 4  # starts at row 1, col 0
@@ -257,7 +256,7 @@ def _view_2d_strides_overflow() raises:
 def test_view_3d_valid() raises:
     comptime dtype = DType.float32
     var t = Tensor[dtype].arange(60)
-    r = t.reshape(Shape(3, 4, 5))  # 3x4x5
+    var r = t.reshape(Shape(3, 4, 5))  # 3x4x5
     var shape = Shape(2, 2, 2)
     var strides = Strides(20, 5, 1)  # default strides for 3D contiguous
     var offset = 0
@@ -269,12 +268,12 @@ def test_view_3d_valid() raises:
 def _view_3d_invalid_strides() raises:
     comptime dtype = DType.float32
     var t = Tensor[dtype].arange(60)
-    r = t.reshape(Shape(3, 4, 5))
+    var r = t.reshape(Shape(3, 4, 5))
     var shape = Shape(2, 2, 2)
     var _strides = Strides(40, 6, 3)  # artificially large strides
     var offset = 10
 
-    # max_index = 10 + (2-1)*40 + (2-1)*6 + (2-1)*3 = 10 + 40 + 6 + 3 = 59 ✅
+    # max_storage_index = 10 + (2-1)*40 + (2-1)*6 + (2-1)*3 = 10 + 40 + 6 + 3 = 59 ✅
     # → Still valid! So tweak one stride...
 
     var strides2 = Strides(41, 6, 3)  # now exceeds
@@ -358,8 +357,8 @@ def test_view_identity() raises:
 
 
 def test_view_stride_bounds_overflow() raises:
-    # max_index = offset + ∑ (shape[i] - 1) * strides[i]
-    # For single dimension max_index = offset + (shape[0] - 1) * strides[0]
+    # max_storage_index = offset + ∑ (shape[i] - 1) * strides[i]
+    # For single dimension max_storage_index = offset + (shape[0] - 1) * strides[0]
     comptime dtype = DType.float32
     var t = Tensor[dtype].d1([1, 2, 3, 4])
     var shape = Shape(2)
@@ -371,9 +370,9 @@ def test_view_stride_bounds_overflow() raises:
 
 def test_getitem_list_empty_indices_returns_full_view() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+    var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     # v = a.__getitem__(List[Int]())
-    v = a[:, :]
+    var v = a[:, :]
     assert_true(v.shape() == a.shape())
     assert_true(v.offset() == 0)
     assert_true(v.all_close(a))
@@ -386,7 +385,13 @@ def test_into_tensor_full_view_copy() raises:
     var v = t.view(Shape(2, 2))
     var out = v.contiguous()
     assert_true(out.all_close(t))
-    assert_false(out.buffer is t.buffer)  # Ensure deep copy
+    # owned=True (default) ALWAYS materialises, even for layout no-ops.
+    assert_false(out.buffer is t.buffer)
+    out.buffer.data_buffer()[0] = 99.0
+    assert_true(t.buffer.data_buffer()[0] == 1.0)  # parent unaffected
+    # owned=False keeps the fast path: alias when already contiguous+shared.
+    var alias = v.contiguous(owned=False)
+    assert_true(alias.buffer is t.buffer)
 
 
 def test_into_tensor_transposed_view() raises:
@@ -441,7 +446,7 @@ def test_into_tensor_grad_flag_false() raises:
 
 def test_into_tensor_large_contiguous_copy() raises:
     comptime dtype = DType.float32
-    N = 1024 * 1024
+    var N = 1024 * 1024
     var t = Tensor[dtype].zeros(Shape(N))
     for i in range(N):
         t[i] = Float32(i)
@@ -453,68 +458,71 @@ def test_into_tensor_large_contiguous_copy() raises:
 
 def test_into_tensor_isolated_memory() raises:
     comptime dtype = DType.float32
-    t = Tensor[dtype].d1([1, 2, 3, 4])
-    v = t[1:3]  # [2, 3]
+    var t = Tensor[dtype].d1([1, 2, 3, 4])
+    var v = t[1:3]  # [2, 3]
     var out = v.contiguous()
     v[0] = 999
 
     assert_true(
         out.all_close(Tensor[dtype].d1([2, 3]))
     )  # Unaffected by view mutation
-    _ = """def test_into_tensor_strided_view_rows() raises:
+
+def test_into_tensor_strided_view_rows() raises:
+    comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6], [7, 8]])
-    var v = t.slice_rows(0, 4, 2)  # Should give rows [0, 2]
+    var v = t.slice(0, 4, 2)  # Should give rows [0, 2]
     var out = v.contiguous()
     assert_true(out.all_close(Tensor[dtype].d2([[1, 2], [5, 6]])))
 
 def test_into_tensor_contiguous_slice_1d() raises:
+    comptime dtype = DType.float32
     var t = Tensor[dtype].d1([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     var v = t.slice(2, 7)
     var out = v.contiguous()
     assert_true(out.all_close(Tensor[dtype].d1([2, 3, 4, 5, 6])))
 
 
-
 def test_into_tensor_nested_view() raises:
+    comptime dtype = DType.float32
     var t = Tensor[dtype].d1([10, 20, 30, 40, 50])
     var v1 = t.slice(1, 5)           # [20, 30, 40, 50]
     var v2 = v1.slice(1, 3)          # [30, 40]
     var out = v2.contiguous()
-    assert_true(out.all_close(Tensor[dtype].d1([30, 40])))"""
+    assert_true(out.all_close(Tensor[dtype].d1([30, 40])))
 
 
 def test_backward_through_nested_views_non_contiguous() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].rand(Shape(4, 4), requires_grad=True)
-    t = a.transpose(0, 1)
-    p = t.permute([1, 0])
-    c = p.contiguous()
-    s = c.sum()
+    var a = Tensor[dtype].rand(Shape(4, 4), requires_grad=True)
+    var t = a.transpose(0, 1)
+    var p = t.permute([1, 0])
+    var c = p.contiguous()
+    var s = c.sum()
     s.backward(42)
     assert_true(Strides.default(a.grad().shape()) == Strides.default(a.shape()))
     assert_true(
-        # (a.grad() == Tensor[dtype].full(Shape([4, 4]), 42)),
-        a.grad().all_close(Tensor[dtype].full(Shape([4, 4]), 42)),
+        # (a.grad() == Tensor[dtype].full(Shape(4, 4), 42)),
+        a.grad().all_close(Tensor[dtype].full(Shape(4, 4), 42)),
         "grad propagation through contiguous failed",
     )
 
 
 def test_identity_permutation() raises:
     comptime dtype = DType.float32
-    x3 = Tensor[dtype].rand(Shape(3, 3), requires_grad=True)
-    v3 = x3.into_view()
-    y3 = v3.permute([0, 1])
-    loss3 = y3.sum()
+    var x3 = Tensor[dtype].rand(Shape(3, 3), requires_grad=True)
+    var v3 = x3.into_view()
+    var y3 = v3.permute([0, 1])
+    var loss3 = y3.sum()
     loss3.backward()
     assert_true(x3.grad().all_close(Tensor[dtype].ones(3, 3)))
 
 
 def test_reshape_slice_sum_backward() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].arange(15, requires_grad=True)
-    r = a.reshape(5, 3)
-    v = r[1:4:2, :]
-    s = v.sum()
+    var a = Tensor[dtype].arange(15, requires_grad=True)
+    var r = a.reshape(5, 3)
+    var v = r[1:4:2, :]
+    var s = v.sum()
     s.backward()
     assert_true(
         (
@@ -547,20 +555,20 @@ def test_reshape_slice_sum_backward() raises:
 def test_backward_through_nested_views() raises:
     comptime dtype = DType.float32
     # Test 1: Simple 2D transpose
-    x1 = Tensor[dtype].rand(Shape(2, 3), requires_grad=True)
-    v1 = x1.into_view()
-    y1 = v1.permute([1, 0])
-    yt1 = y1.contiguous()
-    loss1 = yt1.sum()
+    var x1 = Tensor[dtype].rand(Shape(2, 3), requires_grad=True)
+    var v1 = x1.into_view()
+    var y1 = v1.permute([1, 0])
+    var yt1 = y1.contiguous()
+    var loss1 = yt1.sum()
 
     loss1.backward()
     assert_true(x1.grad().shape() == [2, 3])
     # Test 2: 3D permutation
-    x2 = Tensor[dtype].rand(Shape(4, 5, 6), requires_grad=True)
-    v2 = x2.into_view()
-    y2 = v2.permute([2, 0, 1])
-    yt2 = y2.contiguous()
-    loss2 = yt2.sum()
+    var x2 = Tensor[dtype].rand(Shape(4, 5, 6), requires_grad=True)
+    var v2 = x2.into_view()
+    var y2 = v2.permute([2, 0, 1])
+    var yt2 = y2.contiguous()
+    var loss2 = yt2.sum()
 
     loss2.backward()
     assert_true(x2.grad().shape() == [4, 5, 6])
@@ -631,7 +639,7 @@ def test_nested_views_grad_propagation() raises:
     LOSS.backward()
 
     # Step 6: Validate grad mapping
-    var grad = A.grad().copy()
+    var grad = A.grad().clone()
 
     var total_nonzero = 0
     var total_zero = 0
@@ -659,7 +667,7 @@ def test_nested_views_grad_propagation() raises:
 def test_edge_case_indexing() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(6)
-    r = a.reshape([2, 3])
+    var r = a.reshape([2, 3])
 
     # Empty slice
     var empty = r[0:1, :]
@@ -676,7 +684,7 @@ def test_edge_case_indexing() raises:
 def _mixed_indexing() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(12, requires_grad=True)
-    r = a.reshape([3, 4])
+    var r = a.reshape([3, 4])
 
     # Mixed int/slice/newaxis
     var v = r[i(1), newaxis, s(0, 4, 2)]
@@ -684,7 +692,7 @@ def _mixed_indexing() raises:
     assert_true((v == Tensor[dtype].d2([[4, 6]])))
 
     # Gradient check
-    z = v.contiguous()
+    var z = v.contiguous()
     var s = z.sum()
     s.backward()
     var expected_grad = Tensor[dtype].zeros([3, 4])
@@ -708,7 +716,7 @@ def _newaxis_dimension_insertion() raises:
     assert_true((v2 == Tensor[dtype].d2([[1], [2], [3]])))
 
     # Gradient check
-    b = v2.contiguous()
+    var b = v2.contiguous()
     var s = b.sum()
     s.backward()
     assert_true((a.grad() == Tensor[dtype].d1([1, 1, 1])))
@@ -717,10 +725,10 @@ def _newaxis_dimension_insertion() raises:
 def test_basic_slicing() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(6, requires_grad=True)
-    r = a.reshape([2, 3])
+    var r = a.reshape([2, 3])
     # Gradient check
     var y = r[0:1, 1:3]
-    ss = y.sum()
+    var ss = y.sum()
     ss.backward()
 
     var expected_grad = Tensor[dtype].d1([0, 1, 1, 0, 0, 0])
@@ -737,14 +745,14 @@ def test_basic_slicing() raises:
 
     # Column slice with step
     var col_step = r[s(), s(0, 3, 2)]
-    expect = Tensor[dtype].d2([[0, 2], [3, 5]])
+    var expect = Tensor[dtype].d2([[0, 2], [3, 5]])
     assert_true((col_step == expect))
 
 
 def test_integer_indexing() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(6, requires_grad=True)
-    r = a.reshape(2, 3)
+    var r = a.reshape(2, 3)
 
     # Value checks
     assert_true(r[1, 2] == 5)  # Last element
@@ -761,20 +769,20 @@ def test_integer_indexing() raises:
 
 def _newaxis() raises:
     comptime dtype = DType.float32
-    x = Tensor[dtype].d1([1, 2, 3], requires_grad=True)
-    y = x[newaxis, s(), newaxis]
-    a = y.contiguous()
-    b = a * 2
+    var x = Tensor[dtype].d1([1, 2, 3], requires_grad=True)
+    var y = x[newaxis, s(), newaxis]
+    var a = y.contiguous()
+    var b = a * 2
     b.backward()
     assert_true((x.grad() == Tensor[dtype].d1([2, 2, 2])))
 
 
 def test_scalar_view() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].scalar(10, requires_grad=True)
-    v = a.into_view()
-    t = v.contiguous()
-    s = t * 2
+    var a = Tensor[dtype].scalar(10, requires_grad=True)
+    var v = a.into_view()
+    var t = v.contiguous()
+    var s = t * 2
     s.backward(42)
     assert_true(a.grad().item() == 84, "Scalar view grad assertion failed")
 

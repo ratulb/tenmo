@@ -1,6 +1,6 @@
 from std.time import perf_counter_ns
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 
 
 def measure(ns: UInt) -> Float64:
@@ -11,12 +11,12 @@ def measure(ns: UInt) -> Float64:
 def bench_create_gradbox():
     comptime dtype = DType.float32
     var sizes = List[Shape]()
-    sizes.append(Shape([64]))
-    sizes.append(Shape([256]))
-    sizes.append(Shape([1024]))
-    sizes.append(Shape([4096]))
-    sizes.append(Shape([128, 128]))
-    sizes.append(Shape([256, 256]))
+    sizes.append(Shape(64))
+    sizes.append(Shape(256))
+    sizes.append(Shape(1024))
+    sizes.append(Shape(4096))
+    sizes.append(Shape(128, 128))
+    sizes.append(Shape(256, 256))
 
     print("\n── Benchmark 1: Tensor creation with requires_grad ──")
     print("Shape                Total (ms)    Avg (ms)")
@@ -58,8 +58,8 @@ def bench_forward_graph():
 
         var t0 = perf_counter_ns()
         for _ in range(num_iters):
-            var a = Tensor[dtype](Shape([32]), requires_grad=True)
-            var b = Tensor[dtype](Shape([32]), requires_grad=True)
+            var a = Tensor[dtype](Shape(32), requires_grad=True)
+            var b = Tensor[dtype](Shape(32), requires_grad=True)
             for _ in range(depth):
                 a = a + b
         var t1 = perf_counter_ns()
@@ -87,8 +87,8 @@ def bench_backward():
 
         var t0 = perf_counter_ns()
         for _ in range(num_iters):
-            var a = Tensor[dtype](Shape([32]), requires_grad=True)
-            var b = Tensor[dtype](Shape([32]), requires_grad=True)
+            var a = Tensor[dtype](Shape(32), requires_grad=True)
+            var b = Tensor[dtype](Shape(32), requires_grad=True)
             var out = a + b
             for _ in range(depth - 1):
                 out = out + b
@@ -104,9 +104,9 @@ def bench_backward():
 def bench_full_pipeline():
     comptime dtype = DType.float32
     var sizes = List[Shape]()
-    sizes.append(Shape([16]))
-    sizes.append(Shape([64]))
-    sizes.append(Shape([256]))
+    sizes.append(Shape(16))
+    sizes.append(Shape(64))
+    sizes.append(Shape(256))
 
     print("\n── Benchmark 4: Full pipeline (create + forward + backward) ──")
     print("Shape       Total (ms)    Avg (ms)")
@@ -151,10 +151,10 @@ def bench_fanout():
 
         var t0 = perf_counter_ns()
         for _ in range(num_iters):
-            var root = Tensor[dtype](Shape([16]), requires_grad=True)
+            var root = Tensor[dtype](Shape(16), requires_grad=True)
             var outs = List[Tensor[dtype]]()
             for _ in range(n):
-                var leaf = Tensor[dtype](Shape([16]), requires_grad=True)
+                var leaf = Tensor[dtype](Shape(16), requires_grad=True)
                 outs.append(root + leaf)
             var sum_outs = outs[0]
             var i = 1
@@ -169,22 +169,30 @@ def bench_fanout():
         print(String(n), "          ", total_ms, "       ", avg_ms)
 
 
-# ── Benchmark 6: Gradbox alloc/free churn ──────────────────────────────────
+# ── Benchmark 6: Gradbox alloc/unsafe_free churn ──────────────────────────────────
 def bench_gradbox_churn():
     comptime dtype = DType.float32
     var num_iters = 100000
 
-    print("\n── Benchmark 6: Gradbox alloc/free churn ──")
+    print("\n── Benchmark 6: Gradbox alloc/unsafe_free churn ──")
     var t0 = perf_counter_ns()
     for _ in range(num_iters):
-        var a = Tensor[dtype](Shape([64]), requires_grad=True)
-        var b = Tensor[dtype](Shape([64]), requires_grad=False)
+        var a = Tensor[dtype](Shape(64), requires_grad=True)
+        var b = Tensor[dtype](Shape(64), requires_grad=False)
         _ = a.shape()
         _ = b.shape()
     var t1 = perf_counter_ns()
     var total_ms = measure(t1 - t0)
     var avg_ms = total_ms / Float64(num_iters)
-    print("  ", String(num_iters), "iterations: ", total_ms, " ms total, ", avg_ms, " ms avg")
+    print(
+        "  ",
+        String(num_iters),
+        "iterations: ",
+        total_ms,
+        " ms total, ",
+        avg_ms,
+        " ms avg",
+    )
 
 
 # ── Main ────────────────────────────────────────────────────────────────────

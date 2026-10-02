@@ -21,3 +21,13 @@ tests/test_cpu_all_[0-9]*.mojo
 tests/test_cpu_all.mojo
 tests/test_gpu_all_[0-9]*.mojo
 tests/test_gpu_all.mojo
+working/
+nanogpt/
+tests/tenmo.mojoc
+*.swp
+
+# python binding build artifact
+python-binding/_tenmo.so
+
+# generated docs (pixi run docs-build)
+target/

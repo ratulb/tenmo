@@ -18,8 +18,9 @@ from std.testing import (
 from std.math import sqrt
 from std.random import random_float64
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
-from tenmo.common_utils import isnan, isinf
+from tenmo.shared.shapes import Shape
+from tenmo.shared.strides import Strides
+from std.utils.numerics import isinf, isnan
 from tenmo.gradbox import Gradbox
 
 
@@ -438,7 +439,7 @@ def test_large_batch() raises:
 
 def test_pytorch_comparison() raises:
     """
-    Generate same random values and compare against PyTorch.
+        Generate same random values and compare against PyTorch.
     This test would need PyTorch integration to run.
     """
     print("=" * 80)
@@ -487,9 +488,9 @@ def test_pytorch_comparison() raises:
 
     result.backward()
     comptime dtype = DType.float32
-    A_grad_expected = Tensor[dtype].d2([[10.0, 26.0, 42.0], [10.0, 26.0, 42.0]])
+    var A_grad_expected = Tensor[dtype].d2([[10.0, 26.0, 42.0], [10.0, 26.0, 42.0]])
     assert_true(A.grad() == A_grad_expected)
-    B_grad_expected = Tensor[dtype].d3(
+    var B_grad_expected = Tensor[dtype].d3(
         [[[5.0, 5.0, 5.0, 5.0], [7.0, 7.0, 7.0, 7.0], [9.0, 9.0, 9.0, 9.0]]]
     )
     assert_true(B.grad() == B_grad_expected)
@@ -561,6 +562,281 @@ def test_non_contiguous_gradients() raises:
                 assert_false(isinf(grad_A[i, j, k]), "grad_A contains Inf")
 
     print("Gradients computed correctly for non-contiguous patterns")
+    print()
+
+
+def test_strided_b_wide_p() raises:
+    """Strided-B (transpose-view) matmul with p > TILE_P.
+
+    Regression test: MmCpuNd's pack+SIMD fallback dropped the outer j-tile
+    origin, so every j-tile stored to C-columns [0, jlen) — overwriting
+    earlier tiles and leaving columns past the first tile zero. Any
+    strided-B matmul with p > 64 silently corrupted (forward), which broke
+    every matmul backward dL/dA = grad_out @ B^T at width (backward always
+    multiplies by a transposed view). Shapes here use p=512 (TILE_P selects
+    256 → two j-tiles); p<=TILE_P fits one tile and stays clean, which is
+    why small-dim suites never caught it. Pre-fix the forward max-diff is
+    O(10) and the input grad is ~2x off.
+    """
+    print("=" * 80)
+    print("Test 14: Strided-B Wide-p Forward + Backward")
+    print("=" * 80)
+
+    var X = Tensor[DType.float32].randn(2, 4, 32, init_seed=7)
+    var W = Tensor[DType.float32].randn(512, 32, init_seed=8)
+
+    # --- Forward: transpose-view must match materialized copy exactly ---
+    var w_view = W.transpose[track_grad=False](sync=True)
+    var y_view = matmul[track_grad=False](X, w_view)
+    var w_contig = W.transpose[track_grad=False](sync=True).contiguous[
+        track_grad=False
+    ](sync=True)
+    var y_ref = matmul[track_grad=False](X, w_contig)
+
+    var max_diff: Float32 = 0.0
+    for i in range(y_view.num_elements()):
+        var d = abs(y_view.get(i) - y_ref.get(i))
+        if d > max_diff:
+            max_diff = d
+    print("  strided-vs-contiguous max abs diff:", max_diff)
+    assert_true(max_diff < 1e-4, "strided-B forward disagrees with contiguous")
+
+    # --- Backward: dX through the strided view vs finite differences ---
+    var Xs = Tensor[DType.float32].randn(2, 4, 32, init_seed=7)
+    Xs.requires_grad_(True)
+    var Ws = Tensor[DType.float32].randn(512, 32, init_seed=8)
+    var w_tracked = Ws.transpose[track_grad=True](sync=True)
+    var y = matmul(Xs, w_tracked)
+    y.backward(Tensor[DType.float32].ones(2, 4, 512))
+    var analytical_grad = Xs.grad()[0, 0, 0]
+
+    var epsilon = Scalar[DType.float32](1e-2)
+    var original = Xs[0, 0, 0]
+    Xs[0, 0, 0] = original + epsilon
+    var w_frozen = Ws.transpose[track_grad=False](sync=True)
+    var plus = Float64(
+        matmul[track_grad=False](Xs, w_frozen).sum().item()
+    )
+    Xs[0, 0, 0] = original - epsilon
+    var minus = Float64(
+        matmul[track_grad=False](Xs, w_frozen).sum().item()
+    )
+    Xs[0, 0, 0] = original
+    var numerical_grad = (plus - minus) / (2.0 * Float64(epsilon))
+
+    var rel_err = abs(Float64(analytical_grad) - numerical_grad) / (
+        abs(numerical_grad) + 1e-8
+    )
+    print("  dX analytic:", analytical_grad, " fd:", numerical_grad)
+    assert_true(rel_err < 1e-3, "strided-B backward gradient mismatch")
+    print("Strided-B wide-p forward + backward correct")
+    print()
+
+
+def test_matmul_scalar_times_matrix() raises:
+    comptime dtype = DType.float32
+    # Audit item 17: lone-scalar generosity (mirrors dot) — scalar scales
+    # instead of panicking in classify_matmul. dL/dM = s·up, dL/ds = sum(M).
+    var s = Tensor[dtype].scalar(2.0, requires_grad=True)
+    var m = Tensor[dtype].ones(Shape(2, 3), requires_grad=True)
+    var c = s.matmul(m)
+    assert_true(c.shape() == Shape(2, 3))
+    assert_true(c == Tensor[dtype].ones(Shape(2, 3)) * 2.0)
+    var loss = c.sum()
+    loss.backward()
+    assert_true(m.grad() == Tensor[dtype].ones(Shape(2, 3)) * 2.0)
+    assert_true(s.grad().item() == 6.0)
+
+
+def test_matmul_matrix_times_scalar() raises:
+    comptime dtype = DType.float32
+    var m = Tensor[dtype].ones(Shape(2, 3), requires_grad=True)
+    var s = Tensor[dtype].scalar(2.0, requires_grad=True)
+    var c = m.matmul(s)
+    assert_true(c.shape() == Shape(2, 3))
+    assert_true(c == Tensor[dtype].ones(Shape(2, 3)) * 2.0)
+    var loss = c.sum()
+    loss.backward()
+    assert_true(m.grad() == Tensor[dtype].ones(Shape(2, 3)) * 2.0)
+    assert_true(s.grad().item() == 6.0)
+
+
+def test_matmul_scalar_times_scalar_still_dot() raises:
+    comptime dtype = DType.float32
+    # Both-scalar keeps the pre-existing dot routing (value + grads).
+    var a = Tensor[dtype].scalar(3.0, requires_grad=True)
+    var b = Tensor[dtype].scalar(4.0, requires_grad=True)
+    var c = a.matmul(b)
+    assert_true(c.shape() == Shape())
+    assert_true(c.item() == 12.0)
+    var loss = c.sum()
+    loss.backward()
+    assert_true(a.grad().item() == 4.0)
+    assert_true(b.grad().item() == 3.0)
+
+
+def _strided_b_forward_oracle(
+    name: String, A: Tensor[DType.float32], B_view: Tensor[DType.float32]
+) raises:
+    """Panel-pack gate: strided-B (Path 2) must match contiguous-B (Path 1).
+
+    Packing may change; math may not. Reports max abs diff plus the
+    exact-zero rate (same kernel and summation order should agree
+    bit-for-bit on most elements). Copies below are refcount aliases
+    (cheap) — they exist only to give the `mut`-param `matmul` helper
+    named/cloneable operands without moving the caller's bindings.
+    """
+    var Aa = A
+    var Ab = A
+    var Bv = B_view
+    var Bc = B_view.contiguous[track_grad=False](sync=True)
+    var y_view = matmul[track_grad=False](Aa, Bv)
+    var y_ref = matmul[track_grad=False](Ab, Bc)
+    assert_equal(y_view.num_elements(), y_ref.num_elements())
+    var max_diff: Float32 = 0.0
+    var exact = 0
+    for i in range(y_view.num_elements()):
+        var d = abs(y_view.get(i) - y_ref.get(i))
+        if d > max_diff:
+            max_diff = d
+        if d == 0.0:
+            exact += 1
+    print(
+        "  ",
+        name,
+        "max abs diff:",
+        max_diff,
+        " exact:",
+        exact,
+        "/",
+        y_view.num_elements(),
+    )
+    assert_true(
+        max_diff < 1e-4, name + ": strided-B disagrees with contiguous"
+    )
+
+
+def test_strided_b_panel_scores() raises:
+    """Attention scores shape: (2,8,128,32) @ (2,8,32,128) permute-view."""
+    print("=" * 80)
+    print("Test 15: Strided-B Panel Scores (attention q_h @ k_h)")
+    print("=" * 80)
+    var A = Tensor[DType.float32].randn(2, 8, 128, 32, init_seed=7)
+    var Bbase = Tensor[DType.float32].randn(2, 8, 128, 32, init_seed=8)
+    var Bv = Bbase.transpose[track_grad=False]([0, 1, 3, 2], sync=True)
+    assert_false(Bv.is_contiguous(), "fixture must be strided-B")
+    _strided_b_forward_oracle("scores", A, Bv)
+    print()
+
+
+def test_strided_b_panel_out() raises:
+    """Attention out shape: (2,8,128,128) @ (2,8,128,32) view, p=32.
+
+    Must-not-regress guard for the adaptive rule: single-j-tile shapes
+    keep today's path, so this locks their numerics.
+    """
+    print("=" * 80)
+    print("Test 16: Strided-B Panel Out (attention attn @ v_h)")
+    print("=" * 80)
+    var A = Tensor[DType.float32].randn(2, 8, 128, 128, init_seed=7)
+    var Bbase = Tensor[DType.float32].randn(2, 8, 32, 128, init_seed=8)
+    var Bv = Bbase.transpose[track_grad=False]([0, 1, 3, 2], sync=True)
+    assert_false(Bv.is_contiguous(), "fixture must be strided-B")
+    _strided_b_forward_oracle("out", A, Bv)
+    print()
+
+
+def test_strided_b_panel_tails() raises:
+    """Remainder tiles: m=40, n=48, p=70 (tails in all three dims)."""
+    print("=" * 80)
+    print("Test 17: Strided-B Panel Tails")
+    print("=" * 80)
+    var A = Tensor[DType.float32].randn(2, 40, 48, init_seed=7)
+    var W = Tensor[DType.float32].randn(70, 48, init_seed=8)
+    var Bv = W.transpose[track_grad=False](sync=True)
+    assert_false(Bv.is_contiguous(), "fixture must be strided-B")
+    _strided_b_forward_oracle("tails", A, Bv)
+    print()
+
+
+def test_strided_b_panel_broadcast() raises:
+    """Rank-4 A with rank-2 B broadcast over the batch dims."""
+    print("=" * 80)
+    print("Test 18: Strided-B Panel Batch Broadcast")
+    print("=" * 80)
+    var A = Tensor[DType.float32].randn(2, 3, 32, 48, init_seed=7)
+    var W = Tensor[DType.float32].randn(64, 48, init_seed=8)
+    var Bv = W.transpose[track_grad=False](sync=True)
+    assert_false(Bv.is_contiguous(), "fixture must be strided-B")
+    _strided_b_forward_oracle("broadcast", A, Bv)
+    print()
+
+
+def test_strided_b_panel_offset() raises:
+    """Nonzero-offset strided B: every-other-column slice, transposed."""
+    print("=" * 80)
+    print("Test 19: Strided-B Panel Nonzero Offset")
+    print("=" * 80)
+    var base = Tensor[DType.float32].randn(70, 48, init_seed=8)
+    var vslice = base.view(
+        shape=Shape(70, 24), strides=Strides(48, 2), offset=1
+    )
+    var Bv = vslice.transpose[track_grad=False](sync=True)
+    assert_false(Bv.is_contiguous(), "fixture must be strided-B")
+    var A = Tensor[DType.float32].randn(2, 30, 24, init_seed=7)
+    _strided_b_forward_oracle("offset", A, Bv)
+    print()
+
+
+def test_strided_b_panel_both_strided() raises:
+    """A-strided x B-strided combo (A_STRIDED=True + panel path)."""
+    print("=" * 80)
+    print("Test 20: Strided-B Panel Both-Strided")
+    print("=" * 80)
+    var Abase = Tensor[DType.float32].randn(2, 8, 32, 128, init_seed=9)
+    var Av = Abase.transpose[track_grad=False]([0, 1, 3, 2], sync=True)
+    var Bbase = Tensor[DType.float32].randn(2, 8, 128, 32, init_seed=8)
+    var Bv = Bbase.transpose[track_grad=False]([0, 1, 3, 2], sync=True)
+    assert_false(Av.is_contiguous(), "A fixture must be strided")
+    assert_false(Bv.is_contiguous(), "B fixture must be strided")
+    _strided_b_forward_oracle("both-strided", Av, Bv)
+    print()
+
+
+def test_strided_b_panel_scores_backward() raises:
+    """DX through the scores strided-B path vs finite differences."""
+    print("=" * 80)
+    print("Test 21: Strided-B Panel Scores Backward (finite differences)")
+    print("=" * 80)
+    var Xs = Tensor[DType.float32].randn(
+        2, 8, 128, 32, init_seed=7, requires_grad=True
+    )
+    var Ws = Tensor[DType.float32].randn(2, 8, 128, 32, init_seed=8)
+    var w_tracked = Ws.transpose[track_grad=True]([0, 1, 3, 2], sync=True)
+    var y = matmul(Xs, w_tracked)
+    y.backward(Tensor[DType.float32].ones(Shape(2, 8, 128, 128)))
+    var analytical_grad = Xs.grad()[0, 0, 0, 0]
+
+    var epsilon = Scalar[DType.float32](1e-2)
+    var original = Xs[0, 0, 0, 0]
+    Xs[0, 0, 0, 0] = original + epsilon
+    var w_frozen = Ws.transpose[track_grad=False]([0, 1, 3, 2], sync=True)
+    var plus = Float64(matmul[track_grad=False](Xs, w_frozen).sum().item())
+    Xs[0, 0, 0, 0] = original - epsilon
+    var minus = Float64(matmul[track_grad=False](Xs, w_frozen).sum().item())
+    Xs[0, 0, 0, 0] = original
+    var numerical_grad = (plus - minus) / (2.0 * Float64(epsilon))
+
+    var rel_err = abs(Float64(analytical_grad) - numerical_grad) / (
+        abs(numerical_grad) + 1e-8
+    )
+    print("  dX analytic:", analytical_grad, " fd:", numerical_grad)
+    # Bar is 5e-3, not the wide-p 1e-3: the fd reference sums 262k fp32
+    # terms (vs 4k there), so accumulation rounding alone is ~1e-3.
+    # Forward above is bit-exact (0.0); this gate is only for gross
+    # backward corruption (pre-fix wide-p was ~2x off).
+    assert_true(rel_err < 5e-3, "scores strided-B backward mismatch")
+    print("Strided-B panel scores backward correct")
     print()
 
 

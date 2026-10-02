@@ -1,89 +1,15 @@
 from tenmo.tensor import Tensor
 from std.testing import assert_true, assert_false, TestSuite
-from tenmo.shapes import Shape
-from tenmo.common_utils import log_warning
+from tenmo.shared.shapes import Shape
+from tenmo.shared.logging import log_warning
 from tenmo.gradbox import Gradbox
-from tenmo.intarray import IntArray
+from tenmo.shared.intarray import IntArray
 from std.sys import has_accelerator
 from tenmo.crossentropy import CrossEntropyLoss
 from tenmo.shared import Reduction
-from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
+from tenmo.shared.mnemonics import DEFAULT_INDEX_DTYPE
 from std.math import log, exp
-from std.utils.numerics import min_finite
-
-
-@always_inline("nodebug")
-def inf[dtype: DType]() -> Scalar[dtype]:
-    """Gets a +inf value for the given dtype.
-
-    Constraints:
-        Can only be used for FP dtypes.
-
-    Parameters:
-        dtype: The value dtype.
-
-    Returns:
-        The +inf value of the given dtype.
-    """
-    comptime assert
-        dtype.is_floating_point(),
-        "Only floating point dtypes support +inf."
-
-    comptime if dtype == DType.bfloat16:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<bf16>`,
-        )
-    elif dtype == DType.float16:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f16>`,
-        )
-    elif dtype == DType.float32:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f32>`,
-        )
-    elif dtype == DType.float64:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f64>`,
-        )
-    else:
-        comptime assert False, "unsupported float type"
-
-
-def isinf[dtype: DType, //](value: Scalar[dtype]) -> Bool:
-    return inf[dtype]() == value
-
-
-def isnan[dtype: DType, //](value: Scalar[dtype]) -> Bool:
-    return nan[dtype]() == value
-
-
-@always_inline("nodebug")
-def nan[dtype: DType]() -> Scalar[dtype]:
-    """Gets a NaN value for the given dtype.
-
-    Constraints:
-        Can only be used for FP dtypes.
-
-    Parameters:
-        dtype: The value dtype.
-
-    Returns:
-        The NaN value of the given dtype.
-    """
-    comptime assert
-        dtype.is_floating_point(),
-        "Only floating point dtypes support NaN."
-
-    comptime if dtype == DType.float32:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f32>`,
-        )
-    elif dtype == DType.float64:
-        return rebind[Scalar[dtype]](
-            __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f64>`,
-        )
-    else:
-        comptime assert False, "unsupported float type"
+from std.utils.numerics import min_finite, isinf, isnan
 
 
 # ============================================================================
@@ -143,7 +69,7 @@ def assert_close(
 def test_ce_basic_class_indices() raises:
     """Test basic cross entropy with class indices."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
@@ -165,10 +91,10 @@ def test_ce_basic_class_indices() raises:
 def test_ce_basic_probability_targets() raises:
     """Test basic cross entropy with probability targets."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3]], requires_grad=True
     ).float()
-    var targets = Tensor.d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]).float()
+    var targets = Tensor[DType.float32].d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]).float()
 
     var criterion = CrossEntropyLoss[DType.float32](reduction="mean")
     var loss = criterion(logits, targets)
@@ -189,7 +115,7 @@ def test_ce_basic_probability_targets() raises:
 def test_ce_reduction_mean() raises:
     """Test mean reduction."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3], [0.2, 0.1, 2.5]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1, 2])
@@ -206,7 +132,7 @@ def test_ce_reduction_mean() raises:
 def test_ce_reduction_sum() raises:
     """Test sum reduction."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3], [0.2, 0.1, 2.5]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1, 2])
@@ -224,7 +150,7 @@ def test_ce_reduction_sum() raises:
 def test_ce_reduction_none() raises:
     """Test none reduction."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3], [0.2, 0.1, 2.5]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1, 2])
@@ -247,7 +173,7 @@ def test_ce_reduction_none() raises:
 def test_ce_ignore_index_basic() raises:
     """Test basic ignore index functionality."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0], [1.0, 2.0], [0.5, 0.3]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, -100, 1])  # Middle sample ignored
@@ -279,7 +205,7 @@ def test_ce_ignore_index_basic() raises:
 def test_ce_ignore_index_all_ignored() raises:
     """Test when all samples are ignored."""
 
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([-100, -100])  # All ignored
 
     var criterion = CrossEntropyLoss[DType.float32](
@@ -299,7 +225,7 @@ def test_ce_ignore_index_all_ignored() raises:
 def test_ce_ignore_index_none_reduction() raises:
     """Test ignore index with none reduction."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0], [1.0, 2.0], [0.5, 0.3]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, -100, 1])
@@ -325,7 +251,7 @@ def test_ce_ignore_index_none_reduction() raises:
 def test_ce_label_smoothing_basic() raises:
     """Test basic label smoothing."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
@@ -350,10 +276,10 @@ def test_ce_label_smoothing_basic() raises:
 def test_ce_label_smoothing_with_probabilities() raises:
     """Test label smoothing with probability targets."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3]], requires_grad=True
     ).float()
-    var targets = Tensor.d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]).float()
+    var targets = Tensor[DType.float32].d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]).float()
 
     var criterion_no_smooth = CrossEntropyLoss[DType.float32](
         reduction="mean", label_smoothing=Float32(0.0)
@@ -375,7 +301,7 @@ def test_ce_label_smoothing_with_probabilities() raises:
 def test_ce_label_smoothing_ignore_index_combined() raises:
     """Test label smoothing combined with ignore index."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3], [0.2, 0.1, 2.5]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, -100, 2])
@@ -402,7 +328,7 @@ def test_ce_label_smoothing_ignore_index_combined() raises:
 def test_ce_reduction_types_with_ignore_index_and_label_smoothing() raises:
     """Test all reduction types with ignore index and label smoothing."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3], [0.2, 0.1, 2.5]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1, 2])
@@ -414,14 +340,14 @@ def test_ce_reduction_types_with_ignore_index_and_label_smoothing() raises:
     var loss_mean = criterion_mean(logits, targets)
     assert_close(
         loss_mean,
-        Tensor.scalar(0.5492352).float(),
+        Tensor[DType.float32].scalar(0.5492352).float(),
         msg="Mean reduction value mismatch",
     )
     loss_mean.backward()
 
     assert_close(
         logits.grad(),
-        Tensor.d2(
+        Tensor[DType.float32].d2(
             [
                 [-0.10383275, 0.08788316, 0.015949614],
                 [0.0, 0.0, 0.0],
@@ -440,14 +366,14 @@ def test_ce_reduction_types_with_ignore_index_and_label_smoothing() raises:
     var loss_sum = criterion_sum(logits, targets)
     assert_close(
         loss_sum,
-        Tensor.scalar(1.0984705).float(),
+        Tensor[DType.float32].scalar(1.0984705).float(),
         msg="Sum reduction value mismatch",
     )
     loss_sum.backward()
 
     assert_close(
         logits.grad(),
-        Tensor.d2(
+        Tensor[DType.float32].d2(
             [
                 [-0.2076655, 0.17576632, 0.03189923],
                 [0.0, 0.0, 0.0],
@@ -466,7 +392,7 @@ def test_ce_reduction_types_with_ignore_index_and_label_smoothing() raises:
     var loss_none = criterion_none(logits, targets)
     assert_close(
         loss_none,
-        Tensor.d1([0.6103632, 0.0, 0.4881073]).float(),
+        Tensor[DType.float32].d1([0.6103632, 0.0, 0.4881073]).float(),
         msg="None reduction value mismatch",
     )
 
@@ -474,7 +400,7 @@ def test_ce_reduction_types_with_ignore_index_and_label_smoothing() raises:
 
     assert_close(
         logits.grad(),
-        Tensor.d2(
+        Tensor[DType.float32].d2(
             [
                 [-0.2076655, 0.17576632, 0.03189923],
                 [0.0, 0.0, 0.0],
@@ -494,7 +420,7 @@ def test_ce_spatial_2d() raises:
     """Test 3D input (batch, classes, spatial)."""
 
     # Shape: (2, 3, 4) -> batch=2, classes=3, width=4
-    var logits = Tensor.d3(
+    var logits = Tensor[DType.float32].d3(
         [
             [[2.0, 1.0, 0.5, 1.5], [1.0, 2.0, 1.5, 0.5], [0.5, 0.5, 2.0, 2.0]],
             [[1.5, 2.0, 1.0, 0.5], [2.0, 1.0, 2.0, 1.5], [0.5, 0.5, 0.5, 2.0]],
@@ -523,7 +449,7 @@ def test_ce_spatial_3d() raises:
     """Test 4D input (batch, classes, height, width)."""
 
     # Shape: (1, 2, 2, 2) -> batch=1, classes=2, height=2, width=2
-    var logits = Tensor.d4(
+    var logits = Tensor[DType.float32].d4(
         [
             [
                 [[2.0, 1.0], [1.0, 2.0]],  # Class 0
@@ -606,14 +532,14 @@ def test_ce_spatial_with_ignore_index() raises:
 def test_ce_spatial_probability_targets() raises:
     """Test spatial dimensions with probability targets."""
 
-    var logits = Tensor.d3(
+    var logits = Tensor[DType.float32].d3(
         [
             [[2.0, 1.0], [1.0, 2.0]],  # batch 0, 2 classes, 2 spatial
         ],
         requires_grad=True,
     ).float()
 
-    var targets = Tensor.d3(
+    var targets = Tensor[DType.float32].d3(
         [
             [[1.0, 0.0], [0.0, 1.0]],  # batch 0
         ]
@@ -637,7 +563,7 @@ def test_ce_spatial_probability_targets() raises:
 def test_ce_single_sample() raises:
     """Test with single sample."""
 
-    var logits = Tensor.d2([[2.0, 1.0, 0.1]], requires_grad=True).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0, 0.1]], requires_grad=True).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0])
 
     var criterion = CrossEntropyLoss[DType.float32](reduction="mean")
@@ -659,14 +585,14 @@ def test_ce_large_batch() raises:
 
     # Create random-ish logits
     var logits = Tensor[DType.float32](
-        Shape([batch_size, num_classes]), requires_grad=True
+        Shape(batch_size, num_classes), requires_grad=True
     )
     for i in range(batch_size):
         for j in range(num_classes):
             logits[i, j] = Float32((i + j) % 10) * 0.5
 
     # Create targets (cycling through classes)
-    var targets = Tensor[DEFAULT_INDEX_DTYPE](Shape([batch_size]))
+    var targets = Tensor[DEFAULT_INDEX_DTYPE](Shape(batch_size))
     for i in range(batch_size):
         targets[i] = Int64(i % num_classes)
 
@@ -684,7 +610,7 @@ def test_ce_large_batch() raises:
 def test_ce_binary_classification() raises:
     """Test binary classification (2 classes)."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0], [1.0, 2.0], [0.5, 1.5]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1, 1])
@@ -702,7 +628,7 @@ def test_ce_binary_classification() raises:
 def test_ce_perfect_prediction() raises:
     """Test with perfect predictions (very confident)."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [
             [100.0, -100.0, -100.0],
             [-100.0, 100.0, -100.0],
@@ -724,7 +650,7 @@ def test_ce_perfect_prediction() raises:
 def test_ce_uniform_logits() raises:
     """Test with uniform (uncertain) predictions."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
@@ -747,7 +673,7 @@ def test_ce_numerical_stability() raises:
     """Test numerical stability with extreme values."""
 
     # Very large logits
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[1000.0, -1000.0], [-1000.0, 1000.0]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
@@ -773,7 +699,7 @@ def test_ce_numerical_stability() raises:
 def test_ce_validate_parameter() raises:
     """Test validate parameter for skipping validation."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
@@ -798,7 +724,7 @@ def test_ce_gradient_sum_property() raises:
     """Test that gradients sum to approximately 0 for each sample (softmax property).
     """
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.5], [1.5, 2.0, 0.3]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
@@ -823,7 +749,7 @@ def test_ce_gradient_sum_property() raises:
 def test_ce_gradient_magnitude() raises:
     """Test that gradient magnitudes are reasonable."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
@@ -847,7 +773,7 @@ def test_ce_gradient_magnitude() raises:
 def test_ce_gradients_ignore_index() raises:
     """Test gradients with ignore index."""
 
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, -100])  # Second sample ignored
 
     var loss_fn = CrossEntropyLoss[DType.float32](
@@ -871,7 +797,7 @@ def test_ce_gradients_spatial() raises:
     """Test gradients with spatial dimensions."""
 
     # Create proper 4D tensor with shape (1, 2, 2, 2)
-    var logits = Tensor.d4(
+    var logits = Tensor[DType.float32].d4(
         [
             [
                 [[2.0, 1.0], [1.0, 2.0]],  # Class 0
@@ -909,11 +835,11 @@ def test_ce_gradients_spatial() raises:
 def test_ce_class_indices_vs_onehot() raises:
     """Test that class indices give same result as one-hot probabilities."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3]], requires_grad=True
     ).float()
     var targets_indices = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
-    var targets_onehot = Tensor.d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]).float()
+    var targets_onehot = Tensor[DType.float32].d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]).float()
 
     var criterion = CrossEntropyLoss[DType.float32](reduction="mean")
 
@@ -931,7 +857,7 @@ def test_ce_class_indices_vs_onehot() raises:
 def test_ce_mean_vs_manual_average() raises:
     """Test that mean reduction equals manual average of none reduction."""
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3], [0.2, 0.1, 2.5]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1, 2])
@@ -959,7 +885,7 @@ def test_ce_no_validation_speedup() raises:
     """Test that disabling validation works (can't test speedup, just correctness).
     """
 
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3]], requires_grad=True
     ).float()
     var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
@@ -976,26 +902,26 @@ def test_ce_no_validation_speedup() raises:
 
 
 def test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig() raises:
-    logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3], [0.2, 0.1, 2.5]], requires_grad=True
     ).float()
 
-    targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1, 2])  # Class indices
+    var targets = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1, 2])  # Class indices
 
     # 1. MEAN reduction (default)
-    criterion_mean = CrossEntropyLoss(
+    var criterion_mean = CrossEntropyLoss(
         reduction="mean", ignore_index=1, label_smoothing=Float32(0.2)
     )
-    loss_mean = criterion_mean(logits, targets)
+    var loss_mean = criterion_mean(logits, targets)
     assert_true(
-        loss_mean.all_close(Tensor.scalar(0.5492352).float()),
+        loss_mean.all_close(Tensor[DType.float32].scalar(0.5492352).float()),
         "ce mean reduction value assertion failed",
     )
     loss_mean.backward()
 
     assert_true(
         logits.grad().all_close(
-            Tensor.d2(
+            Tensor[DType.float32].d2(
                 [
                     [-0.10383275, 0.08788316, 0.015949614],
                     [0.0, 0.0, 0.0],
@@ -1008,19 +934,19 @@ def test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig() raises:
 
     logits.zero_grad()
     # 2. SUM reduction
-    criterion_sum = CrossEntropyLoss(
+    var criterion_sum = CrossEntropyLoss(
         reduction="sum", ignore_index=1, label_smoothing=Float32(0.2)
     )
-    loss_sum = criterion_sum(logits, targets)
+    var loss_sum = criterion_sum(logits, targets)
     assert_true(
-        loss_sum.all_close(Tensor.scalar(1.0984705).float()),
+        loss_sum.all_close(Tensor[DType.float32].scalar(1.0984705).float()),
         "ce sum reduction value assertion failed",
     )
     loss_sum.backward()
 
     assert_true(
         logits.grad().all_close(
-            Tensor.d2(
+            Tensor[DType.float32].d2(
                 [
                     [-0.2076655, 0.17576632, 0.03189923],
                     [0.0, 0.0, 0.0],
@@ -1033,12 +959,12 @@ def test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig() raises:
 
     logits.zero_grad()
     # 3. NONE reduction
-    criterion_none = CrossEntropyLoss(
+    var criterion_none = CrossEntropyLoss(
         reduction="none", ignore_index=1, label_smoothing=Float32(0.2)
     )
-    loss_none = criterion_none(logits, targets)
+    var loss_none = criterion_none(logits, targets)
     assert_true(
-        loss_none.all_close(Tensor.d1([0.6103632, 0.0, 0.4881073]).float()),
+        loss_none.all_close(Tensor[DType.float32].d1([0.6103632, 0.0, 0.4881073]).float()),
         "ce none reduction value assertion failed",
     )
 
@@ -1046,7 +972,7 @@ def test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig() raises:
 
     assert_true(
         logits.grad().all_close(
-            Tensor.d2(
+            Tensor[DType.float32].d2(
                 [
                     [-0.2076655, 0.17576632, 0.03189923],
                     [0.0, 0.0, 0.0],
@@ -1078,7 +1004,7 @@ def test_ce_gradients_computation_heavy() raises:
 
     # Create a larger, more complex tensor for thorough gradient testing
     # Shape: (batch=4, classes=5, height=3, width=3) - 4*5*3*3 = 180 elements
-    var logits = Tensor.d4(
+    var logits = Tensor[DType.float32].d4(
         [
             [  # Sample 0
                 [  # Class 0
@@ -1225,7 +1151,7 @@ def test_ce_gradients_computation_heavy() raises:
 
 
 def test_ce_basic_no_reduction() raises:
-    var logits = Tensor.d2([[2.0, 1.0, 0.5], [1.0, 2.0, 0.1]]).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0, 0.5], [1.0, 2.0, 0.1]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)  # mean
@@ -1242,7 +1168,7 @@ def test_ce_basic_no_reduction() raises:
 
 
 def test_ce_reduction_mean_1() raises:
-    var logits = Tensor.d2([[3.0, 1.0], [1.0, 3.0], [2.0, 1.0]]).float()
+    var logits = Tensor[DType.float32].d2([[3.0, 1.0], [1.0, 3.0], [2.0, 1.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1, 0])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)
@@ -1254,7 +1180,7 @@ def test_ce_reduction_mean_1() raises:
 
 
 def test_ce_reduction_sum_1() raises:
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=1)
@@ -1265,18 +1191,18 @@ def test_ce_reduction_sum_1() raises:
 
 
 def test_ce_reduction_none_1() raises:
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=2)
     var loss = loss_fn(logits, target)
 
-    assert_true(loss.shape() == Shape([2]))  # per-sample loss
+    assert_true(loss.shape() == Shape(2))  # per-sample loss
     assert_true(loss[0] > 0 and loss[1] > 0)
 
 
 def test_ce_label_smoothing_basic_orig() raises:
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn_no_smooth = CrossEntropyLoss[DType.float32](label_smoothing=0.0)
@@ -1290,7 +1216,7 @@ def test_ce_label_smoothing_basic_orig() raises:
 
 
 def test_ce_label_smoothing_mean() raises:
-    var logits = Tensor.d2([[3.0, 1.0, 0.5], [1.0, 3.0, 0.1]]).float()
+    var logits = Tensor[DType.float32].d2([[3.0, 1.0, 0.5], [1.0, 3.0, 0.1]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](
@@ -1303,7 +1229,7 @@ def test_ce_label_smoothing_mean() raises:
 
 
 def test_ce_label_smoothing_extreme() raises:
-    var logits = Tensor.d2([[10.0, 0.0], [0.0, 10.0]]).float()
+    var logits = Tensor[DType.float32].d2([[10.0, 0.0], [0.0, 10.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn_max_smooth = CrossEntropyLoss[DType.float32](
@@ -1316,7 +1242,7 @@ def test_ce_label_smoothing_extreme() raises:
 
 
 def test_ce_ignore_index_basic_orig() raises:
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[2.0, 1.0, 0.5], [1.0, 2.0, 0.1], [3.0, 1.0, 0.2]]
     ).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, -100, 2])  # Second sample ignored
@@ -1331,7 +1257,7 @@ def test_ce_ignore_index_basic_orig() raises:
 
 
 def test_ce_ignore_index_all_ignored_orig() raises:
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([-100, -100])  # All ignored
 
     var loss_fn = CrossEntropyLoss[DType.float32](
@@ -1344,7 +1270,7 @@ def test_ce_ignore_index_all_ignored_orig() raises:
 
 
 def test_ce_ignore_index_partial() raises:
-    var logits = Tensor.d3(
+    var logits = Tensor[DType.float32].d3(
         [[[2.0, 1.0], [1.0, 2.0]], [[3.0, 1.0], [1.0, 3.0]]]
     ).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d2([[-100, 1], [0, -100]])  # Mixed ignored
@@ -1359,7 +1285,7 @@ def test_ce_ignore_index_partial() raises:
 
 
 def test_ce_2d_spatial() raises:
-    var logits = Tensor.d4(
+    var logits = Tensor[DType.float32].d4(
         [[[[2.0, 1.0], [1.0, 2.0]], [[3.0, 1.0], [1.0, 3.0]]]]
     ).float()  # (1, 2, 2, 2)
     var target = Tensor[DEFAULT_INDEX_DTYPE].d3([[[0, 1], [1, 0]]])  # (1, 2, 2)
@@ -1375,7 +1301,7 @@ def test_ce_2d_spatial() raises:
 def test_ce_5d_spatial() raises:
 
     # Create proper 5D tensor: (batch=1, classes=2, depth=2, height=2, width=2)
-    var logits = Tensor.d5(
+    var logits = Tensor[DType.float32].d5(
         [
             [  # Batch dimension (size 1)
                 [  # Class 0
@@ -1414,7 +1340,7 @@ def test_ce_5d_spatial() raises:
 
 
 def test_ce_spatial_with_ignore() raises:
-    var logits = Tensor.d4(
+    var logits = Tensor[DType.float32].d4(
         [[[[2.0, 1.0], [1.0, 2.0]], [[3.0, 1.0], [1.0, 3.0]]]]
     ).float()  # (1, 2, 2, 2)
     var target = Tensor[DEFAULT_INDEX_DTYPE].d3(
@@ -1431,7 +1357,7 @@ def test_ce_spatial_with_ignore() raises:
 
 
 def _ce_gradients_basic_uu() raises:
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)
@@ -1447,7 +1373,7 @@ def _ce_gradients_basic_uu() raises:
 
 
 def test_ce_gradients_basic() raises:
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)  # mean
@@ -1477,7 +1403,7 @@ def test_ce_gradients_basic() raises:
 
 
 def test_ce_gradients_label_smoothing() raises:
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](label_smoothing=0.1)
@@ -1486,7 +1412,7 @@ def test_ce_gradients_label_smoothing() raises:
     loss.backward()
 
     # Gradients with smoothing should be different from without
-    var grads_smooth = logits.grad().copy()
+    var grads_smooth = logits.grad().clone()
     logits.zero_grad()
 
     var loss_fn_no_smooth = CrossEntropyLoss[DType.float32](label_smoothing=0.0)
@@ -1497,7 +1423,7 @@ def test_ce_gradients_label_smoothing() raises:
 
 
 def test_ce_gradients_ignore_index_orig() raises:
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, -100])  # Second sample ignored
 
     var loss_fn = CrossEntropyLoss[DType.float32](
@@ -1518,7 +1444,7 @@ def test_ce_gradients_spatial_orig() raises:
 
     # Create proper 4D tensor with shape (1, 2, 2, 2)
     # This means: batch=1, classes=2, height=2, width=2
-    var logits = Tensor.d4(
+    var logits = Tensor[DType.float32].d4(
         [
             [
                 [[2.0, 1.0], [1.0, 2.0]],  # Class 0
@@ -1548,7 +1474,7 @@ def test_ce_gradients_spatial_orig() raises:
 
 
 def test_ce_single_class() raises:
-    var logits = Tensor.d2([[5.0], [3.0]]).float()  # Single class
+    var logits = Tensor[DType.float32].d2([[5.0], [3.0]]).float()  # Single class
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 0])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)
@@ -1559,7 +1485,7 @@ def test_ce_single_class() raises:
 
 
 def test_ce_perfect_prediction_orig() raises:
-    var logits = Tensor.d2([[10.0, 0.0, 0.0], [0.0, 10.0, 0.0]]).float()
+    var logits = Tensor[DType.float32].d2([[10.0, 0.0, 0.0], [0.0, 10.0, 0.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)
@@ -1572,7 +1498,7 @@ def test_ce_perfect_prediction_orig() raises:
 
 def test_ce_extreme_perfect_prediction() raises:
     # Use even larger logits for "more perfect" prediction
-    var logits = Tensor.d2([[100.0, 0.0, 0.0], [0.0, 100.0, 0.0]]).float()
+    var logits = Tensor[DType.float32].d2([[100.0, 0.0, 0.0], [0.0, 100.0, 0.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)
@@ -1585,7 +1511,7 @@ def test_ce_extreme_perfect_prediction() raises:
 
 
 def test_ce_worst_prediction() raises:
-    var logits = Tensor.d2(
+    var logits = Tensor[DType.float32].d2(
         [[0.0, 10.0], [10.0, 0.0]]
     ).float()  # Wrong predictions
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
@@ -1598,7 +1524,7 @@ def test_ce_worst_prediction() raises:
 
 
 def test_ce_zero_logits() raises:
-    var logits = Tensor.d2([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]).float()
+    var logits = Tensor[DType.float32].d2([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 2])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)
@@ -1610,7 +1536,7 @@ def test_ce_zero_logits() raises:
 
 
 def test_ce_large_logits() raises:
-    var logits = Tensor.d2([[1000.0, 0.0], [0.0, 1000.0]]).float()
+    var logits = Tensor[DType.float32].d2([[1000.0, 0.0], [0.0, 1000.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)
@@ -1622,48 +1548,48 @@ def test_ce_large_logits() raises:
 
 # Negative validation tests (should not panic if validation is correct)
 def _ce_validation_wrong_target_dims() raises:
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d2([[0, 1], [1, 0]])  # Wrong: should be 1D
 
     # This should be caught by validation before any computation
     # (Test framework should handle the panic)
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)
-    _loss = loss_fn(logits, target)
+    var _loss = loss_fn(logits, target)
 
 
 def _ce_validation_class_out_of_bounds() raises:
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()  # 2 classes
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]]).float()  # 2 classes
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 2])  # Class 2 is out of bounds"""
 
     # Should be caught by validation
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)
-    _loss = loss_fn(logits, target)
+    var _loss = loss_fn(logits, target)
 
 
 def _ce_validation_spatial_mismatch() raises:
-    var logits = Tensor.d4([[[[2.0, 1.0], [1.0, 2.0]]]]).float()  # (1, 2, 2, 2)
+    var logits = Tensor[DType.float32].d4([[[[2.0, 1.0], [1.0, 2.0]]]]).float()  # (1, 2, 2, 2)
     var target = Tensor[DEFAULT_INDEX_DTYPE].d3(
         [[[0, 1, 0]]]
     )  # Wrong spatial dim: (1, 1, 3)
 
     # Should be caught by spatial dimension validation
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)
-    _loss = loss_fn(logits, target)
+    var _loss = loss_fn(logits, target)
 
 
 def _ce_validation_batch_size_mismatch() raises:
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()  # batch size 2
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]]).float()  # batch size 2
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1, 0])  # batch size 3
 
     # Should be caught by batch size validation
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)
-    _loss = loss_fn(logits, target)
+    var _loss = loss_fn(logits, target)
 
 
 def test_ce_2d_basic() raises:
-    var logits = Tensor.d2([[2.0, 1.0, 0.1], [1.0, 3.0, 0.2]]).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0, 0.1], [1.0, 3.0, 0.2]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])  # Class indices
     var loss_fn = CrossEntropyLoss[DType.float32]()
     var loss = loss_fn(logits, target)
@@ -1673,7 +1599,7 @@ def test_ce_2d_basic() raises:
 
 
 def test_ce_2d_ignore_index() raises:
-    var logits = Tensor.d2([[2.0, 1.0, 0.1], [1.0, 3.0, 0.2]]).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0, 0.1], [1.0, 3.0, 0.2]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, -1])  # Second sample ignored
     var loss_fn = CrossEntropyLoss[DType.float32](ignore_index=-1)
     var loss = loss_fn(logits, target)
@@ -1683,7 +1609,7 @@ def test_ce_2d_ignore_index() raises:
 
 
 def test_ce_2d_label_smoothing() raises:
-    var logits = Tensor.d2([[2.0, 1.0, 0.1], [1.0, 3.0, 0.2]]).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0, 0.1], [1.0, 3.0, 0.2]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](label_smoothing=0.1)
@@ -1694,7 +1620,7 @@ def test_ce_2d_label_smoothing() raises:
 
 
 def test_ce_2d_logits_1d_target() raises:
-    var logits = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var logits = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32]()
@@ -1704,7 +1630,7 @@ def test_ce_2d_logits_1d_target() raises:
 
 
 def test_ce_3d_spatial() raises:
-    var logits = Tensor.d3(
+    var logits = Tensor[DType.float32].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
     ).float()  # (2, 2, 2)
     var target = Tensor[DEFAULT_INDEX_DTYPE].d2([[0, 1], [1, 0]])  # (2, 2)
@@ -1717,7 +1643,7 @@ def test_ce_3d_spatial() raises:
 
 def test_ce_4d_spatial() raises:
     # Logits: 2 samples, 2 classes, 2x2 spatial
-    var logits = Tensor.d4(
+    var logits = Tensor[DType.float32].d4(
         [
             [  # Sample 0
                 [[1.0, 2.0], [3.0, 4.0]],  # Class 0 spatial outputs
@@ -1745,7 +1671,7 @@ def test_ce_4d_spatial() raises:
 
 def test_ce_4d_spatial_1x2() raises:
     # Logits: 2 samples, 2 classes, 1x2 spatial (not 2x2)
-    var logits = Tensor.d4(
+    var logits = Tensor[DType.float32].d4(
         [
             [  # Sample 0
                 [[1.0, 2.0]],  # Class 0: 1x2 spatial
@@ -1770,7 +1696,7 @@ def test_ce_4d_spatial_1x2() raises:
 
 
 def test_ce_reduction_mean_orig() raises:
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=0)  # mean
@@ -1779,7 +1705,7 @@ def test_ce_reduction_mean_orig() raises:
 
 
 def test_ce_reduction_sum_orig() raises:
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=1)  # sum
@@ -1790,14 +1716,14 @@ def test_ce_reduction_sum_orig() raises:
 
 
 def test_ce_reduction_none_orig() raises:
-    var logits = Tensor.d2([[2.0, 1.0], [1.0, 2.0]]).float()
+    var logits = Tensor[DType.float32].d2([[2.0, 1.0], [1.0, 2.0]]).float()
     var target = Tensor[DEFAULT_INDEX_DTYPE].d1([0, 1])
 
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=2)  # none
     # var loss = loss_fn(logits, target)
     var loss = loss_fn(logits, target)
 
-    assert_true(loss.shape() == Shape([2]))  # per-sample loss
+    assert_true(loss.shape() == Shape(2))  # per-sample loss
 
 def test_ce_rank2_basic_v2() raises:
     """Test rank-2 (no spatial dims) - baseline."""
@@ -2896,7 +2822,8 @@ def test_ce_gpu_ci_basic_sum() raises:
         var ce = CrossEntropyLoss[dtype](reduction="sum")
         var loss = ce(logits, target)
         var logits_cpu = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]])
-        var loss_cpu = CrossEntropyLoss[dtype](reduction="sum")(logits_cpu, target_cpu)
+        var criterion = CrossEntropyLoss[dtype](reduction="sum")
+        var loss_cpu = criterion(logits_cpu, target_cpu)
         assert_true(allclose(loss.item(), loss_cpu.item()))
 
 
@@ -2913,9 +2840,11 @@ def test_ce_gpu_ci_ignore_index() raises:
         var logits_cpu = Tensor[dtype].d2(
             [[2.0, 1.0, 0.5], [1.0, 2.0, 0.1], [3.0, 1.0, 0.2]]
         )
-        var loss_cpu = CrossEntropyLoss[dtype](
+        var criterion = CrossEntropyLoss[dtype](
             ignore_index=-100, reduction="mean"
-        )(logits_cpu, target_cpu)
+        )
+
+        var loss_cpu = criterion(logits_cpu, target_cpu)
         assert_true(allclose(loss.item(), loss_cpu.item()))
 
 
@@ -2930,9 +2859,11 @@ def test_ce_gpu_ci_label_smoothing() raises:
         )
         var loss = ce(logits, target.to_gpu())
         var logits_cpu = Tensor[dtype].d2([[2.0, 1.0, 0.5]])
-        var loss_cpu = CrossEntropyLoss[dtype](
+        var criterion = CrossEntropyLoss[dtype](
             reduction="mean", label_smoothing=Scalar[dtype](0.1)
-        )(logits_cpu, target)
+        )
+        var loss_cpu = criterion(logits_cpu, target)
+
         assert_true(allclose(loss.item(), loss_cpu.item()))
 
 def test_ce_gpu_ci_3d() raises:
@@ -3206,7 +3137,8 @@ def test_ce_edge_ignore_only_some_3d() raises:
     # Only batch 1 contributes
     var logits2 = Tensor[dtype].d3([[[2.0, 1.0], [1.0, 3.0]]])
     var target2 = Tensor[DEFAULT_INDEX_DTYPE].d2([[0, 1]])
-    var loss2 = CrossEntropyLoss[dtype](reduction="mean")(logits2, target2)
+    var criterion = CrossEntropyLoss[dtype](reduction="mean")
+    var loss2 = criterion(logits2, target2)
     assert_true(allclose(loss.item(), loss2.item()))
 
 

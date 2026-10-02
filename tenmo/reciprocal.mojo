@@ -1,10 +1,10 @@
 from .tensor import Tensor
 from .backpropagation import (
-    BackwardFnArg,
-    BACKWARD_RIGHT_DIV_SCALAR,
+    BackwardFnType,
+    BackwardFn,
 )
-from .mnemonics import AddTensor, SubtractTensor, ReverseDivide
-from .gradbox import Gradbox
+from .shared.mnemonics import ReverseDivide
+from .division import RightTrueDivBackwardScalar
 from .ancestry import Ancestor
 
 
@@ -28,11 +28,13 @@ struct Reciprocal[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                # null_arg — backward reads output buffer directly
-                var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
-                    BACKWARD_RIGHT_DIV_SCALAR, Scalar[Self.dtype](1)
+                # scalar_arg carries the numerator (1); backward reads
+                # the output buffer directly.
+                var backwardFn = BackwardFn.scalar_arg[Self.dtype](
+                    Scalar[Self.dtype](1),
+                    RightTrueDivBackwardScalar[Self.dtype](),
                 )
-                backwardFnArg.needs_parent_data = True
-                out.add_ancestry(backwardFnArg^, self)
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, self)
 
         return out^

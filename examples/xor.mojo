@@ -1,11 +1,12 @@
 """
-XOR Problem
+XOR Problem.
 =========================
 Classic non-linearly separable problem requiring hidden layers.
 """
 
 from tenmo.tensor import Tensor
-from tenmo.net import Sequential, Linear, Sigmoid, MSELoss
+from tenmo.mse import MSELoss
+from tenmo.net import Sequential, Linear, Sigmoid
 from std.time import perf_counter_ns
 from std.math import sqrt
 from tenmo.optim import SGD
@@ -37,7 +38,9 @@ def xor_classification() -> None:
 
     # Training setup
     var criterion = MSELoss[dtype]()
-    var optimizer = SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+    var optimizer = SGD[dtype](
+        model.parameters(), lr=learning_rate, momentum=momentum
+    )
 
     print("Training XOR solver...")
     var start_time = perf_counter_ns()
@@ -63,11 +66,11 @@ def xor_classification() -> None:
 
             var loss_str = String(loss.item())
             if loss_str.count_codepoints() > 8:
-                loss_str = String(loss_str[byte=0:8])
+                loss_str = String(String(loss_str)[byte=0:8])
 
             var grad_str = String(sqrt(grad_norm_sq))
             if grad_str.count_codepoints() > 8:
-                grad_str = String(grad_str[byte=0:8])
+                grad_str = String(String(grad_str)[byte=0:8])
 
             print(
                 "Epoch "
@@ -90,11 +93,11 @@ def xor_classification() -> None:
                     var pred_val = final_pred[i, 0]
                     var pred_str = String(pred_val)
                     if pred_str.count_codepoints() > 6:
-                        pred_str = String(pred_str[byte=0:6])
+                        pred_str = String(String(pred_str)[byte=0:6])
                     var err = abs(Float64(exp) - Float64(pred_val))
                     var err_str = String(err)
                     if err_str.count_codepoints() > 6:
-                        err_str = String(err_str[byte=0:6])
+                        err_str = String(String(err_str)[byte=0:6])
 
                     print(
                         "  ("
@@ -132,7 +135,11 @@ def xor_classification() -> None:
     print("=" * 50)
     print("Training time: " + String(String(train_time)[byte=0:6]) + "s")
     print("Final loss: " + String(final_loss.item()))
-    print("Accuracy: " + String(Float64(100.0) * Float64(correct) / Float64(4)) + "%")
+    print(
+        "Accuracy: "
+        + String(Float64(100.0) * Float64(correct) / Float64(4))
+        + "%"
+    )
     print("Avg error: " + String(Float64(total_error) / Float64(4)))
     print()
 

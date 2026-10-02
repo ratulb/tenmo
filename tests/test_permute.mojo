@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
-from tenmo.intarray import IntArray
-from tenmo.shapes import Shape
+from tenmo.shared.intarray import IntArray
+from tenmo.shared.shapes import Shape
 from std.testing import assert_true, TestSuite
 from tenmo.permute import Permute
 from std.sys import has_accelerator
@@ -10,9 +10,9 @@ from std.sys import has_accelerator
 
 def test_tensor_permute_basic() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].arange(0, 12)
-    t1 = a.reshape(Shape(3, 4))
-    p = t1.permute(IntArray([1, 0]))
+    var a = Tensor[dtype].arange(0, 12)
+    var t1 = a.reshape(Shape(3, 4))
+    var p = t1.permute(IntArray(1, 0))
     assert_true(p.shape() == Shape(4, 3))
     assert_true(p.strides()[0] == t1.strides()[1])
     assert_true(p.strides()[1] == t1.strides()[0])
@@ -20,19 +20,36 @@ def test_tensor_permute_basic() raises:
 
 def test_tensor_permute_3d_axes() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].arange(0, 60)
-    t1 = a.reshape(Shape(3, 4, 5))
-    p = t1.permute([2, 0, 1])
+    var a = Tensor[dtype].arange(0, 60)
+    var t1 = a.reshape(Shape(3, 4, 5))
+    var p = t1.permute([2, 0, 1])
     assert_true(p.shape() == Shape(5, 3, 4))
     assert_true(p.rank() == 3)
 
 
+def test_tensor_permute_negative_axes() raises:
+    comptime dtype = DType.float32
+    var t = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
+    # (-1, -2) normalizes to (1, 0): transpose-like (2,3) -> (3,2).
+    var p = Permute[dtype].forward(t, IntArray(-1, -2))
+    var expected = Tensor[dtype].d2([[1.0, 4.0], [2.0, 5.0], [3.0, 6.0]])
+    assert_true(p.shape() == Shape(3, 2))
+    assert_true(p.all_close(expected))
+    # Backward must invert the NORMALIZED permutation (raw negatives OOB
+    # invert_permutation): uniform upstream routes ones back to (2,3).
+    var loss = p.sum()
+    loss.backward()
+    assert_true(t.grad().all_close(Tensor[dtype].ones(2, 3)))
+
+
 def test_tensor_permute_inverse() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].arange(0, 24)
-    t1 = a.reshape(Shape(2, 3, 4))
-    p = Permute[dtype].forward(t1, IntArray([2, 0, 1]))
-    inv = Permute[dtype].forward(p, IntArray([1, 2, 0]))
+    var a = Tensor[dtype].arange(0, 24)
+    var t1 = a.reshape(Shape(2, 3, 4))
+    var p = Permute[dtype].forward(t1, IntArray(2, 0, 1))
+    var inv = Permute[dtype].forward(p, IntArray(1, 2, 0))
     assert_true(inv.shape() == t1.shape())
     assert_true(inv.all_close(t1))
 
@@ -40,11 +57,11 @@ def test_tensor_permute_inverse() raises:
 def test_tensor_permute_grad_sum_2d() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(0, 12)
-    t = a.reshape(Shape(3, 4))
+    var t = a.reshape(Shape(3, 4))
     t.requires_grad_(True)
-    var p = Permute[dtype].forward(t, IntArray([1, 0]))
+    var p = Permute[dtype].forward(t, IntArray(1, 0))
     # p.sum() should produce gradient of ones when backpropagated
-    s = p.sum()
+    var s = p.sum()
     s.backward()
     var expected = (
         Tensor[dtype]
@@ -57,15 +74,15 @@ def test_tensor_permute_grad_sum_2d() raises:
 def test_tensor_permute_grad_inverse_chain() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(0, 24)
-    t = a.reshape(Shape(2, 3, 4))
+    var t = a.reshape(Shape(2, 3, 4))
     t.requires_grad_(True)
     # Apply a permutation and then its inverse (should return original layout)
-    var p = Permute[dtype].forward(t, IntArray([1, 2, 0]))
+    var p = Permute[dtype].forward(t, IntArray(1, 2, 0))
     # inverse of [1,2,0] is [2,0,1] (since inverse[ permutation[i] ] = i)
     var r = Permute[dtype].forward(
-        p, IntArray([2, 0, 1])
+        p, IntArray(2, 0, 1)
     )  # r should match t's layout
-    s = r.sum()
+    var s = r.sum()
     s.backward()
     var expected = (
         Tensor[dtype]
@@ -96,21 +113,25 @@ def test_tensor_permute_grad_partial_ops() raises:
     var p = r.permute([2, 0, 1])
     var m = p.mean(axes=[0], keepdims=False)  # result shape (3,4)
     # backprop: m has shape (3,4); grad of t should be broadcasted back along axis 2 (size 5)
-    s = m.sum()
+    var s = m.sum()
     s.backward()
     # since m.sum() -> sums all elements of p, gradient on t should be ones
 
-    assert_true(t.grad().all_close(Tensor.full(Shape(60), Scalar[dtype](0.2))))
+    assert_true(
+        t.grad().all_close(
+            Tensor[DType.float32].full(Shape(60), Scalar[dtype](0.2))
+        )
+    )
 
 
 def test_tensor_permute_grad_scaled_sum_3d() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(0, 60)
-    t = a.reshape(Shape(3, 4, 5))
+    var t = a.reshape(Shape(3, 4, 5))
     t.requires_grad_(True)
-    var p = Permute[dtype].forward(t, IntArray([2, 0, 1]))  # shape -> (5,3,4)
+    var p = Permute[dtype].forward(t, IntArray(2, 0, 1))  # shape -> (5,3,4)
     var q = p * 2.0
-    s = q.sum()
+    var s = q.sum()
     s.backward()
     # corrected expected shape (3, 4, 5)
     var expected = (
@@ -379,7 +400,7 @@ def test_perm_cpu_backward_multiple_uses() raises:
     var b = a.permute(IntArray(1, 0))
     var loss1 = b.sum()
     loss1.backward()
-    var grad1 = a.grad().copy()
+    var grad1 = a.grad().clone()
     # Verify grad is ones
     assert_true(grad1.all_close(Tensor[dtype].ones(Shape(2, 2))))
 
@@ -705,7 +726,7 @@ def test_perm_parity_using_zero_grad() raises:
 
         var loss_cpu = a_cpu.permute(IntArray(1, 0)).sum()
         loss_cpu.backward()
-        var cpu_grad = a_cpu.grad().copy()
+        var cpu_grad = a_cpu.grad().clone()
 
         a_cpu.zero_grad()
 

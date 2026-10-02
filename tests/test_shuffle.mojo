@@ -1,8 +1,10 @@
 from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from tenmo.shuffle import Shuffle
 from std.sys import has_accelerator
+from std.sys.defines import get_defined_string
+from std.python import Python, PythonObject
 
 
 def test_tensor_shuffle_forward_basic() raises:
@@ -95,9 +97,9 @@ def test_tensor_shuffle_multi_dimensional() raises:
     comptime dtype = DType.float32
 
     var a = Tensor[dtype].arange(0, 24)
-    t = a.reshape(Shape(2, 3, 4))
+    var t = a.reshape(Shape(2, 3, 4))
     var shuffled = Shuffle[dtype].forward[False](t, [2, 0, 1], axis=1)
-    expected = Tensor[dtype].d3(
+    var expected = Tensor[dtype].d3(
         [
             [
                 [8.0, 9.0, 10.0, 11.0],
@@ -1005,6 +1007,122 @@ def test_shuf_gpu_large_axis_dim_matches_cpu() raises:
         var loss_cpu = s_cpu.sum()
         loss_cpu.backward()
         assert_true(a.grad().all_close(a_copy.grad()))
+
+
+def test_shuf_cpu_negative_axis_forward() raises:
+    # axis=-1 on a (2,2,3) tensor == axis=2: reverse the last dim.
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d3(
+        [
+            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
+            [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]],
+        ]
+    )
+    var s = a.shuffle([2, 1, 0], axis=-1)
+    assert_true(s.shape() == Shape(2, 2, 3))
+    assert_true(
+        s.all_close(
+            Tensor[dtype].d3(
+                [
+                    [[3.0, 2.0, 1.0], [6.0, 5.0, 4.0]],
+                    [[9.0, 8.0, 7.0], [12.0, 11.0, 10.0]],
+                ]
+            )
+        )
+    )
+
+
+def test_shuf_cpu_negative_axis_matches_positive() raises:
+    # axis=-2 on a (2,2,3) tensor == axis=1: swap the two rows in each batch.
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d3(
+        [
+            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
+            [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]],
+        ]
+    )
+    var neg = a.shuffle([1, 0], axis=-2)
+    var pos = a.shuffle([1, 0], axis=1)
+    assert_true(neg.all_close(pos))
+    assert_true(
+        neg.all_close(
+            Tensor[dtype].d3(
+                [
+                    [[4.0, 5.0, 6.0], [1.0, 2.0, 3.0]],
+                    [[10.0, 11.0, 12.0], [7.0, 8.0, 9.0]],
+                ]
+            )
+        )
+    )
+
+
+def test_shuf_cpu_negative_axis_grad_non_uniform() raises:
+    # Non-uniform loss through axis=-1: grads must scatter back to exact
+    # input positions (exercises the ShuffleArg stored axis).
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+    )
+    # perm [1,0] along last axis: swap pairs within each row
+    var s = a.shuffle([1, 0], axis=-1)
+    var weights = Tensor[dtype].d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+    )
+    var loss = (s * weights).sum()
+    loss.backward()
+    # s[i][j][0] = a[i][j][1] gets weights[i][j][0];
+    # s[i][j][1] = a[i][j][0] gets weights[i][j][1]
+    assert_true(
+        a.grad().all_close(
+            Tensor[dtype].d3(
+                [[[2.0, 1.0], [4.0, 3.0]], [[6.0, 5.0], [8.0, 7.0]]]
+            )
+        )
+    )
+
+
+# ============================================================================
+# Out-of-range axis probe lives in the MINIMAL harness
+# tests/test_negdim_probes.mojo: the child performs exactly one invalid
+# call and dies by the guard under test; we assert non-zero exit plus the
+# exact diagnostic text. If the guard ever stops firing, the child reaches
+# its own trailing panic instead and the message assertion fails. The
+# harness is a separate MINIMAL file because the child JIT runs alongside
+# this resident process — re-executing a full suite file risks OOM.
+# Children are warm-cache recompiles; the mojo cache this process just
+# built is shared.
+# ============================================================================
+
+
+def _spawn_negdim_probe(name: String) raises -> PythonObject:
+    """Run guard probe `name` from the minimal probe harness in a child."""
+    var script = (
+        "__import__('subprocess').run("
+        + "['pixi', 'run', 'mojo', '-I', '.', "
+        + "'tests/test_negdim_probes.mojo', "
+        + "'--probe-" + name + "'], "
+        + "capture_output=True, text=True, timeout=1200)"
+    )
+    return Python.evaluate(script)
+
+
+def test_shuffle_axis_guard_aborts_with_clear_message() raises:
+    # NOTE: children execute only under -D subprocess=1 (else vacuous
+    # pass) — e.g. `pixi run mojo -I . -D subprocess=1 tests/test_shuffle.mojo`.
+    comptime subprocess = get_defined_string["subprocess", ""]()
+    comptime if not subprocess == "":
+        var axis = _spawn_negdim_probe("shuffle-bad-axis")
+        var axis_out = String(axis.stdout) + String(axis.stderr)
+        assert_true(
+            String(axis.returncode) != "0",
+            "Shuffle: bad-axis probe exits non-zero",
+        )
+        assert_true(
+            axis_out.find("Shuffle → forward: axis") >= 0,
+            "Shuffle: bad axis reports a precise diagnostic",
+        )
+    else:
+        pass
 
 
 # ============================================================

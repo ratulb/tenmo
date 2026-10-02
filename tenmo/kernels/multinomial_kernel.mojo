@@ -1,6 +1,4 @@
-# =============================================================================
 # multinomial_kernel.mojo — GPU multinomial sampling (Gumbel-max trick)
-# =============================================================================
 #
 # Strategy: fused kernel using the Gumbel-max trick:
 #   sample = argmax_c ( log_prob[c] + Gumbel_c ),  Gumbel_c ~ Gumbel(0,1)
@@ -33,16 +31,18 @@
 #   classes per Philox call, consuming all 4 generated values instead
 #   of wasting 3/4.
 #
-# =============================================================================
 
 from std.random.philox import Random as PhiloxRandom
-from std.gpu import thread_idx, block_idx, block_dim, barrier
+from max.gpu import thread_idx, block_idx, block_dim
+from max.gpu import barrier
 from std.memory import AddressSpace, stack_allocation
 from std.math import log
-from tenmo.ndbuffer import NDBuffer
-from tenmo.device import GPU, DeviceState
-from tenmo.shapes import Shape
-from tenmo.mnemonics import DEFAULT_INDEX_DTYPE
+from ..shared.layout import Layout
+from ..gpu.transfer import materialize_contiguous
+from ..gpu.device import GPU, DeviceState
+from ..shared.shapes import Shape
+from ..shared.mnemonics import DEFAULT_INDEX_DTYPE
+from std.utils.numerics import neg_inf
 
 
 def multinomial_fused_kernel[
@@ -55,18 +55,18 @@ def multinomial_fused_kernel[
     #   log-prob is set to neg_inf after each draw so it cannot be
     #   re-selected.  The caller passes a deep copy; the original is
     #   never touched.
-    log_probs: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    log_probs: Pointer[Scalar[dtype], MutAnyOrigin],
     # output: [B, K] GPU-resident output indices (Int32).
     #   output[row * K + s] = argmax_c (log_prob[row, c] + Gumbel[row,s,c])
-    output: UnsafePointer[Scalar[index_dtype], MutAnyOrigin],
-    batch_size: Int,
-    num_classes: Int,
-    num_samples: Int,
+    output: Pointer[Scalar[index_dtype], MutAnyOrigin],
+    batch_size_: Int64,
+    num_classes_: Int64,
+    num_samples_: Int64,
     seed: UInt64,
-    with_replacement: Int,  # 0 = without, 1 = with replacement
+    with_replacement_: Int64,  # 0 = without, 1 = with replacement
 ):
     """
-    Fused Gumbel-max multinomial kernel.
+        Fused Gumbel-max multinomial kernel.
 
     One block per batch row, K iterations per block.  Within each
     iteration each thread scores a contiguous chunk of classes
@@ -81,6 +81,10 @@ def multinomial_fused_kernel[
     # grid_dim == batch_size always — all launched blocks are valid.
     # No early-return guard needed.
 
+    var batch_size = Int(batch_size_)
+    var num_classes = Int(num_classes_)
+    var num_samples = Int(num_samples_)
+    var with_replacement = Int(with_replacement_)
     var tid = Int(thread_idx.x)
     var block_size = Int(block_dim.x)
     var row_base = row * num_classes
@@ -98,7 +102,7 @@ def multinomial_fused_kernel[
     var chunk_end = min(chunk_start + chunk_size, num_classes)
 
     for s in range(num_samples):
-        # ── Phase 1: per-thread scoring ──────────────────────────────────
+        # Phase 1: per-thread scoring
         #
         # Thread tid owns a contiguous chunk of ~num_classes/block_size
         # classes.  Within each chunk, 4 consecutive classes are processed
@@ -126,7 +130,7 @@ def multinomial_fused_kernel[
                 var gumbel_f32 = -log(-log(u))
                 var gumbel = Scalar[dtype](gumbel_f32)
                 var idx = c + lane
-                var score = log_probs[row_base + idx] + gumbel
+                var score = log_probs[unsafe_offset=row_base + idx] + gumbel
 
                 if score > best_val:
                     best_val = score
@@ -134,30 +138,30 @@ def multinomial_fused_kernel[
 
             c += 4
 
-        # ── Phase 2: tree reduction for per-row argmax ───────────────────
-        smem_val[tid] = best_val
-        smem_idx[tid] = best_idx
+        # Phase 2: tree reduction for per-row argmax
+        smem_val[unsafe_offset=tid] = best_val
+        smem_idx[unsafe_offset=tid] = best_idx
         barrier()
 
         var stride = block_size >> 1
         while stride > 0:
             if tid < stride:
-                if smem_val[tid + stride] > smem_val[tid]:
-                    smem_val[tid] = smem_val[tid + stride]
-                    smem_idx[tid] = smem_idx[tid + stride]
+                if smem_val[unsafe_offset=tid + stride] > smem_val[unsafe_offset=tid]:
+                    smem_val[unsafe_offset=tid] = smem_val[unsafe_offset=tid + stride]
+                    smem_idx[unsafe_offset=tid] = smem_idx[unsafe_offset=tid + stride]
             barrier()
             stride >>= 1
 
-        # ── Phase 3: write result + handle without-replacement ───────────
+        # Phase 3: write result + handle without-replacement
         if tid == 0:
-            output[row * num_samples + s] = smem_idx[0]
+            output[unsafe_offset=row * num_samples + s] = smem_idx[unsafe_offset=0]
 
             if with_replacement == 0 and s < num_samples - 1:
                 # Zero this class in log-space so it won't be re-selected.
                 # No renormalisation needed — the Gumbel-max trick's
                 # conditional distribution naturally handles a category
                 # with log-prob = -inf (probability = 0).
-                log_probs[row_base + smem_idx[0].__int__()] = neg_inf[dtype]()
+                log_probs[unsafe_offset=row_base + smem_idx[unsafe_offset=0].__int__()] = neg_inf[dtype]()
 
         # barrier() ensures the zeroing write (by thread 0) is visible to
         # all threads before the next sample iteration reads log_probs.
@@ -165,32 +169,34 @@ def multinomial_fused_kernel[
 
 
 @fieldwise_init
-struct MultinomialGpuKernel[
+struct MultinomialKernel[
     dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE
-](ImplicitlyCopyable & Movable):
+](ImplicitlyCopyable):
     """
-    Fused Gumbel-max multinomial sampler on GPU.
+        Fused Gumbel-max multinomial sampler on GPU.
 
     Usage (from within a comptime if has_accelerator() guard):
-        var out_ndb = MultinomialGpuKernel[dtype, index_dtype].launch(
+        var out_ndb = MultinomialKernel[dtype, index_dtype].launch(
             log_probs_ndb, out_shape, num_samples, seed, replacement
         )
     """
 
     @staticmethod
     def launch(
-        log_probs: NDBuffer[Self.dtype],
+        log_probs_layout: Layout,
+        log_probs_device_state: DeviceState[Self.dtype],
         out_shape: Shape,
         num_samples: Int,
         seed: UInt64,
         with_replacement: Bool,
         sync: Bool = False,
-    ) raises -> NDBuffer[Self.index_dtype]:
+    ) raises -> Tuple[Layout, DeviceState[Self.index_dtype]]:
         """
-        Launch the fused Gumbel-max multinomial kernel.
+                Launch the fused Gumbel-max multinomial kernel.
 
         Args:
-            log_probs:  [B, C] log-probabilities, GPU-resident.
+            log_probs_layout: Layout of [B, C] log-probabilities, GPU-resident.
+            log_probs_device_state: DeviceState holding the log-probabilities.
             out_shape:  Output shape — (K,) for 1D input, (B, K) for 2D.
             num_samples: Number of samples to draw per batch row.
             seed:       Philox seed for deterministic random noise.
@@ -198,7 +204,7 @@ struct MultinomialGpuKernel[
             sync:       GPU synchronize before returning.
 
         Returns:
-            NDBuffer[DType.int32] on GPU with shape out_shape.
+            (Layout, DeviceState[DType.int32]) on GPU with shape out_shape.
 
         Notes:
             - log_probs is NOT modified; an internal contiguous copy is
@@ -209,22 +215,20 @@ struct MultinomialGpuKernel[
               samples, because neg_inf + finite_Gumbel = neg_inf, and
               neg_inf > neg_inf is false in IEEE 754.
         """
-        debug_assert(
-            log_probs.is_on_gpu(),
-            "MultinomialGpuKernel.launch requires GPU-resident input",
-        )
         if not with_replacement:
             debug_assert(
-                num_samples <= log_probs.shape[-1],
+                num_samples <= log_probs_layout.shape[-1],
                 "without-replacement multinomial requires num_samples <="
                 " num_classes, but got num_samples="
                 + String(num_samples)
                 + " > num_classes="
-                + String(log_probs.shape[-1]),
+                + String(log_probs_layout.shape[-1]),
             )
 
-        var batch_size = 1 if log_probs.rank() == 1 else log_probs.shape[0]
-        var num_classes = log_probs.shape[-1]
+        var batch_size = (
+            1 if log_probs_layout.rank() == 1 else log_probs_layout.shape[0]
+        )
+        var num_classes = log_probs_layout.shape[-1]
         var output_flat_size = batch_size * num_samples
 
         debug_assert(
@@ -239,9 +243,11 @@ struct MultinomialGpuKernel[
         # Deep contiguous copy — the kernel modifies this copy in-place
         # for without-replacement zeroing.  The caller's tensor is never
         # touched.
-        var contig_state = log_probs.contiguous_device_state()
+        var contig_state = materialize_contiguous(
+            log_probs_device_state, log_probs_layout
+        )
 
-        ref device_state = log_probs.device_state.value()
+        ref device_state = log_probs_device_state
         ref gpu = device_state.get_gpu()
         var device_context = gpu[]
 
@@ -263,20 +269,17 @@ struct MultinomialGpuKernel[
             multinomial_fused_kernel[
                 Self.dtype, Self.index_dtype, MAX_BLOCK_SIZE
             ],
-            multinomial_fused_kernel[
-                Self.dtype, Self.index_dtype, MAX_BLOCK_SIZE
-            ],
         ]()
 
         device_context.enqueue_function(
             compiled,
             contig_state.device_buffer(),
             out_device_buf,
-            batch_size,
-            num_classes,
-            num_samples,
+            Int64(batch_size),
+            Int64(num_classes),
+            Int64(num_samples),
             seed,
-            1 if with_replacement else 0,
+            Int64(1 if with_replacement else 0),
             grid_dim=batch_size,
             block_dim=block_size,
         )
@@ -285,6 +288,7 @@ struct MultinomialGpuKernel[
             device_context.synchronize()
 
         var out_state = DeviceState[Self.index_dtype](out_device_buf^, gpu)
-        return NDBuffer[Self.index_dtype].with_device_state(
-            out_state^, out_shape
+        return (
+            Layout(out_shape),
+            out_state^,
         )

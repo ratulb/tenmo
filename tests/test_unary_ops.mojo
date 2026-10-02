@@ -1,7 +1,7 @@
 from std.testing import assert_true, TestSuite
 from tenmo.tensor import Tensor
 from std.sys import has_accelerator
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

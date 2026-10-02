@@ -1,19 +1,22 @@
 from .tensor import Tensor
 from .gradbox import Gradbox
-from .intarray import IntArray
+from .shared.intarray import IntArray
 from std.math import sqrt
 from std.sys import simd_width_of, has_accelerator
-from .common_utils import panic
-from .kernels import SGDStep
+from std.memory import unsafe_memcpy
+from std.python import Python, PythonObject
+from .shared.panic import panic
+from .kernels import SGDKernel
+from .numpy_interop import to_ndarray, ndarray_ptr, checked_ndarray_ptr
 
 
 @fieldwise_init
-struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
+struct SGD[dtype: DType](ImplicitlyCopyable & Writable):
     """
-    SGD with momentum, weight decay, and gradient clipping.
+        SGD with momentum, weight decay, and gradient clipping.
     """
 
-    var parameters: List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]
+    var parameters: List[Pointer[Tensor[Self.dtype], MutUntrackedOrigin]]
     var lr: Scalar[Self.dtype]
     var momentum: Scalar[Self.dtype]
     var weight_decay: Scalar[Self.dtype]
@@ -22,9 +25,15 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
     var velocities: List[Gradbox[Self.dtype]]
     var use_momentum: Bool
 
+    def write_to[W: Writer](self, mut writer: W):
+        writer.write("SGD")
+
+    def write_repr_to[W: Writer](self, mut writer: W):
+        writer.write("SGD")
+
     def __init__(
         out self,
-        parameters: List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]],
+        parameters: List[Pointer[Tensor[Self.dtype], MutAnyOrigin]],
         lr: Scalar[Self.dtype] = 0.01,
         momentum: Scalar[Self.dtype] = 0.0,
         weight_decay: Scalar[Self.dtype] = 0.0,
@@ -33,7 +42,11 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
     ):
         if clip_norm < 0 or clip_value < 0:
             panic("Clip_norm and clip_value must be >= 0")
-        self.parameters = parameters.copy()
+        self.parameters = List[
+            Pointer[Tensor[Self.dtype], MutUntrackedOrigin]
+        ](capacity=len(parameters))
+        for p in parameters:
+            self.parameters.append(p.unsafe_origin_cast[MutUntrackedOrigin]())
         self.lr = lr
         self.momentum = momentum
         self.weight_decay = weight_decay
@@ -52,7 +65,6 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                             Gradbox[Self.dtype].full(
                                 parameter.shape(),
                                 Scalar[Self.dtype](0),
-
                                 device=parameter.device(),
                             )
                         )
@@ -79,23 +91,23 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         self.use_momentum = copy.use_momentum
         self.velocities = copy.velocities.copy()
 
-    def __init__(out self, deinit existing: Self):
-        self.parameters = existing.parameters^
-        self.lr = existing.lr
-        self.momentum = existing.momentum
-        self.weight_decay = existing.weight_decay
-        self.clip_norm = existing.clip_norm
-        self.clip_value = existing.clip_value
-        self.use_momentum = existing.use_momentum
-        self.velocities = existing.velocities^
+    def __init__(out self, *, deinit move: Self):
+        self.parameters = move.parameters^
+        self.lr = move.lr
+        self.momentum = move.momentum
+        self.weight_decay = move.weight_decay
+        self.clip_norm = move.clip_norm
+        self.clip_value = move.clip_value
+        self.use_momentum = move.use_momentum
+        self.velocities = move.velocities^
 
     @always_inline
     def _step_no_momentum[
         simd_w: Int
     ](
         self,
-        param_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
-        grad_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        param_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
+        grad_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
         num_elements: Int,
     ):
         var lr_vec = SIMD[Self.dtype, simd_w](self.lr)
@@ -104,29 +116,29 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         var vec_end = (num_elements // simd_w) * simd_w
 
         for _ in range(vec_end // simd_w):
-            var p_vec = param_ptr.load[width=simd_w](j)
-            var g_vec = grad_ptr.load[width=simd_w](j)
+            var p_vec = param_ptr.unsafe_load[width=simd_w](j)
+            var g_vec = grad_ptr.unsafe_load[width=simd_w](j)
             if self.weight_decay > 0:
                 g_vec += p_vec * wd_vec
             p_vec -= lr_vec * g_vec
-            param_ptr.store[width=simd_w](j, p_vec)
+            param_ptr.unsafe_store[width=simd_w](j, p_vec)
             j += simd_w
 
         for k in range(vec_end, num_elements):
-            var p = param_ptr[k]
-            var g = grad_ptr[k]
+            var p = param_ptr[unsafe_offset=k]
+            var g = grad_ptr[unsafe_offset=k]
             if self.weight_decay > 0:
                 g += p * self.weight_decay
-            param_ptr[k] = p - self.lr * g
+            param_ptr[unsafe_offset=k] = p - self.lr * g
 
     @always_inline
     def _apply_momentum[
         simd_w: Int
     ](
         self,
-        param_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
-        grad_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
-        vel_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        param_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
+        grad_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
+        vel_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
         num_elements: Int,
     ):
         var lr_vec = SIMD[Self.dtype, simd_w](self.lr)
@@ -136,33 +148,33 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         var vec_end = (num_elements // simd_w) * simd_w
 
         for _ in range(vec_end // simd_w):
-            var p_vec = param_ptr.load[width=simd_w](j)
-            var g_vec = grad_ptr.load[width=simd_w](j)
-            var v_vec = vel_ptr.load[width=simd_w](j)
+            var p_vec = param_ptr.unsafe_load[width=simd_w](j)
+            var g_vec = grad_ptr.unsafe_load[width=simd_w](j)
+            var v_vec = vel_ptr.unsafe_load[width=simd_w](j)
             if self.weight_decay > 0:
                 g_vec += p_vec * wd_vec
             v_vec = momentum_vec * v_vec + g_vec
-            vel_ptr.store[width=simd_w](j, v_vec)
+            vel_ptr.unsafe_store[width=simd_w](j, v_vec)
             p_vec -= lr_vec * v_vec
-            param_ptr.store[width=simd_w](j, p_vec)
+            param_ptr.unsafe_store[width=simd_w](j, p_vec)
             j += simd_w
 
         for k in range(vec_end, num_elements):
-            var p = param_ptr[k]
-            var g = grad_ptr[k]
-            var v = vel_ptr[k]
+            var p = param_ptr[unsafe_offset=k]
+            var g = grad_ptr[unsafe_offset=k]
+            var v = vel_ptr[unsafe_offset=k]
             if self.weight_decay > 0:
                 g += p * self.weight_decay
             v = self.momentum * v + g
-            vel_ptr[k] = v
-            param_ptr[k] = p - self.lr * v
+            vel_ptr[unsafe_offset=k] = v
+            param_ptr[unsafe_offset=k] = p - self.lr * v
 
     @always_inline
     def _zero_rows_ptr[
         simd_w: Int
     ](
         self,
-        ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
         row_width: Int,
         indices: IntArray,
     ):
@@ -173,18 +185,18 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             var j = 0
             var vec_end = (row_width // simd_w) * simd_w
             for _ in range(vec_end // simd_w):
-                ptr.store[width=simd_w](base + j, zero_vec)
+                ptr.unsafe_store[width=simd_w](base + j, zero_vec)
                 j += simd_w
             for col in range(vec_end, row_width):
-                ptr[base + col] = 0
+                ptr[unsafe_offset=base + col] = 0
 
     @always_inline
     def _step_no_momentum_sparse[
         simd_w: Int
     ](
         self,
-        param_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
-        grad_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        param_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
+        grad_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
         row_width: Int,
         indices: IntArray,
     ):
@@ -196,28 +208,28 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             var j = 0
             var vec_end = (row_width // simd_w) * simd_w
             for _ in range(vec_end // simd_w):
-                var p_vec = param_ptr.load[width=simd_w](base + j)
-                var g_vec = grad_ptr.load[width=simd_w](base + j)
+                var p_vec = param_ptr.unsafe_load[width=simd_w](base + j)
+                var g_vec = grad_ptr.unsafe_load[width=simd_w](base + j)
                 if self.weight_decay > 0:
                     g_vec += p_vec * wd_vec
                 p_vec -= lr_vec * g_vec
-                param_ptr.store[width=simd_w](base + j, p_vec)
+                param_ptr.unsafe_store[width=simd_w](base + j, p_vec)
                 j += simd_w
             for col in range(vec_end, row_width):
-                var p = param_ptr[base + col]
-                var g = grad_ptr[base + col]
+                var p = param_ptr[unsafe_offset=base + col]
+                var g = grad_ptr[unsafe_offset=base + col]
                 if self.weight_decay > 0:
                     g += p * self.weight_decay
-                param_ptr[base + col] = p - self.lr * g
+                param_ptr[unsafe_offset=base + col] = p - self.lr * g
 
     @always_inline
     def _apply_momentum_sparse[
         simd_w: Int
     ](
         self,
-        param_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
-        grad_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
-        vel_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        param_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
+        grad_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
+        vel_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
         row_width: Int,
         indices: IntArray,
     ):
@@ -230,32 +242,32 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             var j = 0
             var vec_end = (row_width // simd_w) * simd_w
             for _ in range(vec_end // simd_w):
-                var p_vec = param_ptr.load[width=simd_w](base + j)
-                var g_vec = grad_ptr.load[width=simd_w](base + j)
-                var v_vec = vel_ptr.load[width=simd_w](base + j)
+                var p_vec = param_ptr.unsafe_load[width=simd_w](base + j)
+                var g_vec = grad_ptr.unsafe_load[width=simd_w](base + j)
+                var v_vec = vel_ptr.unsafe_load[width=simd_w](base + j)
                 if self.weight_decay > 0:
                     g_vec += p_vec * wd_vec
                 v_vec = momentum_vec * v_vec + g_vec
-                vel_ptr.store[width=simd_w](base + j, v_vec)
+                vel_ptr.unsafe_store[width=simd_w](base + j, v_vec)
                 p_vec -= lr_vec * v_vec
-                param_ptr.store[width=simd_w](base + j, p_vec)
+                param_ptr.unsafe_store[width=simd_w](base + j, p_vec)
                 j += simd_w
             for col in range(vec_end, row_width):
-                var p = param_ptr[base + col]
-                var g = grad_ptr[base + col]
-                var v = vel_ptr[base + col]
+                var p = param_ptr[unsafe_offset=base + col]
+                var g = grad_ptr[unsafe_offset=base + col]
+                var v = vel_ptr[unsafe_offset=base + col]
                 if self.weight_decay > 0:
                     g += p * self.weight_decay
                 v = self.momentum * v + g
-                vel_ptr[base + col] = v
-                param_ptr[base + col] = p - self.lr * v
+                vel_ptr[unsafe_offset=base + col] = v
+                param_ptr[unsafe_offset=base + col] = p - self.lr * v
 
     @always_inline
     def _apply_clip_norm_to_ptr[
         simd_w: Int
     ](
         self,
-        grad_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        grad_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
         num_elements: Int,
         clip_coef: Scalar[Self.dtype],
     ):
@@ -263,18 +275,18 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         var j = 0
         var vec_end = (num_elements // simd_w) * simd_w
         for _ in range(vec_end // simd_w):
-            var g_vec = grad_ptr.load[width=simd_w](j)
-            grad_ptr.store[width=simd_w](j, g_vec * clip_vec)
+            var g_vec = grad_ptr.unsafe_load[width=simd_w](j)
+            grad_ptr.unsafe_store[width=simd_w](j, g_vec * clip_vec)
             j += simd_w
         for k in range(vec_end, num_elements):
-            grad_ptr[k] *= clip_coef
+            grad_ptr[unsafe_offset=k] *= clip_coef
 
     @always_inline
     def _apply_clip_value_to_ptr[
         simd_w: Int
     ](
         self,
-        grad_ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        grad_ptr: Pointer[Scalar[Self.dtype], MutAnyOrigin],
         num_elements: Int,
     ):
         var min_val = -self.clip_value
@@ -284,11 +296,15 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         var j = 0
         var vec_end = (num_elements // simd_w) * simd_w
         for _ in range(vec_end // simd_w):
-            var g_vec = grad_ptr.load[width=simd_w](j)
-            grad_ptr.store[width=simd_w](j, g_vec.clamp(min_vec, max_vec))
+            var g_vec = grad_ptr.unsafe_load[width=simd_w](j)
+            grad_ptr.unsafe_store[width=simd_w](
+                j, g_vec.clamp(min_vec, max_vec)
+            )
             j += simd_w
         for k in range(vec_end, num_elements):
-            grad_ptr[k] = max(min_val, min(max_val, grad_ptr[k]))
+            grad_ptr[unsafe_offset=k] = max(
+                min_val, min(max_val, grad_ptr[unsafe_offset=k])
+            )
 
     def compute_grad_norm(self) -> Scalar[Self.dtype]:
         var total_norm_sq: Scalar[Self.dtype] = 0.0
@@ -306,19 +322,23 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                     try:
                         var ds = grad.buffer().device_state.value()
                         with ds.buffer.map_to_host() as host:
-                            var grad_ptr = host.unsafe_ptr().bitcast[
-                                Scalar[Self.dtype]
-                            ]()
+                            var grad_ptr = (
+                                host.unsafe_ptr()
+                                .unsafe_bitcast[Scalar[Self.dtype]]()
+                                .unsafe_origin_cast[MutAnyOrigin]()
+                            )
                             var norm_vec = SIMD[Self.dtype, simd_w](0)
                             var j = 0
                             var vec_end = (num_elements // simd_w) * simd_w
                             for _ in range(vec_end // simd_w):
-                                var g_vec = grad_ptr.load[width=simd_w](j)
+                                var g_vec = grad_ptr.unsafe_load[width=simd_w](
+                                    j
+                                )
                                 norm_vec += g_vec * g_vec
                                 j += simd_w
                             total_norm_sq += norm_vec.reduce_add()
                             for k in range(vec_end, num_elements):
-                                var g = grad_ptr[k]
+                                var g = grad_ptr[unsafe_offset=k]
                                 total_norm_sq += g * g
                     except e:
                         panic("SGD.compute_grad_norm GPU failed: " + String(e))
@@ -330,12 +350,12 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             var j = 0
             var vec_end = (num_elements // simd_w) * simd_w
             for _ in range(vec_end // simd_w):
-                var g_vec = grad_ptr.load[width=simd_w](j)
+                var g_vec = grad_ptr.unsafe_load[width=simd_w](j)
                 norm_vec += g_vec * g_vec
                 j += simd_w
             total_norm_sq += norm_vec.reduce_add()
             for k in range(vec_end, num_elements):
-                var g = grad_ptr[k]
+                var g = grad_ptr[unsafe_offset=k]
                 total_norm_sq += g * g
 
         return sqrt(total_norm_sq)
@@ -360,9 +380,9 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                                 var ds = grad.buffer().device_state.value()
                                 with ds.buffer.map_to_host() as host:
                                     self._apply_clip_norm_to_ptr[simd_w](
-                                        host.unsafe_ptr().bitcast[
-                                            Scalar[Self.dtype]
-                                        ](),
+                                        host.unsafe_ptr()
+                                        .unsafe_bitcast[Scalar[Self.dtype]]()
+                                        .unsafe_origin_cast[MutAnyOrigin](),
                                         num_elements,
                                         clip_coef,
                                     )
@@ -388,9 +408,9 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                             var ds = grad.buffer().device_state.value()
                             with ds.buffer.map_to_host() as host:
                                 self._apply_clip_value_to_ptr[simd_w](
-                                    host.unsafe_ptr().bitcast[
-                                        Scalar[Self.dtype]
-                                    ](),
+                                    host.unsafe_ptr()
+                                    .unsafe_bitcast[Scalar[Self.dtype]]()
+                                    .unsafe_origin_cast[MutAnyOrigin](),
                                     num_elements,
                                 )
                         except e:
@@ -404,7 +424,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
     @always_inline
     def step(mut self, indices: IntArray = IntArray()):
         """
-        Optimized parameter update.
+                Optimized parameter update.
 
         When `indices` is provided and non-empty, performs a sparse row-wise
         update: only the rows specified in `indices` are updated (2D parameters
@@ -450,27 +470,27 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                                 )
                                 with param_ds.buffer.map_to_host() as param_host, grad_ds.buffer.map_to_host() as grad_host, vel_ds.buffer.map_to_host() as vel_host:
                                     self._apply_momentum_sparse[simd_w](
-                                        param_host.unsafe_ptr().bitcast[
-                                            Scalar[Self.dtype]
-                                        ](),
-                                        grad_host.unsafe_ptr().bitcast[
-                                            Scalar[Self.dtype]
-                                        ](),
-                                        vel_host.unsafe_ptr().bitcast[
-                                            Scalar[Self.dtype]
-                                        ](),
+                                        param_host.unsafe_ptr()
+                                        .unsafe_bitcast[Scalar[Self.dtype]]()
+                                        .unsafe_origin_cast[MutAnyOrigin](),
+                                        grad_host.unsafe_ptr()
+                                        .unsafe_bitcast[Scalar[Self.dtype]]()
+                                        .unsafe_origin_cast[MutAnyOrigin](),
+                                        vel_host.unsafe_ptr()
+                                        .unsafe_bitcast[Scalar[Self.dtype]]()
+                                        .unsafe_origin_cast[MutAnyOrigin](),
                                         row_width,
                                         indices,
                                     )
                             else:
                                 with param_ds.buffer.map_to_host() as param_host, grad_ds.buffer.map_to_host() as grad_host:
                                     self._step_no_momentum_sparse[simd_w](
-                                        param_host.unsafe_ptr().bitcast[
-                                            Scalar[Self.dtype]
-                                        ](),
-                                        grad_host.unsafe_ptr().bitcast[
-                                            Scalar[Self.dtype]
-                                        ](),
+                                        param_host.unsafe_ptr()
+                                        .unsafe_bitcast[Scalar[Self.dtype]]()
+                                        .unsafe_origin_cast[MutAnyOrigin](),
+                                        grad_host.unsafe_ptr()
+                                        .unsafe_bitcast[Scalar[Self.dtype]]()
+                                        .unsafe_origin_cast[MutAnyOrigin](),
                                         row_width,
                                         indices,
                                     )
@@ -507,19 +527,30 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                             var param_ndb = parameter.buffer.copy()
                             var grad_ndb = grad.buffer().copy()
                             var vel_ndb = velocity.buffer().copy()
-                            SGDStep[Self.dtype].launch_momentum(
-                                param_ndb^, grad_ndb^, vel_ndb^,
+                            SGDKernel[Self.dtype].launch_momentum(
+                                param_ndb.layout(),
+                                param_ndb.device_state.value(),
+                                grad_ndb.layout(),
+                                grad_ndb.device_state.value(),
+                                vel_ndb.layout(),
+                                vel_ndb.device_state.value(),
                                 num_elements,
-                                self.lr, self.momentum, self.weight_decay,
+                                self.lr,
+                                self.momentum,
+                                self.weight_decay,
                                 sync=False,
                             )
                         else:
                             var param_ndb = parameter.buffer.copy()
                             var grad_ndb = grad.buffer().copy()
-                            SGDStep[Self.dtype].launch_no_momentum(
-                                param_ndb^, grad_ndb^,
+                            SGDKernel[Self.dtype].launch_no_momentum(
+                                param_ndb.layout(),
+                                param_ndb.device_state.value(),
+                                grad_ndb.layout(),
+                                grad_ndb.device_state.value(),
                                 num_elements,
-                                self.lr, self.weight_decay,
+                                self.lr,
+                                self.weight_decay,
                                 sync=False,
                             )
                     except e:
@@ -545,7 +576,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
     @always_inline
     def zero_grad(mut self, indices: IntArray = IntArray()):
         """
-        Zero gradients.
+                Zero gradients.
 
         When `indices` is provided and non-empty, only zero the specified
         rows of 2D gradient buffers (sparse mode). Falls back to dense
@@ -594,3 +625,76 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
 
     def set_weight_decay(mut self, weight_decay: Scalar[Self.dtype]):
         self.weight_decay = weight_decay
+
+    def state_dict(self) raises -> PythonObject:
+        var np = Python.import_module("numpy")
+        var state: PythonObject = {}
+        state["type"] = "SGD"
+        state["lr"] = np.array([Float64(self.lr)])
+        state["momentum"] = np.array([Float64(self.momentum)])
+        state["weight_decay"] = np.array([Float64(self.weight_decay)])
+        state["clip_norm"] = np.array([Float64(self.clip_norm)])
+        state["clip_value"] = np.array([Float64(self.clip_value)])
+        if self.use_momentum:
+            var vel_list = Python.list()
+            for i in range(len(self.velocities)):
+                vel_list.append(to_ndarray(self.velocities[i]))
+            state["velocities"] = vel_list
+        return state
+
+    @staticmethod
+    def load_state_dict(
+        state: PythonObject,
+        parameters: List[Pointer[Tensor[Self.dtype], MutAnyOrigin]],
+    ) raises -> Self:
+        var np = Python.import_module("numpy")
+
+        var lr = Scalar[Self.dtype](
+            checked_ndarray_ptr[DType.float64](state["lr"], 1, "SGD:lr").unsafe_load()
+        )
+        var momentum = Scalar[Self.dtype](
+            checked_ndarray_ptr[DType.float64](
+                state["momentum"], 1, "SGD:momentum"
+            ).unsafe_load()
+        )
+        var weight_decay = Scalar[Self.dtype](
+            checked_ndarray_ptr[DType.float64](
+                state["weight_decay"], 1, "SGD:weight_decay"
+            ).unsafe_load()
+        )
+        var clip_norm = Scalar[Self.dtype](
+            checked_ndarray_ptr[DType.float64](
+                state["clip_norm"], 1, "SGD:clip_norm"
+            ).unsafe_load()
+        )
+        var clip_value = Scalar[Self.dtype](
+            checked_ndarray_ptr[DType.float64](
+                state["clip_value"], 1, "SGD:clip_value"
+            ).unsafe_load()
+        )
+
+        var opt = Self(
+            parameters,
+            lr=lr,
+            momentum=momentum,
+            weight_decay=weight_decay,
+            clip_norm=clip_norm,
+            clip_value=clip_value,
+        )
+
+        if opt.use_momentum and state.__contains__("velocities"):
+            var saved_velocities = state["velocities"]
+            for i in range(len(opt.velocities)):
+                var vel_nd = saved_velocities[i]
+                ref dst_gradbox = opt.velocities[i]
+                var dst_ndb = dst_gradbox.buffer()
+                var src_ptr = checked_ndarray_ptr[Self.dtype](
+                    vel_nd, dst_ndb.numels(), "SGD:velocities"
+                )
+                unsafe_memcpy(
+                    dest=dst_ndb.data_ptr().unsafe_mut_cast[True](),
+                    src=src_ptr,
+                    count=dst_ndb.numels(),
+                )
+
+        return opt^

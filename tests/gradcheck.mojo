@@ -1,5 +1,7 @@
-from tenmo import Tensor, DEFAULT_INDEX_DTYPE
-from tenmo.common_utils import log_debug, RED, CYAN
+from tenmo.tensor import Tensor
+from tenmo.shared.mnemonics import DEFAULT_INDEX_DTYPE
+from tenmo.shared.ansi import CYAN, RED
+from tenmo.shared.logging import log_debug
 from tenmo.net import Sequential
 
 comptime dtype = DType.float32

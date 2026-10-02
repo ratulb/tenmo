@@ -1,31 +1,10 @@
 from std.random.philox import Random as PhiloxRandom
 from std.sys import simd_width_of
-from std.gpu import thread_idx, block_dim, grid_dim, block_idx
-from tenmo.ndbuffer import NDBuffer
-from . import elementwise_launch_config
-from tenmo.device import GPU, DeviceState
-
-
-# Key design points:
-#
-# 1. Philox RNG — each thread gets an independent random stream:
-#      rng = PhiloxRandom(seed=seed, subsequence=global_thread_id, offset=0)
-#    subsequence isolates per-thread streams → no race conditions.
-#    Same seed → same mask for a given forward call (reproducible).
-#
-# 2. step_uniform() returns SIMD[float32, 4] — four values per call.
-#    For non-float32 dtypes, cast after comparison.
-#
-# 3. Writes TWO output buffers in one pass (same pattern as unary_ops_with_mask):
-#    result[i] = input[i] * mask[i]
-#    mask[i]   = scale if rand > p else 0   (scale baked in)
-#
-# 4. No dtype.is_floating_point() constraint needed —
-#    Dropout on integer tensors is unusual but the kernel is dtype-generic.
-#    Callers should guard at the Module level if desired.
-#
-# 5. Chunk/stride pattern mirrors existing kernels exactly.
-#
+from max.gpu import thread_idx, block_dim, grid_dim, block_idx
+from ..shared.layout import Layout
+from ..gpu.transfer import materialize_contiguous
+from .kernel_helpers import elementwise_launch_config
+from ..gpu.device import GPU, DeviceState
 
 
 def dropout_forward_kernel[
@@ -33,10 +12,10 @@ def dropout_forward_kernel[
     simd_width: Int = simd_width_of[dtype](),
     simd_vectors_per_thread: Int = 2 * simd_width,
 ](
-    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    mask_out: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    size: Int,
+    result: Pointer[Scalar[dtype], MutAnyOrigin],
+    mask_out: Pointer[Scalar[dtype], MutAnyOrigin],
+    A: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    size_: Int64,
     p: Scalar[dtype],  # dropout probability
     scale: Scalar[dtype],  # 1 / (1 - p)
     rng_seed: UInt64,  # forwarded from Dropout.seed
@@ -50,7 +29,23 @@ def dropout_forward_kernel[
     Writes:
         result[i]   = A[i] * mask[i]
         mask_out[i] = scale  if rand > p  else 0
+
+    Key design points:
+    1. Philox RNG — each thread gets an independent random stream:
+         rng = PhiloxRandom(seed=seed, subsequence=global_thread_id, offset=0)
+       subsequence isolates per-thread streams → no race conditions.
+       Same seed → same mask for a given forward call (reproducible).
+    2. step_uniform() returns SIMD[float32, 4] — four values per call.
+       For non-float32 dtypes, cast after comparison.
+    3. Writes TWO output buffers in one pass (same pattern as unary_ops_with_mask):
+       result[i] = input[i] * mask[i]
+       mask[i]   = scale if rand > p else 0   (scale baked in)
+    4. No dtype.is_floating_point() constraint needed —
+       Dropout on integer tensors is unusual but the kernel is dtype-generic.
+       Callers should guard at the Module level if desired.
+    5. Chunk/stride pattern mirrors existing kernels exactly.
     """
+    var size = Int(size_)
     var tid = thread_idx.x
     var gtid = Int(tid + block_dim.x * block_idx.x)
     var stride = Int(block_dim.x * grid_dim.x)
@@ -69,7 +64,7 @@ def dropout_forward_kernel[
             var i = base_idx + item * simd_width
 
             if i + simd_width <= size:
-                var x_vec = A.load[width=simd_width](i)
+                var x_vec = A.unsafe_load[width=simd_width](i)
 
                 # Philox produces SIMD[float32, 4] per call.
                 # We process simd_width elements per vector; call step_uniform
@@ -88,74 +83,72 @@ def dropout_forward_kernel[
                     mask_vec[lane] = m
                     res_vec[lane] = x_vec[lane] * m
 
-                result.store[width=simd_width](i, res_vec)
-                mask_out.store[width=simd_width](i, mask_vec)
+                result.unsafe_store[width=simd_width](i, res_vec)
+                mask_out.unsafe_store[width=simd_width](i, mask_vec)
 
             elif i < size:
                 # Scalar tail
                 for j in range(size - i):
                     var rand_f32_scalar = rng.step_uniform()
                     var r = rand_f32_scalar[0].cast[dtype]()
-                    var x_val = A[i + j]
+                    var x_val = A[unsafe_offset=i + j]
                     var m = scale_s if r > p else zero_s
-                    result[i + j] = x_val * m
-                    mask_out[i + j] = m
+                    result[unsafe_offset=i + j] = x_val * m
+                    mask_out[unsafe_offset=i + j] = m
 
         base_idx += stride * CHUNK_SIZE
 
 
-# =============================================================================
-# DropoutKernel launcher
-# =============================================================================
-#
-#
-# Returns Tuple[NDBuffer, NDBuffer] — (output, mask) — both on GPU.
-# Follows the same pattern as UnaryOpsKernel.launch_with_mask:
-#   1. contiguous_device_state() for non-contiguous input (single map_to_host)
-#   2. Allocate two output DeviceBuffers
-#   3. Compile and enqueue dropout_forward_kernel
-#   4. Wrap results in DeviceState → NDBuffer via with_device_state()
-#
-# Non-contiguous input:
-#   Same fix as ReLU — contiguous_device_state() does ONE map_to_host sweep.
-#   The kernel then operates on the flat buffer. No per-element host calls.
-# =============================================================================
-
-
-struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
+struct DropoutKernel[dtype: DType](ImplicitlyCopyable):
+    """DropoutKernel launcher
+    Returns (output, mask) — both on GPU — as (Layout, Storage) pairs.
+    Follows the same pattern as UnaryOpsKernel.launch_with_mask:
+      1. materialize_contiguous for non-contiguous input (single map_to_host)
+      2. Allocate two output DeviceBuffers
+      3. Compile and enqueue dropout_forward_kernel
+      4. Wrap results in DeviceState → (Layout, Storage) pairs
+    Non-contiguous input:
+      Same fix as ReLU — materialize_contiguous does ONE map_to_host sweep.
+      The kernel then operates on the flat buffer. No per-element host calls.
+    """
     @staticmethod
     def launch(
-        A: NDBuffer[Self.dtype],
+        A_layout: Layout,
+        A_device_state: DeviceState[Self.dtype],
         p: Scalar[Self.dtype],
         scale: Scalar[Self.dtype],
         rng_seed: UInt64,
         sync: Bool = False,
-    ) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+    ) raises -> Tuple[Tuple[Layout, DeviceState[Self.dtype]], Tuple[Layout, DeviceState[Self.dtype]]]:
         """Launch dropout forward kernel. Returns (output, mask) on GPU.
 
         Args:
-            A:        Input NDBuffer. Must be on GPU.
-            p:        Dropout probability.
-            scale:    1 / (1 - p).
-            rng_seed: Seed forwarded to Philox — same seed → same mask.
+            A_layout:       Input layout. Must be on GPU.
+            A_device_state: Input device state (storage). Must be on GPU.
+            p:              Dropout probability.
+            scale:          1 / (1 - p).
+            rng_seed:       Seed forwarded to Philox — same seed → same mask.
+            sync:           Whether to sync GPU after operation.
 
         Returns:
-            Tuple of (output NDBuffer, mask NDBuffer), both on GPU.
+            ((out_layout, out_storage), (mask_layout, mask_storage)),
+            both on GPU.
         """
-        debug_assert(A.is_on_gpu())
 
-        var numels = A.numels()
+        var numels = A_layout.numel()
         comptime simdwidth = simd_width_of[Self.dtype]()
 
         var (num_blocks, threads_per_block) = Self.launch_config(
             numels, simdwidth
         )
 
-        ref device_state = A.device_state.value()
-        var device_context = device_state.gpu[]
+        ref gpu = A_device_state.get_gpu()
+        var device_context = gpu[]
 
         # Non-contiguous fix: single map_to_host sweep → flat contiguous buffer
-        var contig_state = A.contiguous_device_state()
+        var contig_state = materialize_contiguous(
+            A_device_state, A_layout
+        )
 
         var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
             numels
@@ -170,11 +163,6 @@ struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 simd_width=simdwidth,
                 simd_vectors_per_thread=2 * simdwidth,
             ],
-            dropout_forward_kernel[
-                dtype=Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread=2 * simdwidth,
-            ],
         ]()
 
         device_context.enqueue_function(
@@ -182,7 +170,7 @@ struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
             result_buffer,  # out: dropped values
             mask_buffer,  # out: scale mask
             contig_state.device_buffer(),  # in:  input
-            numels,
+            Int64(numels),
             p,
             scale,
             rng_seed,
@@ -190,21 +178,24 @@ struct DropoutKernel[dtype: DType](ImplicitlyCopyable & Movable):
             block_dim=threads_per_block,
         )
 
-        if sync: device_context.synchronize()
+        if sync:
+            device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
-            result_buffer^, device_state.gpu
+            result_buffer^, gpu
         )
-        var mask_state = DeviceState[Self.dtype](mask_buffer^, device_state.gpu)
+        var mask_state = DeviceState[Self.dtype](mask_buffer^, gpu)
 
-        var out_ndb = NDBuffer[Self.dtype].with_device_state(
-            result_state^, A.shape
+        var out_pair = (
+            Layout(A_layout.shape),
+            result_state^,
         )
-        var mask_ndb = NDBuffer[Self.dtype].with_device_state(
-            mask_state^, A.shape
+        var mask_pair = (
+            Layout(A_layout.shape),
+            mask_state^,
         )
 
-        return (out_ndb^, mask_ndb^)
+        return (out_pair, mask_pair)
 
     @staticmethod
     def launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:

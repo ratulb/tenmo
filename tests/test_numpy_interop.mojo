@@ -1,7 +1,8 @@
 from tenmo.tensor import Tensor
 from tenmo.numpy_interop import to_ndarray, from_ndarray
 
-from std.testing import assert_true, TestSuite
+from std.python import Python
+from std.testing import assert_true, assert_raises, TestSuite
 from std.sys import has_accelerator
 
 
@@ -175,6 +176,25 @@ def test_copy_vs_zero_copy_behavior() raises:
     assert_true((a_zero == a))
 
 
+def test_zero_copy_view_aliases_numpy() raises:
+    print("test_zero_copy_view_aliases_numpy")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
+    var nd_a = to_ndarray(a)
+    var a_zero = from_ndarray[DType.float32](nd_a, copy=False)
+    # Views of a borrowed tensor alias the NumPy buffer: a write through
+    # the transposed view lands in the NumPy array (caller-managed lifetime).
+    var v = a_zero.transpose()
+    v[0, 1] = Scalar[dtype](42.0)
+    var check = from_ndarray[DType.float32](to_ndarray(a_zero))
+    assert_true(check[1, 0] == 42.0 and check[0, 0] == 1.0)
+    # Keep-alive: the borrowed buffer aliases nd_a, whose lifetime is
+    # caller-managed — a last lexical use must come after the final
+    # borrowed access, otherwise the array may be freed early and the
+    # round-trip above reads freed memory.
+    _ = nd_a
+
+
 def test_gpu_tensor_to_numpy_contiguous() raises:
     """GPU contiguous tensor → to_ndarray must not read empty CPU buffer."""
     print("test_gpu_tensor_to_numpy_contiguous")
@@ -209,7 +229,7 @@ def test_gpu_bool_tensor_to_numpy() raises:
         var gpu_t = cpu_t.to_gpu()
         var nd = to_ndarray(gpu_t)
         var back = from_ndarray[DType.bool](nd)
-        assert_true(back.all_close(cpu_t))
+        assert_true(back == cpu_t)
 
 
 def test_gpu_tensor_print() raises:
@@ -222,3 +242,39 @@ def test_gpu_tensor_print() raises:
     comptime if has_accelerator():
         var gpu_t = cpu_t.to_gpu()
         gpu_t.print()
+
+
+def test_from_ndarray_strided_slice() raises:
+    """Non-contiguous slice input: copy path must gather strided values."""
+    print("test_from_ndarray_strided_slice")
+    var np = Python.import_module("numpy")
+    # Every 2nd element of arange(10) -> [0,2,4,6,8]. A flat memcpy from
+    # the base pointer would read [0,1,2,3,4] instead.
+    var nd = np.arange(10, dtype=np.float32)[::2]
+    assert_true(not Bool(py=nd.flags["C_CONTIGUOUS"]))
+    var back = from_ndarray[DType.float32](nd, copy=True)
+    var expect = Tensor[DType.float32].d1([0.0, 2.0, 4.0, 6.0, 8.0])
+    assert_true(back == expect)
+
+
+def test_from_ndarray_transpose() raises:
+    """Transposed (non-contiguous) input: copy path must honor strides."""
+    print("test_from_ndarray_transpose")
+    var np = Python.import_module("numpy")
+    var nd = np.arange(12, dtype=np.float32).reshape(3, 4).T
+    assert_true(not Bool(py=nd.flags["C_CONTIGUOUS"]))
+    var back = from_ndarray[DType.float32](nd, copy=True)
+    var expect = Tensor[DType.float32].d2(
+        [[0.0, 4.0, 8.0], [1.0, 5.0, 9.0], [2.0, 6.0, 10.0], [3.0, 7.0, 11.0]]
+    )
+    assert_true(back == expect)
+
+
+def test_from_ndarray_alias_rejects_strided() raises:
+    """Copy=False cannot represent strides: must raise, not alias wrong."""
+    print("test_from_ndarray_alias_rejects_strided")
+    var np = Python.import_module("numpy")
+    var nd = np.arange(10, dtype=np.float32)[::2]
+    with assert_raises():
+        var aliased = from_ndarray[DType.float32](nd, copy=False)
+        _ = aliased

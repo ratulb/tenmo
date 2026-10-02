@@ -1,9 +1,7 @@
 from std.python import Python, PythonObject
 
 
-# =============================================================================
 # IMDBTextCleaner
-# =============================================================================
 
 # Stopwords filtered BEFORE n-gram assembly only.
 # These high-frequency low-signal words create noisy bigrams/trigrams

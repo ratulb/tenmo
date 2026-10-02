@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 
 
 def main() raises:
@@ -14,8 +14,8 @@ def main() raises:
     )  # y = 2x + 3
 
     # Parameters to learn (initialized arbitrarily)
-    var w = Tensor.rand(1, requires_grad=True)
-    var b = Tensor.rand(1, requires_grad=True)
+    var w = Tensor[DType.float32].rand(1, requires_grad=True)
+    var b = Tensor[DType.float32].rand(1, requires_grad=True)
 
     var learning_rate: Scalar[DType.float32] = 0.01555
 

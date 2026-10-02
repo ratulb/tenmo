@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from std.sys import has_accelerator
-from std.testing import assert_true, TestSuite
+from std.testing import assert_true, assert_false, TestSuite
 
 
 def test_squeeze_scalar() raises:
@@ -48,7 +48,7 @@ def test_squeeze_3d_multiple_singletons() raises:
     assert_true(s.all_close(Tensor[dtype].d1([10.0, 20.0])))
     s = s.sum()
     s.backward()
-    expected_grad = Tensor[dtype].d3([[[1.0, 1.0]]])
+    var expected_grad = Tensor[dtype].d3([[[1.0, 1.0]]])
     assert_true(a.grad().all_close(expected_grad))
 
 
@@ -62,7 +62,7 @@ def test_squeeze_with_specific_dim() raises:
     assert_true(s.all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])))
     s = s.sum()
     s.backward()
-    expected_grad = Tensor[dtype].d3([[[1.0, 1.0], [1.0, 1.0]]])
+    var expected_grad = Tensor[dtype].d3([[[1.0, 1.0], [1.0, 1.0]]])
     assert_true(a.grad().all_close(expected_grad))
 
 
@@ -73,11 +73,11 @@ def test_squeeze_with_non_singleton_dim() raises:
     )
     var s = a.squeeze([1])  # valid because dim=1 has size 1
     assert_true(s.shape() == Shape(2, 2))
-    expected = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
+    var expected = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     assert_true(s.all_close(expected))
     s = s.sum()
     s.backward()
-    expected_grad = Tensor[dtype].d3([[[1.0, 1.0]], [[1.0, 1.0]]])
+    var expected_grad = Tensor[dtype].d3([[[1.0, 1.0]], [[1.0, 1.0]]])
     assert_true(a.grad().all_close(expected_grad))
 
 
@@ -91,7 +91,7 @@ def test_squeeze_keep_chain_grad() raises:
     var z = y.sum()
     z.backward()
     # z = sum(2 * a) → grad(a) = 2
-    expected_grad = Tensor[dtype].d3([[[2.0, 2.0, 2.0]]])
+    var expected_grad = Tensor[dtype].d3([[[2.0, 2.0, 2.0]]])
     assert_true(a.grad().all_close(expected_grad))
 
 
@@ -739,6 +739,30 @@ def test_squz_unsquz_gpu_round_trip_multi() raises:
 # ============================================================
 # MAIN
 # ============================================================
+
+
+def test_squeeze_requires_grad_override_noop() raises:
+    comptime dtype = DType.float32
+    # No size-1 dims: squeeze is a no-op alias path, but the explicit
+    # requires_grad=True must still produce a tracked output. (Parent is
+    # untracked, so no grad accumulates there — the pin is requires_grad
+    # plus a clean backward through the wired no-op.)
+    var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+    var s = a.squeeze(requires_grad=True)
+    assert_true(s.requires_grad)
+    var loss = s.sum()
+    loss.backward()
+
+
+def test_squeeze_requires_grad_override_false_untracks() raises:
+    comptime dtype = DType.float32
+    # Explicit requires_grad=False on a tracked input must yield an
+    # untracked output (previously the tracked alias leaked through).
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
+    var s = a.squeeze(requires_grad=False)
+    assert_false(s.requires_grad)
 
 
 def main() raises:

@@ -2,8 +2,8 @@ from std.testing import assert_true, TestSuite
 from tenmo.tensor import Tensor
 from tenmo.layernorm import *
 from std.sys import has_accelerator
-from tenmo.shapes import Shape
-from tenmo.intarray import IntArray
+from tenmo.shared.shapes import Shape
+from tenmo.shared.intarray import IntArray
 from std.math import sqrt
 
 
@@ -22,6 +22,19 @@ def test_layernorm_cpu_forward_simple() raises:
     var out_std = out.std[track_grad=False](unbiased=False)
     assert_true(out_mean.all_close[atol=1e-5](Tensor[dtype].scalar(0.0)))
     assert_true(out_std.all_close[atol=1e-4](Tensor[dtype].scalar(1.0)))
+
+def test_layernorm_cpu_forward_simple_big_parallel_path() raises:
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].arange(1, 5000).reshape(1, 4999).expand(5, 4999)
+    var gamma = Tensor[dtype].ones(Shape(4999))
+    var beta = Tensor[dtype].zeros(Shape(4999))
+    var out = LayerNormForward[dtype].forward[track_grad=False](x, gamma, beta)
+    # mean of out should be ~0, std ~1
+    var out_mean = out.mean[track_grad=False]()
+    var out_std = out.std[track_grad=False](unbiased=False)
+    assert_true(out_mean.all_close[atol=1e-5](Tensor[dtype].scalar(0.0)))
+    assert_true(out_std.all_close[atol=1e-4](Tensor[dtype].scalar(1.0)))
+
 
 def test_layernorm_cpu_forward_gamma_beta() raises:
     comptime dtype = DType.float32
@@ -71,6 +84,47 @@ def test_layernorm_cpu_backward_dx() raises:
     var dx_sum = x.grad().sum()
     assert_true(dx_sum.all_close[atol=1e-5](Tensor[dtype].scalar(0.0)))
     assert_true(x.grad().shape() == Shape(1, 4))
+
+
+def test_layernorm_cpu_forward_backward_strided_input() raises:
+    comptime dtype = DType.float32
+    # Strided input as a transposed view: logical [[1,4,7],[2,5,8]] (2,3).
+    # D=3 with non-progression rows is required: D=2 rows always normalize
+    # to +-1, progression rows are affine-identical, and property asserts
+    # (row mean~0/std~1) hold for wrong outputs too — only exact values pin.
+    # Each row has mean 4/5, var 6, r = 1/sqrt(6+eps) -> x_hat = [-3r,0,3r].
+    var base = Tensor[dtype].d2(
+        [[1.0, 2.0], [4.0, 5.0], [7.0, 8.0]], requires_grad=True
+    )
+    var x = base.transpose()  # (2,3), strided storage
+    var gamma = Tensor[dtype].ones(Shape(3), requires_grad=True)
+    var beta = Tensor[dtype].zeros(Shape(3), requires_grad=True)
+    var out = LayerNormForward[dtype].forward[track_grad=True](x, gamma, beta)
+    var expected = Tensor[dtype].d2(
+        [[-1.22474487, 0.0, 1.22474487], [-1.22474487, 0.0, 1.22474487]]
+    )
+    assert_true(out.all_close[atol=1e-5](expected))
+    # Non-uniform upstream (uniform upstream gives dx=0 for ANY x_hat since
+    # mean(x_hat)==0 by construction — blind to this bug by design):
+    # loss = (out * w).sum(), w = [[1,0,0],[0,0,0]].
+    # d_x_hat row0 = [1,0,0]: m1 = 1/3, m2 = -r -> dx row0 = [r/6,-r/3,r/6].
+    # Asserted on base (the leaf): x is a view conduit — ViewBackward routes
+    # grad to the parent and always clears the view's own gradbox, so
+    # x.grad() reads back zeros by design; base.grad() holds dx transposed.
+    var w = Tensor[dtype].d2([[1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+    var loss = (out * w).sum()
+    loss.backward()
+    var expected_dx_base = Tensor[dtype].d2(
+        [[0.0680414, 0.0], [-0.1360828, 0.0], [0.0680414, 0.0]]
+    )
+    assert_true(base.grad().all_close[atol=1e-4](expected_dx_base))
+    # dgamma = sum(upstream*x_hat) over rows = [-3r, 0, 0];
+    # dbeta = [1, 0, 0] (wiring sanity, x_hat-independent).
+    var expected_dgamma = Tensor[dtype].d1([-1.22474487, 0.0, 0.0])
+    assert_true(gamma.grad().all_close[atol=1e-4](expected_dgamma))
+    var expected_dbeta = Tensor[dtype].d1([1.0, 0.0, 0.0])
+    assert_true(beta.grad().all_close[atol=1e-5](expected_dbeta))
+    _ = base
 
 
 def test_layernorm_cpu_layer_wrapper() raises:
@@ -612,7 +666,8 @@ def test_layernorm_gpu_layer_wrapper_fwd() raises:
 def test_layernorm_gpu_layer_wrapper_bwd() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var ln_gpu = LayerNorm[dtype](4).to_gpu()
+        var ln_gpu = LayerNorm[dtype](4)
+        ln_gpu = ln_gpu.to_gpu()
         var x = Tensor[dtype].d2(
             [[1.0,2.0,3.0,4.0]], requires_grad=True
         ).to_gpu()
@@ -1198,6 +1253,126 @@ def test_layernorm_layer_gamma_ones_beta_zeros_init() raises:
     var ln = LayerNorm[dtype](4)
     assert_true(ln.gamma.all_close(Tensor[dtype].ones(Shape(4))))
     assert_true(ln.beta.all_close(Tensor[dtype].zeros(Shape(4))))
+
+
+def test_layernorm_module_direct_default_parity() raises:
+    comptime dtype = DType.float32
+    # Audit item 15: the module default eps (1e-5) and the direct-forward
+    # default eps must agree — no silent numeric divergence between call
+    # styles. Same kernel, same eps → bit-identical output.
+    var x = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0, 4.0], [2.0, 0.0, -1.0, 5.0]], requires_grad=True
+    )
+    var ln = LayerNorm[dtype](4)
+    var out_module = ln(x)
+    var gamma = Tensor[dtype].ones(Shape(4))
+    var beta = Tensor[dtype].zeros(Shape(4))
+    var out_direct = LayerNormForward[dtype].forward[track_grad=False](
+        x, gamma, beta
+    )
+    assert_true(out_module == out_direct)
+
+
+def layernorm_fd_loss(
+    x: Tensor[DType.float32],
+    gamma: Tensor[DType.float32],
+    beta: Tensor[DType.float32],
+    w: Tensor[DType.float32],
+) -> Scalar[DType.float32]:
+    """Weighted-loss forward for finite differences (no graph)."""
+    var out = LayerNormForward[DType.float32].forward[track_grad=False](
+        x, gamma, beta
+    )
+    var loss = (out * w).sum()
+    return loss.item()
+
+
+def test_layernorm_bwd_finite_diff_batched() raises:
+    comptime dtype = DType.float32
+    # Batched (B=2, T=3, D=4) central differences vs analytic grads.
+    # The weighted loss is load-bearing: loss = out.sum() (uniform upstream)
+    # gives dx == 0 for ANY x_hat, so it cannot catch a miswired three-term
+    # formula. The batched shape exercises the sequential axis-0 reduction
+    # loops for d_gamma/d_beta. Follows the test_cnn.mojo clone()+perturb
+    # pattern (perturb a clone, never the live tensor).
+    var eps = Scalar[dtype](1e-3)
+    var tol = Scalar[dtype](1e-2)
+    var _tmp = Tensor[dtype].arange(1.0, 25.0)
+    var x = _tmp.reshape(2, 3, 4).contiguous()
+    x.requires_grad_(True)
+    var gamma = Tensor[dtype].d1([2.0, 0.5, 1.0, 1.5], requires_grad=True)
+    var beta = Tensor[dtype].d1([0.1, -0.2, 0.3, 0.0], requires_grad=True)
+    var w = Tensor[dtype].arange(1.0, 25.0).reshape(2, 3, 4) * 0.05
+
+    var out = LayerNormForward[dtype].forward[track_grad=True](x, gamma, beta)
+    var loss = (out * w).sum()
+    loss.backward()
+
+    for idx in range(x.numels()):
+        var xp = x.clone()
+        xp.buffer.data_buffer()[idx] += eps
+        var lp = layernorm_fd_loss(xp, gamma, beta, w)
+        var xm = x.clone()
+        xm.buffer.data_buffer()[idx] -= eps
+        var lm = layernorm_fd_loss(xm, gamma, beta, w)
+        var num = (lp - lm) / (Scalar[dtype](2.0) * eps)
+        var an = x.gradbox[].buffer().buffer[idx]
+        assert_true(
+            abs(an - num) < tol, "layernorm fd dx idx=" + String(idx)
+        )
+
+    for idx in range(gamma.numels()):
+        var gp = gamma.clone()
+        gp.buffer.data_buffer()[idx] += eps
+        var lp = layernorm_fd_loss(x, gp, beta, w)
+        var gm = gamma.clone()
+        gm.buffer.data_buffer()[idx] -= eps
+        var lm = layernorm_fd_loss(x, gm, beta, w)
+        var num = (lp - lm) / (Scalar[dtype](2.0) * eps)
+        var an = gamma.gradbox[].buffer().buffer[idx]
+        assert_true(
+            abs(an - num) < tol, "layernorm fd dgamma idx=" + String(idx)
+        )
+
+    for idx in range(beta.numels()):
+        var bp = beta.clone()
+        bp.buffer.data_buffer()[idx] += eps
+        var lp = layernorm_fd_loss(x, gamma, bp, w)
+        var bm = beta.clone()
+        bm.buffer.data_buffer()[idx] -= eps
+        var lm = layernorm_fd_loss(x, gamma, bm, w)
+        var num = (lp - lm) / (Scalar[dtype](2.0) * eps)
+        var an = beta.gradbox[].buffer().buffer[idx]
+        assert_true(
+            abs(an - num) < tol, "layernorm fd dbeta idx=" + String(idx)
+        )
+
+
+def test_layernorm_cpu_offset_strided_gamma_beta_view() raises:
+    comptime dtype = DType.float32
+    # Sliced gamma/beta (offset != 0 / strided): pass 2 reads them flat from
+    # index 0, so forward must materialize a contiguous copy. Without the
+    # guard this silently computes with the wrong elements.
+    var x = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0]])
+    var gamma = Tensor[dtype].d1([2.0, 0.5, 1.0, 1.5])
+    var beta = Tensor[dtype].d1([0.1, -0.2, 0.3, 0.0])
+    var ref_ = LayerNormForward[dtype].forward[track_grad=False](
+        x, gamma, beta
+    )
+    # Offset view: same values, storage offset 1.
+    var big_g = Tensor[dtype].d1([99.0, 2.0, 0.5, 1.0, 1.5, 88.0])
+    var big_b = Tensor[dtype].d1([9.0, 0.1, -0.2, 0.3, 0.0, 8.0])
+    var out_off = LayerNormForward[dtype].forward[track_grad=False](
+        x, big_g.slice(1, 5), big_b.slice(1, 5)
+    )
+    assert_true(out_off.all_close[atol=1e-5](ref_))
+    # Strided view: same values at stride 2.
+    var big_gs = Tensor[dtype].d1([2.0, 99.0, 0.5, 99.0, 1.0, 99.0, 1.5, 99.0])
+    var big_bs = Tensor[dtype].d1([0.1, 9.0, -0.2, 9.0, 0.3, 9.0, 0.0, 9.0])
+    var out_str = LayerNormForward[dtype].forward[track_grad=False](
+        x, big_gs.slice(0, 8, 2), big_bs.slice(0, 8, 2)
+    )
+    assert_true(out_str.all_close[atol=1e-5](ref_))
 
 
 def main() raises:

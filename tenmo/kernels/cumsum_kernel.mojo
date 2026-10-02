@@ -1,28 +1,31 @@
-# === Cumsum GPU kernel  —  thread-per-frame sequential scan ===
+# Cumsum GPU kernel  —  thread-per-frame sequential scan
 #
 # For a tensor with shape folded to (outer, axis_size, inner), each
 # thread scans one frame (fixed outer x inner coordinate) along the
 # axis dimension.  Coalesced when inner=1 (axis is innermost);
 # L1-cache-friendly otherwise for small-to-moderate inner sizes.
 
-from std.gpu import thread_idx, block_dim, grid_dim, block_idx
+from max.gpu import thread_idx, block_dim, grid_dim, block_idx
 from std.sys import simd_width_of
 
-from tenmo.ndbuffer import NDBuffer
-from . import elementwise_launch_config
-from tenmo.device import DeviceState
-from tenmo.common_utils import panic
+from ..shared.layout import Layout
+from ..gpu.transfer import materialize_contiguous
+from .kernel_helpers import elementwise_launch_config
+from ..gpu.device import DeviceState
 
 
 def cumsum_kernel[
     dtype: DType,
 ](
-    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    axis_size: Int,
-    inner: Int,
-    outer: Int,
+    result: Pointer[Scalar[dtype], MutAnyOrigin],
+    A: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    axis_size_: Int64,
+    inner_: Int64,
+    outer_: Int64,
 ):
+    var axis_size = Int(axis_size_)
+    var inner = Int(inner_)
+    var outer = Int(outer_)
     var tid = thread_idx.x
     var gtid = tid + block_dim.x * block_idx.x
     var stride = block_dim.x * grid_dim.x
@@ -34,13 +37,13 @@ def cumsum_kernel[
         var i_local = idx % inner
         var base = (o * axis_size + 0) * inner + i_local
 
-        var running = A[base]
-        result[base] = running
+        var running = A[unsafe_offset=base]
+        result[unsafe_offset=base] = running
 
         for k in range(1, axis_size):
             var pos = base + k * inner
-            running += A[pos]
-            result[pos] = running
+            running += A[unsafe_offset=pos]
+            result[unsafe_offset=pos] = running
 
         idx += stride
 
@@ -48,12 +51,15 @@ def cumsum_kernel[
 def cumsum_backward_kernel[
     dtype: DType,
 ](
-    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    grad: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    axis_size: Int,
-    inner: Int,
-    outer: Int,
+    result: Pointer[Scalar[dtype], MutAnyOrigin],
+    grad: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    axis_size_: Int64,
+    inner_: Int64,
+    outer_: Int64,
 ):
+    var axis_size = Int(axis_size_)
+    var inner = Int(inner_)
+    var outer = Int(outer_)
     var tid = thread_idx.x
     var gtid = tid + block_dim.x * block_idx.x
     var stride = block_dim.x * grid_dim.x
@@ -66,41 +72,43 @@ def cumsum_backward_kernel[
         var i_local = idx % inner
         var base = (o * axis_size + last_k) * inner + i_local
 
-        var running = grad[base]
-        result[base] = running
+        var running = grad[unsafe_offset=base]
+        result[unsafe_offset=base] = running
 
         for k in range(1, axis_size):
             var pos = base - k * inner
-            running += grad[pos]
-            result[pos] = running
+            running += grad[unsafe_offset=pos]
+            result[unsafe_offset=pos] = running
 
         idx += stride
 
 
-struct CumsumGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
+struct CumsumKernel[dtype: DType](ImplicitlyCopyable):
     comptime datatype: DType = DType.uint8 if Self.dtype == DType.bool else Self.dtype
 
     @staticmethod
     def launch(
-        A: NDBuffer[Self.dtype],
+        A_layout: Layout,
+        A_device_state: DeviceState[Self.dtype],
         axis: Int,
         outer: Int,
         axis_size: Int,
         inner: Int,
         sync: Bool = False,
-    ) raises -> NDBuffer[Self.dtype]:
-        debug_assert(A.is_on_gpu())
+    ) raises -> Tuple[Layout, DeviceState[Self.dtype]]:
         var total_frames = outer * inner
-        var numels = A.numels()
+        var numels = A_layout.numel()
 
         comptime simdwidth = simd_width_of[Self.datatype]()
         var (num_blocks, threads_per_block) = elementwise_launch_config(
             total_frames, simdwidth
         )
 
-        ref device_state = A.device_state.value()
-        var device_context = device_state.gpu[]
-        var contig_state = A.contiguous_device_state()
+        ref gpu = A_device_state.get_gpu()
+        var device_context = gpu[]
+        var contig_state = materialize_contiguous(
+            A_device_state, A_layout
+        )
 
         var result_buffer = device_context.enqueue_create_buffer[Self.datatype](
             numels
@@ -108,15 +116,14 @@ struct CumsumGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         var compiled = device_context.compile_function[
             cumsum_kernel[Self.datatype],
-            cumsum_kernel[Self.datatype],
         ]()
         device_context.enqueue_function(
             compiled,
             result_buffer,
             contig_state.device_buffer(),
-            axis_size,
-            inner,
-            outer,
+            Int64(axis_size),
+            Int64(inner),
+            Int64(outer),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
@@ -124,32 +131,39 @@ struct CumsumGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
         if sync:
             device_context.synchronize()
 
+        # bool-as-uint8: skip sub-buffer creation (buffer dtype != Self.dtype when bool)
         var result_state = DeviceState[Self.dtype].__init__[True](
-            result_buffer^, device_state.gpu
+            result_buffer^, gpu
         )
-        return NDBuffer[Self.dtype].with_device_state(result_state^, A.shape)
+
+        return (
+            Layout(A_layout.shape),
+            result_state^,
+        )
 
     @staticmethod
     def launch_backward(
-        grad: NDBuffer[Self.dtype],
+        grad_layout: Layout,
+        grad_device_state: DeviceState[Self.dtype],
         axis: Int,
         outer: Int,
         axis_size: Int,
         inner: Int,
         sync: Bool = False,
-    ) raises -> NDBuffer[Self.dtype]:
-        debug_assert(grad.is_on_gpu())
+    ) raises -> Tuple[Layout, DeviceState[Self.dtype]]:
         var total_frames = outer * inner
-        var numels = grad.numels()
+        var numels = grad_layout.numel()
 
         comptime simdwidth = simd_width_of[Self.datatype]()
         var (num_blocks, threads_per_block) = elementwise_launch_config(
             total_frames, simdwidth
         )
 
-        ref device_state = grad.device_state.value()
-        var device_context = device_state.gpu[]
-        var contig_state = grad.contiguous_device_state()
+        ref gpu = grad_device_state.get_gpu()
+        var device_context = gpu[]
+        var contig_state = materialize_contiguous(
+            grad_device_state, grad_layout
+        )
 
         var result_buffer = device_context.enqueue_create_buffer[Self.datatype](
             numels
@@ -157,15 +171,14 @@ struct CumsumGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         var compiled = device_context.compile_function[
             cumsum_backward_kernel[Self.datatype],
-            cumsum_backward_kernel[Self.datatype],
         ]()
         device_context.enqueue_function(
             compiled,
             result_buffer,
             contig_state.device_buffer(),
-            axis_size,
-            inner,
-            outer,
+            Int64(axis_size),
+            Int64(inner),
+            Int64(outer),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
@@ -173,7 +186,12 @@ struct CumsumGpuKernel[dtype: DType](ImplicitlyCopyable & Movable):
         if sync:
             device_context.synchronize()
 
+        # bool-as-uint8: skip sub-buffer creation (buffer dtype != Self.dtype when bool)
         var result_state = DeviceState[Self.dtype].__init__[True](
-            result_buffer^, device_state.gpu
+            result_buffer^, gpu
         )
-        return NDBuffer[Self.dtype].with_device_state(result_state^, grad.shape)
+
+        return (
+            Layout(grad_layout.shape),
+            result_state^,
+        )

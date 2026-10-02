@@ -1,4 +1,3 @@
-# =============================================================================
 # concate_kernel.mojo — GPU concatenation copy kernel
 #
 # Strategy: one kernel launch per input tensor. A comptime bool `forward`
@@ -22,14 +21,11 @@
 # This is correct for any concat axis because row-major strides depend only
 # on later dimensions (which are identical between parent and output), and
 # the integer arithmetic correctly handles the different axis sizes.
-# =============================================================================
 
-from std.gpu import thread_idx, block_dim, grid_dim, block_idx
-from std.sys import has_accelerator
-from tenmo.ndbuffer import NDBuffer
-from tenmo.device import GPU, DeviceState
-from tenmo.shapes import Shape
-from tenmo.common_utils import panic
+from max.gpu import thread_idx, block_dim, grid_dim, block_idx
+from ..shared.layout import Layout
+from ..gpu.transfer import materialize_contiguous
+from ..gpu.device import GPU, DeviceState
 from .kernel_helpers import elementwise_launch_config
 
 
@@ -37,16 +33,16 @@ def concate_copy_kernel[
     dtype: DType,
     forward: Bool,
 ](
-    src: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    dst: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    num_elements: Int,
-    input_axis_size: Int,
-    output_axis_size: Int,
-    stride_axis: Int,
-    offset: Int,
+    src: Pointer[Scalar[dtype], ImmutAnyOrigin],
+    dst: Pointer[Scalar[dtype], MutAnyOrigin],
+    num_elements_: Int64,
+    input_axis_size_: Int64,
+    output_axis_size_: Int64,
+    stride_axis_: Int64,
+    offset_: Int64,
 ):
     """
-    GPU kernel for concatenation copy.
+        GPU kernel for concatenation copy.
 
     Iterates over the smaller (parent) tensor with a grid-stride loop.
     For each flat index, decomposes to coordinates, applies the concat-axis
@@ -55,14 +51,19 @@ def concate_copy_kernel[
     Args:
         src: Source buffer pointer.
         dst: Destination buffer pointer.
-        num_elements: Number of elements in the parent-sized tensor.
-        input_axis_size: Parent's concat axis size.
-        output_axis_size: Total concat axis size (output).
-        stride_axis: Stride of the concat axis (= product of later dims).
-        offset: Cumulative concat axis offset for this parent.
+        num_elements_: Number of elements in the parent-sized tensor.
+        input_axis_size_: Parent's concat axis size.
+        output_axis_size_: Total concat axis size (output).
+        stride_axis_: Stride of the concat axis (= product of later dims).
+        offset_: Cumulative concat axis offset for this parent.
     """
-    var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
-    var gstride = Int(block_dim.x * grid_dim.x)
+    var num_elements = Int(num_elements_)
+    var input_axis_size = Int(input_axis_size_)
+    var output_axis_size = Int(output_axis_size_)
+    var stride_axis = Int(stride_axis_)
+    var offset = Int(offset_)
+    var gtid = thread_idx.x + block_dim.x * block_idx.x
+    var gstride = block_dim.x * grid_dim.x
     var before_divisor = input_axis_size * stride_axis
 
     var flat = gtid
@@ -71,24 +72,24 @@ def concate_copy_kernel[
         var coord = (flat // stride_axis) % input_axis_size
         var after = flat % stride_axis
 
-        var mapped = before * output_axis_size * stride_axis
-                   + (coord + offset) * stride_axis
-                   + after
+        var mapped = (
+            before * output_axis_size * stride_axis
+            + (coord + offset) * stride_axis
+            + after
+        )
 
         comptime if forward:
-            dst[mapped] = src[flat]
+            dst[unsafe_offset=mapped] = src[unsafe_offset=flat]
         else:
-            dst[flat] = src[mapped]
+            dst[unsafe_offset=flat] = src[unsafe_offset=mapped]
 
         flat += gstride
 
 
 @fieldwise_init
-struct ConcateGpuKernel[dtype: DType](
-    ImplicitlyCopyable & Movable
-):
+struct ConcatKernel[dtype: DType](ImplicitlyCopyable):
     """
-    GPU concatenation kernel launcher.
+        GPU concatenation kernel launcher.
 
     Provides `launch_forward` and `launch_backward` static methods for
     GPU-resident concatenation and its backward pass.
@@ -103,25 +104,25 @@ struct ConcateGpuKernel[dtype: DType](
     def _launch[
         forward: Bool,
     ](
-        src_ndb: NDBuffer[Self.dtype],
-        dst_ndb: NDBuffer[Self.dtype],
+        src_layout: Layout,
+        src_device_state: DeviceState[Self.dtype],
+        dst_layout: Layout,
+        dst_device_state: DeviceState[Self.dtype],
         input_axis_size: Int,
         output_axis_size: Int,
         stride_axis: Int,
         offset: Int,
     ) raises -> None:
         """
-        Internal launch helper.
+                Internal launch helper.
 
         Makes src contiguous (if needed), enqueues the copy kernel, and
         synchronises.  dst must already be contiguous (freshly allocated).
         """
-        debug_assert(src_ndb.is_on_gpu(), "ConcateGpuKernel requires GPU src")
-        debug_assert(dst_ndb.is_on_gpu(), "ConcateGpuKernel requires GPU dst")
 
-        var num_elements = src_ndb.numels()
+        var num_elements = src_layout.numel()
 
-        ref dst_state = dst_ndb.device_state.value()
+        ref dst_state = dst_device_state
         ref gpu = dst_state.get_gpu()
         var device_context = gpu[]
 
@@ -132,10 +133,11 @@ struct ConcateGpuKernel[dtype: DType](
 
         # Materialize contiguous src — stored locally so the DeviceBuffer
         # reference stays valid through the sync.
-        var contig_src_state = src_ndb.contiguous_device_state()
+        var contig_src_state = materialize_contiguous(
+            src_device_state, src_layout
+        )
 
         var compiled = device_context.compile_function[
-            concate_copy_kernel[Self.dtype, forward],
             concate_copy_kernel[Self.dtype, forward],
         ]()
 
@@ -143,22 +145,24 @@ struct ConcateGpuKernel[dtype: DType](
             compiled,
             contig_src_state.device_buffer(),
             dst_state.device_buffer(),
-            num_elements,
-            input_axis_size,
-            output_axis_size,
-            stride_axis,
-            offset,
+            Int64(num_elements),
+            Int64(input_axis_size),
+            Int64(output_axis_size),
+            Int64(stride_axis),
+            Int64(offset),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
 
-        # Sync so the local contig_src_state can be freed on return.
+        # Sync so the local contig_src_state can be unsafe_freed on return.
         device_context.synchronize()
 
     @staticmethod
     def launch_forward(
-        src: NDBuffer[Self.dtype],
-        dst: NDBuffer[Self.dtype],
+        src_layout: Layout,
+        src_device_state: DeviceState[Self.dtype],
+        dst_layout: Layout,
+        dst_device_state: DeviceState[Self.dtype],
         input_axis_size: Int,
         output_axis_size: Int,
         stride_axis: Int,
@@ -168,15 +172,23 @@ struct ConcateGpuKernel[dtype: DType](
 
         dst[mapped(flat)] = src[flat]  for all flat in [0, src.numels())
         """
-        ConcateGpuKernel[Self.dtype]._launch[True](
-            src, dst,
-            input_axis_size, output_axis_size, stride_axis, offset,
+        ConcatKernel[Self.dtype]._launch[True](
+            src_layout,
+            src_device_state,
+            dst_layout,
+            dst_device_state,
+            input_axis_size,
+            output_axis_size,
+            stride_axis,
+            offset,
         )
 
     @staticmethod
     def launch_backward(
-        grad_output: NDBuffer[Self.dtype],
-        grad_input: NDBuffer[Self.dtype],
+        grad_output_layout: Layout,
+        grad_output_device_state: DeviceState[Self.dtype],
+        grad_input_layout: Layout,
+        grad_input_device_state: DeviceState[Self.dtype],
         parent_axis_size: Int,
         output_axis_size: Int,
         stride_axis: Int,
@@ -186,7 +198,13 @@ struct ConcateGpuKernel[dtype: DType](
 
         grad_input[flat] = grad_output[mapped(flat)] for all flat.
         """
-        ConcateGpuKernel[Self.dtype]._launch[False](
-            grad_output, grad_input,
-            parent_axis_size, output_axis_size, stride_axis, offset,
+        ConcatKernel[Self.dtype]._launch[False](
+            grad_output_layout,
+            grad_output_device_state,
+            grad_input_layout,
+            grad_input_device_state,
+            parent_axis_size,
+            output_axis_size,
+            stride_axis,
+            offset,
         )

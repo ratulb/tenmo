@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from std.sys import has_accelerator
 
 
@@ -794,7 +794,7 @@ def test_tile_parity_using_zero_grad() raises:
 
         var loss_cpu = a_cpu.tile([3]).sum()
         loss_cpu.backward()
-        var cpu_grad = a_cpu.grad().copy()
+        var cpu_grad = a_cpu.grad().clone()
 
         a_cpu.zero_grad()
 

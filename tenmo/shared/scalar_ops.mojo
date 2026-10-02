@@ -1,4 +1,4 @@
-# === Scalar Operations  —  Single home for all per-element functions ===
+# Scalar Operations  —  Single home for all per-element functions
 #
 # Every function here is a pure Scalar[dtype] → Scalar[dtype] (or → Bool)
 # transformation.  No buffer, shape, stride, or device knowledge.
@@ -6,8 +6,8 @@
 # Both NDBuffer and CpuArithmeticOps import from here instead of duplicating
 # or calling across module boundaries.  Test files should import too.
 
-from tenmo.common_utils import Epsilon, One
-from tenmo.mnemonics import (
+from .constants import Epsilon, One
+from .mnemonics import (
     Multiply,
     Add,
     Subtract,
@@ -40,18 +40,16 @@ from std.math import sqrt, log, exp, tanh, rsqrt
 
 
 struct ScalarOps[dtype: DType](
-    ImplicitlyCopyable & Movable & Equatable & Writable
+    ImplicitlyCopyable & Equatable & Writable
 ):
-    """Namespace for per-element arithmetic, unary, loss, and comparison
-    operations on Scalar[dtype] values.
+    """Namespace for per-element arithmetic, unary, loss, and comparison ops.
+    Operates on Scalar[dtype] values.
 
     All methods are @staticmethod; the struct exists only to carry the
     dtype parameter so that Self.dtype resolves correctly inside each.
     """
 
-    # ------------------------------------------------------------------
     # Float64 cast helper  (used by PRODUCT reduction)
-    # ------------------------------------------------------------------
 
     @staticmethod
     @always_inline
@@ -97,12 +95,6 @@ struct ScalarOps[dtype: DType](
             return Self.cast_result[Self.dtype](sign * exp(excl_log))
 
 
-# =============================================================================
-# Standalone SIMD and scalar op dispatch — shared by CPU broadcast and GPU
-# kernel paths.  Avoids duplicating the comptime op dispatch logic.
-# =============================================================================
-
-
 @always_inline
 def simd_op[
     op_code: Int,
@@ -113,10 +105,20 @@ def simd_op[
     b: SIMD[dtype, simd_width],
     epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ) -> SIMD[dtype, simd_width]:
+    """Standalone SIMD and scalar op dispatch.
+    Shared by CPU broadcast and GPU kernel paths. Avoids duplicating the
+    comptime op dispatch logic.
+    """
     var one = SIMD[dtype, simd_width](One[dtype].value())
     var eps = SIMD[dtype, simd_width](epsilon)
 
-    comptime if op_code == Add:
+    comptime if dtype == DType.bool and op_code == Add:
+        return a | b
+    elif dtype == DType.bool and op_code == Subtract:
+        return a ^ b
+    elif dtype == DType.bool and op_code == Multiply:
+        return a & b
+    elif op_code == Add:
         return a + b
     elif op_code == Subtract:
         return a - b
@@ -160,7 +162,13 @@ def scalar_op[
 ) -> Scalar[dtype]:
     var one = One[dtype].value()
 
-    comptime if op_code == Add:
+    comptime if dtype == DType.bool and op_code == Add:
+        return a | b
+    elif dtype == DType.bool and op_code == Subtract:
+        return a ^ b
+    elif dtype == DType.bool and op_code == Multiply:
+        return a & b
+    elif op_code == Add:
         return a + b
     elif op_code == Subtract:
         return a - b
@@ -220,11 +228,49 @@ def float_unary_op[
     comptime if op_code == LOG:
         return log(max(scalar, epsilon))
     elif op_code == SIGMOID_FORWARD:
-        return One[dtype].value() / (One[dtype].value() + exp(scalar))
+        return One[dtype].value() / (One[dtype].value() + exp(-scalar))
     elif op_code == TANH_FORWARD:
         return tanh(scalar)
     else:  # op_code == EXP
         return exp(scalar)
+
+
+@always_inline
+def unary_op_simd[
+    op_code: Int,
+    dtype: DType,
+    simd_width: Int,
+](block: SIMD[dtype, simd_width],) -> SIMD[dtype, simd_width]:
+    """Standalone unary SIMD dispatch — mirrors unary_op semantics."""
+    comptime if op_code == NEGATE:
+        return -block
+    elif op_code == SQRT:
+        return sqrt(block)
+    else:  # op_code == ABS
+        return block.__abs__()
+
+
+@always_inline
+def float_unary_op_simd[
+    op_code: Int,
+    dtype: DType,
+    simd_width: Int,
+    epsilon: Scalar[dtype] = Epsilon[dtype].value(),
+](
+    block: SIMD[dtype, simd_width],
+) -> SIMD[dtype, simd_width] where dtype.is_floating_point():
+    """Standalone float unary SIMD dispatch.
+    Mirrors the contiguous Buffer.float_unary_ops path (exp(-x) sigmoid
+    form)."""
+    var one = SIMD[dtype, simd_width](One[dtype].value())
+    comptime if op_code == LOG:
+        return log(max(block, epsilon))
+    elif op_code == SIGMOID_FORWARD:
+        return one / (one + exp(-block))
+    elif op_code == TANH_FORWARD:
+        return tanh(block)
+    else:  # op_code == EXP
+        return exp(block)
 
 
 @always_inline

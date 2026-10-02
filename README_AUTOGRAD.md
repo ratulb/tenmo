@@ -1,11 +1,9 @@
 # Tenmo — Autograd Deep Dive
 
-This document explains **how forward and backward pass work** in Tenmo's autograd system.
-
-> ⚠️ **WIP** — Created to document the architecture clearly for users and contributors.
+This document explains **how forward and backward pass work** in Tenmo's autograd system, with real code from the implementation.
 
 ---
-## 🏗️ Architecture
+## Architecture
 
 ![Tenmo Architecture](docs/architecture.svg)
 
@@ -20,7 +18,7 @@ No hidden CUDA kernels. No opaque `torch.autograd.Function`. Every backward pass
 **2. The design is principled.**
 - Type-erased dispatch instead of variant explosion
 - Lightweight ancestry handles instead of recursive Tensor copies
-- Independent gradbox refcounting for memory safety
+- Shared-from-birth gradient storage for memory safety
 - Compile-time graph elimination (`track_grad: Bool`)
 
 **3. Zero overhead in inference.**
@@ -39,52 +37,97 @@ If you want to *understand* autograd — not just use it — this document walks
 
 ```mojo
 struct Tensor[dtype: DType](
-    ImplicitlyCopyable & Movable & Sized & Writable & Absable & Equatable & Iterable
+    ImplicitlyCopyable & Sized & Writable & Absable & Equatable & Iterable
 ):
-    var _id: UInt                           # unique identity for graph traversal
-    var buffer: NDBuffer[Self.dtype]       # shape, strides, offset, data (single source of truth)
-    var requires_grad: Bool                 # gradient tracking flag
-    var gradbox: Optional[Gradbox[Self.dtype]]   # gradient storage (allocated only when needed)
-    var ancestors: Optional[Ancestors[Self.dtype]]  # lightweight parent handles for autograd graph
 ```
 
 ### Gradbox — Gradient Storage
 
 ```mojo
 struct Gradbox[dtype: DType](
-    ImplicitlyCopyable & Movable & Sized & Writable & Equatable & Absable
+    ImplicitlyCopyable & Sized & Writable & Equatable & Absable
 ):
-    var _ndb_ptr: Optional[UnsafePointer[NDBuffer[Self.dtype], MutAnyOrigin]]   # heap-allocated NDBuffer
-    var _refcount: Optional[UnsafePointer[Atomic[DType.uint64], MutAnyOrigin]]  # independent atomic refcount
+    var handle: NDBufferLite[Self.dtype]
 ```
 
-**Key design**: Gradbox has its own refcount. When Mojo ASAP-destroys an intermediate tensor, the gradbox survives if other ancestors still reference it.
+**Key design**: Gradbox is a thin wrapper over its `NDBufferLite` handle. Gradient storage comes from the Buffer's `[rc|data]` block, allocated **shared-from-birth**, so the Buffer's atomic refcount (not a Gradbox-owned one) keeps the gradient storage alive across Mojo's ASAP destruction of intermediates. `var b = a` aliases the same gradient storage (refcount bump); `clone()` deep-copies. The former combined `[Atomic | NDBuffer]` handle was removed in the 2026-08-29 storage cleanup.
 
 ### Ancestor — Lightweight Parent Handle
 
 ```mojo
-struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
+struct Ancestor[dtype: DType](ImplicitlyCopyable):
     var _id: UInt                           # graph traversal key
     var requires_grad: Bool                 # skip gradient update if False
     var gradbox: Optional[Gradbox[Self.dtype]]   # gradient storage (inline via Optional)
-    var ndb: Optional[NDBuffer[Self.dtype]]      # data+layout (None unless needs_parent_data=True)
+    var ndb: NDBufferLite[Self.dtype]       # data+layout (empty unless needs_parent_data=True)
     var parents: Optional[Ancestors[Self.dtype]] # recursive ancestry chain
 ```
 
 **Why not store full Tensors?** The old design copied entire Tensors at every `add_ancestry` call — triggering recursive copies, gradbox allocations, and heap blocks. `Ancestor` carries only what backward actually needs.
 
-### BackwardFnArg — Type-Erased Operation Argument
+### Ancestry/Ancestors — Dtype-Erased Parent Storage
+
+The parent list behind every node is **dtype-erased** (node erasure, 2026-08):
 
 ```mojo
-struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
-    var op_code: Int                     # dispatch tag (e.g., BACKWARD_MULTIPLY_SCALAR)
-    var ptr: UnsafePointer[UInt8, MutAnyOrigin]   # type-erased argument (scalar, shape, etc.)
-    var destroy: DestroyerFn                        # custom destructor
-    var copy_fn: CopyFn                           # custom copier
-    var needs_parent_data: Bool                    # whether backward reads parent shape/buffer
+struct ParentNode(ImplicitlyCopyable):
+    var ptr: Pointer[UInt8, MutUntrackedOrigin]  # byte pointer to a true Ancestor[dtype]
+    var tag: DType                               # stored node's dtype
+    var destroy_fn: DestroyerFn                  # instantiated at wrap time
+    var copy_fn: CopyFn
+
+struct Ancestry(Sized & Movable):
+    var origins: List[ParentNode]   # dtype-erased nodes
+    var backwardFn: BackwardFn      # non-generic container
+
+struct Ancestors[dtype: DType](Sized & ImplicitlyCopyable):
+    # refcounted handle over one combined [Atomic | Ancestry] heap allocation
+    var _ptr: Optional[Pointer[Ancestry, MutUntrackedOrigin]]
+    var _refcount: Optional[Pointer[Atomic[UInt64], MutUntrackedOrigin]]
 ```
 
-This is the key: a **jump table** dispatch instead of variant extraction.
+Every op snapshots its parents in O(1) via the shared refcounted handle instead
+of deep-copying subtrees. Because storage is erased, one backward traversal can
+mix dtypes — e.g. an `f32` leaf reached through an `f16` cast: `to_dtype`
+registers `ToDtypeBackward[src, dst]` (`cast.mojo`) for float→float conversions,
+registration uses `append_erased[pt]`, and backward restores nodes with
+`get_erased(i).as[T]()` (tag-checked in debug). Same-dtype accessors
+(`get`/`ref_get`) assert tags too.
+
+### BackwardFn — Type-Erased Handler + Argument
+
+```mojo
+struct BackwardFn(ImplicitlyCopyable):        # deliberately non-generic
+    var ptr: Pointer[UInt8, MutUntrackedOrigin]  # type-erased argument payload
+    var destroy: DestroyerFn                     # custom destructor
+    var copy_fn: CopyFn                          # custom copier
+    var needs_parent_data: Bool                  # whether backward reads parent shape/buffer
+    var backward_fn: BackwardFnHandle            # type-erased handler pointer
+```
+
+`BackwardFn` is **non-generic** — the dtype parameter carried no storage
+meaning, and dropping it lets one graph mix dtypes across cast edges.
+Payload-generic factories take an explicit leading dtype parameter:
+`null_arg[dtype]`, `boolean_arg[dtype]`, `scalar_arg[dtype]`,
+`integer_arg[dtype]`, `from_intarray[dtype]`, `from_buffer[dtype]`,
+`from_ndbuffer[dtype]`. The argument taxonomy:
+
+| Payload | Carries | Used by |
+|---|---|---|
+| `NullArg` | nothing | most ops |
+| `Boolean` | `Bool` | dropout-style ops |
+| `ScalarArg` | `Scalar[dtype]` | scalar variants |
+| `Integer` | `Int` | axis-parameterized ops |
+| `IntArrayArg` | `IntArray` | transpose/unsqueeze axes |
+| `BufferArg` / `NDBufferArg` | forward data | ReLU mask; Sigmoid/Tanh/Exp outputs |
+
+`BackwardFn` carries **both** the argument payload and the backward handler, so
+the ancestor graph never references a graph type (`Ancestor`, `Tensor`). The
+handler is lifted into a raw-pointer call pointer via `make_backward_fn_handle`
+— breaking the type-level recursion that stalled GPU codegen.
+
+This is the key: **direct dispatch** — `Backward.invoke` calls the stored
+handler pointer; there is no op-code dispatch table.
 
 ---
 
@@ -103,57 +146,87 @@ var c = a * 42 + b
 
 #### 2.1 `a * 42` (MultiplyScalar.forward)
 
-From `tenmo/multiplication.mojo`:
+From `tenmo/multiplication.mojo` — `MultiplyScalar.forward`:
 
 ```mojo
-def forward[track_grad: Bool = True](self, factor) -> Tensor:
-    var out = Tensor(self.buffer.scalar_ops[Multiply](factor), requires_grad=False)
+struct MultiplyScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+    @staticmethod
+    def forward[
+        track_grad: Bool = True
+    ](
+        self: Tensor[Self.dtype], factor: Scalar[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
+        var out: Tensor[Self.dtype] = Tensor[Self.dtype](
+            self.buffer.scalar_ops[Multiply](factor, sync=sync),
+            requires_grad=False,
+        )
 
-    comptime if track_grad:
-        if self.requires_grad:
-            out.requires_grad_(True)
-            # Create type-erased argument containing scalar factor 42
-            var backwardFnArg = BackwardFnArg.scalar_arg(BACKWARD_MULTIPLY_SCALAR, factor)
-            out.add_ancestry(backwardFnArg^, self)  # record parent
-    return out
+        comptime if track_grad:
+            if self.requires_grad:
+                out.requires_grad_(True)
+                var backwardFn = BackwardFn.scalar_arg[Self.dtype](
+                    factor,
+                    MultiplyBackwardScalar[Self.dtype](),
+                )
+                out.add_ancestry(backwardFn^, self)
+
+        return out^
 ```
 
 **What happens:**
 1. Buffer performs element-wise multiplication: `[1,2,3] * 42 = [42,84,126]`
 2. If `a.requires_grad = True`, set output's gradient flag
-3. Create `BackwardFnArg` with opcode `BACKWARD_MULTIPLY_SCALAR` and value `42`
-4. Call `out.add_ancestry(backwardFnArg^, self)` — stores:
-   - The backward function dispatch tag
+3. Create `BackwardFn` with the scalar value `42` and the `MultiplyBackwardScalar` handler
+4. Call `out.add_ancestry(backwardFn^, self)` — stores:
+   - The type-erased backward function (argument + handler pointer)
    - A lightweight `Ancestor` handle to `a` (not a full copy!)
 
 #### 2.2 `result + b` (Adder.forward)
 
-From `tenmo/addition.mojo`:
+From `tenmo/addition.mojo` — `Adder.forward`:
 
 ```mojo
-def forward[track_grad: Bool = True](self, other) -> Tensor:
-    var out = Tensor(self.buffer.arithmetic_ops[Add](other.buffer), requires_grad=False)
+struct Adder[dtype: DType](Copyable, RegisterPassable):
+    @staticmethod
+    def forward[
+        track_grad: Bool = True
+    ](
+        self: Tensor[Self.dtype], other: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
+        if not self.broadcastable(other):
+            panic("Tensor addition dimension mismatch...")
 
-    comptime if track_grad:
-        if self.requires_grad or other.requires_grad:
-            out.requires_grad_(True)
-            if self.shape() == other.shape():
-                var backwardFnArg = BackwardFnArg.null_arg(BACKWARD_ADD)
-                if self.requires_grad and other.requires_grad:
-                    out.add_ancestry(backwardFnArg^, self, other)  # two parents
-                elif self.requires_grad:
-                    out.add_ancestry(backwardFnArg^, self)       # one parent
+        var out = Tensor[Self.dtype](
+            self.buffer.arithmetic_ops[Add](other.buffer, sync=sync),
+            requires_grad=False,
+        )
+
+        comptime if track_grad:
+            if self.requires_grad or other.requires_grad:
+                out.requires_grad_(True)
+                if self.shape() == other.shape():
+                    var backwardFn = BackwardFn.null_arg[Self.dtype](
+                        AddBackward[Self.dtype]()
+                    )
+                    if self.requires_grad and other.requires_grad:
+                        out.add_ancestry(backwardFn^, self, other)
+                    elif self.requires_grad:
+                        out.add_ancestry(backwardFn^, self)
+                    else:
+                        out.add_ancestry(backwardFn^, other)
                 else:
-                    out.add_ancestry(backwardFnArg^, other)
-            else:
-                var backwardFnArg = BackwardFnArg.null_arg(BACKWARD_ADD_BROADCAST)
-                out.add_ancestry(backwardFnArg^, self, other)  # broadcast case
-    return out
+                    var backwardFn = BackwardFn.null_arg[Self.dtype](
+                        AddBroadcastBackward[Self.dtype](),
+                    )
+                    backwardFn.needs_parent_data = True
+                    out.add_ancestry(backwardFn^, self, other)
+
+        return out^
 ```
 
 **What happens:**
 1. Buffer performs element-wise addition: `[42,84,126] + [1,2,3] = [43,86,129]`
-2. Sets up ancestry with `BACKWARD_ADD` opcode
+2. Sets up ancestry with an `AddBackward` handler (same-shape) or `AddBroadcastBackward` (broadcast, with `needs_parent_data = True` — an alias for `BroadcastBackward[dtype, augment=False, lhs_op=AddTensor, rhs_op=AddTensor]`)
 3. Records parent handles to both tensors that require gradients
 
 ---
@@ -175,25 +248,43 @@ From `tenmo/backpropagation.mojo`:
 struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     @staticmethod
     def invoke(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-    ):
+    ) raises:
         if not output.has_ancestry():
+            print("Inside Backward invoke: output ancestry is not set")
             return
-        ref arg = output.ancestry().backward_fn_arg()
-        var op_code = arg.op_code
-
-        # Direct jump table — no variant extraction!
-        if op_code == BACKWARD_ADD_SCALAR:
-            AddBackwardScalar[Self.dtype].backward(output, parent_ids)
-        elif op_code == BACKWARD_ADD:
-            AddBackward[Self.dtype].backward(output, parent_ids)
-        elif op_code == BACKWARD_MULTIPLY_SCALAR:
-            MultiplyBackwardScalar[Self.dtype].backward(output, parent_ids)
-        elif op_code == BACKWARD_MULTIPLY:
-            MultiplyBackward[Self.dtype].backward(output, parent_ids)
-        # ... and so on for 50+ operations
+        # Handler-boundary invariant: every backward handler receives a
+        # contiguous, zero-offset gradbox (debug-checked, erased in release).
+        ref incoming_gb = output.gradients()
+        debug_assert(
+            incoming_gb.buffer().is_contiguous()
+            and incoming_gb.buffer().offset == 0,
+            "Backward.invoke: incoming gradbox must be contiguous with"
+            " zero offset",
+        )
+        ref arg = output.ancestry().backward_fn()
+        var output_ptr = (
+            Pointer(to=output)
+            .unsafe_origin_cast[MutAnyOrigin]()
+            .unsafe_bitcast[UInt8]()
+        )
+        var parent_ids_ptr = (
+            Pointer(to=parent_ids)
+            .unsafe_origin_cast[MutAnyOrigin]()
+            .unsafe_bitcast[UInt8]()
+        )
+        arg.backward_fn(output_ptr, parent_ids_ptr)
 ```
+
+`BackwardFn` stores a **type-erased call pointer** to the specific handler that
+was built at the forward site. `Backward.invoke` calls that pointer directly —
+there is no `op_code` jump table and no variant extraction. The raw-pointer
+signature (`Pointer[UInt8]`, `Pointer[UInt8]`) is the reason
+the ancestor graph can carry a backward function without referencing a graph
+type: the closure body reconstructs the typed `Ancestor` and `List[UInt]` at the
+call site. Intermediate grads always clear once consumed (like views);
+transfer nodes never clear.
 
 Each handler receives a `mut parent_ids: List[UInt]` that it fills with the IDs of
 parents that received gradient updates. The caller uses this list to decrement
@@ -204,29 +295,26 @@ fan-in counters. Handlers call `parent.update_grad()` internally — no return v
 From `tenmo/multiplication.mojo`:
 
 ```mojo
+@fieldwise_init
 struct MultiplyBackwardScalar[dtype: DType](
-    ImplicitlyCopyable, RegisterPassable
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
 ):
+    comptime datatype = Self.dtype
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
     ):
-        # Retrieve the scalar factor from the type-erased argument
-        var factor = output.ancestry()
-            .backward_fn_arg()
-            .get[ScalarArg[Self.dtype]]()
-            .value  # = 42
+        var factor = (
+            output.ancestry().backward_fn().get[ScalarArg[Self.dtype]]().value
+        )  # = 42
 
-        # Get incoming gradient from downstream
         ref gradbox = output.gradients()  # ∂loss/∂c
-
-        # Scale gradient: ∂loss/∂a = ∂loss/∂c * ∂c/∂a = grad * 42
+        var ancestor = output.ancestry().get(0)
         var scaled_gradbox = gradbox * factor
-
-        # Accumulate into parent's gradbox and register for fan-in
         ancestor.update_grad(scaled_gradbox^, AddTensor, None)
         parent_ids.append(ancestor._id)
+        gradbox.zero_grad()  # intermediates always clear once consumed
 ```
 
 ### Example: Backward for `a + b`
@@ -234,29 +322,44 @@ struct MultiplyBackwardScalar[dtype: DType](
 From `tenmo/addition.mojo`:
 
 ```mojo
-struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+@fieldwise_init
+struct AddBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable, RegisterPassable):
+    comptime datatype = Self.dtype
     @staticmethod
     def backward(
-        output: Ancestor[Self.dtype],
+        var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
     ):
-        var gradbox = output.gradbox[]
-        count = len(output.ancestry())
+        var gradbox = output.gradients()
+        var count = len(output.ancestry())
 
-        if count == 1:  # Only one parent needed grad
+        if count == 1:
             var ancestor = output.ancestry().get(0)
             ancestor.update_grad(gradbox^, AddTensor, None)
             parent_ids.append(ancestor._id)
-        else:  # Both parents might need grad
-            var ancestor_lhs = output.ancestry().get(0)  # a
-            var ancestor_rhs = output.ancestry().get(1)  # b
+        else:
+            var ancestor_lhs = output.ancestry().get(0)
+            var ancestor_rhs = output.ancestry().get(1)
+            var lhs_requires_grad = ancestor_lhs.requires_grad
+            var rhs_requires_grad = ancestor_rhs.requires_grad
 
-            if ancestor_lhs.requires_grad:
+            if lhs_requires_grad and rhs_requires_grad:
                 ancestor_lhs.update_grad(gradbox, AddTensor, None)
                 parent_ids.append(ancestor_lhs._id)
-            if ancestor_rhs.requires_grad:
                 ancestor_rhs.update_grad(gradbox, AddTensor, None)
                 parent_ids.append(ancestor_rhs._id)
+
+            elif lhs_requires_grad and not rhs_requires_grad:
+                ancestor_lhs.update_grad(gradbox, AddTensor, None)
+                parent_ids.append(ancestor_lhs._id)
+
+            elif not lhs_requires_grad and rhs_requires_grad:
+                ancestor_rhs.update_grad(gradbox, AddTensor, None)
+                parent_ids.append(ancestor_rhs._id)
+
+            else:
+                pass
+        gradbox.zero_grad()  # intermediates always clear once consumed
 ```
 
 **Key insight**: For addition, ∂(a+b)/∂a = ∂(a+b)/∂b = 1, so the gradient passes through unchanged.
@@ -273,11 +376,11 @@ b = [1,2,3], requires_grad = True
 
 c = a * 42
   → c = [42,84,126]
-  → ancestors = [Ancestor(a)], backward_fn_arg = BACKWARD_MULTIPLY_SCALAR(42)
+  → ancestors = [Ancestor(a)], backward_fn = BackwardFn(scalar 42, MultiplyBackwardScalar)
 
 d = c + b
   → d = [43,86,129]
-  → ancestors = [Ancestor(c), Ancestor(b)], backward_fn_arg = BACKWARD_ADD
+  → ancestors = [Ancestor(c), Ancestor(b)], backward_fn = BackwardFn(null, AddBackward)
 ```
 
 ### Backward:
@@ -292,7 +395,7 @@ loss.backward()
 
   → Phase 3: ready_queue = [d]
      pop d → Backward.invoke(d, parent_ids)
-        op_code = BACKWARD_ADD
+        handler = AddBackward
         grad_d = [1,1,1]
         propagates to c: c.update_grad(grad_d, AddTensor)  → c.grad = [1,1,1]
         propagates to b: b.update_grad(grad_d, AddTensor)  → b.grad = [1,1,1]
@@ -300,14 +403,13 @@ loss.backward()
         fanin: {c:0, b:0, a:1}  → enqueue c, b
 
      pop c → Backward.invoke(c, parent_ids)
-        op_code = BACKWARD_MULTIPLY_SCALAR
+        handler = MultiplyBackwardScalar
         grad_c = [1,1,1], factor = 42
-        a.update_grad(grad_c * 42, AddTensor)              → a.grad = [42,84,126]
+        a.update_grad(grad_c * 42, AddTensor)              → a.grad = [42,42,42]
         parent_ids = [a._id]
         fanin: {a:0, b:0}  → enqueue a
 
      pop b → Backward.invoke(b, parent_ids)
-        op_code = BACKWARD_ADD_SCALAR
         b has no ancestry → returns, parent_ids empty
         fanin: {a:0}  → nothing to enqueue
 
@@ -317,26 +419,31 @@ loss.backward()
 ```
 
 **Final gradients:**
-- `a.grad() = [42, 84, 126]` — because ∂(a*42)/∂a = 42
+- `a.grad() = [42, 42, 42]` — because ∂(a*42)/∂a = 42 at every position
 - `b.grad() = [1, 1, 1]` — because ∂(c+b)/∂b = 1
 
 ---
 
 ## 5. Key Design Decisions
 
-### Why BackwardFnArg is type-erased?
+### Why is BackwardFn type-erased?
 
 ```mojo
-struct BackwardFnArg:
-    var op_code: Int                     # dispatch tag
-    var ptr: UnsafePointer[UInt8]        # type-erased payload
-    var destroy: DestroyerFn              # custom destructor
-    var copy_fn: CopyFn                  # custom copier
+struct BackwardFn(ImplicitlyCopyable):          # non-generic by design
+    var ptr: Pointer[UInt8, MutUntrackedOrigin]  # type-erased payload
+    var destroy: DestroyerFn                     # custom destructor
+    var copy_fn: CopyFn                          # custom copier
+    var needs_parent_data: Bool                  # whether backward reads parent data
+    var backward_fn: BackwardFnHandle            # erased call pointer
 ```
 
 - **No variant explosion**: Each op doesn't need a custom Variant type
-- **Direct jump table**: Integer tag → static method, no runtime type extraction
+- **Direct dispatch**: Each node stores the one erased handler pointer it needs
+  — `Backward.invoke` calls it directly, no integer tag, no jump-table elaboration
 - **Custom cleanup**: Each argument type knows how to destroy/copy itself
+- **GPU recursion invariant**: The raw-pointer signature means nothing stored in
+  the ancestor graph (`Ancestors` → `Optional[BackwardFn]` → payload) references a
+  graph type (`Ancestor`/`Tensor`) — this is what keeps GPU codegen compiling
 
 ### Why Ancestor instead of Tensor copies?
 
@@ -344,17 +451,18 @@ struct BackwardFnArg:
 |----------------|----------------|
 | Recursive gradbox allocation | No new gradbox |
 | Full NDBuffer copy | NDBuffer refcount bump |
-| Copy backwardFnArg heap block | Reference existing argument |
+| Copy backwardFn heap block | Reference existing argument |
 | O(n) per ancestry entry | O(1) per ancestry entry |
 
-### Why Gradbox has independent refcount?
+### Why does gradient storage survive Mojo's ASAP destruction?
 
 When Mojo ASAP-destroys intermediate tensors:
-1. `Tensor.__del__` decrements gradbox refcount
-2. If other `Ancestor` copies in graph still reference it → refcount stays > 0
-3. Last owner (graph root) frees the gradbox
+1. Dropping a `Tensor` drops its `Gradbox` handle
+2. The handle's `NDBuffer` copy-init/deinit bumps the Buffer refcount
+3. If other `Ancestor` copies in the graph still reference the storage → refcount stays > 0
+4. Last reference frees the `[rc|data]` block
 
-This prevents **dangling pointers** in the autograd graph.
+This prevents **dangling pointers** in the autograd graph without a per-Gradbox atomic.
 
 ### Why track_grad is compile-time?
 
@@ -381,16 +489,16 @@ Tenmo supports **50+ operations** with backward passes:
 | Arithmetic | `+`, `-`, `*`, `/`, `**` |
 | Scalar variants | `tensor + scalar`, `tensor * scalar` |
 | Reductions | `sum`, `mean`, `max`, `min` |
-| Linear Algebra | `matmul`, `dot`, `vector_matmul`, `matrix_vector_mul` |
-| Activations | `relu`, `sigmoid`, `tanh`, `softmax` |
+| Linear Algebra | `matmul`, `dot`, `outer` |
+| Activations | `relu`, `gelu`, `sigmoid`, `tanh`, `softmax` |
 | Reshaping | `reshape`, `flatten`, `squeeze`, `unsqueeze`, `transpose`, `permute` |
 | View ops | `view`, `expand`, `tile`, `repeat` |
-| Utility | `concat`, `stack`, `pad`, `clip` |
-| Loss | `mse_loss`, `cross_entropy`, `bceloss` |
+| Utility | `concat`, `stack`, `pad`, `clip`, `masked_fill`, `where`, `triu`, `tril`, `cumsum`, `gather`, `to_dtype` (grad-tracked cast — gradients cross dtype boundaries via `ToDtypeBackward`) |
+| Loss | `MSELoss`, `CrossEntropyLoss`, `BCELoss` |
 
 Each operation follows the same pattern:
-1. **Forward**: Compute result, record `BackwardFnArg` + parent `Ancestor` handles
-2. **Backward**: Dispatch via op_code, compute gradient contributions, accumulate to parents
+1. **Forward**: Compute result, record `BackwardFn` (argument + handler pointer) + parent `Ancestor` handles
+2. **Backward**: Call the stored handler directly, compute gradient contributions, accumulate to parents
 
 ---
 
@@ -499,9 +607,9 @@ for epoch in range(epochs):
 model = model.to_cpu(stop_grad=True)
 ```
 
-### What's NOT Done (WIP)
+### Known gaps
 
-- **Module layers on GPU**: `Conv2d`, `MaxPool2d` etc. being migrated to GPU.
+- **Module layers on GPU**: `Conv2D` forward runs on GPU (`ConvGpu`); its backward round-trips through CPU. `MaxPool2d` has no GPU path. `arange`/`linspace` build on CPU; non-`constant` `Pad` raises on GPU.
 
 ---
 
@@ -510,10 +618,11 @@ model = model.to_cpu(stop_grad=True)
 | Component | Role |
 |-----------|------|
 | `Tensor` | Main type with buffer, gradient flag, ancestry |
-| `Gradbox` | Independent gradient storage with refcount |
+| `Gradbox` | Thin wrapper over its `NDBuffer`; gradient storage lives in the Buffer's shared-from-birth `[rc\|data]` block |
 | `Ancestor` | Lightweight handle for graph traversal |
-| `BackwardFnArg` | Type-erased op argument with dispatch tag |
-| `Backward.invoke()` | Jump table dispatch to backward implementations |
+| `ParentNode` / `Ancestry` | Dtype-erased parent storage (`List[ParentNode]`) behind the refcounted `Ancestors` handle |
+| `BackwardFn` | Non-generic type-erased argument + handler pointer, stored per node |
+| `Backward.invoke()` | Direct call to the stored handler pointer |
 | `track_grad` | Compile-time graph elimination |
 
 The system provides **PyTorch-like ergonomics** with **visible, optimizable internals** — every operation readable in pure Mojo.

@@ -1,7 +1,10 @@
 from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
-from tenmo.common_utils import i, il, s, newaxis, Idx
-from tenmo.intarray import IntArray
+from tenmo.shared.indexhelper import Idx, i, il, newaxis, s
+from tenmo.shared.intarray import IntArray
+from tenmo.shared.shapes import Shape
+from tenmo.ndbuffer import NDBuffer
+from tenmo.filler import Filler
 
 # ============================================================================
 # SCALAR FILL TESTS - Basic Integer Indexing
@@ -499,7 +502,7 @@ def test_fill_contiguous_optimization() raises:
     var x = Tensor[dtype].zeros(100)
     var src = Tensor[dtype].ones(100) * 7.0
 
-    # Should use fast memcpy path
+    # Should use fast unsafe_memcpy path
     x.fill(src, s())
 
     var expected = Tensor[dtype].ones(100) * 7.0
@@ -541,6 +544,38 @@ def test_fill_image_patch_simulation() raises:
     assert_true(image[3, 2] == 5.0)  # [3, 2]
     assert_true(image[4, 4] == 5.0)  # [4, 4]
     assert_true(image[0, 0] == 0.0)  # Outside
+
+
+# ============================================================================
+# SCATTER-ADD TESTS (Filler.scatter_add — generic axis=1 path)
+# ============================================================================
+
+
+def test_scatter_add_axis1_generic() raises:
+    """Generic (non-embedding) scatter-add along axis=1.
+
+    target[:, indices[k]] += source[:, k]. Pins the row-walk path used for
+    any axis != 0 (the axis=0 2D case has its own SIMD fast path).
+    """
+    comptime dtype = DType.float32
+    var target = NDBuffer[dtype].zeros(Shape(2, 4))
+    var source = NDBuffer[dtype].zeros(Shape(2, 2))
+    source[IntArray(0, 0)] = Scalar[dtype](1.0)
+    source[IntArray(0, 1)] = Scalar[dtype](1.0)
+    source[IntArray(1, 0)] = Scalar[dtype](1.0)
+    source[IntArray(1, 1)] = Scalar[dtype](1.0)
+    var indices = IntArray.with_capacity(2)
+    indices.append(0)
+    indices.append(2)
+
+    Filler[dtype].scatter_add(target, source, indices, axis=1)
+
+    assert_true(target[IntArray(0, 0)] == 1.0)
+    assert_true(target[IntArray(0, 1)] == 0.0)
+    assert_true(target[IntArray(0, 2)] == 1.0)
+    assert_true(target[IntArray(0, 3)] == 0.0)
+    assert_true(target[IntArray(1, 0)] == 1.0)
+    assert_true(target[IntArray(1, 2)] == 1.0)
 
 
 # ============================================================================

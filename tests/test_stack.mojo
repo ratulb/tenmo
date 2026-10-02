@@ -1,6 +1,6 @@
 from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from std.sys import has_accelerator
 
 # ============================================================================
@@ -687,14 +687,18 @@ def test_concat_gpu_axis0_3d() raises:
     """Concatenate 3D tensors along axis 0 on GPU."""
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var A = Tensor[dtype].d3([
-            [[1.0, 2.0], [3.0, 4.0]],
-            [[5.0, 6.0], [7.0, 8.0]],
-        ])
-        var B = Tensor[dtype].d3([
-            [[9.0, 10.0], [11.0, 12.0]],
-            [[13.0, 14.0], [15.0, 16.0]],
-        ])
+        var A = Tensor[dtype].d3(
+            [
+                [[1.0, 2.0], [3.0, 4.0]],
+                [[5.0, 6.0], [7.0, 8.0]],
+            ]
+        )
+        var B = Tensor[dtype].d3(
+            [
+                [[9.0, 10.0], [11.0, 12.0]],
+                [[13.0, 14.0], [15.0, 16.0]],
+            ]
+        )
 
         var tensors = List[Tensor[dtype]]()
         tensors.append(A.to_gpu())
@@ -714,14 +718,18 @@ def test_concat_gpu_axis1_3d() raises:
     """Concatenate 3D tensors along axis 1 on GPU."""
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var A = Tensor[dtype].d3([
-            [[1.0, 2.0], [3.0, 4.0]],
-            [[5.0, 6.0], [7.0, 8.0]],
-        ])
-        var B = Tensor[dtype].d3([
-            [[9.0, 10.0], [11.0, 12.0]],
-            [[13.0, 14.0], [15.0, 16.0]],
-        ])
+        var A = Tensor[dtype].d3(
+            [
+                [[1.0, 2.0], [3.0, 4.0]],
+                [[5.0, 6.0], [7.0, 8.0]],
+            ]
+        )
+        var B = Tensor[dtype].d3(
+            [
+                [[9.0, 10.0], [11.0, 12.0]],
+                [[13.0, 14.0], [15.0, 16.0]],
+            ]
+        )
 
         var tensors = List[Tensor[dtype]]()
         tensors.append(A.to_gpu())
@@ -741,14 +749,18 @@ def test_concat_gpu_axis2_3d() raises:
     """Concatenate 3D tensors along axis 2 on GPU."""
     comptime if has_accelerator():
         comptime dtype = DType.float32
-        var A = Tensor[dtype].d3([
-            [[1.0, 2.0], [3.0, 4.0]],
-            [[5.0, 6.0], [7.0, 8.0]],
-        ])
-        var B = Tensor[dtype].d3([
-            [[9.0, 10.0], [11.0, 12.0]],
-            [[13.0, 14.0], [15.0, 16.0]],
-        ])
+        var A = Tensor[dtype].d3(
+            [
+                [[1.0, 2.0], [3.0, 4.0]],
+                [[5.0, 6.0], [7.0, 8.0]],
+            ]
+        )
+        var B = Tensor[dtype].d3(
+            [
+                [[9.0, 10.0], [11.0, 12.0]],
+                [[13.0, 14.0], [15.0, 16.0]],
+            ]
+        )
 
         var tensors = List[Tensor[dtype]]()
         tensors.append(A.to_gpu())
@@ -807,12 +819,16 @@ def test_concat_gpu_backward_axis0() raises:
         loss_cpu.backward()
 
         # GPU backward
-        var gpu_A = Tensor[dtype].d2(
-            [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
-        ).to_gpu()
-        var gpu_B = Tensor[dtype].d2(
-            [[5.0, 6.0], [7.0, 8.0]], requires_grad=True
-        ).to_gpu()
+        var gpu_A = (
+            Tensor[dtype]
+            .d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+            .to_gpu()
+        )
+        var gpu_B = (
+            Tensor[dtype]
+            .d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
+            .to_gpu()
+        )
         var tensors_gpu = List[Tensor[dtype]]()
         tensors_gpu.append(gpu_A)
         tensors_gpu.append(gpu_B)
@@ -820,12 +836,8 @@ def test_concat_gpu_backward_axis0() raises:
         var loss_gpu = result_gpu.sum()
         loss_gpu.backward()
 
-        assert_true(
-            gpu_A.grad().to_cpu().all_close[atol=1e-6](cpu_A.grad())
-        )
-        assert_true(
-            gpu_B.grad().to_cpu().all_close[atol=1e-6](cpu_B.grad())
-        )
+        assert_true(gpu_A.grad().to_cpu().all_close[atol=1e-6](cpu_A.grad()))
+        assert_true(gpu_B.grad().to_cpu().all_close[atol=1e-6](cpu_B.grad()))
 
 
 def test_concat_gpu_backward_axis1() raises:
@@ -847,12 +859,16 @@ def test_concat_gpu_backward_axis1() raises:
         loss_cpu.backward()
 
         # GPU backward
-        var gpu_A = Tensor[dtype].d2(
-            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
-        ).to_gpu()
-        var gpu_B = Tensor[dtype].d2(
-            [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]], requires_grad=True
-        ).to_gpu()
+        var gpu_A = (
+            Tensor[dtype]
+            .d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+            .to_gpu()
+        )
+        var gpu_B = (
+            Tensor[dtype]
+            .d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]], requires_grad=True)
+            .to_gpu()
+        )
         var tensors_gpu = List[Tensor[dtype]]()
         tensors_gpu.append(gpu_A)
         tensors_gpu.append(gpu_B)
@@ -860,12 +876,8 @@ def test_concat_gpu_backward_axis1() raises:
         var loss_gpu = result_gpu.sum()
         loss_gpu.backward()
 
-        assert_true(
-            gpu_A.grad().to_cpu().all_close[atol=1e-6](cpu_A.grad())
-        )
-        assert_true(
-            gpu_B.grad().to_cpu().all_close[atol=1e-6](cpu_B.grad())
-        )
+        assert_true(gpu_A.grad().to_cpu().all_close[atol=1e-6](cpu_A.grad()))
+        assert_true(gpu_B.grad().to_cpu().all_close[atol=1e-6](cpu_B.grad()))
 
 
 def test_concat_gpu_backward_axis2_3d() raises:
@@ -887,14 +899,22 @@ def test_concat_gpu_backward_axis2_3d() raises:
         var loss_cpu = result_cpu.sum()
         loss_cpu.backward()
 
-        var gpu_A = Tensor[dtype].d3(
-            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
-            requires_grad=True,
-        ).to_gpu()
-        var gpu_B = Tensor[dtype].d3(
-            [[[9.0, 10.0], [11.0, 12.0]], [[13.0, 14.0], [15.0, 16.0]]],
-            requires_grad=True,
-        ).to_gpu()
+        var gpu_A = (
+            Tensor[dtype]
+            .d3(
+                [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+                requires_grad=True,
+            )
+            .to_gpu()
+        )
+        var gpu_B = (
+            Tensor[dtype]
+            .d3(
+                [[[9.0, 10.0], [11.0, 12.0]], [[13.0, 14.0], [15.0, 16.0]]],
+                requires_grad=True,
+            )
+            .to_gpu()
+        )
         var tensors_gpu = List[Tensor[dtype]]()
         tensors_gpu.append(gpu_A)
         tensors_gpu.append(gpu_B)
@@ -902,12 +922,8 @@ def test_concat_gpu_backward_axis2_3d() raises:
         var loss_gpu = result_gpu.sum()
         loss_gpu.backward()
 
-        assert_true(
-            gpu_A.grad().to_cpu().all_close[atol=1e-6](cpu_A.grad())
-        )
-        assert_true(
-            gpu_B.grad().to_cpu().all_close[atol=1e-6](cpu_B.grad())
-        )
+        assert_true(gpu_A.grad().to_cpu().all_close[atol=1e-6](cpu_A.grad()))
+        assert_true(gpu_B.grad().to_cpu().all_close[atol=1e-6](cpu_B.grad()))
 
 
 def test_stack_gpu_axis0() raises:

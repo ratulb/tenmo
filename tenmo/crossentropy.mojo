@@ -1,25 +1,29 @@
-from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
-from tenmo.common_utils import panic, Epsilon
-from tenmo.subtraction import Subtractor
-from tenmo.backpropagation import (
-    BackwardFnArg,
+from .tensor import Tensor
+from .shared.shapes import Shape
+from .shared.constants import Epsilon
+from .shared.panic import panic
+from .backpropagation import (
+    BackwardFnType,
+    BackwardFn,
     ArgumentType,
-    BACKWARD_CE_CLASS_INDICES_INT32,
-    BACKWARD_CE_CLASS_INDICES_INT64,
-    BACKWARD_CE_PROBABILITIES,
 )
-from tenmo.mnemonics import AddTensor, NotEqual, DEFAULT_INDEX_DTYPE
-from tenmo.gradbox import Gradbox
-from tenmo.ndbuffer import NDBuffer
-from tenmo.intarray import IntArray
-from tenmo.ancestry import Ancestor
-from tenmo.device import Device, GPU
-from tenmo.shared import Reduction
-from tenmo.softmax import SoftmaxNdBuffer
-from tenmo.sum_mean_reduction import SumMeanReduction
+from .shared.mnemonics import (
+    AddTensor,
+    NotEqual,
+    DEFAULT_INDEX_DTYPE,
+    Multiply,
+    Subtract,
+)
+from .gradbox import Gradbox
+from .ndbuffer import NDBuffer
+from .shared.intarray import IntArray
+from .ancestry import Ancestor
+from .gpu.device import GPU
+from .shared import Reduction
+from .sum_mean_reduction import SumMeanReduction
 from std.math import exp, log, max
-from std.sys import simd_width_of
+from std.sys import simd_width_of, has_accelerator
+
 from std.utils.numerics import min_finite
 
 
@@ -49,7 +53,7 @@ struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         target_shape: Shape,
     ):
         """
-        Logits: (N, C, d1, ..., dk).
+                Logits: (N, C, d1, ..., dk).
         target: (N, d1, ..., dk).
         → target rank must be logits_rank - 1.
         → batch size and all spatial dims must match.
@@ -115,7 +119,7 @@ struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         target_dtype: DType = DType.int64,
     ](target: Tensor[target_dtype], num_classes: Int, ignore_index: Int,):
         """
-        All target indices must be in [0, num_classes) or == ignore_index.
+                All target indices must be in [0, num_classes) or == ignore_index.
         ignore_index is always valid regardless of its value.
         """
         for coord in target.shape():
@@ -161,7 +165,7 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
         Int,  # N
     ]:
         """
-        Flatten (N, C, d1..dk) → (M, C) and (N, d1..dk) → (M,).
+                Flatten (N, C, d1..dk) → (M, C) and (N, d1..dk) → (M,).
         Permutes logits so class dim is last before flattening.
         Returns NDBuffers — safe to store in backward structs.
         """
@@ -187,8 +191,8 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
             for i in range(2, rank):
                 perm.append(i)
             perm.append(1)
-            var logits_buffer = logits.buffer.copy()
-            var permuted = logits_buffer.permute(perm, shared=False)
+            var logits_buffer = logits.buffer
+            var permuted = logits_buffer.permute(perm).contiguous()
             logits_2d = permuted.reshape(Shape(M, C))
 
         var target_1d = target.buffer.reshape(Shape(M))
@@ -244,7 +248,7 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
         ignore_index: Int,
     ) -> NDBuffer[Self.dtype]:
         """
-        Build float mask: 1.0 where target != ignore_index, 0.0 where ignored.
+                Build float mask: 1.0 where target != ignore_index, 0.0 where ignored.
         Used both in forward (zero losses) and backward (zero gradients).
         GPU safe: compare_scalar returns NDBuffer[DType.bool] → to_dtype.
         """
@@ -329,23 +333,25 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
         for row in range(M):
             var row_base = row * stride0
 
-            # ── Pass 1: Find max ──
+            # Pass 1: Find max
             var max_val = min_finite[Self.dtype]()
             for c in range(0, simd_end, SIMD_WIDTH):
-                var ptr = logits_ptr + (row_base + c * stride1)
-                var vec = ptr.load[width=SIMD_WIDTH]()
+                var ptr = logits_ptr.unsafe_offset((row_base + c * stride1))
+                var vec = ptr.unsafe_load[width=SIMD_WIDTH]()
                 for i in range(SIMD_WIDTH):
                     max_val = max(max_val, vec[i])
             for c in range(simd_end, C):
-                max_val = max(max_val, logits_ptr[row_base + c * stride1])
+                max_val = max(
+                    max_val, logits_ptr[unsafe_offset=row_base + c * stride1]
+                )
 
-            # ── Pass 2: exp + sum_exp + loss ──
+            # Pass 2: exp + sum_exp + loss
             var sum_exp = Scalar[Self.dtype](0)
             var sum_logits = Scalar[Self.dtype](0)
 
             for c in range(0, simd_end, SIMD_WIDTH):
-                var ptr = logits_ptr + (row_base + c * stride1)
-                var vec = ptr.load[width=SIMD_WIDTH]()
+                var ptr = logits_ptr.unsafe_offset((row_base + c * stride1))
+                var vec = ptr.unsafe_load[width=SIMD_WIDTH]()
                 var e_vec = exp(vec - max_val)
                 for i in range(SIMD_WIDTH):
                     sum_exp += e_vec[i]
@@ -354,28 +360,32 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
                         sum_logits += vec[i]
                 comptime if track_grad:
                     var sp = softmax_ndb.data_ptr()
-                    (sp + (row * C + c)).store[width=SIMD_WIDTH](e_vec)
+                    (sp.unsafe_offset((row * C + c))).unsafe_store[
+                        width=SIMD_WIDTH
+                    ](e_vec)
             for c in range(simd_end, C):
-                var val = logits_ptr[row_base + c * stride1]
+                var val = logits_ptr[unsafe_offset=row_base + c * stride1]
                 var e = exp(val - max_val)
                 sum_exp += e
                 if has_ls:
                     sum_logits += val
                 comptime if track_grad:
                     var sp = softmax_ndb.data_ptr()
-                    sp[row * C + c] = e
+                    sp[unsafe_offset=row * C + c] = e
 
             var safe_sum_exp = max(sum_exp, Epsilon[Self.dtype].value())
             var log_sum_exp = log(safe_sum_exp)
 
-            # ── Loss (O(1) per row — target lookup) ──
+            # Loss (O(1) per row — target lookup)
             var is_valid = target_1d.get(row) != Scalar[Self.target_dtype](
                 ignore_index
             )
             var loss = Scalar[Self.dtype](0)
             if is_valid:
                 var tgt_idx = target_1d.get(row).__int__()
-                var logit_tgt = logits_ptr[row_base + tgt_idx * stride1]
+                var logit_tgt = logits_ptr[
+                    unsafe_offset=row_base + tgt_idx * stride1
+                ]
                 var log_softmax_tgt = logit_tgt - max_val - log_sum_exp
                 loss = -log_softmax_tgt
                 if has_ls:
@@ -393,18 +403,24 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
             else:
                 scalar_loss += loss
 
-            # ── Pass 3: Normalize softmax in-place (only if track_grad) ──
+            # Pass 3: Normalize softmax in-place (only if track_grad)
             comptime if track_grad:
                 var sp = softmax_ndb.data_ptr()
                 var inv_sum_exp_val = Scalar[Self.dtype](1) / sum_exp
-                var sm_base = sp + (row * C)
+                var sm_base = sp.unsafe_offset((row * C))
                 for c in range(0, simd_end, SIMD_WIDTH):
-                    var raw = (sm_base + c).load[width=SIMD_WIDTH]()
-                    (sm_base + c).store[width=SIMD_WIDTH](raw * inv_sum_exp_val)
+                    var raw = (sm_base.unsafe_offset(c)).unsafe_load[
+                        width=SIMD_WIDTH
+                    ]()
+                    (sm_base.unsafe_offset(c)).unsafe_store[width=SIMD_WIDTH](
+                        raw * inv_sum_exp_val
+                    )
                 for c in range(simd_end, C):
-                    sm_base[c] = sm_base[c] * inv_sum_exp_val
+                    sm_base[unsafe_offset=c] = (
+                        sm_base[unsafe_offset=c] * inv_sum_exp_val
+                    )
 
-        # ── Apply reduction ──
+        # Apply reduction
         var out: Tensor[Self.dtype]
         if reduction_is_none:
             var spatial_rank = spatial_shape.rank()
@@ -431,22 +447,6 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
 
         return softmax_ndb^, valid_count, out^
 
-    @always_inline
-    @staticmethod
-    def compute_log_softmax_and_softmax(
-        logits_2d: NDBuffer[Self.dtype],
-    ) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ] where Self.dtype.is_floating_point():
-        """
-        Returns (log_softmax, softmax) along axis=1.
-        GPU safe — log_softmax and softmax are both GPU ready.
-        Returns NDBuffers — safe for backward storage.
-        """
-        return SoftmaxNdBuffer[Self.dtype].log_softmax(
-            logits_2d, IntArray([1]), validated=True
-        )
-
     @staticmethod
     def scale_grad_by_upstream(
         grad: NDBuffer[Self.dtype],
@@ -466,7 +466,7 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
             var ug = upstream.buffer().copy()
             var ug_flat = ug.reshape(Shape(M))
             var ug_expanded = ug_flat.unsqueeze(IntArray(-1)).broadcast_to(
-                Shape(M, C)
+                Shape(M, C), sync=False
             )
             return grad.arithmetic_ops[Multiply](ug_expanded)
         else:
@@ -519,7 +519,9 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
         var smoothed_target_ndb = NDBuffer[Self.dtype]()
         comptime if track_grad:
             softmax_ndb = NDBuffer[Self.dtype].zeros(logits_2d.shape)
-            smoothed_target_ndb = NDBuffer[Self.dtype].zeros(logits_2d.shape)
+            smoothed_target_ndb = NDBuffer[Self.dtype].zeros(
+                logits_2d.shape
+            )
 
         var per_sample_loss = NDBuffer[Self.dtype]()
         if reduction_is_none:
@@ -530,48 +532,52 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
         for row in range(M):
             var row_base = row * stride0
 
-            # ── Pass 1: Find max ──
+            # Pass 1: Find max
             var max_val = min_finite[Self.dtype]()
             for c in range(0, simd_end, SIMD_WIDTH):
-                var ptr = logits_ptr + (row_base + c * stride1)
-                var vec = ptr.load[width=SIMD_WIDTH]()
+                var ptr = logits_ptr.unsafe_offset((row_base + c * stride1))
+                var vec = ptr.unsafe_load[width=SIMD_WIDTH]()
                 for i in range(SIMD_WIDTH):
                     max_val = max(max_val, vec[i])
             for c in range(simd_end, C):
-                max_val = max(max_val, logits_ptr[row_base + c * stride1])
+                max_val = max(
+                    max_val, logits_ptr[unsafe_offset=row_base + c * stride1]
+                )
 
-            # ── Pass 2: exp + sum_exp + write raw exp ──
+            # Pass 2: exp + sum_exp + write raw exp
             var sum_exp = Scalar[Self.dtype](0)
             for c in range(0, simd_end, SIMD_WIDTH):
-                var ptr = logits_ptr + (row_base + c * stride1)
-                var vec = ptr.load[width=SIMD_WIDTH]()
+                var ptr = logits_ptr.unsafe_offset((row_base + c * stride1))
+                var vec = ptr.unsafe_load[width=SIMD_WIDTH]()
                 var e_vec = exp(vec - max_val)
                 for i in range(SIMD_WIDTH):
                     sum_exp += e_vec[i]
                 comptime if track_grad:
                     var sp = softmax_ndb.data_ptr()
-                    (sp + (row * C + c)).store[width=SIMD_WIDTH](e_vec)
+                    (sp.unsafe_offset((row * C + c))).unsafe_store[
+                        width=SIMD_WIDTH
+                    ](e_vec)
             for c in range(simd_end, C):
-                var val = logits_ptr[row_base + c * stride1]
+                var val = logits_ptr[unsafe_offset=row_base + c * stride1]
                 var e = exp(val - max_val)
                 sum_exp += e
                 comptime if track_grad:
                     var sp = softmax_ndb.data_ptr()
-                    sp[row * C + c] = e
+                    sp[unsafe_offset=row * C + c] = e
 
             var safe_sum_exp = max(sum_exp, Epsilon[Self.dtype].value())
             var log_sum_exp = log(safe_sum_exp)
             var inv_sum_exp = Scalar[Self.dtype](1) / safe_sum_exp
 
-            # ── Pass 3: normalize softmax + write smoothed_target + compute loss ──
+            # Pass 3: normalize softmax + write smoothed_target + compute loss
             var loss = Scalar[Self.dtype](0)
             for c in range(0, simd_end, SIMD_WIDTH):
-                var t_vec = (target_ptr + (row_base + c * stride1)).load[
-                    width=SIMD_WIDTH
-                ]()
-                var l_vec = (logits_ptr + (row_base + c * stride1)).load[
-                    width=SIMD_WIDTH
-                ]()
+                var t_vec = (
+                    target_ptr.unsafe_offset((row_base + c * stride1))
+                ).unsafe_load[width=SIMD_WIDTH]()
+                var l_vec = (
+                    logits_ptr.unsafe_offset((row_base + c * stride1))
+                ).unsafe_load[width=SIMD_WIDTH]()
 
                 # smoothed_target[c] = target[c] * (1-ls) + ls/C
                 var smoothed: SIMD[Self.dtype, SIMD_WIDTH]
@@ -584,15 +590,19 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
                     smoothed = t_vec
                 comptime if track_grad:
                     var st_ptr = smoothed_target_ndb.data_ptr()
-                    (st_ptr + (row * C + c)).store[width=SIMD_WIDTH](smoothed)
+                    (st_ptr.unsafe_offset((row * C + c))).unsafe_store[
+                        width=SIMD_WIDTH
+                    ](smoothed)
 
                 # normalized softmax
                 comptime if track_grad:
                     var sp = softmax_ndb.data_ptr()
-                    var sm_vec = (sp + (row * C + c)).load[
+                    var sm_vec = (sp.unsafe_offset((row * C + c))).unsafe_load[
                         width=SIMD_WIDTH
                     ]() * inv_sum_exp
-                    (sp + (row * C + c)).store[width=SIMD_WIDTH](sm_vec)
+                    (sp.unsafe_offset((row * C + c))).unsafe_store[
+                        width=SIMD_WIDTH
+                    ](sm_vec)
 
                 # log_softmax[c] = logits[c] - max_val - log_sum_exp
                 var log_sm_vec = (l_vec - max_val) - log_sum_exp
@@ -603,8 +613,8 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
 
             # Flush remainder
             for c in range(simd_end, C):
-                var t_val = target_ptr[row_base + c * stride1]
-                var l_val = logits_ptr[row_base + c * stride1]
+                var t_val = target_ptr[unsafe_offset=row_base + c * stride1]
+                var l_val = logits_ptr[unsafe_offset=row_base + c * stride1]
 
                 var smoothed_val: Scalar[Self.dtype]
                 if has_ls:
@@ -616,12 +626,12 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
                     smoothed_val = t_val
                 comptime if track_grad:
                     var st_ptr = smoothed_target_ndb.data_ptr()
-                    st_ptr[row * C + c] = smoothed_val
+                    st_ptr[unsafe_offset=row * C + c] = smoothed_val
 
                 var sm = exp(l_val - max_val) * inv_sum_exp
                 comptime if track_grad:
                     var sp = softmax_ndb.data_ptr()
-                    sp[row * C + c] = sm
+                    sp[unsafe_offset=row * C + c] = sm
 
                 var log_sm = l_val - max_val - log_sum_exp
                 loss -= smoothed_val * log_sm
@@ -631,7 +641,7 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
             else:
                 scalar_loss += loss
 
-        # ── Apply reduction ──
+        # Apply reduction
         var out: Tensor[Self.dtype]
         if reduction_is_none:
             var spatial_rank = spatial_shape.rank()
@@ -663,8 +673,9 @@ struct CECommon[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE](
 
 @fieldwise_init
 struct CEClassIndicesBackward[dtype: DType, target_dtype: DType = DType.int32](
-    ImplicitlyCopyable & Movable
+    BackwardFnType, ImplicitlyCopyable & RegisterPassable
 ):
+    comptime datatype = Self.dtype
     """
     Backward for class index targets.
 
@@ -675,14 +686,58 @@ struct CEClassIndicesBackward[dtype: DType, target_dtype: DType = DType.int32](
     """
 
     @staticmethod
+    def _decomposed_cpu(
+        target_1d: NDBuffer[Self.target_dtype],
+        C: Int,
+        softmax_probs: NDBuffer[Self.dtype],
+        label_smoothing: Scalar[Self.dtype],
+        ignore_index: Int,
+        M: Int,
+        upstream: Gradbox[Self.dtype],
+        reduction: Reduction,
+        valid_count: Int,
+    ) -> NDBuffer[Self.dtype]:
+        """Decomposed CPU label-target backward (onehot+smooth+mask+scale).
+
+        Shared by the `has_accelerator` CPU-fallback leg and the
+        no-accelerator leg (formerly two ~27-line copies differing only
+        by a CPU-no-op `sync` flag). `sync` is irrelevant on CPU, so the
+        single copy passes none.
+        """
+        var onehot = NDBuffer[Self.dtype].onehot(
+            target_1d.to_dtype[Self.dtype](),
+            C,
+            softmax_probs.device(),
+            ignore_index=ignore_index,
+        )
+        var grad = softmax_probs
+        var ls = label_smoothing
+        if ls > Scalar[Self.dtype](0):
+            var ls_uniform = ls / Scalar[Self.dtype](C)
+            grad = grad.arithmetic_ops[Subtract](
+                onehot.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls)
+            ).scalar_ops[Subtract](ls_uniform)
+        else:
+            grad = grad.arithmetic_ops[Subtract](onehot)
+        var ignore_mask = CECommon[
+            Self.dtype, Self.target_dtype
+        ].build_ignore_mask(target_1d, ignore_index)
+        var ignore_mask_2d = ignore_mask.unsqueeze(
+            IntArray(-1)
+        ).broadcast_to(Shape(M, C), sync=False)
+        grad = grad.arithmetic_ops[Multiply](ignore_mask_2d)
+        return CECommon[Self.dtype].scale_grad_by_upstream(
+            grad, upstream, reduction, valid_count, M, C
+        )
+
+    @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         ref bwd_arg = (
             output.ancestry()
-            .backward_fn_arg()
+            .backward_fn()
             .get[ClassIndicesBwdArg[Self.dtype, Self.target_dtype]]()
         )
         var (
@@ -713,18 +768,32 @@ struct CEClassIndicesBackward[dtype: DType, target_dtype: DType = DType.int32](
         # Falls back to decomposed CPU path when no GPU.
         var scaled = NDBuffer[Self.dtype]()
         comptime if has_accelerator():
-            from tenmo.kernels.crossentropy_fused_kernel import (
+            from .kernels.crossentropy_fused_kernel import (
                 CrossEntropyFusedKernel,
             )
 
             if softmax_probs.is_on_gpu():
                 try:
-                    scaled = CrossEntropyFusedKernel[
+                    # Ensure upstream is on GPU
+                    var upstream_ndb = upstream.buffer()
+                    if not upstream_ndb.is_on_gpu():
+                        var (_, gpu_upstream) = upstream_ndb.to_device(
+                            softmax_probs.device()
+                        )
+                        upstream_ndb = gpu_upstream^
+
+                    var (
+                        scaled_layout,
+                        scaled_storage,
+                    ) = CrossEntropyFusedKernel[
                         Self.dtype, Self.target_dtype
                     ].launch_backward(
-                        softmax_probs,
-                        target_1d,
-                        upstream.buffer(),
+                        softmax_probs.layout(),
+                        softmax_probs.device_state.value(),
+                        target_1d.layout(),
+                        target_1d.device_state.value(),
+                        upstream_ndb.layout(),
+                        upstream_ndb.device_state.value(),
                         reduction,
                         valid_count,
                         M,
@@ -732,64 +801,39 @@ struct CEClassIndicesBackward[dtype: DType, target_dtype: DType = DType.int32](
                         ignore_index,
                         label_smoothing,
                     )
+                    scaled = NDBuffer[Self.dtype].with_layout_device_state(
+                        scaled_layout, scaled_storage
+                    )
                 except e:
                     panic(
                         "CrossEntropyFusedKernel.launch_backward failed: "
                         + String(e)
                     )
             else:
-                # CPU fallback — decomposed path
-                var onehot = NDBuffer[Self.dtype].onehot(
-                    target_1d.to_dtype[Self.dtype](),
+                # CPU fallback — decomposed path (shared helper).
+                scaled = Self._decomposed_cpu(
+                    target_1d,
                     C,
-                    softmax_probs.device(),
-                    ignore_index=ignore_index,
-                )
-                var grad = softmax_probs
-                var ls = label_smoothing
-                if ls > Scalar[Self.dtype](0):
-                    var ls_uniform = ls / Scalar[Self.dtype](C)
-                    grad = grad.arithmetic_ops[Subtract](
-                        onehot.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls)
-                    ).scalar_ops[Subtract](ls_uniform)
-                else:
-                    grad = grad.arithmetic_ops[Subtract](onehot)
-                var ignore_mask = CECommon[
-                    Self.dtype, Self.target_dtype
-                ].build_ignore_mask(target_1d, ignore_index)
-                var ignore_mask_2d = ignore_mask.unsqueeze(
-                    IntArray(-1)
-                ).broadcast_to(Shape(M, C))
-                grad = grad.arithmetic_ops[Multiply](ignore_mask_2d)
-                scaled = CECommon[Self.dtype].scale_grad_by_upstream(
-                    grad, upstream, reduction, valid_count, M, C
+                    softmax_probs,
+                    label_smoothing,
+                    ignore_index,
+                    M,
+                    upstream,
+                    reduction,
+                    valid_count,
                 )
         else:
-            # No accelerator — CPU decomposed path
-            var onehot = NDBuffer[Self.dtype].onehot(
-                target_1d.to_dtype[Self.dtype](),
+            # No accelerator — CPU decomposed path (shared helper).
+            scaled = Self._decomposed_cpu(
+                target_1d,
                 C,
-                softmax_probs.device(),
-                ignore_index=ignore_index,
-            )
-            var grad = softmax_probs
-            var ls = label_smoothing
-            if ls > Scalar[Self.dtype](0):
-                var ls_uniform = ls / Scalar[Self.dtype](C)
-                grad = grad.arithmetic_ops[Subtract](
-                    onehot.scalar_ops[Multiply](Scalar[Self.dtype](1) - ls)
-                ).scalar_ops[Subtract](ls_uniform)
-            else:
-                grad = grad.arithmetic_ops[Subtract](onehot)
-            var ignore_mask = CECommon[
-                Self.dtype, Self.target_dtype
-            ].build_ignore_mask(target_1d, ignore_index)
-            var ignore_mask_2d = ignore_mask.unsqueeze(
-                IntArray(-1)
-            ).broadcast_to(Shape(M, C))
-            grad = grad.arithmetic_ops[Multiply](ignore_mask_2d)
-            scaled = CECommon[Self.dtype].scale_grad_by_upstream(
-                grad, upstream, reduction, valid_count, M, C
+                softmax_probs,
+                label_smoothing,
+                ignore_index,
+                M,
+                upstream,
+                reduction,
+                valid_count,
             )
         # Step 6: Reshape back to original logits shape
         var _tmp0 = Gradbox[Self.dtype](scaled^)
@@ -813,14 +857,11 @@ struct CEClassIndicesBackward[dtype: DType, target_dtype: DType = DType.int32](
             for i in range(1, rank - 1):
                 inv_perm.append(i)  # d1..dk shift right
             grad_final = reshaped.permute(inv_perm)
-            # else:
-            # grad_final = grad_final.reshape(self.logits_shape)
 
         if logits.requires_grad:
             logits.update_grad(grad_final, AddTensor, None)
         parent_ids.append(logits._id)
-        if not retain_graph:
-            upstream.zero_grad()
+        upstream.zero_grad()
 
 
 # CEClassIndicesForward
@@ -837,83 +878,6 @@ struct ClassIndicesBwdArg[
     var valid_count: Int
     var M: Int
     var C: Int
-
-
-def _forward_cpu_impl[
-    dtype: DType,
-    target_dtype: DType = DEFAULT_INDEX_DTYPE,
-](
-    logits_2d_ndb: NDBuffer[dtype],
-    target_1d_ndb: NDBuffer[target_dtype],
-    reduction: Reduction,
-    ignore_index: Int,
-    label_smoothing: Scalar[dtype],
-    spatial_shape: Shape,
-    N: Int,
-    C: Int,
-) -> Tuple[NDBuffer[dtype], Int, Tensor[dtype]] where dtype.is_floating_point():
-    """CPU decomposed forward path. Returns (softmax_probs, valid_count, out).
-    """
-    var log_probs_ndb: NDBuffer[dtype]
-    var softmax_probs_ndb: NDBuffer[dtype]
-    log_probs_ndb, softmax_probs_ndb = CECommon[
-        dtype
-    ].compute_log_softmax_and_softmax(logits_2d_ndb)
-
-    var ignore_mask_ndb = CECommon[dtype, target_dtype].build_ignore_mask(
-        target_1d_ndb, ignore_index
-    )
-    var valid_count = (
-        SumMeanReduction[dtype]
-        .sum(ignore_mask_ndb, normalized_axes=IntArray())
-        .item()
-        .__int__()
-    )
-    var device = logits_2d_ndb.device()
-    var onehot_mask = NDBuffer[dtype].onehot(
-        target_1d_ndb.to_dtype[dtype](),
-        C,
-        device,
-        ignore_index=ignore_index,
-    )
-
-    var losses: NDBuffer[dtype]
-    if label_smoothing > Scalar[dtype](0):
-        var nll = (
-            SumMeanReduction[dtype]
-            .sum(
-                onehot_mask.arithmetic_ops[Multiply](log_probs_ndb),
-                normalized_axes=IntArray(1),
-            )
-            .unary_ops[NEGATE]()
-        )
-        var mean_log_p = (
-            SumMeanReduction[dtype]
-            .sum(log_probs_ndb, normalized_axes=IntArray(1))
-            .scalar_ops[Divide](Scalar[dtype](C))
-        )
-        losses = nll.scalar_ops[Multiply](
-            Scalar[dtype](1) - label_smoothing
-        ).arithmetic_ops[Subtract](
-            mean_log_p.scalar_ops[Multiply](label_smoothing)
-        )
-    else:
-        losses = (
-            SumMeanReduction[dtype]
-            .sum(
-                onehot_mask.arithmetic_ops[Multiply](log_probs_ndb),
-                normalized_axes=IntArray(1),
-            )
-            .unary_ops[NEGATE]()
-        )
-
-    losses = losses.arithmetic_ops[Multiply](ignore_mask_ndb)
-
-    var out = CECommon[dtype].apply_reduction(
-        losses, reduction, N, spatial_shape, valid_count
-    )
-
-    return softmax_probs_ndb, valid_count, out
 
 
 @fieldwise_init
@@ -971,13 +935,13 @@ struct CEClassIndicesForward[
             Self.dtype, Self.target_dtype
         ].flatten_spatial_class_indices(logits, target)
 
-        # ── Compute softmax + loss: GPU fused vs CPU decomposed ──
+        # Compute softmax + loss: GPU fused vs CPU decomposed
         var softmax_probs_ndb = NDBuffer[Self.dtype]()
         var valid_count = 0
         var out: Tensor[Self.dtype]
 
         comptime if has_accelerator():
-            from tenmo.kernels.crossentropy_fused_kernel import (
+            from .kernels.crossentropy_fused_kernel import (
                 CrossEntropyFusedKernel,
             )
 
@@ -986,19 +950,26 @@ struct CEClassIndicesForward[
                 var losses_ndb = NDBuffer[Self.dtype]()
                 var scalar_loss_val = Scalar[Self.dtype](0)
                 try:
-                    (
-                        softmax_probs_ndb,
-                        losses_ndb,
-                        scalar_loss_val,
-                        valid_count,
-                    ) = CrossEntropyFusedKernel[
+                    var launch_result = CrossEntropyFusedKernel[
                         Self.dtype, Self.target_dtype
                     ].launch(
-                        logits_2d_ndb,
-                        target_1d_ndb,
+                        logits_2d_ndb.layout(),
+                        logits_2d_ndb.device_state.value(),
+                        target_1d_ndb.layout(),
+                        target_1d_ndb.device_state.value(),
                         reduction,
                         ignore_index,
                         label_smoothing,
+                    )
+                    var softmax_pair = launch_result[0]
+                    var loss_pair = launch_result[1]
+                    scalar_loss_val = launch_result[2]
+                    valid_count = launch_result[3]
+                    softmax_probs_ndb = NDBuffer[
+                        Self.dtype
+                    ].with_layout_device_state(softmax_pair[0], softmax_pair[1])
+                    losses_ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        loss_pair[0], loss_pair[1]
                     )
                 except e:
                     panic("CrossEntropyFusedKernel.launch failed: " + String(e))
@@ -1057,11 +1028,7 @@ struct CEClassIndicesForward[
         comptime if track_grad:
             if logits.requires_grad:
                 out.requires_grad_(True)
-                var ce_op_code = BACKWARD_CE_CLASS_INDICES_INT32
-                if Self.target_dtype == DType.int64:
-                    ce_op_code = BACKWARD_CE_CLASS_INDICES_INT64
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    ce_op_code,
+                var backwardFn = BackwardFn(
                     ClassIndicesBwdArg[Self.dtype, Self.target_dtype](
                         softmax_probs_ndb^,
                         target_1d_ndb^,
@@ -1073,8 +1040,9 @@ struct CEClassIndicesForward[
                         M,
                         C2,
                     ),
+                    CEClassIndicesBackward[Self.dtype, Self.target_dtype](),
                 )
-                out.add_ancestry(backwardFnArg^, logits)
+                out.add_ancestry(backwardFn^, logits)
 
         comptime if has_accelerator():
             if sync and out.is_on_gpu():
@@ -1087,7 +1055,10 @@ struct CEClassIndicesForward[
 
 
 @fieldwise_init
-struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
+struct CEProbabilitiesBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable & RegisterPassable
+):
+    comptime datatype = Self.dtype
     """
     Backward for probability targets.
 
@@ -1100,11 +1071,10 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         ref bwd_arg = (
             output.ancestry()
-            .backward_fn_arg()
+            .backward_fn()
             .get[ClassProbabilitiesBwdArg[Self.dtype]]()
         )
         var (
@@ -1147,8 +1117,7 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         if logits.requires_grad:
             logits.update_grad(gradbox, AddTensor, None)
         parent_ids.append(logits._id)
-        if not retain_graph:
-            upstream.zero_grad()
+        upstream.zero_grad()
 
 
 # CEProbabilitiesForward
@@ -1264,19 +1233,22 @@ struct CEProbabilitiesForward[dtype: DType](
         comptime if track_grad:
             if logits.requires_grad:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_CE_PROBABILITIES,
+                # Soft targets carry no class indices, so ignore_index
+                # masks nothing: all M rows are valid.
+                var valid_count = M
+                var backwardFn = BackwardFn(
                     ClassProbabilitiesBwdArg[Self.dtype](
                         softmax_probs_ndb^,
                         smoothed_target_ndb^,
                         logits_shape^,
                         reduction,
-                        M,
+                        valid_count,
                         M,
                         C,
                     ),
+                    CEProbabilitiesBackward[Self.dtype](),
                 )
-                out.add_ancestry(backwardFnArg^, logits)
+                out.add_ancestry(backwardFn^, logits)
 
         comptime if has_accelerator():
             if sync and out.is_on_gpu():
@@ -1291,7 +1263,7 @@ struct CEProbabilitiesForward[dtype: DType](
 @fieldwise_init
 struct CrossEntropyLoss[
     dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE
-](ImplicitlyCopyable, RegisterPassable):
+](ImplicitlyCopyable, RegisterPassable, Writable):
     """
     CrossEntropyLoss — flexible, modular, GPU-ready.
 
@@ -1316,6 +1288,12 @@ struct CrossEntropyLoss[
     var ignore_index: Int
     var label_smoothing: Scalar[Self.dtype]
     var training: Bool
+
+    def write_to[W: Writer](self, mut writer: W):
+        writer.write("CrossEntropyLoss")
+
+    def write_repr_to[W: Writer](self, mut writer: W):
+        writer.write("CrossEntropyLoss")
 
     def __init__(
         out self,
@@ -1358,7 +1336,7 @@ struct CrossEntropyLoss[
         self.training = False
 
     def __call__(
-        self,
+        mut self,
         logits: Tensor[Self.dtype],
         target: Tensor[Self.target_dtype],
         validate: Bool = True,
@@ -1391,7 +1369,7 @@ struct CrossEntropyLoss[
             )
 
     def __call__(
-        self,
+        mut self,
         logits: Tensor[Self.dtype],
         target: Tensor[Self.dtype],
         validate: Bool = True,

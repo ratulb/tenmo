@@ -1,7 +1,7 @@
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from tenmo.validators import Validator
 from std.testing import assert_true, TestSuite
-from tenmo.intarray import IntArray
+from tenmo.shared.intarray import IntArray
 
 
 # ============================================
@@ -195,8 +195,8 @@ def test_reshape_infer_last() raises:
 
 
 def test_validate_and_normalize_axes() raises:
-    shape = Shape([2, 3, 4])
-    axes = Validator.validate_and_normalize_axes(shape, IntArray())
+    var shape = Shape(2, 3, 4)
+    var axes = Validator.validate_and_normalize_axes(shape, IntArray())
     assert_true(
         axes == IntArray(0, 1, 2), "Assertion failed for empty axes list"
     )
@@ -215,16 +215,16 @@ def test_validate_and_normalize_axes() raises:
 
 
 def test_validate_new_shape() raises:
-    curr_dims = Shape(IntArray([3, 4, 5]))
-    new_dims = IntArray([2, -1, 10])
-    concrete_shape = Validator.validate_and_construct_new_shape(
+    var curr_dims = Shape(IntArray(3, 4, 5))
+    var new_dims = IntArray(2, -1, 10)
+    var concrete_shape = Validator.validate_and_construct_new_shape(
         curr_dims, new_dims
     )
     assert_true(
         concrete_shape == Shape(2, 3, 10),
         "validate_new_shape assertion 1 failed",
     )
-    new_dims = IntArray([-1])
+    new_dims = IntArray(-1)
     concrete_shape = Validator.validate_and_construct_new_shape(
         curr_dims, new_dims
     )

@@ -1,13 +1,14 @@
 from .tensor import Tensor
 from .backpropagation import (
-    BackwardFnArg,
+    BackwardFnType,
+    BackwardFn,
     ArgumentType,
-    BACKWARD_DEVICE_TRANSFER,
 )
-from .mnemonics import AddTensor
-from .common_utils import panic
+from .shared.mnemonics import AddTensor
+from .shared.panic import panic
 from .gradbox import Gradbox
-from .device import Device, CPU, GPU
+from .gpu.device import Device, CPU, GPU
+from .shared.shapes import Shape
 from std.sys import has_accelerator
 from .ancestry import Ancestor
 
@@ -40,23 +41,34 @@ struct Flow(RegisterPassable & Equatable, ImplicitlyCopyable):
 struct DeviceTransferBwdArg(ArgumentType):
     var flow: Flow
     var device: Device
+    # Source shape at forward time. Backward needs only this (for the
+    # gradbox sanity check) — never the source buffer — so the transfer
+    # node runs with needs_parent_data=False and frees the source early.
+    var shape: Shape
 
 
-struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
+@fieldwise_init
+struct DeviceTransferBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
+        # Transfer nodes never clear the gradbox.
     ):
         var bwd_arg = (
-            output.ancestry().backward_fn_arg().get[DeviceTransferBwdArg]()
+            output.ancestry().backward_fn().get[DeviceTransferBwdArg]()
         )
-        var (flow, device) = bwd_arg.flow, bwd_arg.device
+        var (flow, device, src_shape) = (
+            bwd_arg.flow,
+            bwd_arg.device,
+            bwd_arg.shape,
+        )
         var gradbox = output.gradients()
         var ancestor_ref = output.ancestry().get(0)
         debug_assert(
-            ancestor_ref.shape() == gradbox.shape(),
+            src_shape == gradbox.shape(),
             "DeviceTransferBackward: gradbox shape and ancestor shape mismatch",
         )
 
@@ -80,7 +92,6 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
                     try:
                         var gpu_grad = Gradbox[Self.dtype](
                             gradbox.buffer().to_gpu(device.kind[GPU]),
-
                         )
                         ancestor_ref.update_grad(gpu_grad, AddTensor, None)
                     except e:
@@ -97,8 +108,8 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
 
 @fieldwise_init
 struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    """Handles tensor transfers between CPU and GPU devices, with full
-    autograd support.
+    """Handles tensor transfers between CPU and GPU devices.
+    Autograd support included.
 
     ## Grad Flow Rules
 
@@ -178,31 +189,34 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             return self.copy()
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
-        comptime if track_grad:
+        comptime if track_grad and Self.dtype.is_numeric():
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
                 if not stop_grad:
-                    var backwardFnArg: BackwardFnArg[Self.dtype]
+                    var backwardFn: BackwardFn
                     if device.is_cpu():
                         # Forward was GPU->CPU
-                        backwardFnArg = BackwardFnArg[Self.dtype](
-                            BACKWARD_DEVICE_TRANSFER,
+                        backwardFn = BackwardFn(
                             DeviceTransferBwdArg(
                                 Flow.Gpu2Cpu,
                                 self.buffer.device_state.value()
                                 .get_gpu()
                                 .into(),
+                                self.shape(),
                             ),
+                            DeviceTransferBackward[Self.dtype](),
                         )
                     else:
                         # Forward was CPU->GPU
-                        backwardFnArg = BackwardFnArg[Self.dtype](
-                            BACKWARD_DEVICE_TRANSFER,
-                            DeviceTransferBwdArg(Flow.Cpu2Gpu, CPU().into()),
+                        backwardFn = BackwardFn(
+                            DeviceTransferBwdArg(
+                                Flow.Cpu2Gpu, CPU().into(), self.shape()
+                            ),
+                            DeviceTransferBackward[Self.dtype](),
                         )
-                    backwardFnArg.needs_parent_data = True
-                    out.add_ancestry(backwardFnArg^, self)
+                    backwardFn.needs_parent_data = False
+                    out.add_ancestry(backwardFn^, self)
 
         return out^
 

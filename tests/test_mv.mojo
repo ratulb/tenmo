@@ -1,8 +1,8 @@
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
-from tenmo.mnemonics import mv
+from tenmo.shared.shapes import Shape
+from tenmo.shared.mnemonics import mv
 from std.testing import assert_true, TestSuite
-from tenmo.strides import Strides
+from tenmo.shared.strides import Strides
 
 # comptime mv = 2 # matrix vector
 

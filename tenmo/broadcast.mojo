@@ -1,30 +1,33 @@
-from tenmo.tensor import Tensor
-from tenmo.gradbox import Gradbox
-from tenmo.ndbuffer import NDBuffer
-from tenmo.shapes import Shape
-from tenmo.ancestry import Ancestor
-from tenmo.broadcasthelper import ShapeBroadcaster
-from tenmo.mnemonics import AddTensor
-from tenmo.common_utils import panic
-from tenmo.backpropagation import BackwardFnArg, BACKWARD_BROADCAST_TO
+from .tensor import Tensor
+from .gradbox import Gradbox
+from .ndbuffer import NDBuffer
+from .shared.shapes import Shape
+from .ancestry import Ancestor
+from .shared.broadcasthelper import ShapeBroadcaster
+from .shared.mnemonics import AddTensor
+from .backpropagation import BackwardFn, BackwardFnType
 
 
 @fieldwise_init
 struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
-    ImplicitlyCopyable, RegisterPassable
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
 ):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         ref incoming_grad = output.gradients()
 
         var left_parent = output.ancestry().get(0)
         var right_parent = output.ancestry().get(1)
 
-        # For left parent: compute the gradient contribution if needed
+        # For left parent: compute the gradient contribution if needed.
+        # The id is ALWAYS appended: parent_ids is the engine's
+        # fanin-completion signal (appended set must equal ancestry set),
+        # and update_grad no-ops internally for untracked parents.
         if left_parent.requires_grad:
             var left_parent_grad: Gradbox[Self.dtype]
             comptime if Self.augment:
@@ -40,9 +43,10 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
                 )
 
             left_parent.update_grad(left_parent_grad^, Self.lhs_op, None)
-            parent_ids.append(left_parent._id)
+        parent_ids.append(left_parent._id)
 
-        # For right parent: compute its gradient if needed
+        # For right parent: compute its gradient if needed (id always
+        # appended, same contract as above).
         if right_parent.requires_grad:
             var right_parent_grad: Gradbox[Self.dtype]
             comptime if Self.augment:
@@ -58,9 +62,8 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
                 )
 
             right_parent.update_grad(right_parent_grad^, Self.rhs_op, None)
-            parent_ids.append(right_parent._id)
-        if not retain_graph:
-            incoming_grad.zero_grad()
+        parent_ids.append(right_parent._id)
+        incoming_grad.zero_grad()
 
     @staticmethod
     def upstream_grad_shape_only(
@@ -75,11 +78,12 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
                 device=upstream_grad.device(),
             )
         else:
-            # var grad_ndb = upstream_grad.copy()
-            grad_contrib = Gradbox[Self.dtype](upstream_grad)
+            # Sync BEFORE wrapping: the Gradbox aliases this storage, so
+            # the kernel must be ordered before any read through it.
             upstream_grad.sync()
+            grad_contrib = Gradbox[Self.dtype](upstream_grad)
             if grad_contrib.shape() != self_shape:
-                axes = ShapeBroadcaster.broadcast_mask(
+                var axes = ShapeBroadcaster.broadcast_mask(
                     self_shape, grad_contrib.shape()
                 ).indices_of(1)
                 grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
@@ -93,36 +97,40 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
         other: NDBuffer[Self.dtype],
         upstream_grad: NDBuffer[Self.dtype],
     ) -> Gradbox[Self.dtype]:
+        var self_shape = self.shape
         var grad_contrib: Gradbox[Self.dtype]
         if upstream_grad.shape == Shape():
             grad_contrib = Gradbox[Self.dtype].full(
-                self.shape,
+                self_shape,
                 upstream_grad.item(),
                 device=upstream_grad.device(),
             )
         else:
             var product_ndb = upstream_grad * other
-            grad_contrib = Gradbox[Self.dtype](product_ndb)
-            #grad_contrib = Gradbox[Self.dtype](product_ndb^)
+            # Sync BEFORE wrapping (same aliasing reason as above).
             product_ndb.sync()
+            grad_contrib = Gradbox[Self.dtype](product_ndb^)
 
-            if grad_contrib.shape() != self.shape:
+            if grad_contrib.shape() != self_shape:
                 var axes = ShapeBroadcaster.broadcast_mask(
-                    self.shape, grad_contrib.shape()
+                    self_shape, grad_contrib.shape()
                 ).indices_of(1)
                 grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
-            if grad_contrib.shape() != self.shape:
-                grad_contrib = grad_contrib.reshape(self.shape)
+            if grad_contrib.shape() != self_shape:
+                grad_contrib = grad_contrib.reshape(self_shape)
         return grad_contrib^
 
 
 @fieldwise_init
-struct BroadcastToBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct BroadcastToBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         var parent = output.ancestry().get(0)
         ref incoming_grad = output.gradients()
@@ -146,8 +154,7 @@ struct BroadcastToBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         parent.update_grad(grad^, AddTensor, None)
         parent_ids.append(parent._id)
-        if not retain_graph:
-            incoming_grad.zero_grad()
+        incoming_grad.zero_grad()
 
 
 @fieldwise_init
@@ -161,17 +168,19 @@ struct Broadcast[dtype: DType](Copyable, RegisterPassable):
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
     ) -> Tensor[Self.dtype]:
-        var broadcasted_buffer = self.buffer.broadcast_to(target_shape)
+        var broadcasted_buffer = self.buffer.broadcast_to(
+            target_shape, sync=sync
+        )
         var out = Tensor[Self.dtype](broadcasted_buffer^, requires_grad=False)
 
         comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
-                    BACKWARD_BROADCAST_TO
+                var backwardFn = BackwardFn.null_arg[Self.dtype](
+                    BroadcastToBackward[Self.dtype](),
                 )
-                backwardFnArg.needs_parent_data = True
-                out.add_ancestry(backwardFnArg^, self)
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, self)
 
         return out^

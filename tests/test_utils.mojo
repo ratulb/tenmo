@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
 
 # from common_utils import binary_accuracy as accuracy
-from tenmo.common_utils import now
+from tenmo.shared.timing import now
 from std.testing import assert_true, TestSuite
 
 
@@ -148,7 +148,7 @@ def test_accuracy_float64() raises:
 def run_all_accuracy_tests() raises:
     """Run all accuracy tests."""
     print("\n=== Running Accuracy Test Suite ===\n")
-    start = now()
+    var start = now()
     test_accuracy_perfect_predictions()
     test_accuracy_all_wrong_predictions()
     test_accuracy_mixed_predictions()

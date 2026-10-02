@@ -1,8 +1,8 @@
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from std.testing import assert_true, TestSuite
-from tenmo.strides import Strides
-from tenmo.mnemonics import vm
+from tenmo.shared.strides import Strides
+from tenmo.shared.mnemonics import vm
 
 
 def main() raises:
@@ -725,9 +725,9 @@ def test_matrix_vector_basic_forward_backward() raises:
     )
     var v = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     # Matrix @ Vector
-    v_unsqueezed = v.unsqueeze([-1])
+    var v_unsqueezed = v.unsqueeze([-1])
     var result = M.matmul[mode=vm](v_unsqueezed)
-    r = result.squeeze([-1])  # [2]
+    var r = result.squeeze([-1])  # [2]
 
     # Expected: [1*1+2*2+3*3, 4*1+5*2+6*3] = [14, 32]
     assert_true(r.all_close(Tensor[dtype].d1([14.0, 32.0])))

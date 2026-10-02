@@ -1,30 +1,32 @@
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from std.testing import assert_true, TestSuite
 
 
 def test_repeat_1d_simple() raises:
-    var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var x = Tensor[DType.float32].d1([1.0, 2.0, 3.0], requires_grad=True)
     var y = x.repeat(2)
     var loss = y.sum()
     loss.backward()
     assert_true(y.shape() == Shape(6))
-    assert_true(x.grad().all_close(Tensor.d1([2.0, 2.0, 2.0])))
+    assert_true(x.grad().all_close(Tensor[DType.float32].d1([2.0, 2.0, 2.0])))
 
 
 def test_repeat_axis_selective() raises:
-    var x = Tensor.d3(
+    var x = Tensor[DType.float32].d3(
         [[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True
     )  # shape (1, 2, 2)
     var y = x.repeat(2, 1, 3)  # repeat depth=2, row=1, col=3 → shape (2, 2, 6)
     var loss = y.sum()
     loss.backward()
     # per-element grad = total number of repeats per original element (2×1×3=6)
-    assert_true(x.grad().all_close(Tensor.d3([[[6.0, 6.0], [6.0, 6.0]]])))
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d3([[[6.0, 6.0], [6.0, 6.0]]]))
+    )
 
 
 def test_repeat_partial_nonrepeated_axes_grad() raises:
-    var x = Tensor.d3(
+    var x = Tensor[DType.float32].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )  # shape (2,2,2)
     var y = x.repeat(1, 3, 2)  # repeat middle=3, last=2 → shape (2,6,4)
@@ -35,36 +37,44 @@ def test_repeat_partial_nonrepeated_axes_grad() raises:
 
 
 def test_repeat_scalar() raises:
-    var x = Tensor.scalar(5.0, requires_grad=True)
+    var x = Tensor[DType.float32].scalar(5.0, requires_grad=True)
     var y = x.repeat(3)
     var loss = y.sum()
     loss.backward()
     assert_true(y.shape() == Shape(3))
-    assert_true(x.grad().all_close(Tensor.scalar(3.0)))  # repeated 3 times
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].scalar(3.0))
+    )  # repeated 3 times
 
 
 def test_repeat_2d_axis_expand() raises:
-    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var x = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var y = x.repeat(2, 3)
     var loss = y.sum()
     loss.backward()
     assert_true(y.shape() == Shape(4, 6))
     # each element is repeated 6 times (2×3)
-    assert_true(x.grad().all_close(Tensor.d2([[6.0, 6.0], [6.0, 6.0]])))
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d2([[6.0, 6.0], [6.0, 6.0]]))
+    )
 
 
 def test_repeat_with_broadcast_like_extension() raises:
-    var x = Tensor.d2([[1.0], [2.0]], requires_grad=True)  # shape (2,1)
+    var x = Tensor[DType.float32].d2(
+        [[1.0], [2.0]], requires_grad=True
+    )  # shape (2,1)
     var y = x.repeat(3, 4)  # (6,4)
     var loss = y.sum()
     loss.backward()
     # each input repeated 12 times total (3×4)
-    assert_true(x.grad().all_close(Tensor.d2([[12.0], [12.0]])))
+    assert_true(x.grad().all_close(Tensor[DType.float32].d2([[12.0], [12.0]])))
 
 
 def test_repeat_in_computational_graph() raises:
-    var a = Tensor.d1([1.0, 2.0], requires_grad=True)
-    var b = Tensor.d1([3.0, 4.0], requires_grad=True)
+    var a = Tensor[DType.float32].d1([1.0, 2.0], requires_grad=True)
+    var b = Tensor[DType.float32].d1([3.0, 4.0], requires_grad=True)
 
     var c = a * b  # [3.0, 8.0]
     var d = c.repeat(2, 2)  # Shape: (2,) → (2, 4)
@@ -72,34 +82,44 @@ def test_repeat_in_computational_graph() raises:
     loss.backward()
 
     # d contains each element of c 4 times (2×2)
-    assert_true(a.grad().all_close(Tensor.d1([12.0, 16.0])))  # 4*3, 4*4
-    assert_true(b.grad().all_close(Tensor.d1([4.0, 8.0])))  # 4*1, 4*2
+    assert_true(
+        a.grad().all_close(Tensor[DType.float32].d1([12.0, 16.0]))
+    )  # 4*3, 4*4
+    assert_true(
+        b.grad().all_close(Tensor[DType.float32].d1([4.0, 8.0]))
+    )  # 4*1, 4*2
 
 
 def test_repeat_scalar_to_1d() raises:
-    var x = Tensor.scalar(2.0, requires_grad=True)
+    var x = Tensor[DType.float32].scalar(2.0, requires_grad=True)
     var y = x.repeat(5)
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(5))
-    assert_true(y.all_close(Tensor.d1([2.0, 2.0, 2.0, 2.0, 2.0])))
+    assert_true(
+        y.all_close(Tensor[DType.float32].d1([2.0, 2.0, 2.0, 2.0, 2.0]))
+    )
     assert_true(x.grad().item() == 5.0)
 
 
 def test_repeat_scalar_to_2d() raises:
-    var x = Tensor.scalar(3.0, requires_grad=True)
+    var x = Tensor[DType.float32].scalar(3.0, requires_grad=True)
     var y = x.repeat(2, 3)
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(2, 3))
-    assert_true(y.all_close(Tensor.d2([[3.0, 3.0, 3.0], [3.0, 3.0, 3.0]])))
+    assert_true(
+        y.all_close(
+            Tensor[DType.float32].d2([[3.0, 3.0, 3.0], [3.0, 3.0, 3.0]])
+        )
+    )
     assert_true(x.grad().item() == 6.0)
 
 
 def test_repeat_scalar_to_3d() raises:
-    var x = Tensor.scalar(4.0, requires_grad=True)
+    var x = Tensor[DType.float32].scalar(4.0, requires_grad=True)
     var y = x.repeat(2, 3, 1)  # Note: must have at least 1 dimension for scalar
     var loss = y.sum()
     loss.backward()
@@ -109,21 +129,21 @@ def test_repeat_scalar_to_3d() raises:
 
 
 def test_repeat_1d_to_longer_1d() raises:
-    var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var x = Tensor[DType.float32].d1([1.0, 2.0, 3.0], requires_grad=True)
     var y = x.repeat(4)
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(12))
-    var expected_data = Tensor.d1(
+    var expected_data = Tensor[DType.float32].d1(
         [1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0]
     )
     assert_true(y.all_close(expected_data))
-    assert_true(x.grad().all_close(Tensor.d1([4.0, 4.0, 4.0])))
+    assert_true(x.grad().all_close(Tensor[DType.float32].d1([4.0, 4.0, 4.0])))
 
 
 def test_repeat_1d_to_2d() raises:
-    var x = Tensor.d1([1.0, 2.0], requires_grad=True)
+    var x = Tensor[DType.float32].d1([1.0, 2.0], requires_grad=True)
     var y = x.repeat(
         3, 2
     )  # Must provide exactly 1 repeat dimension for 1D tensor
@@ -131,15 +151,15 @@ def test_repeat_1d_to_2d() raises:
     loss.backward()
 
     assert_true(y.shape() == Shape(3, 4))
-    var expected = Tensor.d2(
+    var expected = Tensor[DType.float32].d2(
         [[1.0, 2.0, 1.0, 2.0], [1.0, 2.0, 1.0, 2.0], [1.0, 2.0, 1.0, 2.0]]
     )
     assert_true(y.all_close(expected))
-    assert_true(x.grad().all_close(Tensor.d1([6.0, 6.0])))
+    assert_true(x.grad().all_close(Tensor[DType.float32].d1([6.0, 6.0])))
 
 
 def test_repeat_1d_to_3d() raises:
-    var x = Tensor.d1([1.0, 2.0], requires_grad=True)
+    var x = Tensor[DType.float32].d1([1.0, 2.0], requires_grad=True)
     var y = x.repeat(
         2, 3, 1
     )  # Must provide exactly 1 repeat dimension for 1D tensor
@@ -147,17 +167,19 @@ def test_repeat_1d_to_3d() raises:
     loss.backward()
 
     assert_true(y.shape() == Shape(2, 3, 2))
-    assert_true(x.grad().all_close(Tensor.d1([6.0, 6.0])))
+    assert_true(x.grad().all_close(Tensor[DType.float32].d1([6.0, 6.0])))
 
 
 def test_repeat_2d_same_rank() raises:
-    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var x = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var y = x.repeat(2, 3)
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(4, 6))
-    var expected = Tensor.d2(
+    var expected = Tensor[DType.float32].d2(
         [
             [1.0, 2.0, 1.0, 2.0, 1.0, 2.0],
             [3.0, 4.0, 3.0, 4.0, 3.0, 4.0],
@@ -166,74 +188,90 @@ def test_repeat_2d_same_rank() raises:
         ]
     )
     assert_true(y.all_close(expected))
-    assert_true(x.grad().all_close(Tensor.d2([[6.0, 6.0], [6.0, 6.0]])))
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d2([[6.0, 6.0], [6.0, 6.0]]))
+    )
 
 
 def test_repeat_2d_to_3d() raises:
-    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var x = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var y = x.repeat(2, 1, 1)  # Add batch dimension
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(2, 2, 2))
-    assert_true(x.grad().all_close(Tensor.d2([[2.0, 2.0], [2.0, 2.0]])))
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d2([[2.0, 2.0], [2.0, 2.0]]))
+    )
 
 
 def test_repeat_3d_same_rank() raises:
-    var x = Tensor.d3([[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True)
+    var x = Tensor[DType.float32].d3(
+        [[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True
+    )
     var y = x.repeat(2, 1, 1)
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(2, 2, 2))
-    assert_true(x.grad().all_close(Tensor.d3([[[2.0, 2.0], [2.0, 2.0]]])))
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d3([[[2.0, 2.0], [2.0, 2.0]]]))
+    )
 
 
 def test_repeat_3d_all_dims() raises:
-    var x = Tensor.d3([[[1.0], [2.0]]], requires_grad=True)
+    var x = Tensor[DType.float32].d3([[[1.0], [2.0]]], requires_grad=True)
     var y = x.repeat(2, 3, 4)
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(2, 6, 4))
-    assert_true(x.grad().all_close(Tensor.d3([[[24.0], [24.0]]])))
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d3([[[24.0], [24.0]]]))
+    )
 
 
 def test_repeat_identity_operation() raises:
-    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var x = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
+    )
     var y = x.repeat(1, 1)  # Repeat once along each dimension = no change
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(2, 2))
     assert_true(y.all_close(x))
-    assert_true(x.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(
+        x.grad().all_close(Tensor[DType.float32].d2([[1.0, 1.0], [1.0, 1.0]]))
+    )
 
 
 def test_repeat_complex_pattern() raises:
-    var x = Tensor.d2([[1.0, 2.0]], requires_grad=True)
+    var x = Tensor[DType.float32].d2([[1.0, 2.0]], requires_grad=True)
     var y = x.repeat(3, 2, 1)  # Shape: (1, 2) → (3, 2, 2)
     var loss = y.sum()
     loss.backward()
 
     assert_true(y.shape() == Shape(3, 2, 2))
-    assert_true(x.grad().all_close(Tensor.d2([[6.0, 6.0]])))
+    assert_true(x.grad().all_close(Tensor[DType.float32].d2([[6.0, 6.0]])))
 
 
 def test_repeat_gradient_accumulation() raises:
-    var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var x = Tensor[DType.float32].d1([1.0, 2.0, 3.0], requires_grad=True)
     var y1 = x.repeat(2)
     var y2 = x.repeat(3)
     var loss = y1.sum() + y2.sum()
     loss.backward()
 
     # Each element appears 2 times in y1 and 3 times in y2 = 5 times total
-    assert_true(x.grad().all_close(Tensor.d1([5.0, 5.0, 5.0])))
+    assert_true(x.grad().all_close(Tensor[DType.float32].d1([5.0, 5.0, 5.0])))
 
 
 def test_repeat_in_computational_graph_1() raises:
-    var a = Tensor.d1([1.0, 2.0], requires_grad=True)
-    var b = Tensor.d1([3.0, 4.0], requires_grad=True)
+    var a = Tensor[DType.float32].d1([1.0, 2.0], requires_grad=True)
+    var b = Tensor[DType.float32].d1([3.0, 4.0], requires_grad=True)
 
     var c = a * b  # [3.0, 8.0]
     var d = c.repeat(2, 2)  # Shape: (2,) → (2, 4)
@@ -241,12 +279,16 @@ def test_repeat_in_computational_graph_1() raises:
     loss.backward()
 
     # d contains each element of c 4 times (2×2)
-    assert_true(a.grad().all_close(Tensor.d1([12.0, 16.0])))  # 4*3, 4*4
-    assert_true(b.grad().all_close(Tensor.d1([4.0, 8.0])))  # 4*1, 4*2
+    assert_true(
+        a.grad().all_close(Tensor[DType.float32].d1([12.0, 16.0]))
+    )  # 4*3, 4*4
+    assert_true(
+        b.grad().all_close(Tensor[DType.float32].d1([4.0, 8.0]))
+    )  # 4*1, 4*2
 
 
 def test_repeat_strict_validation() raises:
-    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
+    var x = Tensor[DType.float32].d2([[1.0, 2.0], [3.0, 4.0]])
 
     # These should all PANIC due to strict PyTorch rules:
     # x.repeat()           # Empty repeat list for 2D tensor

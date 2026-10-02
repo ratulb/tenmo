@@ -1,9 +1,10 @@
 from tenmo.tensor import Tensor
-from tenmo.net import MSELoss, BCELoss, Linear, Sigmoid
+from tenmo.mse import MSELoss
+from tenmo.net import Linear, Sigmoid
 from tenmo.bceloss import BCELoss, BCEWithLogitsLoss
-from tenmo.common_utils import isnan, isinf
+from std.utils.numerics import isinf, isnan
 from std.testing import assert_true, TestSuite
-from tenmo.intarray import IntArray
+from tenmo.shared.intarray import IntArray
 
 # ============================================================================
 # MSE Loss Tests
@@ -308,7 +309,9 @@ def test_mse_loss_with_linear_layer() raises:
 
     # Check gradients exist
     assert_true(layer.weight.has_grad(), "Linear weight should have gradient")
-    assert_true(layer.bias.value().has_grad(), "Linear bias should have gradient")
+    assert_true(
+        layer.bias.value().has_grad(), "Linear bias should have gradient"
+    )
 
 
 def test_bce_loss_with_sigmoid_output() raises:

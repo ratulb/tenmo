@@ -1,7 +1,7 @@
 from tenmo.tensor import Tensor
 from std.testing import assert_true, TestSuite
-from tenmo.shapes import Shape
-from tenmo.mnemonics import AddTensor
+from tenmo.shared.shapes import Shape
+from tenmo.shared.mnemonics import AddTensor
 from std.sys import has_accelerator
 
 comptime dtype = DType.float32
@@ -96,8 +96,8 @@ def test_gpu_scalar_add_full_backward() raises:
         var b_gpu = b.to_gpu()
         var cpu_result = a + b
         cpu_result.backward()
-        var a_cpu_grad = a.grad().copy()
-        var b_cpu_grad = b.grad().copy()
+        var a_cpu_grad = a.grad().clone()
+        var b_cpu_grad = b.grad().clone()
         a.zero_grad()
         b.zero_grad()
         var gpu_result = a_gpu + b_gpu

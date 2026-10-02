@@ -1,13 +1,16 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor
-from .backpropagation import ArgumentType, BackwardFnArg, BACKWARD_TRIU
+from .shared.mnemonics import AddTensor
+from .backpropagation import ArgumentType, BackwardFn, BackwardFnType
+
 from .gradbox import Gradbox
 from .ancestry import Ancestor
 from .ndbuffer import NDBuffer
-from .common_utils import panic
+from .shared.panic import panic
 from std.sys import has_accelerator
 from std.sys import simd_width_of
-from .kernels.triu_kernel import TriuGpuKernel
+from std.sys.info import num_physical_cores
+from max.algorithm import parallelize
+from .kernels.trilu_kernel import TriuKernel
 
 
 @fieldwise_init
@@ -18,14 +21,17 @@ struct TriuArg(ArgumentType):
 
 
 @fieldwise_init
-struct TriuBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct TriuBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
-    ) raises:
-        ref bwd_arg = output.ancestry().backward_fn_arg().get[TriuArg]()
+    ):
+        ref bwd_arg = output.ancestry().backward_fn().get[TriuArg]()
         var diagonal = bwd_arg.diagonal
         var M = bwd_arg.M
         var N = bwd_arg.N
@@ -35,9 +41,21 @@ struct TriuBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var grad_ndb: NDBuffer[Self.dtype]
         comptime if has_accelerator():
             if gradbox.is_on_gpu():
-                grad_ndb = TriuGpuKernel[Self.dtype].launch_backward(
-                    gradbox.buffer().copy(), diagonal
-                )
+                try:
+                    var (grad_layout, grad_storage) = TriuKernel[
+                        Self.dtype
+                    ].launch_backward(
+                        gradbox.buffer().layout(),
+                        gradbox.buffer().device_state.value(),
+                        diagonal,
+                    )
+                    grad_ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        grad_layout, grad_storage
+                    )
+                except e:
+                    print(e)
+                    panic("TriuBackward → GPU backward launch failed")
+                    grad_ndb = NDBuffer[Self.dtype].Empty()
             else:
                 grad_ndb = apply_triu_cpu[Self.dtype](
                     gradbox.buffer(), M, N, diagonal
@@ -50,10 +68,11 @@ struct TriuBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         if parent.requires_grad:
             parent.update_grad(gradbox_ancestor^, AddTensor, None)
+        # Unconditional: parent_ids is the engine's fanin-completion
+        # signal (appended set must equal ancestry set).
         parent_ids.append(parent._id)
 
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -71,8 +90,7 @@ struct Triu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var rank = shape.rank()
         if rank < 2:
             panic(
-                "triu requires at least 2 dimensions, got rank "
-                + String(rank)
+                "triu requires at least 2 dimensions, got rank " + String(rank)
             )
         var M = shape[rank - 2]
         var N = shape[rank - 1]
@@ -81,18 +99,22 @@ struct Triu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         comptime if has_accelerator():
             if self.buffer.is_on_gpu():
                 try:
-                    ndb = TriuGpuKernel[Self.dtype].launch(
-                        self.buffer, diagonal, sync
+                    var (result_layout, result_storage) = TriuKernel[
+                        Self.dtype
+                    ].launch(
+                        self.buffer.layout(),
+                        self.buffer.device_state.value(),
+                        diagonal,
+                        sync,
+                    )
+                    ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        result_layout, result_storage
                     )
                 except e:
-                    panic(
-                        "triu GPU forward failed: " + String(e)
-                    )
+                    panic("triu GPU forward failed: " + String(e))
                     ndb = NDBuffer[Self.dtype].Empty()
             else:
-                ndb = apply_triu_cpu[Self.dtype](
-                    self.buffer, M, N, diagonal
-                )
+                ndb = apply_triu_cpu[Self.dtype](self.buffer, M, N, diagonal)
         else:
             ndb = apply_triu_cpu[Self.dtype](self.buffer, M, N, diagonal)
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
@@ -102,23 +124,19 @@ struct Triu[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             if grad_required:
                 out.requires_grad_(True)
                 var arg = TriuArg(diagonal, M, N)
-                var backwardFnArg = BackwardFnArg[Self.dtype](
-                    BACKWARD_TRIU, arg^
+                var backwardFn = BackwardFn(
+                    arg^, TriuBackward[Self.dtype]()
                 )
-                backwardFnArg.needs_parent_data = False
-                out.add_ancestry(backwardFnArg^, self)
+                backwardFn.needs_parent_data = False
+                out.add_ancestry(backwardFn^, self)
 
         return out^
 
 
 def apply_triu_cpu[
     dtype: DType,
-](
-    inp: NDBuffer[dtype],
-    M: Int,
-    N: Int,
-    diagonal: Int,
-) -> NDBuffer[dtype]:
+](inp: NDBuffer[dtype], M: Int, N: Int, diagonal: Int,) -> NDBuffer[dtype]:
+    var in_storage = inp.buffer
     var numels = inp.numels()
     var shape = inp.shape
     var out = NDBuffer[dtype].zeros(shape)
@@ -130,40 +148,46 @@ def apply_triu_cpu[
         var out_ptr = out.data_ptr().unsafe_mut_cast[True]()
         var out_offset = out.offset
         comptime simd_width = simd_width_of[dtype]()
+        var n_rows = numels // N
+        var n_threads = num_physical_cores()
 
-        var i = 0
-        while i < numels:
-            var chunk_end = min(i + simd_width, numels)
-            var simd_width_actual = chunk_end - i
-            if simd_width_actual == simd_width:
-                var vec = in_ptr.load[width=simd_width](in_offset + i)
-                var result = SIMD[dtype, simd_width](0)
+        def worker_triu(R: Int) {imm}:
+            # Kept region of row R is a contiguous suffix — copy it once, no
+            # per-lane div/mod; the rest of the row is already zero.
+            var r = R % M
+            var kept_start = min(max(r + diagonal, 0), N)
+            var row_base = R * N
+            var j = kept_start
+            while j + simd_width <= N:
+                var val = in_ptr.unsafe_load[width=simd_width](
+                    in_offset + row_base + j
+                )
+                out_ptr.unsafe_store[width=simd_width](
+                    out_offset + row_base + j, val
+                )
+                j += simd_width
+            for k in range(j, N):
+                var idx = row_base + k
+                out_ptr[unsafe_offset=out_offset + idx] = in_ptr[
+                    unsafe_offset=in_offset + idx
+                ]
 
-                for lane in range(simd_width):
-                    var within = (i + lane) % batch_stride
-                    var row = within // N
-                    var col = within % N
-                    if col >= row + diagonal:
-                        result[lane] = vec[lane]
-
-                out_ptr.store[width=simd_width](out_offset + i, result)
-            else:
-                for lane in range(simd_width_actual):
-                    var idx = i + lane
-                    var within = idx % batch_stride
-                    var row = within // N
-                    var col = within % N
-                    if col >= row + diagonal:
-                        out_ptr[out_offset + idx] = in_ptr[in_offset + idx]
-            i += simd_width_actual
+        if n_rows >= n_threads and numels >= n_threads * 32768:
+            parallelize(worker_triu, n_rows, n_threads)
+        else:
+            for R in range(n_rows):
+                worker_triu(R)
     else:
+        var out_offset = out.offset
         var flat_idx = 0
         for buf_idx in inp.index_iterator():
             var within = flat_idx % batch_stride
             var row = within // N
             var col = within % N
             if col >= row + diagonal:
-                out.data_ptr()[out.offset + flat_idx] = inp.buffer[buf_idx]
+                out.data_ptr()[
+                    unsafe_offset=out_offset + flat_idx
+                ] = in_storage[buf_idx]
             flat_idx += 1
 
     return out^

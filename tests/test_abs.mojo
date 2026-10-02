@@ -144,12 +144,18 @@ def test_abs_gpu_forward() raises:
 
 def test_abs_gpu_backward() raises:
     comptime if has_accelerator():
-        var x_cpu = Tensor[F32].d1([-2.0, -1.0, 0.0, 1.0, 2.0], requires_grad=True)
+        var x_cpu = Tensor[F32].d1(
+            [-2.0, -1.0, 0.0, 1.0, 2.0], requires_grad=True
+        )
         var y_cpu = x_cpu.abs()
         var loss_cpu = y_cpu.sum()
         loss_cpu.backward()
 
-        var x_gpu = Tensor[F32].d1([-2.0, -1.0, 0.0, 1.0, 2.0], requires_grad=True).to_gpu()
+        var x_gpu = (
+            Tensor[F32]
+            .d1([-2.0, -1.0, 0.0, 1.0, 2.0], requires_grad=True)
+            .to_gpu()
+        )
         var y_gpu = x_gpu.abs()
         var loss_gpu = y_gpu.sum()
         loss_gpu.backward()

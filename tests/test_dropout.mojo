@@ -4,7 +4,7 @@ from std.testing import assert_true, TestSuite
 from tenmo.net import Dropout
 from std.sys import has_accelerator
 from std.random import seed
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 
 
 # ============================================================================
@@ -535,6 +535,55 @@ def test_dropout_large_tensor_backward() raises:
     # Roughly 50% should be zero, 50% should be scale
     var zero_ratio = Float64(num_zero_grads) / Float64(size)
     assert_true(zero_ratio > 0.45 and zero_ratio < 0.55)
+
+
+# ============================================================================
+# SEED / REPRODUCIBILITY TESTS (audit item 14)
+# ============================================================================
+
+
+def test_dropout_cpu_fixed_seed_reproducible() raises:
+    # set_seed is honored on CPU: two layers with the same seed produce
+    # bit-identical masks. Ones input exposes the mask directly (out ==
+    # mask since x == 1).
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].ones(Shape(64))
+    var d1 = Dropout[dtype](p=0.5)
+    d1.set_seed(7)
+    var d2 = Dropout[dtype](p=0.5)
+    d2.set_seed(7)
+    assert_true(d1(x) == d2(x))
+
+
+def test_dropout_cpu_fixed_seed_same_mask_every_call() raises:
+    # A fixed seed is reused every call (mirrors the GPU path): the same
+    # layer produces the same mask on consecutive calls.
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].ones(Shape(64))
+    var d = Dropout[dtype](p=0.5)
+    d.set_seed(7)
+    assert_true(d(x) == d(x))
+
+
+def test_dropout_cpu_different_seeds_differ() raises:
+    # Sanity: distinct seeds do not share a mask stream (64 elements at
+    # p=0.5 — accidental equality is a 2^-64 event).
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].ones(Shape(64))
+    var d1 = Dropout[dtype](p=0.5)
+    d1.set_seed(7)
+    var d2 = Dropout[dtype](p=0.5)
+    d2.set_seed(8)
+    assert_true(not (d1(x) == d2(x)))
+
+
+def test_dropout_cpu_unseeded_calls_differ() raises:
+    # Without set_seed each call draws a fresh seed, so consecutive masks
+    # differ (same 2^-64 accident caveat as above).
+    comptime dtype = DType.float32
+    var x = Tensor[dtype].ones(Shape(64))
+    var d = Dropout[dtype](p=0.5)
+    assert_true(not (d(x) == d(x)))
 
 
 # ============================================================================

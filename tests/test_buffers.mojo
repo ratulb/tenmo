@@ -1,7 +1,8 @@
-from tenmo.buffers import Buffer
-from tenmo.mnemonics import *
+from tenmo.shared.buffers import Buffer
+from tenmo.shared.mnemonics import *
 from tenmo.numpy_interop import ndarray_ptr
 from std.sys import simd_width_of
+from std.memory.alloc import alloc, Layout
 from std.time import perf_counter_ns
 from std.testing import assert_almost_equal, TestSuite
 from std.testing import assert_true, assert_false
@@ -50,34 +51,34 @@ def test_constructor_external_ptr() raises:
     """Buffer wrapping an external pointer (copy=False — the old 'rebind' path).
     """
     var n = 5
-    var ptr = alloc[Scalar[DType.float32]](n)
+    var ptr = alloc(Layout[Scalar[DType.float32]](count=n)).unsafe_leak()
     for i in range(n):
-        ptr[i] = Float32(Float32(i) * 1.5)
+        ptr.unsafe_store(i, Float32(Float32(i) * 1.5))
     var buffer = Buffer[DType.float32](n, ptr, copy=False)
     assert_true(buffer.size == n)
     assert_true(buffer.external)
     for i in range(n):
         assert_true(buffer[i] == Float32(Float32(i) * 1.5))
-    ptr.free()
+    ptr.unsafe_free()
 
 
 def test_constructor_external_ptr_copy() raises:
     """Buffer deep-copying from an external pointer (copy=True)."""
     var n = 4
-    var ptr = alloc[Scalar[DType.int64]](n)
+    var ptr = alloc(Layout[Scalar[DType.int64]](count=n)).unsafe_leak()
     for i in range(n):
-        ptr[i] = Int64(i * 100)
+        ptr[unsafe_offset=i] = Int64(i * 100)
     var buffer = Buffer[DType.int64](n, ptr, copy=True)
     assert_true(buffer.size == n)
     assert_false(buffer.external)
     for i in range(n):
         assert_true(buffer[i] == Int64(i * 100))
     # Mutate original — buffer must be unaffected
-    ptr[0] = Int64(-999)
+    ptr[unsafe_offset=0] = Int64(-999)
     assert_true(
         buffer[0] == Int64(0), "Buffer must not share memory with external ptr"
     )
-    ptr.free()
+    ptr.unsafe_free()
 
 
 # ============================================
@@ -417,7 +418,7 @@ def test_invert_bool() raises:
 
     var result = ~buffer
     for i in range(MEDIUM_SIZE):
-        expected = i % 2 != 0
+        var expected = i % 2 != 0
         assert_true(
             result[i] == expected, "invert: value mismatch at " + String(i)
         )
@@ -534,7 +535,7 @@ def test_eq_full_scalar() raises:
 
     var result = buffer.eq(5)
     for i in range(MEDIUM_SIZE):
-        expected = (i % 10) == 5
+        var expected = (i % 10) == 5
         assert_true(result[i] == expected, "eq full: mismatch at " + String(i))
 
 
@@ -545,7 +546,7 @@ def test_ne_full_scalar() raises:
 
     var result = buffer.ne(5)
     for i in range(MEDIUM_SIZE):
-        expected = (i % 10) != 5
+        var expected = (i % 10) != 5
         assert_true(result[i] == expected, "ne full: mismatch at " + String(i))
 
 
@@ -556,7 +557,7 @@ def test_lt_full_scalar() raises:
 
     var result = buffer.lt(10)
     for i in range(20):
-        expected = i < 10
+        var expected = i < 10
         assert_true(result[i] == expected, "lt full: mismatch at " + String(i))
 
 
@@ -567,7 +568,7 @@ def test_gt_full_scalar() raises:
 
     var result = buffer.gt(10)
     for i in range(20):
-        expected = i > 10
+        var expected = i > 10
         assert_true(result[i] == expected, "gt full: mismatch at " + String(i))
 
 
@@ -619,7 +620,7 @@ def test_eq_full_buffers() raises:
 
     var result = a.eq(b)
     for i in range(MEDIUM_SIZE):
-        expected = a[i] == b[i]
+        var expected = a[i] == b[i]
         assert_true(
             result[i] == expected, "eq full buffers: mismatch at " + String(i)
         )
@@ -634,7 +635,7 @@ def test_lt_full_buffers() raises:
 
     var result = a.lt(b)
     for i in range(MEDIUM_SIZE):
-        expected = a[i] < b[i]
+        var expected = a[i] < b[i]
         assert_true(
             result[i] == expected, "lt full buffers: mismatch at " + String(i)
         )
@@ -751,7 +752,7 @@ def test_to_dtype_from_bool() raises:
 
     var result = buffer.to_dtype[DType.int32]()
     for i in range(10):
-        expected = 1 if i % 2 == 0 else 0
+        var expected = 1 if i % 2 == 0 else 0
         assert_true(
             result[i] == Int32(expected),
             "to_dtype from bool: mismatch at " + String(i),
@@ -1124,7 +1125,7 @@ def test_dunder_compare_float64() raises:
 # EQ Tests
 # ============================================
 def test_eq_int32() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32](size)
     for i in range(size):
         buffer[i] = Int32(i) % 10
@@ -1133,7 +1134,7 @@ def test_eq_int32() raises:
 
     # Check indices where i % 10 == 5: 5, 15, 25, 35, 45, 55, 65
     for i in range(size):
-        expected = (i % 10) == 5
+        var expected = (i % 10) == 5
         assert_true(
             result[i] == expected,
             "test_eq_int32: index "
@@ -1144,7 +1145,7 @@ def test_eq_int32() raises:
 
 
 def test_eq_float64() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.float64](size)
     for i in range(size):
         buffer[i] = Scalar[DType.float64](i % 5)
@@ -1152,7 +1153,7 @@ def test_eq_float64() raises:
     var result = buffer.eq(3.0)
 
     for i in range(size):
-        expected = (i % 5) == 3
+        var expected = (i % 5) == 3
         assert_true(
             result[i] == expected,
             "test_eq_float64: index " + String(i) + " failed",
@@ -1160,7 +1161,7 @@ def test_eq_float64() raises:
 
 
 def test_eq_all_same() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.int64].full(42, size)
 
     var result_true = buffer.eq(42)
@@ -1176,7 +1177,7 @@ def test_eq_all_same() raises:
 
 
 def test_eq_small_buffer() raises:
-    size = SMALL_SIZE
+    var size = SMALL_SIZE
     var buffer = Buffer[DType.int32](size)
     for i in range(size):
         buffer[i] = Int32(i)
@@ -1184,7 +1185,7 @@ def test_eq_small_buffer() raises:
     var result = buffer.eq(3)
 
     for i in range(size):
-        expected = i == 3
+        var expected = i == 3
         assert_true(
             result[i] == expected,
             "test_eq_small_buffer: index " + String(i) + " failed",
@@ -1195,7 +1196,7 @@ def test_eq_small_buffer() raises:
 # NE Tests
 # ============================================
 def test_ne_int32() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32](size)
     for i in range(size):
         buffer[i] = Int32(i) % 10
@@ -1203,7 +1204,7 @@ def test_ne_int32() raises:
     var result = buffer.ne(5)
 
     for i in range(size):
-        expected = (i % 10) != 5
+        var expected = (i % 10) != 5
         assert_true(
             result[i] == expected,
             "test_ne_int32: index " + String(i) + " failed",
@@ -1211,7 +1212,7 @@ def test_ne_int32() raises:
 
 
 def test_ne_float32() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.float32](size)
     for i in range(size):
         buffer[i] = Scalar[DType.float32](i)
@@ -1219,7 +1220,7 @@ def test_ne_float32() raises:
     var result = buffer.ne(10.0)
 
     for i in range(size):
-        expected = i != 10
+        var expected = i != 10
         assert_true(
             result[i] == expected,
             "test_ne_float32: index " + String(i) + " failed",
@@ -1227,7 +1228,7 @@ def test_ne_float32() raises:
 
 
 def test_ne_all_different() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.int64].full(100, size)
 
     var result = buffer.ne(0)
@@ -1242,7 +1243,7 @@ def test_ne_all_different() raises:
 # GT Tests
 # ============================================
 def test_gt_int64() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var ll = List[Scalar[DType.int64]](capacity=size)
     for i in range(size):
         ll.append(Scalar[DType.int64](i))
@@ -1251,7 +1252,7 @@ def test_gt_int64() raises:
     var result = buffer.gt(50)
 
     for i in range(size):
-        expected = i > 50
+        var expected = i > 50
         assert_true(
             result[i] == expected,
             "test_gt_int64: index " + String(i) + " failed",
@@ -1259,7 +1260,7 @@ def test_gt_int64() raises:
 
 
 def test_gt_float32() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.float32](size)
     for i in range(size):
         buffer[i] = Scalar[DType.float32](i) * 0.5
@@ -1267,7 +1268,7 @@ def test_gt_float32() raises:
     var result = buffer.gt(15.0)
 
     for i in range(size):
-        expected = (Scalar[DType.float32](i) * 0.5) > 15.0
+        var expected = (Scalar[DType.float32](i) * 0.5) > 15.0
         assert_true(
             result[i] == expected,
             "test_gt_float32: index " + String(i) + " failed",
@@ -1275,7 +1276,7 @@ def test_gt_float32() raises:
 
 
 def test_gt_negative_values() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32](size)
     for i in range(size):
         buffer[i] = Int32(i) - 30  # Values from -30 to 37
@@ -1283,7 +1284,7 @@ def test_gt_negative_values() raises:
     var result = buffer.gt(0)
 
     for i in range(size):
-        expected = (i - 30) > 0
+        var expected = (i - 30) > 0
         assert_true(
             result[i] == expected,
             "test_gt_negative_values: index " + String(i) + " failed",
@@ -1291,7 +1292,7 @@ def test_gt_negative_values() raises:
 
 
 def test_gt_boundary() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32](size)
     for i in range(size):
         buffer[i] = 10
@@ -1318,7 +1319,7 @@ def test_gt_boundary() raises:
 # GE Tests
 # ============================================
 def test_ge_int32() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32](size)
     for i in range(size):
         buffer[i] = Int32(i)
@@ -1326,7 +1327,7 @@ def test_ge_int32() raises:
     var result = buffer.ge(50)
 
     for i in range(size):
-        expected = i >= 50
+        var expected = i >= 50
         assert_true(
             result[i] == expected,
             "test_ge_int32: index " + String(i) + " failed",
@@ -1334,7 +1335,7 @@ def test_ge_int32() raises:
 
 
 def test_ge_float64() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.float64](size)
     for i in range(size):
         buffer[i] = Scalar[DType.float64](i)
@@ -1342,7 +1343,7 @@ def test_ge_float64() raises:
     var result = buffer.ge(33.0)
 
     for i in range(size):
-        expected = i >= 33
+        var expected = i >= 33
         assert_true(
             result[i] == expected,
             "test_ge_float64: index " + String(i) + " failed",
@@ -1350,7 +1351,7 @@ def test_ge_float64() raises:
 
 
 def test_ge_equal_value() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.int64].full(100, size)
 
     var result = buffer.ge(100)
@@ -1365,7 +1366,7 @@ def test_ge_equal_value() raises:
 # LT Tests
 # ============================================
 def test_lt_int64() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var ll = List[Scalar[DType.int64]](capacity=size)
     for _ in range(size):
         ll.append(Scalar[DType.int64](2))
@@ -1382,7 +1383,7 @@ def test_lt_int64() raises:
 
 
 def test_lt_float32() raises:
-    size = 20
+    var size = 20
     var ll = List[Scalar[DType.float32]](capacity=size)
     for i in range(size):
         ll.append(Scalar[DType.float32](i))
@@ -1391,7 +1392,7 @@ def test_lt_float32() raises:
     var result = buffer.lt(10.0)
 
     for i in range(size):
-        expected = i < 10
+        var expected = i < 10
         assert_true(
             result[i] == expected,
             "test_lt_float32: index " + String(i) + " failed",
@@ -1399,7 +1400,7 @@ def test_lt_float32() raises:
 
 
 def test_lt_all_less() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32].full(0, size)
 
     var result = buffer.lt(100)
@@ -1409,7 +1410,7 @@ def test_lt_all_less() raises:
 
 
 def test_lt_none_less() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32].full(100, size)
 
     var result = buffer.lt(50)
@@ -1424,7 +1425,7 @@ def test_lt_none_less() raises:
 # LE Tests
 # ============================================
 def test_le_int32() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.int32](size)
     for i in range(size):
         buffer[i] = Int32(i)
@@ -1432,7 +1433,7 @@ def test_le_int32() raises:
     var result = buffer.le(50)
 
     for i in range(size):
-        expected = i <= 50
+        var expected = i <= 50
         assert_true(
             result[i] == expected,
             "test_le_int32: index " + String(i) + " failed",
@@ -1440,7 +1441,7 @@ def test_le_int32() raises:
 
 
 def test_le_float64() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.float64](size)
     for i in range(size):
         buffer[i] = Scalar[DType.float64](i)
@@ -1448,7 +1449,7 @@ def test_le_float64() raises:
     var result = buffer.le(33.0)
 
     for i in range(size):
-        expected = i <= 33
+        var expected = i <= 33
         assert_true(
             result[i] == expected,
             "test_le_float64: index " + String(i) + " failed",
@@ -1456,7 +1457,7 @@ def test_le_float64() raises:
 
 
 def test_le_equal_value() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.int64].full(100, size)
 
     var result = buffer.le(100)
@@ -1511,7 +1512,7 @@ def test_compare_simd_boundary() raises:
         var result = buffer.lt(Int32(size) // 2)
 
         for i in range(size):
-            expected = i < (size // 2)
+            var expected = i < (size // 2)
             assert_true(
                 result[i] == expected,
                 "test_compare_simd_boundary: size "
@@ -1523,7 +1524,7 @@ def test_compare_simd_boundary() raises:
 
 
 def test_compare_large_buffer() raises:
-    size = LARGE_SIZE
+    var size = LARGE_SIZE
     var buffer = Buffer[DType.float32](size)
     for i in range(size):
         buffer[i] = Scalar[DType.float32](i)
@@ -1531,7 +1532,7 @@ def test_compare_large_buffer() raises:
     var result = buffer.ge(500.0)
 
     for i in range(size):
-        expected = i >= 500
+        var expected = i >= 500
         assert_true(
             result[i] == expected,
             "test_compare_large_buffer: index " + String(i) + " failed",
@@ -1539,7 +1540,7 @@ def test_compare_large_buffer() raises:
 
 
 def test_compare_uint8() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.uint8](size)
     for i in range(size):
         buffer[i] = Scalar[DType.uint8](i % 256)
@@ -1547,7 +1548,7 @@ def test_compare_uint8() raises:
     var result = buffer.gt(100)
 
     for i in range(size):
-        expected = (i % 256) > 100
+        var expected = (i % 256) > 100
         assert_true(
             result[i] == expected,
             "test_compare_uint8: index " + String(i) + " failed",
@@ -1555,7 +1556,7 @@ def test_compare_uint8() raises:
 
 
 def test_compare_int8() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.int8](size)
     for i in range(size):
         buffer[i] = Scalar[DType.int8](i - 30)  # -30 to 37
@@ -1563,7 +1564,7 @@ def test_compare_int8() raises:
     var result = buffer.ge(0)
 
     for i in range(size):
-        expected = (i - 30) >= 0
+        var expected = (i - 30) >= 0
         assert_true(
             result[i] == expected,
             "test_compare_int8: index " + String(i) + " failed",
@@ -1571,7 +1572,7 @@ def test_compare_int8() raises:
 
 
 def test_compare_int16() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.int16](size)
     for i in range(size):
         buffer[i] = Scalar[DType.int16](i * 100)
@@ -1579,7 +1580,7 @@ def test_compare_int16() raises:
     var result = buffer.lt(3000)
 
     for i in range(size):
-        expected = (i * 100) < 3000
+        var expected = (i * 100) < 3000
         assert_true(
             result[i] == expected,
             "test_compare_int16: index " + String(i) + " failed",
@@ -1587,7 +1588,7 @@ def test_compare_int16() raises:
 
 
 def test_compare_uint64() raises:
-    size = MEDIUM_SIZE
+    var size = MEDIUM_SIZE
     var buffer = Buffer[DType.uint64](size)
     for i in range(size):
         buffer[i] = Scalar[DType.uint64](i * 1000)
@@ -1595,7 +1596,7 @@ def test_compare_uint64() raises:
     var result = buffer.le(50000)
 
     for i in range(size):
-        expected = (i * 1000) <= 50000
+        var expected = (i * 1000) <= 50000
         assert_true(
             result[i] == expected,
             "test_compare_uint64: index " + String(i) + " failed",
@@ -1604,15 +1605,15 @@ def test_compare_uint64() raises:
 
 # ====================================="
 def test_lt() raises:
-    size = 68
-    ll = List[Scalar[DType.int64]](capacity=size)
+    var size = 68
+    var ll = List[Scalar[DType.int64]](capacity=size)
     for _ in range(size):
         ll.append(Scalar[DType.int64](2))
     ll[0] = 5
     ll[65] = 42
-    buffer = Buffer[DType.int64](ll)
+    var buffer = Buffer[DType.int64](ll)
 
-    cmp_result = buffer.lt(5)
+    var cmp_result = buffer.lt(5)
 
     # Assertions
     assert_true(
@@ -1632,16 +1633,16 @@ def test_lt() raises:
 
 
 def test_lt_breaks_original() raises:
-    size = 20
-    ll = List[Scalar[DType.float32]](capacity=size)
+    var size = 20
+    var ll = List[Scalar[DType.float32]](capacity=size)
 
     # Create a pattern that will show the bug clearly
     for i in range(size):
         ll.append(Scalar[DType.float32](i))
 
-    buffer = Buffer[DType.float32](ll)
+    var buffer = Buffer[DType.float32](ll)
 
-    cmp_result = buffer.lt(10.0)
+    var cmp_result = buffer.lt(10.0)
 
     # Assertions
     assert_true(cmp_result[0] == True, "buffer.lt: 0 < 10 should be True")
@@ -1672,8 +1673,8 @@ def test_what_values() raises:
         buffer[i] = Float32(i)
 
     for block in range(2):
-        idx = block * simd_width
-        cmp = buffer.load[simd_width](idx).lt(10.0)
+        var idx = block * simd_width
+        var cmp = buffer.load[simd_width](idx).lt(10.0)
 
         # Verify expected values for Block 0
         if block == 0:
@@ -1764,7 +1765,7 @@ def test_to_dtype_from_bool_orig() raises:
 
 
 def test_to_dtype_large_buffer() raises:
-    size = 100
+    var size = 100
     var buffer = Buffer[DType.float64](size)
     for i in range(size):
         buffer[i] = Float64(i) * 0.5
@@ -1772,7 +1773,7 @@ def test_to_dtype_large_buffer() raises:
     var result = buffer.to_dtype[DType.int32]()
 
     for i in range(size):
-        expected = Int32(Float64(i) * 0.5)
+        var expected = Int32(Float64(i) * 0.5)
         assert_true(
             result[i] == expected,
             "Large buffer conversion failed at index " + String(i),
@@ -1780,11 +1781,11 @@ def test_to_dtype_large_buffer() raises:
 
 
 def test_count_orig() raises:
-    size = 135
-    ll = List[Scalar[DType.int64]](capacity=size)
+    var size = 135
+    var ll = List[Scalar[DType.int64]](capacity=size)
     for _ in range(size):
         ll.append(Scalar[DType.int64](2))
-    buffer = Buffer[DType.int64](ll)
+    var buffer = Buffer[DType.int64](ll)
     assert_true(
         buffer.count(Scalar[DType.int64](2)) == size, "count assertion 1 failed"
     )
@@ -1810,10 +1811,10 @@ def test_count_orig() raises:
         "count assertion 5 failed",
     )
 
-    lb = List[Scalar[DType.bool]](capacity=size)
+    var lb = List[Scalar[DType.bool]](capacity=size)
     for _ in range(size):
         lb.append(Scalar[DType.bool](True))
-    buffer_b = Buffer[DType.bool](lb)
+    var buffer_b = Buffer[DType.bool](lb)
     assert_true(buffer_b.count(True) == size, "count assertion 6 failed")
 
     buffer_b[0] = False
@@ -1834,11 +1835,11 @@ def test_count_orig() raises:
 
 
 def test_log_orig() raises:
-    ll = List[Scalar[DType.float32]](capacity=100)
+    var ll = List[Scalar[DType.float32]](capacity=100)
     for i in range(1, 100):
         ll.insert(0, Scalar[DType.float32](i))
-    buf = Buffer[DType.float32](ll)
-    logs = buf.log()
+    var buf = Buffer[DType.float32](ll)
+    var logs = buf.log()
 
     assert_true(logs[len(logs) - 1] == 0, "Buffer log zero assertion failed")
     assert_true(
@@ -1848,8 +1849,8 @@ def test_log_orig() raises:
 
 def test_buffer_iter() raises:
     comptime dtype = DType.float32
-    buff = Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    sliced = buff[4:1:-1]
+    var buff = Buffer[dtype](1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+    var sliced = buff[4:1:-1]
     var expect = 5
     for elem in sliced:
         assert_true(elem == Float32(expect), "Buffer iter assertion failed")
@@ -1858,23 +1859,23 @@ def test_buffer_iter() raises:
 
 def test_buffer_slice() raises:
     comptime dtype = DType.float32
-    buff = Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    sliced = buff[4:1:-2]
+    var buff = Buffer[dtype](1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+    var sliced = buff[4:1:-2]
     assert_true(
-        (sliced == Buffer[dtype]([5, 3])),
+        (sliced == Buffer[dtype](5, 3)),
         "Buffer slicing assertion failed",
     )
 
 
 def _buffer_buffer_mul() raises:
-    x = Buffer[DType.bool](129)
+    var x = Buffer[DType.bool](129)
     x.fill(Scalar[DType.bool](True))
-    y = Buffer[DType.bool](129)
+    var y = Buffer[DType.bool](129)
     y.fill(Scalar[DType.bool](True))
-    expect = Buffer[DType.bool](129)
+    var expect = Buffer[DType.bool](129)
     expect.fill(Scalar[DType.bool](True))
-    mul_result = x * y
-    cmp_result = mul_result == expect
+    var mul_result = x * y
+    var cmp_result = mul_result == expect
     assert_true(
         cmp_result,
         "Buffer buffer mul for boolean - assertion failed",
@@ -1891,14 +1892,14 @@ def _buffer_buffer_mul() raises:
 
 def test_buffer_buffer_add() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](72)
+    var a = Buffer[dtype](72)
     a.fill(43.0)
-    b = Buffer[dtype](72)
+    var b = Buffer[dtype](72)
     b.fill(43.0)
-    expected = Buffer[dtype](72)
+    var expected = Buffer[dtype](72)
     expected.fill(86)
-    added = a + b
-    result = added == expected
+    var added = a + b
+    var result = added == expected
     assert_true(
         result,
         "Buffer buffer add assertion failed",
@@ -1907,11 +1908,11 @@ def test_buffer_buffer_add() raises:
 
 def test_buffer_scalar_float_greater_than_eq() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](72)
+    var a = Buffer[dtype](72)
     a.fill(43.0)
-    result1 = a >= 42
+    var result1 = a >= 42
     a.fill(42.0)
-    result2 = a >= 42
+    var result2 = a >= 42
     assert_true(
         result1 and result2,
         "Buffer scalar float greater than eq assertion failed",
@@ -1920,10 +1921,10 @@ def test_buffer_scalar_float_greater_than_eq() raises:
 
 def test_buffer_scalar_float_less_than_eq() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](72)
+    var a = Buffer[dtype](72)
     a.fill(42.0)
-    result1 = a <= 43
-    result2 = a <= 42
+    var result1 = a <= 43
+    var result2 = a <= 42
     assert_true(
         result1 and result2,
         "Buffer scalar float less than eq assertion failed",
@@ -1932,41 +1933,41 @@ def test_buffer_scalar_float_less_than_eq() raises:
 
 def test_buffer_scalar_float_greater_than() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](72)
+    var a = Buffer[dtype](72)
     a.fill(42.0)
-    result = a > 41
+    var result = a > 41
     assert_true(result, "Buffer scalar float greater than assertion failed")
 
 
 def test_buffer_scalar_float_less_than() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](72)
+    var a = Buffer[dtype](72)
     a.fill(42.0)
-    result = a < 43
+    var result = a < 43
     assert_true(result, "Buffer scalar float less than assertion failed")
 
 
 def test_buffer_scalar_float_inequality() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](72)
+    var a = Buffer[dtype](72)
     a.fill(42.0)
-    result = a != 43
+    var result = a != 43
     assert_true(result, "Buffer scalar float inequality assertion failed")
 
 
 def test_buffer_scalar_float_equality() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](72)
+    var a = Buffer[dtype](72)
     a.fill(42.0)
-    result = a == 42
+    var result = a == 42
     assert_true(result, "Buffer scalar float equality assertion failed")
 
 
 def test_buffer_dot() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](33)
+    var a = Buffer[dtype](33)
     a.fill(42.0)
-    b = Buffer[dtype](33)
+    var b = Buffer[dtype](33)
     b.fill(2.0)
     assert_true(
         a.dot(b) == b.dot(a) and a.dot(b) == 2772, "dot assertion failed"
@@ -1975,27 +1976,27 @@ def test_buffer_dot() raises:
 
 def test_buffer_prod() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](2)
+    var a = Buffer[dtype](2)
     a.fill(42.0)
-    result = a.product()
+    var result = a.product()
     assert_true(result == 1764, "prod assertion failed")
 
 
 def test_buffer_sum() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](72)
+    var a = Buffer[dtype](72)
     a.fill(42.0)
-    result = a.sum()
+    var result = a.sum()
     assert_true(result == 3024, "Sum assertion failed")
 
 
 def test_buffer_float_greater_than_eq() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](72)
+    var a = Buffer[dtype](72)
     a.fill(42.0)
-    b = Buffer[dtype](72)
+    var b = Buffer[dtype](72)
     b.fill(420)
-    result = b >= a
+    var result = b >= a
     assert_true(result, "72 float greater than eq assertion failed")
 
     a = Buffer[dtype](31)
@@ -2008,21 +2009,21 @@ def test_buffer_float_greater_than_eq() raises:
 
 def test_buffer_float_greater_than() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](72)
+    var a = Buffer[dtype](72)
     a.fill(42.0)
-    b = Buffer[dtype](72)
+    var b = Buffer[dtype](72)
     b.fill(420)
-    result = b > a
+    var result = b > a
     assert_true(result, "72 float greater than assertion failed")
 
 
 def test_buffer_float_less_eq_than() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](72)
+    var a = Buffer[dtype](72)
     a.fill(42.0)
-    b = Buffer[dtype](72)
+    var b = Buffer[dtype](72)
     b.fill(420)
-    result = a <= b
+    var result = a <= b
     assert_true(result, "72 float less than eq assertion failed")
 
     a = Buffer[dtype](65)
@@ -2035,21 +2036,21 @@ def test_buffer_float_less_eq_than() raises:
 
 def test_buffer_float_less_than() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](72)
+    var a = Buffer[dtype](72)
     a.fill(42.0)
-    b = Buffer[dtype](72)
+    var b = Buffer[dtype](72)
     b.fill(420)
-    result = a < b
+    var result = a < b
     assert_true(result, "72 float less than assertion failed")
 
 
 def test_buffer_float_equality() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](72)
+    var a = Buffer[dtype](72)
     a.fill(42.0)
-    b = Buffer[dtype](72)
+    var b = Buffer[dtype](72)
     b.fill(42)
-    result = a == b
+    var result = a == b
     assert_true(result, "72 float equality assertion failed")
 
     a = Buffer[dtype](1)
@@ -2069,11 +2070,11 @@ def test_buffer_float_equality() raises:
 
 def test_buffer_float_inequality() raises:
     comptime dtype = DType.float32
-    a = Buffer[dtype](72)
+    var a = Buffer[dtype](72)
     a.fill(42.0)
-    b = Buffer[dtype](72)
+    var b = Buffer[dtype](72)
     b.fill(420)
-    result = a != b
+    var result = a != b
     assert_true(result, "72 float inequality assertion failed")
 
     a = Buffer[dtype](1)
@@ -2093,91 +2094,87 @@ def test_buffer_float_inequality() raises:
 
 def test_fill_segment() raises:
     comptime dtype = DType.int32
-    size = 21
-    l = List[Scalar[dtype]](capacity=Int(size))
+    var size = 21
+    var l = List[Scalar[dtype]](capacity=Int(size))
     for i in range(size):
         l.append(Int32(i))
 
-    buffer = Buffer[dtype](l)
+    var buffer = Buffer[dtype](l)
 
     buffer.fill(42, 3, 6)
     assert_true(
         buffer
         == Buffer[dtype](
-            [
-                0,
-                1,
-                2,
-                42,
-                42,
-                42,
-                6,
-                7,
-                8,
-                9,
-                10,
-                11,
-                12,
-                13,
-                14,
-                15,
-                16,
-                17,
-                18,
-                19,
-                20,
-            ]
+            0,
+            1,
+            2,
+            42,
+            42,
+            42,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
         )
     )
-    bool_buff = Buffer[DType.bool](
-        [True, True, True, False, False, False, False, False, False]
+    var bool_buff = Buffer[DType.bool](
+        True, True, True, False, False, False, False, False, False
     )
     bool_buff.fill(False, 0, 3)
     assert_true(
         bool_buff
         == Buffer[DType.bool](
-            [False, False, False, False, False, False, False, False, False]
+            False, False, False, False, False, False, False, False, False
         )
     )
 
 
 def test_overwrite_orig() raises:
     comptime dtype = DType.int32
-    size = 21
-    l = List[Scalar[dtype]](capacity=Int(size))
+    var size = 21
+    var l = List[Scalar[dtype]](capacity=Int(size))
     for i in range(size):
         l.append(Int32(i))
 
-    buffer = Buffer[dtype](l)
-    result = Buffer[dtype]([42, 42, 42])
+    var buffer = Buffer[dtype](l)
+    var result = Buffer[dtype](42, 42, 42)
 
     buffer.overwrite(result, 3, 6)
     assert_true(
         buffer
         == Buffer[dtype](
-            [
-                0,
-                1,
-                2,
-                42,
-                42,
-                42,
-                6,
-                7,
-                8,
-                9,
-                10,
-                11,
-                12,
-                13,
-                14,
-                15,
-                16,
-                17,
-                18,
-                19,
-                20,
-            ]
+            0,
+            1,
+            2,
+            42,
+            42,
+            42,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
         )
     )
 
@@ -3153,7 +3150,7 @@ def test_arithmetic_ops_preserve_original_arith() raises:
         buf1[i] = Int32(i)
         buf2[i] = 10
 
-    _result = buf1.arithmetic_ops[Add](buf2)
+    var _result = buf1.arithmetic_ops[Add](buf2)
 
     # Check original buffers unchanged
     for i in range(50):
@@ -3167,7 +3164,7 @@ def test_arithmetic_scalar_preserve_original_arith() raises:
     for i in range(50):
         buffer[i] = Int32(i)
 
-    _result = buffer.arithmetic_ops_scalar[Multiply](5)
+    var _result = buffer.arithmetic_ops_scalar[Multiply](5)
 
     # Check original buffer unchanged
     for i in range(50):
@@ -4037,7 +4034,6 @@ def test_compare_scalar_manual() raises:
     )
 
 
-
 def test_compare_buffer_manual_gt() raises:
     var buf1 = Buffer[DType.int32](MEDIUM_SIZE)
     var buf2 = Buffer[DType.int32](MEDIUM_SIZE)
@@ -4209,7 +4205,6 @@ def test_copied_shared_independent() raises:
     var buf = Buffer[dtype](5)
     for i in range(5):
         buf[i] = Float32(i)
-    buf.shared()  # convert to shared in-place
     var copy = buf.copied()
     buf[0] = Float32(99)
     copy[0] = Float32(88)
@@ -4233,7 +4228,9 @@ def test_buffer_numpy_noncopy_roundtrip() raises:
         Float32(1.0), Float32(2.0), Float32(3.0), Float32(4.0)
     )
     var arr = np.array(py_list, dtype=np.float32)
-    var ptr = ndarray_ptr[DType.float32](arr)
+    var ptr = ndarray_ptr[DType.float32](arr).unsafe_origin_cast[
+        MutUntrackedOrigin
+    ]()
     var buf = Buffer[DType.float32](4, ptr, copy=False)
     assert_true(buf.size == 4)
     assert_true(buf.external, "non-copy Buffer should be marked external")
@@ -4248,7 +4245,7 @@ def test_buffer_numpy_noncopy_roundtrip() raises:
     assert_true(
         buf[2] == -77.0, "Buffer must see numpy modifications (no copy)"
     )
-    # Buffer destructor will NOT free numpy's memory (external=True)
+    # Buffer destructor will NOT unsafe_free numpy's memory (external=True)
 
 
 def main() raises:

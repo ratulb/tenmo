@@ -12,13 +12,14 @@ from std.testing import (
     TestSuite,
 )
 from std.math import sqrt
-from tenmo.common_utils import isnan, isinf
+from std.utils.numerics import isinf, isnan
 from std.math import sqrt
 from std.random import seed
+from std.sys import has_accelerator
 from tenmo.gradbox import Gradbox
-from tenmo.shapes import Shape
-from tenmo.common_utils import i, s
-from tenmo.forwards import Padding
+from tenmo.shared.shapes import Shape
+from tenmo.shared.indexhelper import i, s
+from tenmo.pad import Padding
 
 
 def test_basic_forward() raises:
@@ -213,7 +214,7 @@ def test_batch() raises:
 
     # Each batch should have different values
     for b in range(4):
-        expected = Float32((b + 1) * 4)  # 4 kernel elements
+        var expected = Float32((b + 1) * 4)  # 4 kernel elements
         assert_almost_equal(result[b, 0, 0, 0], expected, atol=1e-5)
 
     print("Batch processing correct")
@@ -500,7 +501,9 @@ def assert_tensor_close(
     var total_elements = a.numels()
 
     for i in range(total_elements):
-        var diff = abs(a.buffer().data_buffer()[i] - b.buffer().data_buffer()[i])
+        var diff = abs(
+            a.buffer().data_buffer()[i] - b.buffer().data_buffer()[i]
+        )
         var threshold = atol + rtol * abs(b.buffer().data_buffer()[i])
 
         if diff > threshold:
@@ -549,13 +552,13 @@ def compute_numerical_gradient(
         # Forward pass with +eps
         var param_plus: Tensor[DType.float32]
         if param_type == "image":
-            param_plus = image.copy()
+            param_plus = image.clone()
             param_plus.buffer.data_buffer()[idx] += eps
         elif param_type == "kernel":
-            param_plus = kernel.copy()
+            param_plus = kernel.clone()
             param_plus.buffer.data_buffer()[idx] += eps
         else:
-            param_plus = bias.value().copy()
+            param_plus = bias.value().clone()
             param_plus.buffer.data_buffer()[idx] += eps
 
         var out_plus: Tensor[DType.float32]
@@ -577,13 +580,13 @@ def compute_numerical_gradient(
         # Forward pass with -eps
         var param_minus: Tensor[DType.float32]
         if param_type == "image":
-            param_minus = image.copy()
+            param_minus = image.clone()
             param_minus.buffer.data_buffer()[idx] -= eps
         elif param_type == "kernel":
-            param_minus = kernel.copy()
+            param_minus = kernel.clone()
             param_minus.buffer.data_buffer()[idx] -= eps
         else:
-            param_minus = bias.value().copy()
+            param_minus = bias.value().clone()
             param_minus.buffer.data_buffer()[idx] -= eps
 
         var out_minus: Tensor[DType.float32]
@@ -1186,7 +1189,7 @@ def test_batch_processing() raises:
     var out_individual_list = List[Tensor[DType.float32]]()
     for i in range(4):
         var img_single = img_batch[i : i + 1, :, :, :]  # Keep batch dimension
-        img_single = img_single.contiguous()
+        img_single = img_single.clone()
         var out_single = Conv2dFused[DType.float32].forward[track_grad=False](
             img_single, kernel
         )
@@ -1927,6 +1930,78 @@ def test_conv2d_backward_with_stride() raises:
 
 
 # ============================================================================
+# BIAS GRADIENT — non-uniform dY (regression)
+# ============================================================================
+
+
+def _assert_db_exact(
+    n: Int,
+    c_in: Int,
+    h: Int,
+    w: Int,
+    c_out: Int,
+    kh: Int,
+    kw: Int,
+) raises:
+    """Assert db equals the exact column sums of a distinct-value dY ramp.
+
+    Every other conv gradcheck seeds dY uniformly (`backward(1.0)` or
+    `.sum()`), which makes a contiguous row-window sum numerically equal
+    to a strided column sum. That uniformity hid two real defects in the
+    db reduction: a contiguous (not strided) SIMD load, and a `parallelize`
+    corruption in the tiny packed-P regime. A distinct-value ramp makes
+    the column sum identifiable.
+    """
+    comptime dtype = DType.float32
+    var h_out = h - kh + 1
+    var w_out = w - kw + 1
+    var ramp = Tensor[dtype].zeros(n, c_out, h_out, w_out)
+    for ni in range(n):
+        for co in range(c_out):
+            for oy in range(h_out):
+                for ox in range(w_out):
+                    ramp[ni, co, oy, ox] = Float32(
+                        1.0 + Float64(ni * 1000 + co * 100 + oy * 10 + ox)
+                    )
+    var x = Tensor[dtype].ones(n, c_in, h, w, requires_grad=True)
+    var k = Tensor[dtype].ones(c_out, c_in, kh, kw, requires_grad=True)
+    var b = Tensor[dtype].zeros(c_out, requires_grad=True)
+    var out = Conv2dFused[dtype].forward(
+        image=x, kernel=k, bias=b, stride=1, padding=Padding("valid")
+    )
+    # d(loss)/d(out) == ramp, so db[co] == column sum of ramp.
+    var loss = (out * ramp).sum()
+    loss.backward(1.0)
+    var db = b.grad().as_tensor()
+    for co in range(c_out):
+        var expect = Float32(0.0)
+        for ni in range(n):
+            for oy in range(h_out):
+                for ox in range(w_out):
+                    expect += ramp[ni, co, oy, ox]
+        var got: Float32 = db[co]
+        assert_true(
+            got == expect,
+            "db[" + String(co) + "]=" + String(got) + " expected " + String(
+                expect
+            ),
+        )
+
+
+def test_conv2d_backward_bias_grad_nonuniform() raises:
+    """DB exact for M >> simdwidth, M < simdwidth, and the tiny packed-P race."""
+    print("test_conv2d_backward_bias_grad_nonuniform")
+    # M = 4*10*10 = 400: far above simdwidth, so the strided SIMD loop runs.
+    _assert_db_exact(4, 3, 12, 12, 4, 3, 3)
+    # M = 2*2*2 = 8 < simdwidth: scalar tail only.
+    _assert_db_exact(2, 2, 4, 4, 3, 3, 3)
+    # M = 2, C_out = 4 -> packed P = 8: the parallelize corruption regime.
+    _assert_db_exact(1, 1, 2, 3, 4, 2, 2)
+    # C_out = 2 (>= 2 physical cores on small boxes) with P = 4.
+    _assert_db_exact(1, 1, 2, 3, 2, 2, 2)
+
+
+# ============================================================================
 # EDGE CASES AND NUMERICAL TESTS
 # ============================================================================
 
@@ -1993,3 +2068,141 @@ def test_conv2d_edge_output_size_1() raises:
     assert_true(output.shape()[2] == 1)
     assert_true(output.shape()[3] == 1)
     assert_true(output[0, 0, 0, 0] == 9.0)
+
+
+# -------------------------------------------------------------------
+# GPU TESTS: ConvGpu forward parity + CPU-fallback backward.
+# No-op without an accelerator (comptime guard); run on the GPU box
+# via `./execute.sh cnn`.
+# -------------------------------------------------------------------
+
+
+def test_conv_gpu_forward_parity() raises:
+    """GPU Conv2dFused.forward matches CPU (valid padding, with bias)."""
+    print("test_conv_gpu_forward_parity")
+
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        seed(7)
+        var img = Tensor[dtype].randn(1, 2, 5, 5)
+        var kernel = Tensor[dtype].randn(3, 2, 3, 3)
+        var bias = Tensor[dtype].randn(3)
+
+        var expected = Conv2dFused[dtype].forward(
+            img, kernel, bias=bias, padding=Padding("valid")
+        )
+
+        var result = Conv2dFused[dtype].forward(
+            img.to_gpu(),
+            kernel.to_gpu(),
+            bias=bias.to_gpu(),
+            padding=Padding("valid"),
+        )
+        assert_true(result.is_on_gpu())
+        assert_true(result.to_cpu().all_close[atol=1e-5](expected))
+
+
+def test_conv_gpu_forward_no_bias_same() raises:
+    """GPU forward without bias (device zeros) + same padding."""
+    print("test_conv_gpu_forward_no_bias_same")
+
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        seed(11)
+        var img = Tensor[dtype].randn(2, 3, 6, 6)
+        var kernel = Tensor[dtype].randn(4, 3, 3, 3)
+
+        var expected = Conv2dFused[dtype].forward(
+            img, kernel, padding=Padding("same")
+        )
+
+        var result = Conv2dFused[dtype].forward(
+            img.to_gpu(), kernel.to_gpu(), padding=Padding("same")
+        )
+        assert_true(result.is_on_gpu())
+        assert_equal(result.shape()[2], 6)
+        assert_equal(result.shape()[3], 6)
+        assert_true(result.to_cpu().all_close[atol=1e-5](expected))
+
+
+def test_conv_gpu_forward_stride_dilation() raises:
+    """GPU forward with stride=2, dilation=2, asymmetric int padding."""
+    print("test_conv_gpu_forward_stride_dilation")
+
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        seed(13)
+        var img = Tensor[dtype].randn(1, 2, 9, 9)
+        var kernel = Tensor[dtype].randn(2, 2, 3, 3)
+        var bias = Tensor[dtype].randn(2)
+
+        var expected = Conv2dFused[dtype].forward(
+            img, kernel, bias=bias, stride=2, dilation=2, padding=Padding(1)
+        )
+
+        var result = Conv2dFused[dtype].forward(
+            img.to_gpu(),
+            kernel.to_gpu(),
+            bias=bias.to_gpu(),
+            stride=2,
+            dilation=2,
+            padding=Padding(1),
+        )
+        assert_true(result.is_on_gpu())
+        assert_true(result.to_cpu().all_close[atol=1e-5](expected))
+
+
+def test_conv_gpu_backward_gradflow() raises:
+    """GPU forward + sum backward: grads land on GPU and match CPU grads."""
+    print("test_conv_gpu_backward_gradflow")
+
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        seed(17)
+        var img_c = Tensor[dtype].randn(1, 2, 5, 5)
+        var kernel_c = Tensor[dtype].randn(2, 2, 3, 3)
+        var bias_c = Tensor[dtype].randn(2)
+        img_c.requires_grad_(True)
+        kernel_c.requires_grad_(True)
+        bias_c.requires_grad_(True)
+
+        var img_g = img_c.clone().to_gpu()
+        var kernel_g = kernel_c.clone().to_gpu()
+        var bias_g = bias_c.clone().to_gpu()
+        img_g.requires_grad_(True)
+        kernel_g.requires_grad_(True)
+        bias_g.requires_grad_(True)
+
+        var out_g = Conv2dFused[dtype].forward(
+            img_g, kernel_g, bias=bias_g, padding=Padding("same")
+        )
+        assert_true(out_g.is_on_gpu())
+        var loss_g = out_g.sum()
+        loss_g.backward()
+
+        var out_c = Conv2dFused[dtype].forward(
+            img_c, kernel_c, bias=bias_c, padding=Padding("same")
+        )
+        var loss_c = out_c.sum()
+        loss_c.backward()
+
+        # Grads accumulated on the GPU leaves...
+        assert_true(img_g.grad().is_on_gpu())
+        assert_true(kernel_g.grad().is_on_gpu())
+        assert_true(bias_g.grad().is_on_gpu())
+        # ...with CPU-matching values.
+        assert_true(
+            img_g.grad()
+            .to_cpu()
+            .all_close[atol=1e-4](img_c.grad().as_tensor())
+        )
+        assert_true(
+            kernel_g.grad()
+            .to_cpu()
+            .all_close[atol=1e-4](kernel_c.grad().as_tensor())
+        )
+        assert_true(
+            bias_g.grad()
+            .to_cpu()
+            .all_close[atol=1e-4](bias_c.grad().as_tensor())
+        )

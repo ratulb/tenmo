@@ -1,5 +1,5 @@
 from tenmo.tensor import Tensor
-from tenmo.shapes import Shape
+from tenmo.shared.shapes import Shape
 from std.testing import assert_true, TestSuite
 from std.sys import has_accelerator
 
@@ -545,7 +545,7 @@ def test_iop_gpu_iadd_fwd_matches_cpu() raises:
     comptime if has_accelerator():
         var a_cpu = Tensor[dtype].rand(Shape(9, 20))
         var b_cpu = Tensor[dtype].rand(Shape(9, 20))
-        var a_ref = a_cpu.copy()
+        var a_ref = a_cpu.clone()
         a_ref += b_cpu
         var a_gpu = a_cpu.to_gpu()
         var b_gpu = b_cpu.to_gpu()
@@ -580,7 +580,7 @@ def test_iop_gpu_isub_fwd_matches_cpu() raises:
     comptime if has_accelerator():
         var a_cpu = Tensor[dtype].rand(Shape(8, 12))
         var b_cpu = Tensor[dtype].rand(Shape(8, 12))
-        var a_ref = a_cpu.copy()
+        var a_ref = a_cpu.clone()
         a_ref -= b_cpu
         var a_gpu = a_cpu.to_gpu()
         var b_gpu = b_cpu.to_gpu()
@@ -673,7 +673,7 @@ def test_iop_gpu_imul_fwd_matches_cpu() raises:
     comptime if has_accelerator():
         var a_cpu = Tensor[dtype].rand(Shape(9, 20))
         var b_cpu = Tensor[dtype].rand(Shape(9, 20))
-        var a_ref = a_cpu.copy()
+        var a_ref = a_cpu.clone()
         a_ref *= b_cpu
         var a_gpu = a_cpu.to_gpu()
         var b_gpu = b_cpu.to_gpu()
@@ -721,7 +721,7 @@ def test_iop_gpu_idiv_fwd_matches_cpu() raises:
     comptime if has_accelerator():
         var a_cpu = Tensor[dtype].rand(Shape(8, 12)) + Scalar[dtype](0.1)
         var b_cpu = Tensor[dtype].rand(Shape(8, 12)) + Scalar[dtype](0.1)
-        var a_ref = a_cpu.copy()
+        var a_ref = a_cpu.clone()
         a_ref /= b_cpu
         var a_gpu = a_cpu.to_gpu()
         var b_gpu = b_cpu.to_gpu()
@@ -894,8 +894,8 @@ def test_iop_gpu_bwd_matches_cpu() raises:
         var out_cpu = a * b
         var loss_cpu = out_cpu.sum()
         loss_cpu.backward()
-        var ga_cpu = a.grad().as_tensor().copy()
-        var gb_cpu = b.grad().as_tensor().copy()
+        var ga_cpu = a.grad().as_tensor().clone()
+        var gb_cpu = b.grad().as_tensor().clone()
         a.zero_grad()
         b.zero_grad()
 

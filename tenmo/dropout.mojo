@@ -1,49 +1,50 @@
 from std.random.philox import Random as PhiloxRandom
-from std.random import random_float64, random_ui64
+from std.random import random_ui64
 from std.sys import simd_width_of, has_accelerator
+from std.sys.info import num_physical_cores
+from max.algorithm import parallelize
 
 from .tensor import Tensor
-from .mnemonics import AddTensor, DROPOUT
-from .backpropagation import BackwardFnArg, ArgumentType, BACKWARD_DROPOUT
+from .gpu.device import GPU
+from .shared.mnemonics import AddTensor, Multiply
+from .backpropagation import BackwardFn, ArgumentType, BackwardFnType
+
 from .gradbox import Gradbox
-from .common_utils import panic
+from .shared.panic import panic
 from .ndbuffer import NDBuffer
-from .buffers import Buffer
-from .named_parameter import NamedParameter
-from .net import Module, Layer
-from tenmo.kernels.dropout_kernel import DropoutKernel
+from .shared.buffers import Buffer
+from .layer_trait import LayerTrait
+from .kernels.dropout_kernel import DropoutKernel
 from .ancestry import Ancestor
-
-# =============================================================================
-# ArgDropout: packed argument struct for BackwardFnArg
-# =============================================================================
-#
-# Stored in ArgumentType. Carries everything DropoutBackward needs:
-#   mask_cpu  — CPU Buffer mask (set when tensor is on CPU, else empty)
-#   mask_gpu  — GPU NDBuffer mask (set when tensor is on GPU, else None)
-#   scale     — 1 / (1 - p), used to reconstruct gradient scaling
-#   on_gpu    — which mask arm to read in backward
-#
-
 
 @fieldwise_init
 struct ArgDropout[dtype: DType](ArgumentType):
+    """ArgDropout.
+    Packed argument struct for BackwardFn
+    Stored in ArgumentType. Carries everything DropoutBackward needs:
+      mask_cpu  — CPU Buffer mask (set when tensor is on CPU, else empty)
+      mask_gpu  — GPU NDBuffer mask (set when tensor is on GPU, else None)
+      on_gpu    — which mask arm to read in backward
+    (Scale is baked into the mask at forward time, so it is not stored.)
+    """
     var mask_cpu: Buffer[Self.dtype]  # valid on CPU path
     var mask_gpu: Optional[NDBuffer[Self.dtype]]  # valid on GPU path
-    var scale: Scalar[Self.dtype]
     var on_gpu: Bool
 
 
 @fieldwise_init
-struct DropoutBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+struct DropoutBackward[dtype: DType](
+    BackwardFnType, ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
         ref arg_dropout = (
-            output.ancestry().backward_fn_arg().get[ArgDropout[Self.dtype]]()
+            output.ancestry().backward_fn().get[ArgDropout[Self.dtype]]()
         )
         ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
@@ -66,19 +67,24 @@ struct DropoutBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             ancestor.update_grad(gradbox_ancestor^, AddTensor, None)
         parent_ids.append(ancestor._id)
 
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()
 
 
 @fieldwise_init
-struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
+struct Dropout[dtype: DType](LayerTrait & RegisterPassable):
     """Dropout layer — CPU and GPU enabled.
 
     Forward (training):
-      CPU: Philox RNG generates mask in a SIMD loop; output and mask written
-           in one pass.
+      CPU: local Philox RNG (subsequence 0) generates the mask in a SIMD
+           loop; output and mask written in one pass.
       GPU: dropout_forward_kernel generates mask on-device via per-thread
            Philox subsequences; output and mask returned as GPU NDBuffers.
+
+    Reproducibility: set_seed(s) fixes the mask stream per device — same
+      seed gives the same mask every call on the same device. A fixed
+      seed is NOT bit-identical across CPU/GPU (different Philox stream
+      decomposition), only statistically identical. Without set_seed both
+      paths draw a fresh random seed per call.
 
     Backward:
       grad_input = grad_output * mask   (scale already baked into mask)
@@ -87,6 +93,10 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     Eval / p==0:
       Identity — returns input, no mask stored, no grad bookkeeping.
     """
+
+    # Homogeneous layer: consumes and produces Tensor[Self.dtype];
+    # OutputDType inherits InputDType (LayerTrait default).
+    comptime InputDType = Self.dtype
 
     var training: Bool
     var p: Scalar[Self.dtype]
@@ -110,15 +120,20 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self.seed = copy.seed
         self.fixed_seed = copy.fixed_seed
 
-    def __call__(self, x: Tensor[Self.dtype], sync: Bool = True) -> Tensor[Self.dtype]:
-        # ── Eval / no-op paths ────────────────────────────────────────────────
+    def __call__(
+        mut self, x: Tensor[Self.dtype], sync: Bool = True
+    ) -> Tensor[Self.dtype]:
+        # Eval / no-op paths
+        # Identity: returning the input alias is intentional (PyTorch
+        # parity) — shared _id keeps autograd correct, zero-copy.
         if not self.training or self.p == Scalar[Self.dtype](0.0):
             return x
 
-        if self.p == Scalar[Self.dtype](1.0):
-            return Tensor[Self.dtype].zeros(x.shape())
+        # No p==1 branch: the constructor rejects p>=1, and even a
+        # directly-mutated p==1 flows correctly below (r > 1 never fires,
+        # all-zero mask with proper ancestry instead of a severed graph).
 
-        # ── GPU path ──────────────────────────────────────────────────────────
+        # GPU path
         comptime if has_accelerator():
             if x.buffer.is_on_gpu():
                 try:
@@ -126,14 +141,19 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                         random_ui64(0, 1000)
                     )
                     var result = DropoutKernel[Self.dtype].launch(
-                        x.buffer,
+                        x.buffer.layout(),
+                        x.buffer.device_state.value(),
                         self.p,
                         self.scale,
                         seed,
                         sync=sync,
                     )
-                    var out_ndb = result[0]
-                    var mask_ndb = result[1]
+                    var out_ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        result[0][0], result[0][1]
+                    )
+                    var mask_ndb = NDBuffer[
+                        Self.dtype
+                    ].with_layout_device_state(result[1][0], result[1][1])
 
                     var out = Tensor[Self.dtype](out_ndb^, requires_grad=False)
 
@@ -142,14 +162,14 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                         var arg = ArgDropout[Self.dtype](
                             mask_cpu=Buffer[Self.dtype](),  # empty — not used
                             mask_gpu=Optional(mask_ndb^),
-                            scale=self.scale,
                             on_gpu=True,
                         )
-                        var backwardFnArg = BackwardFnArg[Self.dtype](
-                            BACKWARD_DROPOUT, arg^
+                        var backwardFn = BackwardFn(
+                            arg^,
+                            DropoutBackward[Self.dtype](),
                         )
-                        backwardFnArg.needs_parent_data = True
-                        out.add_ancestry(backwardFnArg^, x)
+                        backwardFn.needs_parent_data = True
+                        out.add_ancestry(backwardFn^, x)
 
                     return out^
 
@@ -158,11 +178,24 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                     # Unreachable
                     return Tensor[Self.dtype].zeros(x.shape())
 
-        # ── CPU path ──────────────────────────────────────────────────────────
+        # CPU path
         var shape = x.shape()
         var numels = x.numels()
         var out_buf = Buffer[Self.dtype](numels)
         var mask_buf = Buffer[Self.dtype](numels)
+
+        # Mask stream: a local Philox generator (NOT the global RNG), so
+        # set_seed is honored on CPU. fixed_seed reuses self.seed every
+        # call — same mask each time, mirroring the GPU path; otherwise
+        # seed from the global RNG so consecutive calls differ.
+        # NOTE: a fixed seed is reproducible per device but NOT
+        # bit-identical across CPU/GPU — the GPU kernel splits the key
+        # into per-thread subsequences with grid-stride chunking, while
+        # the CPU draws per-segment subsequence streams (serial: one
+        # subsequence-0 stream, as before). Both paths use
+        # the same r > p criterion with scale baked in, so masks are
+        # statistically identical, just not bitwise equal.
+        var philox_seed = self.seed if self.fixed_seed else random_ui64(0, 1000)
 
         var x_ptr = x.buffer.data_ptr()
         var out_ptr = out_buf.unsafe_ptr()
@@ -178,39 +211,63 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         var scale_vec = SIMD[Self.dtype, simd_w](scale_s)
         var zero_vec = SIMD[Self.dtype, simd_w](zero_s)
 
-        var vec_end = (numels // simd_w) * simd_w
-
-        # SIMD vectorized path — mask generation is scalar (random_float64
-        # returns one value at a time), but the mask application and store
-        # use SIMD loads/stores for throughput.
-        var i = 0
-        while i < vec_end:
-            var x_vec = x_ptr.load[width=simd_w](i)
-
-            # Generate random values — one scalar per lane, no SIMD RNG
-            var rand_vec = SIMD[Self.dtype, simd_w](0)
-            for lane in range(simd_w):
-                rand_vec[lane] = random_float64(0.0, 1.0).cast[Self.dtype]()
-
-            # Create mask: scale where rand > p, else 0
-            # var mask_vec = (rand_vec > threshold_vec).select(scale_vec, zero_vec)
-            var mask_vec = rand_vec.gt(threshold_vec).select(
-                scale_vec, zero_vec
+        # Per-segment worker: independent Philox subsequence per segment, so
+        # workers never share RNG state and the mask is deterministic for a
+        # fixed seed (same mask every call, bit-identical across layers with
+        # the same seed). Serial path below threshold keeps the legacy
+        # single-stream layout exactly.
+        def worker(seg: Int, seg_start: Int, seg_end: Int) {imm}:
+            var rng = PhiloxRandom(
+                seed=philox_seed, subsequence=UInt64(seg), offset=0
             )
+            var i = seg_start
+            var seg_vec_end = (
+                seg_start + ((seg_end - seg_start) // simd_w) * simd_w
+            )
+            while i < seg_vec_end:
+                var x_vec = x_ptr.unsafe_load[width=simd_w](i)
 
-            # Apply mask and store both output and mask
-            out_ptr.store[width=simd_w](i, x_vec * mask_vec)
-            mask_ptr.store[width=simd_w](i, mask_vec)
+                # Generate random values — Philox stream, one scalar per lane
+                var rand_vec = SIMD[Self.dtype, simd_w](0)
+                var lane = 0
+                while lane < simd_w:
+                    var rand_f32 = rng.step_uniform()
+                    for k in range(4):
+                        if lane + k < simd_w:
+                            rand_vec[lane + k] = rand_f32[k].cast[Self.dtype]()
+                    lane += 4
 
-            i += simd_w
+                # Create mask: scale where rand > p, else 0
+                var mask_vec = rand_vec.gt(threshold_vec).select(
+                    scale_vec, zero_vec
+                )
 
-        # Scalar tail
-        for j in range(vec_end, numels):
-            var r = random_float64(0.0, 1.0).cast[Self.dtype]()
-            var x_v = x_ptr[j]
-            var m = scale_s if r > p_s else zero_s
-            out_ptr[j] = x_v * m
-            mask_ptr[j] = m
+                # Apply mask and store both output and mask
+                out_ptr.unsafe_store[width=simd_w](i, x_vec * mask_vec)
+                mask_ptr.unsafe_store[width=simd_w](i, mask_vec)
+
+                i += simd_w
+
+            # Scalar tail
+            for j in range(seg_vec_end, seg_end):
+                var r = rng.step_uniform()[0].cast[Self.dtype]()
+                var x_v = x_ptr[unsafe_offset=j]
+                var m = scale_s if r > p_s else zero_s
+                out_ptr[unsafe_offset=j] = x_v * m
+                mask_ptr[unsafe_offset=j] = m
+
+        var n_threads = num_physical_cores()
+        if numels >= n_threads * 4096 and n_threads > 1:
+            # Parallel path: split the flat index space across cores.
+            def dispatch(t: Int) {imm}:
+                var seg_start = t * numels // n_threads
+                var seg_end = (t + 1) * numels // n_threads
+                worker(t, seg_start, seg_end)
+
+            parallelize(dispatch, n_threads, n_threads)
+        else:
+            # Serial path — single subsequence-0 stream (legacy layout).
+            worker(0, 0, numels)
 
         var out_ndb = NDBuffer[Self.dtype](out_buf^, shape)
         var out = Tensor[Self.dtype](out_ndb^, requires_grad=False)
@@ -220,29 +277,16 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             var arg = ArgDropout[Self.dtype](
                 mask_cpu=mask_buf^,
                 mask_gpu=None,
-                scale=self.scale,
                 on_gpu=False,
             )
-            var backwardFnArg = BackwardFnArg[Self.dtype](
-                BACKWARD_DROPOUT, arg^
+            var backwardFn = BackwardFn(
+                arg^,
+                DropoutBackward[Self.dtype](),
             )
-            backwardFnArg.needs_parent_data = True
-            out.add_ancestry(backwardFnArg^, x)
+            backwardFn.needs_parent_data = True
+            out.add_ancestry(backwardFn^, x)
 
         return out^
-
-    def parameters(
-        ref self,
-    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
-        return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
-
-    def named_parameters(
-        ref self, prefix: String
-    ) -> List[NamedParameter[Self.dtype]]:
-        return List[NamedParameter[Self.dtype]]()
-
-    def num_parameters(self) -> Int:
-        return 0
 
     def train(mut self):
         self.training = True
@@ -251,17 +295,13 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         self.training = False
 
     def set_seed(mut self, seed_val: UInt64):
-        """Set Philox seed for reproducible dropout masks."""
+        """Set Philox seed for reproducible dropout masks.
+
+        Honored on BOTH paths: the CPU draws a local Philox stream from
+        this seed, the GPU forwards it to the kernel. With a fixed seed
+        the same call produces the same mask every time (per device —
+        CPU and GPU masks from one seed are statistically identical but
+        not bit-identical).
+        """
         self.seed = seed_val
         self.fixed_seed = True
-
-    def into(self) -> Module[Self.dtype]:
-        return Module[Self.dtype](Layer[Self.dtype](self), DROPOUT)
-
-    def to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
-        """No-op — activation layers have no parameters to move."""
-        return self
-
-    def to_cpu(self) raises -> Self:
-        """No-op — no parameters to move."""
-        return self

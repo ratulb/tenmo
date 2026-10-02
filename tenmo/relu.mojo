@@ -1,29 +1,30 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor, RELU_FORWARD
+from .shared.mnemonics import AddTensor, RELU_FORWARD, Multiply
 from .backpropagation import (
-    BackwardFnArg,
+    BackwardFnType,
+    BackwardFn,
     BufferArg,
     NDBufferArg,
-    BACKWARD_RELU,
 )
 from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
-from .buffers import Buffer
+from .shared.buffers import Buffer
 from .ancestry import Ancestor
-from tenmo.kernels.unary_ops_kernel import UnaryOpsKernel
-from .common_utils import panic
+from .kernels.unary_ops_kernel import UnaryKernel
+from .shared.panic import panic
 from std.sys import simd_width_of, has_accelerator
 
 
 @fieldwise_init
-struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
+struct ReLUBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
+    comptime datatype = Self.dtype
+
     @staticmethod
     def backward(
         var output: Ancestor[Self.dtype],
         mut parent_ids: List[UInt],
-        retain_graph: Bool = False,
     ):
-        ref arg = output.ancestry().backward_fn_arg()
+        ref arg = output.ancestry().backward_fn()
         ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
         ref shape = ancestor.shape()
@@ -42,8 +43,7 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
         ancestor.update_grad(ancestor_gbx^, AddTensor, None)
 
         parent_ids.append(ancestor._id)
-        if not retain_graph:
-            gradbox.zero_grad()
+        gradbox.zero_grad()
 
 
 @fieldwise_init
@@ -64,6 +64,7 @@ struct ReLU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         Args:
             self: Input tensor.
             requires_grad: Override gradient tracking (default: inherit from input).
+            sync: Whether to synchronize the GPU operation.
 
         Returns:
             Output tensor with ReLU applied.
@@ -79,18 +80,20 @@ struct ReLU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg: BackwardFnArg[Self.dtype]
+                var backwardFn: BackwardFn
 
                 if self.buffer.is_on_gpu():
-                    backwardFnArg = BackwardFnArg[Self.dtype].from_ndbuffer(
-                        BACKWARD_RELU, mask_ndb^
+                    backwardFn = BackwardFn.from_ndbuffer[Self.dtype](
+                        mask_ndb^,
+                        ReLUBackward[Self.dtype](),
                     )
                 else:
-                    backwardFnArg = BackwardFnArg[Self.dtype].from_buffer(
-                        BACKWARD_RELU, mask_ndb.data_buffer()
+                    backwardFn = BackwardFn.from_buffer[Self.dtype](
+                        mask_ndb.data_buffer(),
+                        ReLUBackward[Self.dtype](),
                     )
-                backwardFnArg.needs_parent_data = True
-                out.add_ancestry(backwardFnArg^, self)
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, self)
 
         return out^
 
@@ -151,11 +154,15 @@ struct ReLU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         comptime if has_accelerator():
             if ndb.is_on_gpu():
                 try:
-                    var result = UnaryOpsKernel[Self.dtype].launch_with_mask[
+                    var result = UnaryKernel[Self.dtype].launch_with_mask[
                         RELU_FORWARD
-                    ](ndb)
-                    out = result[0]
-                    mask = result[1]
+                    ](ndb.layout(), ndb.device_state.value())
+                    out = NDBuffer[Self.dtype].with_layout_device_state(
+                        result[0], result[1]
+                    )
+                    mask = NDBuffer[Self.dtype].with_layout_device_state(
+                        result[2], result[3]
+                    )
                 except e:
                     panic(
                         "ReluNdBuffer forward → GPU launch failed: ",

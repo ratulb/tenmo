@@ -1,6 +1,7 @@
 from std.pathlib import Path
 from std.python import Python, PythonObject
-from tenmo.nlp import IMDBTextCleaner
+from .cleaner import IMDBTextCleaner
+from bpe.tokenizer_trait import Tokenizer
 
 comptime DEFAULT_SPLITTER = r'([,.:;?_!"()\']|--|\s)'
 comptime DEFAULT_SUBSTITUTION: Tuple[StaticString, StaticString] = (
@@ -21,7 +22,7 @@ struct SimpleTokenizer[
     substitution: Tuple[StaticString, StaticString] = DEFAULT_SUBSTITUTION,
     UNK: StaticString = DEFAULT_UNK,
     end_of_text: StaticString = END_OF_TEXT,
-](Sized & ImplicitlyCopyable & Movable):
+](Sized & ImplicitlyCopyable & Tokenizer):
     var str_to_int: Dict[String, Int]
     var int_to_str: Dict[Int, String]
     var regex_parser: PythonObject
@@ -47,12 +48,12 @@ struct SimpleTokenizer[
         self.max_n = copy.max_n
         self.regex_parser = copy.regex_parser.copy()
 
-    def __init__(out self, deinit existing: Self):
-        self.int_to_str = existing.int_to_str^
-        self.str_to_int = existing.str_to_int^
-        self.text_cleaner = existing.text_cleaner
-        self.max_n = existing.max_n
-        self.regex_parser = existing.regex_parser^
+    def __init__(out self, *, deinit move: Self):
+        self.int_to_str = move.int_to_str^
+        self.str_to_int = move.str_to_int^
+        self.text_cleaner = move.text_cleaner
+        self.max_n = move.max_n
+        self.regex_parser = move.regex_parser^
 
     @staticmethod
     def ngramify(

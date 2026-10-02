@@ -16,73 +16,135 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 8  # Mojo compilation is memory-bound
+      max-parallel: 8  # Mojo compilation is memory-bound — even 2 parallel compilations OOM a GitHub runner
       matrix:
         test:
-          - attn_matmul
-          - variance
-          - variance_and_std
-          - std_variance
-          - sigmoid
-          - summean
-          - exp
-          - transmute
-          - count_unique
-          - compare
+          - abs
+          - accuracy
+          - adamw
           - allany
-          - power
-          - onehot
-          - maxmin_scalar
-          - contiguous
-          - item
-          - intarray
-          - mm2d
-          - relu
-          - shuffle
-          - permute
-          - unsqueeze
-          - gradbox
-          - transpose
-          - ndb
-          - ce
-          - buffers
-          - views
-          - shapes
-          - shapebroadcast
-          - strides
-          - validators
-          - losses
-          - tanh
-          - tensors
-          - indexhelper
-          - utils
-          - mmnd
-          - mv
-          - vm
           - argminmax
-          - minmax
-          - repeat
-          - tiles
+          - assignment
+          - attention
+          - attn_matmul
+          - attn_matmul_cpu
+          - attn_matmul_gpu
+          - bce
+          - bidirectional
+          - blas
+          - broadcast
+          - buffers
+          - cast_graph
+          - causal
+          - ce
+          - checkpoint
+          - chunk
+          - cnn
+          - compare
+          - concat
+          - contiguous
+          - count_unique
+          - cumsum
+          - data
+          - dev_transfer
+          - division
+          - dot
+          - dropout
+          - dtype_cast
+          - embedding
+          - encoder
+          - epochs
+          - exp
+          - exp_gpu
+          - exp_gpu_standalone
+          - expand
+          - fanin
+          - fill
+          - flatten
+          - gather
+          - gelu
+          - generate
+          - gpt_stack
+          - gptflow
+          - gpu_cpu
+          - gpu_expand
+          - gpusummean
+          - gradbox
+          - idgen
+          - imdb_bert_data
+          - indexhelper
+          - inplace
+          - intarray
+          - item
+          - layer_norm
           - linspace
+          - logarithm
+          - logarithm_gpu
+          - losses
+          - masked_fill
+          - matmul
+          - maxmin_scalar
+          - minmax
+          - mixedseq
+          - mm2d
+          - mm_cpu
+          - mmnd
+          - module_list
+          - multinomial
+          - mv
+          - ndb
+          - ndb_inp_arith
+          - ndb_oop_arith
+          - npiop
+          - onehot
+          - outer
+          - pad
+          - permute
+          - positional
+          - power
+          - product
+          - reciprocal
+          - relu
+          - repeat
+          - reshape
+          - scalar
+          - scalar_gpu
+          - scalar_ops_gpu
+          - scheduler
+          - sgd
+          - shapebroadcast
+          - shapes
+          - shuffle
+          - sigmoid
           - slice
           - softmax
-          - flatten
+          - sparse_sgd
+          - sqrt
           - squeeze
-          - sgd
-          - matmul
-          - dropout
           - stack
-          - concat
-          - pad
-          - fill
-          - chunk
-          - logarithm
-          - blas
-          - data
-          - scalar
-          - broadcast
-          - expand
-          - npiop
+          - staticseq
+          - std_variance
+          - strides
+          - summean
+          - tanh
+          - tanh_gpu
+          - tensors
+          - tiles
+          - transmute
+          - transpose
+          - tril
+          - triu
+          - unary
+          - unsqueeze
+          - utils
+          - validators
+          - variance
+          - variance_and_std
+          - view_slice
+          - views
+          - vm
+          - welford
+          - where
 
     steps:
 
@@ -115,6 +177,57 @@ jobs:
             fi
             chmod +x execute.sh
             pixi run ./execute.sh ${{ matrix.test }}
+            exit_code=$?
+            if [ $exit_code -eq 0 ]; then
+              echo "Test '${{ matrix.test }}' passed on attempt $((attempt + 1))"
+              exit 0
+            fi
+            attempt=$((attempt + 1))
+          done
+          echo "::error::Test '${{ matrix.test }}' FAILED after ${{ env.MAX_RETRIES }} retries"
+          exit $exit_code
+
+  test-blas:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 2  # BLAS tests are heavy compiles; keep the runner breathing
+      matrix:
+        test:
+          - blasinteg
+          - blasnet
+
+    steps:
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopenblas-dev
+
+      - name: Install pixi
+        run: |
+          curl -fsSL https://pixi.sh/install.sh | sh
+          echo "$HOME/.pixi/bin" >> $GITHUB_PATH
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Install dependencies via pixi
+        run: pixi install
+
+      - name: Run BLAS test — ${{ matrix.test }} with OpenBLAS on (with retry)
+        id: run_blas_test
+        run: |
+          attempt=0
+          exit_code=0
+          while [ $attempt -le ${{ env.MAX_RETRIES }} ]; do
+            if [ $attempt -gt 0 ]; then
+              echo "::warning::Test '${{ matrix.test }}' failed — retry $attempt of ${{ env.MAX_RETRIES }}"
+            fi
+            chmod +x execute.sh
+            pixi run ./execute.sh -b ${{ matrix.test }}
             exit_code=$?
             if [ $exit_code -eq 0 ]; then
               echo "Test '${{ matrix.test }}' passed on attempt $((attempt + 1))"
@@ -239,7 +352,7 @@ jobs:
 
   summary:
     runs-on: ubuntu-latest
-    needs: [test]
+    needs: [test, test-blas]
     if: always()
     steps:
       - name: Write test summary
@@ -247,7 +360,7 @@ jobs:
           echo "## Test Results" >> $GITHUB_STEP_SUMMARY
           echo "| Test | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Overall | ${{ needs.test.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Overall | ${{ needs.test.result == 'success' && needs.test-blas.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "Triggered by: \`${{ github.actor }}\`" >> $GITHUB_STEP_SUMMARY
