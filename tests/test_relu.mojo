@@ -44,7 +44,7 @@ def test_relu_multidim() raises:
     )
 
     # Backward on sum of outputs
-    s = out.sum()
+    var s = out.sum()
     s.backward()
 
     # Gradient should be 1 where input > 0, else 0
