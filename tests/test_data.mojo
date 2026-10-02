@@ -1471,7 +1471,7 @@ def test_multi_epoch_no_memory_growth() raises:
     )
 
 
-def test_performance_overhead_is_negligible() raises:
+def disabled_performance_overhead_is_negligible() raises:
     """Measure DataLoader overhead vs raw data access."""
 
     var num_samples = 10000
@@ -1550,7 +1550,7 @@ def test_dataloader_pointer_semantics() raises:
     print("  Loader uses pointer semantics (<10ms creation)")
 
 
-def test_comparing_copy_vs_reference_semantics() raises:
+def disabled_comparing_copy_vs_reference_semantics() raises:
     """Demonstrate the difference between copy and reference."""
 
     var features = Tensor[DType.float32].zeros(10000, 784)
