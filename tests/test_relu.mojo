@@ -12,7 +12,7 @@ def test_relu_basic() raises:
     var t = Tensor[dtype].d1([-1.0, 0.0, 1.0, 2.0])
     t.requires_grad_(True)
     var out = ReLU[dtype].forward[True](t)
-    s = out.sum()
+    var s = out.sum()
     s.backward()
 
     assert_true(out == Tensor[dtype].d1([0.0, 0.0, 1.0, 2.0]))
