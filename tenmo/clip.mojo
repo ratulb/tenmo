@@ -3,8 +3,11 @@ from .shared.mnemonics import AddTensor
 from .backpropagation import ArgumentType, BackwardFn, BackwardFnType
 
 from .gradbox import Gradbox
-from std.sys import simd_width_of
+from std.sys import simd_width_of, has_accelerator
 from .ancestry import Ancestor
+from .ndbuffer import NDBuffer
+from .kernels.clip_kernel import ClipKernel
+from .shared.panic import panic
 
 
 @fieldwise_init
@@ -32,6 +35,34 @@ struct ClipBackward[dtype: DType](
         ref shape = parent.shape()
         var parent_buffer = parent.buffer()
         var parent_gradbox = Gradbox[Self.dtype].zeros(shape)
+
+        comptime if has_accelerator():
+            if grad_output.is_on_gpu():
+                try:
+                    var (result_layout, result_storage) = ClipKernel[
+                        Self.dtype
+                    ].launch_backward(
+                        grad_output.buffer().layout(),
+                        grad_output.buffer().device_state.value(),
+                        parent.buffer().layout(),
+                        parent.buffer().device_state.value(),
+                        min_val,
+                        max_val,
+                        sync=False,
+                    )
+                    var ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        result_layout, result_storage
+                    )
+                    parent.update_grad(
+                        Gradbox[Self.dtype](ndb^), AddTensor, None
+                    )
+                    parent_ids.append(parent._id)
+                    grad_output.zero_grad()
+                    return
+                except e:
+                    print(e)
+                    panic("ClipBackward → GPU operation failed")
+                    return
 
         if parent_buffer.is_contiguous():
             var src = parent_buffer.data_ptr()
@@ -110,6 +141,42 @@ struct Clip[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ) -> Tensor[Self.dtype]:
         """Clip values: y = clamp(x, min, max)."""
         var shape = self.shape()
+
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    var (result_layout, result_storage) = ClipKernel[
+                        Self.dtype
+                    ].launch_forward(
+                        self.buffer.layout(),
+                        self.buffer.device_state.value(),
+                        min_val,
+                        max_val,
+                        sync=sync,
+                    )
+                    var ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        result_layout, result_storage
+                    )
+                    var out_gpu = Tensor[Self.dtype](
+                        ndb^, requires_grad=False
+                    )
+                    comptime if track_grad:
+                        var grad_required = requires_grad.or_else(
+                            self.requires_grad
+                        )
+                        if grad_required:
+                            out_gpu.requires_grad_(True)
+                            var backwardFn = BackwardFn(
+                                ClipArg[Self.dtype](min_val, max_val),
+                                ClipBackward[Self.dtype](),
+                            )
+                            backwardFn.needs_parent_data = True
+                            out_gpu.add_ancestry(backwardFn^, self)
+                    return out_gpu^
+                except e:
+                    print(e)
+                    panic("Clip → GPU operation failed")
+
         var out = Tensor[Self.dtype].zeros(shape, requires_grad=False)
 
         if self.is_contiguous():
