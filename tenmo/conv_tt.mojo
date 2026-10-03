@@ -1,4 +1,4 @@
-"""GPU Conv2D forward + backward via TileTensor — the CPU `Conv` is untouched.
+"""GPU Conv2D forward + backward via TileTensor.
 
 `ConvTT.forward` mirrors the CPU `Conv.forward` contract (`tenmo/conv.mojo`):
 rank-4 image, rank-4 kernel, rank-1 bias (required), scalar stride and
