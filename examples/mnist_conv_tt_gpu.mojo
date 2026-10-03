@@ -4,7 +4,7 @@ A simple CNN for MNIST digit classification, running end-to-end on GPU
 after a one-time parameter transfer. Mirrors
 examples/mnist_conv2d_gpu.mojo except the convolutions run the zero-copy
 TileTensor path (`ConvTT2D`) and downsampling uses real max-pooling
-(`MaxPoolTT`, k=2) — the thing the ConvGpu path could not do (MaxPool2d
+(`MaxPool2d`, k=2) — the thing the ConvGpu path could not do (MaxPool2d
 has no GPU kernel, so the sibling uses stride-2 convolutions instead).
 
 Spatial path: 28 → conv(same) → 28 → pool → 14 → conv(same) → 14 →
@@ -20,7 +20,7 @@ from tenmo.tensor import Tensor
 from tenmo.optim import SGD
 from tenmo.net import MixedSequential, Linear, ReLU, Flatten
 from tenmo.conv_tt import ConvTT2D
-from tenmo.pool_tt import MaxPoolTT
+from tenmo.pooling import MaxPool2d
 from tenmo.crossentropy import CrossEntropyLoss
 from std.python import Python
 from tenmo.numpy_interop import from_ndarray, numpy_dtype
@@ -121,7 +121,7 @@ def train_mnist() raises:
         )
     )
     model.append(ReLU[dtype]())
-    model.append(MaxPoolTT[dtype](kernel_size=2))
+    model.append(MaxPool2d[dtype](kernel_size=2))
     model.append(
         ConvTT2D[dtype](
             in_channels=32,
@@ -132,7 +132,7 @@ def train_mnist() raises:
         )
     )
     model.append(ReLU[dtype]())
-    model.append(MaxPoolTT[dtype](kernel_size=2))
+    model.append(MaxPool2d[dtype](kernel_size=2))
     # Transition from 4D to 2D
     model.append(Flatten[dtype]())
     # Fully connected layers (64 x 7 x 7 = 3136)

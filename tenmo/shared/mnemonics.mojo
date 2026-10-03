@@ -50,4 +50,6 @@ comptime MEAN = 53
 comptime PRODUCT = 54
 comptime ABS_BACKWARD = 55
 comptime GELU_FORWARD = 58
+comptime ROUND = 59
+comptime FLOOR = 60
 comptime DEFAULT_INDEX_DTYPE = DType.int64

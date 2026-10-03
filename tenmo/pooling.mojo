@@ -7,10 +7,13 @@ from .layer_trait import LayerTrait
 from .shared.mnemonics import AddTensor
 from .shared.buffers import Buffer
 from .ndbuffer import NDBuffer
+from .shared.layout import Layout
 from std.utils.numerics import neg_inf
 from .shared.panic import panic
 from max.algorithm import parallelize
 from .ancestry import Ancestor
+from std.sys.info import has_accelerator
+from .kernels.pool_tt import PoolTt
 
 
 @fieldwise_init
@@ -47,6 +50,30 @@ struct MaxPool2dBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
         # parent_ids is the engine's fanin-completion signal (appended set
         # must equal ancestry set).
         if input_tensor_ref.requires_grad:
+            comptime if has_accelerator():
+                if grad_output.is_on_gpu():
+                    try:
+                        var result = PoolTt[Self.dtype].backward(
+                            grad_output.buffer().layout(),
+                            grad_output.buffer().device_state.value(),
+                            argmax_mask.device_state.value(),
+                            input_shape[2],
+                            input_shape[3],
+                            sync=True,
+                        )
+                        var grad_ndb = NDBuffer[
+                            Self.dtype
+                        ].with_layout_device_state(result[0], result[1])
+                        input_tensor_ref.update_grad(
+                            Gradbox[Self.dtype](grad_ndb^), AddTensor, None
+                        )
+                    except e:
+                        panic(
+                            "MaxPool2d backward GPU failed: " + String(e)
+                        )
+                    parent_ids.append(input_tensor_ref._id)
+                    grad_output.zero_grad()
+                    return
             var N = input_shape[0]
             var C = input_shape[1]
             var H_in = input_shape[2]
@@ -197,6 +224,60 @@ struct MaxPool2d[dtype: DType](LayerTrait & RegisterPassable):
 
         if H_out <= 0 or W_out <= 0:
             panic("Invalid MaxPool2d parameters")
+
+        comptime if has_accelerator():
+            if input_tensor.is_on_gpu():
+                try:
+                    var result = PoolTt[Self.dtype].forward(
+                        input_tensor.buffer.layout(),
+                        input_tensor.buffer.device_state.value(),
+                        KH,
+                        s,
+                        pad,
+                        sync=sync,
+                    )
+                    var out_ndb = NDBuffer[Self.dtype].with_layout_device_state(
+                        result[0], result[1]
+                    )
+                    ref out_shape = out_ndb.shape
+                    var mask_ndb = NDBuffer[DType.int64].with_layout_device_state(
+                        Layout(
+                            Shape(
+                                out_shape[0],
+                                out_shape[1],
+                                out_shape[2],
+                                out_shape[3],
+                            )
+                        ),
+                        result[2],
+                    )
+                    var gpu_out = Tensor[Self.dtype](
+                        out_ndb^, requires_grad=False
+                    )
+                    comptime if track_grad:
+                        var grad_required = requires_grad.or_else(
+                            input_tensor.requires_grad
+                        )
+                        if grad_required:
+                            gpu_out.requires_grad_(True)
+                            var backwardFn = BackwardFn(
+                                MaxPool2dBwdArg(
+                                    kernel_size,
+                                    s,  # Stride
+                                    pad,
+                                    input_shape,
+                                    mask_ndb,
+                                ),
+                                MaxPool2dBackward[Self.dtype](),
+                            )
+                            gpu_out.add_ancestry(
+                                backwardFn^, input_tensor
+                            )
+                    return gpu_out^
+                except e:
+                    panic("MaxPool2d forward GPU failed: " + String(e))
+                    # Unreachable — satisfies definite assignment.
+                    return Tensor[Self.dtype].zeros(Shape(1))
 
         # Uninitialized allocs: every element of both is overwritten by the
         # pool kernels below (one output + one argmax per position), so the

@@ -24,6 +24,8 @@ from ..shared.mnemonics import (
     RELU_FORWARD,
     GELU_FORWARD,
     INVERT,
+    ROUND,
+    FLOOR,
 )
 
 
@@ -146,7 +148,7 @@ struct UnaryKernel[dtype: DType](ImplicitlyCopyable):
         var result_buffer = device_context.enqueue_create_buffer[Self.datatype](
             numels
         )
-        comptime if op_code == LOG or op_code == EXP or op_code == TANH_FORWARD or op_code == SIGMOID_FORWARD:
+        comptime if op_code == LOG or op_code == EXP or op_code == TANH_FORWARD or op_code == SIGMOID_FORWARD or op_code == ROUND or op_code == FLOOR:
             comptime if Self.dtype.is_floating_point():
                 var compiled = device_context.compile_function[
                     float_unary_ops[

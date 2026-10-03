@@ -12,9 +12,8 @@ differentiated ops (see `tenmo/fakequant.mojo`). Both therefore return a
 bare leaf and register no ancestry, following `argmax`/`argmin`
 (`tensor.mojo`) rather than the grad-carrying unary ops.
 
-CPU only: GPU kernels do not exist yet, so a device tensor is rejected
-loudly instead of silently producing host-side garbage from a device
-pointer.
+GPU kernel shipped 2026-10-03: device tensors route through
+`UnaryKernel[ROUND|FLOOR]` (float dtypes only, half-to-even ties for round).
 
 Semantics verified on this toolchain (Mojo 1.1.0):
 
@@ -26,13 +25,16 @@ Semantics verified on this toolchain (Mojo 1.1.0):
 - `round`/`floor` are **free functions** on both `Scalar` and `SIMD`
   (elementwise). There is no method form -- `v.round()` is a compile error.
 
-CPU only. The SIMD loop shape mirrors `clip.mojo`: contiguous fast path plus
+CPU path. The SIMD loop shape mirrors the old `clip.mojo`: contiguous fast path plus
 an `index_iterator` fallback for strided views.
 """
 
 from .tensor import Tensor
 from .shared.panic import panic
-from std.sys import simd_width_of
+from std.sys import simd_width_of, has_accelerator
+from .ndbuffer import NDBuffer
+from .kernels.unary_ops_kernel import UnaryKernel
+from .shared.mnemonics import ROUND, FLOOR
 from std.math import round, floor, Roundable, Floorable
 
 
@@ -46,7 +48,7 @@ struct Round[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """Rounds x. Always returns a leaf -- no ancestry is registered."""
-        return _unary_round_floor[is_round=True](self, "Tensor.round")
+        return _unary_round_floor[is_round=True](self, "Tensor.round", sync)
 
 
 @fieldwise_init
@@ -59,7 +61,7 @@ struct Floor[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """Floors x. Always returns a leaf -- no ancestry is registered."""
-        return _unary_round_floor[is_round=False](self, "Tensor.floor")
+        return _unary_round_floor[is_round=False](self, "Tensor.floor", sync)
 
 
 @always_inline
@@ -89,15 +91,41 @@ def _unary_round_floor[
 ](
     self: Tensor[dtype],
     label: String,
+    sync: Bool = True,
 ) -> Tensor[dtype] where dtype.is_floating_point():
-    if self.is_on_gpu():
-        panic(
-            label,
-            " has no GPU kernel yet (CPU only). Move the tensor to CPU first,",
-            ". No GPU kernel exists yet for this op.",
-        )
-
     var shape = self.shape()
+
+    comptime if has_accelerator():
+        if self.is_on_gpu():
+            try:
+                comptime if is_round:
+                    var (result_layout, result_storage) = UnaryKernel[
+                        dtype
+                    ].launch[ROUND](
+                        self.buffer.layout(),
+                        self.buffer.device_state.value(),
+                        sync=sync,
+                    )
+                    var ndb_round = NDBuffer[dtype].with_layout_device_state(
+                        result_layout, result_storage
+                    )
+                    return Tensor[dtype](ndb_round^, requires_grad=False)
+                else:
+                    var (result_layout, result_storage) = UnaryKernel[
+                        dtype
+                    ].launch[FLOOR](
+                        self.buffer.layout(),
+                        self.buffer.device_state.value(),
+                        sync=sync,
+                    )
+                    var ndb_floor = NDBuffer[dtype].with_layout_device_state(
+                        result_layout, result_storage
+                    )
+                    return Tensor[dtype](ndb_floor^, requires_grad=False)
+            except e:
+                print(e)
+                panic(label, " — GPU operation failed")
+
     var out = Tensor[dtype].zeros(shape, requires_grad=False)
 
     if self.is_contiguous():

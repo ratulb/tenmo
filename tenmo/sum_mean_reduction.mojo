@@ -216,7 +216,42 @@ struct SumMeanReduction[dtype: DType]:
 
     @staticmethod
     def sum_all(ndb: NDBuffer[Self.dtype]) -> Scalar[Self.dtype]:
-        """CPU only operation — sum of all elements."""
+        """Sum of all elements; GPU tensors reduce via ReductionKernel.
+
+        Returns a host scalar, so the GPU path syncs once to materialise
+        the single-element result. Autograd note: this is a terminal
+        extraction — `Tensor.sum_all` is not differentiable. For a
+        differentiating full reduction use `Tensor.sum()`.
+        """
+        comptime if has_accelerator():
+            if ndb.is_on_gpu():
+                try:
+                    var (_, result_storage) = ReductionKernel[
+                        Self.dtype
+                    ].launch[SUM](
+                        ndb.layout(),
+                        ndb.device_state.value(),
+                        IntArray(),
+                        keepdims=False,
+                        sync=True,
+                    )
+                    with result_storage.buffer.map_to_host() as host_buffer:
+                        comptime if Self.dtype == DType.bool:
+                            return Scalar[Self.dtype](
+                                host_buffer[0].cast[DType.uint8]() != UInt8(0)
+                            )
+                        else:
+                            return host_buffer[0].cast[Self.dtype]()
+                except e:
+                    print(e)
+                    panic(
+                        (
+                            "SumMeanReduction sum_all — GPU operation failed"
+                            " for dtype: "
+                        ),
+                        String(Self.dtype),
+                    )
+                    return Scalar[Self.dtype](0)
         if ndb.is_contiguous():
             var start = ndb.offset
             var end = start + ndb.numels()

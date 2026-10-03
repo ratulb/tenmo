@@ -7,7 +7,7 @@ launch wrappers (`UnaryOpsKernel`, `unary_ops_with_mask`) stay in
 
 from max.gpu import thread_idx, block_dim, grid_dim, block_idx
 from std.sys import simd_width_of
-from std.math import log2, exp2, rsqrt
+from std.math import log2, exp2, rsqrt, round, floor
 
 from ..shared.constants import Epsilon, LOG2E, LN2, _GELU_K0, _GELU_C, _GELU_C3
 from ..shared.mnemonics import (
@@ -20,6 +20,8 @@ from ..shared.mnemonics import (
     RELU_FORWARD,
     GELU_FORWARD,
     INVERT,
+    ROUND,
+    FLOOR,
 )
 
 # log2(e) and ln(2): used to lower exp()/log() to the hardware lg2/ex2
@@ -201,6 +203,10 @@ def float_unary_ops[
                 elif op_code == TANH_FORWARD:
                     var e2x = exp2((vec_a + vec_a) * LOG2E)
                     vec_result = (e2x - one) / (e2x + one)
+                elif op_code == ROUND:
+                    vec_result = round(vec_a)
+                elif op_code == FLOOR:
+                    vec_result = floor(vec_a)
                 else:  # SIGMOID_FORWARD
                     vec_result = one / (one + exp2(-vec_a * LOG2E))
 
@@ -218,6 +224,10 @@ def float_unary_ops[
                     elif op_code == TANH_FORWARD:
                         var e2x = exp2((x + x) * LOG2E)
                         res = (e2x - 1.0) / (e2x + 1.0)
+                    elif op_code == ROUND:
+                        res = round(x)
+                    elif op_code == FLOOR:
+                        res = floor(x)
                     else:  # SIGMOID_FORWARD
                         res = 1.0 / (1.0 + exp2(-x * LOG2E))
 
