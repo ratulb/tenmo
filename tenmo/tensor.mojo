@@ -2589,7 +2589,11 @@ struct Tensor[dtype: DType](
         return self.buffer.count(key)
 
     def sum_all(self) -> Scalar[Self.dtype]:
-        """Sum all elements into a single scalar - CPU only op.
+        """Sum all elements into a single scalar (CPU + GPU).
+
+        Returns a host scalar, so this is a terminal extraction — it is
+        not part of the autograd graph and has no backward. For a
+        differentiating full reduction use `Tensor.sum()`.
 
         Returns:
             Sum of all elements in the tensor.
