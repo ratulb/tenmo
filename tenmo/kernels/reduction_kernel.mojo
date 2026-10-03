@@ -913,9 +913,9 @@ struct ReductionKernel[dtype: DType = DType.float32](
 
         var normalized_axes_copy = normalized_axes
         if len(normalized_axes_copy) == 0:
-            normalized_axes_copy = IntArray(len(shape_A))
-            for i in range(len(shape_A)):
-                normalized_axes_copy[i] = i
+            normalized_axes_copy = IntArray.range(
+                start=0, end=len(shape_A), step=1
+            )
 
         var reduction_axes: RankArray = RankArray(normalized_axes_copy)
         var reduced_shape = shape_A.reduced_shape(normalized_axes)
@@ -1015,9 +1015,9 @@ struct ReductionKernel[dtype: DType = DType.float32](
 
         var normalized_axes_copy = normalized_axes
         if len(normalized_axes_copy) == 0:
-            normalized_axes_copy = IntArray(len(shape_A))
-            for i in range(len(shape_A)):
-                normalized_axes_copy[i] = i
+            normalized_axes_copy = IntArray.range(
+                start=0, end=len(shape_A), step=1
+            )
 
         var reduction_axes: RankArray = RankArray(normalized_axes_copy)
         var reduced_shape = shape_A.reduced_shape(normalized_axes)
@@ -1137,9 +1137,9 @@ struct ReductionKernel[dtype: DType = DType.float32](
         )
         var normalized_axes_copy = normalized_axes
         if len(normalized_axes_copy) == 0:
-            normalized_axes_copy = IntArray(len(shape_A))
-            for i in range(len(shape_A)):
-                normalized_axes_copy[i] = i
+            normalized_axes_copy = IntArray.range(
+                start=0, end=len(shape_A), step=1
+            )
 
         var reduction_axes: RankArray = RankArray(normalized_axes_copy)
         var in_shape: RankArray = shape_A.array()
@@ -1209,9 +1209,9 @@ struct ReductionKernel[dtype: DType = DType.float32](
 
         var normalized_axes_copy = normalized_axes
         if len(normalized_axes_copy) == 0:
-            normalized_axes_copy = IntArray(len(shape_A))
-            for i in range(len(shape_A)):
-                normalized_axes_copy[i] = i
+            normalized_axes_copy = IntArray.range(
+                start=0, end=len(shape_A), step=1
+            )
 
         var reduction_axes: RankArray = RankArray(normalized_axes_copy)
         var reduced_shape = shape_A.reduced_shape(normalized_axes)
@@ -1318,9 +1318,9 @@ struct ReductionKernel[dtype: DType = DType.float32](
 
         var normalized_axes_copy = normalized_axes
         if len(normalized_axes_copy) == 0:
-            normalized_axes_copy = IntArray(len(shape_A))
-            for i in range(len(shape_A)):
-                normalized_axes_copy[i] = i
+            normalized_axes_copy = IntArray.range(
+                start=0, end=len(shape_A), step=1
+            )
 
         var reduction_axes: RankArray = RankArray(normalized_axes_copy)
         var reduced_shape = shape_A.reduced_shape(normalized_axes)
