@@ -1,7 +1,7 @@
 """Pytest configuration for tenmo Python binding tests.
 
-Injects the python-binding directory into sys.path so that ``import tenmo``
-and ``import _tenmo`` resolve to the local build, then exposes session-wide
+Injects the python-binding directory into sys.path so that `import tenmo`
+and `import _tenmo` resolve to the local build, then exposes session-wide
 fixtures used across the test suite.
 """
 from __future__ import annotations

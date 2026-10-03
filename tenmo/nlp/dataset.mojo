@@ -15,7 +15,7 @@ struct LLMDataset[
 
     Encodes text with a Tokenizer, then creates input/target pairs
     using a sliding window. Stores IDs in two flat 1-D tensors
-    (input and target) so that ``NativeLoader`` can access them via
+    (input and target) so that `NativeLoader` can access them via
     fixed-offset pointer arithmetic.
     """
 
@@ -139,7 +139,7 @@ struct RandomSlidingWindowDataset[
     """Sliding-window dataset from a 1D token tensor.
 
     Given a 1D tensor of token IDs and a window size, pre-computes all
-    overlapping context/target pairs so that ``NativeLoader`` can access
+    overlapping context/target pairs so that `NativeLoader` can access
     them via fixed-offset pointer arithmetic.
     """
 

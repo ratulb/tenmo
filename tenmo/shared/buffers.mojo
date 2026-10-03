@@ -141,7 +141,7 @@ struct Buffer[dtype: DType = DType.float32](
         """Check if this buffer has ref counting enabled."""
         return self._refcount != None and self.external == False
 
-    # All buffers created through the primary ``Buffer(size)`` ctor are
+    # All buffers created through the primary `Buffer(size)` ctor are
     # shared-from-birth ([refcount][data] block). `is_shared()` therefore
     # only distinguishes external (borrowed) memory, which stays unshared.
 
@@ -154,7 +154,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         Allocates [refcount][data] in one contiguous block and copies this
         buffer's data into it — a single allocation plus a single copy. The
-        result owns fresh shared storage, fully decoupled from ``self``.
+        result owns fresh shared storage, fully decoupled from `self`.
         Works on external buffers too — their data is read and cloned into
         owned storage (the external source stays unshared).
         """

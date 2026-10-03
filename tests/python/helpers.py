@@ -21,7 +21,7 @@ def assert_tensors_close(
     """Assert two tensors are elementwise close within tolerance.
 
     Handles Tensor-vs-Tensor, Tensor-vs-scalar, and Tensor-vs-numpy-array.
-    Uses numpy's ``allclose`` under the hood.
+    Uses numpy's `allclose` under the hood.
     """
     if isinstance(b, tenmo.Tensor):
         a_np = a.numpy()
@@ -87,8 +87,8 @@ def numeric_grad_check(
 ) -> None:
     """Finite-difference gradient check against autograd.
 
-    ``fn`` must be ``def (Tensor) -> Tensor`` and operate elementwise.
-    Verifies that ``autograd.grad(fn(x))`` matches finite differences.
+    `fn` must be `def (Tensor) -> Tensor` and operate elementwise.
+    Verifies that `autograd.grad(fn(x))` matches finite differences.
     """
     x_np = x.numpy()
     flat = x_np.flatten()

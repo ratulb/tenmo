@@ -31,9 +31,9 @@ trait BackwardFnType(ImplicitlyCopyable & Deinitable):
     """Conformance trait for backward handlers.
 
     Each backward handler struct implements this trait and pins its own
-    ``dtype`` via ``comptime datatype = Self.dtype``. The stored call pointer
-    inside ``BackwardFn`` is fully type-erased (raw ``Pointer``
-    arguments) so the trait's signature never leaks an ``Ancestor[dtype]``
+    `dtype` via `comptime datatype = Self.dtype`. The stored call pointer
+    inside `BackwardFn` is fully type-erased (raw `Pointer`
+    arguments) so the trait's signature never leaks an `Ancestor[dtype]`
     reference into the ancestor graph — breaking the type-level recursion that
     stalled GPU codegen.
     """

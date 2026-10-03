@@ -96,7 +96,7 @@ trait Dataset(Sized & Copyable):
 struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
     ImplicitlyCopyable & Sized & Iterator
 ):
-    """Zero-copy batched data loading over a ``Dataset`` trait source.
+    """Zero-copy batched data loading over a `Dataset` trait source.
     (Mojo-native; not directly Python-bound)."""
 
     var dataset: Pointer[Self.DatasetSource, Self.origin]
@@ -784,38 +784,38 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
     """Dtype-generic batched data loader over in-memory Tensors.
 
     Args:
-        features: ``(N, *feat)`` contiguous tensor of sample features.
-        labels: ``(N, *lab)`` tensor of sample labels (any int/float dtype).
+        features: `(N, *feat)` contiguous tensor of sample features.
+        labels: `(N, *lab)` tensor of sample labels (any int/float dtype).
         batch_size: Number of samples per batch.
         shuffle: If True, yields randomly permuted batches.
         drop_last: If True, drops the final partial batch.
 
     DataLoader — dtype-generic, tensor-native, std-Iterator-conforming
     The concrete tensor-native batching engine behind the Python binding
-    ``tenmo.DataLoader``. Owns its data as ``Tensor[sample_dtype]`` /
-    ``Tensor[label_dtype]`` and produces ``Batch[sample_dtype, label_dtype]`` from
+    `tenmo.DataLoader`. Owns its data as `Tensor[sample_dtype]` /
+    `Tensor[label_dtype]` and produces `Batch[sample_dtype, label_dtype]` from
     tensor-native ops:
       * sequential (eval):  zero-copy view slices of the source tensors
       * shuffled (train):   row-gather into a persistent preallocated buffer
-    ``DataLoader`` conforms to Mojo's std ``Iterator`` protocol exactly like the
-    trait-generic ``NativeLoader`` above: ``__iter__`` / ``__has_next__`` /
-    ``__next__`` (raising ``StopIteration`` at epoch end), ``bounds()``,
-    ``reset()``, ``__len__``. Use it directly in a ``for batch in loader:`` loop;
-    exhaustion raises ``StopIteration``.
+    `DataLoader` conforms to Mojo's std `Iterator` protocol exactly like the
+    trait-generic `NativeLoader` above: `__iter__` / `__has_next__` /
+    `__next__` (raising `StopIteration` at epoch end), `bounds()`,
+    `reset()`, `__len__`. Use it directly in a `for batch in loader:` loop;
+    exhaustion raises `StopIteration`.
     Data movement budget:
       * construction: at most one owned copy (only when the source is a tracked
         or non-contiguous view); the numpy wrap itself is one copy
       * per epoch:    zero bytes sequential; batch_bytes shuffled
       * per batch:    zero allocations (persistent buffers reused)
-    The shuffle permutation is re-permuted per epoch via ``std.random.shuffle``
-    (the same source as the trait-generic ``NativeLoader``), so both engines
+    The shuffle permutation is re-permuted per epoch via `std.random.shuffle`
+    (the same source as the trait-generic `NativeLoader`), so both engines
     share one shuffling behavior. Runs are not reproducible, so no seed
     parameter is offered.
     Contract: a shuffled batch aliases the loader's reused buffer and is valid
-    ONLY until the next ``__next__()`` call. Sequential batches view the
+    ONLY until the next `__next__()` call. Sequential batches view the
     immutable source tensors and stay valid. Batches are read-only training
-    inputs — never mutate them. ``__next__()`` yields a reference: copy-init it
-    (``var b = loader.__next__()``) if you need to hold a batch past the next
+    inputs — never mutate them. `__next__()` yields a reference: copy-init it
+    (`var b = loader.__next__()`) if you need to hold a batch past the next
     call.
     """
 
@@ -1073,7 +1073,7 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
     ) raises StopIteration -> ref[
         self._batch, self._last_batch.value()
     ] Self.Element:
-        """Get the next batch; raises ``StopIteration`` when the epoch ends."""
+        """Get the next batch; raises `StopIteration` when the epoch ends."""
         if not self.__has_next__():
             raise StopIteration()
         var start = self._current_idx
@@ -1113,7 +1113,7 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
         start: Int,
         bs: Int,
     ):
-        """Gather rows ``_indices[start:start+bs]`` into a batch buffer."""
+        """Gather rows `_indices[start:start+bs]` into a batch buffer."""
         var batch_features_ptr = (
             batch.features.data_ptr()
             .unsafe_mut_cast[True]()
@@ -1176,26 +1176,26 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
 
 
 def _window_count(n: Int, seq_length: Int, stride: Int) -> Int:
-    """Number of full ``seq_length`` windows in a stream of ``n`` IDs.
+    """Number of full `seq_length` windows in a stream of `n` IDs.
 
-    Stride-1 gives ``n - seq_length`` (legacy ``RandomSlidingWindowDataset``);
+    Stride-1 gives `n - seq_length` (legacy `RandomSlidingWindowDataset`);
     general stride gives the ceiling
-    ``(n - seq_length + stride - 1) // stride`` (legacy ``LLMDataset``).
+    `(n - seq_length + stride - 1) // stride` (legacy `LLMDataset`).
     Streams holding no full window yield 0, never a panic.
 
     Token-stream windowing core.
     Tokenizer-free by design: these types consume token-ID streams (a flat 1-D
-    ``Tensor`` or ``List[Scalar]``), never text. Tokenization (mbpe
-    ``BPETokenizer().encode``) happens at the call site; IDs cross via
-    ``Tensor.from_list[DType.int64]``. This keeps ``dataloader.mojo`` free of
-    any edge into ``tenmo.nlp`` (import-DAG cycle).
-    The legacy ``LLMDataset`` / ``RandomSlidingWindowDataset``
-    (``tenmo/nlp/dataset.mojo``) pre-materialize every window into flat lists
-    (O(N·T) memory) to satisfy the ``Dataset`` trait's pointer contract. The
+    `Tensor` or `List[Scalar]`), never text. Tokenization (mbpe
+    `BPETokenizer().encode`) happens at the call site; IDs cross via
+    `Tensor.from_list[DType.int64]`. This keeps `dataloader.mojo` free of
+    any edge into `tenmo.nlp` (import-DAG cycle).
+    The legacy `LLMDataset` / `RandomSlidingWindowDataset`
+    (`tenmo/nlp/dataset.mojo`) pre-materialize every window into flat lists
+    (O(N·T) memory) to satisfy the `Dataset` trait's pointer contract. The
     core below gathers windows lazily from the owned flat stream (O(N) +
     B·T batch buffers) and unifies both legacy numbering schemes:
-    stride=1 matches ``RandomSlidingWindowDataset``; general stride matches
-    ``LLMDataset``'s ceiling formula.
+    stride=1 matches `RandomSlidingWindowDataset`; general stride matches
+    `LLMDataset`'s ceiling formula.
     """
     if n <= seq_length:
         return 0
@@ -1205,9 +1205,9 @@ def _window_count(n: Int, seq_length: Int, stride: Int) -> Int:
 struct SlidingWindowDataset[dtype: DType = DType.int64](Sized):
     """Lazy sliding-window dataset over a flat 1-D token-ID stream.
 
-    Owns one contiguous, non-tracking ``(N,)`` tensor; windows are gathered
-    on demand (by ``sample`` / ``WindowLoader``), never pre-materialized.
-    Deliberately NOT a ``Dataset``-trait conformer — the trait's flat-pointer
+    Owns one contiguous, non-tracking `(N,)` tensor; windows are gathered
+    on demand (by `sample` / `WindowLoader`), never pre-materialized.
+    Deliberately NOT a `Dataset`-trait conformer — the trait's flat-pointer
     contract is what forces the legacy O(N·T) layout.
     """
 
@@ -1295,7 +1295,7 @@ struct SlidingWindowDataset[dtype: DType = DType.int64](Sized):
         drop_last: Bool = False,
         random_offsets: Bool = False,
     ) -> WindowLoader[Self.dtype]:
-        """Build a ``WindowLoader`` over this dataset's stream.
+        """Build a `WindowLoader` over this dataset's stream.
 
         The loader aliases (never mutates) the stream storage; the dataset
         stays usable afterwards.
@@ -1314,9 +1314,9 @@ struct SlidingWindowDataset[dtype: DType = DType.int64](Sized):
         ref self,
         idx: Optional[Int] = None,
     ) raises -> Tuple[Tensor[Self.dtype], Tensor[Self.dtype]]:
-        """One window pair: input ``stream[off:off+T]``, target shifted by one.
+        """One window pair: input `stream[off:off+T]`, target shifted by one.
 
-        A random window is drawn when ``idx`` is None (one-shot parity with
+        A random window is drawn when `idx` is None (one-shot parity with
         the legacy datasets).
         """
         if self._num_samples == 0:
@@ -1364,22 +1364,22 @@ struct WindowLoader[dtype: DType = DType.int64](
 ):
     """Batched iterator over a flat 1-D token-ID stream.
 
-    Two modes in one struct (mirrors ``DataLoader``'s protocol field for
+    Two modes in one struct (mirrors `DataLoader`'s protocol field for
     field):
 
-    - enumerate (``random_offsets=False``): window starts ``i * stride``
-      (default 1), per-epoch ``reshuffle``'d when ``shuffle`` — crisp epoch,
+    - enumerate (`random_offsets=False`): window starts `i * stride`
+      (default 1), per-epoch `reshuffle`'d when `shuffle` — crisp epoch,
       the rescued legacy semantics.
-    - random-offset (``random_offsets=True``): each batch draws fresh starts
-      in ``[0, N - seq_length - 1]``; nominal epoch length is
-      ``ceil((N - seq_length) / batch_size)`` and stride is ignored — the
+    - random-offset (`random_offsets=True`): each batch draws fresh starts
+      in `[0, N - seq_length - 1]`; nominal epoch length is
+      `ceil((N - seq_length) / batch_size)` and stride is ignored — the
       pretraining path (one epoch is not a crisp concept).
 
-    Yields ``Batch[dtype, dtype]`` pairs of ``(B, seq_length)`` with the
-    shift-by-one relationship (input ``[0..T-1]``, target ``[1..T]``).
-    Both paths gather with ``unsafe_memcpy`` into persistent buffers —
-    ``DataLoader``'s zero-copy slice views do not apply (windows overlap /
-    stride > 1) — so buffers are always owned and ``set_shuffle`` never
+    Yields `Batch[dtype, dtype]` pairs of `(B, seq_length)` with the
+    shift-by-one relationship (input `[0..T-1]`, target `[1..T]`).
+    Both paths gather with `unsafe_memcpy` into persistent buffers —
+    `DataLoader`'s zero-copy slice views do not apply (windows overlap /
+    stride > 1) — so buffers are always owned and `set_shuffle` never
     rebuilds them.
     """
 
@@ -1584,7 +1584,7 @@ struct WindowLoader[dtype: DType = DType.int64](
     ) raises StopIteration -> ref[
         self._batch, self._last_batch.value()
     ] Self.Element:
-        """Get the next window batch; raises ``StopIteration`` at epoch end."""
+        """Get the next window batch; raises `StopIteration` at epoch end."""
         if not self.__has_next__():
             raise StopIteration()
         var total = self._epoch_total()
@@ -1609,10 +1609,10 @@ struct WindowLoader[dtype: DType = DType.int64](
         start: Int,
         bs: Int,
     ):
-        """Gather ``bs`` windows into a batch buffer.
+        """Gather `bs` windows into a batch buffer.
 
         Enumerate mode reads starts from the (possibly reshuffled) offset
-        list; random-offset mode draws fresh starts per batch (``shuffle``
+        list; random-offset mode draws fresh starts per batch (`shuffle`
         is irrelevant there).
         """
         if self.random_offsets:
@@ -1631,7 +1631,7 @@ struct WindowLoader[dtype: DType = DType.int64](
         row: Int,
         off: Int,
     ):
-        """Gather one window: input ``stream[off:off+T]``, target shifted by one."""
+        """Gather one window: input `stream[off:off+T]`, target shifted by one."""
         var batch_features_ptr = (
             batch.features.data_ptr()
             .unsafe_mut_cast[True]()
@@ -1670,7 +1670,7 @@ struct WindowLoader[dtype: DType = DType.int64](
     def set_shuffle(mut self, shuffle: Bool):
         """Switch between train (shuffle) and eval (sequential) modes.
 
-        Unlike ``DataLoader.set_shuffle``, no buffer rebuild is ever needed:
+        Unlike `DataLoader.set_shuffle`, no buffer rebuild is ever needed:
         both paths gather into owned buffers (no zero-copy views to replace).
         The offset list is re-shuffled on the next __iter__()/reset() call.
         """

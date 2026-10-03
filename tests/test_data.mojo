@@ -541,12 +541,12 @@ def test_dataloader_shuffle_quality() raises:
 # Token-stream windowing core (SlidingWindowDataset / WindowLoader) Tests
 #
 # Deterministic int64 streams where each ID equals its own position, so the
-# shift-by-one invariant reads as ``target == input + 1`` elementwise.
+# shift-by-one invariant reads as `target == input + 1` elementwise.
 # ============================================================================
 
 
 def _sliding_ids(n: Int) -> List[Scalar[DType.int64]]:
-    """IDs ``0..n-1`` as int64 scalars."""
+    """IDs `0..n-1` as int64 scalars."""
     var ids = List[Scalar[DType.int64]](capacity=n)
     for i in range(n):
         ids.append(Scalar[DType.int64](i))
@@ -2434,7 +2434,7 @@ def test_data_loader_tensor_drop_last_no_partial() raises:
 
 
 def test_data_loader_tensor_exhaustion_raises_stop_iteration() raises:
-    """Calling ``__next__()`` past the epoch end raises ``StopIteration``."""
+    """Calling `__next__()` past the epoch end raises `StopIteration`."""
     var features = Tensor[DType.float32].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]
     )
@@ -2454,7 +2454,7 @@ def test_data_loader_tensor_exhaustion_raises_stop_iteration() raises:
 
 
 def test_data_loader_tensor_epoch_restart_reiterates() raises:
-    """Each ``for`` starts a fresh epoch; second loop iterates again cleanly."""
+    """Each `for` starts a fresh epoch; second loop iterates again cleanly."""
     var features = Tensor[DType.float32].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
     )

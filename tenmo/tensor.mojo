@@ -176,10 +176,10 @@ struct Tensor[dtype: DType](
     def __init__(out self, *, copy: Self):
         """Copy-init — ALIASES the source's storage by design (PyTorch parity).
 
-        ``var b = a`` shares storage with ``a``: the underlying buffer is
-        refcounted (shared-from-birth), the ``Gradbox``/``Ancestors`` handles
-        are shared, and ``_id`` is inherited. Mutations through one alias are
-        visible through the other. To opt out of sharing, use ``clone()``.
+        `var b = a` shares storage with `a`: the underlying buffer is
+        refcounted (shared-from-birth), the `Gradbox`/`Ancestors` handles
+        are shared, and `_id` is inherited. Mutations through one alias are
+        visible through the other. To opt out of sharing, use `clone()`.
         """
         self._id = copy._id
         self.buffer = copy.buffer.copy()
@@ -190,15 +190,15 @@ struct Tensor[dtype: DType](
     def clone(self, requires_grad: Optional[Bool] = None) -> Self:
         """Clone this tensor into an independent, deep copy (opt-out of sharing).
 
-        Unlike the copy-init / assignment (``var b = a``), which aliases the
-        source's storage, ``clone`` materialises fresh storage — the result
+        Unlike the copy-init / assignment (`var b = a`), which aliases the
+        source's storage, `clone` materialises fresh storage — the result
         shares no memory with the source, so mutations through one never affect
         the other. Layout (shape, strides, offset) is preserved. The clone is a
-        fresh leaf: new ``_id``, no ancestry, and (if the source tracks
+        fresh leaf: new `_id`, no ancestry, and (if the source tracks
         gradients) a fresh zero gradbox. On GPU the clone is materialised as an
         independent device buffer.
 
-        ``requires_grad`` is preserved on both CPU and GPU (NDBuffer.clone
+        `requires_grad` is preserved on both CPU and GPU (NDBuffer.clone
         handles the GPU round-trip internally).
         """
         var out = Tensor[Self.dtype](
@@ -1724,7 +1724,7 @@ struct Tensor[dtype: DType](
             requires_grad: Whether to track gradients.
 
         Returns:
-            A 1D tensor with ``len(values)`` elements.
+            A 1D tensor with `len(values)` elements.
         """
         if len(values) == 0:
             return Tensor[Self.dtype].scalar(

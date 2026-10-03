@@ -2794,9 +2794,9 @@ def _init_data_loader[
 def _loader_next[
     sample_dtype: DType, label_dtype: DType
 ](py_self: PyObjectPtr, args: PyObjectPtr) abi("C") -> PyObjectPtr:
-    """Raw ``next()``.
-    Calls ``DataLoader.__next__()`` and surfaces a typed
-    Python ``StopIteration`` when the epoch ends (``def_py_method`` cannot
+    """Raw `next()`.
+    Calls `DataLoader.__next__()` and surfaces a typed
+    Python `StopIteration` when the epoch ends (`def_py_method` cannot
     express a custom Python exception type)."""
     _ = args
     var self_obj = PythonObject(from_borrowed=py_self)

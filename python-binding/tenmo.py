@@ -1597,15 +1597,15 @@ _LOADER_PAIRS = {
 
 
 class DataLoader:
-    """Iterate batches of ``(features, labels)`` Tensors from in-memory data.
+    """Iterate batches of `(features, labels)` Tensors from in-memory data.
 
     Args:
-        features: ``(N, *feat)`` — Tenmo Tensor, numpy array, or list.
-        labels: ``(N, *lab)`` — same value types (any int/float dtype).
+        features: `(N, *feat)` — Tenmo Tensor, numpy array, or list.
+        labels: `(N, *lab)` — same value types (any int/float dtype).
         batch_size: Samples per batch.
         shuffle: If True, yield randomly permuted batches.
         drop_last: If True, drop the final partial batch.
-        transform: Optional ``(xb, yb) -> (xb, yb)`` applied per batch.
+        transform: Optional `(xb, yb) -> (xb, yb)` applied per batch.
     """
 
     def __init__(

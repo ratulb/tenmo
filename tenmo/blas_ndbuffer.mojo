@@ -1,26 +1,26 @@
 """Forward-only OpenBLAS GEMM on NDBuffer.
 
-Imports only ``ndbuffer`` and ``tenmo.shared`` — never
-``tensor``/``matmul``/``gradbox``/``blashandle``. This keeps the module
-acyclic with respect to the tensor core, so ``matmul.mojo`` (and
-``blashandle.mojo``) can import it without closing a dependency cycle.
+Imports only `ndbuffer` and `tenmo.shared` — never
+`tensor`/`matmul`/`gradbox`/`blashandle`. This keeps the module
+acyclic with respect to the tensor core, so `matmul.mojo` (and
+`blashandle.mojo`) can import it without closing a dependency cycle.
 
-This module owns the *raw* BLAS FFI (the ``dlopen``ed handle cache, the CBLAS
-constants and the ``cblas_sgemm``/``cblas_dgemm`` call) and exposes two
+This module owns the *raw* BLAS FFI (the `dlopen`ed handle cache, the CBLAS
+constants and the `cblas_sgemm`/`cblas_dgemm` call) and exposes two
 forward-only operations:
 
-- ``blas_gemm`` — raw GEMM on raw pointers.
-- ``blas_matmul`` — GEMM on two contiguous, offset-0, CPU ``NDBuffer``
-  operands (used by ``matmul.mojo``'s 2D matmul and the explicit
-  ``BLASHandleLite`` wrapper in ``blashandle.mojo``). Returns a fresh result
-  ``NDBuffer``.
+- `blas_gemm` — raw GEMM on raw pointers.
+- `blas_matmul` — GEMM on two contiguous, offset-0, CPU `NDBuffer`
+  operands (used by `matmul.mojo`'s 2D matmul and the explicit
+  `BLASHandleLite` wrapper in `blashandle.mojo`). Returns a fresh result
+  `NDBuffer`.
 
 Neither operation touches the autograd/ancestor graph — there is no
-``requires_grad`` here. Gradient *computation* re-uses these forward GEMMs
+`requires_grad` here. Gradient *computation* re-uses these forward GEMMs
 from the caller.
 
-Enabled at compile time with ``-D BLAS=<anything non-empty>``
-(``BLAS_PATH`` overrides the default override path). Native matmul stays the
+Enabled at compile time with `-D BLAS=<anything non-empty>`
+(`BLAS_PATH` overrides the default override path). Native matmul stays the
 default when the flag is absent.
 """
 
@@ -156,13 +156,13 @@ def blas_gemm[
     beta: Scalar[dtype] = 0.0,
     sync: Bool = False,
 ):
-    """Raw OpenBLAS GEMM: ``C = alpha * op(A) @ op(B) + beta * C`` (row-major).
+    """Raw OpenBLAS GEMM: `C = alpha * op(A) @ op(B) + beta * C` (row-major).
 
-    ``M``/``N``/``K`` and ``lda``/``ldb``/``ldc`` are the *logical* dims and
+    `M`/`N`/`K` and `lda`/`ldb`/`ldc` are the *logical* dims and
     leading dims after applying the optional operand transposes. CPU-only,
     contiguous, offset-0 storage is assumed (enforced upstream).
-    ``sync`` is a no-op sink (CPU is always synchronous) kept so the
-    matmul ``sync`` chain stays symmetric.
+    `sync` is a no-op sink (CPU is always synchronous) kept so the
+    matmul `sync` chain stays symmetric.
     """
     var arc_opt = BLASCache.get()
     if not arc_opt:
@@ -235,15 +235,15 @@ def blas_matmul[
     transpose_B: Bool = False,
     sync: Bool = False,
 ) -> NDBuffer[dtype]:
-    """Forward-only 2D GEMM on NDBuffers: ``C = A @ B`` (with optional
+    """Forward-only 2D GEMM on NDBuffers: `C = A @ B` (with optional
     operand transposes). Returns a fresh contiguous CPU result NDBuffer.
 
     No gradient/ancestor machinery — this is a pure forward GEMM; the caller
-    (e.g. ``matmul.mojo``) owns autograd registration and gradient math.
-    ``sync`` is a no-op sink (CPU-only path panics on GPU operands) kept
-    so the matmul ``sync`` chain stays symmetric.
+    (e.g. `matmul.mojo`) owns autograd registration and gradient math.
+    `sync` is a no-op sink (CPU-only path panics on GPU operands) kept
+    so the matmul `sync` chain stays symmetric.
 
-    Caller must have checked eligibility via ``BLASCache.is_available()`` and
+    Caller must have checked eligibility via `BLASCache.is_available()` and
     operands being contiguous/offset-0/CPU; we re-verify defensively.
     """
     var ok_dtype = False

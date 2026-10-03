@@ -81,7 +81,7 @@ struct PadKernel[dtype: DType](ImplicitlyCopyable):
     """
         GPU constant-padding kernel launcher.
 
-    Provides ``launch_forward`` (pad) and ``launch_backward`` (unpad) for
+    Provides `launch_forward` (pad) and `launch_backward` (unpad) for
     GPU-resident constant-mode padding and its backward pass.
 
     The source tensor is made contiguous before launching; its temporary
@@ -103,7 +103,7 @@ struct PadKernel[dtype: DType](ImplicitlyCopyable):
                 Internal launch helper.
 
         Makes src contiguous, enqueues the copy kernel, synchronises
-        (when ``sync`` is True).
+        (when `sync` is True).
         dst must already contain the pad value in its padded regions.
         """
         var ndim = src_layout.rank()

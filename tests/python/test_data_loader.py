@@ -1,12 +1,12 @@
 """Tests for the tensor-native DataLoader (dtype-generic batches).
 
-A batch is a pair ``(features: Tensor, labels: Tensor)`` with their natural
+A batch is a pair `(features: Tensor, labels: Tensor)` with their natural
 source dtypes preserved — the loader never forces float32/int64. Sequential
 (eval) batches are zero-copy view slices; shuffled (train) batches are
 row-gathers into a persistent buffer.
 
 v1 registers two pairs — (float32, int64) and (float32, float32) —
-the engine ``DataLoader[sample_dtype, label_dtype]`` is fully generic,
+the engine `DataLoader[sample_dtype, label_dtype]` is fully generic,
 but each *registered* pair
 costs ~1-2GB of compile-time memory, so pairs widen incrementally.
 """

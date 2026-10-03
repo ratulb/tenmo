@@ -25,11 +25,11 @@ struct Gradbox[dtype: DType](
     provides the shared lifecycle.
 
     The NDBuffer descriptor itself (Shape/Strides/offset) is kept behind a
-    shared ``NDBufferLite`` handle so copying a Gradbox is an O(1) refcount
+    shared `NDBufferLite` handle so copying a Gradbox is an O(1) refcount
     bump instead of a per-copy deep copy of the descriptor (which allocates
-    Shape/Strides dims arrays). ``Gradbox(shape)`` allocates own storage
-    (shared-from-birth). ``var b = a`` is an alias operator — the copy shares
-    the same gradient storage (Buffer refcount bump); ``clone()`` materialises
+    Shape/Strides dims arrays). `Gradbox(shape)` allocates own storage
+    (shared-from-birth). `var b = a` is an alias operator — the copy shares
+    the same gradient storage (Buffer refcount bump); `clone()` materialises
     an independent deep copy.
     """
 
@@ -56,8 +56,8 @@ struct Gradbox[dtype: DType](
     def clone(self) -> Gradbox[Self.dtype]:
         """Independent deep copy: fresh refcount and fresh storage.
 
-        Unlike copy-init (``var gb2 = gb1``), which aliases the same gradient
-        storage, ``clone`` materialises fresh, independent storage — later
+        Unlike copy-init (`var gb2 = gb1`), which aliases the same gradient
+        storage, `clone` materialises fresh, independent storage — later
         gradient accumulation through one never affects the other. GPU storage
         is cloned as an independent device buffer.
         """
@@ -322,7 +322,7 @@ struct Gradbox[dtype: DType](
         """Create a Gradbox with uniform random values in [min, max).
 
         CPU-only (gradboxes are gradient storage; device-side RNG belongs to
-        ``Tensor.rand``). Delegates to ``NDBuffer.rand``.
+        `Tensor.rand`). Delegates to `NDBuffer.rand`.
 
         Args:
             shape: The tensor shape.

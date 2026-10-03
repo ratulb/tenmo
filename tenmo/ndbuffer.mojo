@@ -171,7 +171,7 @@ struct NDBuffer[dtype: DType](
     def clone(self, sync: Bool = True) -> Self:
         """Create an independent deep-copy of this buffer (opt-out of sharing).
 
-        Unlike copy-init (which aliases shared-from-birth buffers), ``clone``
+        Unlike copy-init (which aliases shared-from-birth buffers), `clone`
         materialises fresh storage — the result shares no memory with the
         source. Layout (shape, strides, offset) is preserved on CPU. On GPU the
         clone is materialised as an independent device buffer.
@@ -659,7 +659,7 @@ struct NDBuffer[dtype: DType](
         GPU path: delegates to OnehotKernel[dtype, dtype].launch().
         CPU path: direct iteration on CPU buffer.
 
-        The ``device`` parameter is honored exactly: when present, indices
+        The `device` parameter is honored exactly: when present, indices
         are first transferred to that device (no-op if already there) and
         the result is produced on it. When absent, behavior follows the
         indices' current device.
@@ -3411,8 +3411,8 @@ def print_buffer[
 ) raises:
     """Pretty-print an NDBuffer with elision.
 
-    Recursively prints each dimension, showing the first ``num_first`` and
-    last ``num_last`` elements along each axis. GPU buffers are transferred
+    Recursively prints each dimension, showing the first `num_first` and
+    last `num_last` elements along each axis. GPU buffers are transferred
     to host first. Moved here from tenmo/common_utils.mojo so
     common_utils stops importing NDBuffer — breaks the `common_utils ⇄
     ndbuffer` two-cycle.

@@ -145,8 +145,8 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         """
         Matrix multiplication using BLAS.
 
-        ``sync`` is a no-op sink (BLAS path is CPU-only) kept so the
-        matmul ``sync`` chain stays symmetric.
+        `sync` is a no-op sink (BLAS path is CPU-only) kept so the
+        matmul `sync` chain stays symmetric.
         """
         # Validate inputs
         if A.rank() != 2:
