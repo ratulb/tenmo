@@ -6,7 +6,7 @@ plus one fallback-shape test (k=9 → global-direct kernel) and one strided
 input view. Backward gradflow runs sum-loss backward on CPU and GPU
 and compares image, kernel, and bias grads — all GPU-resident. Also adds
 layer parity (ConvTT2D vs CPU Conv), MixedSequential integration
-(ConvTT2D+MaxPoolTT+Linear, GPU shapes+gradflow), and a teacher-student
+(ConvTT2D+MaxPool2d+Linear, GPU shapes+gradflow), and a teacher-student
 convergence test proving end-to-end SGD on GPU. GPU bodies start with
 the `comptime if has_accelerator()` guard so the file compiles everywhere
 and the cpu_all generator skips them.
@@ -14,7 +14,7 @@ and the cpu_all generator skips them.
 from tenmo.tensor import Tensor
 from tenmo.conv import Conv
 from tenmo.conv_tt import ConvTT, ConvTT2D
-from tenmo.pool_tt import MaxPoolTT
+from tenmo.pooling import MaxPool2d
 from tenmo.net import MixedSequential, Linear, Flatten, ReLU
 from tenmo.mse import MSELoss
 from tenmo.optim import SGD
@@ -254,7 +254,7 @@ def test_conv_tt_layer_parity() raises:
 
 
 def test_conv_tt_mixed_sequential() raises:
-    """ConvTT2D+MaxPoolTT ride MixedSequential to GPU (shapes+gradflow)."""
+    """ConvTT2D+MaxPool2d ride MixedSequential to GPU (shapes+gradflow)."""
     print("test_conv_tt_mixed_sequential")
     comptime if has_accelerator():
         comptime dtype = DType.float32
@@ -262,7 +262,7 @@ def test_conv_tt_mixed_sequential() raises:
         var model = MixedSequential()
         model.append(ConvTT2D[dtype](2, 3, 3, padding=1, init_seed=7))
         model.append(ReLU[dtype]())
-        model.append(MaxPoolTT[dtype](kernel_size=2))
+        model.append(MaxPool2d[dtype](kernel_size=2))
         model.append(Flatten[dtype]())
         model.append(Linear[dtype](27, 5, init_method="he", bias_zero=True))
         assert_true(model.num_parameters() == (3 * 2 * 9 + 3) + (27 * 5 + 5))
