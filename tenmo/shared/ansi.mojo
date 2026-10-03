@@ -1,6 +1,6 @@
 """ANSI color codes for terminal output.
 
-Layer-0 leaf: no tenmo imports.
+No tenmo imports.
 """
 
 comptime RED: String = "\033[31m"

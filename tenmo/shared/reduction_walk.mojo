@@ -1,6 +1,6 @@
 # ReductionWalk / ReductionOdometer — tenmo/shared/reduction_walk.mojo
 #
-# Layer-0 (pure, leaf) stride arithmetic for NDBuffer reductions over a set of
+# Pure stride arithmetic for NDBuffer reductions over a set of
 # axes. Historically each reduced element was addressed by building a fresh
 # IntArray (replace/insert) + bounds-checked flatten — a per-element allocation
 # for every reduction over a non-suffix axis.

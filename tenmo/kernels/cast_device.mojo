@@ -1,4 +1,4 @@
-"""Layer-0 GPU kernel: element-wise dtype cast.
+"""GPU kernel: element-wise dtype cast.
 
 Kernel body only — takes raw pointers. Host-side launch logic lives
 in tenmo/kernels/cast_kernel.mojo (CastKernel.launch).

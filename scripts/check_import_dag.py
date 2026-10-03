@@ -151,7 +151,7 @@ def main() -> int:
                         help='root directory of .mojo sources (default: tenmo)')
     parser.add_argument('--rootset', action='append', default=[],
                         help='module prefix whose members must not import '
-                             'outside the prefix (Layer-0 purity check); '
+                             'outside the prefix (purity check); '
                              'repeatable')
     parser.add_argument('--rootset-imports', action='append', default=[],
                         help='allow a rootset to import from another prefix: '

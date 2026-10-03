@@ -1,6 +1,6 @@
 """Per-dtype numeric constants.
 
-Layer-0 leaf: only depends on `shared.panic` and the stdlib.
+Only depends on `shared.panic` and the stdlib.
 """
 
 from std.utils.numerics import min_finite

@@ -3,7 +3,7 @@
 Describes a (possibly strided) view of a flat buffer purely in terms of
 shape/strides/offset, independent of any buffer or device type.
 
-Layer-0 leaf: depends only on `shared.shapes`, `shared.strides`, and the
+Depends only on `shared.shapes`, `shared.strides`, and the
 stdlib. `contiguous` is computed once at construction using the same
 `strides.is_contiguous(shape)` semantics as `NDBuffer.is_contiguous()`
 (size-1 dimensions are wildcards) — this is the single source of truth for

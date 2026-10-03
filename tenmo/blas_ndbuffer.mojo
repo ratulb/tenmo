@@ -1,6 +1,6 @@
 """Forward-only OpenBLAS GEMM on NDBuffer.
 
-Layer-0 leaf module: imports only ``ndbuffer`` and ``tenmo.shared`` — never
+Imports only ``ndbuffer`` and ``tenmo.shared`` — never
 ``tensor``/``matmul``/``gradbox``/``blashandle``. This keeps the module
 acyclic with respect to the tensor core, so ``matmul.mojo`` (and
 ``blashandle.mojo``) can import it without closing a dependency cycle.

@@ -647,7 +647,7 @@ struct LayoutIndexIterator[layout_origin: ImmOrigin](
 # Index construction vocabulary (moved from tenmo/common_utils.mojo).
 # `i`/`s`/`il` build an `Idx` (Variant[Int, IntArray, Slice, NewAxis]) used
 # by the tensor indexing API; `newaxis` is the constant axis-insertion marker.
-# Layer-0 leaf: stdlib + shared only.
+# Stdlib + shared only.
 
 
 # Helper

@@ -1,6 +1,6 @@
 """Pointer identity helper (moved from tenmo/common_utils.mojo).
 
-Layer-0 leaf: stdlib only.
+Stdlib only.
 """
 
 

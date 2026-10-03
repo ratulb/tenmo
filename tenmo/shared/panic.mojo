@@ -1,6 +1,6 @@
 """Fatal error reporting for the whole library.
 
-Layer-0 leaf: only depends on `shared.ansi` and the stdlib.
+Only depends on `shared.ansi` and the stdlib.
 """
 
 from std.os import abort

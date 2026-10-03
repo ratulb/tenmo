@@ -1,4 +1,4 @@
-"""Layer-0 GPU launch configuration + helpers.
+"""GPU launch configuration + helpers.
 
 `elementwise_launch_config` is the canonical element-wise kernel launch
 config, moved here from `tenmo/kernels/kernel_helpers.mojo` so that

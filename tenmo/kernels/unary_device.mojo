@@ -1,4 +1,4 @@
-"""Layer-0 unary GPU kernels: scalar/bool unary op bodies.
+"""Unary GPU kernels: scalar/bool unary op bodies.
 
 Kernel *bodies* only — they take raw `DeviceBuffer` pointers. The host-side
 launch wrappers (`UnaryOpsKernel`, `unary_ops_with_mask`) stay in

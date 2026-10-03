@@ -1,4 +1,4 @@
-"""Process-wide canonical GPU registry (Layer-0).
+"""Process-wide canonical GPU registry.
 
 Every ordinary `GPU()` / `GPU(device_id)` construction routes through
 `GPURegistry.get()`, which returns the process-wide canonical `RegisteredGPU`
@@ -19,7 +19,7 @@ keyed by device id (`Int64`), so it can never hold more entries than the
 machine has physical devices. Single-threaded today: no locking around the
 create-or-fetch critical section — add a mutex before introducing threads.
 
-Layer-0 purity: this module imports only `std` + `tenmo.shared` (never any
+Purity: this module imports only `std` + `tenmo.shared` (never any
 `tenmo.gpu` module and never upward), so `device.mojo` can depend on it
 one-way without creating an import cycle.
 """

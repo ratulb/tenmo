@@ -1,4 +1,4 @@
-"""Layer-0 host<->device transfer helpers over `Layout` + `DeviceState`.
+"""Host<->device transfer helpers over `Layout` + `DeviceState`.
 
 All helpers work purely in terms of `Layout` + `DeviceState` — no
 NDBuffer/Tensor in sight. Strided CPU regions are gathered element-by-element
@@ -124,7 +124,7 @@ def materialize_contiguous[
     """Materialise the logical (possibly strided) view of `src` described by
     `layout` into a fresh contiguous `DeviceState`.
 
-    This is the GPU-side equivalent of the tenmo-layer
+    This is the GPU-side equivalent of
     `NDBuffer.contiguous_device_state()`: a strided device view is gathered
     (via a CPU round-trip) into an independent, contiguous device buffer.
     """

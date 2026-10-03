@@ -1,9 +1,9 @@
-"""Layer-0 GPU device types: `GPU` handle and `DeviceState` device storage.
+"""GPU device types: `GPU` handle and `DeviceState` device storage.
 
 This module is self-contained: it depends only on the stdlib and the
 `tenmo.shared` package. There is **no** reference to `NDBuffer`, `Tensor`,
- or any tenmo-layer type. The NDBuffer bridge (`from_device_state` / `fill_device_state`)
-lives in `tenmo/ndbuffer.mojo` keeping this layer pure.
+ or any tensor type. The NDBuffer bridge (`from_device_state` / `fill_device_state`)
+lives in `tenmo/ndbuffer.mojo`.
 
 `GPU.__eq__` uses a stable per-device instance identity: every ordinary
 `GPU()` / `GPU(device_id)` construction returns a copy of the process-wide
@@ -11,7 +11,7 @@ canonical GPU for that device (`tenmo/gpu/registry.mojo`), so all kernels
 share one `DeviceContext` (one stream, one memory pool, one compiled-function
 cache). `GPU(force=True)` bypasses the registry for a fresh, caller-owned
 context. Identity comes from the shared `IDGen` (`tenmo/shared/idgen.mojo`,
-`_TENMO_GPU_ID_COUNTER` slot — Layer-0).
+`_TENMO_GPU_ID_COUNTER` slot).
 Delegating equality to the `DeviceContext` handle is not possible in the b2
 stdlib (`DeviceContext` implements no `__eq__`, and address-of identity would
 break the copy-preserving identity that `NDBuffer.__is__` relies on).

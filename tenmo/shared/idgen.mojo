@@ -4,8 +4,7 @@
 stored in a process-global `std.ffi._Global` slot. Each distinct
 `global_name` gets an independent counter.
 
-Moved here from `tenmo/common_utils.mojo` so Layer-0 modules
-(`tenmo.gpu`, which must not import `common_utils`) can share it: tenmo
+Moved here from `tenmo/common_utils.mojo` so `tenmo.gpu` (which must not import `common_utils`) can share it: tenmo
 tensors draw from `_TENMO_ID_COUNTER` (default), `GPU` instances draw from
 `_TENMO_GPU_ID_COUNTER`. Deliberately two counters — `tests/test_idgen.mojo`
 asserts `Tensor` and `IDGen` share one slot, so GPU ids must not reuse it.

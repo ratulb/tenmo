@@ -1,6 +1,6 @@
 """Logging helpers — `log_debug` / `log_info` / `log_warning`.
 
-Layer-0 leaf: only depends on `shared.ansi` and the stdlib.
+Only depends on `shared.ansi` and the stdlib.
 """
 
 from std.sys.defines import get_defined_string

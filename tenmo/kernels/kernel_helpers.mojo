@@ -7,7 +7,7 @@
 #   kernels (used by scalar, binary, unary, bce, dropout, division,
 #   compare, sgd, gather, filler kernels)
 #
-# elementwise_launch_config now lives in tenmo/gpu/runtime.mojo (Layer-0) and
+# elementwise_launch_config now lives in tenmo/gpu/runtime.mojo and
 # is re-exported here so tenmo.kernels callers keep their existing import.
 
 from ..shared.array import RankArray

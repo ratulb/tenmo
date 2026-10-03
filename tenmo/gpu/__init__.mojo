@@ -1,4 +1,4 @@
-"""Tenmo GPU — Layer-0 GPU device abstractions.
+"""Tenmo GPU — GPU device abstractions.
    Must never import upward (tenmo.ndbuffer, tenmo.tensor, ...).
 """
 
