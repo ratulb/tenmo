@@ -1,9 +1,9 @@
-"""Closure of the §32.18 "unimplemented" audit stubs.
+"""Closure of the "unimplemented" stubs.
 
-Each test uses the exact stub name from `tests/test_python_bindings.txt` so the
-audit matches by name. Stubs with an already-covered equivalent live in the
+Each test uses the exact stub name from `tests/test_python_bindings.txt`.
+Stubs with an already-covered equivalent live in the
 themed files; stubs whose surface does not exist were moved to the "blocked"
-bucket in §32.18.
+bucket.
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ import pytest
 import tenmo
 
 
-# ── §1 Construction ─────────────────────────────────────────────────
+# ── Construction ─────────────────────────────────────────────────
 
 
 class TestConstructionClosure:
@@ -30,7 +30,7 @@ class TestConstructionClosure:
         assert float(vals.max()) < 6.0
 
 
-# ── §2 Dtype & Casting ─────────────────────────────────────────────
+# ── Dtype & Casting ─────────────────────────────────────────────
 
 
 class TestDtypeClosure:
@@ -58,7 +58,7 @@ class TestDtypeClosure:
         assert w.tolist() == expected
 
 
-# ── §3 Shape & Metadata ─────────────────────────────────────────────
+# ── Shape & Metadata ─────────────────────────────────────────────
 
 
 class TestShapeClosure:
@@ -79,7 +79,7 @@ class TestShapeClosure:
         assert t.nbytes == 48
 
 
-# ── §5 Views & Reshaping ────────────────────────────────────────────
+# ── Views & Reshaping ────────────────────────────────────────────
 
 
 class TestViewsClosure:
@@ -96,7 +96,7 @@ class TestViewsClosure:
         np.testing.assert_allclose(s.numpy(), t.numpy().swapaxes(0, 2))
 
 
-# ── §8 Comparison Operators ─────────────────────────────────────────
+# ── Comparison Operators ─────────────────────────────────────────
 
 
 class TestComparisonsClosure:
@@ -121,7 +121,7 @@ class TestComparisonsClosure:
         assert not x.allclose(z, rtol=0.0, atol=1e-9)
 
 
-# ── §10 Unary Math Functions ────────────────────────────────────────
+# ── Unary Math Functions ────────────────────────────────────────
 
 
 class TestUnaryMathClosure:
@@ -131,7 +131,7 @@ class TestUnaryMathClosure:
         assert c.tolist() == [0.5, 1.0, 1.5]
 
 
-# ── §12 Reduction Operations ────────────────────────────────────────
+# ── Reduction Operations ────────────────────────────────────────
 
 
 class TestReductionsClosure:
@@ -141,7 +141,7 @@ class TestReductionsClosure:
         assert abs(v.variance(unbiased=False).item() - np.var([1, 2, 3, 4], ddof=0)) < 1e-4
 
 
-# ── §13 Linear Algebra ──────────────────────────────────────────────
+# ── Linear Algebra ──────────────────────────────────────────────
 
 
 class TestLinalgClosure:
@@ -154,7 +154,7 @@ class TestLinalgClosure:
         np.testing.assert_allclose(c.numpy(), a_np @ b_np, atol=1e-3)
 
 
-# ── §14 Autograd Core Mechanics ─────────────────────────────────────
+# ── Autograd Core Mechanics ─────────────────────────────────────
 
 
 class TestAutogradCoreClosure:
@@ -171,7 +171,7 @@ class TestAutogradCoreClosure:
         assert x.grad.tolist() == [4.0, 4.0]
 
 
-# ── §16 Autograd Graph Edge Cases ───────────────────────────────────
+# ── Autograd Graph Edge Cases ───────────────────────────────────
 
 
 class TestAutogradGraphClosure:
@@ -185,7 +185,7 @@ class TestAutogradGraphClosure:
         assert b.grad.tolist() == [0.0, 0.0, 0.0]
 
 
-# ── §17 Memory & Reference Counting ─────────────────────────────────
+# ── Memory & Reference Counting ─────────────────────────────────
 
 
 class TestMemoryClosure:
@@ -199,7 +199,7 @@ class TestMemoryClosure:
         )
 
 
-# ── §19 NumPy Interop ───────────────────────────────────────────────
+# ── NumPy Interop ───────────────────────────────────────────────
 
 
 class TestNumpyInteropClosure:
@@ -210,7 +210,7 @@ class TestNumpyInteropClosure:
         assert mv.tolist() == [1.0, 2.0, 3.0]
 
 
-# ── §20 Python Protocol Compliance ──────────────────────────────────
+# ── Python Protocol Compliance ──────────────────────────────────
 
 
 class TestPythonProtocolClosure:
@@ -236,7 +236,7 @@ class TestPythonProtocolClosure:
             t.__enter__()
 
 
-# ── §22 Error Handling & Edge Cases ─────────────────────────────────
+# ── Error Handling & Edge Cases ─────────────────────────────────
 
 
 class TestErrorHandlingClosure:

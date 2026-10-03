@@ -1257,7 +1257,7 @@ def test_layernorm_layer_gamma_ones_beta_zeros_init() raises:
 
 def test_layernorm_module_direct_default_parity() raises:
     comptime dtype = DType.float32
-    # Audit item 15: the module default eps (1e-5) and the direct-forward
+    # The module default eps (1e-5) and the direct-forward
     # default eps must agree — no silent numeric divergence between call
     # styles. Same kernel, same eps → bit-identical output.
     var x = Tensor[dtype].d2(

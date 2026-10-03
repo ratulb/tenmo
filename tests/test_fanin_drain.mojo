@@ -1,4 +1,4 @@
-# Fanin-drain regression suite (audit item 16).
+# Fanin-drain regression suite.
 #
 # Engine contract: `parent_ids` is the fanin-completion signal — the
 # appended set must equal the ancestry set. Handlers used to skip the

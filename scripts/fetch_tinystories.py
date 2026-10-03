@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Fetch the Episode 18 (§18.3) TinyStories subset.
+"""Fetch the TinyStories subset.
 
 Downloads a byte-bounded prefix of HF `roneneldan/TinyStories` train text
 (TinyStories-train.txt), cuts it at a story boundary, splits stories 90/10
 into train/val, and writes the two text files plus counts. Tokenization
-(mbpe gpt2 → cached id stream) happens Mojo-side later (§18.2) — this
+(mbpe gpt2 → cached id stream) happens Mojo-side later — this
 script moves text bytes only, so it needs nothing but the stdlib.
 
 Story separator: TinyStories txt files delimit stories with
@@ -19,7 +19,7 @@ Usage:
 
 Outputs (in --out-dir):
     tinystories_train.txt / tinystories_val.txt + stdout token estimate.
-License note: dataset is CDLA-Sharing-1.0 (spec §5.2/§18.3), not for
+License note: dataset is CDLA-Sharing-1.0, not for
 redistribution — fetched bytes stay in the gitignored data/ dir.
 """
 
@@ -33,7 +33,7 @@ DEFAULT_URL = (
     "/resolve/main/TinyStories-train.txt"
 )
 SEPARATOR = "<|endoftext|>"
-# ~4 chars/token heuristic (§18.3) — estimate only; the true count is
+# ~4 chars/token heuristic — estimate only; the true count is
 # measured at mbpe-encode time and recorded in the run log.
 CHARS_PER_TOKEN = 4
 
@@ -86,7 +86,7 @@ def main() -> int:
               file=sys.stderr)
         return 1
 
-    # Contiguous 90/10 split on the STORY stream (§18.3): no window drawn
+    # Contiguous 90/10 split on the STORY stream: no window drawn
     # from one side may cross into the other at WindowLoader time, and a
     # prefix split keeps the subset deterministic across re-fetches.
     cut = int(len(stories) * 0.9)
@@ -100,7 +100,7 @@ def main() -> int:
     with open(val_path, "w", encoding="utf-8") as f:
         f.write("\n".join(val) + "\n")
 
-    # Report the numbers §18.3 requires in the run log: story counts are
+    # Report the numbers in the run log: story counts are
     # exact, token counts are estimates until mbpe-encode time.
     t_chars = sum(len(s) for s in train)
     v_chars = sum(len(s) for s in val)

@@ -48,9 +48,8 @@ struct Weights[dtype: DType]:
         `PositionalEmbedding`/`MLP` → "xavier", `Conv2D` → "he"), but
         containers (attention blocks, GPTEmbedding, GPTModel) FORWARD one
         `init_method` down their whole subtree, so a default `GPTModel` is
-        all-xavier end to end. Keep it that way: the one hard rule learned
-        from the zero-grad incident is that every layer in one
-        model must draw from this ONE vocabulary. A name outside it
+        all-xavier end to end. Keep it that way: the one hard rule is
+        that every layer in one model must draw from this ONE vocabulary. A name outside it
         (`WeightStrategy` panics on unknown strings) fails LOUDLY at
         construction; a name silently unhandled somewhere builds a
         dead-zero model whose `backward()` then faithfully propagates

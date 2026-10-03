@@ -300,7 +300,7 @@ class Tensor:
             raise ImportError("numpy is required for Tensor.numpy()")
         return self._raw.numpy()
 
-    # ── indexing / slicing (§4) ─────────────────────────────────────
+    # ── indexing / slicing ───────────────────────────────────────────
 
     def _normalize_index_key(self, key):
         """Expand an index key into parallel lane lists for the Mojo binding.
@@ -801,7 +801,7 @@ class Tensor:
         reads are exact and writes to the buffer do not alias the tensor."""
         return memoryview(np.ascontiguousarray(self.numpy()))
 
-    # ── operator machinery (§30: guards before raw calls) ───────────
+    # ── operator machinery (guards before raw calls) ───────────────
 
     __hash__ = None  # unhashable, like PyTorch (== returns a BoolTensor, not bool)
 

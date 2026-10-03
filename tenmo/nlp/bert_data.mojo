@@ -7,9 +7,8 @@ How this file fits the pipeline:
 MLM pretrain example, the classifier example — loads it through
 `load_imdb_vocab()` here and never touches raw `load_tiktoken`.
 
-NOVICE: Why does one helper own every load? The `.tiktoken` file format
-silently DROPS special tokens on save (verified against the mbpe
-source — design doc F11). A loader that forgets to re-register them
+Why does one helper own every load? The `.tiktoken` file format
+silently DROPS special tokens on save (verified against the mbpe writer). A loader that forgets to re-register them
 shifts every special id's meaning without any error. Centralizing
 load-then-re-register in one function makes that bug impossible.
 """
@@ -19,10 +18,10 @@ from ..tensor import Tensor
 from std.pathlib import Path
 from std.os.process import Process
 
-# NOVICE: The vocabulary contract, in one place. BPE training fills ids
+# The vocabulary contract, in one place. BPE training fills ids
 # 0..7999 contiguously with NO room reserved for specials, so the four
 # BERT markers are appended BEYOND the trained range (in-range
-# registration would overwrite a real BPE entry — doc F11). The model
+# registration would overwrite a real BPE entry). The model
 # embedding tables must therefore be sized IMDB_MODEL_VOCAB (8004),
 # and every `id < V` gate in the codebase means `id < 8004`.
 comptime IMDB_VOCAB_SIZE = 8000
@@ -75,7 +74,7 @@ def encode_review(
     `[CLS] ids [SEP]`, head-truncated,
     right-padded with `[PAD]` to exactly `max_len`.
 
-    NOVICE: This is the anti-v1 function. The old
+    This is the anti-v1 function. The old
     `imdb_sentiment_v1.mojo` pushed ids through a `Set` (presence-only
     bag-of-words), which DESTROYS word order — "good, not bad" and
     "bad, not good" become identical. An encoder's whole point is
@@ -110,7 +109,7 @@ def materialize_batch(
     and `(N,)[int64]` true lengths (non-`[PAD]` counts, `make_padding_mask`
     -ready).
 
-    NOVICE: `Tensor.d2` needs `List[Scalar[int64]]` rows, but the
+    `Tensor.d2` needs `List[Scalar[int64]]` rows, but the
     tokenizer speaks plain `Int` — hence the explicit per-element
     conversion loop. Ragged rows raise instead of silently stacking:
     every row must already be exactly `max_len` (that is
@@ -148,7 +147,7 @@ def _lt(x: Int, y: Int) -> Bool:
 def lengths_of(xb: Tensor[DType.int64]) -> Tensor[DType.int64]:
     """Per-row non-`[PAD]` counts of an `(N,T)` id batch.
 
-    NOVICE: the dataset stores ids + sentiment labels; lengths are
+    the dataset stores ids + sentiment labels; lengths are
     DERIVED from the ids (a row is `[CLS] ... [SEP] [PAD]*`, so
     non-PAD count == true length) instead of carried as a third
     tensor — one fewer thing that can disagree. Feed straight into
@@ -169,7 +168,7 @@ def lengths_of(xb: Tensor[DType.int64]) -> Tensor[DType.int64]:
 def ensure_aclImdb() raises:
     """Fetch + extract aclImdb to /tmp once (idempotent).
 
-    NOVICE: the 84MB tarball lives OUTSIDE the repo (too big for git)
+    the 84MB tarball lives OUTSIDE the repo (too big for git)
     at a fixed `/tmp` path — every IMDB example calls this first, so a
     fresh machine self-provisions on first run and skips after.
     """
@@ -217,8 +216,8 @@ def read_imdb_split(dir: String) raises -> Tuple[List[String], List[Int]]:
 def log_corpus_stats(lengths: List[Int], max_len: Int):
     """Log length percentiles, truncation rate, and pad fraction.
 
-    NOVICE: These are the numbers the old v1/v2 examples never printed
-    (doc F10) — without them you cannot tell whether T=128 truncates
+    These are the numbers the old v1/v2 examples never printed —
+    without them you cannot tell whether T=128 truncates
     half the corpus or pads 90% air. `lengths` holds per-review
     true_lens (CLS/SEP included, PAD excluded).
     """

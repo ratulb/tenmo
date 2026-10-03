@@ -379,7 +379,7 @@ def register_tensor[
         )
 
 
-# ── Scalar marshalling (dtype-family exact; §30.3 #3) ────────────
+# ── Scalar marshalling (dtype-family exact) ───────────────────────
 
 def _py_to_scalar[
     dtype: DType
@@ -717,14 +717,14 @@ def _generic_itruediv_scalar[
     return PythonObject(None)
 
 
-# ── Indexing / slicing (§4) ────────────────────────────────────
+# ── Indexing / slicing ───────────────────────────────────────────
 # All three handlers consume four parallel python int lists
 # (kinds, starts, stops, steps) + optional trailing flags.
 # Lane kinds: 0 = integer index lane, 1 = slice lane, 2 = newaxis lane.
 # The wrapper pre-normalizes slices (positive step only) and pre-checks
 # integer bounds so a core panic (abort) can never fire from
 # Python-land input; reversed-slice and bool/fancy indexing raise in
-# the wrapper (documented core deviations).
+# the wrapper (intentional deviations from core semantics).
 
 def _index_lanes_to_idx(
     py_kinds: PythonObject,

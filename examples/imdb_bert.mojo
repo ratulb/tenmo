@@ -56,8 +56,8 @@ comptime N_LABELS = 2
 comptime SEED = 11
 # False = transfer (needs `imdb_bert_pretrain` checkpoint); True =
 # from-scratch control (runs standalone). 6k-subset frozen-test at
-# matched LR: scratch 0.766 / transfer 0.758 (majority 0.5) — see
-# doc §4.9. Default True so the example runs without the checkpoint.
+# matched LR: scratch 0.766 / transfer 0.758 (majority 0.5). Default
+# True so the example runs without the checkpoint.
 comptime FROM_SCRATCH = True
 comptime HEAD_STEPS = 100
 comptime FULL_STEPS = 1500
@@ -68,7 +68,7 @@ comptime EVAL_EVERY = 375
 # Smoke subset: contiguous TRAIN rows straddling the pos/neg boundary
 # (row 12500), so 6000 balanced reviews with zero concat ops. Both
 # arms train on the SAME subset; eval stays the FULL frozen test.
-# Full-25k training is scale-up, not smoke (see doc §4.10 spirit).
+# Full-25k training is scale-up, not smoke.
 comptime SUB_A = 9500
 comptime SUB_B = 15500
 comptime EVAL_B = 64
@@ -167,8 +167,8 @@ def train_phase(
     in `__iter__`, so batches MUST come from `for batch in loader`.
     Calling `loader.__next__()` directly skips the shuffle and serves
     identity order — on pos-first data the model then "learns" the
-    constant-positive predictor while every scoreboard applauds (see
-    doc §4.9 incident note). One `for` pass = exactly ONE epoch
+    constant-positive predictor while every scoreboard applauds.
+    One `for` pass = exactly ONE epoch
     (`__next__` raises StopIteration at the end), so multi-epoch
     training needs `while done < steps:` outside + `for` inside; each
     re-entry reshuffles for free. `break` at the cap is the shape.
@@ -297,8 +297,7 @@ def main() raises:
 
     # Eval halves: first 1024 TEST-pos rows + first 1024 TEST-neg
     # rows (test order is pos-first, so a head slice would be
-    # all-positive and gameable — the incident note in §4.9). FIXED
-    # for the whole run.
+    # all-positive and gameable). FIXED for the whole run.
     var eval_a_ids = test_ids.slice[track_grad=False](0, 1024, axis=0).clone()
     var eval_a_labels = test_labels.slice[track_grad=False](0, 1024, axis=0).clone()
     var eval_b_ids = test_ids.slice[track_grad=False](12500, 13524, axis=0).clone()

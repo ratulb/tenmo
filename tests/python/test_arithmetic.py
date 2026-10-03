@@ -189,7 +189,7 @@ class TestElementwiseArithmetic:
     def test_mod_tensor_tensor(self): pass
 
 
-# ── §7: Arithmetic error cases / §10: Unary edge cases / §11: Sigmoid ──
+# ── Arithmetic error cases / Unary edge cases / Sigmoid ──
 
 
 class TestArithmeticExtended:

@@ -231,7 +231,7 @@ assert 0.0 <= acc <= 1.0
         assert 0.0 <= acc <= 1.0
 
 
-# ── §14: Missing core mechanics ─────────────────────────────────────
+# ── Missing core mechanics ─────────────────────────────────────
 
 
 class TestAutogradCoreExtended:
@@ -259,7 +259,7 @@ class TestAutogradCoreExtended:
         # (is_leaf behavior may differ; just verify no crash)
 
 
-# ── §15: Missing per-op gradient correctness ────────────────────────
+# ── Missing per-op gradient correctness ────────────────────────
 
 
 def _numerical_grad(fn, inputs, eps=1e-5):
@@ -371,7 +371,7 @@ class TestGradientCorrectness:
         np.testing.assert_allclose(x.grad.numpy(), [0.0, 0.0], atol=1e-5)
 
 
-# ── §16: Graph & cross-dtype edge cases ─────────────────────────────
+# ── Graph & cross-dtype edge cases ─────────────────────────────
 
 
 class TestGraphEdgeCases:

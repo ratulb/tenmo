@@ -538,7 +538,7 @@ def test_dropout_large_tensor_backward() raises:
 
 
 # ============================================================================
-# SEED / REPRODUCIBILITY TESTS (audit item 14)
+# SEED / REPRODUCIBILITY TESTS
 # ============================================================================
 
 

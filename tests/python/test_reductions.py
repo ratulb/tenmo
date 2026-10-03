@@ -109,7 +109,7 @@ for v in s.tolist():
         assert result.returncode == 0, f"subprocess failed: {result.stderr.decode()}"
 
 
-# ── §12: Previously skipped stubs now implemented ───────────────────
+# ── Previously skipped stubs now implemented ───────────────────
 
 
 class TestReductionExtended:

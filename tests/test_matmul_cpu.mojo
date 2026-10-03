@@ -17,8 +17,7 @@ frameworks, so each dispatcher is independently swept here.
 m/n/p bucket-representative values below are deliberately NOT exact
 multiples of their tile size, so every dispatch test also exercises
 partial/remainder-tile handling, not just the clean-multiple case -- this
-is exactly the class of bug the "FIX Issue 1/2" comments in matmul_cpu.mojo
-document as having occurred before.
+is exactly the class of bug a naive OR-across-dims tile pick hits.
 
 ASSUMPTIONS VERIFIED AGAINST REAL TENMO:
   1. matmul_cpu.mojo exports NO top-level `matmul`; the public dispatcher
@@ -535,7 +534,7 @@ def test_4d_multi_axis_broadcast() raises:
 # ═══════════════════════════════════════════════════════════════════════
 
 def test_tall_narrow_matrix_tile_p_regression() raises:
-    """Direct regression guard for the documented 'FIX Issue 1': a tall.
+    """Direct regression guard: a tall.
     narrow matrix (large m, tiny p) must select a small TILE_P, not a
     large one sized for wide matrices. m=300 (TILE_M=128), p=5 (well
     under one SIMD vector width -- forces scalar-tail-only for every

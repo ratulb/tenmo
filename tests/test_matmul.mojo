@@ -635,7 +635,7 @@ def test_strided_b_wide_p() raises:
 
 def test_matmul_scalar_times_matrix() raises:
     comptime dtype = DType.float32
-    # Audit item 17: lone-scalar generosity (mirrors dot) — scalar scales
+    # Lone-scalar generosity (mirrors dot) — scalar scales
     # instead of panicking in classify_matmul. dL/dM = s·up, dL/ds = sum(M).
     var s = Tensor[dtype].scalar(2.0, requires_grad=True)
     var m = Tensor[dtype].ones(Shape(2, 3), requires_grad=True)

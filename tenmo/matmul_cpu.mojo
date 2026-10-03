@@ -529,12 +529,9 @@ struct MmCpu2d[
     #                           (simdwidth * UNROLL = 32 for float32/AVX2)
     #                           for the unrolled SIMD loop to fire at all.
     #
-    #  FIX Issue 1 (previous review): old code used OR across all dims,
-    #  meaning (300, 10, 10) hit TILE_P=256 even with p=10.
-    #
-    #  FIX Issue 1 (this review): all 18 combinations are explicitly
-    #  enumerated. A final fallback panics on any unanticipated combination
-    #  rather than silently using wrong tile sizes.
+    #  All 18 combinations are explicitly enumerated. A final fallback
+    #  panics on any unanticipated combination rather than silently
+    #  using wrong tile sizes.
     @staticmethod
     def tiled_matmul(
         A_layout: Layout,

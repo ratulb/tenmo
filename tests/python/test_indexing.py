@@ -1,7 +1,6 @@
-"""Indexing & slicing tests (§4, §15).
+"""Indexing & slicing tests.
 
-Stub names match `tests/test_python_bindings.txt` so the §32.18 audit can match
-by name. Slices are *shared views* through the Python boundary: the handlers
+Stub names match `tests/test_python_bindings.txt`. Slices are *shared views* through the Python boundary: the handlers
 pass the stored pointee by reference into `View.forward_list` (no `var a = ptr[]`
 copy-out), so `t[a:b]` and strided `t[::k]` alias the source. The
 documented deviations are all at the very edge of what the core view metadata

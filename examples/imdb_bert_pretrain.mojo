@@ -63,7 +63,7 @@ comptime PEAK_LR = 1e-4
 comptime FLOOR_LR = 1e-6
 comptime SEED = 7
 # Smoke cap: N > 0 = batches this run, -1 = full epoch (~3125 @ B=8).
-# 100 = the cheap smoke (default); 1000-step run recorded in the doc.
+# 100 = the cheap smoke (default); raise for a longer run.
 comptime MAX_BATCHES = 100
 comptime EVAL_EVERY = 25
 comptime EVAL_N = 256
@@ -80,7 +80,7 @@ def apply_mlm_mask(
 ) raises -> Tensor[DType.int64]:
     """80/10/10 BERT masking, in place on a CLONED batch.
 
-    NOVICE: `[CLS]`/`[SEP]`/`[PAD]` are never selected (masking the
+    `[CLS]`/`[SEP]`/`[PAD]` are never selected (masking the
     summary token or filler teaches nothing). Returns `(B,T)` int64
     labels: original ids at selected positions, `IGNORE` elsewhere —
     the loss's `ignore_index` then scores masked slots only. Caller
@@ -121,7 +121,7 @@ def masked_accuracy(
 ) -> Float64:
     """Fraction correct over `labels != IGNORE` positions.
 
-    NOVICE: chance is ~1/8000, so anything in the percents is real
+    chance is ~1/8000, so anything in the percents is real
     learning. `argmax` over the vocab axis picks each position's top
     guess; unmasked slots never count.
     """
@@ -346,11 +346,11 @@ def main() raises:
 
 
 def right_context_probe(mut model: BertForMLM[DType.float32]) raises:
-    """Non-causality probe (doc §2.3, goal 3).
+    """Non-causality probe.
     Does the encoder really
     use RIGHT-side context?
 
-    NOVICE: A causal (GPT-style) model physically cannot see future
+    A causal (GPT-style) model physically cannot see future
     tokens, so hiding them changes nothing. A bidirectional encoder
     SHOULD get worse when the right side is taken away. For 64 fresh
     test reviews: mask one middle position, score its per-slot loss

@@ -229,7 +229,7 @@ class TestWhereAndMaskedFill:
         np.testing.assert_array_equal(mf, np.where(mask_np, -99.0, t_np))
 
 
-# ── §3: Shape / §5: View ops / §6: Broadcasting extras ──────────────
+# ── Shape / View ops / Broadcasting extras ──────────────
 
 
 class TestShapeExtended:

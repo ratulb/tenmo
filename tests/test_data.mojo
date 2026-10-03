@@ -352,7 +352,7 @@ def test_dataloader_multiple_epochs() raises:
 def test_dataloader_steps_cap_across_epochs() raises:
     """Boundary: `while done < steps: for batch in loader` runs past one epoch.
 
-    Regression for the imdb_bert incident (§4.9): a single `for` pass is
+    Regression: a single `for` pass is
     exactly one epoch (`__next__` raises StopIteration at the end), so a
     bare `for` + `break`-at-cap silently under-trains whenever `steps`
     exceeds batches-per-epoch. The blessed multi-epoch shape re-enters

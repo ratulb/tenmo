@@ -40,8 +40,7 @@ def _toy_tokenizer() raises -> BPETokenizer[Tokenizers.gpt2]:
 
 
 def test_bert_specials_reregistered_after_load() raises:
-    """The F11 footgun, pinned.
-    Save drops specials, so a raw load
+    """Save drops special tokens, so a raw load
     encodes `[CLS]` as ordinary subwords — only `load_imdb_vocab`
     (load + re-register) restores the boundary ids."""
     var tok = _toy_tokenizer()
@@ -73,8 +72,8 @@ def test_bert_encode_review_shape_and_wrap() raises:
 
 
 def test_bert_encode_review_truncates_head() raises:
-    """Over-long reviews keep the FIRST (T-2) content ids (head.
-    truncation, doc §4.7) — never the tail, never an error."""
+    """Over-long reviews keep the FIRST (T-2) content ids (head
+    truncation) — never the tail, never an error."""
     var tok = _toy_tokenizer()
     comptime T = 8
     var long = String(
@@ -91,8 +90,7 @@ def test_bert_encode_review_truncates_head() raises:
 
 
 def test_bert_order_preserved_regression() raises:
-    """Anti-F10 regression.
-    Word-order swaps must change the id
+    """Word-order swaps must change the id
     sequence (the v1 `Set`-dedup collapsed them to identical bags)."""
     var tok = _toy_tokenizer()
     var a = encode_review(tok, "great movie, not terrible", 16)[0].copy()

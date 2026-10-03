@@ -1,7 +1,6 @@
-"""View-aliasing through the Python boundary (§5 Views & Reshaping).
+"""View-aliasing through the Python boundary.
 
-Stub names match `tests/test_python_bindings.txt` so the §32.18 audit can match
-by name. These were previously unobtainable: the binding handlers bound
+Stub names match `tests/test_python_bindings.txt`. These were previously unobtainable: the binding handlers bound
 `var a = ptr[]` (a deep-copy by Tensor's copy ctor) before calling the core
 view ops, so every view was a view of a throwaway copy. The no-copy-out sweep
 passes the stored pointee by reference, so the core metadata-only view ops
