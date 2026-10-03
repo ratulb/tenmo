@@ -1437,12 +1437,16 @@ struct Tensor[dtype: DType](
     def arange(
         *args: Scalar[Self.dtype],
         requires_grad: Bool = False,
+        device: Optional[Device] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Create a 1D tensor with evenly spaced values.
 
         Args:
             args: Start, stop, and optionally step values.
             requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
+            sync: If True, synchronize GPU after creation.
 
         Returns:
             A 1D tensor with values from start to stop.
@@ -1453,9 +1457,11 @@ struct Tensor[dtype: DType](
             Tensor[DType.float32].arange(0, 10, 2)  # [0, 2, 4, 6, 8]
             ```
         """
-        var nd_buffer = NDBuffer[Self.dtype].arange(args)
-        var tensor = Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
-        return tensor^
+        var target_device = device.or_else(CPU().into())
+        var nd_buffer = NDBuffer[Self.dtype].arange(
+            args, device=target_device, sync=sync
+        )
+        return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
     @staticmethod
     def linspace(
@@ -1463,6 +1469,8 @@ struct Tensor[dtype: DType](
         end: Scalar[Self.dtype],
         steps: Int,
         requires_grad: Bool = False,
+        device: Optional[Device] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
         """Create a 1D tensor with linearly spaced values.
 
@@ -1471,13 +1479,17 @@ struct Tensor[dtype: DType](
             end: Ending value.
             steps: Number of samples.
             requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
+            sync: If True, synchronize GPU after creation.
 
         Returns:
             A 1D tensor with steps values from start to end (inclusive).
         """
-        var nd_buffer = NDBuffer[Self.dtype].linspace(start, end, steps)
-        var tensor = Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
-        return tensor^
+        var target_device = device.or_else(CPU().into())
+        var nd_buffer = NDBuffer[Self.dtype].linspace(
+            start, end, steps, device=target_device, sync=sync
+        )
+        return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
     @staticmethod
     def zeros(

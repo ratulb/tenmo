@@ -143,6 +143,7 @@ declare -a ALL_TESTS_IN_ORDER=(
   "gpuround|tests/test_gpu_round_floor.mojo"
   "gpuclip|tests/test_gpu_clip.mojo"
   "gpusuma|tests/test_gpu_sum_all.mojo"
+  "gpufactory|tests/test_gpu_device_factory.mojo"
   "broadcast|tests/test_broadcast.mojo"
   "scalar|tests/test_scalar_tensors.mojo"
   "inplace|tests/test_inplace.mojo"
@@ -256,6 +257,7 @@ declare -a GPU_TESTS=(
   "gpuround|tests/test_gpu_round_floor.mojo"
   "gpuclip|tests/test_gpu_clip.mojo"
   "gpusuma|tests/test_gpu_sum_all.mojo"
+  "gpufactory|tests/test_gpu_device_factory.mojo"
   "broadcast|tests/test_broadcast.mojo"
   "scalar|tests/test_scalar_tensors.mojo"
   "accuracy|tests/test_accuracy.mojo"
@@ -333,7 +335,7 @@ if [ $# -eq 0 ]; then
   print_colored "$CYAN" "Available tests:"
   echo "  scalar_ops_gpu, reshape, ndb_inp_arith, ndb_oop_arith, dot, division, embedding, positional, layer_norm, reciprocal, product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
   echo "  allany, compare, count_unique, transmute, exp, exp_gpu, summean, sigmoid"
-  echo "  gpusummean, gpuround, gpuclip, gpusuma, broadcast, scalar, inplace, expand, gpu_expand, gpu_cpu"
+  echo "  gpusummean, gpuround, gpuclip, gpusuma, gpufactory, broadcast, scalar, inplace, expand, gpu_expand, gpu_cpu"
   echo "  sgd, sparse_sgd, npiop, fill, chunk, cnn, matmul, pad, blas, blasinteg, dropout, dev_transfer"
   echo "  std_variance, stack, logarithm, concat, variance, variance_and_std, accuracy, utils, onehot, power"
   echo "  indexhelper, welford, losses, tanh, data, softmax, repeat, mmnd, attn_matmul"
@@ -610,6 +612,10 @@ run_test_by_name() {
       ;;
     gpusuma)
       run_test "gpusuma" "tests/test_gpu_sum_all.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    gpufactory)
+      run_test "gpufactory" "tests/test_gpu_device_factory.mojo" "$MOJO_FLAGS"
       exit_code=$?
       ;;
     broadcast)

@@ -805,10 +805,23 @@ struct NDBuffer[dtype: DType](
     @always_inline
     def arange(
         args: VariadicList[Scalar[Self.dtype], _],
+        device: Device = CPU().into(),
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype]:
         var buffer = Buffer[Self.dtype].arange(args)
         var shape = Shape(buffer.size)
-        return NDBuffer[Self.dtype](buffer^, shape^)
+        var ndb = NDBuffer[Self.dtype](buffer^, shape^)
+        if device.is_cpu():
+            return ndb^
+        comptime if has_accelerator():
+            try:
+                var (_, result) = ndb^.to_device(device, sync=sync)
+                return result^
+            except e:
+                print(e)
+                panic("NDBuffer arange: device transfer failed")
+                return Self.Empty()
+        return ndb^
 
     @staticmethod
     @always_inline
@@ -823,10 +836,23 @@ struct NDBuffer[dtype: DType](
         start: Scalar[Self.dtype],
         end: Scalar[Self.dtype],
         steps: Int,
+        device: Device = CPU().into(),
+        sync: Bool = True,
     ) -> NDBuffer[Self.dtype]:
         var buffer = Buffer[Self.dtype].linspace(start, end, steps)
         var shape = Shape(buffer.size)
-        return NDBuffer[Self.dtype](buffer^, shape^)
+        var ndb = NDBuffer[Self.dtype](buffer^, shape^)
+        if device.is_cpu():
+            return ndb^
+        comptime if has_accelerator():
+            try:
+                var (_, result) = ndb^.to_device(device, sync=sync)
+                return result^
+            except e:
+                print(e)
+                panic("NDBuffer linspace: device transfer failed")
+                return Self.Empty()
+        return ndb^
 
     @always_inline
     def is_contiguous(self) -> Bool:
