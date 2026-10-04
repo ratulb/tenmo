@@ -1240,7 +1240,7 @@ def test_ip_1d_pow_2_f32_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[POW](Scalar[dtype](2))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[POW](Scalar[dtype](2), sync=True)
@@ -1253,7 +1253,7 @@ def test_ip_1d_pow_2_f64_gpu_scalar() raises:
         comptime dtype = DType.float64
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[POW](Scalar[dtype](2))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[POW](Scalar[dtype](2), sync=True)
@@ -1299,7 +1299,7 @@ def test_ip_1d_add_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Add](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](5.0), sync=True)
@@ -1312,7 +1312,7 @@ def test_ip_1d_subtract_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Subtract](Scalar[dtype](3.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Subtract](Scalar[dtype](3.0), sync=True)
@@ -1325,7 +1325,7 @@ def test_ip_1d_reversesubtract_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[ReverseSubtract](Scalar[dtype](10.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[ReverseSubtract](
@@ -1340,7 +1340,7 @@ def test_ip_1d_multiply_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Multiply](Scalar[dtype](2.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
@@ -1353,7 +1353,7 @@ def test_ip_1d_divide_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Divide](Scalar[dtype](4.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Divide](Scalar[dtype](4.0), sync=True)
@@ -1366,7 +1366,7 @@ def test_ip_1d_max_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MAX](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MAX](Scalar[dtype](5.0), sync=True)
@@ -1379,7 +1379,7 @@ def test_ip_1d_min_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MIN](Scalar[dtype](8.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MIN](Scalar[dtype](8.0), sync=True)
@@ -1392,7 +1392,7 @@ def test_ip_2d_add_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 26).reshape(Shape(5, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Add](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](5.0), sync=True)
@@ -1405,7 +1405,7 @@ def test_ip_2d_subtract_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 26).reshape(Shape(5, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Subtract](Scalar[dtype](3.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Subtract](Scalar[dtype](3.0), sync=True)
@@ -1418,7 +1418,7 @@ def test_ip_2d_reversesubtract_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 26).reshape(Shape(5, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[ReverseSubtract](Scalar[dtype](10.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[ReverseSubtract](
@@ -1433,7 +1433,7 @@ def test_ip_2d_multiply_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 26).reshape(Shape(5, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Multiply](Scalar[dtype](2.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
@@ -1446,7 +1446,7 @@ def test_ip_2d_divide_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 26).reshape(Shape(5, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Divide](Scalar[dtype](4.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Divide](Scalar[dtype](4.0), sync=True)
@@ -1459,7 +1459,7 @@ def test_ip_2d_max_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 26).reshape(Shape(5, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MAX](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MAX](Scalar[dtype](5.0), sync=True)
@@ -1472,7 +1472,7 @@ def test_ip_2d_min_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 26).reshape(Shape(5, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MIN](Scalar[dtype](8.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MIN](Scalar[dtype](8.0), sync=True)
@@ -1485,7 +1485,7 @@ def test_ip_3d_add_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 61).reshape(Shape(3, 4, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Add](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](5.0), sync=True)
@@ -1498,7 +1498,7 @@ def test_ip_3d_subtract_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 61).reshape(Shape(3, 4, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Subtract](Scalar[dtype](3.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Subtract](Scalar[dtype](3.0), sync=True)
@@ -1511,7 +1511,7 @@ def test_ip_3d_reversesubtract_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 61).reshape(Shape(3, 4, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[ReverseSubtract](Scalar[dtype](10.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[ReverseSubtract](
@@ -1526,7 +1526,7 @@ def test_ip_3d_multiply_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 61).reshape(Shape(3, 4, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Multiply](Scalar[dtype](2.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
@@ -1539,7 +1539,7 @@ def test_ip_3d_divide_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 61).reshape(Shape(3, 4, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Divide](Scalar[dtype](4.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Divide](Scalar[dtype](4.0), sync=True)
@@ -1552,7 +1552,7 @@ def test_ip_3d_max_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 61).reshape(Shape(3, 4, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MAX](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MAX](Scalar[dtype](5.0), sync=True)
@@ -1565,7 +1565,7 @@ def test_ip_3d_min_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 61).reshape(Shape(3, 4, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MIN](Scalar[dtype](8.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MIN](Scalar[dtype](8.0), sync=True)
@@ -1578,7 +1578,7 @@ def test_ip_4d_add_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 121).reshape(Shape(3, 2, 4, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Add](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](5.0), sync=True)
@@ -1591,7 +1591,7 @@ def test_ip_4d_subtract_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 121).reshape(Shape(3, 2, 4, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Subtract](Scalar[dtype](3.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Subtract](Scalar[dtype](3.0), sync=True)
@@ -1604,7 +1604,7 @@ def test_ip_4d_reversesubtract_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 121).reshape(Shape(3, 2, 4, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[ReverseSubtract](Scalar[dtype](10.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[ReverseSubtract](
@@ -1619,7 +1619,7 @@ def test_ip_4d_multiply_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 121).reshape(Shape(3, 2, 4, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Multiply](Scalar[dtype](2.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
@@ -1632,7 +1632,7 @@ def test_ip_4d_divide_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 121).reshape(Shape(3, 2, 4, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Divide](Scalar[dtype](4.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Divide](Scalar[dtype](4.0), sync=True)
@@ -1645,7 +1645,7 @@ def test_ip_4d_max_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 121).reshape(Shape(3, 2, 4, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MAX](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MAX](Scalar[dtype](5.0), sync=True)
@@ -1658,7 +1658,7 @@ def test_ip_4d_min_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 121).reshape(Shape(3, 2, 4, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MIN](Scalar[dtype](8.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MIN](Scalar[dtype](8.0), sync=True)
@@ -1676,7 +1676,7 @@ def test_ip_1d_add_f64_gpu_scalar() raises:
         comptime dtype = DType.float64
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Add](Scalar[DType.float64](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[DType.float64](5.0), sync=True)
@@ -1689,7 +1689,7 @@ def test_ip_1d_subtract_f64_gpu_scalar() raises:
         comptime dtype = DType.float64
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Subtract](Scalar[DType.float64](3.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Subtract](
@@ -1704,7 +1704,7 @@ def test_ip_1d_reversesubtract_f64_gpu_scalar() raises:
         comptime dtype = DType.float64
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[ReverseSubtract](
             Scalar[DType.float64](10.0)
         )
@@ -1721,7 +1721,7 @@ def test_ip_1d_multiply_f64_gpu_scalar() raises:
         comptime dtype = DType.float64
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Multiply](Scalar[DType.float64](2.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](
@@ -1736,7 +1736,7 @@ def test_ip_1d_divide_f64_gpu_scalar() raises:
         comptime dtype = DType.float64
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Divide](Scalar[DType.float64](4.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Divide](Scalar[DType.float64](4.0), sync=True)
@@ -1749,7 +1749,7 @@ def test_ip_1d_max_f64_gpu_scalar() raises:
         comptime dtype = DType.float64
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MAX](Scalar[DType.float64](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MAX](Scalar[DType.float64](5.0), sync=True)
@@ -1762,7 +1762,7 @@ def test_ip_1d_min_f64_gpu_scalar() raises:
         comptime dtype = DType.float64
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MIN](Scalar[DType.float64](8.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MIN](Scalar[DType.float64](8.0), sync=True)
@@ -2652,7 +2652,7 @@ def test_ip_tail7_add_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 8)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Add](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](5.0), sync=True)
@@ -2665,7 +2665,7 @@ def test_ip_tail7_subtract_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 8)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Subtract](Scalar[dtype](3.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Subtract](Scalar[dtype](3.0), sync=True)
@@ -2678,7 +2678,7 @@ def test_ip_tail7_reversesubtract_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 8)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[ReverseSubtract](Scalar[dtype](10.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[ReverseSubtract](
@@ -2693,7 +2693,7 @@ def test_ip_tail7_multiply_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 8)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Multiply](Scalar[dtype](2.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
@@ -2706,7 +2706,7 @@ def test_ip_tail7_divide_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 8)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Divide](Scalar[dtype](4.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Divide](Scalar[dtype](4.0), sync=True)
@@ -2719,7 +2719,7 @@ def test_ip_tail7_max_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 8)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MAX](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MAX](Scalar[dtype](5.0), sync=True)
@@ -2732,7 +2732,7 @@ def test_ip_tail7_min_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 8)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MIN](Scalar[dtype](8.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MIN](Scalar[dtype](8.0), sync=True)
@@ -2745,7 +2745,7 @@ def test_ip_1elem_add_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 2)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Add](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](5.0), sync=True)
@@ -2758,7 +2758,7 @@ def test_ip_1elem_subtract_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 2)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Subtract](Scalar[dtype](3.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Subtract](Scalar[dtype](3.0), sync=True)
@@ -2771,7 +2771,7 @@ def test_ip_1elem_reversesubtract_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 2)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[ReverseSubtract](Scalar[dtype](10.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[ReverseSubtract](
@@ -2786,7 +2786,7 @@ def test_ip_1elem_multiply_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 2)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Multiply](Scalar[dtype](2.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
@@ -2799,7 +2799,7 @@ def test_ip_1elem_divide_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 2)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Divide](Scalar[dtype](4.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Divide](Scalar[dtype](4.0), sync=True)
@@ -2812,7 +2812,7 @@ def test_ip_1elem_max_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 2)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MAX](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MAX](Scalar[dtype](5.0), sync=True)
@@ -2825,7 +2825,7 @@ def test_ip_1elem_min_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 2)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MIN](Scalar[dtype](8.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MIN](Scalar[dtype](8.0), sync=True)
@@ -2838,7 +2838,7 @@ def test_ip_size100_add_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 101)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Add](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](5.0), sync=True)
@@ -2851,7 +2851,7 @@ def test_ip_size100_multiply_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 101)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Multiply](Scalar[dtype](2.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
@@ -2864,7 +2864,7 @@ def test_ip_size1000_add_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 1001)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Add](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](5.0), sync=True)
@@ -2877,7 +2877,7 @@ def test_ip_size1000_multiply_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 1001)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Multiply](Scalar[dtype](2.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
@@ -2890,7 +2890,7 @@ def test_ip_size7777_add_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 7778)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Add](Scalar[dtype](5.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](5.0), sync=True)
@@ -2903,7 +2903,7 @@ def test_ip_size7777_multiply_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 7778)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Multiply](Scalar[dtype](2.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](2.0), sync=True)
@@ -2916,7 +2916,7 @@ def test_ip_identity_add_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 26).reshape(Shape(5, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Add](Scalar[dtype](0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](0), sync=True)
@@ -2929,7 +2929,7 @@ def test_ip_identity_multiply_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 26).reshape(Shape(5, 5))
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Multiply](Scalar[dtype](1.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](1.0), sync=True)
@@ -2942,7 +2942,7 @@ def test_ip_neg_add_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Add](Scalar[dtype](-3.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Add](Scalar[dtype](-3.0), sync=True)
@@ -2955,7 +2955,7 @@ def test_ip_neg_multiply_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[Multiply](Scalar[dtype](-2.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[Multiply](Scalar[dtype](-2.0), sync=True)
@@ -2968,7 +2968,7 @@ def test_ip_neg_max_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MAX](Scalar[dtype](-3.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MAX](Scalar[dtype](-3.0), sync=True)
@@ -2981,7 +2981,7 @@ def test_ip_neg_min_gpu_scalar() raises:
         comptime dtype = DType.float32
         var gpu = GPU()
         var a = NDBuffer[dtype].arange(1, 9)
-        var expected = a.copy()
+        var expected = a.clone()
         expected.inplace_scalar_ops[MIN](Scalar[dtype](-3.0))
         var a_gpu = a.to_gpu(gpu)
         a_gpu.inplace_scalar_ops[MIN](Scalar[dtype](-3.0), sync=True)
