@@ -1,4 +1,5 @@
 from .tensor import Tensor
+from .gpu.device import CPU, Device, GPU
 from .shared.panic import panic
 from std.random import shuffle as reshuffle, random_si64
 from std.python import PythonObject
@@ -74,6 +75,15 @@ trait Dataset(Sized & Copyable):
     def get_labels_per_sample(self) -> Int:
         """Total number of elements per label."""
         ...
+
+    def device(ref self) -> Device:
+        """Device the bulk data lives on. Defaults to CPU.
+
+        Overridden by conformers that hold device-resident tensors.
+        Loaders allocate their batch buffers here and dispatch their
+        gather here.
+        """
+        return CPU().into()
 
     def into_loader(
         ref self,
@@ -200,12 +210,12 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
         for i in range(self._label_shape.rank()):
             batch_label_dims.append(self._label_shape[i])
 
-        # Allocate full-size batch
+        # Allocate full-size batch on the dataset's device
         var batch_features = Tensor[Self.DatasetSource._sample_dtype].zeros(
-            Shape(batch_feature_dims)
+            Shape(batch_feature_dims), device=dataset_ref.device()
         )
         var batch_labels = Tensor[Self.DatasetSource._label_dtype].zeros(
-            Shape(batch_label_dims)
+            Shape(batch_label_dims), device=dataset_ref.device()
         )
 
         self._batch = Batch[
@@ -234,9 +244,11 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
 
                 var last_features = Tensor[
                     Self.DatasetSource._sample_dtype
-                ].zeros(Shape(last_feature_dims))
+                ].zeros(
+                    Shape(last_feature_dims), device=dataset_ref.device()
+                )
                 var last_labels = Tensor[Self.DatasetSource._label_dtype].zeros(
-                    Shape(last_label_dims)
+                    Shape(last_label_dims), device=dataset_ref.device()
                 )
 
                 self._last_batch = Batch[
@@ -499,14 +511,48 @@ struct NumpyDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
     def __len__(self) -> Int:
         return self._size
 
+    def device(ref self) -> Device:
+        return self._features.device()
+
+    def to_gpu(
+        ref self, gpu: Optional[GPU] = None, sync: Bool = True
+    ) raises -> Self:
+        """Return a dataset whose bulk data is resident on `gpu`.
+
+        The returned dataset owns its tensors; the receiver is unchanged.
+        """
+        var target = gpu.or_else(GPU())
+        var f = self._features.to_gpu(target, sync=sync)
+        var y = self._labels.to_gpu(target, sync=sync)
+        return Self(f, y)
+
+    def to_cpu(ref self, sync: Bool = True) raises -> Self:
+        """Return a dataset whose bulk data is resident on the host."""
+        return Self(
+            self._features.to_cpu(sync=sync),
+            self._labels.to_cpu(sync=sync),
+        )
+
     def get_features_ptr(
         ref self,
     ) -> Pointer[Scalar[Self.sample_dtype], ImmutAnyOrigin]:
+        if self.device().is_gpu():
+            panic(
+                "NumpyDataset.get_features_ptr: bulk data is device-resident;"
+                " the flat host pointer contract does not apply. Use the"
+                " loader's tensor-level path or .to_cpu() first."
+            )
         return self._features.data_ptr().as_imm()
 
     def get_labels_ptr(
         ref self,
     ) -> Pointer[Scalar[Self.label_dtype], ImmutAnyOrigin]:
+        if self.device().is_gpu():
+            panic(
+                "NumpyDataset.get_labels_ptr: bulk data is device-resident;"
+                " the flat host pointer contract does not apply. Use the"
+                " loader's tensor-level path or .to_cpu() first."
+            )
         return self._labels.data_ptr().as_imm()
 
     def get_feature_shape(self) -> Shape:
@@ -528,11 +574,13 @@ struct NumpyDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
         if idx < 0 or idx >= self._size:
             panic("NumpyDataset: index out of bounds")
 
-        # Create tensors with proper shape
+        # Create tensors with proper shape, on the dataset's device
         var sample_feature = Tensor[Self.sample_dtype].zeros(
-            self._feature_shape
+            self._feature_shape, device=self._features.device()
         )
-        var sample_label = Tensor[Self.label_dtype].zeros(self._label_shape)
+        var sample_label = Tensor[Self.label_dtype].zeros(
+            self._label_shape, device=self._features.device()
+        )
 
         var dataset_features_ptr = self.get_features_ptr()
         var dataset_labels_ptr = self.get_labels_ptr()
@@ -664,14 +712,48 @@ struct TensorDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
     def __len__(self) -> Int:
         return self._size
 
+    def device(ref self) -> Device:
+        return self._features.device()
+
+    def to_gpu(
+        ref self, gpu: Optional[GPU] = None, sync: Bool = True
+    ) raises -> Self:
+        """Return a dataset whose bulk data is resident on `gpu`.
+
+        The returned dataset owns its tensors; the receiver is unchanged.
+        """
+        var target = gpu.or_else(GPU())
+        var f = self._features.to_gpu(target, sync=sync)
+        var y = self._labels.to_gpu(target, sync=sync)
+        return Self(f, y)
+
+    def to_cpu(ref self, sync: Bool = True) raises -> Self:
+        """Return a dataset whose bulk data is resident on the host."""
+        return Self(
+            self._features.to_cpu(sync=sync),
+            self._labels.to_cpu(sync=sync),
+        )
+
     def get_features_ptr(
         ref self,
     ) -> Pointer[Scalar[Self.sample_dtype], ImmutAnyOrigin]:
+        if self.device().is_gpu():
+            panic(
+                "TensorDataset.get_features_ptr: bulk data is device-resident;"
+                " the flat host pointer contract does not apply. Use the"
+                " loader's tensor-level path or .to_cpu() first."
+            )
         return self._features.data_ptr().as_imm()
 
     def get_labels_ptr(
         ref self,
     ) -> Pointer[Scalar[Self.label_dtype], ImmutAnyOrigin]:
+        if self.device().is_gpu():
+            panic(
+                "TensorDataset.get_labels_ptr: bulk data is device-resident;"
+                " the flat host pointer contract does not apply. Use the"
+                " loader's tensor-level path or .to_cpu() first."
+            )
         return self._labels.data_ptr().as_imm()
 
     # New API methods (required by updated Dataset trait)
@@ -713,11 +795,13 @@ struct TensorDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
         if idx < 0 or idx >= self._size:
             panic("TensorDataset: index out of bounds")
 
-        # Create tensors with proper shape
+        # Create tensors with proper shape, on the dataset's device
         var sample_feature = Tensor[Self.sample_dtype].zeros(
-            self._feature_shape
+            self._feature_shape, device=self._features.device()
         )
-        var sample_label = Tensor[Self.label_dtype].zeros(self._label_shape)
+        var sample_label = Tensor[Self.label_dtype].zeros(
+            self._label_shape, device=self._features.device()
+        )
 
         var dataset_features_ptr = self.get_features_ptr()
         var dataset_labels_ptr = self.get_labels_ptr()
