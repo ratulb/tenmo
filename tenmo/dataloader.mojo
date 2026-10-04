@@ -1,12 +1,14 @@
 from .tensor import Tensor
 from .gpu.device import CPU, Device, GPU
+from .kernels.gather_kernel import GatherKernel
+from .shared.intarray import IntArray
 from .shared.panic import panic
 from std.random import shuffle as reshuffle, random_si64
 from std.python import PythonObject
 from .numpy_interop import from_ndarray
 from std.memory import unsafe_memcpy, Pointer
 from .shared.shapes import Shape
-from std.sys import simd_width_of
+from std.sys import has_accelerator, simd_width_of
 
 # MNIST
 comptime MNIST_MEAN = 0.1307
@@ -85,6 +87,28 @@ trait Dataset(Sized & Copyable):
         """
         return CPU().into()
 
+    def get_features(ref self) -> Tensor[Self._sample_dtype]:
+        """Borrow the bulk feature tensor (aliases storage; zero-copy).
+
+        Default panics: only tensor-backed datasets (whose bulk data can
+        live on a device) implement this. List-backed datasets
+        (`LLMDataset`, `RandomSlidingWindowDataset`) are always host-side
+        and are served by the flat-pointer contract instead.
+        """
+        panic(
+            "Dataset.get_features: no tensor-backed bulk storage; the"
+            " flat host pointer contract applies."
+        )
+        return Tensor[Self._sample_dtype].zeros(Shape(0))
+
+    def get_labels(ref self) -> Tensor[Self._label_dtype]:
+        """Borrow the bulk label tensor (aliases storage; zero-copy)."""
+        panic(
+            "Dataset.get_labels: no tensor-backed bulk storage; the flat"
+            " host pointer contract applies."
+        )
+        return Tensor[Self._label_dtype].zeros(Shape(0))
+
     def into_loader(
         ref self,
         batch_size: Int,
@@ -107,7 +131,13 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
     ImplicitlyCopyable & Sized & Iterator
 ):
     """Zero-copy batched data loading over a `Dataset` trait source.
-    (Mojo-native; not directly Python-bound)."""
+    (Mojo-native; not directly Python-bound).
+
+    On a device-resident source, sequential batches are view slices that
+    alias the dataset (like `DataLoader`); shuffled batches fill the
+    persistent device buffers in place. The loader is single-mode
+    (`shuffle` is fixed at construction), so the two never mix.
+    """
 
     var dataset: Pointer[Self.DatasetSource, Self.origin]
     var batch_size: Int
@@ -303,10 +333,27 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
 
         var is_last_batch = actual_batch_size < self.batch_size
         ref dataset_ref = self.dataset[]
+        var on_gpu = dataset_ref.device().is_gpu()
 
-        # Choose appropriate batch
+        # Choose appropriate batch. __next__ raises StopIteration only, so
+        # device errors (OOM, transfer failure) panic with context instead
+        # of widening the iterator protocol. The device branch is also
+        # comptime-guarded: it instantiates GPU kernels, which have no
+        # target architecture on a CPU-only build.
         if is_last_batch and self._last_batch:
             ref current_batch = self._last_batch.value()
+            comptime if has_accelerator():
+                if on_gpu:
+                    try:
+                        self._next_batch_device(
+                            True, start_idx, actual_batch_size, dataset_ref
+                        )
+                    except e:
+                        panic(
+                            "NativeLoader: device batch failed: ", String(e)
+                        )
+                    self._current_idx = end_idx
+                    return current_batch
             self._fill_batch(
                 current_batch, start_idx, actual_batch_size, dataset_ref
             )
@@ -314,11 +361,129 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
             return current_batch
         else:
             ref current_batch = self._batch
+            comptime if has_accelerator():
+                if on_gpu:
+                    try:
+                        self._next_batch_device(
+                            False, start_idx, actual_batch_size, dataset_ref
+                        )
+                    except e:
+                        panic(
+                            "NativeLoader: device batch failed: ", String(e)
+                        )
+                    self._current_idx = end_idx
+                    return current_batch
             self._fill_batch(
                 current_batch, start_idx, actual_batch_size, dataset_ref
             )
             self._current_idx = end_idx
             return current_batch
+
+    def _next_batch_device(
+        mut self,
+        is_last_batch: Bool,
+        start_idx: Int,
+        actual_batch_size: Int,
+        ref dataset_ref: Self.DatasetSource,
+    ) raises:
+        """Device-resident batch: sequential binds views, shuffled gathers.
+
+        Sequential batches become view slices aliasing the dataset (the
+        `DataLoader` shape); shuffled batches gather rows in place into
+        the persistent device buffers. No host transfers either way.
+        """
+        var feats = dataset_ref.get_features()
+        var labs = dataset_ref.get_labels()
+        var end_idx = start_idx + actual_batch_size
+
+        if not self.shuffle_data:
+            var fx = feats.slice(
+                start=start_idx, end=end_idx, step=1, axis=0
+            )
+            var ly = labs.slice(
+                start=start_idx, end=end_idx, step=1, axis=0
+            )
+            if self._normalize_mean and self._normalize_std:
+                var mean = self._normalize_mean.value()
+                var inv_std = Scalar[Self.DatasetSource._sample_dtype](1) / (
+                    self._normalize_std.value()
+                )
+                fx = ((fx - mean) * inv_std)
+            if is_last_batch and self._last_batch:
+                ref last_batch = self._last_batch.value()
+                last_batch.features = fx
+                last_batch.labels = ly
+            else:
+                self._batch.features = fx
+                self._batch.labels = ly
+        else:
+            if is_last_batch and self._last_batch:
+                self._fill_batch_device(
+                    self._last_batch.value(),
+                    start_idx,
+                    actual_batch_size,
+                    dataset_ref,
+                )
+            else:
+                self._fill_batch_device(
+                    self._batch, start_idx, actual_batch_size, dataset_ref
+                )
+            self._normalize_device_batch(is_last_batch)
+
+    def _fill_batch_device(
+        self,
+        batch: Batch[
+            Self.DatasetSource._sample_dtype, Self.DatasetSource._label_dtype
+        ],
+        start_idx: Int,
+        actual_batch_size: Int,
+        ref dataset_ref: Self.DatasetSource,
+    ) raises:
+        """Gather rows `_indices[start_idx:start_idx+bs]` in place on device.
+
+        Fills the preallocated device batch buffers; the only host→device
+        traffic is the batch's index list. Bulk data stays resident.
+        """
+        var feats = dataset_ref.get_features()
+        var labs = dataset_ref.get_labels()
+        var idx = IntArray.with_capacity(actual_batch_size)
+        for k in range(actual_batch_size):
+            idx.append(self._indices[start_idx + k])
+        GatherKernel[Self.DatasetSource._sample_dtype].gather_rows_2d_into(
+            feats.buffer.layout(),
+            feats.buffer.device_state.value(),
+            idx,
+            batch.features.buffer.layout(),
+            batch.features.buffer.device_state.value(),
+        )
+        GatherKernel[Self.DatasetSource._label_dtype].gather_rows_2d_into(
+            labs.buffer.layout(),
+            labs.buffer.device_state.value(),
+            idx,
+            batch.labels.buffer.layout(),
+            batch.labels.buffer.device_state.value(),
+        )
+
+    def _normalize_device_batch(mut self, is_last_batch: Bool) raises:
+        """Apply (x - mean) * inv_std to a device batch, in place by rebind.
+
+        Transient until normalization is hoisted out of the loader: two
+        elementwise launches, zero transfers. No-op unless configured.
+        """
+        if self._normalize_mean and self._normalize_std:
+            var mean = self._normalize_mean.value()
+            var inv_std = Scalar[Self.DatasetSource._sample_dtype](1) / (
+                self._normalize_std.value()
+            )
+            if is_last_batch and self._last_batch:
+                ref last_batch = self._last_batch.value()
+                last_batch.features = (
+                    (last_batch.features - mean) * inv_std
+                )
+            else:
+                self._batch.features = (
+                    (self._batch.features - mean) * inv_std
+                )
 
     def _fill_batch(
         self,
@@ -403,17 +568,18 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
             comptime simd_width = simd_width_of[
                 Scalar[Self.DatasetSource._sample_dtype]
             ]()
-            var i = 0
-            for i in range(
-                0, total_feature_elements - simd_width + 1, simd_width
-            ):
+            # Remainder starts where vector coverage ends: the last vector
+            # starts at or below total - simd, so starting the scalar tail
+            # at total - simd + 1 would re-process (and double-normalize)
+            # the tail whenever total is a multiple of simd_width.
+            var vec_end = (
+                total_feature_elements // simd_width
+            ) * simd_width
+            for i in range(0, vec_end, simd_width):
                 var vec = batch_features_ptr.unsafe_load[width=simd_width](i)
                 vec = (vec - mean) * inv_std
                 batch_features_ptr.unsafe_store[width=simd_width](i, vec)
-            for i in range(
-                total_feature_elements - simd_width + 1,
-                total_feature_elements,
-            ):
+            for i in range(vec_end, total_feature_elements):
                 batch_features_ptr[unsafe_offset=i] = (
                     batch_features_ptr[unsafe_offset=i] - mean
                 ) * inv_std
@@ -532,6 +698,12 @@ struct NumpyDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
             self._features.to_cpu(sync=sync),
             self._labels.to_cpu(sync=sync),
         )
+
+    def get_features(ref self) -> Tensor[Self.sample_dtype]:
+        return self._features
+
+    def get_labels(ref self) -> Tensor[Self.label_dtype]:
+        return self._labels
 
     def get_features_ptr(
         ref self,
@@ -733,6 +905,12 @@ struct TensorDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
             self._features.to_cpu(sync=sync),
             self._labels.to_cpu(sync=sync),
         )
+
+    def get_features(ref self) -> Tensor[Self.sample_dtype]:
+        return self._features
+
+    def get_labels(ref self) -> Tensor[Self.label_dtype]:
+        return self._labels
 
     def get_features_ptr(
         ref self,
@@ -1173,12 +1351,12 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
             self._buffers_owned = False
             if is_last and self._last_batch:
                 ref last_batch = self._last_batch.value()
-                last_batch.features = fx^
-                last_batch.labels = ly^
+                last_batch.features = fx
+                last_batch.labels = ly
                 return last_batch
             else:
-                self._batch.features = fx^
-                self._batch.labels = ly^
+                self._batch.features = fx
+                self._batch.labels = ly
                 return self._batch
         else:
             # Shuffled (train): row-gather into the persistent buffer.

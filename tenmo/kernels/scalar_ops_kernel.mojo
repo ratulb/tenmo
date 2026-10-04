@@ -271,6 +271,14 @@ struct ScalarKernel[dtype: DType](ImplicitlyCopyable):
         # Dispatch on contiguity — same pattern as ScalarInplaceKernel.launch.
         if A_layout.is_contiguous():
             # PATH 1: Contiguous A → flat linear indexing (fast SIMD).
+            # Offset views (e.g. slices) are contiguous but do NOT start
+            # at the buffer base: read from a sub-buffer at the view
+            # offset, else the kernel silently computes the wrong rows.
+            var a_input = A_buffer
+            if A_layout.offset != 0:
+                a_input = A_buffer.create_sub_buffer[
+                    DeviceState[Self.dtype].datatype
+                ](A_layout.offset, numels)
             var compiled_func = device_context.compile_function[
                 scalar_ops[
                     op_code=op_code,
@@ -283,7 +291,7 @@ struct ScalarKernel[dtype: DType](ImplicitlyCopyable):
             device_context.enqueue_function(
                 compiled_func,
                 result_buffer,
-                A_buffer,
+                a_input,
                 scalar,
                 Int64(numels),
                 grid_dim=num_blocks,

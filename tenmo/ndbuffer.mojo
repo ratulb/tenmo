@@ -1758,8 +1758,16 @@ struct NDBuffer[dtype: DType](
         var new_state = DeviceState[Self.dtype](self.numels(), gpu)
 
         if self.is_contiguous():
-            # Fast path: direct DeviceBuffer → DeviceBuffer copy, no host round-trip
-            curr_state.buffer.enqueue_copy_to(new_state.buffer)
+            # Fast path: direct DeviceBuffer → DeviceBuffer copy, no host
+            # round-trip. Offset views (e.g. slices) are contiguous but do
+            # NOT start at the buffer base: copy from a sub-buffer at the
+            # view offset, else the copy silently reads the wrong rows.
+            var src_buf = curr_state.buffer
+            if self.offset != 0:
+                src_buf = curr_state.buffer.create_sub_buffer[
+                    DeviceState[Self.dtype].datatype
+                ](self.offset, self.numels())
+            src_buf.enqueue_copy_to(new_state.buffer)
             if sync:
                 new_state.sync()
         else:

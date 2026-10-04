@@ -346,18 +346,24 @@ struct GatherKernel[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
         out_device_state: DeviceState[Self.dtype],
     ) raises:
         comptime datatype = DType.uint8 if Self.dtype == DType.bool else Self.dtype
-        var rank = tensor_layout.shape.rank()
-        if rank != 2:
-            panic(
-                "gather_rows_2d_into: expected rank 2, got ",
-                String(rank),
-            )
+        # Flat-row interpretation: any contiguous, offset-0 source works —
+        # rank-2 (N, C) as well as rank-N (N, ...) with C = numel // N.
+        # (The host loader's flat-pointer path already assumes contiguous
+        # bulk storage; this is the same contract, enforced loudly.)
+        if not tensor_layout.contiguous:
+            panic("gather_rows_2d_into: source layout must be contiguous")
+        if tensor_layout.offset != 0:
+            panic("gather_rows_2d_into: source layout offset must be 0")
+        if not out_layout.contiguous:
+            panic("gather_rows_2d_into: out layout must be contiguous")
 
         var in_rows = tensor_layout.shape[0]
-        var in_cols = tensor_layout.shape[1]
+        var in_cols = tensor_layout.numel() // in_rows
         var out_rows = out_layout.shape[0]
         if out_rows != len(indices):
             panic("gather_rows_2d_into: out_rows != len(indices)")
+        if out_layout.numel() != out_rows * in_cols:
+            panic("gather_rows_2d_into: out numel != out_rows * in_cols")
 
         ref ds = tensor_device_state
         ref gpu = ds.get_gpu()

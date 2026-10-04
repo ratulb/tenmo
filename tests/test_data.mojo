@@ -14,6 +14,7 @@ from tenmo.nlp.dataset import RandomSlidingWindowDataset
 # from tenmo.nlp import LLMDataset
 # from bpe import BasicTokenizer, Tokenizer
 from std.python import Python, PythonObject
+from std.sys import has_accelerator
 
 # Comprehensive tests for TensorDataset, Batch, DataLoader (tensor engine),
 # NativeLoader (trait-generic engine), and the token-stream windowing core
@@ -2628,3 +2629,132 @@ def test_data_loader_tensor_2d_labels() raises:
                 "Batch 1 partial label row",
             )
         batch_idx += 1
+
+
+# ============================================================================
+# NativeLoader device-resident path (GPU only)
+# ============================================================================
+
+
+def _device_parity_dataset() raises -> TensorDataset[
+    DType.float32, DType.int64
+]:
+    """130x8 integer-valued features + scalar-per-row labels (2D)."""
+    var n = 130
+    var X = Tensor[DType.float32](Shape(n, 8))
+    var y = Tensor[DType.int64](Shape(n, 1))
+    for r in range(n):
+        for c in range(8):
+            X[r, c] = Scalar[DType.float32](r * 8 + c)
+        y[r, 0] = Scalar[DType.int64](r % 5)
+    return TensorDataset[DType.float32, DType.int64](X, y)
+
+
+def test_nativeloader_device_parity_sequential() raises:
+    comptime if has_accelerator():
+        var cpu_ds = _device_parity_dataset()
+        var gpu_ds = cpu_ds.to_gpu()
+        var cpu_loader = cpu_ds.into_loader(batch_size=64, shuffle=False)
+        var gpu_loader = gpu_ds.into_loader(batch_size=64, shuffle=False)
+        var n_batches = 0
+        for cpu_batch in cpu_loader:
+            # Manual lockstep: advance the GPU loader once per CPU batch.
+            var gpu_batch = gpu_loader.__next__()
+            assert_true(
+                cpu_batch.features.all_close(gpu_batch.features.to_cpu()),
+                "sequential features must match",
+            )
+            assert_true(
+                cpu_batch.labels == gpu_batch.labels.to_cpu(),
+                "sequential labels must match",
+            )
+            n_batches += 1
+        # 130 = 2x64 + 2: two full batches plus a partial tail.
+        assert_true(n_batches == 3, "expected 3 sequential batches")
+
+
+def test_nativeloader_device_parity_shuffled() raises:
+    comptime if has_accelerator():
+        from tenmo.shared.intarray import IntArray
+
+        var cpu_ds = _device_parity_dataset()
+        var gpu_ds = cpu_ds.to_gpu()
+        var cpu_loader = cpu_ds.into_loader(batch_size=64, shuffle=True)
+        var gpu_loader = gpu_ds.into_loader(batch_size=64, shuffle=True)
+        # Seed-independent check: both loaders must surface the same
+        # multiset of rows (sorted comparison), catching index-offset,
+        # sub-buffer, and kernel-argument bugs without depending on RNG.
+        var cpu_vals = IntArray()
+        for cpu_batch in cpu_loader:
+            var f = cpu_batch.features
+            for r in range(f.shape()[0]):
+                for c in range(f.shape()[1]):
+                    cpu_vals.append(Int(f[r, c]))
+        var gpu_vals = IntArray()
+        for gpu_batch in gpu_loader:
+            var gf = gpu_batch.features.to_cpu()
+            for r in range(gf.shape()[0]):
+                for c in range(gf.shape()[1]):
+                    gpu_vals.append(Int(gf[r, c]))
+        var cpu_sorted = cpu_vals.sorted()
+        var gpu_sorted = gpu_vals.sorted()
+        assert_true(len(cpu_sorted) == 130 * 8, "all rows must surface")
+        assert_true(len(cpu_sorted) == len(gpu_sorted), "same row count")
+        for k in range(len(cpu_sorted)):
+            assert_true(
+                cpu_sorted[k] == gpu_sorted[k], "shuffled multisets differ"
+            )
+
+
+def test_nativeloader_device_parity_normalized() raises:
+    comptime if has_accelerator():
+        var cpu_ds = _device_parity_dataset()
+        var gpu_ds = cpu_ds.to_gpu()
+        var mean = Scalar[DType.float32](260.0)
+        var std = Scalar[DType.float32](130.0)
+        var cpu_loader = cpu_ds.into_loader(
+            batch_size=64,
+            shuffle=False,
+            normalize_mean=mean,
+            normalize_std=std,
+        )
+        var gpu_loader = gpu_ds.into_loader(
+            batch_size=64,
+            shuffle=False,
+            normalize_mean=mean,
+            normalize_std=std,
+        )
+        for cpu_batch in cpu_loader:
+            var gpu_batch = gpu_loader.__next__()
+            assert_true(
+                cpu_batch.features.all_close[atol=1e-5](
+                    gpu_batch.features.to_cpu()
+                ),
+                "normalized features must match",
+            )
+
+
+def test_nativeloader_device_rank4_shuffled() raises:
+    comptime if has_accelerator():
+        # Conv-like (N,1,4,4) features: exercises the flat-row
+        # interpretation (in_cols = numel // rows) on device.
+        var n = 10
+        var X = Tensor[DType.float32](Shape(n, 1, 4, 4))
+        var y = Tensor[DType.int64](Shape(n, 1))
+        for r in range(n):
+            for c in range(16):
+                X[r, 0, c // 4, c % 4] = Scalar[DType.float32](r * 16 + c)
+            y[r, 0] = Scalar[DType.int64](r)
+        var cpu_ds = TensorDataset[DType.float32, DType.int64](X, y)
+        var gpu_ds = cpu_ds.to_gpu()
+        var cpu_loader = cpu_ds.into_loader(batch_size=4, shuffle=True)
+        var gpu_loader = gpu_ds.into_loader(batch_size=4, shuffle=True)
+        var cpu_total = Scalar[DType.float32](0)
+        for cpu_batch in cpu_loader:
+            cpu_total += cpu_batch.features.sum().item()
+        var gpu_total = Scalar[DType.float32](0)
+        for gpu_batch in gpu_loader:
+            gpu_total += gpu_batch.features.to_cpu().sum().item()
+        assert_true(
+            cpu_total == gpu_total, "rank-4 shuffled totals must match"
+        )

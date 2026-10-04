@@ -3086,3 +3086,40 @@ def test_ip_3d_multiply_transposed_f64_gpu_scalar() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+# =============================================================================
+# Z. Out-of-place scalar_ops — offset views (regression)
+# =============================================================================
+# GPU scalar kernels once ignored view offsets on the contiguous fast path
+# (ScalarKernel.launch PATH 1 read from the buffer base), silently computing
+# the wrong rows for any offset slice. The launcher now reads from a
+# sub-buffer at the view offset.
+
+
+def test_oop_offset_view_sub_mul_matches_cpu() raises:
+    comptime if has_accelerator():
+        from tenmo.tensor import Tensor
+        from tenmo.shared.shapes import Shape
+
+        comptime dtype = DType.float32
+        var n = 130
+        var X = Tensor[dtype](Shape(n, 8))
+        for r in range(n):
+            for c in range(8):
+                X[r, c] = Scalar[dtype](r * 8 + c)
+        var Xg = X.to_gpu()
+        var mean = Scalar[dtype](260.0)
+        var inv = Scalar[dtype](1) / Scalar[dtype](130.0)
+        # Offset slice: rows 64..127.
+        var g = Xg.slice(start=64, end=128, step=1, axis=0)
+        var got = ((g - mean) * inv).to_cpu()
+        var c = X.slice(start=64, end=128, step=1, axis=0)
+        var expected = (c - mean) * inv
+        assert_true(got.all_close[atol=1e-5](expected))
+        # Offset-0 slice sanity (always worked).
+        var g0 = Xg.slice(start=0, end=64, step=1, axis=0)
+        var got0 = ((g0 - mean) * inv).to_cpu()
+        var c0 = X.slice(start=0, end=64, step=1, axis=0)
+        var expected0 = (c0 - mean) * inv
+        assert_true(got0.all_close[atol=1e-5](expected0))

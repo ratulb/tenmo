@@ -675,3 +675,21 @@ def test_contig_gpu_cpu_tensor_unchanged() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+def test_contig_gpu_2d_offset_slice_values() raises:
+    comptime if has_accelerator():
+        # Regression: contiguous_device_state's fast path copied from the
+        # buffer base, dropping view offsets (wrong rows for offset slices).
+        comptime dtype = DType.float32
+        var n = 130
+        var X = Tensor[dtype](Shape(n, 8))
+        for r in range(n):
+            for c in range(8):
+                X[r, c] = Scalar[dtype](r * 8 + c)
+        var Xg = X.to_gpu()
+        var g = Xg.slice(start=64, end=128, step=1, axis=0)
+        var got = g.contiguous().to_cpu()
+        var c = X.slice(start=64, end=128, step=1, axis=0)
+        var expected = c.contiguous()
+        assert_true(got.all_close(expected))
