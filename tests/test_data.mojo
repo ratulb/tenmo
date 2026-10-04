@@ -2632,6 +2632,147 @@ def test_data_loader_tensor_2d_labels() raises:
 
 
 # ============================================================================
+# DataLoader derive-the-device (5c)
+# Buffers live where the sources live; moves rebuild buffers on-device.
+# ============================================================================
+
+
+def test_data_loader_device_cpu_round_trip() raises:
+    """CPU loader: shuffled epoch works, to_cpu() is a safe no-op."""
+    var features = Tensor[DType.float32].d2(
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
+    )
+    var labels = Tensor[DType.int64].d1(0, 1, 2, 3)
+    var loader = DataLoader[DType.float32, DType.int64](
+        features, labels, batch_size=2, shuffle=True
+    )
+    assert_true(
+        not loader.features.is_on_gpu(), "CPU sources stay on CPU"
+    )
+    var total = Float32(0.0)
+    var count = 0
+    for batch in loader:
+        count += 1
+        for s in range(batch.batch_size):
+            total += batch.features[s, 0] + batch.features[s, 1]
+    assert_true(count == 2, "Two shuffled batches")
+    assert_true(total == 36.0, "Shuffled epoch covers all rows")
+    loader.to_cpu()
+    assert_true(
+        not loader.features.is_on_gpu(), "to_cpu keeps CPU loader on CPU"
+    )
+    var count2 = 0
+    for batch in loader:
+        count2 += 1
+    assert_true(count2 == 2, "Loader still iterates after to_cpu")
+
+
+def test_data_loader_device_gpu_parity_sequential() raises:
+    comptime if has_accelerator():
+        var n = 130
+        var X = Tensor[DType.float32](Shape(n, 8))
+        var y = Tensor[DType.int64](Shape(n, 1))
+        for r in range(n):
+            for c in range(8):
+                X[r, c] = Scalar[DType.float32](r * 8 + c)
+            y[r, 0] = Scalar[DType.int64](r % 5)
+        var cpu_loader = DataLoader[DType.float32, DType.int64](
+            X, y, batch_size=64, shuffle=False
+        )
+        var gpu_loader = DataLoader[DType.float32, DType.int64](
+            X, y, batch_size=64, shuffle=False
+        )
+        gpu_loader.to_gpu()
+        assert_true(
+            gpu_loader.features.is_on_gpu(), "to_gpu moves sources"
+        )
+        var n_batches = 0
+        for cpu_batch in cpu_loader:
+            var gpu_batch = gpu_loader.__next__()
+            assert_true(
+                cpu_batch.features.all_close(
+                    gpu_batch.features.to_cpu()
+                ),
+                "sequential features must match",
+            )
+            assert_true(
+                cpu_batch.labels == gpu_batch.labels.to_cpu(),
+                "sequential labels must match",
+            )
+            n_batches += 1
+        assert_true(n_batches == 3, "130 = 2x64 + 2 -> 3 batches")
+
+
+def test_data_loader_device_gpu_shuffled_covers_all() raises:
+    comptime if has_accelerator():
+        from tenmo.shared.intarray import IntArray
+
+        var n = 130
+        var X = Tensor[DType.float32](Shape(n, 8))
+        var y = Tensor[DType.int64](Shape(n, 1))
+        for r in range(n):
+            for c in range(8):
+                X[r, c] = Scalar[DType.float32](r * 8 + c)
+            y[r, 0] = Scalar[DType.int64](r % 5)
+        var loader = DataLoader[DType.float32, DType.int64](
+            X, y, batch_size=64, shuffle=True
+        )
+        loader.to_gpu()
+        # Device gather must surface the same multiset of rows (sorted
+        # comparison, seed-independent).
+        var expected = IntArray()
+        for r in range(n):
+            for c in range(8):
+                expected.append(r * 8 + c)
+        var got = IntArray()
+        for batch in loader:
+            assert_true(
+                batch.features.is_on_gpu(), "gather buffer lives on GPU"
+            )
+            var f = batch.features.to_cpu()
+            for r in range(f.shape()[0]):
+                for c in range(f.shape()[1]):
+                    got.append(Int(f[r, c]))
+        var got_sorted = got.sorted()
+        var expected_sorted = expected.sorted()
+        assert_true(
+            len(got_sorted) == n * 8, "every row must surface exactly once"
+        )
+        assert_true(
+            len(got_sorted) == len(expected_sorted), "same element count"
+        )
+        for k in range(len(got_sorted)):
+            assert_true(
+                got_sorted[k] == expected_sorted[k], "same row multiset"
+            )
+        # Mode toggle keeps the device (the §4.4 trap): sequential views
+        # then shuffle rebuild must both stay on GPU.
+        loader.set_shuffle(False)
+        for batch in loader:
+            assert_true(
+                batch.features.is_on_gpu(), "sequential view stays on GPU"
+            )
+            break
+        loader.set_shuffle(True)
+        var total = 0
+        for batch in loader:
+            assert_true(
+                batch.features.is_on_gpu(), "rebuilt buffer stays on GPU"
+            )
+            total += batch.batch_size
+        assert_true(total == n, "rebuilt buffers cover all rows")
+        # Round trip home.
+        loader.to_cpu()
+        assert_true(
+            not loader.features.is_on_gpu(), "to_cpu moves sources back"
+        )
+        var count = 0
+        for batch in loader:
+            count += 1
+        assert_true(count == 3, "CPU loader iterates after round trip")
+
+
+# ============================================================================
 # NativeLoader device-resident path (GPU only)
 # ============================================================================
 

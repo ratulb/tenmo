@@ -1673,3 +1673,15 @@ class DataLoader:
     def eval(self) -> None:
         """Switch to sequential zero-copy batch mode."""
         self._raw.set_mode(False)
+
+    def to_gpu(self) -> None:
+        """Move sources + batch buffers to the GPU (derive-the-device)."""
+        self._raw.to_gpu()
+
+    def to_cpu(self) -> None:
+        """Move sources + batch buffers back to the CPU."""
+        self._raw.to_cpu()
+
+    def device(self) -> str:
+        """Return the device string ('cpu' or 'cuda:0')."""
+        return str(self._raw.device())

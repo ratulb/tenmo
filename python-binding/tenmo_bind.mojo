@@ -2865,6 +2865,39 @@ def _loader_set_mode[
     return PythonObject(None)
 
 
+def _loader_to_gpu[
+    sample_dtype: DType, label_dtype: DType
+](mut self: PythonObject, mut args: PythonObject) raises -> PythonObject:
+    """Move loader sources + batch buffers to the default GPU."""
+    _ = args
+    self.downcast_value_ptr[
+        DataLoader[sample_dtype, label_dtype]
+    ]()[].to_gpu()
+    return PythonObject(None)
+
+
+def _loader_to_cpu[
+    sample_dtype: DType, label_dtype: DType
+](mut self: PythonObject, mut args: PythonObject) raises -> PythonObject:
+    _ = args
+    self.downcast_value_ptr[
+        DataLoader[sample_dtype, label_dtype]
+    ]()[].to_cpu()
+    return PythonObject(None)
+
+
+def _loader_device[
+    sample_dtype: DType, label_dtype: DType
+](mut self: PythonObject, mut args: PythonObject) raises -> PythonObject:
+    _ = args
+    var d = self.downcast_value_ptr[
+        DataLoader[sample_dtype, label_dtype]
+    ]()[].features.device()
+    if d.is_gpu():
+        return PythonObject("cuda:0")
+    return PythonObject("cpu")
+
+
 def register_data_loader[
     sample_dtype: DType, label_dtype: DType
 ](
@@ -2881,6 +2914,9 @@ def register_data_loader[
     _ = b.def_py_method[_loader_set_mode[sample_dtype, label_dtype]](
         "set_mode"
     )
+    _ = b.def_py_method[_loader_to_gpu[sample_dtype, label_dtype]]("to_gpu")
+    _ = b.def_py_method[_loader_to_cpu[sample_dtype, label_dtype]]("to_cpu")
+    _ = b.def_py_method[_loader_device[sample_dtype, label_dtype]]("device")
 
 
 # ── Module entry point ───────────────────────────────────────────

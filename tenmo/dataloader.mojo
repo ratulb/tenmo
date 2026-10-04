@@ -1099,6 +1099,14 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
 
         self.features = src_f^
         self.labels = src_l^
+        # Derive-the-device (§4.5): batch buffers live where the sources
+        # live. Mixed-device sources are a caller bug — fail loudly rather
+        # than silently building half-CPU batches.
+        if self.features.device() != self.labels.device():
+            panic(
+                "DataLoader: features and labels must live on the same"
+                " device. Move both with .to_gpu()/.to_cpu() first."
+            )
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.drop_last = drop_last
@@ -1151,8 +1159,12 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
         for i in range(1, lshape0.rank()):
             blabel.append(lshape0.dims[i])
         self._batch = Batch[Self.sample_dtype, Self.label_dtype](
-            Tensor[Self.sample_dtype].zeros(Shape(bfeat)),
-            Tensor[Self.label_dtype].zeros(Shape(blabel)),
+            Tensor[Self.sample_dtype].zeros(
+                Shape(bfeat), device=self.features.device()
+            ),
+            Tensor[Self.label_dtype].zeros(
+                Shape(blabel), device=self.features.device()
+            ),
         )
         self._last_batch_size = 0
         self._last_batch = None
@@ -1171,8 +1183,12 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
                 self._last_batch = Batch[
                     Self.sample_dtype, Self.label_dtype
                 ](
-                    Tensor[Self.sample_dtype].zeros(Shape(lfeat)),
-                    Tensor[Self.label_dtype].zeros(Shape(llabel)),
+                    Tensor[Self.sample_dtype].zeros(
+                        Shape(lfeat), device=self.features.device()
+                    ),
+                    Tensor[Self.label_dtype].zeros(
+                        Shape(llabel), device=self.features.device()
+                    ),
                 )
         self._buffers_owned = True
 
@@ -1205,8 +1221,12 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
         var full_batch = Batch[
             Self.sample_dtype, Self.label_dtype
         ](
-            Tensor[Self.sample_dtype].zeros(Shape(bfeat)),
-            Tensor[Self.label_dtype].zeros(Shape(blabel)),
+            Tensor[Self.sample_dtype].zeros(
+                Shape(bfeat), device=self.features.device()
+            ),
+            Tensor[Self.label_dtype].zeros(
+                Shape(blabel), device=self.features.device()
+            ),
         )
 
         var last_batch: Optional[
@@ -1230,11 +1250,48 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
                 last_batch = Batch[
                     Self.sample_dtype, Self.label_dtype
                 ](
-                    Tensor[Self.sample_dtype].zeros(Shape(lfeat)),
-                    Tensor[Self.label_dtype].zeros(Shape(llabel)),
+                    Tensor[Self.sample_dtype].zeros(
+                        Shape(lfeat), device=self.features.device()
+                    ),
+                    Tensor[Self.label_dtype].zeros(
+                        Shape(llabel), device=self.features.device()
+                    ),
                 )
 
         return (full_batch, last_batch, last_batch_size)
+
+    def to_gpu(mut self, gpu: Optional[GPU] = None) raises:
+        """Move sources to the GPU and rebuild batch buffers there.
+
+        Derive-the-device (§4.5): buffers always follow the sources via
+        `_make_buffers`, so no stored device can drift. Transfers stay
+        visible at the call site; call once before training.
+        """
+        comptime if has_accelerator():
+            self.features = self.features.to_gpu(gpu)
+            self.labels = self.labels.to_gpu(gpu)
+        else:
+            raise Error("DataLoader.to_gpu: no accelerator on this system")
+        var buffers = self._make_buffers()
+        var (batch0, last_batch0, last_batch_size0) = buffers
+        self._batch = batch0
+        self._last_batch = last_batch0
+        self._last_batch_size = last_batch_size0
+        self._buffers_owned = True
+
+    def to_cpu(mut self) raises:
+        """Move sources to the CPU and rebuild batch buffers there."""
+        comptime if has_accelerator():
+            if self.features.is_on_gpu():
+                self.features = self.features.to_cpu()
+            if self.labels.is_on_gpu():
+                self.labels = self.labels.to_cpu()
+        var buffers = self._make_buffers()
+        var (batch0, last_batch0, last_batch_size0) = buffers
+        self._batch = batch0
+        self._last_batch = last_batch0
+        self._last_batch_size = last_batch_size0
+        self._buffers_owned = True
 
     def __len__(self) -> Int:
         return self._num_batches
@@ -1318,13 +1375,22 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
                 return self._batch
         else:
             # Shuffled (train): row-gather into the persistent buffer.
+            # __next__ raises StopIteration only, so device errors panic
+            # with context instead of widening the iterator protocol
+            # (same policy as NativeLoader.__next__).
             if is_last and self._last_batch:
                 ref current_batch = self._last_batch.value()
-                self._fill_batch(current_batch, start, bs)
+                try:
+                    self._fill_batch(current_batch, start, bs)
+                except e:
+                    panic("DataLoader: batch gather failed: ", String(e))
                 return current_batch
             else:
                 ref current_batch = self._batch
-                self._fill_batch(current_batch, start, bs)
+                try:
+                    self._fill_batch(current_batch, start, bs)
+                except e:
+                    panic("DataLoader: batch gather failed: ", String(e))
                 return current_batch
 
     def _fill_batch(
@@ -1332,8 +1398,39 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
         batch: Batch[Self.sample_dtype, Self.label_dtype],
         start: Int,
         bs: Int,
-    ):
-        """Gather rows `_indices[start:start+bs]` into a batch buffer."""
+    ) raises:
+        """Gather rows `_indices[start:start+bs]` into a batch buffer.
+
+        Device branch dispatches `gather_rows_2d_into` (5a kernel) with
+        only the index list crossing host→device; bulk data stays
+        resident. Sources are owned offset-0 contiguous by construction
+        (`__init__` always materializes), satisfying the kernel contract.
+        """
+        # Comptime-guarded: the gather path instantiates GPU kernels,
+        # which have no target architecture on a CPU-only build (same
+        # policy as NativeLoader.__next__).
+        comptime if has_accelerator():
+            if self.features.is_on_gpu():
+                var feats = self.features
+                var labs = self.labels
+                var idx = IntArray.with_capacity(bs)
+                for k in range(bs):
+                    idx.append(self._indices[start + k])
+                GatherKernel[Self.sample_dtype].gather_rows_2d_into(
+                    feats.buffer.layout(),
+                    feats.buffer.device_state.value(),
+                    idx,
+                    batch.features.buffer.layout(),
+                    batch.features.buffer.device_state.value(),
+                )
+                GatherKernel[Self.label_dtype].gather_rows_2d_into(
+                    labs.buffer.layout(),
+                    labs.buffer.device_state.value(),
+                    idx,
+                    batch.labels.buffer.layout(),
+                    batch.labels.buffer.device_state.value(),
+                )
+                return
         var batch_features_ptr = (
             batch.features.data_ptr()
             .unsafe_mut_cast[True]()

@@ -259,7 +259,7 @@ The shared kernel (`gather_rows_2d_into` + the device-resident permutation, [§5
 
 > **Phase 5a — kernel, standalone.** Add `GatherKernel.gather_rows_2d_into` and test it directly against `Tensor.gather` as the oracle. No loader touched.
 > **Phase 5b — `NativeLoader`.** Consume the kernel; add `Dataset.to_gpu`; hoist normalization.
-> **Phase 5c — `DataLoader`.** Consume the same kernel; gain `device=` plumbing for the Python binding.
+> **Phase 5c — `DataLoader`.** Consume the same kernel; derive the device from the source tensors (no `device=` param — see §4.5).
 
 Why this order:
 
@@ -277,6 +277,21 @@ The counter-argument, stated fairly: **`DataLoader` is the better test oracle.**
 Converting `NativeLoader`'s sequential path to view slices ([§5.3](#53-sequential-path-delete-the-copy)) makes its batch buffers hold **aliases of the source dataset**, not owned storage. `NativeLoader` fixes `shuffle` at construction and has no `set_shuffle`, so nothing can flip modes today and there is no immediate bug — but the invariant is now implicit and unrecorded.
 
 **Action:** when converting, either port `_buffers_owned` to `NativeLoader` for parity, or state in the docstring that a sequential `NativeLoader` batch aliases the dataset and the loader is single-mode. Do not leave it undocumented — this is the class of bug that appears later when someone adds `set_shuffle` for parity and gets stale view buffers back.
+
+### 4.5 `DataLoader` derives its device — no `device=` param
+
+Decision (agreed 2026-10-04): `DataLoader` reads the device from its source tensors instead of taking a `device=` constructor parameter. Rationale:
+
+1. **One source of truth.** A stored device duplicates reality (`"I asked for cuda:0"` vs `"sources are on CPU"`), and every buffer-replacing path (`__init__`, `_make_buffers`, copy-init) must reconcile the two. Deriving from `self.features.device()` makes the `set_shuffle` rebuild-wrong-device bug from §4.4 unexpressible.
+2. **Transfers stay visible.** `loader.to_gpu(gpu)` puts the one big copy at the call site, mirroring `NativeLoader`'s `dataset.to_gpu(gpu)` pattern and `mnist_gpu.mojo`'s `to_gpu(gpu).normalized()`. A ctor that silently moves gigabytes hides cost inside what looks like cheap construction.
+3. **The silent-CPU footgun is cheap to fix.** `__init__` panics if `features.device() != labels.device()`; pure-CPU-in means CPU-loader, which is a legitimate configuration (all local tests run that way).
+
+Resulting 5c shape:
+
+- `__init__`: unchanged signature. Normalize sources as today, then assert device match and allocate `_batch`/`_last_batch` on the sources' device via `Tensor.zeros(..., device=)`.
+- `to_gpu(gpu)` / `to_cpu()`: move both sources, rebuild both buffers on-device. This is also the entire Python story — the binding exposes the same method, so no ctor plumbing through `register_data_loader`. A `device="cuda:0"` Python kwarg is deferred as sugar over construct-then-move.
+- `_fill_batch`: device branch via `gather_rows_2d_into` (5a kernel); host branch keeps `unsafe_memcpy`.
+- Tests: CPU↔GPU batch parity plus buffer-device assertions across `set_shuffle` toggles and `to_gpu`→`to_cpu` round trips.
 
 ---
 
