@@ -8,7 +8,7 @@ from std.python import PythonObject
 from .numpy_interop import from_ndarray
 from std.memory import unsafe_memcpy, Pointer
 from .shared.shapes import Shape
-from std.sys import has_accelerator, simd_width_of
+from std.sys import has_accelerator
 
 # MNIST
 comptime MNIST_MEAN = 0.1307
@@ -114,8 +114,6 @@ trait Dataset(Sized & Copyable):
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
-        normalize_mean: Optional[Scalar[Self._sample_dtype]] = None,
-        normalize_std: Optional[Scalar[Self._sample_dtype]] = None,
     ) -> NativeLoader[Self, origin_of(self)]:
         ...
 
@@ -164,9 +162,9 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
     ]
     var _last_batch_size: Int
 
-    # Optional normalization (mean/std applied after batch fill)
-    var _normalize_mean: Optional[Scalar[Self.DatasetSource._sample_dtype]]
-    var _normalize_std: Optional[Scalar[Self.DatasetSource._sample_dtype]]
+    # NOTE: no normalization lives here. Datasets are normalized once,
+    # eagerly, via Dataset.normalized() before into_loader — per-batch
+    # (x - mean) / std recompute was removed (normalization hoist).
 
     def __init__(out self, *, copy: Self):
         self.dataset = copy.dataset
@@ -183,8 +181,6 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
         self._batch = copy._batch
         self._last_batch = copy._last_batch
         self._last_batch_size = copy._last_batch_size
-        self._normalize_mean = copy._normalize_mean
-        self._normalize_std = copy._normalize_std
 
     def __init__(
         out self,
@@ -192,20 +188,12 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
-        normalize_mean: Optional[
-            Scalar[Self.DatasetSource._sample_dtype]
-        ] = None,
-        normalize_std: Optional[
-            Scalar[Self.DatasetSource._sample_dtype]
-        ] = None,
     ):
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle_data = shuffle
         self.drop_last = drop_last
         self._current_idx = 0
-        self._normalize_mean = normalize_mean
-        self._normalize_std = normalize_std
 
         var total_samples = len(self.dataset[])
         self._indices = List[Int](capacity=total_samples)
@@ -403,12 +391,6 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
             var ly = labs.slice(
                 start=start_idx, end=end_idx, step=1, axis=0
             )
-            if self._normalize_mean and self._normalize_std:
-                var mean = self._normalize_mean.value()
-                var inv_std = Scalar[Self.DatasetSource._sample_dtype](1) / (
-                    self._normalize_std.value()
-                )
-                fx = ((fx - mean) * inv_std)
             if is_last_batch and self._last_batch:
                 ref last_batch = self._last_batch.value()
                 last_batch.features = fx
@@ -428,7 +410,6 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
                 self._fill_batch_device(
                     self._batch, start_idx, actual_batch_size, dataset_ref
                 )
-            self._normalize_device_batch(is_last_batch)
 
     def _fill_batch_device(
         self,
@@ -463,27 +444,6 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
             batch.labels.buffer.layout(),
             batch.labels.buffer.device_state.value(),
         )
-
-    def _normalize_device_batch(mut self, is_last_batch: Bool) raises:
-        """Apply (x - mean) * inv_std to a device batch, in place by rebind.
-
-        Transient until normalization is hoisted out of the loader: two
-        elementwise launches, zero transfers. No-op unless configured.
-        """
-        if self._normalize_mean and self._normalize_std:
-            var mean = self._normalize_mean.value()
-            var inv_std = Scalar[Self.DatasetSource._sample_dtype](1) / (
-                self._normalize_std.value()
-            )
-            if is_last_batch and self._last_batch:
-                ref last_batch = self._last_batch.value()
-                last_batch.features = (
-                    (last_batch.features - mean) * inv_std
-                )
-            else:
-                self._batch.features = (
-                    (self._batch.features - mean) * inv_std
-                )
 
     def _fill_batch(
         self,
@@ -556,33 +516,6 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
                     src=dataset_labels_ptr.unsafe_offset(src_label_offset),
                     count=self._labels_per_sample,
                 )
-
-        # Apply normalization after fill (SIMD)
-        if self._normalize_mean and self._normalize_std:
-            var mean = self._normalize_mean.value()
-            var inv_std = (
-                Scalar[Self.DatasetSource._sample_dtype](1)
-                / self._normalize_std.value()
-            )
-
-            comptime simd_width = simd_width_of[
-                Scalar[Self.DatasetSource._sample_dtype]
-            ]()
-            # Remainder starts where vector coverage ends: the last vector
-            # starts at or below total - simd, so starting the scalar tail
-            # at total - simd + 1 would re-process (and double-normalize)
-            # the tail whenever total is a multiple of simd_width.
-            var vec_end = (
-                total_feature_elements // simd_width
-            ) * simd_width
-            for i in range(0, vec_end, simd_width):
-                var vec = batch_features_ptr.unsafe_load[width=simd_width](i)
-                vec = (vec - mean) * inv_std
-                batch_features_ptr.unsafe_store[width=simd_width](i, vec)
-            for i in range(vec_end, total_feature_elements):
-                batch_features_ptr[unsafe_offset=i] = (
-                    batch_features_ptr[unsafe_offset=i] - mean
-                ) * inv_std
 
     def __has_next__(self) -> Bool:
         if self.drop_last:
@@ -699,6 +632,23 @@ struct NumpyDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
             self._labels.to_cpu(sync=sync),
         )
 
+    def normalized(
+        ref self, mean: Scalar[Self.sample_dtype], std: Scalar[Self.sample_dtype]
+    ) raises -> Self:
+        """Return a dataset with `(features - mean) / std`, computed once.
+
+        The transform runs wherever the bulk data currently lives (host
+        SIMD or device kernels — no transfers), so call this after
+        `to_gpu()` for device residency. Features are newly allocated;
+        label storage is shared with the receiver. `track_grad=False`:
+        dataset bulk is data, not a differentiable leaf.
+        """
+        var inv_std = Scalar[Self.sample_dtype](1) / std
+        var normed = self._features.__sub__[track_grad=False](
+            mean
+        ).__mul__[track_grad=False](inv_std)
+        return Self(normed, self._labels)
+
     def get_features(ref self) -> Tensor[Self.sample_dtype]:
         return self._features
 
@@ -798,16 +748,12 @@ struct NumpyDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
-        normalize_mean: Optional[Scalar[Self._sample_dtype]] = None,
-        normalize_std: Optional[Scalar[Self._sample_dtype]] = None,
     ) -> NativeLoader[Self, origin_of(self)]:
         return NativeLoader(
             Pointer(to=self),
             batch_size,
             shuffle,
             drop_last,
-            normalize_mean=normalize_mean,
-            normalize_std=normalize_std,
         )
 
 
@@ -905,6 +851,22 @@ struct TensorDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
             self._features.to_cpu(sync=sync),
             self._labels.to_cpu(sync=sync),
         )
+
+    def normalized(
+        ref self, mean: Scalar[Self.sample_dtype], std: Scalar[Self.sample_dtype]
+    ) raises -> Self:
+        """Return a dataset with `(features - mean) / std`, computed once.
+
+        Runs wherever the bulk data lives (no transfers); call after
+        `to_gpu()` for device residency. Features are newly allocated,
+        label storage is shared. `track_grad=False`: bulk is data, not a
+        differentiable leaf.
+        """
+        var inv_std = Scalar[Self.sample_dtype](1) / std
+        var normed = self._features.__sub__[track_grad=False](
+            mean
+        ).__mul__[track_grad=False](inv_std)
+        return Self(normed, self._labels)
 
     def get_features(ref self) -> Tensor[Self.sample_dtype]:
         return self._features
@@ -1026,16 +988,12 @@ struct TensorDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
-        normalize_mean: Optional[Scalar[Self._sample_dtype]] = None,
-        normalize_std: Optional[Scalar[Self._sample_dtype]] = None,
     ) -> NativeLoader[Self, origin_of(self)]:
         return NativeLoader(
             Pointer(to=self),
             batch_size,
             shuffle,
             drop_last,
-            normalize_mean=normalize_mean,
-            normalize_std=normalize_std,
         )
 
 

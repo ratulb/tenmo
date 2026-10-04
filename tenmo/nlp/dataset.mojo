@@ -119,16 +119,12 @@ struct LLMDataset[
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
-        normalize_mean: Optional[Scalar[Self._sample_dtype]] = None,
-        normalize_std: Optional[Scalar[Self._sample_dtype]] = None,
     ) -> NativeLoader[Self, origin_of(self)]:
         return NativeLoader(
             Pointer(to=self),
             batch_size,
             shuffle,
             drop_last,
-            normalize_mean=normalize_mean,
-            normalize_std=normalize_std,
         )
 
 
@@ -234,14 +230,10 @@ struct RandomSlidingWindowDataset[
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
-        normalize_mean: Optional[Scalar[Self._sample_dtype]] = None,
-        normalize_std: Optional[Scalar[Self._label_dtype]] = None,
     ) -> NativeLoader[Self, origin_of(self)]:
         return NativeLoader(
             Pointer(to=self),
             batch_size,
             shuffle,
             drop_last,
-            normalize_mean=normalize_mean,
-            normalize_std=normalize_std,
         )

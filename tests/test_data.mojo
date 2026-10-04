@@ -2708,30 +2708,44 @@ def test_nativeloader_device_parity_shuffled() raises:
 
 def test_nativeloader_device_parity_normalized() raises:
     comptime if has_accelerator():
+        # Normalization is hoisted: eager normalized() once per side
+        # (host kernels on CPU, device kernels with zero transfers on
+        # GPU), then plain loaders with no norm parameters.
         var cpu_ds = _device_parity_dataset()
-        var gpu_ds = cpu_ds.to_gpu()
         var mean = Scalar[DType.float32](260.0)
         var std = Scalar[DType.float32](130.0)
-        var cpu_loader = cpu_ds.into_loader(
-            batch_size=64,
-            shuffle=False,
-            normalize_mean=mean,
-            normalize_std=std,
+        var cpu_norm = cpu_ds.normalized(mean, std)
+        var gpu_norm = cpu_ds.to_gpu().normalized(mean, std)
+        # Bulk spot-checks: (x - mean) / std; labels untouched.
+        assert_true(
+            cpu_norm.get_features()[0, 0] == Scalar[DType.float32](-2.0),
+            "normalized bulk must equal (x - mean) / std",
         )
-        var gpu_loader = gpu_ds.into_loader(
-            batch_size=64,
-            shuffle=False,
-            normalize_mean=mean,
-            normalize_std=std,
+        assert_true(
+            cpu_norm.get_labels()[0, 0] == cpu_ds.get_labels()[0, 0],
+            "normalized() must not touch labels",
         )
+        # Bulk host-vs-device: validates the device-side kernels.
+        assert_true(
+            cpu_norm.get_features().all_close[atol=1e-5](
+                gpu_norm.get_features().to_cpu()
+            ),
+            "hoisted-norm bulks must match across devices",
+        )
+        # Sequential lockstep through plain loaders.
+        var cpu_loader = cpu_norm.into_loader(batch_size=64, shuffle=False)
+        var gpu_loader = gpu_norm.into_loader(batch_size=64, shuffle=False)
+        var n_batches = 0
         for cpu_batch in cpu_loader:
             var gpu_batch = gpu_loader.__next__()
             assert_true(
                 cpu_batch.features.all_close[atol=1e-5](
                     gpu_batch.features.to_cpu()
                 ),
-                "normalized features must match",
+                "hoisted-norm sequential features must match",
             )
+            n_batches += 1
+        assert_true(n_batches == 3, "expected 3 sequential batches")
 
 
 def test_nativeloader_device_rank4_shuffled() raises:

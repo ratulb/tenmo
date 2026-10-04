@@ -2646,12 +2646,12 @@ def _train_epoch(
     var ds = NumpyDataset[DType.float32, DType.int64](
         features, labels, copy=True
     )
+    if normalize_mean and normalize_std:
+        ds = ds.normalized(normalize_mean.value(), normalize_std.value())
     var loader = ds.into_loader(
         batch_size=batch_size,
         shuffle=shuffle,
         drop_last=False,
-        normalize_mean=normalize_mean,
-        normalize_std=normalize_std,
     )
 
     var mod_ptr = model.downcast_value_ptr[S32]()
@@ -2716,12 +2716,12 @@ def _eval_epoch(
     var ds = NumpyDataset[DType.float32, DType.int64](
         features, labels, copy=True
     )
+    if normalize_mean and normalize_std:
+        ds = ds.normalized(normalize_mean.value(), normalize_std.value())
     var loader = ds.into_loader(
         batch_size=batch_size,
         shuffle=False,
         drop_last=False,
-        normalize_mean=normalize_mean,
-        normalize_std=normalize_std,
     )
 
     var mod_ptr = model.downcast_value_ptr[S32]()
