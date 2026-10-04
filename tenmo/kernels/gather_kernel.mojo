@@ -284,7 +284,9 @@ struct GatherKernel[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
 
         var out_dev = ctx.enqueue_create_buffer[datatype](total_output)
 
+        var dispatched_2d_fastpath = False
         if rank == 2 and axis == 0 and tensor_layout.shape[1] <= 512:
+            dispatched_2d_fastpath = True
             var in_cols = tensor_layout.shape[1]
             var block_cols = _gather_2d_block_cols(in_cols)
             var compiled = ctx.compile_function[
@@ -308,7 +310,7 @@ struct GatherKernel[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
         # instantiations (dead arms never fire; over-rank inputs panic
         # above); raising it generates new arms automatically.
         comptime for r in range(1, MAX_RANK + 1):
-            if rank == r:
+            if rank == r and not dispatched_2d_fastpath:
                 _launch_gather_generic[datatype, r, Self.index_dtype](
                     ctx,
                     out_dev,
@@ -334,3 +336,56 @@ struct GatherKernel[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             Layout(out_shape),
             result_state^,
         )
+
+    @staticmethod
+    def gather_rows_2d_into(
+        tensor_layout: Layout,
+        tensor_device_state: DeviceState[Self.dtype],
+        indices: IntArray,
+        out_layout: Layout,
+        out_device_state: DeviceState[Self.dtype],
+    ) raises:
+        comptime datatype = DType.uint8 if Self.dtype == DType.bool else Self.dtype
+        var rank = tensor_layout.shape.rank()
+        if rank != 2:
+            panic(
+                "gather_rows_2d_into: expected rank 2, got ",
+                String(rank),
+            )
+
+        var in_rows = tensor_layout.shape[0]
+        var in_cols = tensor_layout.shape[1]
+        var out_rows = out_layout.shape[0]
+        if out_rows != len(indices):
+            panic("gather_rows_2d_into: out_rows != len(indices)")
+
+        ref ds = tensor_device_state
+        ref gpu = ds.get_gpu()
+        var ctx = gpu[]
+
+        var n_indices = len(indices)
+        var idx_dev = ctx.enqueue_create_buffer[Self.index_dtype](n_indices)
+        with idx_dev.map_to_host() as host_idx:
+            for k in range(n_indices):
+                host_idx[k] = Scalar[Self.index_dtype](indices[k])
+
+        var in_dev = ds.buffer
+        var out_dev = out_device_state.buffer
+        var block_cols = _gather_2d_block_cols(in_cols)
+        var compiled = ctx.compile_function[
+            gather_rows_2d_kernel[datatype, Self.index_dtype],
+        ]()
+        ctx.enqueue_function(
+            compiled,
+            out_dev,
+            in_dev,
+            Int64(in_rows),
+            Int64(in_cols),
+            Int64(tensor_layout.strides[0]),
+            idx_dev,
+            Int64(n_indices),
+            Int64(out_layout.strides[0]),
+            grid_dim=n_indices,
+            block_dim=block_cols,
+        )
+        return

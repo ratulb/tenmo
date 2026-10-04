@@ -167,6 +167,101 @@ def test_mcpy_gpu_2d_single_col() raises:
         assert_true(result.to_cpu().all_close(Tensor[dtype].d2([[4.0], [1.0]])))
 
 
+def test_gather_gpu_2d_axis0_cols512_boundary() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        # Exactly at the fast-path boundary (<= 512)
+        var cols = 512
+        var a = Tensor[dtype](Shape(2, cols))
+        for r in range(2):
+            for c in range(cols):
+                a[r, c] = Scalar[dtype](r * 1000 + c)
+        var a_gpu = a.to_gpu()
+        var idx = IntArray()
+        idx.append(1)
+        idx.append(0)
+        var result = a_gpu.gather(idx, axis=0).to_cpu()
+        assert_true(result.shape() == Shape(2, cols))
+        for r in range(2):
+            for c in range(cols):
+                var exp = a[1 - r, c]
+                assert_true(result[r, c] == exp)
+
+
+def test_gather_gpu_2d_axis0_cols513_above_boundary() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        # Above fast-path boundary (> 512)
+        var cols = 513
+        var a = Tensor[dtype](Shape(2, cols))
+        for r in range(2):
+            for c in range(cols):
+                a[r, c] = Scalar[dtype](r * 2000 + c)
+        var a_gpu = a.to_gpu()
+        var idx = IntArray()
+        idx.append(0)
+        idx.append(1)
+        idx.append(0)
+        var result = a_gpu.gather(idx, axis=0).to_cpu()
+        assert_true(result.shape() == Shape(3, cols))
+        var exp0 = a[i(0), s()]
+        var exp1 = a[i(1), s()]
+        assert_true(result[i(0), s()].all_close(exp0))
+        assert_true(result[i(1), s()].all_close(exp1))
+        assert_true(result[i(2), s()].all_close(exp0))
+
+
+def test_gather_gpu_2d_axis0_cols784_mnist_like() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        # MNIST-like columns (784) - above fast path (> 512)
+        var cols = 784
+        var a = Tensor[dtype](Shape(3, cols))
+        for r in range(3):
+            for c in range(cols):
+                a[r, c] = Scalar[dtype](r * 500 + c % 17)
+        var a_gpu = a.to_gpu()
+        var idx = IntArray()
+        idx.append(2)
+        idx.append(0)
+        var result = a_gpu.gather(idx, axis=0).to_cpu()
+        assert_true(result.shape() == Shape(2, cols))
+        assert_true(result[i(0), s()] == a[i(2), s()])
+        assert_true(result[i(1), s()] == a[i(0), s()])
+
+
+def test_gather_rows_2d_into_matches_gather() raises:
+    comptime if has_accelerator():
+        from tenmo.kernels.gather_kernel import GatherKernel
+
+        comptime dtype = DType.float32
+        # Preallocated out-buffer path vs the allocating oracle, on both
+        # sides of the cols <= 512 fast-path boundary, with duplicate and
+        # out-of-order indices.
+        for cols in [3, 512, 784]:
+            var nrows = 5
+            var a = Tensor[dtype](Shape(nrows, cols))
+            for r in range(nrows):
+                for c in range(cols):
+                    a[r, c] = Scalar[dtype](r * 1000 + c % 251)
+            var a_gpu = a.to_gpu()
+            var idx = IntArray()
+            idx.append(4)
+            idx.append(0)
+            idx.append(2)
+            idx.append(4)
+            var expected = a_gpu.gather(idx, axis=0).to_cpu()
+            var out_gpu = Tensor[dtype].zeros(4, cols).to_gpu()
+            GatherKernel[dtype].gather_rows_2d_into(
+                a_gpu.buffer.layout(),
+                a_gpu.buffer.device_state.value(),
+                idx,
+                out_gpu.buffer.layout(),
+                out_gpu.buffer.device_state.value(),
+            )
+            assert_true(out_gpu.to_cpu().all_close(expected))
+
+
 def test_mcpy_gpu_2d_all_rows_identity() raises:
     comptime if has_accelerator():
         comptime dtype = DType.float32
