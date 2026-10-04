@@ -101,9 +101,20 @@ struct AccuracyKernel[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
 
         var result_buffer = ctx.enqueue_create_buffer[DType.int64](1)
 
-        ref pred_buf = pred_dev.device_buffer()
+        # Offset views (e.g. row-slice batches) do not start at the
+        # buffer base: read from sub-buffers at the view offsets, else
+        # every batch after the first scores the wrong rows.
+        var pred_buf = pred_dev.device_buffer()
+        if pred_layout.offset != 0:
+            pred_buf = pred_dev.device_buffer().create_sub_buffer[
+                DeviceState[Self.dtype].datatype
+            ](pred_layout.offset, pred_layout.numel())
         ref labels_dev = labels_device_state
-        ref labels_buf = labels_dev.device_buffer()
+        var labels_buf = labels_dev.device_buffer()
+        if labels_layout.offset != 0:
+            labels_buf = labels_dev.device_buffer().create_sub_buffer[
+                DeviceState[Self.index_dtype].datatype
+            ](labels_layout.offset, labels_layout.numel())
 
         var compiled = ctx.compile_function[
             accuracy_kernel[Self.dtype, Self.index_dtype],
@@ -154,9 +165,18 @@ struct SequenceAccuracyKernel[
 
         var result_buffer = ctx.enqueue_create_buffer[DType.int64](1)
 
-        ref pred_buf = pred_dev.device_buffer()
+        # Same offset-view handling as AccuracyKernel.launch.
+        var pred_buf = pred_dev.device_buffer()
+        if pred_layout.offset != 0:
+            pred_buf = pred_dev.device_buffer().create_sub_buffer[
+                DeviceState[Self.dtype].datatype
+            ](pred_layout.offset, pred_layout.numel())
         ref labels_dev = labels_device_state
-        ref labels_buf = labels_dev.device_buffer()
+        var labels_buf = labels_dev.device_buffer()
+        if labels_layout.offset != 0:
+            labels_buf = labels_dev.device_buffer().create_sub_buffer[
+                DeviceState[Self.index_dtype].datatype
+            ](labels_layout.offset, labels_layout.numel())
 
         var compiled = ctx.compile_function[
             sequence_accuracy_kernel[Self.dtype, Self.index_dtype],

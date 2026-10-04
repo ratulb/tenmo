@@ -256,9 +256,16 @@ struct NDBuffer[dtype: DType](
 
         if self.is_on_gpu():
             if self.is_contiguous():
-                self.device_state.value().buffer.enqueue_copy_to(
-                    device_state.buffer
-                )
+                # Offset views (e.g. row-slice batches) are contiguous but
+                # do NOT start at the buffer base: copy from a sub-buffer
+                # at the view offset, else every view silently duplicates
+                # the base rows (same class as contiguous_device_state).
+                var src_buf = self.device_state.value().buffer
+                if self.offset != 0:
+                    src_buf = self.device_state.value().buffer.create_sub_buffer[
+                        DeviceState[Self.dtype].datatype
+                    ](self.offset, self.numels())
+                src_buf.enqueue_copy_to(device_state.buffer)
             else:
                 with device_state.buffer.map_to_host() as host_buffer:
                     var next_index = 0
