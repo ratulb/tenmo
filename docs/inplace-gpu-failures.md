@@ -21,12 +21,19 @@ fill_device_state):
   `(base_ptr, scalar, shape, strides, numels, rank)` — **no offset
   parameter exists**; `a_base` accumulates from 0.
 
-Fix shape (not yet written): PATH 1 mirrors `ScalarKernel.launch`
-(`scalar_ops_kernel.mojo:271-278`, sub-buffer at offset); strided
-kernels gain an `Int64 offset` arg added to the three `a_base`/`a_idx`
-initializers per kernel (6 sites total across
-`inplace_scalar_ops_strided`, `inplace_pow_op_strided`), threaded
-from both launchers. Kernels are only compiled at those two sites.
+Fix shape — IMPLEMENTED 2026-10-04 (committed, GPU proof pending):
+PATH 1 mirrors `ScalarKernel.launch`
+(`scalar_ops_kernel.mojo:271-278`, sub-buffer at offset) in both
+`launch` and `launch_inplace_pow`; both strided kernels gained a
+trailing `offset_: Int64` arg initializing the two `a_base` (one per
+kernel) + four `a_idx` (slow-path + tail per kernel) sites via
+`Int(offset_)`, threaded from both launchers. Kernels are only
+compiled at those two sites. Regression tests added to
+`test_scalar_gpu.mojo` §Z2 (`test_ip_offset_row_slice_add/pow_matches_cpu`:
+device row-slice with real offset, CPU-slice oracle, first-element
+offset pin). Strided+offset path changed but has no dedicated
+regression test yet — add one (transpose-of-slice on device) when
+the box is back.
 
 ## 2. Twist: the offset bug is likely dormant in exactly these tests
 
@@ -124,14 +131,19 @@ would *introduce* the write-back bug. The rule: `.copy()` = new
 handle, same memory; `.clone()` = new memory. Grep training paths
 for copy-then-mutate assumptions before trusting them.
 
-Resume checklist (remaining):
+Resume checklist (remaining — all need the GPU box, currently
+connection-refused on :9191):
 
-1. Confirm `ip_fix.log` 227/227 on GPU.
-2. Full GPU suite sweep (§4) — `test_ndbuffer_inplace_gpu` and
-   `test_inplace` likely carry the same `copy()`-oracle pattern;
-   grep all GPU tests for `= a.copy()` + mutate-then-compare.
-3. §1 offset fix still open and still wanted (device-view
-   consumers), but decoupled from the 45 — schedule separately.
+1. Confirm `ip_fix.log` 229/229 on GPU (`test_scalar_gpu`: 45
+   oracle fixes + 2 new §Z2 offset regressions).
+2. Run `test_ndbuffer_inplace_gpu` on GPU (expect 199/199 after
+   its 88× `clone()` fix; same oracle disease, fixed same day).
+3. Add a strided+offset regression test (transpose-of-slice on
+   device) for the changed strided kernels.
+4. Full GPU suite sweep (§4).
+5. Known sibling: oop `scalar_ops_strided` PATH 2
+   (`scalar_ops_kernel.mojo:300-322`) passes the base buffer with
+   no offset either — same latent class, out of scope here.
 
 ## 6. Deferred: Option A (Python-boundary auto-D2H)
 

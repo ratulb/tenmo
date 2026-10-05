@@ -3123,3 +3123,62 @@ def test_oop_offset_view_sub_mul_matches_cpu() raises:
         var c0 = X.slice(start=0, end=64, step=1, axis=0)
         var expected0 = (c0 - mean) * inv
         assert_true(got0.all_close[atol=1e-5](expected0))
+
+
+# =============================================================================
+# Z2. In-place scalar_ops — offset views (regression)
+# =============================================================================
+# ScalarInplaceKernel.launch / launch_inplace_pow once ignored view offsets
+# on the contiguous fast path (read/wrote from the buffer base) and the
+# strided kernels had no offset parameter at all, silently mutating the
+# wrong rows for any offset slice. The launchers now operate on a
+# sub-buffer at the view offset (contiguous) / thread the offset into the
+# strided kernels.
+
+
+def test_ip_offset_row_slice_add_matches_cpu() raises:
+    comptime if has_accelerator():
+        from tenmo.tensor import Tensor
+        from tenmo.shared.shapes import Shape
+
+        comptime dtype = DType.float32
+        var n = 8
+        var X = Tensor[dtype](Shape(n, 4))
+        for r in range(n):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+        var Xg = X.to_gpu()
+        # Offset slice: rows 3..5 (offset 12 elements).
+        var g = Xg.slice(start=3, end=6, step=1, axis=0)
+        g.buffer.inplace_scalar_ops[Add](Scalar[dtype](100.0), sync=True)
+        var got = Xg.to_cpu()
+        var c = X.slice(start=3, end=6, step=1, axis=0)
+        c.buffer.inplace_scalar_ops[Add](Scalar[dtype](100.0))
+        assert_true(got.all_close[atol=1e-5](X))
+        # First sliced element pins the offset (pre-fix wrote rows 0..2).
+        assert_true(got[3, 0] == Scalar[dtype](3 * 4 + 100.0))
+        assert_true(got[0, 0] == Scalar[dtype](0))
+
+
+def test_ip_offset_row_slice_pow_matches_cpu() raises:
+    comptime if has_accelerator():
+        from tenmo.tensor import Tensor
+        from tenmo.shared.shapes import Shape
+
+        comptime dtype = DType.float32
+        var n = 8
+        var X = Tensor[dtype](Shape(n, 4))
+        for r in range(n):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+        var Xg = X.to_gpu()
+        # Offset slice: rows 3..5 (offset 12 elements).
+        var g = Xg.slice(start=3, end=6, step=1, axis=0)
+        g.buffer.inplace_scalar_ops[POW](Scalar[dtype](2), sync=True)
+        var got = Xg.to_cpu()
+        var c = X.slice(start=3, end=6, step=1, axis=0)
+        c.buffer.inplace_scalar_ops[POW](Scalar[dtype](2))
+        assert_true(got.all_close[atol=1e-4](X))
+        # First sliced element pins the offset (pre-fix wrote rows 0..2).
+        assert_true(got[3, 0] == Scalar[dtype]((3 * 4) * (3 * 4)))
+        assert_true(got[0, 0] == Scalar[dtype](0))
