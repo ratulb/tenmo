@@ -140,3 +140,201 @@ locally — deliberately uncommitted. Box logs: `/root/ip_proof.log`,
 `nd_proof.log`, `nd_chunk*.log`, `ip_fix` superseded,
 `arith_chunk*.log`, `bcast_chunk*.log`, `iop_chunk*.log`,
 `scalar_chunk*.log`.
+
+---
+
+## Appendix: runbook for the fixer
+
+Everything below is what the 2026-10-05 session learned the hard
+way. Follow it literally; all commands are copy-paste ready.
+
+### A. GPU box workflow
+
+Box: `ssh -p 9191 root@127.0.0.1` (2x Tesla T4, 31 GB RAM).
+Every box shell needs:
+
+```bash
+export PATH=/root/.pixi/bin:/opt/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/nvidia/lib64:$LD_LIBRARY_PATH
+```
+
+Sources live at `/root/tenmo` (plain files, NOT a git repo).
+Transfer additional files as a tarball:
+
+```bash
+# local:
+tar -czf /tmp/opencode/more.tgz tests/<files...> tenmo/<files...>
+scp -P 9191 /tmp/opencode/more.tgz root@127.0.0.1:/root/more.tgz
+# box:
+tar -xzf /root/more.tgz -C /root/tenmo
+```
+
+Per-binary compile is ~1000s FLAT regardless of test count
+(measured 7→1001s, 96→1049s). Chunking buys early-exit
+granularity, not speed. Keep chunks <= 50 tests.
+
+Split any test file into chunks with (keep header + `main`,
+keep non-test helper defs WITH the chunk that uses them —
+`iop_close` once shipped without its helper and burned a cycle):
+
+```bash
+python3 -c "
+import re
+src = open('tests/<file>.mojo').read()
+m = re.search(r'(?m)^def ', src)
+header, rest = src[:m.start()], src[m.start():]
+blocks = [b for b in re.split(r'(?m)(?=^def )', rest) if b.strip()]
+byname, order = {}, []
+for b in blocks:
+    mm = re.match(r'def (\w+)', b)
+    if mm and mm.group(1) != 'main':
+        byname[mm.group(1)] = b; order.append(mm.group(1))
+for i, ns in enumerate([order[j:j+50] for j in range(0, len(order), 50)]):
+    out = header + ''.join(byname[n] for n in ns) + '''
+def main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
+'''
+    open(f'/tmp/opencode/<tag>{i+1}.mojo','w').write(out)
+"
+```
+
+Verify each chunk LOCALLY first (`pixi run mojo -I . <file>` —
+GPU tests prune, runs in seconds), then ship + launch with
+`setsid` so snapped connections don't kill the run, one chunk at
+a time:
+
+```bash
+scp -P 9191 <chunk> root@127.0.0.1:/root/tenmo/tests/
+ssh -p 9191 root@127.0.0.1 "export PATH=... ; setsid nohup bash -c \
+  'cd /root/tenmo && pixi run mojo -I . tests/<chunk> \
+  > /root/<tag>.log 2>&1; echo EXIT=\$? >> /root/<tag>.log' \
+  >/dev/null 2>&1 </dev/null & disown; echo launched"
+# poll:
+ssh -p 9191 root@127.0.0.1 \
+  "grep -E 'FAIL|Summary|EXIT' /root/<tag>.log | tail -5"
+```
+
+Pitfalls seen: `pixi run --manifest-path` runs in the WRONG cwd
+(`cd /root/tenmo` inside the wrapped bash instead); chaining
+`verify && ship` after `grep -E "error|..."` always succeeds
+because grep matching "error" exits 0 — verify and ship as
+SEPARATE steps.
+
+### B. Fix recipes (issue -> exact fix per item)
+
+General rule. Contiguous fast path: build
+`buffer.create_sub_buffer[DeviceState[dtype].datatype](layout.offset,
+numels)` when `layout.offset != 0` and pass THAT as the kernel
+pointer (read-write safe: sub-buffers share storage at the
+offset). Strided paths: append trailing `offset_: Int64` kernel
+params (offsetS for two-operand kernels), seed every
+`a_base`/`b_base`/`a_idx`/`b_idx` zero-initializer with
+`Int(offset_)`, thread `Int64(layout.offset)` from the launcher
+after the last shape/strides arg. Then add a §Z2 regression test
+(see C) and prove in chunks (see A).
+
+1. **`binary_inplace_ops_kernel.mojo : launch:538`** (mutates A).
+   PATH 1 (:593-609): sub-buffers at `A_layout.offset` AND
+   `B_layout.offset`. Strided kernels and their zero-initializers:
+   `arithmetic_ops_A_contiguous` (:62; `b_base` :115, `b_idx`
+   :154/:175), `arithmetic_ops_B_contiguous` (:191; `a_base` :253,
+   `a_idx` :282/:299/:318), `arithmetic_ops_both_strided` (:336;
+   `a_base`/`b_base` :388-389, `a_idx`/`b_idx` :404/:407,
+   :424-425, :446-447),
+   `arithmetic_ops_A_contiguous_lastdim_contiguous_B` (:466;
+   `b_idx` :506 is `i % last_dim`, needs `+ Int(b_offset_)`).
+   Launchers: PATH 2 `:673-683`, PATH 3 `:708-718`, PATH 4
+   `:739-750`, lastdim `:658-666`.
+2. **`binary_ops_kernel.mojo : launch:700`** (fresh output, reads
+   A,B). Same shape with two offsets. Kernels:
+   `arithmetic_ops_both_contiguous` (:23),
+   `arithmetic_ops_both_contiguous_broadcast` (:70),
+   `arithmetic_ops_A_contiguous` (:255; initializers
+   :319/:354/:372), `arithmetic_ops_A_contiguous_lastdim_contiguous_B`
+   (:390; :434), `arithmetic_ops_B_contiguous` (:461; :512,
+   :534/:548/:566), `arithmetic_ops_both_strided` (:584; :623-624,
+   :641/:644, :658-659). Launch sites: :744, :789, :806, :831,
+   :856, :881.
+3. **`compare_kernel.mojo : Compare.launch:349`**: replace
+   hardcoded `Int64(0), Int64(0)` (:385-386) with
+   `Int64(A_layout.offset), Int64(B_layout.offset)` — kernel
+   already supports it. Then `AllClose.launch:178`,
+   `CompareScalar.launch:484` (linear-from-base; sub-buffer or
+   offset param).
+4. **`filler_kernel.mojo`**: `_fill_scalar_gpu:216` contiguous
+   enqueues (:241/:250) need target sub-buffer at
+   `target_layout.offset`; `_scatter_add_gpu:351` both branches
+   (:379/:393) need target+source offsets (mirror the honored
+   `_scatter_add_nd_gpu:408`, which passes
+   `target.offset/source.offset` at :471-472).
+5. **Reductions** (`reduction_kernel.mojo` launches :880/:967/
+   :1053/:1099/:1194/:1286, `minmax_kernel.mojo :189`,
+   `dotproduct :115`, `matrixvector`/`vectormatrix :89`,
+   `argminmax _gpu_reduce:115`, `shuffle` :86/:141,
+   `gather` embedding_bag :238/:255): all pass base buffer +
+   shape/strides with no offset. Same recipe; reductions thread
+   one offset, scatter/gather two.
+6. **Optimizers** (`sgd_kernel.mojo` :60/:95,
+   `adamw_kernel.mojo` :49): harden the same way AND re-prove
+   torch loss parity afterward (sequential, batch 64, SGD
+   lr=0.01 momentum=0.9, same prep, seed 0, 2 epochs; reference:
+   E1 0.341914, E2 0.128499, B0 2.330240). Params are dense
+   offset-0 today so this is hardening, not a live fix.
+7. **OOP scalar PATH 2** (`scalar_ops_kernel.mojo :300-322`):
+   same recipe as B.1 single-operand.
+8. **Partials** (layernorm aux :200-203, conv_tt bias, pad/concate
+   dst :149): sub-buffer the remaining base-buffer reads/writes.
+
+### C. Regression test recipe (§Z2 pattern)
+
+For each fixed kernel, append to the matching test file:
+
+```mojo
+def test_<op>_offset_row_slice_matches_cpu() raises:
+    comptime if has_accelerator():
+        from tenmo.tensor import Tensor
+        from tenmo.shared.shapes import Shape
+        # 1. Build small CPU tensor with position-encoding values.
+        # 2. to_gpu(), then .slice() ON DEVICE (real offset view).
+        # 3. Run the fixed op on the device view (sync=True).
+        # 4. Same op on the CPU slice; all_close full tensors.
+        # 5. Pin the offset: first sliced element == expected value,
+        #    row 0 untouched (pre-fix wrote rows 0..N).
+```
+
+Why this shape: `to_gpu` DENSIFIES (offset 0), so slicing must
+happen on-device; position-encoding values (`r*W+c`) make wrong-row
+reads/writes visible; the row-0 assertion catches exactly the
+base-indexing bug. Still missing: a strided+offset test
+(transpose-of-slice on device) for the strided kernels changed in
+`scalar_inplace_ops_kernel.mojo`.
+
+### D. Copy-then-mutate review procedure
+
+For each site (`conv.mojo:238,308-310`, `bceloss.mojo:1324,1415`,
+`crossentropy.mojo:466`, `dataloader.mojo` index/offset copies,
+`adamw.mojo:399-402`): answer ONE question — does any code path
+mutate the copy while the original must stay intact (needs
+`.clone()`), or is the mutation MEANT to be visible through the
+original (aliasing is load-bearing, leave it)? The tell: after
+`var x = y.copy()`, does `y` get read again expecting old values
+(bug: needs clone) or is `y` never touched / expected updated
+(fine as-is)? Optimizer + AdamW copies are the second kind —
+verified by torch parity. Flip nothing without a test proving the
+new behavior.
+
+### E. Option A pointers (Python-boundary auto-D2H)
+
+- `_loader_next` at `python-binding/tenmo_bind.mojo:2794`: copy
+  device-resident batches via `.to_cpu()` BEFORE wrapping in
+  Python objects (Python iteration is a host operation).
+- Register `device` for int dtypes: `register_data_loader`
+  (`tenmo_bind.mojo:2901`) only registers
+  `_loader_device[...]` (`:2919`) and `_tensor_device` for
+  float32 (`:2971`) / float64 (`:3030`) — the
+  `where dtype.is_floating_point()` guards at :822-931 exclude
+  int64 labels. Add int registrations mirroring the float ones.
+- Verify LOCALLY only: box `.so` rebuild (~2h wall) must be
+  batched with other box work. Until it lands, document
+  `to_gpu()`d Python-iterated loaders as unsupported (`.numpy()`
+  on a GPU tensor segfaults; no graceful error).
