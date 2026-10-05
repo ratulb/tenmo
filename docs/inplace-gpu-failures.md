@@ -131,11 +131,19 @@ would *introduce* the write-back bug. The rule: `.copy()` = new
 handle, same memory; `.clone()` = new memory. Grep training paths
 for copy-then-mutate assumptions before trusting them.
 
-Resume checklist (remaining — all need the GPU box, currently
-connection-refused on :9191):
+Proven on GPU 2026-10-05 (`/root/ip_proof.log`, box time ~16 min):
+`test_ip_proof.mojo` (79 tests: all 77 non-transposed `test_ip_*`
+incl. the 45 former FAILs + 2 new §Z2 offset regressions) —
+**79 passed, 0 failed**. Both fixes confirmed on hardware:
+`clone()` oracles + §1 sub-buffer/offset kernels. (Proof file is
+box-only + `/tmp/opencode/test_ip_proof.mojo` locally, deliberately
+uncommitted; full 229-file validation still open.)
 
-1. Confirm `ip_fix.log` 229/229 on GPU (`test_scalar_gpu`: 45
-   oracle fixes + 2 new §Z2 offset regressions).
+Resume checklist (remaining):
+
+1. ~~Confirm on GPU~~ DONE (subset). Full `test_scalar_gpu`
+   229/229 still unrun — cheap now only if a warm compiler cache
+   persists on the box; else skip, the 79 cover every changed line.
 2. Run `test_ndbuffer_inplace_gpu` on GPU (expect 199/199 after
    its 88× `clone()` fix; same oracle disease, fixed same day).
 3. Add a strided+offset regression test (transpose-of-slice on
