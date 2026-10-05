@@ -3003,5 +3003,96 @@ def test_inplace_edge_ones_scale_multiply_identity_gpu_inplace_arith() raises:
         assert_true(a_gpu.to_cpu().all_close[atol=1e-5](expected))
 
 
+# =============================================================================
+# Z3. In-place binary_ops — offset views (regression)
+# =============================================================================
+# BinaryInplaceKernel.launch once ignored view offsets on all four
+# paths, silently mutating the wrong rows for offset slices. Linear
+# sides now go through sub-buffers at the view offset; strided sides
+# take explicit offset params. Slices are taken ON DEVICE.
+
+
+def test_ip_offset_row_slice_add_matches_cpu() raises:
+    comptime if has_accelerator():
+        from tenmo.tensor import Tensor
+
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(8, 4))
+        var Y = Tensor[dtype](Shape(4, 4))
+        for r in range(8):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+        for r in range(4):
+            for c in range(4):
+                Y[r, c] = Scalar[dtype](100 + r * 4 + c)
+        var Xg = X.to_gpu()
+        var Yg = Y.to_gpu()
+        # Offset slice: rows 2..5, PATH 1.
+        var g = Xg.slice(start=2, end=6, step=1, axis=0)
+        var b = Yg.slice(start=0, end=4, step=1, axis=0)
+        g.buffer.inplace_ops[Add](b.buffer, sync=True)
+        var got = Xg.to_cpu()
+        var c = X.slice(start=2, end=6, step=1, axis=0)
+        var cb = Y.slice(start=0, end=4, step=1, axis=0)
+        c.buffer.inplace_ops[Add](cb.buffer)
+        assert_true(got.all_close[atol=1e-5](X))
+        # First sliced element pins the offset (pre-fix wrote rows 0..3).
+        assert_true(got[2, 0] == Scalar[dtype](2 * 4 + 100))
+        assert_true(got[0, 0] == Scalar[dtype](0))
+
+
+def test_ip_offset_broadcast_add_matches_cpu() raises:
+    comptime if has_accelerator():
+        from tenmo.tensor import Tensor
+
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(4, 4))
+        var V = Tensor[dtype](Shape(8))
+        for r in range(4):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+        for i in range(8):
+            V[i] = Scalar[dtype](1000 + i)
+        var Xg = X.to_gpu()
+        var Vg = V.to_gpu()
+        # Offset 1D bias slice, broadcast over rows, PATH 2.
+        var g = Xg.slice(start=0, end=4, step=1, axis=0)
+        var b = Vg.slice(start=2, end=6, step=1, axis=0)
+        g.buffer.inplace_ops[Add](b.buffer, sync=True)
+        var got = Xg.to_cpu()
+        var c = X.slice(start=0, end=4, step=1, axis=0)
+        var cb = V.slice(start=2, end=6, step=1, axis=0)
+        c.buffer.inplace_ops[Add](cb.buffer)
+        assert_true(got.all_close[atol=1e-5](X))
+        assert_true(got[0, 0] == Scalar[dtype](1002))
+
+
+def test_ip_offset_strided_add_matches_cpu() raises:
+    comptime if has_accelerator():
+        from tenmo.tensor import Tensor
+
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(8, 4))
+        var Y = Tensor[dtype](Shape(8, 4))
+        for r in range(8):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+                Y[r, c] = Scalar[dtype](50 + r * 4 + c)
+        var Xt = X.to_gpu().transpose(1, 0)
+        var Yt = Y.to_gpu().transpose(1, 0)
+        # Strided + offset slices, PATH 4.
+        var g = Xt.slice(start=1, end=3, step=1, axis=0)
+        var b = Yt.slice(start=1, end=3, step=1, axis=0)
+        g.buffer.inplace_ops[Add](b.buffer, sync=True)
+        var got = Xt.to_cpu()
+        var c = X.transpose(1, 0).slice(start=1, end=3, step=1, axis=0)
+        var cb = Y.transpose(1, 0).slice(start=1, end=3, step=1, axis=0)
+        c.buffer.inplace_ops[Add](cb.buffer)
+        var want = X.transpose(1, 0).to_cpu()
+        assert_true(got.all_close[atol=1e-5](want))
+        # Element [1,0] of the transpose == X[0,1] + Y[0,1].
+        assert_true(got[1, 0] == Scalar[dtype](1 + 51))
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
