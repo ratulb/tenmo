@@ -116,6 +116,48 @@ Each fix ships with a §Z2-style device-slice regression test;
 GPU-proof in <=50-test chunks (per-binary compile is ~1000s flat,
 so chunking is for early-exit granularity, not speed).
 
+## Open item: `NDBuffer.to_dtype` GPU path (study, 2026-10-05)
+
+Status: studied, NOT changed. Current code
+(`tenmo/ndbuffer.mojo:1309-1354`): same-dtype on GPU takes a
+zero-copy view via `create_sub_buffer[NewType](0, len)`; cross-dtype
+on GPU does a CPU round-trip (D2H, CPU cast, H2D). An earlier
+experiment tried `create_sub_buffer` for the cross-dtype path and
+hit inconsistencies — correctly abandoned. Findings (all from the
+official `DeviceBuffer` contract,
+`max/gpu/host/device_context/DeviceBuffer`):
+
+1. **Reinterpret is not convert.** `create_sub_buffer[view_type]`
+   "creates a new buffer that references a subset of the memory
+   ... with a different element dtype" — same bytes re-read as a
+   new type, no value conversion. A real cast changes bytes per
+   element AND converts each value; a sub-buffer can do neither.
+   Wrong tool for cross-dtype, full stop.
+2. **Units trap.** `offset`/`size` are in **view_type elements**
+   (`__len__` = bytes / sizeof(dtype)). Source-dtype counts
+   passed for a differently-sized view read out of bounds or half
+   the data — the likely shape of the earlier inconsistency.
+3. **Aliasing even when sizes match.** The sub-buffer "shares the
+   underlying memory" (same as the copy-constructor: "new reference
+   to the same memory"). So the live same-dtype branch aliases the
+   source while the CPU path allocates fresh — a caller mutating
+   the "cast" corrupts the original. Minimum: comment it; safer:
+   `clone()` there.
+
+Fix recipe (when scheduled): replace the round-trip
+(`ndbuffer.mojo:1335-1350`) with `CastKernel.launch`
+(`tenmo/kernels/cast_kernel.mojo:30`), which already does
+`materialize_contiguous` + elementwise convert into a FRESH
+buffer. No sub-buffer involved.
+
+Bool caveat: Mojo supports no `DType.bool` in GPU kernels, which is
+why `CastKernel.launch` remaps bool <-> uint8 storage
+(`src_datatype`/`dst_datatype`, `:48-53`) and allocates the result
+in the storage dtype. Any `NDBuffer[DType.bool].to_dtype` wiring
+must preserve that mapping on both sides (storage dtype for
+alloc/launch, logical dtype for the returned Layout) — verify with
+a bool round-trip test, not just f32/f16.
+
 ## GPU validation log (2026-10-05, 2x T4)
 
 All green, 692 tests total. Per-binary compile ~1000s flat
