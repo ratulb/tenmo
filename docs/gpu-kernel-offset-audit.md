@@ -213,8 +213,9 @@ zeros. Small binaries passed on fresh zero pages. Fix (commit
 8.0 hit. Lesson: every GPU test must initialize its tensors —
 zero-assumption pins are process-history coin flips.
 
-Still open from item 2: `test_compare` no-regression chunks
-(`test_cmp_chunk1/2`, 29+29, sources pre-shipped to box).
+Still open from item 2: NONE — `test_compare` no-regression chunks
+`test_cmp_chunk1/2` 29/29 each (`/root/cmp1_run.log`,
+`/root/cmp2_run.log`). Item 2 fully closed.
 
 ---
 
