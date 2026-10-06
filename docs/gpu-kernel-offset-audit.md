@@ -221,7 +221,7 @@ Still open from item 2: NONE — `test_compare` no-regression chunks
 `test_cmp_chunk1/2` 29/29 each (`/root/cmp1_run.log`,
 `/root/cmp2_run.log`). Item 2 fully closed.
 
-## Item 3 in progress: reductions/minmax/dot/matvec/vecmat (2026-10-06)
+## Item 3 proven: reductions/minmax/dot/matvec/vecmat (2026-10-06)
 
 Audit verdict: ALL ignored `Layout.offset` — `reduce`, `product_reduce`,
 `excl_product_kernel`, `log_sum_exp_f32/f64`, `welford_reduce`
@@ -260,8 +260,9 @@ arithmetic before blaming the kernel.
 Proof status: new rental (old 12h box expired). `test_gpu_all_24`
 (dot) 55/55, `test_gpu_all_25` (argmax) 60/60 green. Chunk 1 rerun
 green 64/64 — product-forward AND backward-recompute proven, i.e. the
-excl write-base fix works on hardware. Chunks 5/6 rerun in flight
-(`/root/run_56.sh`, ~35 min).
+excl write-base fix works on hardware. Chunks 5/6 rerun green 59/59
+each after regenerating with the corrected pins — all 11 Z5 proven.
+Item 3 CLOSED.
 Full 1751-test sweep (22 remaining chunks) deferred — GPU time.
 
 Stale-chunk lesson: the 5/6 rerun above first ran with STALE generated
