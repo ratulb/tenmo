@@ -195,6 +195,27 @@ no memory pressure; relaunch clean), `/root/rq_arith*.log`,
 `/root/rq_ndip*.log`. One process note: chunk splitter must bundle
 non-test helper defs with the chunk that uses them.
 
+## Item 2 proven: filler + compare (2026-10-06 rental, 2x T4)
+
+`FillerKernel` + `Compare/AllClose/CompareScalar` offset fixes
+(commit `c1be6d1`, test-bug fixes `d255bab`/`caac944`):
+`test_cf_proof` 5/5 (§Z4 device-slice regressions), `test_fill`
+**36/36** full-suite green (`/root/fill_bin2_run.log`).
+
+Flake post-mortem (recorded so nobody re-chases it):
+`test_scatter_add_offset_gpu` failed 5/5 in the 36-test binary while
+passing 6/6 in small binaries. Dumps proved GPU `got` == CPU `want`
+exactly (kernel correct). Root cause was the TEST: `Tensor(Shape)`
+leaves memory uninitialized; big-binary pages carried earlier tests'
+fill values (9.0/10.0), failing the untouched-row pins that assumed
+zeros. Small binaries passed on fresh zero pages. Fix (commit
+`e1f99de`): sentinel-fill `T` with 7.0, pins expect 7.0 untouched /
+8.0 hit. Lesson: every GPU test must initialize its tensors —
+zero-assumption pins are process-history coin flips.
+
+Still open from item 2: `test_compare` no-regression chunks
+(`test_cmp_chunk1/2`, 29+29, sources pre-shipped to box).
+
 ---
 
 ## Appendix: runbook for the fixer
