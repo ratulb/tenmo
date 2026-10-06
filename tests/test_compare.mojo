@@ -703,8 +703,8 @@ def test_compare_offset_eq_matches_cpu() raises:
         var b = Y.to_gpu().slice(start=2, end=6, step=1, axis=0)
         var result = a.eq(b)
         assert_true(result.is_on_gpu())
-        assert_true(result[[0, 0]] == True)
-        assert_true(result[[3, 3]] == True)
+        assert_true(result[0, 0] == True)
+        assert_true(result[3, 3] == True)
 
 
 def test_compare_scalar_offset_matches_cpu() raises:
@@ -721,8 +721,8 @@ def test_compare_scalar_offset_matches_cpu() raises:
         var a = X.to_gpu().slice(start=2, end=4, step=1, axis=0)
         var result = a == Scalar[dtype](7.0)
         assert_true(result.is_on_gpu())
-        assert_true(result[[0, 0]] == True)
-        assert_true(result[[1, 3]] == True)
+        assert_true(result[0, 0] == True)
+        assert_true(result[1, 3] == True)
 
 
 def test_all_close_offset_matches_cpu() raises:
