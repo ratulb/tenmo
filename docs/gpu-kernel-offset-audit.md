@@ -183,6 +183,18 @@ locally — deliberately uncommitted. Box logs: `/root/ip_proof.log`,
 `arith_chunk*.log`, `bcast_chunk*.log`, `iop_chunk*.log`,
 `scalar_chunk*.log`.
 
+## Item 1 proven (2026-10-05 rental, 2x T4)
+
+`BinaryKernel` + `BinaryInplaceKernel` offset fixes (commit
+`46c5c75`): `test_bin_proof` 6/6 (§Z3 device-slice regressions:
+oop+inplace x contig/broadcast/strided — fail pre-fix, green
+post-fix), `test_ndbuffer_arithmetic_gpu` 85/85,
+`test_ndbuffer_inplace_gpu` 202/202. Box logs: `/root/bin_proof.log`
+(first attempt EXIT=137, empty log — cause undetermined, box showed
+no memory pressure; relaunch clean), `/root/rq_arith*.log`,
+`/root/rq_ndip*.log`. One process note: chunk splitter must bundle
+non-test helper defs with the chunk that uses them.
+
 ---
 
 ## Appendix: runbook for the fixer
