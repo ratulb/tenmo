@@ -598,9 +598,9 @@ def test_fill_scalar_offset_rows_gpu() raises:
             for c in range(4):
                 X[r, c] = Scalar[dtype](r * 4 + c)
         var Xg = X.to_gpu()
-        Xg.fill(Scalar[dtype](999.0), s(2, 6))
+        Xg.fill(Scalar[dtype](999.0), s(2, 6), s())
         var got = Xg.to_cpu()
-        X.fill(Scalar[dtype](999.0), s(2, 6))
+        X.fill(Scalar[dtype](999.0), s(2, 6), s())
         assert_true(got.all_close[atol=1e-5](X))
         # Rows 0..1 untouched, rows 2..5 filled (pre-fix filled 0..3).
         assert_true(got[0, 0] == Scalar[dtype](0))
