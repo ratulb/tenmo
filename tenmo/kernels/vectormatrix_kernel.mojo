@@ -30,6 +30,8 @@ def vector_matmul_nd[
     k_: Int64,
     n_: Int64,
     total_output_: Int64,  # total_batch * n
+    v_offset_: Int64,  # Layout.offset: raw base buffer passed by launcher
+    m_offset_: Int64,
 ):
     var k = Int(k_)
     var n = Int(n_)
@@ -54,14 +56,16 @@ def vector_matmul_nd[
     # Step 3: v base offset — right-aligned broadcast clamping
     # Mirrors ShapeBroadcaster.broadcasted_indices exactly:
     #   target_idx = len(batch_shape) - len(v_batch_shape) + i
-    var v_base = 0
+    # Offset fix: seed from Layout.offset since launcher passes raw base buffer.
+    var v_base = Int(v_offset_)
     var v_rank_off = len(batch_shape) - len(v_batch_shape)
     for i in range(len(v_batch_shape)):
         var coord = batch_coords[unsafe_offset=v_rank_off + i] if v_batch_shape[i] > 1 else 0
         v_base += coord * v_batch_strides[i]
 
     # Step 4: M base offset — right-aligned broadcast clamping
-    var M_base = 0
+    # Offset fix: seed from Layout.offset since launcher passes raw base buffer.
+    var M_base = Int(m_offset_)
     var M_rank_off = len(batch_shape) - len(M_batch_shape)
     for i in range(len(M_batch_shape)):
         var coord = batch_coords[unsafe_offset=M_rank_off + i] if M_batch_shape[i] > 1 else 0
@@ -159,6 +163,8 @@ struct VectorMatmulKernel[dtype: DType = DType.float32](
             Int64(k),
             Int64(n),
             Int64(total_output),
+            Int64(v_layout.offset),
+            Int64(M_layout.offset),
             grid_dim=num_blocks,
             block_dim=block_size,
         )

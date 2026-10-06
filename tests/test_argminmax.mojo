@@ -790,3 +790,25 @@ def test_argmin_4d_axis0_gpu() raises:
         var result = t_gpu.argmin(axis=0)
         var result_cpu = result.to_cpu()
         assert_true(result_cpu.shape() == Shape(2, 2, 2))
+
+
+# ============================================================================
+# Z5. Argmax on offset views (regression)
+# ============================================================================
+# ArgMinMaxKernel._gpu_reduce ignored Layout.offset. The 999.0 plant makes
+# row 4 peak at col 1; pre-fix (rows 0..3) every row peaked at col 3.
+
+
+def test_argmax_offset_rows_gpu() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(8, 4))
+        for r in range(8):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+        X[4, 1] = Scalar[dtype](999.0)
+        var g = X.to_gpu().slice(start=2, end=6, step=1, axis=0)
+        var r = g.argmax(axis=1)
+        var e = X.slice(start=2, end=6, step=1, axis=0).argmax(axis=1)
+        assert_true(r.to_cpu() == e)
+        assert_true(r.to_cpu() == Tensor[DEFAULT_INDEX_DTYPE].d1([3, 3, 1, 3]))

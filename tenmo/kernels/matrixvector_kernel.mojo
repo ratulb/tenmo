@@ -30,6 +30,8 @@ def matrix_vector_nd[
     m_: Int64,  # number of rows  — output width per batch
     k_: Int64,  # contraction dim
     total_output_: Int64,  # total_batch * m
+    m_offset_: Int64,  # Layout.offset: raw base buffer passed by launcher
+    v_offset_: Int64,
 ):
     var m = Int(m_)
     var k = Int(k_)
@@ -53,7 +55,8 @@ def matrix_vector_nd[
     # Step 3: M base offset — right-aligned broadcast clamping
     # M[..., m, k]: batch dims are all but last 2.
     # Contiguous guarantee: M_row_stride = k, M_col_stride = 1
-    var M_base = 0
+    # Offset fix: seed from Layout.offset since launcher passes raw base buffer.
+    var M_base = Int(m_offset_)
     var M_rank_off = len(batch_shape) - len(M_batch_shape)
     for i in range(len(M_batch_shape)):
         var coord = batch_coords[unsafe_offset=M_rank_off + i] if M_batch_shape[i] > 1 else 0
@@ -65,7 +68,8 @@ def matrix_vector_nd[
     # Step 4: v base offset — right-aligned broadcast clamping
     # v[..., k]: batch dims are all but last 1.
     # Contiguous guarantee: v_k_stride = 1
-    var v_base = 0
+    # Offset fix: seed from Layout.offset since launcher passes raw base buffer.
+    var v_base = Int(v_offset_)
     var v_rank_off = len(batch_shape) - len(v_batch_shape)
     for i in range(len(v_batch_shape)):
         var coord = batch_coords[unsafe_offset=v_rank_off + i] if v_batch_shape[i] > 1 else 0
@@ -160,6 +164,8 @@ struct MatrixVectorKernel[dtype: DType = DType.float32](
             Int64(m),
             Int64(k),
             Int64(total_output),
+            Int64(M_layout.offset),
+            Int64(v_layout.offset),
             grid_dim=num_blocks,
             block_dim=block_size,
         )

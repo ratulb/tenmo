@@ -908,3 +908,25 @@ def test_log_softmax_parity_using_zero_grad() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+# ============================================================================
+# Z5. Softmax (log-sum-exp path) on offset views (regression)
+# ============================================================================
+# launch_log_sum ignored Layout.offset. Slice rows on-device; every output
+# row must still be a distribution.
+
+
+def test_softmax_offset_rows_gpu() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(6, 4))
+        for r in range(6):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+        var g = X.to_gpu().slice(start=2, end=5, step=1, axis=0)
+        var s = g.softmax(axes=[1])
+        var e = X.slice(start=2, end=5, step=1, axis=0).softmax(axes=[1])
+        assert_true(s.to_cpu().all_close(e))
+        var rows = s.to_cpu().sum(axes=[1])
+        assert_true(rows.all_close(Tensor[dtype].d1([1.0, 1.0, 1.0])))

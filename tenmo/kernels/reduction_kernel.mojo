@@ -135,6 +135,7 @@ def reduce[
     reduction_axes: RankArray,
     total_output_: Int64,
     reduced_volume_: Int64,
+    offset_: Int64,
 ):
     """Sum / mean reduction kernel.
 
@@ -183,7 +184,8 @@ def reduce[
 
     smem[unsafe_offset=tid] = Scalar[dtype](0)
 
-    var input_base = output_to_input_base(
+    # Offset fix: base pointer is raw buffer start; seed with view offset.
+    var input_base = Int(offset_) + output_to_input_base(
         out_idx, in_shape, in_strides, reduction_axes
     )
     var local = Scalar[dtype](0)
@@ -228,6 +230,7 @@ def product_reduce[
     reduction_axes: RankArray,
     total_output_: Int64,
     reduced_volume_: Int64,
+    offset_: Int64,
 ):
     """Product reduction kernel — all dtypes, float64 log-space accumulation.
 
@@ -312,7 +315,8 @@ def product_reduce[
     smem_neg[unsafe_offset=tid] = Scalar[DType.int32](0)
     smem_zero[unsafe_offset=tid] = Scalar[DType.int32](0)
 
-    var input_base = output_to_input_base(
+    # Offset fix: base pointer is raw buffer start; seed with view offset.
+    var input_base = Int(offset_) + output_to_input_base(
         out_idx, in_shape, in_strides, reduction_axes
     )
 
@@ -391,6 +395,7 @@ def excl_product_kernel[
     reduction_axes: RankArray,
     total_output_: Int64,
     reduced_volume_: Int64,
+    offset_: Int64,
 ):
     """Compute product-of-all-others for each input element.
 
@@ -442,7 +447,8 @@ def excl_product_kernel[
     if out_idx >= total_output:
         return
 
-    var input_base = output_to_input_base(
+    # Offset fix: base pointer is raw buffer start; seed with view offset.
+    var input_base = Int(offset_) + output_to_input_base(
         out_idx, in_shape, in_strides, reduction_axes
     )
 
@@ -584,6 +590,7 @@ def log_sum_exp_f32[
     reduction_axes: RankArray,
     total_output_: Int64,
     reduced_volume_: Int64,
+    offset_: Int64,
 ):
     var total_output = Int(total_output_)
     var reduced_volume = Int(reduced_volume_)
@@ -603,7 +610,8 @@ def log_sum_exp_f32[
         return
 
     smem[unsafe_offset=tid] = Scalar[DType.float32](0)
-    var input_base = output_to_input_base(
+    # Offset fix: base pointer is raw buffer start; seed with view offset.
+    var input_base = Int(offset_) + output_to_input_base(
         out_idx, in_shape, in_strides, reduction_axes
     )
     var local = Scalar[DType.float32](0)
@@ -647,6 +655,7 @@ def log_sum_exp_f64[
     reduction_axes: RankArray,
     total_output_: Int64,
     reduced_volume_: Int64,
+    offset_: Int64,
 ):
     var total_output = Int(total_output_)
     var reduced_volume = Int(reduced_volume_)
@@ -666,7 +675,8 @@ def log_sum_exp_f64[
         return
 
     smem[unsafe_offset=tid] = Scalar[DType.float64](0)
-    var input_base = output_to_input_base(
+    # Offset fix: base pointer is raw buffer start; seed with view offset.
+    var input_base = Int(offset_) + output_to_input_base(
         out_idx, in_shape, in_strides, reduction_axes
     )
     var local = Scalar[DType.float64](0)
@@ -712,6 +722,7 @@ def welford_reduce[
     reduction_axes: RankArray,
     total_output_: Int64,
     reduced_volume_: Int64,
+    offset_: Int64,
 ):
     """Welford online mean + M2 reduction kernel.
 
@@ -796,7 +807,8 @@ def welford_reduce[
     smem_M2[unsafe_offset=tid] = Scalar[dtype](0)
     smem_count[unsafe_offset=tid] = Int32(0)
 
-    var input_base = output_to_input_base(
+    # Offset fix: base pointer is raw buffer start; seed with view offset.
+    var input_base = Int(offset_) + output_to_input_base(
         out_idx, in_shape, in_strides, reduction_axes
     )
 
@@ -949,6 +961,7 @@ struct ReductionKernel[dtype: DType = DType.float32](
             reduction_axes,
             Int64(total_output),
             Int64(reduced_volume),
+            Int64(A_layout.offset),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
@@ -1060,6 +1073,7 @@ struct ReductionKernel[dtype: DType = DType.float32](
             reduction_axes,
             Int64(total_output),
             Int64(reduced_volume),
+            Int64(A_layout.offset),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
@@ -1105,6 +1119,7 @@ struct ReductionKernel[dtype: DType = DType.float32](
                 reduction_axes,
             Int64(total_output),
             Int64(reduced_volume),
+            Int64(A_layout.offset),
                 grid_dim=excl_blocks,
                 block_dim=excl_threads,
             )
@@ -1175,6 +1190,7 @@ struct ReductionKernel[dtype: DType = DType.float32](
             reduction_axes,
             Int64(total_output),
             Int64(reduced_volume),
+            Int64(A_layout.offset),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
@@ -1247,6 +1263,7 @@ struct ReductionKernel[dtype: DType = DType.float32](
                 reduction_axes,
             Int64(total_output),
             Int64(reduced_volume),
+            Int64(A_layout.offset),
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
@@ -1266,6 +1283,7 @@ struct ReductionKernel[dtype: DType = DType.float32](
                 reduction_axes,
             Int64(total_output),
             Int64(reduced_volume),
+            Int64(A_layout.offset),
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
@@ -1360,6 +1378,7 @@ struct ReductionKernel[dtype: DType = DType.float32](
             reduction_axes,
             Int64(total_output),
             Int64(reduced_volume),
+            Int64(A_layout.offset),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
