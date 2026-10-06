@@ -614,6 +614,11 @@ def test_scatter_add_offset_gpu() raises:
 
         comptime dtype = DType.float32
         var T = Tensor[dtype](Shape(6, 4))
+        # NOTE: Tensor() leaves memory uninitialized — in big binaries the
+        # pages carry earlier tests' values (observed 9.0/10.0 leftovers),
+        # so sentinel-fill instead of assuming zeros. Untouched rows must
+        # stay 7.0, hit rows become 8.0: proves no stray writes.
+        T.fill(Scalar[dtype](7.0))
         var S = Tensor[dtype](Shape(6, 4))
         for r in range(6):
             for c in range(4):
@@ -635,10 +640,10 @@ def test_scatter_add_offset_gpu() raises:
         Filler[dtype].scatter_add(tc.buffer, sc.buffer, indices, axis=0)
         assert_true(got.all_close[atol=1e-5](T))
         # Rows 0..1 of the full target untouched; view rows 0 and 2 hit.
-        assert_true(got[0, 0] == Scalar[dtype](0))
-        assert_true(got[2, 0] == Scalar[dtype](1.0))
-        assert_true(got[4, 0] == Scalar[dtype](1.0))
-        assert_true(got[3, 0] == Scalar[dtype](0))
+        assert_true(got[0, 0] == Scalar[dtype](7.0))
+        assert_true(got[2, 0] == Scalar[dtype](8.0))
+        assert_true(got[4, 0] == Scalar[dtype](8.0))
+        assert_true(got[3, 0] == Scalar[dtype](7.0))
 
 
 # ============================================================================
