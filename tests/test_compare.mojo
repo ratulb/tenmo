@@ -678,5 +678,69 @@ def test_compare_parity_large() raises:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+# =============================================================================
+# Z4. Compare GPU — offset views (regression)
+# =============================================================================
+# Compare.launch hardcoded both offsets to 0 (kernel supported them),
+# CompareScalar/AllClose indexed from the buffer base — offset slices
+# compared the wrong rows. Slices are taken ON DEVICE: to_gpu
+# densifies, so only device-side slicing produces real offsets.
+
+
+def test_compare_offset_eq_matches_cpu() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(8, 4))
+        var Y = Tensor[dtype](Shape(8, 4))
+        for r in range(8):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+                Y[r, c] = Scalar[dtype](r * 4 + c)
+        Y[0, 0] = Scalar[dtype](-1.0)
+        # Offset slices: rows 2..5, identical — mask must be all True.
+        # Pre-fix read rows 0..3, where [0,0] differs.
+        var a = X.to_gpu().slice(start=2, end=6, step=1, axis=0)
+        var b = Y.to_gpu().slice(start=2, end=6, step=1, axis=0)
+        var result = a.eq(b)
+        assert_true(result.is_on_gpu())
+        assert_true(result[[0, 0]] == True)
+        assert_true(result[[3, 3]] == True)
+
+
+def test_compare_scalar_offset_matches_cpu() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(8, 4))
+        for r in range(8):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+        for c in range(4):
+            X[2, c] = Scalar[dtype](7.0)
+            X[3, c] = Scalar[dtype](7.0)
+        # Offset slices: rows 2..3, all == 7. Rows 0..1 differ.
+        var a = X.to_gpu().slice(start=2, end=4, step=1, axis=0)
+        var result = a == Scalar[dtype](7.0)
+        assert_true(result.is_on_gpu())
+        assert_true(result[[0, 0]] == True)
+        assert_true(result[[1, 3]] == True)
+
+
+def test_all_close_offset_matches_cpu() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(8, 4))
+        var Y = Tensor[dtype](Shape(8, 4))
+        for r in range(8):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+                Y[r, c] = Scalar[dtype](r * 4 + c)
+        Y[1, 1] = Scalar[dtype](-5.0)
+        # Offset slices rows 2..5 are identical; rows 0..1 differ.
+        # Pre-fix compared rows 0..3 -> False; fixed -> True.
+        var a = X.to_gpu().slice(start=2, end=6, step=1, axis=0)
+        var b = Y.to_gpu().slice(start=2, end=6, step=1, axis=0)
+        assert_true(a.buffer.all_close(b.buffer, sync=True))
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

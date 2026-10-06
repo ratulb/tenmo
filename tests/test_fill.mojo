@@ -1,4 +1,5 @@
 from tenmo.tensor import Tensor
+from std.sys import has_accelerator
 from std.testing import assert_true, TestSuite
 from tenmo.shared.indexhelper import Idx, i, il, newaxis, s
 from tenmo.shared.intarray import IntArray
@@ -576,6 +577,68 @@ def test_scatter_add_axis1_generic() raises:
     assert_true(target[IntArray(0, 3)] == 0.0)
     assert_true(target[IntArray(1, 0)] == 1.0)
     assert_true(target[IntArray(1, 2)] == 1.0)
+
+
+# ============================================================================
+# Z4. Filler GPU — offset views (regression)
+# ============================================================================
+# FillerKernel._fill_scalar_gpu ignored absolute_offset on the
+# contiguous fast path (filled from the buffer base) and
+# _scatter_add_gpu indexed both operands from base. Fills now go
+# through a sub-buffer at the offset; scatter kernels take explicit
+# offset params. Transfer densifies, so offsets here come from the
+# advanced-indexing metadata itself (absolute_offset != 0).
+
+
+def test_fill_scalar_offset_rows_gpu() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(8, 4))
+        for r in range(8):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+        var Xg = X.to_gpu()
+        Xg.fill(Scalar[dtype](999.0), s(2, 6))
+        var got = Xg.to_cpu()
+        X.fill(Scalar[dtype](999.0), s(2, 6))
+        assert_true(got.all_close[atol=1e-5](X))
+        # Rows 0..1 untouched, rows 2..5 filled (pre-fix filled 0..3).
+        assert_true(got[0, 0] == Scalar[dtype](0))
+        assert_true(got[2, 0] == Scalar[dtype](999.0))
+        assert_true(got[6, 0] == Scalar[dtype](6 * 4))
+
+
+def test_scatter_add_offset_gpu() raises:
+    comptime if has_accelerator():
+        from tenmo.shared.intarray import IntArray
+
+        comptime dtype = DType.float32
+        var T = Tensor[dtype](Shape(6, 4))
+        var S = Tensor[dtype](Shape(6, 4))
+        for r in range(6):
+            for c in range(4):
+                S[r, c] = Scalar[dtype](1.0)
+        var Tg = T.to_gpu()
+        var Sg = S.to_gpu()
+        # Offset views on both sides: target rows 2..5, source rows 0..3.
+        var t = Tg.slice(start=2, end=6, step=1, axis=0)
+        var s_ = Sg.slice(start=0, end=4, step=1, axis=0)
+        var indices = IntArray.with_capacity(2)
+        indices.append(0)
+        indices.append(2)
+        Filler[dtype].scatter_add(
+            t.buffer, s_.buffer, indices, axis=0, sync=True
+        )
+        var got = Tg.to_cpu()
+        var tc = T.slice(start=2, end=6, step=1, axis=0)
+        var sc = S.slice(start=0, end=4, step=1, axis=0)
+        Filler[dtype].scatter_add(tc.buffer, sc.buffer, indices, axis=0)
+        assert_true(got.all_close[atol=1e-5](T))
+        # Rows 0..1 of the full target untouched; view rows 0 and 2 hit.
+        assert_true(got[0, 0] == Scalar[dtype](0))
+        assert_true(got[2, 0] == Scalar[dtype](1.0))
+        assert_true(got[4, 0] == Scalar[dtype](1.0))
+        assert_true(got[3, 0] == Scalar[dtype](0))
 
 
 # ============================================================================

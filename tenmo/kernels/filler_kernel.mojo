@@ -61,9 +61,13 @@ def scatter_add_rows_kernel[
     indices: Pointer[Int32, ImmutAnyOrigin],
     n_indices_: Int64,
     row_width_: Int64,
+    target_offset_: Int64,
+    source_offset_: Int64,
 ):
     var n_indices = Int(n_indices_)
     var row_width = Int(row_width_)
+    var target_offset = Int(target_offset_)
+    var source_offset = Int(source_offset_)
     var row = block_idx.x
     var col = thread_idx.x
 
@@ -71,8 +75,8 @@ def scatter_add_rows_kernel[
         return
 
     var target_row = Int(indices[unsafe_offset=row])
-    var target_idx = target_row * row_width + col
-    var source_idx = row * row_width + col
+    var target_idx = target_offset + target_row * row_width + col
+    var source_idx = source_offset + row * row_width + col
 
     _ = Atomic.fetch_add(
         target.unsafe_offset(target_idx), source[unsafe_offset=source_idx]
@@ -127,17 +131,21 @@ def scatter_add_broadcast_kernel[
     indices: Pointer[Int32, ImmutAnyOrigin],
     n_indices_: Int64,
     row_width_: Int64,
+    target_offset_: Int64,
+    source_offset_: Int64,
 ):
     var n_indices = Int(n_indices_)
     var row_width = Int(row_width_)
+    var target_offset = Int(target_offset_)
+    var source_offset = Int(source_offset_)
     var row = block_idx.x
     var col = thread_idx.x
     if row >= n_indices or col >= row_width:
         return
     var target_row = Int(indices[unsafe_offset=row])
     _ = Atomic.fetch_add(
-        target.unsafe_offset(target_row * row_width + col),
-        source[unsafe_offset=col],
+        target.unsafe_offset(target_offset + target_row * row_width + col),
+        source[unsafe_offset=source_offset + col],
     )
 
 
@@ -234,13 +242,21 @@ struct FillerKernel[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                 var compiled = ctx.compile_function[
                     fill_scalar_kernel[Self.datatype],
                 ]()
+                # The strided path below starts at absolute_offset; the
+                # contiguous fast path must too — fill a sub-buffer at
+                # the offset, else an offset view fills the wrong rows.
+                var fill_target = device_state.device_buffer()
+                if absolute_offset != 0:
+                    fill_target = device_state.device_buffer().create_sub_buffer[
+                        Self.datatype
+                    ](absolute_offset, size)
                 comptime if Self.dtype == DType.bool:
                     var storage_value = rebind[Scalar[Self.datatype]](
                         UInt8(1) if value.cast[DType.bool]() else UInt8(0)
                     )
                     ctx.enqueue_function(
                         compiled,
-                        device_state.device_buffer(),
+                        fill_target,
                         storage_value,
                         Int64(size),
                         grid_dim=blocks,
@@ -249,7 +265,7 @@ struct FillerKernel[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                 else:
                     ctx.enqueue_function(
                         compiled,
-                        device_state.device_buffer(),
+                        fill_target,
                         value,
                         Int64(size),
                         grid_dim=blocks,
@@ -383,6 +399,8 @@ struct FillerKernel[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                     idx_buf,
                     Int64(n_indices),
                     Int64(row_width),
+                    Int64(target_layout.offset),
+                    Int64(source_layout.offset),
                     grid_dim=blocks,
                     block_dim=tpb,
                 )
@@ -397,6 +415,8 @@ struct FillerKernel[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                     idx_buf,
                     Int64(n_indices),
                     Int64(row_width),
+                    Int64(target_layout.offset),
+                    Int64(source_layout.offset),
                     grid_dim=blocks,
                     block_dim=tpb,
                 )
