@@ -112,6 +112,10 @@ launcher), `kernel_helpers` (helpers, no enqueue).
    pad/concate dst).
 6. Lib copy-then-mutate intent review.
 
+Also open (no owner yet): strided+offset transpose-of-slice test,
+scalar PATH2 OOP coverage, full 35-suite sweep (see §validation log
+for the 692-test baseline).
+
 Each fix ships with a §Z2-style device-slice regression test;
 GPU-proof in <=50-test chunks (per-binary compile is ~1000s flat,
 so chunking is for early-exit granularity, not speed).
@@ -254,9 +258,18 @@ oracle asserts passed. When the oracle passes and pins fail, check your
 arithmetic before blaming the kernel.
 
 Proof status: new rental (old 12h box expired). `test_gpu_all_24`
-(dot) 55/55, `test_gpu_all_25` (argmax) 60/60 green. Chunks 1/5/6 rerun
-with the excl + pin fixes in flight (`/root/run_156.sh`, ~1h).
+(dot) 55/55, `test_gpu_all_25` (argmax) 60/60 green. Chunk 1 rerun
+green 64/64 — product-forward AND backward-recompute proven, i.e. the
+excl write-base fix works on hardware. Chunks 5/6 rerun in flight
+(`/root/run_56.sh`, ~35 min).
 Full 1751-test sweep (22 remaining chunks) deferred — GPU time.
+
+Stale-chunk lesson: the 5/6 rerun above first ran with STALE generated
+files (pins fixed in the source test files but chunks generated before
+the fix) and failed on the old arithmetic. Regenerating
+(`generate_gpu_test_suite.py --chunks 30`, membership unchanged) and
+re-shipping fixed it. Rule: any edit to an embedded test INVALIDATES
+the generated chunks — regenerate + re-ship before every box run.
 
 ---
 
