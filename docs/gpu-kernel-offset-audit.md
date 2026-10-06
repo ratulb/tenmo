@@ -217,6 +217,47 @@ Still open from item 2: NONE — `test_compare` no-regression chunks
 `test_cmp_chunk1/2` 29/29 each (`/root/cmp1_run.log`,
 `/root/cmp2_run.log`). Item 2 fully closed.
 
+## Item 3 in progress: reductions/minmax/dot/matvec/vecmat (2026-10-06)
+
+Audit verdict: ALL ignored `Layout.offset` — `reduce`, `product_reduce`,
+`excl_product_kernel`, `log_sum_exp_f32/f64`, `welford_reduce`
+(`reduction_kernel.mojo`); `reduce_minmax` + `build_minmax_mask`
+(`minmax_kernel.mojo`); `reduce_argminmax`; `dot_product_32/64`
+(offset AND strides — dense `a[i]*b[i]`); `matrix_vector_nd`
+(`M_base`/`v_base` started at 0); `vector_matmul_nd` (same).
+Dispatch sites pass whole `Layout`s that the launchers then discard;
+CPU paths honor offsets. Transfer densifies, so the bug bites on
+on-device slices.
+
+Fix shape (commits `9406b62`, `d8a82c8`): trailing `offset_: Int64`
+param on every device fn, seeded into the read base, `Int64(layout.offset)`
+from each launcher — uniform, no sub-buffer needed (unlike items 1-2).
+Dot additionally takes `a/b_stride_` (used `strides[0]`). Contiguous-inner
+assumptions in matvec/vecmat left as-is (pre-existing, out of scope).
+
+Write-side trap (SECOND instance — first was the minmax mask in item 2):
+`excl_product_kernel` writes a FRESH view-sized buffer, so the offset seed
+applies to `in_buffer` reads only; seeding the write ran out of bounds and
+failed product-backward grads on the first proof run. Fixed with a separate
+0-based `write_base`. Rule, now twice-earned: fresh output buffers are
+always 0-based — only seed reads from shared storage.
+
+Z5 regression tests (11, all GPU-slice vs CPU-oracle + hand pins):
+sum/mean offset rows, minmax offset (999.0 planted OUTSIDE the slice),
+dot offset slices, matvec offset rows, vecmat offset batch, argmax offset,
+product offset fwd + backward-recompute (`store_excl_product=False`),
+softmax offset, variance offset.
+
+Pin-arithmetic lesson: minmax and matvec "failures" were MY pins wrong
+(row-4 max is 19 not 23; rows map to 40r+20 not 40r+30) while GPU==CPU
+oracle asserts passed. When the oracle passes and pins fail, check your
+arithmetic before blaming the kernel.
+
+Proof status: new rental (old 12h box expired). `test_gpu_all_24`
+(dot) 55/55, `test_gpu_all_25` (argmax) 60/60 green. Chunks 1/5/6 rerun
+with the excl + pin fixes in flight (`/root/run_156.sh`, ~1h).
+Full 1751-test sweep (22 remaining chunks) deferred — GPU time.
+
 ---
 
 ## Appendix: runbook for the fixer
