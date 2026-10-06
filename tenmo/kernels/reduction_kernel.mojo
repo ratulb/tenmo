@@ -448,7 +448,14 @@ def excl_product_kernel[
         return
 
     # Offset fix: base pointer is raw buffer start; seed with view offset.
+    # NOTE: the seed applies to in_buffer READS only. excl_out is a fresh
+    # view-sized buffer (offset 0), so writes use the unseeded base —
+    # seeding the write side would run out of bounds (same trap as the
+    # minmax mask kernel).
     var input_base = Int(offset_) + output_to_input_base(
+        out_idx, in_shape, in_strides, reduction_axes
+    )
+    var write_base = output_to_input_base(
         out_idx, in_shape, in_strides, reduction_axes
     )
 
@@ -558,7 +565,7 @@ def excl_product_kernel[
                 # excl = (sign * exp(excl_log)).cast[dtype]()
                 excl = _cast_result[dtype](sign * exp(excl_log))
 
-        (excl_out .unsafe_offset(flat_input_idx))[] = excl
+        (excl_out .unsafe_offset(write_base + offset))[] = excl
         rank += block_size
 
 

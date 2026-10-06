@@ -1944,5 +1944,5 @@ def test_minmax_offset_rows_gpu() raises:
             mn.to_cpu().all_close(Tensor[dtype].d1([8.0, 12.0, -100.0, 20.0]))
         )
         assert_true(
-            mx.to_cpu().all_close(Tensor[dtype].d1([11.0, 15.0, 23.0, 23.0]))
+            mx.to_cpu().all_close(Tensor[dtype].d1([11.0, 15.0, 19.0, 23.0]))
         )

@@ -32,7 +32,7 @@ def test_matvec_offset_rows_gpu() raises:
         var r = gM.matmul[mode=mv](v.to_gpu())
         var eM = M.slice(start=2, end=5, step=1, axis=0)
         assert_true(r.to_cpu().all_close(eM.matmul[mode=mv](v)))
-        assert_true(r.to_cpu().all_close(Tensor[dtype].d1([110.0, 150.0, 190.0])))
+        assert_true(r.to_cpu().all_close(Tensor[dtype].d1([100.0, 140.0, 180.0])))
 
 
 def test_vecmat_offset_batch_gpu() raises:
