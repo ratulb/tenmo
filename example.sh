@@ -1,5 +1,16 @@
 #!/usr/bin/bash
 clear
+# DATA-PREREQUISITE CONVENTION (read before running chained examples):
+# examples/data/ is gitignored and ships EMPTY — every corpus, vocab and
+# checkpoint below must be generated in order. The chains are:
+#   TinyStories corpus:  python3 scripts/fetch_tinystories.py  ->  examples/data/tinystories_{train,val}.txt
+#   TinyStories 8k vocab: ./example.sh tinystories_vocab      ->  examples/data/tinystories_8k.tiktoken
+#   Stage-2 pilot:        ./example.sh tinystories_pilot      ->  examples/data/pilot_best.npy (~2 h)
+#   Stage-2b pilot:       ./example.sh tinystories_pilot_8k   ->  examples/data/pilot_8k_best.npy
+#   BERT vocab:           ./example.sh imdb_bert_vocab        ->  examples/data/imdb_8k.tiktoken
+#   BERT pretrain:        ./example.sh imdb_bert_pretrain     ->  examples/data/imdb_bert_mlm_best.npy
+# Skipping a step fails LOUDLY with "No such file or directory" — go back
+# and run the producer first.
 # Single source of truth for dispatchable targets (keep in sync with the case table below).
 EXAMPLES="word2vec_cbow|imdb|imdb_v1|binary_mnist|mnist|mnist_adamw|mnist_native|mnist_mixed|mnist_mixed_dtypes|mnist_unified|mnist_gelu|mnist_gpu|mnist_gpu_prof|mnist_conv2d|mnist_conv2d_gpu|mnist_conv_tt_gpu|xor|spiral|reverse_sequence|sort_sequence|cifar_10|gpt_dataset_demo|gpt_overfit|gpt_epochs|gpt_generate|tinystories_smoke|tinystories_pilot|tinystories_pilot_8k|tinystories_generate|tinystories_vocab|imdb_bert_vocab|imdb_bert_pretrain|imdb_bert|mnist_py|mnist_sgd_py|mnist_adamw_py|mnist_dataloader_py"
 # Check if an argument was provided
@@ -115,34 +126,43 @@ case $1 in
     pixi run mojo -I . $DEBUG_MODE examples/gpt_epochs.mojo
     ;;
   tinystories_smoke)
+    # PREREQ: python3 scripts/fetch_tinystories.py (corpus: tinystories_train.txt).
     echo "Running TinyStories Stage-1 dress rehearsal (Ep-18 pieces, small scale)"
     pixi run mojo -I . $DEBUG_MODE examples/tinystories_smoke.mojo
     ;;
   tinystories_pilot)
+    # PREREQ: fetched corpus (see above). Trains ~2 h, saves examples/data/pilot_best.npy.
     echo "Running TinyStories Stage-2 pilot (shrink config, ~1M tokens)"
     pixi run mojo -I . $DEBUG_MODE examples/tinystories_pilot.mojo
     ;;
   tinystories_generate)
+    # PREREQ: ./example.sh tinystories_pilot (needs examples/data/pilot_best.npy).
     echo "Running TinyStories generation demo (stage-2 checkpoint -> text)"
     pixi run mojo -I . $DEBUG_MODE examples/tinystories_generate.mojo
     ;;
   tinystories_vocab)
+    # PREREQ: fetched corpus. Produces examples/data/tinystories_8k.tiktoken for pilot_8k.
     echo "Running TinyStories vocab spike (train/save/reload 8k BPE)"
     pixi run mojo -I . $DEBUG_MODE examples/tinystories_vocab.mojo
     ;;
   imdb_bert_vocab)
+    # First link of the BERT chain. Produces examples/data/imdb_8k.tiktoken.
     echo "Running IMDB BERT vocab builder (train/save/reload 8k BPE + specials)"
     pixi run mojo -I . $DEBUG_MODE examples/imdb_bert_vocab.mojo
     ;;
   imdb_bert_pretrain)
+    # PREREQ: ./example.sh imdb_bert_vocab. Saves examples/data/imdb_bert_mlm_{best,latest}.npy.
     echo "Running IMDB BERT MLM pretraining smoke (2Lx128, capped batches)"
     pixi run mojo -I . $DEBUG_MODE examples/imdb_bert_pretrain.mojo
     ;;
   imdb_bert)
+    # PREREQ: ./example.sh imdb_bert_pretrain (needs examples/data/imdb_bert_mlm_best.npy).
     echo "Running IMDB BERT sentiment fine-tune (transfer + frozen-test report)"
     pixi run mojo -I . $DEBUG_MODE examples/imdb_bert.mojo
     ;;
   tinystories_pilot_8k)
+    # PREREQ: fetched corpus + ./example.sh tinystories_vocab (needs tinystories_8k.tiktoken).
+    # Saves examples/data/pilot_8k_best.npy.
     echo "Running TinyStories Stage-2b pilot (custom 8k vocab, ~1M tokens)"
     pixi run mojo -I . $DEBUG_MODE examples/tinystories_pilot_8k.mojo
     ;;
