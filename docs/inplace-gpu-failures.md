@@ -1,11 +1,9 @@
 # In-place GPU scalar failures (`test_ip_*`) — investigation notes
 
-Working note. If the session ends before this is resolved, start here.
-Status: `test_scalar_gpu.mojo` — 104 `test_ip_*` tests, **45 fail on GPU**.
-Pristine-baseline run (pre-change HEAD) fails the byte-identical set:
-pre-existing, not caused by device-resident loading work.
-Old per-test logs were wiped with the box; `ip_list.log` re-run launched
-2026-10-04 to recapture the exact FAIL list — read that first.
+Working note. Investigation CLOSED — both suspects proven and fixed on GPU (see §5 + §§1–2 notes below).
+Status at close: `test_ip_proof` 79/79 on GPU 2026-10-05 (`c52a6f8`); full regime 692/692 green (`8f34d4e`).
+`test_scalar_gpu.mojo` holds 106 `test_ip_*` tests (104 original + 2 §Z2 offset regressions).
+Original symptom (for context): 45 failed on GPU; pristine-baseline failed the byte-identical set — pre-existing, not caused by device-resident loading work.
 
 ## 1. Confirmed by reading (no run needed)
 
@@ -14,14 +12,15 @@ drops view offsets in every launch path — sixth instance of the
 offset-drop class (cf. matmul, accuracy, scalar-oop, contiguous,
 fill_device_state):
 
-- `launch` PATH 1 (contiguous, :391-398): flat kernel from `A_buffer`
+- `launch` PATH 1 (contiguous; `launch` at `:360`, PATH 1 at `:383-398`): flat kernel from `A_buffer`
   base, `A_layout.offset` never added.
-- `launch` PATH 2 (strided, :410-420) and `launch_inplace_pow` both
+- `launch` PATH 2 (strided, `:411-420`) and `launch_inplace_pow` both
   paths: strided kernels take
   `(base_ptr, scalar, shape, strides, numels, rank)` — **no offset
   parameter exists**; `a_base` accumulates from 0.
 
-Fix shape — IMPLEMENTED 2026-10-04 (committed, GPU proof pending):
+Fix shape — IMPLEMENTED 2026-10-04 (committed `c68d4a6`), PROVEN on GPU 2026-10-05
+(`test_ip_proof` 79/79, `c52a6f8`):
 PATH 1 mirrors `ScalarKernel.launch`
 (`scalar_ops_kernel.mojo:271-278`, sub-buffer at offset) in both
 `launch` and `launch_inplace_pow`; both strided kernels gained a
@@ -54,7 +53,11 @@ may be *views + non-view f64*. The f64 half has no cause yet —
 candidates: f64 H2D/D2H width, `simd_op[*, float64, *]` codegen,
 `all_close` on f64.
 
-## 3. Shared-by-default hypothesis (leading suspect for the remainder)
+## 3. Shared-by-default hypothesis (SUPERSEDED — retained as trail)
+
+> Verdict (§5) superseded this suspect: the 45 FAILs were the `copy()`-aliasing
+> oracle, not shared-storage misclassification. The mechanism notes below are
+> kept so nobody re-derives them; do not re-chase this thread for `test_ip_*`.
 
 History: CPU `Buffer`/`NDBuffer` became **shared by default**; sharing
 used to happen only via views/slices. Trail:
@@ -88,7 +91,13 @@ storage that `a_gpu`'s transfer later reads? Print `ref_count()` /
 identity around the copy→transfer→inplace sequence for one failing
 case.
 
-## 4. Coverage gap (bigger than this file)
+## 4. Coverage gap (CLOSED for this regime 2026-10-05 — historical note)
+
+> At the time of writing, `scripts/gpu_test_files.txt` listed ~40 GPU suites and only
+> 7 had been validated since the shared-by-default change. The 692-test regime
+> since went green (`8f34d4e`: scalar 229, ndbuffer_inplace 199, arith 82,
+> broadcast 113, inplace 69). The item-3 full 1751-test sweep remains deferred
+> for GPU time — see `gpu-kernel-offset-audit.md`.
 
 `scripts/gpu_test_files.txt` lists ~40 GPU suites. Since the
 shared-by-default change, validated on hardware: `test_data`,
@@ -139,19 +148,17 @@ incl. the 45 former FAILs + 2 new §Z2 offset regressions) —
 box-only + `/tmp/opencode/test_ip_proof.mojo` locally, deliberately
 uncommitted; full 229-file validation still open.)
 
-Resume checklist (remaining):
+Resume checklist (remaining — refreshed 2026-10-07):
 
-1. ~~Confirm on GPU~~ DONE (subset). Full `test_scalar_gpu`
-   229/229 still unrun — cheap now only if a warm compiler cache
-   persists on the box; else skip, the 79 cover every changed line.
-2. Run `test_ndbuffer_inplace_gpu` on GPU (expect 199/199 after
-   its 88× `clone()` fix; same oracle disease, fixed same day).
+1. ~~Confirm on GPU~~ DONE: `test_ip_proof` 79/79 (`c52a6f8`); full `test_scalar_gpu`
+   229/229 green per the 692 regime (`8f34d4e`).
+2. ~~Run `test_ndbuffer_inplace_gpu` on GPU~~ DONE: 199/199 (`8f34d4e`; 88× `clone()` fix same family).
 3. Add a strided+offset regression test (transpose-of-slice on
-   device) for the changed strided kernels.
-4. Full GPU suite sweep (§4).
+   device) for the changed strided kernels. STILL OPEN.
+4. Full GPU suite sweep (§4). PARTIAL: 692 regime green; item-3 full 1751-test sweep deferred.
 5. Known sibling: oop `scalar_ops_strided` PATH 2
-   (`scalar_ops_kernel.mojo:300-322`) passes the base buffer with
-   no offset either — same latent class, out of scope here.
+   (`scalar_ops_kernel.mojo:301`) passes the base buffer with
+   no offset either — same latent class, out of scope here. STILL OPEN.
 
 ## 6. Deferred: Option A (Python-boundary auto-D2H)
 

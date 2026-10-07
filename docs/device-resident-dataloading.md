@@ -431,7 +431,15 @@ launching `gather_rows_2d_kernel` with `indices_buffer[row + idx_offset]`. Launc
 var idx_sub = self._perm_dev.create_sub_buffer[index_dtype](start, bs)
 ```
 
-`create_sub_buffer[dtype](start, count)` is already used this way at ndbuffer.mojo:1306-1320 (`to_dtype` on GPU, "zero-copy view via create_sub_buffer. No allocation, no copy"). That precedent removes the need for an `idx_offset` kernel parameter entirely — the sub-buffer's pointer already points at `start`. **Per batch: zero allocations, zero transfers.** Compare [§2.5](#25-the-existing-gpu-gather-allocates-per-call)'s 2 allocations + 1 upload per batch.
+`create_sub_buffer[dtype](start, count)` zero-copy views are established practice
+(`contiguous_device_state` uses one at its view offset before the D2D copy).
+That precedent removes the need for an `idx_offset` kernel parameter entirely — the sub-buffer's pointer already points at `start`. **Per batch: zero allocations, zero transfers.** Compare [§2.5](#25-the-existing-gpu-gather-allocates-per-call)'s 2 allocations + 1 upload per batch.
+
+> Note: this section once cited `to_dtype`'s same-dtype path as the precedent;
+> that path now routes through `CastKernel` (fresh buffer, no aliasing) — the
+> `contiguous_device_state` site above is the surviving precedent. (The
+> sub-buffer permutation sketched here was itself never implemented — the
+> landed `gather_rows_2d_into` takes `IntArray` indices; see §12.)
 
 Note that the permutation must be re-uploaded on `reset()`/`__iter__()` (dataloader.mojo:418-423, 1056-1060, 1156-1160) — 0.5 MB per epoch for MNIST, 7.2 MB over the run. Keep `std.random.shuffle` host-side; it is microseconds and keeps the loader host-light. This is a deliberate divergence from `torch.randperm(n, device=device)` (mnist_pytorch_optimized.py:62), and it is the right one: 0.5 MB/epoch is not where the time goes.
 

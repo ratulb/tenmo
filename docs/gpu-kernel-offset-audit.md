@@ -1,7 +1,10 @@
 # GPU kernel offset-drop audit (`tenmo/kernels/`)
 
-Working note. Date: 2026-10-05. Status: audit complete (code reading
-only, zero GPU spent); fixes NOT yet written except where noted.
+Working note. Date: 2026-10-05 (status refreshed 2026-10-07). Status: audit complete (code reading
+only, zero GPU spent); items 1–3 FIXED and proven on GPU (see §§Item 1/2/3 proven below:
+`46c5c75`, `c1be6d1`, `9406b62`+`d8a82c8`, closed by `25e4036`).
+Remaining open tail: optimizers, shuffle, gather 2D fast path, layernorm aux,
+conv bias, pad/concate dst, scalar PATH 2, plus the lib copy-then-mutate review.
 Start here when scheduling kernel hardening.
 
 ## Background
@@ -44,7 +47,7 @@ sequential device batches, `contiguous_device_state` views.
 output-safe). HONORED = sub-buffer / offset param / panic on
 nonzero / `materialize_contiguous` / offset-carried DevicePointer.
 
-### Already fixed — do not touch
+### Already fixed — do not touch (refreshed 2026-10-07)
 
 | file | status |
 |---|---|
@@ -54,31 +57,28 @@ nonzero / `materialize_contiguous` / offset-carried DevicePointer.
 | `scalar_inplace_ops_kernel.mojo` all paths | fixed (sub-buffer + `offset_`) |
 | `ndbuffer` contiguous path, `fill_device_state` | fixed |
 | `gather_rows_2d_into` | safe via `panic` on nonzero offset |
+| `binary_ops_kernel.mojo` | fixed, item 1 (`46c5c75`; `a/b_offset_`) |
+| `binary_inplace_ops_kernel.mojo` | fixed, item 1 (`46c5c75`) |
+| `reduction_kernel.mojo` (6 enqueues) | fixed, item 3 (`9406b62`; trailing `offset_`) |
+| `minmax_kernel.mojo` | fixed, item 3 (`9406b62`) |
+| `filler_kernel.mojo` (`_fill_scalar_gpu`, `_scatter_add_gpu`) | fixed, item 2 (`c1be6d1`; `target/source_offset_`) |
+| `compare_kernel.mojo` (`Compare`, `AllClose`, `CompareScalar`) | fixed, item 2 (`c1be6d1`; launcher passes `A/B_layout.offset`) |
+| `dotproduct_kernel.mojo` | fixed, item 3 (`9406b62`; `a/b_offset_` + strides) |
+| `matrixvector_kernel.mojo`, `vectormatrix_kernel.mojo` | fixed, item 3 (`9406b62`; `m/v_offset_`) |
+| `argminmax_kernel.mojo` | fixed, item 3 (`9406b62`; `offset_`) |
 
-### Needs fixing
+### Needs fixing (open tail — items 1–3 moved above on 2026-10-07)
 
 | file : launcher | reads | mutates | paths affected | notes |
 |---|---|---|---|---|
-| `binary_ops_kernel.mojo : launch:700` | A,B | no | ALL (PATH 1,2,3,4,5) | hottest path: every oop tensor add/sub/mul/div on offset views |
-| `binary_inplace_ops_kernel.mojo : launch:538` | A,B | yes (A) | ALL 4 paths | two operands; same fix shape as scalar |
-| `scalar_ops_kernel.mojo : launch` PATH 2 | A | no | strided only | PATH 1 fixed; strided still base-indexed |
 | `sgd_kernel.mojo` : both launchers | param,grad[,vel] | yes | all operands | dormant (params dense offset-0); harden + re-prove parity |
 | `adamw_kernel.mojo : launch:49` | param,grad,m,v | yes | all 4 | same as SGD |
-| `reduction_kernel.mojo` : 6 enqueues | A | no | all | `.sum()` over device slice reduces wrong rows |
-| `minmax_kernel.mojo : launch:189` | A | no | both passes | same reduction-helper pattern |
-| `filler_kernel.mojo : _fill_scalar_gpu` | — | yes (target) | contiguous path only | strided path honored via IndexIterator |
-| `filler_kernel.mojo : _scatter_add_gpu` | target+source | yes | both branches | `_scatter_add_nd` next door is honored — inconsistent |
-| `compare_kernel.mojo : Compare:349` | A,B | no | strided | kernel HAS `A_offset/B_offset`; launcher hardcodes `0,0` (:385-386) — one-line fix |
-| `compare_kernel.mojo : AllClose:178`, `CompareScalar:484` | A(,B) | no | all | linear from base |
-| `dotproduct_kernel.mojo : launch:115` | A,B | no | both paths | |
-| `matrixvector_kernel.mojo : launch:89` | M,v | no | all | also assumes inner-contiguous |
-| `vectormatrix_kernel.mojo : launch:89` | v,M | no | all | mirror of above |
-| `argminmax_kernel.mojo : _gpu_reduce:115` | A | no | all | |
+| `scalar_ops_kernel.mojo : launch` PATH 2 | A | no | strided only | PATH 1 fixed; strided still base-indexed (`:301`, enqueue passes no offset) |
 | `shuffle_kernel.mojo` : gather+scatter | A / grad | scatter target | both | coord*strides from base |
-| `gather_kernel.mojo` : embedding_bag, gather_rows_2d | yes | no | all | generic `gather_gpu` is honored; these two lack the offset param |
+| `gather_kernel.mojo` : 2D fast path (`gather_rows_2d_kernel`), embedding-bag | yes | no | offset views with cols ≤ 512 (fast path); embedding-bag | generic `gather_gpu` honors `in_offset` (`:28`, passed at `:320`); the 2D fast path takes strides but NO offset, so an offset view with cols ≤ 512 still reads from base. `gather_rows_2d_into` stays safe via its nonzero-offset panic |
 | `layernorm_kernel.mojo : launch:113` | x,mean,var,gamma,beta | no | aux inputs | x honored via materialize; mean/var/gamma/beta read from base |
 | `conv_tt.mojo : forward` | image,kernel,bias | no | bias only | image/kernel honored via offset-carried DevicePointer |
-| `pad_kernel.mojo`, `concate_kernel.mojo` | src,dst | yes (dst) | dst writes | src honored via materialize; dst base assumed fresh-contig |
+| `pad_kernel.mojo`, `concate_kernel.mojo` | src,dst | yes (dst) | dst writes | src honored via materialize; dst base assumed fresh-contig (note: `concate_kernel.mojo:42` `offset_` is the cumulative concat-axis offset, a different quantity — verify before trusting this row) |
 | `cast_kernel.mojo` | — | — | — | mentions offset only in a comment; uses materialize — HONORED, listed here to close the loop |
 
 ### Safe — no action
@@ -102,14 +102,14 @@ launcher), `kernel_helpers` (helpers, no enqueue).
   trusting them. Rule: `.copy()` = new handle, same memory;
   `.clone()` = new memory.
 
-## Fix order (proposed, risk x size)
+## Fix order (proposed, risk x size — refreshed 2026-10-07: items 1–3 done)
 
-1. `binary_ops` + `binary_inplace` (shared pattern, highest traffic).
-2. `compare` hardcoded zeros + `filler` contiguous fill (tiny).
-3. Reductions/minmax + dotproduct/matvec/vecmat.
+1. ~~`binary_ops` + `binary_inplace` (shared pattern, highest traffic)~~ — DONE, item 1 (`46c5c75`).
+2. ~~`compare` hardcoded zeros + `filler` contiguous fill (tiny)~~ — DONE, item 2 (`c1be6d1`).
+3. ~~Reductions/minmax + dotproduct/matvec/vecmat~~ — DONE, item 3 (`9406b62`+`d8a82c8`, closed `25e4036`).
 4. Optimizers (harden, parity proof).
-5. Long tail (shuffle, gather variants, layernorm aux, conv bias,
-   pad/concate dst).
+5. Long tail (shuffle, gather 2D fast path, layernorm aux, conv bias,
+   pad/concate dst, scalar PATH 2).
 6. Lib copy-then-mutate intent review.
 
 Also open (no owner yet): strided+offset transpose-of-slice test,
@@ -120,9 +120,18 @@ Each fix ships with a §Z2-style device-slice regression test;
 GPU-proof in <=50-test chunks (per-binary compile is ~1000s flat,
 so chunking is for early-exit granularity, not speed).
 
-## Open item: `NDBuffer.to_dtype` GPU path (study, 2026-10-05)
+## Open item: `NDBuffer.to_dtype` GPU path (LANDED + PROVEN 2026-10-07)
 
-Status: studied, NOT changed. Current code
+Implemented per the recipe below (`CastKernel.launch` for all GPU casts;
+same-dtype aliasing closed with a fresh-buffer identity copy; bool
+nonzero→True canonicalized in `dtype_cast`; `DeviceState` `special`-tag
+intent documented). GPU proof: `tests/test_dtype_cast_gpu.mojo` **20/20**
+(16 existing + independence pin + bool round-trip + fractional→bool parity +
+offset-view casts); no-regression sweep `test_embedding` 50/50,
+`test_cross_entropy` 139/139 (3 chunks). Box logs: `/root/dtype_proof.log`,
+`/root/embed_proof.log`, `/root/ce1/2/3.log`.
+
+Original study (2026-10-05, retained):
 (`tenmo/ndbuffer.mojo:1309-1354`): same-dtype on GPU takes a
 zero-copy view via `create_sub_buffer[NewType](0, len)`; cross-dtype
 on GPU does a CPU round-trip (D2H, CPU cast, H2D). An earlier
@@ -275,6 +284,11 @@ the generated chunks — regenerate + re-ship before every box run.
 ---
 
 ## Appendix: runbook for the fixer
+
+> Line numbers below were written 2026-10-05 against pre-fix code. Recipes
+> for the landed items 1–3 (binary, filler/compare, reductions/dot/matvec)
+> describe code that no longer exists verbatim — read them as fix *shapes*,
+> not exact `:line` refs. Symbol search is authoritative.
 
 Everything below is what the 2026-10-05 session learned the hard
 way. Follow it literally; all commands are copy-paste ready.

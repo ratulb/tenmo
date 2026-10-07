@@ -1,6 +1,6 @@
 # `GatherKernel.gather_gpu` Double-Dispatches the 2D Row-Gather Fast Path
 
-**Status:** fix applied and validated on GPU (2× T4, Mojo 1.1.0) — `dispatched_2d_fastpath` flag gates the generic rank dispatch; all 36 tests in `tests/test_gather_gpu.mojo` pass. Exact-one-launch assertion still open (needs a runtime launch-count hook).
+**Status:** fixed in `03ea4e8` and validated on GPU (2× T4, Mojo 1.1.0) — `dispatched_2d_fastpath` flag gates the generic rank dispatch; all 36 tests in `tests/test_gather_gpu.mojo` pass. Exact-one-launch assertion still open (needs a runtime launch-count hook).
 **Severity:** performance only — results are correct on every input.
 **File:** `tenmo/kernels/gather_kernel.mojo`
 **Found:** 2026-10-04, while tracing the kernel dispatch for [device-resident data loading](device-resident-dataloading.md).
@@ -9,15 +9,15 @@
 
 ## Summary
 
-`gather_gpu` selects a specialized 2D row-gather kernel and then **falls through** to the generic rank-dispatch kernel, enqueuing both into the same output buffer. The two kernels compute identical values, so the result is correct — but the "fast path" performs 2× the memory traffic it exists to avoid, on exactly the inputs it was written for.
+`gather_gpu` selected a specialized 2D row-gather kernel and then **fell through** to the generic rank-dispatch kernel, enqueuing both into the same output buffer. The two kernels computed identical values, so the result was correct — but the "fast path" performed 2× the memory traffic it existed to avoid, on exactly the inputs it was written for. (Fixed in `03ea4e8`; this document keeps the pre-fix shape for context and records the as-shipped fix in [The Fix](#the-fix).)
 
-The adjacent `comptime for r in range(1, MAX_RANK + 1)` block was written as if it were an unconditional fallback. It is not guarded by `else` and the fast path does not `return`.
+The adjacent `comptime for r in range(1, MAX_RANK + 1)` block was written as if it were an unconditional fallback. It was not guarded by `else` and the fast path did not `return`.
 
 ---
 
-## The Defect
+## The Defect (pre-fix; fixed in `03ea4e8`)
 
-`tenmo/kernels/gather_kernel.mojo:287-326`:
+Pre-fix `tenmo/kernels/gather_kernel.mojo:287-326` (current dispatch flag at `:287-289`, guarded generic dispatch at `:313`):
 
 ```mojo
         var out_dev = ctx.enqueue_create_buffer[datatype](total_output)
@@ -55,9 +55,9 @@ The adjacent `comptime for r in range(1, MAX_RANK + 1)` block was written as if 
                 )
 ```
 
-Line 287 opens an `if`. Line 305 closes the `enqueue_function` call. Line 306 starts the rank dispatch with **no `else`, no `return`**. When `rank == 2`, the condition on line 287 is true *and* the comptime loop's `rank == r` arm matches `r == 2`, so both fire.
+Line 287 opened an `if`. Line 305 closed the `enqueue_function` call. Line 306 started the rank dispatch with **no `else`, no `return`**. When `rank == 2`, the condition on line 287 was true *and* the comptime loop's `rank == r` arm matched `r == 2`, so both fired.
 
-Contrast the embedding-bag branch immediately above, which gets this right — it `return`s inside the `if` (gather_kernel.mojo:262-276):
+Contrast the embedding-bag branch immediately above, which gets this right — it `return`s inside the `if` (gather_kernel.mojo:227-276, `return (` at `:273`):
 
 ```mojo
             if sync:
@@ -72,13 +72,13 @@ Contrast the embedding-bag branch immediately above, which gets this right — i
             )
 ```
 
-That branch is unreachable-from-the-row-gather branch (it requires `reduction.is_sum() or reduction.is_mean()`, the row-gather path is only reached with `reduction == NONE`), so **the row-gather branch is the only defective dispatch in the function.**
+That branch is unreachable-from-the-row-gather branch (it requires `reduction.is_sum() or reduction.is_mean()`, the row-gather path is only reached with `reduction == NONE`), so **the row-gather branch was the only defective dispatch in the function.**
 
 ---
 
-## Why the Result Is Still Correct
+## Why the Result Was Still Correct
 
-Both kernels write the same `out_dev`, over the same `n_indices × in_cols` region, with the same values. Neither reads `out_dev`, so the second write is idempotent.
+Both kernels wrote the same `out_dev`, over the same `n_indices × in_cols` region, with the same values. Neither read `out_dev`, so the second write was idempotent.
 
 **Region.** For `rank == 2, axis == 0`, line 278-283 builds:
 
@@ -95,7 +95,7 @@ Both kernels write the same `out_dev`, over the same `n_indices × in_cols` regi
 
 so `out_shape == [n_indices, cols]` and `out_strides == [cols, 1]`. The 2D kernel's maximum write index is `(n_indices - 1) * cols + (cols - 1) == n_indices * cols - 1 == total_output - 1` — in bounds, and it covers the buffer exactly once.
 
-**Values.** `gather_rows_2d_kernel` (gather_kernel.mojo:66-99), one block per output row:
+**Values.** `gather_rows_2d_kernel` (gather_kernel.mojo:65-99; `def` at `:65`), one block per output row:
 
 ```mojo
     var src_row = indices_buffer[unsafe_offset=row]
@@ -107,7 +107,7 @@ so `out_shape == [n_indices, cols]` and `out_strides == [cols, 1]`. The 2D kerne
     ]
 ```
 
-`gather_gpu_kernel` via `_launch_gather_generic` (gather_kernel.mojo:20-64), one thread per output element:
+`gather_gpu_kernel` via `_launch_gather_generic` (gather_kernel.mojo:19-64 kernel, launcher at `:149-177`), one thread per output element:
 
 ```mojo
         var src_coords = out_coords
@@ -123,7 +123,7 @@ so `out_shape == [n_indices, cols]` and `out_strides == [cols, 1]`. The 2D kerne
 
 With `axis == 0`: `out_coords[0]` is the destination row, `src_coords[0]` becomes `indices[out_coords[0]]`, and `dst_flat == out_coords[0] * cols + out_coords[1] == row * out_row_stride + c`. Identical mapping, including negative-index normalization.
 
-**Cost.** For MNIST-shaped inputs the generic kernel additionally pays full grid-stride launch overhead (`elementwise_launch_config(total_output, simdwidth)`, gather_kernel.mojo:154) and recomputes `RankArray` coordinates per element, where the 2D kernel's threads read a single scalar each.
+**Cost.** For MNIST-shaped inputs the generic kernel additionally paid full grid-stride launch overhead (`elementwise_launch_config(total_output, simdwidth)`, gather_kernel.mojo:166) and recomputed `RankArray` coordinates per element, where the 2D kernel's threads read a single scalar each.
 
 ---
 
@@ -133,10 +133,10 @@ All four must hold:
 
 | # | Condition | Source |
 |---|---|---|
-| 1 | Host has an accelerator | `has_accelerator()` — gather.mojo:462 |
-| 2 | Source tensor `is_on_gpu()` | gather.mojo:463 |
-| 3 | `rank == 2 and axis == 0 and cols <= 512` | gather_kernel.mojo:287 |
-| 4 | `reduction == NONE` (`Reduction(2)`) | `Reduction.is_none()` — shared/__init__.mojo:49 |
+| 1 | Host has an accelerator | `has_accelerator()` — gather.mojo:461 |
+| 2 | Source tensor `is_on_gpu()` | gather.mojo:462 |
+| 3 | `rank == 2 and axis == 0 and cols <= 512` | gather_kernel.mojo:288 (flag at `:287-289`, guard at `:313`) |
+| 4 | `reduction == NONE` (`Reduction(2)`) | `Reduction.is_none()` — shared/__init__.mojo:45 |
 
 Condition 4 is implied by the call path. `Gather._gather_copy`'s fused fast path (gather.mojo:405-425) requires `_is_fast_path(reduction, ax, rank)`, which demands `is_sum()` or `is_mean()` (gather.mojo:345-352) — so it always lands in the early-returning embedding-bag branch. The general path (gather.mojo:461-487) passes `reduction=Reduction(2)` explicitly:
 
@@ -153,27 +153,37 @@ Condition 4 is implied by the call path. `Gather._gather_copy`'s fused fast path
                     )
 ```
 
-`Reduction(2)` is `none` (shared/__init__.mojo:15-20, 49-50). So **every plain 2D row-gather on a GPU tensor with ≤ 512 columns double-dispatches.**
+`Reduction(2)` is `none` (shared/__init__.mojo:13-28 ctor, `:45`). So **every plain 2D row-gather on a GPU tensor with ≤ 512 columns double-dispatched (pre-fix).**
 
 ### Blast radius
 
 - **Not hit:** MNIST (784 cols > 512). `examples/mnist_gpu.mojo`, `mnist_conv2d_gpu.mojo`, `mnist_conv_tt_gpu.mojo` are unaffected.
 - **Hit:** any 2D GPU tensor with ≤ 512 columns gathered along axis 0 with no reduction — `Tensor.gather`, `embedding`, and the token-embedding path in the LLM examples. Narrow 2D data (sequence models, `examples/sort_sequence.mojo`, `examples/reverse_sequence.mojo`, IMDb) is squarely in range.
-- **Also hit:** whatever device-resident loader work consumes row-gathers, which is why it is documented here rather than deferred.
+- **Also hit (pre-fix):** whatever device-resident loader work consumed row-gathers through `gather_gpu`. Resolved by construction: the landed `GatherKernel.gather_rows_2d_into` (gather_kernel.mojo:341) calls `gather_rows_2d_kernel` directly and bypasses the `gather_gpu` dispatch entirely, so the loader path cannot double-dispatch.
 
 ---
 
-## Why No Existing Test Caught It
+## Why No Existing Test Caught It (pre-fix analysis)
 
-Two independent reasons, both verified.
+Two independent reasons, both verified at the time.
 
-**1. The defect is invisible to value assertions.** Both kernels write the same values, so every correctness test passes. All of `tests/test_gather_gpu.mojo` — `test_gather_gpu_2d_axis0_irregular_copy` (:18), `test_mcpy_gpu_2d_multi_row_reversed` (:115), `test_mcpy_gpu_2d_duplicate_indices` (:132), `test_mcpy_gpu_2d_all_rows_identity` (:170), the fused sum/mean tests (:242-362), and `test_mcpy_cpu_gpu_parity_2d_fuse_mean` (:364) — asserts values and would keep passing after a fix. **A regression test for this defect cannot be a correctness test.**
+**1. The defect was invisible to value assertions.** Both kernels wrote the same values, so every correctness test passed. All of `tests/test_gather_gpu.mojo` — `test_gather_gpu_2d_axis0_irregular_copy` (:18), `test_mcpy_gpu_2d_multi_row_reversed` (:115), `test_mcpy_gpu_2d_duplicate_indices` (:132), `test_gather_gpu_2d_axis0_cols512_boundary` (:170), the fused sum/mean tests (:337-458), and parity tests (:459+) — asserted values and kept passing after the fix. **A regression test for this defect cannot be a correctness test.** (Test names/lines are post-fix positions; pre-fix the file had 2–3-col fixtures at those early lines.)
 
-**2. No test exercises the other side of the threshold.** Every 2D fixture in `test_gather_gpu.mojo` is 2-3 columns wide (`Tensor[dtype].d2([[1.0, 2.0, 3.0], ...])` and similar). There is no `cols > 512` 2D case anywhere in the file, so the generic rank-2 arm is **never tested at all** — the double dispatch means the generic kernel silently substitutes for the fast one in every existing test, and the fast path's exclusive behavior is unverified.
+**2. Pre-fix, no test exercised the other side of the threshold.** Every 2D fixture in `test_gather_gpu.mojo` was 2-3 columns wide (`Tensor[dtype].d2([[1.0, 2.0, 3.0], ...])` and similar). There was no `cols > 512` 2D case anywhere in the file, so the generic rank-2 arm was **never tested at all** — the double dispatch meant the generic kernel silently substituted for the fast one in every existing test, and the fast path's exclusive behavior was unverified. **Closed with the fix:** `test_gather_gpu_2d_axis0_cols512_boundary` (:170), `test_gather_gpu_2d_axis0_cols513_above_boundary` (:191), `test_gather_gpu_2d_axis0_cols784_mnist_like` (:214), and `test_gather_rows_2d_into_matches_gather` (:233).
 
 ---
 
 ## The Fix
+
+> **As shipped (`03ea4e8`) vs as proposed.** The proposal below extracts a
+> `_use_row_2d_fast_path()` predicate with a named `_ROW_2D_MAX_COLS`
+> constant and a local `dispatched` flag. What actually landed is the
+> minimal variant: an inline `dispatched_2d_fastpath` flag
+> (gather_kernel.mojo:287-289) with the literal `<= 512` predicate kept in
+> place, and the generic dispatch guarded by
+> `if rank == r and not dispatched_2d_fastpath` (`:313`). No predicate
+> helper, no named constant, no launch counters. The rest of this section is
+> the original proposal, kept for the launch-count work that is still open.
 
 Make double dispatch structurally impossible. Extract the predicate so it is named, testable, and stated once:
 
@@ -252,9 +262,9 @@ An `elif` is *not* usable here: the rank dispatch is a `comptime for` statement,
 
 Three layers, because layers 1 and 2 alone cannot see the regression.
 
-### Layer 1 — Predicate unit test (CPU-only, no GPU required)
+### Layer 1 — Predicate unit test (CPU-only, no GPU required; NOT landed — helper does not exist)
 
-Pins the dispatch *condition*, including the threshold boundary, in `tests/test_gather.mojo` or `tests/test_gather_gpu.mojo`:
+Pins the dispatch *condition*, including the threshold boundary, in `tests/test_gather.mojo` or `tests/test_gather_gpu.mojo`. Requires extracting `_use_row_2d_fast_path` first (see [The Fix](#the-fix) note):
 
 ```mojo
 def test_gather_row2d_fast_path_predicate() raises:
@@ -268,11 +278,11 @@ def test_gather_row2d_fast_path_predicate() raises:
     assert_false(_use_row_2d_fast_path(2, 0, 513))
 ```
 
-The `512` / `513` pair is the boundary that matters — the bare literal `512` at gather_kernel.mojo:287 is currently unnamed and untested.
+The `512` / `513` pair is the boundary that matters — the bare literal `512` at gather_kernel.mojo:288 is still unnamed (no `_ROW_2D_MAX_COLS` constant landed) and has no predicate unit test, though value coverage on both sides now exists (Layer 2 tests above).
 
-### Layer 2 — Launch-count regression test (GPU; the only layer that catches the bug)
+### Layer 2 — Launch-count regression test (GPU; the only layer that catches the bug; NOT landed)
 
-Module-scope counters in `gather_kernel.mojo` — one file, host-side, one increment per kernel launch, negligible next to the launch itself:
+Module-scope counters in `gather_kernel.mojo` — one file, host-side, one increment per kernel launch, negligible next to the launch itself. (Not implemented — no such counters exist in the file today.)
 
 ```mojo
 var _row2d_launches: Int = 0
@@ -296,7 +306,8 @@ def test_gather_gpu_row2d_dispatches_exactly_one_kernel() raises:
                 [Float32(i % 97) for i in range(64 * 384)]
             )
         ).reshape(Shape(64, 384))
-        var a_gpu = a.to_gpu()
+        var gpu = GPU()
+        var a_gpu = a.to_gpu(gpu)
         var idx = IntArray()
         for i in range(8):
             idx.append(Int(63 - i))
@@ -320,29 +331,30 @@ Instead: time `Tensor.gather` on a `(4096, 384)` GPU tensor, 200 iterations, bef
 
 ## Checklist
 
-- [ ] Extract `_use_row_2d_fast_path` with the named `_ROW_2D_MAX_COLS` constant
-- [ ] Gate the rank dispatch on `not dispatched`
+- [ ] Extract `_use_row_2d_fast_path` with the named `_ROW_2D_MAX_COLS` constant (shipped instead as inline `dispatched_2d_fastpath` + literal `512` in `03ea4e8`)
+- [x] Gate the rank dispatch on `not dispatched` (landed as `not dispatched_2d_fastpath`, gather_kernel.mojo:313)
 - [ ] Add launch counters + reset/read helpers to `gather_kernel.mojo`
-- [ ] Layer 1 predicate test (CPU)
+- [ ] Layer 1 predicate test (CPU; blocked on predicate extraction)
 - [ ] Layer 2 launch-count test, both sides of the 512 threshold (GPU)
-- [ ] Add a `cols > 512` 2D GPU value test (new coverage — currently absent)
+- [x] Add a `cols > 512` 2D GPU value test (landed: cols512 `:170`, cols513 `:191`, cols784 `:214`, plus `gather_rows_2d_into_matches_gather` `:233`)
 - [ ] Record before/after timings in this document
 - [ ] Confirm no behavior change in `tests/test_gather.mojo` and `tests/test_embedding.mojo`
-- [ ] Re-check that `GatherKernel.gather_into` (device-resident loader work) inherits the corrected dispatch
+- [x] Re-check that `GatherKernel.gather_into` (device-resident loader work) inherits the corrected dispatch — vacuous: `gather_rows_2d_into` (`:341`) calls the 2D kernel directly, bypassing `gather_gpu` dispatch
 
 ---
 
-## References
+## References (line numbers refreshed 2026-10-07; `gather_kernel.mojo` is 397 lines)
 
-- `tenmo/kernels/gather_kernel.mojo:287-326` — the defect
-- `tenmo/kernels/gather_kernel.mojo:66-99` — `gather_rows_2d_kernel`
-- `tenmo/kernels/gather_kernel.mojo:20-64` — `gather_gpu_kernel`
-- `tenmo/kernels/gather_kernel.mojo:139-177` — `_launch_gather_generic`
-- `tenmo/kernels/gather_kernel.mojo:189-225` — `gather_gpu` entry, per-call allocations
-- `tenmo/kernels/gather_kernel.mojo:262-276` — the embedding-bag branch that gets the early return right
+- `tenmo/kernels/gather_kernel.mojo:287-289,313` — the defect site (pre-fix `:287-326`); flag + guard as shipped
+- `tenmo/kernels/gather_kernel.mojo:65-99` — `gather_rows_2d_kernel`
+- `tenmo/kernels/gather_kernel.mojo:19-64` — `gather_gpu_kernel`
+- `tenmo/kernels/gather_kernel.mojo:149-177` — `_launch_gather_generic` (`elementwise_launch_config` at `:166`)
+- `tenmo/kernels/gather_kernel.mojo:193-340` — `gather_gpu` entry, per-call allocations
+- `tenmo/kernels/gather_kernel.mojo:227-276` — the embedding-bag branch that gets the early return right (`return (` at `:273`)
+- `tenmo/kernels/gather_kernel.mojo:341-397` — `gather_rows_2d_into` (bypasses `gather_gpu` dispatch)
 - `tenmo/gather.mojo:5` — the fast path this comment advertises
 - `tenmo/gather.mojo:345-352` — `_is_fast_path`
 - `tenmo/gather.mojo:461-487` — the general path that passes `Reduction(2)`
-- `tenmo/shared/__init__.mojo:15-20`, `49-50` — `Reduction(2) == none`
-- `tenmo/gpu/runtime.mojo:9-105` — `elementwise_launch_config` (deliberately *not* instrumented)
-- `tests/test_gather_gpu.mojo` — all fixtures 2-3 cols wide
+- `tenmo/shared/__init__.mojo:13-28`, `45` — `Reduction(2) == none`
+- `tenmo/gpu/runtime.mojo:1-105` — `elementwise_launch_config` (deliberately *not* instrumented)
+- `tests/test_gather_gpu.mojo` — 36 tests; boundary coverage at `:170` (512), `:191` (513), `:214` (784), `:233` (into-vs-gather)

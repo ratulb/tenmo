@@ -31,6 +31,10 @@ def dtype_cast[
     is correct because uint8→uint8 is identity and float→float/int→int
     truncation works via SIMD.cast.
 
+    Bool DESTINATION is canonicalized: nonzero → 1 (CPU parity — truncation
+    would map 0.5 → 0 → False, while the CPU path casts nonzero to True).
+    Compare kernels produce the same canonical 0/1 storage.
+
     Grid-stride loop processes CHUNK_SIZE = simd_vectors_per_thread * simd_width
     elements per thread per pass, matching elementwise_launch_config.
     """
@@ -42,15 +46,33 @@ def dtype_cast[
     comptime CHUNK = simd_vectors_per_thread * simd_width
     var base = gtid * CHUNK
 
+    var zero_src = SIMD[src_datatype, simd_width](0)
+    var one_dst = SIMD[dst_datatype, simd_width](1)
+    var zero_dst = SIMD[dst_datatype, simd_width](0)
+
     while base < size:
         comptime for v in range(simd_vectors_per_thread):
             var i = base + v * simd_width
             if i + simd_width <= size:
                 var chunk = src.unsafe_load[width=simd_width](i)
-                dst.unsafe_store[width=simd_width](i, chunk.cast[dst_datatype]())
+                comptime if dst_dtype == DType.bool:
+                    dst.unsafe_store[width=simd_width](
+                        i, chunk.ne(zero_src).select(one_dst, zero_dst)
+                    )
+                else:
+                    dst.unsafe_store[width=simd_width](
+                        i, chunk.cast[dst_datatype]()
+                    )
             elif i < size:
                 for j in range(size - i):
-                    dst[unsafe_offset=i + j] = Scalar[dst_datatype](
-                        src[unsafe_offset=i + j]
-                    )
+                    comptime if dst_dtype == DType.bool:
+                        dst[unsafe_offset=i + j] = (
+                            one_dst[0]
+                            if src[unsafe_offset=i + j] != zero_src[0]
+                            else zero_dst[0]
+                        )
+                    else:
+                        dst[unsafe_offset=i + j] = Scalar[dst_datatype](
+                            src[unsafe_offset=i + j]
+                        )
         base += stride * CHUNK
