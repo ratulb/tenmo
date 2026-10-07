@@ -1,17 +1,15 @@
 # Device-Resident Data Loading for `NativeLoader` and `DataLoader`
 
-**Status:** Phase X + 5a + steps 0–2 landed; 5b device path implemented and GPU-validated, uncommitted (see §12).
-**Date:** 2026-10-04
+**Status:** Phase X + 5a + steps 0–2 + 5b + norm-hoist + `mnist_gpu` migration + 5c landed (`03ea4e8`→`e512431`, 2026-10-04); tree clean (see §12).
+**Date:** 2026-10-04 (status refreshed 2026-10-07)
+**Line numbers:** stale — `dataloader.mojo` grew ~+30–280 lines as the device path landed. Symbol names are authoritative; treat `:line` refs as pre-5b approximations.
 **Scope:** `tenmo/dataloader.mojo` (`Dataset` trait, `NativeLoader`, `DataLoader`, `TensorDataset`, `NumpyDataset`), the gather kernel family, and the Python binding surface.
 **Reference:** `mnist_pytorch_optimized.py` vs `examples/mnist_gpu.mojo`.
 **Related:** [`gather-kernel-double-dispatch.md`](gather-kernel-double-dispatch.md) — a pre-existing perf defect in the kernel this work extends (Phase X).
 
 - [1. The Premise](#1-the-premise)
 - [2. Findings — Why Device Residency Is Impossible Today](#2-findings--why-device-residency-is-impossible-today)
-- [3. The Central Design Question](#4-the-central-design-question)
-- [4. Design](#5-design)
-- [5. The Sync Budget After the Change](#6-the-sync-budget-after-the-change)
-- [6. Alternatives Considered and Rejected](#7-alternatives-considered-and-rejected)
+- [3. The Central Design Question](#3-the-central-design-question)
 - [4. Sequencing: Which Loader First](#4-sequencing-which-loader-first)
 - [5. Design](#5-design)
 - [6. The Sync Budget After the Change](#6-the-sync-budget-after-the-change)
@@ -20,6 +18,7 @@
 - [9. Call-Site Migration](#9-call-site-migration)
 - [10. Test Strategy](#10-test-strategy)
 - [11. Rollout](#11-rollout)
+- [12. Implementation Status](#12-implementation-status-2026-10-04-refreshed-2026-10-07)
 - [Appendix A — Related Defect: `GatherKernel` Double-Dispatch](#appendix-a--related-defect-gatherkernel-double-dispatch)
 - [Appendix B — Reference Inventory](#appendix-b--reference-inventory)
 
@@ -64,7 +63,7 @@ var labels_gpu = batch.labels.to_gpu(gpu, sync=False)
 
 That is 14,070 batch transfers over a 15-epoch run, and it is the entire remaining gap. The header comment in mnist_gpu.mojo:3-4 already claims "running entirely on GPU after a one-time parameter transfer" — one-time for the *parameters*, not the data.
 
-**Memory budget** (float32, MNIST): train features 60000×784×4 = **188.2 MB**, test features **31.4 MB**, train labels 60000×8 = **0.5 MB**. Comfortable. This will not hold for CIFAR-10 or ImageNet at full resolution — see [§4](#4-the-central-design-question).
+**Memory budget** (float32, MNIST): train features 60000×784×4 = **188.2 MB**, test features **31.4 MB**, train labels 60000×8 = **0.5 MB**. Comfortable. This will not hold for CIFAR-10 or ImageNet at full resolution — see [§3](#3-the-central-design-question).
 
 ---
 
@@ -199,6 +198,10 @@ Verified in `python-binding/tenmo.py`:
 
 So a Python user cannot even move a tensor to the GPU, let alone ask a loader to batch it there. Mojo-side work alone leaves the binding broken.
 
+> **Partially landed (`e512431`):** `DataLoader.to_gpu` / `to_cpu` / `device`
+> (tenmo.py) now exist; the `Tensor`-level `to_gpu`/`to_cpu` move methods and
+> the `device=`/`residency=` ctor sugar are still missing (deferred by design, §4.5).
+
 `_LOADER_PAIRS` (tenmo.py:1593-1596) is compile-time dtype dispatch, not device dispatch:
 
 ```python
@@ -268,7 +271,7 @@ Why this order:
 3. **The trait's `device()` contract gets proven against the harder case.** If `DataLoader` goes first, `device()` is never exercised through the trait at all (DataLoader reads `self.features.device()` directly), and the defaulted trait method ships untested against its only real consumer. Doing `NativeLoader` first means the default and the override are both validated by the same test run.
 4. **Normalization removal is `NativeLoader`-only and is the largest mechanical change** (11 files). [§9](#9-call-site-migration) notes this is *not* a pure signature deletion — each site needs an equivalent prep step. Doing it while the diff is otherwise small, and before the `DataLoader` changes land, keeps the numerics review separable.
 
-The counter-argument, stated fairly: **`DataLoader` is the better test oracle.** Its sequential path already works on device ([§3.4](#34-what-already-works--the-good-news)), and `tests/python/test_data_loader.py` gives an end-to-end GPU check with no new harness. That is exactly why Phase 5a validates the kernel *before* either loader — the oracle is available without making it the first thing converted.
+The counter-argument, stated fairly: **`DataLoader` is the better test oracle.** Its sequential path already works on device ([§2.4](#24-what-already-works--the-good-news)), and `tests/python/test_data_loader.py` gives an end-to-end GPU check with no new harness. That is exactly why Phase 5a validates the kernel *before* either loader — the oracle is available without making it the first thing converted.
 
 ### 4.4 One asymmetry the conversion introduces
 
@@ -297,7 +300,7 @@ Resulting 5c shape:
 
 ## 5. Design
 
-### 4.1 Extend the trait with `device()` — do not widen the pointer contract
+### 5.1 Extend the trait with `device()` — do not widen the pointer contract
 
 The pointer methods must **stay**: they are the storage contract for `SlidingWindowDataset` and its `WindowLoader`, which deliberately avoid the `Dataset` trait for exactly this reason (dataloader.mojo:1210-1212 — "Deliberately NOT a `Dataset`-trait conformer — the trait's flat-pointer contract is what forces the legacy O(N·T) layout"). Replacing them would cascade into `LLMDataset`, `RandomSlidingWindowDataset`, `spiral.mojo`, and ~40 call sites in `tests/test_data.mojo`.
 
@@ -322,7 +325,7 @@ A **defaulted** method keyed on `Device` means every existing conformer keeps co
         return self._features.device()
 ```
 
-Separately, make the pointer accessors fail loudly rather than dangling, which closes the unsafe-failure-mode gap from [§3.2](#32-a-gpu-tensor-has-no-host-pointer-to-return):
+Separately, make the pointer accessors fail loudly rather than dangling, which closes the unsafe-failure-mode gap from [§2.2](#22-a-gpu-tensor-has-no-host-pointer-to-return):
 
 ```mojo
     def get_features_ptr(
@@ -337,9 +340,9 @@ Separately, make the pointer accessors fail loudly rather than dangling, which c
         return self._features.data_ptr().as_imm()
 ```
 
-### 4.2 Datasets get `to_gpu()`, mirroring `Tensor` and `Module`
+### 5.2 Datasets get `to_gpu()`, mirroring `Tensor` and `Module`
 
-Naming is not free: `Tensor.to_gpu(gpu, sync, stop_grad)` (tensor.mojo:772) and `Module.to_gpu(gpu, stop_grad)` (net.mojo:1099) already own this verb. Datasets should match, and the signature should be a mirror of the `Tensor` one:
+Naming is not free: `Tensor.to_gpu(...)` (tensor.mojo:772) and `Module.to_gpu` (net.mojo:960; `Sequential.to_gpu` at net.mojo:1099) already own this verb. Datasets should match, and the signature should be a mirror of the `Tensor` one:
 
 ```mojo
     def to_gpu(
@@ -373,9 +376,9 @@ Two details that matter:
 
 (rarely hit — the loaders do not use `__getitem__` — but it is the same bug and belongs in the same change.)
 
-### 4.3 Sequential path: delete the copy
+### 5.3 Sequential path: delete the copy
 
-The `DataLoader` sequential path already works on device ([§3.4](#34-what-already-works--the-good-news)). `NativeLoader` needs to be converted to match, and the conversion is a **deletion**, not an addition. Replace dataloader.mojo:339-359:
+The `DataLoader` sequential path already works on device ([§2.4](#24-what-already-works--the-good-news)). `NativeLoader` needs to be converted to match, and the conversion is a **deletion**, not an addition. Replace dataloader.mojo:339-359:
 
 ```mojo
         # Bulk copy if not shuffled
@@ -402,7 +405,7 @@ This deletes the two `unsafe_memcpy` calls, both `get_*_ptr()` uses in the hot p
 
 One contract consequence: a sequential batch is now an **alias of the source**, valid indefinitely, instead of a private copy valid until the next `__next__()`. That asymmetry already exists in `DataLoader` and is documented at dataloader.mojo:813-819. `NativeLoader`'s docstring must be updated to match, and `Batch` consumers must be read-only (they already are — see `epochs.mojo`, which clones off the gather buffer).
 
-### 4.4 Shuffled path: `gather_into` with a device-resident permutation
+### 5.4 Shuffled path: `gather_into` with a device-resident permutation
 
 This is the only genuinely new kernel work. Three layers.
 
@@ -428,7 +431,7 @@ launching `gather_rows_2d_kernel` with `indices_buffer[row + idx_offset]`. Launc
 var idx_sub = self._perm_dev.create_sub_buffer[index_dtype](start, bs)
 ```
 
-`create_sub_buffer[dtype](start, count)` is already used this way at ndbuffer.mojo:1306-1320 (`to_dtype` on GPU, "zero-copy view via create_sub_buffer. No allocation, no copy"). That precedent removes the need for an `idx_offset` kernel parameter entirely — the sub-buffer's pointer already points at `start`. **Per batch: zero allocations, zero transfers.** Compare [§3.5](#35-the-existing-gpu-gather-allocates-per-call)'s 2 allocations + 1 upload per batch.
+`create_sub_buffer[dtype](start, count)` is already used this way at ndbuffer.mojo:1306-1320 (`to_dtype` on GPU, "zero-copy view via create_sub_buffer. No allocation, no copy"). That precedent removes the need for an `idx_offset` kernel parameter entirely — the sub-buffer's pointer already points at `start`. **Per batch: zero allocations, zero transfers.** Compare [§2.5](#25-the-existing-gpu-gather-allocates-per-call)'s 2 allocations + 1 upload per batch.
 
 Note that the permutation must be re-uploaded on `reset()`/`__iter__()` (dataloader.mojo:418-423, 1056-1060, 1156-1160) — 0.5 MB per epoch for MNIST, 7.2 MB over the run. Keep `std.random.shuffle` host-side; it is microseconds and keeps the loader host-light. This is a deliberate divergence from `torch.randperm(n, device=device)` (mnist_pytorch_optimized.py:62), and it is the right one: 0.5 MB/epoch is not where the time goes.
 
@@ -460,7 +463,13 @@ and the preallocated batch buffers gain `device=self.features.device()` (dataloa
 
 Host behavior stays byte-for-byte identical, so the CPU path and its ~40 tests are untouched. This also means `Gather` (gather.mojo) does **not** need to change — the loader uses the kernel directly rather than the autograd-tracked `Gather.forward` op. Batches are read-only training inputs; there is nothing to differentiate.
 
-### 4.5 `into_loader(device=)` as sugar, not the primitive
+### 5.5 `into_loader(device=)` as sugar, not the primitive
+
+> **Not landed as proposed.** All `into_loader` overloads still take only
+> `(batch_size, shuffle, drop_last)`; the `device=`/`residency=` knobs below
+> were not implemented. What landed instead is the §4.5 derive-from-source
+> pattern everywhere: move the dataset (`dataset.to_gpu(gpu)` /
+> `DataLoader.to_gpu(gpu)`), then build the loader with no new argument.
 
 ```mojo
     def into_loader(
@@ -486,7 +495,7 @@ struct Residency:
 Two knobs rather than one, because they answer different questions:
 
 - **`device=`** — *where should batches be produced?* This is the common case and the reason someone reached for this feature.
-- **`residency=`** — *how much data should live there?* `FULL` is the PyTorch-style upfront move. `NONE` with `device=gpu` is Model B. Defaulting `device=` to `FULL` would mean "pass `device=cuda`" silently allocates your entire dataset in VRAM; making it explicit is the [§4](#4-the-central-design-question) gate, made visible.
+- **`residency=`** — *how much data should live there?* `FULL` is the PyTorch-style upfront move. `NONE` with `device=gpu` is Model B. Defaulting `device=` to `FULL` would mean "pass `device=cuda`" silently allocates your entire dataset in VRAM; making it explicit is the [§3](#3-the-central-design-question) gate, made visible.
 
 `FULL` should refuse rather than OOM:
 
@@ -508,7 +517,7 @@ var train_dataset = TensorDataset[FEATURE_DTYPE, LABEL_DTYPE](
 var train_loader = train_dataset.into_loader(batch_size=64, shuffle=True)
 ```
 
-### 4.6 Normalization must leave the loader
+### 5.6 Normalization must leave the loader
 
 `NativeLoader._fill_batch` (dataloader.mojo:384-407) applies `(x - mean) * inv_std` through a raw SIMD loop over a host pointer. There is no GPU equivalent of "poke a host pointer", and adding one would be the wrong abstraction anyway — it re-normalizes the same row on every epoch it appears in.
 
@@ -522,7 +531,7 @@ This is a **behavior-preserving** change for numerics: today the loader applies 
 
 `DataLoader` never had normalization, so it is unaffected — it is already the "pre-normalize, then load" engine.
 
-### 4.7 What stays host-side, deliberately
+### 5.7 What stays host-side, deliberately
 
 | State | Location | Why |
 |---|---|---|
@@ -533,7 +542,7 @@ This is a **behavior-preserving** change for numerics: today the loader applies 
 
 Only bulk sample data and the permutation cross to the device.
 
-### 4.8 Python binding
+### 5.8 Python binding
 
 ```python
 class Tensor:
@@ -550,7 +559,7 @@ class DataLoader:
 
 `device`/`residency` are runtime strings, so `_LOADER_PAIRS` (tenmo.py:1593-1596) needs no new entries — but `tenmo_bind.mojo`'s `_init_data_loader` must forward them. Precedent for adding a string-valued kwarg to a bound type already exists: `CrossEntropyLoss(reduction: String)` (crossentropy.mojo:1311-1322).
 
-The `Tensor.to_gpu` / `to_cpu` bindings are the harder half and are worth doing regardless of this feature — the Python API currently cannot move a tensor to a GPU at all ([§3.6](#36-the-python-surface-cannot-express-any-of-this)).
+The `Tensor.to_gpu` / `to_cpu` bindings are the harder half and are worth doing regardless of this feature — the Python API currently cannot move a tensor to a GPU at all ([§2.6](#26-the-python-surface-cannot-express-any-of-this)).
 
 ---
 
@@ -594,7 +603,7 @@ adding into `acc` on device, read back once per epoch.
 
 ## 7. Alternatives Considered and Rejected
 
-**Reuse `Tensor.gather` per batch.** Already GPU-capable (gather.mojo:461-487) and needs zero new kernels. Rejected as the fast path because it allocates two device buffers and does a host→device index upload per call ([§3.5](#35-the-existing-gpu-gather-allocates-per-call)), violating the documented persistent-buffer contract (dataloader.mojo:809). **Retained as the reference oracle** the new `gather_into` path is tested against — for `rank==2, axis==0` the two must agree element-for-element.
+**Reuse `Tensor.gather` per batch.** Already GPU-capable (gather.mojo:461-487) and needs zero new kernels. Rejected as the fast path because it allocates two device buffers and does a host→device index upload per call ([§2.5](#25-the-existing-gpu-gather-allocates-per-call)), violating the documented persistent-buffer contract (dataloader.mojo:809). **Retained as the reference oracle** the new `gather_into` path is tested against — for `rank==2, axis==0` the two must agree element-for-element.
 
 **Pre-gather the whole epoch into a permuted device buffer, then slice sequentially.** One gather per epoch instead of per batch; the sequential path is then free. Rejected as the default: it needs a second full copy of the dataset (another 188 MB for MNIST train) and its epoch barrier serializes the permutation against compute. Worth an opt-in flag for datasets that comfortably fit — the per-batch launch is ~5 µs and the gather is ~200 KB, so for small batches the launch overhead may dominate. **Measure before adding the flag.**
 
@@ -623,7 +632,7 @@ So a user who passes a *strided* GPU tensor pays a full-dataset copy — and pos
 
 **Q4 — `DType.bool` labels.** `DeviceState` stores `bool` as `uint8` (gpu/transfer.mojo:44, 142) and every `map_to_host`/`materialize_contiguous` site branches on it. A new kernel must either reject `bool` or handle the storage cast. MNIST labels are `int64` so this is not on the critical path, but `DataLoaderProb` (float32/float32) and any boolean-mask loader will hit it.
 
-**Q5 — Multi-GPU.** `into_loader(device=)` takes a `Device`, and `to_device` already handles GPU→different-GPU by materializing through the host (ndbuffer.mojo:567-585). Multi-GPU *training* (DDP-style) is out of scope; multi-GPU *inference over a loader* should work but is untested.
+**Q5 — Multi-GPU.** The proposed `into_loader(device=)` would take a `Device`, and `to_device` already handles GPU→different-GPU by materializing through the host (ndbuffer.mojo:567-585). Multi-GPU *training* (DDP-style) is out of scope; multi-GPU *inference over a loader* should work but is untested.
 
 **Q6 — The `epochs.mojo` clone pattern.** `tenmo/epochs.mojo` documents that it "clone[s] batches off the loader's persistent gather buffers before use." On GPU that clone is a full device allocation per batch (tensor.mojo `clone`), reintroducing exactly the churn [§5.4](#54-shuffled-path-gather_into--with-a-device-resident-permutation) removes. **Action:** re-examine whether the clone is still necessary once the gather buffer is device-resident and the consumer is read-only; if it is not, remove it and update the docstring.
 
@@ -631,7 +640,11 @@ So a user who passes a *strided* GPU tensor pays a full-dataset copy — and pos
 
 ## 9. Call-Site Migration
 
-`examples/mnist_gpu.mojo`, the reference GPU example:
+> **Landed (`4441e93`, `345dee9`).** The deletions below are done;
+> `normalize_mean`/`normalize_std` no longer exist and `mnist_gpu.mojo`
+> already uses resident batches. Keep this section as the migration record.
+
+`examples/mnist_gpu.mojo`, the reference GPU example (pre-migration shape):
 
 ```mojo
 -    # Normalize to [0, 1]
@@ -690,25 +703,25 @@ with `Accuracy.compute(pred, labels_gpu, sync=True)` → `Accuracy.compute(pred,
 
 Unchanged: the `has_accelerator()` guard (mnist_gpu.mojo:23-26), `model.to_gpu(gpu, stop_grad=True)` (:132), and `model.to_cpu()` (:251).
 
-**Call sites needing the mechanical `normalize_*` removal** (all `into_loader` callers passing both kwargs): `mnist_gpu.mojo`, `mnist_conv2d_gpu.mojo`, `mnist_conv_tt_gpu.mojo`, `mnist_mixed.mojo`, `mnist_quant.mojo`, `mnist_gelu.mojo`, `mnist_conv2d.mojo`, `mnist_adamw.mojo`, `mnist_mixed_dtypes.mojo`, `mnist.mojo`, `cifar_10.mojo`, `sort_sequence.mojo`, `reverse_sequence.mojo`, `spiral.mojo`, plus `tests/test_data.mojo`. Each must gain the equivalent prep-step normalization or its numerics change — **do not treat this as a pure signature deletion.**
+**Call sites needing the mechanical `normalize_*` removal** (all `into_loader` callers passing both kwargs — since removed in `4441e93`): `mnist_gpu.mojo`, `mnist_conv2d_gpu.mojo`, `mnist_conv_tt_gpu.mojo`, `mnist_mixed.mojo`, `mnist_quant.mojo`, `mnist_gelu.mojo`, `mnist_conv2d.mojo`, `mnist_adamw.mojo`, `mnist_mixed_dtypes.mojo`, `mnist.mojo`, `cifar_10.mojo`, `sort_sequence.mojo`, `reverse_sequence.mojo`, `spiral.mojo`, plus `tests/test_data.mojo`. Each must gain the equivalent prep-step normalization or its numerics change — **do not treat this as a pure signature deletion.**
 
 ---
 
 ## 10. Test Strategy
 
-`tests/test_data.mojo` has ~40 loader tests, all CPU, several asserting the pointer and persistent-buffer contracts directly (e.g. dataloader.mojo:1520-1582, "Test that DataLoader properly uses pointer (not copy)"). Those must stay green unchanged — they are the regression net for the host path.
+`tests/test_data.mojo` has ~90+ loader tests (was ~40 when written; 94 defs at refresh), all CPU initially, several asserting the pointer and persistent-buffer contracts directly. Those must stay green unchanged — they are the regression net for the host path.
 
 New coverage, gated on `comptime if has_accelerator():` and following the repo's GPU test conventions (`scripts/run_gpu_tests.sh`, `scripts/gpu_test_files.txt`):
 
 1. **Differential test, shuffled.** Same seed, same dataset, host loader vs device loader; assert batches are element-for-element identical. This is the single most valuable test — it catches index-offset bugs, sub-buffer mis-slicing, and kernel argument errors all at once. Run against `DataLoader` first ([§4.3](#43-recommendation-nativeloader-first-with-the-shared-kernel-pulled-ahead-of-both)): its sequential path already works on device, so it is the cheapest oracle for the Phase 5a kernel.
-2. **`gather_into` vs `Tensor.gather`.** Random `(N, C)` for `C` in {1, 32, 64, 128, 512, 784, 1024} to straddle both the `cols <= 512` fast path and the generic rank-dispatch path ([`gather-kernel-double-dispatch.md`](gather-kernel-double-dispatch.md)), with repeated and out-of-order indices. Note that `cols > 512` 2D currently has **no** GPU coverage in `tests/test_gather_gpu.mojo` — this test closes that gap.
+ 2. **`gather_into` vs `Tensor.gather`.** Random `(N, C)` for `C` in {1, 32, 64, 128, 512, 784, 1024} to straddle both the `cols <= 512` fast path and the generic rank-dispatch path ([`gather-kernel-double-dispatch.md`](gather-kernel-double-dispatch.md)), with repeated and out-of-order indices. The `cols > 512` 2D gap in `tests/test_gather_gpu.mojo` was closed with the fix (cols-512/513/784 boundary tests).
 3. **Allocation-count regression.** Assert the per-batch path issues zero `enqueue_create_buffer` calls — this is the contract at dataloader.mojo:809 and the entire point of the change. Needs a counter in the GPU runtime or a test-only hook. The same mechanism, in `gather_kernel.mojo`, is what makes the double-dispatch fix testable.
 4. **Sequential == shuffled-set.** Sequential batches over the full dataset must equal the concatenation of shuffled batches for the same permutation — validates [§5.3](#53-sequential-path-delete-the-copy)'s view-slice conversion, and the `_buffers_owned` invariant in [§4.4](#44-one-asymmetry-the-conversion-introduces).
 5. **Partial last batch.** `drop_last=False` with `N % batch_size != 0` on device (MNIST train is 60000 = 937×64 + 32, so this path is live).
 6. **`to_gpu` / `to_cpu` round-trip.** Numerical identity after round-trip; receiver unchanged; lifetime of the returned dataset outliving its loader.
-7. **`residency=FULL` capacity guard.** Panics cleanly on an oversized request rather than OOM-ing the device.
+ 7. **`residency=FULL` capacity guard (proposed; `residency=` not implemented).** If the `FULL` knob is ever added, it must panic cleanly on an oversized request rather than OOM-ing the device.
 8. **Dtype matrix.** `(float32, int64)`, `(float32, float32)`, and the `bool`-as-`uint8` storage path (Q4).
-9. **Python.** `DataLoader(device="cuda")` and `Tensor.to_gpu()` parity with the Mojo path, via `tests/python/test_data_loader.py`.
+ 9. **Python.** `DataLoader(device="cuda")` and `Tensor.to_gpu()` parity with the Mojo path, via `tests/python/test_data_loader.py`. (Still open at refresh: `DataLoader.to_gpu/to_cpu` landed, ctor `device=` sugar and `Tensor.to_gpu` did not.)
 
 ---
 
@@ -736,17 +749,21 @@ Phase X is a separate concern with its own document and its own test strategy, b
 
 ---
 
-## 12. Implementation Status (2026-10-04)
+## 12. Implementation Status (2026-10-04; refreshed 2026-10-07)
+
+> **Refresh note (2026-10-07):** the three "uncommitted / remaining" items below all landed
+> same-day (`30162c4`, `4441e93`, `345dee9`, `e512431`). Tree is clean. Only
+> genuinely open item is the Phase X launch-count regression test.
 
 - **Phase X + 5a — committed (`03ea4e8`).** `dispatched_2d_fastpath` flag; `GatherKernel.gather_rows_2d_into` reusing `gather_rows_2d_kernel`; cols-512/513/784 boundary tests + into-vs-`Tensor.gather` oracle. GPU: `test_gather_gpu.mojo` 35–36 passed.
 - **Steps 0–2 — committed (`c5aad88`).** Trait `device()` (CPU default), GPU pointer guards, `Dataset.to_gpu`/`to_cpu`, device-aware batch/sample allocations. `test_data.mojo` 87/87 on CPU and GPU.
-- **5b device path — implemented, GPU-validated, uncommitted.** `get_features`/`get_labels`, `_next_batch_device` (sequential = aliasing view slices; shuffled = in-place `gather_rows_2d_into`), `_normalize_device_batch`. Relaxed `gather_rows_2d_into` to flat-row (rank-N, offset-0, contiguous, numel-checked).
+- **5b device path — committed (`30162c4`).** `get_features`/`get_labels`, `_next_batch_device` (sequential = aliasing view slices; shuffled = in-place `gather_rows_2d_into` via `_fill_batch_device`). Relaxed `gather_rows_2d_into` to flat-row (rank-N, offset-0, contiguous, numel-checked) — takes `IntArray` indices, not the `DeviceBuffer` + sub-buffer permutation sketched in §5.4.
 - **Offset defects fixed along the way (same batch).** `ScalarKernel.launch` PATH 1 and `contiguous_device_state` fast path ignored view offsets (read/copied from buffer base); both now read from a sub-buffer at the offset. Regression tests: `test_oop_offset_view_sub_mul_matches_cpu`, `test_contig_gpu_2d_offset_slice_values`.
 - **Host norm-tail defect fixed.** `_fill_batch` SIMD remainder started at `total - simd + 1`, double-normalizing the tail whenever `total` was a multiple of `simd_width` (all other repo loops already used the correct `total - total % simd` idiom). Caught by the new `test_nativeloader_device_parity_normalized`. GPU: `test_data.mojo` 91/91, `test_contiguous.mojo` 39/39.
-- **Remaining:** Phase 5c, launch-count regression test for Phase X, `mnist_gpu.mojo` end-to-end loss parity.
+- **Remaining (as of refresh):** launch-count regression test for Phase X. Done since: Phase 5c (`e512431`), `mnist_gpu` resident-batch migration (`345dee9`), normalization hoist (below) — all committed 2026-10-04.
 - **View-offset defects in compute kernels — found by parity, fixed, validating.** Strict loss parity (same torch init weights + sequential order) matched batch 0 to 7 digits, then diverged: Mojo epoch means collapsed (0.07/0.0003 vs torch 0.34/0.13) with suspiciously smooth batch losses — the signature of re-served rows. Root cause, same bug class as the loader fixes: `MatmulKernel.launch` built per-batch base offsets from batch coordinates only, dropping `Layout.offset`, so every offset row-slice read from the buffer base (batch 0 always looked right). Fixed by adding the view offset to each base offset (covers forward + `matmul_2d` backward, incl. transposed-view dW — `transpose()` preserves offset). `AccuracyKernel`/`SequenceAccuracyKernel.launch` had the same defect on label views (eval accuracy) — fixed via offset sub-buffers. CE fused kernels are safe (`materialize_contiguous` is layout-aware); `blas_matmul` is CPU-only with loud offset guards. Regression tests: `test_matmul2d_gpu_offset_row_slice` (CPU oracle + hand-checked dot), `test_accuracy_gpu_offset_label_view` (decoy labels: 0.4 pre-fix vs 0.7 post-fix).
 - **Follow-up (tracked): audit remaining GPU kernels for dropped view offsets.** Any kernel taking raw `device_buffer()` + manual indexing is suspect (ReLU/Adder/etc. currently only see fresh offset-0 tensors in the MLP path, but conv/NLP paths may differ).
-- **Normalization hoisted (step iv) — uncommitted.** `normalize_mean/std` deleted from the trait `into_loader`, `NativeLoader` (fields, both fill paths, `_normalize_device_batch`), both tensor-dataset overrides, and both NLP wrappers. New `NumpyDataset`/`TensorDataset.normalized(mean, std) -> Self` (value semantics mirroring `to_gpu`/`to_cpu`; `(x-mean)*inv` via Tensor scalar kernels with `track_grad=False`, wherever the data lives; fresh features, shared labels). All 12 examples migrated (eager `normalized()` before `into_loader`); `mnist_unified.mojo` chains it on the temporary. Python binding applies it eagerly in `_train_epoch`/`_eval_epoch`, so `examples/mnist.py` is untouched. `test_nativeloader_device_parity_normalized` rewritten: bulk spot-checks + host-vs-device bulk match + sequential lockstep through param-free loaders.
+- **Normalization hoisted — committed (`4441e93`; `mnist_gpu` migration `345dee9`; 5c `e512431`).** `normalize_mean/std` deleted from the trait `into_loader`, `NativeLoader` (fields, both fill paths), both tensor-dataset overrides, and both NLP wrappers. New `NumpyDataset`/`TensorDataset.normalized(mean, std) -> Self` (value semantics mirroring `to_gpu`/`to_cpu`; `(x-mean)*inv` via Tensor scalar kernels with `track_grad=False`, wherever the data lives; fresh features, shared labels). All 12 examples migrated (eager `normalized()` before `into_loader`); `mnist_unified.mojo` chains it on the temporary. Python binding applies it eagerly in `_train_epoch`/`_eval_epoch`, so `examples/mnist.py` is untouched. `test_nativeloader_device_parity_normalized` rewritten: bulk spot-checks + host-vs-device bulk match + sequential lockstep through param-free loaders.
 - **Known pre-existing failures (not this work):** 45 `test_ip_*` in-place GPU scalar tests fail on device (`test_scalar_gpu.mojo`: 182 passed / 45 failed). Untouched code (`ScalarInplaceKernel`, HEAD-committed tests); pristine-HEAD baseline run on the same box fails the identical 45 (226 run: 181 passed / 45 failed — the +1 delta is the new offset test).
 - **Follow-up (tracked, not this phase): fix the `test_ip_*` in-place GPU scalar failures.** All 45 fail in `ScalarInplaceKernel.launch`'s generic path (add/sub/mul/div/reverse-sub + `pow(2)` scalar across 1d/2d/3d/4d/tail/edge shapes; the dedicated `launch_inplace_pow` strided path passes). Suspect the `inplace_scalar_ops` kernel launch configuration (`simd_vectors_per_thread = 2 * simdwidth` chunking vs `launch_config`) rather than any loader work — the loader never calls this kernel. Repro: `pixi run mojo -I . tests/test_scalar_gpu.mojo` on a T4 box, filter `test_ip_`. Owner: whoever owns `scalar_inplace_ops_kernel.mojo`.
 
@@ -758,7 +775,11 @@ Phase X is a separate concern with its own document and its own test strategy, b
 
 Found while tracing the kernel dispatch for this design; it is a pre-existing defect, not a consequence of it, but Phase 5a touches the same function and must inherit the corrected dispatch.
 
-`GatherKernel.gather_gpu` enqueues the 2D row-gather fast path **and then falls through** to the generic rank-dispatch kernel — there is no `else` and no early return (gather_kernel.mojo:287 onward):
+> **Fixed in `03ea4e8` (Phase X).** The snippet below is the pre-fix shape, kept
+> for context — current code sets `dispatched_2d_fastpath` and guards the
+> generic dispatch with `if rank == r and not dispatched_2d_fastpath`.
+
+`GatherKernel.gather_gpu` enqueued the 2D row-gather fast path **and then fell through** to the generic rank-dispatch kernel — there was no `else` and no early return (pre-fix gather_kernel.mojo:287 onward):
 
 ```mojo
         var out_dev = ctx.enqueue_create_buffer[datatype](total_output)
@@ -774,15 +795,18 @@ Found while tracing the kernel dispatch for this design; it is a pre-existing de
                 _launch_gather_generic[datatype, r, Self.index_dtype](ctx, out_dev, ...)
 ```
 
-Both kernels write the same `out_dev` with the same values, so **results are correct** — but the "Optimized 2D row-gather fast path" advertised at gather.mojo:5 does 2× the memory traffic it is meant to save, on exactly the inputs it targets.
+Both kernels wrote the same `out_dev` with the same values, so **results were correct** — but the "Optimized 2D row-gather fast path" advertised at gather.mojo:5 did 2× the memory traffic it was meant to save, on exactly the inputs it targets.
 
 **Scope:** `rank==2, axis==0, cols <= 512, reduction=NONE`, GPU. MNIST is 784 columns, so it is *not* hit by `mnist_gpu.mojo` — but it is hit by any narrow 2D dataset (`sort_sequence.mojo`, `reverse_sequence.mojo`, IMDb) and by the token-embedding path. `GatherKernel` is reached from `Gather._gather_copy` (gather.mojo:409-418, 467-476), so `Tensor.gather` and `embedding` are both affected.
 
-**Why it survived:** the defect is invisible to value assertions — every test in `tests/test_gather_gpu.mojo` asserts values and keeps passing after a fix. A regression test for it *cannot* be a correctness test; it has to assert launch counts. All 2D fixtures in that file are also 2-3 columns wide, so the generic rank-2 arm has no coverage at all. The dedicated document works this through, specifies the `dispatched`-flag fix, and specifies a three-layer test strategy (CPU predicate unit test, GPU launch-count regression test, recorded before/after benchmark).
+**Why it survived:** the defect is invisible to value assertions — every test in `tests/test_gather_gpu.mojo` asserts values and keeps passing after a fix. A regression test for it *cannot* be a correctness test; it has to assert launch counts. Pre-fix, all 2D fixtures in that file were also 2-3 columns wide, so the generic rank-2 arm had no coverage at all (cols-512/513/784 boundary tests were added with the fix). The dedicated document works this through, specifies the `dispatched`-flag fix, and specifies a three-layer test strategy (CPU predicate unit test, GPU launch-count regression test, recorded before/after benchmark).
 
 ---
 
 ## Appendix B — Reference Inventory
+
+> Line numbers below are pre-5b approximations (see header note). Prefer
+> symbol search over exact `:line` refs.
 
 **Blockers**
 - `tenmo/dataloader.mojo:42-92` — `Dataset` trait, host-pointer contract
