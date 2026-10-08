@@ -216,8 +216,11 @@ struct MatmulKernel[dtype: DType = DType.float32](
                 )
                 B_off += coord * B_batch_strides_obj[i]
 
-            A_offsets.append(A_off)
-            B_offsets.append(B_off)
+            # View offsets (e.g. row-slice batches) are flat element
+            # offsets into the buffer that batch-coordinate math does not
+            # include: without them every view reads from the buffer base.
+            A_offsets.append(A_off + A_layout.offset)
+            B_offsets.append(B_off + B_layout.offset)
 
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu[]

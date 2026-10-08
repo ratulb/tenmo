@@ -381,6 +381,38 @@ def test_reshape_preserves_requires_grad() raises:
 # ===== COMPREHENSIVE TEST FUNCTION =====
 
 
+# =============================================================================
+# GPU reshape of offset views (regression)
+# =============================================================================
+# NDBuffer.fill_device_state's contiguous-GPU fast path copied from the
+# buffer base, dropping view offsets — reshape_gpu silently duplicated the
+# base rows for any offset slice. This broke every consumer that reshapes
+# batch views on device (notably CE's target flattening: every batch ≥1
+# trained against batch-0's labels). Fixed via an offset sub-buffer.
+
+
+def test_reshape_gpu_offset_row_slice() raises:
+    comptime if not has_accelerator():
+        return
+    from tenmo.gpu.device import GPU
+
+    comptime dtype = DType.float32
+    var gpu = GPU()
+    var n = 130
+    var X = Tensor[dtype](Shape(n, 8))
+    for r in range(n):
+        for c in range(8):
+            X[r, c] = Scalar[dtype](r * 8 + c)
+    var Xg = X.to_gpu(gpu)
+    var g = Xg.slice(start=64, end=128, step=1, axis=0)
+    var got = g.reshape(Shape(64, 8)).to_cpu()
+    var c = X.slice(start=64, end=128, step=1, axis=0)
+    var expected = c.reshape(Shape(64, 8))
+    assert_true(got.all_close(expected))
+    # First element pins the offset (pre-fix reads row 0 = 0.0).
+    assert_true(got[0, 0] == Scalar[dtype](64 * 8))
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
 

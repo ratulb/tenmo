@@ -368,6 +368,28 @@ def test_dot_gpu_bwd_chained() raises:
 
 
 # =============================================================================
+# Z5. Dot on offset slices (regression)
+# =============================================================================
+# DotProductKernel.launch ignored Layout.offset AND strides (dense a[i]*b[i]
+# from base). Slice both operands on-device; pre-fix dotted the first 4.
+
+
+def test_dot_offset_slices_gpu() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
+        var b = Tensor[dtype].d1([8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0])
+        var ga = a.to_gpu().slice(start=2, end=6, step=1, axis=0)
+        var gb = b.to_gpu().slice(start=2, end=6, step=1, axis=0)
+        var r = ga.dot(gb)
+        var ea = a.slice(start=2, end=6, step=1, axis=0)
+        var eb = b.slice(start=2, end=6, step=1, axis=0)
+        assert_true(r.to_cpu().all_close(ea.dot(eb)))
+        # 3*6 + 4*5 + 5*4 + 6*3 = 76.
+        assert_true(r.to_cpu().all_close(Tensor[dtype].scalar(76.0)))
+
+
+# =============================================================================
 # Main
 # =============================================================================
 

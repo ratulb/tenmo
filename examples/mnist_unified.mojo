@@ -46,20 +46,18 @@ def train_mnist() raises:
 
     # ── DataLoaders ──
     var batch_size = 64
-    var train_loader = NumpyDataset[dtype, LABEL_DTYPE](
+    var train_dataset = NumpyDataset[dtype, LABEL_DTYPE](
         X_train, y_train
-    ).into_loader(
+    ).normalized(Float32(MNIST_MEAN), Float32(MNIST_STD))
+    var train_loader = train_dataset.into_loader(
         batch_size=batch_size,
         shuffle=True,
-        normalize_mean=Float32(MNIST_MEAN),
-        normalize_std=Float32(MNIST_STD),
     )
-    var test_loader = NumpyDataset[dtype, LABEL_DTYPE](
+    var test_dataset = NumpyDataset[dtype, LABEL_DTYPE](
         X_test, y_test
-    ).into_loader(
+    ).normalized(Float32(MNIST_MEAN), Float32(MNIST_STD))
+    var test_loader = test_dataset.into_loader(
         batch_size=batch_size,
-        normalize_mean=Float32(MNIST_MEAN),
-        normalize_std=Float32(MNIST_STD),
     )
 
     # ── Model ──

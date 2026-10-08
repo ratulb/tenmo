@@ -39,6 +39,7 @@ from .matmul_cpu import MmCpu2d, MmCpuNd
 from .cpu_arithmetics import CpuArithmeticOps
 from .shared.scalar_ops import compare_pair
 from .kernels.compare_kernel import AllClose, Compare, CompareScalar
+from .kernels.cast_kernel import CastKernel
 
 from std.math import sqrt, log, exp, tanh
 from std.random import seed, random_float64, random_ui64
@@ -256,9 +257,16 @@ struct NDBuffer[dtype: DType](
 
         if self.is_on_gpu():
             if self.is_contiguous():
-                self.device_state.value().buffer.enqueue_copy_to(
-                    device_state.buffer
-                )
+                # Offset views (e.g. row-slice batches) are contiguous but
+                # do NOT start at the buffer base: copy from a sub-buffer
+                # at the view offset, else every view silently duplicates
+                # the base rows (same class as contiguous_device_state).
+                var src_buf = self.device_state.value().buffer
+                if self.offset != 0:
+                    src_buf = self.device_state.value().buffer.create_sub_buffer[
+                        DeviceState[Self.dtype].datatype
+                    ](self.offset, self.numels())
+                src_buf.enqueue_copy_to(device_state.buffer)
             else:
                 with device_state.buffer.map_to_host() as host_buffer:
                     var next_index = 0
@@ -1302,45 +1310,25 @@ struct NDBuffer[dtype: DType](
     def to_dtype[NewType: DType](self) -> NDBuffer[NewType]:
         comptime if has_accelerator():
             if self.is_on_gpu():
-                comptime if Self.dtype == NewType:
-                    # Same dtype on GPU: zero-copy view via create_sub_buffer.
-                    # No allocation, no copy — just GPU pointer offset.
-                    # size_of[Self.dtype]() == size_of[NewType]() by comptime
-                    # guarantee, so element counts match exactly.
-                    try:
-                        var src_state = self.contiguous_device_state()
-                        var sub_buf = src_state.buffer.create_sub_buffer[
-                            NewType
-                        ](0, len(src_state.buffer))
-                        var new_state = DeviceState[NewType](
-                            sub_buf, src_state.gpu
-                        )
-                        return NDBuffer[NewType].with_device_state(
-                            new_state^, self.shape
-                        )
-                    except e:
-                        panic(
-                            "NDBuffer to_dtype same-dtype GPU failed: "
-                            + String(e)
-                        )
-                        return NDBuffer[NewType].Empty()
-                else:
-                    # Cross-dtype on GPU: CPU round-trip.
-                    try:
-                        var cpu_ndb = Self.from_device_state(
-                            self.contiguous_device_state(), self.shape
-                        )
-                        var cast_ndb = cpu_ndb.to_dtype[NewType]()
-                        var new_state = DeviceState[NewType](
-                            self.numels(), self.device_state.value().gpu
-                        )
-                        cast_ndb.fill_device_state(new_state)
-                        return NDBuffer[NewType].with_device_state(
-                            new_state^, self.shape
-                        )
-                    except e:
-                        panic("NDBuffer to_dtype GPU failed: " + String(e))
-                        return NDBuffer[NewType].Empty()  # unreachable
+                # All GPU casts go through CastKernel: one device kernel into
+                # a FRESH buffer (no CPU round-trip). Same-dtype is an
+                # identity copy — this also restores CPU parity, since the CPU
+                # path always allocates: the old zero-copy sub-buffer view
+                # aliased the source, so mutating the "cast" corrupted the
+                # original on GPU but not on CPU. No bool special-casing:
+                # CastKernel handles uint8 storage (incl. nonzero→True
+                # canonicalization) and strided/offset views densify inside
+                # materialize_contiguous, as before.
+                try:
+                    var out = CastKernel.launch[Self.dtype, NewType](
+                        self.layout(), self.device_state.value()
+                    )
+                    return NDBuffer[NewType].with_device_state(
+                        out[1], out[0].shape
+                    )
+                except e:
+                    panic("NDBuffer to_dtype GPU failed: " + String(e))
+                    return NDBuffer[NewType].Empty()  # unreachable
 
         # CPU path — unchanged
         var new_buffer = self.contiguous_buffer().to_dtype[NewType]()
@@ -1758,8 +1746,16 @@ struct NDBuffer[dtype: DType](
         var new_state = DeviceState[Self.dtype](self.numels(), gpu)
 
         if self.is_contiguous():
-            # Fast path: direct DeviceBuffer → DeviceBuffer copy, no host round-trip
-            curr_state.buffer.enqueue_copy_to(new_state.buffer)
+            # Fast path: direct DeviceBuffer → DeviceBuffer copy, no host
+            # round-trip. Offset views (e.g. slices) are contiguous but do
+            # NOT start at the buffer base: copy from a sub-buffer at the
+            # view offset, else the copy silently reads the wrong rows.
+            var src_buf = curr_state.buffer
+            if self.offset != 0:
+                src_buf = curr_state.buffer.create_sub_buffer[
+                    DeviceState[Self.dtype].datatype
+                ](self.offset, self.numels())
+            src_buf.enqueue_copy_to(new_state.buffer)
             if sync:
                 new_state.sync()
         else:

@@ -21,6 +21,10 @@ def dot_product_32[
     a: Pointer[Scalar[dtype], ImmutAnyOrigin],
     b: Pointer[Scalar[dtype], ImmutAnyOrigin],
     size_: Int64,
+    a_offset_: Int64,
+    b_offset_: Int64,
+    a_stride_: Int64,
+    b_stride_: Int64,
 ):
     """
         Warp-optimized dot product kernel.
@@ -46,7 +50,10 @@ def dot_product_32[
     var accum = Scalar[dtype](0)
     var i = gtid
     while i < size:
-        accum += a[unsafe_offset=i] * b[unsafe_offset=i]
+        # GPU offset fix: strided view reads (offset + i * stride)
+        accum += a[unsafe_offset=Int(a_offset_) + i * Int(a_stride_)] * b[
+            unsafe_offset=Int(b_offset_) + i * Int(b_stride_)
+        ]
         i += block_dim.x * grid_dim.x
 
     var lane = lane_id()
@@ -82,6 +89,10 @@ def dot_product_64[
     a: Pointer[Scalar[dtype], ImmutAnyOrigin],
     b: Pointer[Scalar[dtype], ImmutAnyOrigin],
     size_: Int64,
+    a_offset_: Int64,
+    b_offset_: Int64,
+    a_stride_: Int64,
+    b_stride_: Int64,
 ):
     var size = Int(size_)
     var block_shared_memory = stack_allocation[
@@ -91,7 +102,10 @@ def dot_product_64[
     var gtid = cache_index + block_dim.x * block_idx.x
     var accum: Scalar[dtype] = 0
     for i in range(gtid, size, block_dim.x * grid_dim.x):
-        accum += a[unsafe_offset=i] * b[unsafe_offset=i]
+        # GPU offset fix: strided view reads (offset + i * stride)
+        accum += a[unsafe_offset=Int(a_offset_) + i * Int(a_stride_)] * b[
+            unsafe_offset=Int(b_offset_) + i * Int(b_stride_)
+        ]
 
     block_shared_memory[unsafe_offset=cache_index] = accum
     barrier()
@@ -172,6 +186,10 @@ struct DotProductKernel[dtype: DType](ImplicitlyCopyable):
                 A_buffer,
                 B_buffer,
                 Int64(numels),
+                Int64(A_layout.offset),  # GPU offset fix
+                Int64(B_layout.offset),  # GPU offset fix
+                Int64(A_layout.strides[0]),  # 1D stride
+                Int64(B_layout.strides[0]),  # 1D stride
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
@@ -186,6 +204,10 @@ struct DotProductKernel[dtype: DType](ImplicitlyCopyable):
                 A_buffer,
                 B_buffer,
                 Int64(numels),
+                Int64(A_layout.offset),  # GPU offset fix
+                Int64(B_layout.offset),  # GPU offset fix
+                Int64(A_layout.strides[0]),  # 1D stride
+                Int64(B_layout.strides[0]),  # 1D stride
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )

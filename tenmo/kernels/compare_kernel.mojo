@@ -202,6 +202,20 @@ struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref A_buffer = A_device_state.device_buffer()
         ref B_buffer = B_device_state.device_buffer()
 
+        # Offset views are contiguous but do NOT start at the buffer
+        # base: read from sub-buffers at the view offsets.
+        var numels = A_layout.numel()
+        var a_input = A_buffer
+        if A_layout.offset != 0:
+            a_input = A_buffer.create_sub_buffer[
+                DeviceState[Self.dtype].datatype
+            ](A_layout.offset, numels)
+        var b_input = B_buffer
+        if B_layout.offset != 0:
+            b_input = B_buffer.create_sub_buffer[
+                DeviceState[Self.dtype].datatype
+            ](B_layout.offset, numels)
+
         var compiled_func = device_context.compile_function[
             all_close[
                 Self.dtype,
@@ -216,9 +230,9 @@ struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         device_context.enqueue_function(
             compiled_func,
             result_buffer,
-            A_buffer,
-            B_buffer,
-            Int64(A_layout.numel()),
+            a_input,
+            b_input,
+            Int64(numels),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
@@ -382,8 +396,8 @@ struct Compare[dtype: DType = DType.float32](
             result_buffer,
             A_buffer,
             B_buffer,
-            Int64(0),
-            Int64(0),
+            Int64(A_layout.offset),
+            Int64(B_layout.offset),
             Int64(output_size),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
@@ -509,6 +523,16 @@ struct CompareScalar[dtype: DType = DType.float32](ImplicitlyCopyable):
 
         ref A_buffer = A_device_state.device_buffer()
 
+        # Offset views are contiguous but do NOT start at the buffer
+        # base: read from a sub-buffer at the view offset. (bool and
+        # uint8 storage are both 1 byte/element, so the offset is valid
+        # in either unit.)
+        var a_input = A_buffer
+        if A_layout.offset != 0:
+            a_input = A_buffer.create_sub_buffer[
+                DeviceState[Self.dtype].datatype
+            ](A_layout.offset, numels)
+
         var result_buffer = device_context.enqueue_create_buffer[DType.uint8](
             numels
         )
@@ -520,7 +544,7 @@ struct CompareScalar[dtype: DType = DType.float32](ImplicitlyCopyable):
             device_context.enqueue_function(
                 compiled_func,
                 result_buffer,
-                A_buffer,
+                a_input,
                 storage_scalar,
                 Int64(numels),
                 grid_dim=num_blocks,
@@ -530,7 +554,7 @@ struct CompareScalar[dtype: DType = DType.float32](ImplicitlyCopyable):
             device_context.enqueue_function(
                 compiled_func,
                 result_buffer,
-                A_buffer,
+                a_input,
                 scalar,
                 Int64(numels),
                 grid_dim=num_blocks,

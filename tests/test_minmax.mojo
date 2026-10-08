@@ -1915,3 +1915,34 @@ def test_backwards_compatibility() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+# ============================================================================
+# Z5. Min/max on offset views (regression)
+# ============================================================================
+# MinMaxKernel.launch ignored Layout.offset (read and mask paths). The
+# 999.0 plant sits OUTSIDE the slice: pre-fix max read rows 0..3 and
+# returned it.
+
+
+def test_minmax_offset_rows_gpu() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(8, 4))
+        for r in range(8):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+        X[4, 1] = Scalar[dtype](-100.0)  # min inside the slice
+        X[0, 0] = Scalar[dtype](999.0)  # max outside the slice
+        var g = X.to_gpu().slice(start=2, end=6, step=1, axis=0)
+        var mn = g.min([1])
+        var mx = g.max([1])
+        var gc = X.slice(start=2, end=6, step=1, axis=0)
+        assert_true(mn.to_cpu().all_close(gc.min([1])))
+        assert_true(mx.to_cpu().all_close(gc.max([1])))
+        assert_true(
+            mn.to_cpu().all_close(Tensor[dtype].d1([8.0, 12.0, -100.0, 20.0]))
+        )
+        assert_true(
+            mx.to_cpu().all_close(Tensor[dtype].d1([11.0, 15.0, 19.0, 23.0]))
+        )

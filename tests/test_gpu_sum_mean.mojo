@@ -1178,3 +1178,47 @@ def test_gpu_mean_keepdims_then_sum_backward() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+# ============================================================================
+# Z5. Reductions on offset views (regression)
+# ============================================================================
+# ReductionKernel.launch ignored Layout.offset: reducing an on-device slice
+# read from the buffer base. Slice rows 2..5 on-device; pre-fix the kernel
+# reduced rows 0..3 instead.
+
+
+def test_sum_offset_rows_gpu() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(8, 4))
+        for r in range(8):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+        var g = X.to_gpu().slice(start=2, end=6, step=1, axis=0)
+        var s = g.sum(axes=[1])
+        var expect = X.slice(start=2, end=6, step=1, axis=0).sum(axes=[1])
+        assert_true(s.to_cpu().all_close(expect))
+        # Row r sums to 16*r + 6.
+        assert_true(
+            s.to_cpu().all_close(Tensor[dtype].d1([38.0, 54.0, 70.0, 86.0]))
+        )
+        var total = g.sum()
+        assert_true(total.to_cpu().all_close(Tensor[dtype].scalar(248.0)))
+
+
+def test_mean_offset_rows_gpu() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(8, 4))
+        for r in range(8):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+        var g = X.to_gpu().slice(start=2, end=6, step=1, axis=0)
+        var m = g.mean(axes=[1])
+        var expect = X.slice(start=2, end=6, step=1, axis=0).mean(axes=[1])
+        assert_true(m.to_cpu().all_close(expect))
+        # Row r averages to 4*r + 1.5.
+        assert_true(
+            m.to_cpu().all_close(Tensor[dtype].d1([9.5, 13.5, 17.5, 21.5]))
+        )

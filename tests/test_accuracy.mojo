@@ -385,6 +385,43 @@ def test_gpu_seq_accuracy() raises:
         assert_equal(gpu_acc, cpu_acc)
 
 
+# ── GPU offset label views (regression) ─────────────────────────────────
+# AccuracyKernel.launch read pred/labels from the buffer base, dropping
+# Layout.offset — every offset batch scored the wrong rows. The launcher
+# now reads from sub-buffers at the view offsets. Decoy first-half labels
+# (all 1s) give 0.4 pre-fix vs 0.7 post-fix, so the test distinguishes.
+
+
+def test_accuracy_gpu_offset_label_view() raises:
+    comptime if not has_accelerator():
+        return
+    from tenmo.gpu.device import GPU
+
+    var gpu = GPU()
+    var full = Tensor[DEFAULT_INDEX_DTYPE].d1(
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0]
+    )
+    var full_gpu = full.to_gpu(gpu)
+    var labs = full_gpu.slice(start=10, end=20, step=1, axis=0)
+    # argmax pattern matches the slice in 7 of 10 rows.
+    var pred = Tensor[DType.float32].d2(
+        [
+            [0.9, 0.1],
+            [0.1, 0.9],
+            [0.9, 0.1],
+            [0.1, 0.9],
+            [0.9, 0.1],
+            [0.1, 0.9],
+            [0.9, 0.1],
+            [0.9, 0.1],
+            [0.9, 0.1],
+            [0.1, 0.9],
+        ]
+    )
+    var acc = Accuracy[DType.float32].compute(pred.to_gpu(gpu), labs)
+    assert_equal(acc, 7.0 / 10.0)
+
+
 # ── main ────────────────────────────────────────────────────────────────
 
 

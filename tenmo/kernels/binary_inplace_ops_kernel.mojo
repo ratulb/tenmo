@@ -71,6 +71,7 @@ def arithmetic_ops_A_contiguous[
     B_strides: RankArray,
     size_: Int64,
     rank_: Int64,
+    b_offset_: Int64,
 ):
     """KERNEL for PATH 2 — A contiguous (fills broadcast_shape); B strided/broadcast.
     OPTIMIZATION vs original scalar-per-lane version:
@@ -112,7 +113,7 @@ def arithmetic_ops_A_contiguous[
                 # Strip innermost coord first to avoid double-counting.
                 var inner_offset = i % inner_dim
                 var outer_remaining = i // inner_dim
-                var b_base = 0
+                var b_base = Int(b_offset_)
 
                 for dim in range(rank - 2, -1, -1):
                     var coord = outer_remaining % result_shape[dim]
@@ -151,7 +152,7 @@ def arithmetic_ops_A_contiguous[
                     comptime for lane in range(simd_width):
                         var linear_idx = i + lane
                         var rem = linear_idx
-                        var b_idx = 0
+                        var b_idx = Int(b_offset_)
 
                         for dim in range(rank - 1, -1, -1):
                             var coord = rem % result_shape[dim]
@@ -172,7 +173,7 @@ def arithmetic_ops_A_contiguous[
                 for j in range(size - i):
                     var linear_idx = i + j
                     var rem = linear_idx
-                    var b_idx = 0
+                    var b_idx = Int(b_offset_)
 
                     for dim in range(rank - 1, -1, -1):
                         var coord = rem % result_shape[dim]
@@ -200,6 +201,7 @@ def arithmetic_ops_B_contiguous[
     A_strides: RankArray,
     size_: Int64,
     rank_: Int64,
+    a_offset_: Int64,
 ):
     """KERNEL for PATH 3 — A strided; B contiguous, no broadcasting.
     OPTIMIZATION vs original scalar-per-lane version:
@@ -250,7 +252,7 @@ def arithmetic_ops_B_contiguous[
                 # Strip innermost coord first to avoid double-counting.
                 var inner_offset = i % inner_dim
                 var outer_remaining = i // inner_dim
-                var a_base = 0
+                var a_base = Int(a_offset_)
                 var a_inner_stride = A_strides[rank - 1]
 
                 for dim in range(rank - 2, -1, -1):
@@ -296,7 +298,7 @@ def arithmetic_ops_B_contiguous[
                     comptime for lane in range(simd_width):
                         var linear_idx = i + lane
                         var rem = linear_idx
-                        var a_idx = 0
+                        var a_idx = Int(a_offset_)
 
                         for dim in range(rank - 1, -1, -1):
                             var coord = rem % result_shape[dim]
@@ -315,7 +317,7 @@ def arithmetic_ops_B_contiguous[
                 for j in range(size - i):
                     var linear_idx = i + j
                     var rem = linear_idx
-                    var a_idx = 0
+                    var a_idx = Int(a_offset_)
 
                     for dim in range(rank - 1, -1, -1):
                         var coord = rem % result_shape[dim]
@@ -346,6 +348,8 @@ def arithmetic_ops_both_strided[
     B_strides: RankArray,
     size_: Int64,
     rank_: Int64,
+    a_offset_: Int64,
+    b_offset_: Int64,
 ):
     """KERNEL for PATH 4 — Both strided / A strided + B needs broadcasting.
     OPTIMIZATION vs original scalar-per-lane version:
@@ -385,8 +389,8 @@ def arithmetic_ops_both_strided[
                 # Strip innermost coord first — prevents double-counting.
                 var inner_offset = i % inner_dim
                 var outer_remaining = i // inner_dim
-                var a_base = 0
-                var b_base = 0
+                var a_base = Int(a_offset_)
+                var b_base = Int(b_offset_)
                 var a_inner_stride = A_strides[rank - 1]
                 var b_inner_stride = B_strides[rank - 1]
 
@@ -421,8 +425,8 @@ def arithmetic_ops_both_strided[
                     comptime for lane in range(simd_width):
                         var linear_idx = i + lane
                         var rem = linear_idx
-                        var a_idx = 0
-                        var b_idx = 0
+                        var a_idx = Int(a_offset_)
+                        var b_idx = Int(b_offset_)
 
                         for dim in range(rank - 1, -1, -1):
                             var coord = rem % result_shape[dim]
@@ -443,8 +447,8 @@ def arithmetic_ops_both_strided[
                 for j in range(size - i):
                     var linear_idx = i + j
                     var rem = linear_idx
-                    var a_idx = 0
-                    var b_idx = 0
+                    var a_idx = Int(a_offset_)
+                    var b_idx = Int(b_offset_)
 
                     for dim in range(rank - 1, -1, -1):
                         var coord = rem % result_shape[dim]
@@ -473,6 +477,7 @@ def arithmetic_ops_A_contiguous_lastdim_contiguous_B[
     B: Pointer[Scalar[dtype], ImmutAnyOrigin],
     last_dim_: Int64,
     size_: Int64,
+    b_offset_: Int64,
 ):
     """KERNEL for bias_add pattern — A contiguous, B contiguous only in last dim.
     Preconditions (enforced by launcher):
@@ -503,7 +508,8 @@ def arithmetic_ops_A_contiguous_lastdim_contiguous_B[
                 var vec_a = A.unsafe_load[width=simd_width](i)
                 var vec_result: SIMD[dtype, simd_width] = 0
 
-                var b_idx = i % last_dim
+                var b_idx = Int(b_offset_) + i % last_dim
+                var b_wrap = Int(b_offset_) + last_dim
 
                 comptime for lane in range(simd_width):
                     vec_result[lane] = scalar_op[op_code, dtype](
@@ -513,8 +519,8 @@ def arithmetic_ops_A_contiguous_lastdim_contiguous_B[
                     )
 
                     b_idx += 1
-                    if b_idx >= last_dim:
-                        b_idx = 0
+                    if b_idx >= b_wrap:
+                        b_idx = Int(b_offset_)
 
                 A.unsafe_store[width=simd_width](i, vec_result)
 
@@ -523,7 +529,10 @@ def arithmetic_ops_A_contiguous_lastdim_contiguous_B[
                     var linear_idx = i + j
                     A[unsafe_offset=linear_idx] = scalar_op[op_code, dtype](
                         A[unsafe_offset=linear_idx],
-                        B[unsafe_offset=linear_idx % last_dim],
+                        B[
+                            unsafe_offset=Int(b_offset_)
+                            + linear_idx % last_dim
+                        ],
                         Epsilon[dtype].value(),
                     )
 
@@ -591,6 +600,19 @@ struct BinaryInplaceKernel[dtype: DType](
         # A_shape == B_shape is guaranteed here because needs_broadcasting
         # is False and broadcast_shape == A_shape by contract.
         if A_is_contiguous and B_is_contiguous and not needs_broadcasting:
+            # Offset views are contiguous but do NOT start at the buffer
+            # base: operate on sub-buffers at the view offsets, else the
+            # kernel silently mutates the wrong elements.
+            var a_target = A_buffer
+            if A_layout.offset != 0:
+                a_target = A_buffer.create_sub_buffer[
+                    DeviceState[Self.dtype].datatype
+                ](A_layout.offset, output_size)
+            var b_target = B_buffer
+            if B_layout.offset != 0:
+                b_target = B_buffer.create_sub_buffer[
+                    DeviceState[Self.dtype].datatype
+                ](B_layout.offset, output_size)
             var compiled_func = device_context.compile_function[
                 arithmetic_ops_both_contiguous[
                     op_code, Self.dtype, simdwidth, 2 * simdwidth
@@ -598,8 +620,8 @@ struct BinaryInplaceKernel[dtype: DType](
             ]()
             device_context.enqueue_function(
                 compiled_func,
-                A_buffer,
-                B_buffer,
+                a_target,
+                b_target,
                 Int64(output_size),
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
@@ -655,12 +677,20 @@ struct BinaryInplaceKernel[dtype: DType](
                         op_code, Self.dtype, simdwidth, 2 * simdwidth
                     ],
                 ]()
+                # A is linear: sub-buffer at its offset. B is strided:
+                # thread its offset into the kernel.
+                var a_target_ld = A_buffer
+                if A_layout.offset != 0:
+                    a_target_ld = A_buffer.create_sub_buffer[
+                        DeviceState[Self.dtype].datatype
+                    ](A_layout.offset, output_size)
                 device_context.enqueue_function(
                     compiled_func,
-                    A_buffer,
+                    a_target_ld,
                     B_buffer,
                     Int64(broadcast_shape[rank - 1]),
                     Int64(output_size),
+                    Int64(B_layout.offset),
                     grid_dim=num_blocks,
                     block_dim=threads_per_block,
                 )
@@ -670,14 +700,22 @@ struct BinaryInplaceKernel[dtype: DType](
                         op_code, Self.dtype, simdwidth, 2 * simdwidth
                     ],
                 ]()
+                # A is linear: sub-buffer at its offset. B is strided:
+                # thread its offset into the kernel.
+                var a_target = A_buffer
+                if A_layout.offset != 0:
+                    a_target = A_buffer.create_sub_buffer[
+                        DeviceState[Self.dtype].datatype
+                    ](A_layout.offset, output_size)
                 device_context.enqueue_function(
                     compiled_func,
-                    A_buffer,
+                    a_target,
                     B_buffer,
                     broadcast_shape.array(),
                     B_broadcast_strides.array(),
                     Int64(output_size),
                     Int64(rank),
+                    Int64(B_layout.offset),
                     grid_dim=num_blocks,
                     block_dim=threads_per_block,
                 )
@@ -705,14 +743,22 @@ struct BinaryInplaceKernel[dtype: DType](
                     op_code, Self.dtype, simdwidth, 2 * simdwidth
                 ],
             ]()
+            # B is linear (exactly output_size elements): sub-buffer at
+            # its offset. A is strided: thread its offset into the kernel.
+            var b_target = B_buffer
+            if B_layout.offset != 0:
+                b_target = B_buffer.create_sub_buffer[
+                    DeviceState[Self.dtype].datatype
+                ](B_layout.offset, output_size)
             device_context.enqueue_function(
                 compiled_func,
                 A_buffer,
-                B_buffer,
+                b_target,
                 broadcast_shape.array(),
                 A_broadcast_strides.array(),
                 Int64(output_size),
                 Int64(rank),
+                Int64(A_layout.offset),
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
@@ -745,6 +791,8 @@ struct BinaryInplaceKernel[dtype: DType](
             B_broadcast_strides.array(),
             Int64(output_size),
             Int64(rank),
+            Int64(A_layout.offset),
+            Int64(B_layout.offset),
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )

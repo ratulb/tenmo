@@ -25,6 +25,7 @@ def reduce_minmax[
     reduction_axes: RankArray,
     total_output_: Int64,
     reduced_volume_: Int64,
+    offset_: Int64,
 ):
     comptime assert (
         max_block_size.is_power_of_two() and max_block_size < 1024
@@ -57,7 +58,7 @@ def reduce_minmax[
 
     var input_base = output_to_input_base(
         out_idx, in_shape, in_strides, reduction_axes
-    )
+    ) + Int(offset_)  # GPU offset fix: seed base with view offset (READ path)
 
     # Grid-stride loop over reduced dimension
     var reduced_idx = tid
@@ -112,6 +113,7 @@ def build_minmax_mask[
     reduction_axes: RankArray,
     total_output_: Int64,
     reduced_volume_: Int64,
+    offset_: Int64,
 ):
     comptime assert (
         max_block_size.is_power_of_two() and max_block_size < 1024
@@ -134,7 +136,7 @@ def build_minmax_mask[
 
     var input_base = output_to_input_base(
         out_idx, in_shape, in_strides, reduction_axes
-    )
+    ) + Int(offset_)  # GPU offset fix: value READs shift by view offset
     var best = (result_buffer .unsafe_offset(out_idx))[]
 
     # Pass 1: count ties in this thread's slice
@@ -175,7 +177,8 @@ def build_minmax_mask[
             reduced_idx, in_shape, in_strides, reduction_axes
         )
         var val = (in_buffer .unsafe_offset(input_base + offset))[]
-        (mask_buffer .unsafe_offset(input_base + offset))[] = inv if val == best else Scalar[
+        # Mask is a fresh dense view-sized buffer — index without view offset
+        (mask_buffer .unsafe_offset(input_base - Int(offset_) + offset))[] = inv if val == best else Scalar[
             dtype
         ](0)
         reduced_idx += block_size
@@ -239,6 +242,7 @@ struct MinMaxKernel[dtype: DType = DType.float32](
             reduction_axes,
             Int64(total_output),
             Int64(reduced_volume),
+            Int64(A_layout.offset),  # GPU offset fix
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
@@ -265,6 +269,7 @@ struct MinMaxKernel[dtype: DType = DType.float32](
             reduction_axes,
             Int64(total_output),
             Int64(reduced_volume),
+            Int64(A_layout.offset),  # GPU offset fix (value READs only)
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )

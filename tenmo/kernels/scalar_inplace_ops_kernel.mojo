@@ -131,6 +131,7 @@ def inplace_scalar_ops_strided[
     strides: RankArray,
     numels_: Int64,
     rank_: Int64,
+    offset_: Int64,
 ):
     """KERNEL for non-contiguous A (strided view).
     Used when inplace_scalar_ops is called on a GPU view that is NOT contiguous
@@ -171,7 +172,7 @@ def inplace_scalar_ops_strided[
                 # Strip innermost coord first — prevents double-counting.
                 var inner_offset = i % inner_dim
                 var outer_remaining = i // inner_dim
-                var a_base = 0
+                var a_base = Int(offset_)
                 var a_inner_stride = strides[rank - 1]
 
                 for dim in range(rank - 2, -1, -1):
@@ -215,7 +216,7 @@ def inplace_scalar_ops_strided[
                     comptime for lane in range(simd_width):
                         var linear_idx = i + lane
                         var rem = linear_idx
-                        var a_idx = 0
+                        var a_idx = Int(offset_)
 
                         for dim in range(rank - 1, -1, -1):
                             var coord = rem % shape[dim]
@@ -233,7 +234,7 @@ def inplace_scalar_ops_strided[
                 for j in range(numels - i):
                     var linear_idx = i + j
                     var rem = linear_idx
-                    var a_idx = 0
+                    var a_idx = Int(offset_)
 
                     for dim in range(rank - 1, -1, -1):
                         var coord = rem % shape[dim]
@@ -260,6 +261,7 @@ def inplace_pow_op_strided[
     strides: RankArray,
     numels_: Int64,
     rank_: Int64,
+    offset_: Int64,
 ) where dtype.is_floating_point():
     """Inplace strided pow — A[idx] = pow(A[idx], exponent). Float dtypes only.
 
@@ -291,7 +293,7 @@ def inplace_pow_op_strided[
                 if i + simd_width <= numels:
                     var inner_offset = i % inner_dim
                     var outer_remaining = i // inner_dim
-                    var a_base = 0
+                    var a_base = Int(offset_)
                     var a_inner_stride = strides[rank - 1]
 
                     for dim in range(rank - 2, -1, -1):
@@ -321,7 +323,7 @@ def inplace_pow_op_strided[
                         comptime for lane in range(simd_width):
                             var linear_idx = i + lane
                             var rem = linear_idx
-                            var a_idx = 0
+                            var a_idx = Int(offset_)
 
                             for dim in range(rank - 1, -1, -1):
                                 var coord = rem % shape[dim]
@@ -335,7 +337,7 @@ def inplace_pow_op_strided[
                     for j in range(numels - i):
                         var linear_idx = i + j
                         var rem = linear_idx
-                        var a_idx = 0
+                        var a_idx = Int(offset_)
 
                         for dim in range(rank - 1, -1, -1):
                             var coord = rem % shape[dim]
@@ -379,6 +381,15 @@ struct ScalarInplaceKernel[dtype: DType = DType.float32](
         # Dispatch on contiguity — same pattern as BinaryInplaceKernel.launch.
         if A_layout.is_contiguous():
             # PATH 1: Contiguous A → flat linear indexing (fast SIMD).
+            # Offset views (e.g. slices) are contiguous but do NOT start
+            # at the buffer base: operate on a sub-buffer at the view
+            # offset, else the kernel silently mutates the wrong rows.
+            # Mirrors ScalarKernel.launch PATH 1.
+            var a_target = A_buffer
+            if A_layout.offset != 0:
+                a_target = A_buffer.create_sub_buffer[
+                    DeviceState[Self.dtype].datatype
+                ](A_layout.offset, numels)
             var compiled_func = device_context.compile_function[
                 inplace_scalar_ops[
                     op_code=op_code,
@@ -390,7 +401,7 @@ struct ScalarInplaceKernel[dtype: DType = DType.float32](
 
             device_context.enqueue_function(
                 compiled_func,
-                A_buffer,
+                a_target,
                 scalar,
                 Int64(numels),
                 grid_dim=num_blocks,
@@ -415,6 +426,7 @@ struct ScalarInplaceKernel[dtype: DType = DType.float32](
                 A_layout.strides.array(),
                 Int64(numels),
                 Int64(rank),
+                Int64(A_layout.offset),
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
@@ -446,6 +458,14 @@ struct ScalarInplaceKernel[dtype: DType = DType.float32](
 
         comptime if Self.dtype.is_floating_point():
             if A_layout.is_contiguous():
+                # Offset views are contiguous but do NOT start at the
+                # buffer base: operate on a sub-buffer at the view
+                # offset, else pow silently mutates the wrong rows.
+                var a_target = A_buffer
+                if A_layout.offset != 0:
+                    a_target = A_buffer.create_sub_buffer[
+                        DeviceState[Self.dtype].datatype
+                    ](A_layout.offset, numels)
                 var compiled = device_context.compile_function[
                     inplace_pow_op[
                         dtype=Self.dtype,
@@ -455,7 +475,7 @@ struct ScalarInplaceKernel[dtype: DType = DType.float32](
                 ]()
                 device_context.enqueue_function(
                     compiled,
-                    A_buffer,
+                    a_target,
                     exponent,
                     Int64(numels),
                     grid_dim=num_blocks,
@@ -478,6 +498,7 @@ struct ScalarInplaceKernel[dtype: DType = DType.float32](
                     A_layout.strides.array(),
                     Int64(numels),
                     Int64(rank),
+                    Int64(A_layout.offset),
                     grid_dim=num_blocks,
                     block_dim=threads_per_block,
                 )

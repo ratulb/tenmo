@@ -1,4 +1,6 @@
+from std.sys import has_accelerator
 from tenmo.tensor import Tensor
+from tenmo.shared.shapes import Shape
 from std.math import sqrt
 from std.testing import assert_true, TestSuite
 from std.utils.numerics import isinf, isnan
@@ -637,3 +639,27 @@ def test_variance_global() raises:
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+# ============================================================================
+# Z5. Variance (Welford path) on offset views (regression)
+# ============================================================================
+# launch_welford ignored Layout.offset. Row r holds {4r..4r+3}: unbiased
+# variance is 5/3 for every row.
+
+
+def test_variance_offset_rows_gpu() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(6, 4))
+        for r in range(6):
+            for c in range(4):
+                X[r, c] = Scalar[dtype](r * 4 + c)
+        var g = X.to_gpu().slice(start=2, end=5, step=1, axis=0)
+        var vv = g.variance(axis=1)
+        var e = X.slice(start=2, end=5, step=1, axis=0).variance(axis=1)
+        assert_true(vv.to_cpu().all_close(e))
+        var third = Scalar[dtype](5.0) / Scalar[dtype](3.0)
+        assert_true(
+            vv.to_cpu().all_close(Tensor[dtype].d1([third, third, third]))
+        )

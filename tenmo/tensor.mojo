@@ -1722,7 +1722,7 @@ struct Tensor[dtype: DType](
 
     @staticmethod
     def from_list[
-        src_dtype: DType
+        src_dtype: DType = Self.dtype
     ](
         values: List[Scalar[src_dtype]],
         requires_grad: Bool = False,

@@ -23,6 +23,7 @@
 from std.sys import has_accelerator
 from std.testing import assert_true, TestSuite, assert_equal
 from tenmo.tensor import Tensor
+from tenmo.shared.shapes import Shape
 from std.math import abs
 from tenmo.shared.intarray import IntArray
 
@@ -913,3 +914,49 @@ def test_prd_parity_store_vs_recompute() raises:
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll product reduction tests passed!")
+
+
+# =============================================================================
+# Z5. Product on offset views (regression)
+# =============================================================================
+# launch_product ignored Layout.offset (both product_reduce and the stored
+# excl_product kernel). Rows hold constant r+1 so products are exact cubes.
+
+
+def test_product_offset_rows_gpu() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(6, 3))
+        for r in range(6):
+            for c in range(3):
+                X[r, c] = Scalar[dtype](r + 1)
+        var g = X.to_gpu().slice(start=2, end=5, step=1, axis=0)
+        var p = g.product(axes=[1])
+        var e = X.slice(start=2, end=5, step=1, axis=0).product(axes=[1])
+        assert_true(p.to_cpu().all_close(e))
+        # 3^3, 4^3, 5^3.
+        assert_true(p.to_cpu().all_close(Tensor[dtype].d1([27.0, 64.0, 125.0])))
+
+
+def test_product_offset_rows_backward_gpu() raises:
+    # Recompute path (compute_excl_product): store_excl_product=False, so
+    # backward recomputes the excluded product on-device instead of reading
+    # the stored one. d loss / d X[r,c] = prod(X[r,:]) / X[r,c] = (r+1)^2.
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var X = Tensor[dtype](Shape(6, 3))
+        X.requires_grad_()
+        for r in range(6):
+            for c in range(3):
+                X[r, c] = Scalar[dtype](r + 1)
+        var g = X.to_gpu().slice(start=2, end=5, step=1, axis=0)
+        var p = g.product[True, False](axes=[1])
+        var loss = p.sum()
+        loss.backward()
+        var G = Tensor[dtype](Shape(6, 3))
+        G.fill(Scalar[dtype](0))
+        for c in range(3):
+            G[2, c] = Scalar[dtype](9.0)
+            G[3, c] = Scalar[dtype](16.0)
+            G[4, c] = Scalar[dtype](25.0)
+        assert_true(X.grad().all_close(G))

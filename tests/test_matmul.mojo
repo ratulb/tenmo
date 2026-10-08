@@ -840,6 +840,50 @@ def test_strided_b_panel_scores_backward() raises:
     print()
 
 
+# =============================================================================
+# Offset row-slice views on GPU (regression)
+# =============================================================================
+# MatmulKernel.launch built per-batch base offsets from batch coordinates
+# only, dropping Layout.offset — every offset view silently read from the
+# buffer base (batch 0 always looked right). The launcher now adds the
+# view offset to each base offset. Small integer values keep all partial
+# sums exactly representable, so the comparison is bit-exact.
+
+
+def test_matmul2d_gpu_offset_row_slice() raises:
+    from std.sys import has_accelerator
+
+    comptime if not has_accelerator():
+        return
+    from tenmo.gpu.device import GPU
+
+    comptime dtype = DType.float32
+    var gpu = GPU()
+    var m = 64
+    var k = 8
+    var n = 4
+    var A = Tensor[dtype](Shape(2 * m, k))
+    for r in range(2 * m):
+        for c in range(k):
+            A[r, c] = Scalar[dtype]((r * k + c) % 7)
+    var B = Tensor[dtype](Shape(k, n))
+    for r in range(k):
+        for c in range(n):
+            B[r, c] = Scalar[dtype]((r * n + c) % 4)
+    var Ag = A.to_gpu(gpu)
+    var Bg = B.to_gpu(gpu)
+    var g = Ag.slice(start=m, end=2 * m, step=1, axis=0)
+    var got = g.matmul[track_grad=False](Bg).to_cpu()
+    var c = A.slice(start=m, end=2 * m, step=1, axis=0)
+    var expected = c.matmul[track_grad=False](B)
+    assert_true(got.all_close(expected))
+    # Hand check C[0,0] = dot(A row 64, B col 0).
+    var dot = Scalar[dtype](0)
+    for t in range(k):
+        dot += Scalar[dtype]((m * k + t) % 7) * Scalar[dtype]((t * n) % 4)
+    assert_true(got[0, 0] == dot)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
     print("\nAll matmul tests passed!")

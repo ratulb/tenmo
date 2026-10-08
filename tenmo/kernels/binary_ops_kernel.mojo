@@ -81,6 +81,8 @@ def arithmetic_ops_both_contiguous_broadcast[
     B_strides: RankArray,  # broadcast strides from Strides.default(B_shape)
     size_: Int64,
     rank_: Int64,
+    a_offset_: Int64,
+    b_offset_: Int64,
     epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ):
     """KERNEL 2 — Both contiguous, shapes differ — broadcast expansion needed.
@@ -140,8 +142,8 @@ def arithmetic_ops_both_contiguous_broadcast[
                 var inner_offset = i % inner_dim
                 var outer_remaining = i // inner_dim
 
-                var a_base = 0
-                var b_base = 0
+                var a_base = Int(a_offset_)
+                var b_base = Int(b_offset_)
 
                 for dim in range(rank - 2, -1, -1):
                     var coord = outer_remaining % result_shape[dim]
@@ -214,8 +216,8 @@ def arithmetic_ops_both_contiguous_broadcast[
                     comptime for lane in range(simd_width):
                         var linear_idx = i + lane
                         var rem = linear_idx
-                        var a_idx = 0
-                        var b_idx = 0
+                        var a_idx = Int(a_offset_)
+                        var b_idx = Int(b_offset_)
 
                         for dim in range(rank - 1, -1, -1):
                             var coord = rem % result_shape[dim]
@@ -236,8 +238,8 @@ def arithmetic_ops_both_contiguous_broadcast[
                 for j in range(size - i):
                     var linear_idx = i + j
                     var rem = linear_idx
-                    var a_idx = 0
-                    var b_idx = 0
+                    var a_idx = Int(a_offset_)
+                    var b_idx = Int(b_offset_)
 
                     for dim in range(rank - 1, -1, -1):
                         var coord = rem % result_shape[dim]
@@ -265,6 +267,7 @@ def arithmetic_ops_A_contiguous[
     B_strides: RankArray,
     size_: Int64,
     rank_: Int64,
+    b_offset_: Int64,
     epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ):
     """KERNEL 3 — A contiguous and fills broadcast shape; B strided/broadcast.
@@ -316,7 +319,7 @@ def arithmetic_ops_A_contiguous[
                 var inner_offset = i % inner_dim
                 var outer_remaining = i // inner_dim
 
-                var b_base = 0
+                var b_base = Int(b_offset_)
                 for dim in range(rank - 2, -1, -1):
                     var coord = outer_remaining % result_shape[dim]
                     b_base += coord * B_strides[dim]
@@ -351,7 +354,7 @@ def arithmetic_ops_A_contiguous[
                     comptime for lane in range(simd_width):
                         var linear_idx = i + lane
                         var rem = linear_idx
-                        var b_idx = 0
+                        var b_idx = Int(b_offset_)
 
                         for dim in range(rank - 1, -1, -1):
                             var coord = rem % result_shape[dim]
@@ -369,7 +372,7 @@ def arithmetic_ops_A_contiguous[
                 for j in range(size - i):
                     var linear_idx = i + j
                     var rem = linear_idx
-                    var b_idx = 0
+                    var b_idx = Int(b_offset_)
 
                     for dim in range(rank - 1, -1, -1):
                         var coord = rem % result_shape[dim]
@@ -398,6 +401,7 @@ def arithmetic_ops_A_contiguous_lastdim_contiguous_B[
     B: Pointer[Scalar[dtype], ImmutAnyOrigin],
     last_dim_: Int64,
     size_: Int64,
+    b_offset_: Int64,
     epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ):
     """KERNEL 3B — A contiguous and fills broadcast shape; B is last-dim-contiguous
@@ -431,7 +435,8 @@ def arithmetic_ops_A_contiguous_lastdim_contiguous_B[
                 var vec_a = A.unsafe_load[width=simd_width](i)
                 var vec_result: SIMD[dtype, simd_width] = 0
 
-                var b_idx = i % last_dim
+                var b_idx = Int(b_offset_) + i % last_dim
+                var b_wrap = Int(b_offset_) + last_dim
 
                 comptime for lane in range(simd_width):
                     vec_result[lane] = scalar_op[op_code, dtype](
@@ -439,8 +444,8 @@ def arithmetic_ops_A_contiguous_lastdim_contiguous_B[
                     )
 
                     b_idx += 1
-                    if b_idx >= last_dim:
-                        b_idx = 0
+                    if b_idx >= b_wrap:
+                        b_idx = Int(b_offset_)
 
                 result.unsafe_store[width=simd_width](i, vec_result)
 
@@ -451,7 +456,10 @@ def arithmetic_ops_A_contiguous_lastdim_contiguous_B[
                         op_code, dtype
                     ](
                         A[unsafe_offset=linear_idx],
-                        B[unsafe_offset=linear_idx % last_dim],
+                        B[
+                            unsafe_offset=Int(b_offset_)
+                            + linear_idx % last_dim
+                        ],
                         epsilon,
                     )
 
@@ -471,6 +479,7 @@ def arithmetic_ops_B_contiguous[
     A_strides: RankArray,
     size_: Int64,
     rank_: Int64,
+    a_offset_: Int64,
     epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ):
     """KERNEL 4 — B contiguous and fills broadcast shape; A strided/broadcast.
@@ -509,7 +518,7 @@ def arithmetic_ops_B_contiguous[
                 var inner_offset = i % inner_dim
                 var outer_remaining = i // inner_dim
 
-                var a_base = 0
+                var a_base = Int(a_offset_)
                 for dim in range(rank - 2, -1, -1):
                     var coord = outer_remaining % result_shape[dim]
                     a_base += coord * A_strides[dim]
@@ -545,7 +554,7 @@ def arithmetic_ops_B_contiguous[
                     comptime for lane in range(simd_width):
                         var linear_idx = i + lane
                         var rem = linear_idx
-                        var a_idx = 0
+                        var a_idx = Int(a_offset_)
 
                         for dim in range(rank - 1, -1, -1):
                             var coord = rem % result_shape[dim]
@@ -563,7 +572,7 @@ def arithmetic_ops_B_contiguous[
                 for j in range(size - i):
                     var linear_idx = i + j
                     var rem = linear_idx
-                    var a_idx = 0
+                    var a_idx = Int(a_offset_)
 
                     for dim in range(rank - 1, -1, -1):
                         var coord = rem % result_shape[dim]
@@ -595,6 +604,8 @@ def arithmetic_ops_both_strided[
     B_strides: RankArray,
     size_: Int64,
     rank_: Int64,
+    a_offset_: Int64,
+    b_offset_: Int64,
     epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ):
     """KERNEL 5 — General fallback: both tensors non-contiguous and/or strided.
@@ -620,8 +631,8 @@ def arithmetic_ops_both_strided[
                 # Compute outer bases for both A and B once per vector.
                 var inner_offset = i % inner_dim
                 var outer_remaining = i // inner_dim
-                var a_base = 0
-                var b_base = 0
+                var a_base = Int(a_offset_)
+                var b_base = Int(b_offset_)
                 var a_inner_stride = A_strides[rank - 1]
                 var b_inner_stride = B_strides[rank - 1]
 
@@ -655,8 +666,8 @@ def arithmetic_ops_both_strided[
                     comptime for lane in range(simd_width):
                         var linear_idx = i + lane
                         var rem = linear_idx
-                        var a_idx = 0
-                        var b_idx = 0
+                        var a_idx = Int(a_offset_)
+                        var b_idx = Int(b_offset_)
 
                         for dim in range(rank - 1, -1, -1):
                             var coord = rem % result_shape[dim]
@@ -676,8 +687,8 @@ def arithmetic_ops_both_strided[
                 for j in range(size - i):
                     var linear_idx = i + j
                     var rem = linear_idx
-                    var a_idx = 0
-                    var b_idx = 0
+                    var a_idx = Int(a_offset_)
+                    var b_idx = Int(b_offset_)
 
                     for dim in range(rank - 1, -1, -1):
                         var coord = rem % result_shape[dim]
@@ -736,6 +747,18 @@ struct BinaryKernel[dtype: DType = DType.float32](
         # No broadcasting, no strides needed. Fastest path.
         # Example: [256, 512] + [256, 512]
         if A_shape == B_shape and A_is_contiguous and B_is_contiguous:
+            # Offset views are contiguous but do NOT start at the buffer
+            # base: read from sub-buffers at the view offsets.
+            var a_input = A_buffer
+            if A_layout.offset != 0:
+                a_input = A_buffer.create_sub_buffer[
+                    DeviceState[Self.dtype].datatype
+                ](A_layout.offset, output_size)
+            var b_input = B_buffer
+            if B_layout.offset != 0:
+                b_input = B_buffer.create_sub_buffer[
+                    DeviceState[Self.dtype].datatype
+                ](B_layout.offset, output_size)
             var compiled_func = device_context.compile_function[
                 arithmetic_ops_both_contiguous[
                     op_code, Self.dtype, simdwidth, 2 * simdwidth
@@ -744,8 +767,8 @@ struct BinaryKernel[dtype: DType = DType.float32](
             device_context.enqueue_function(
                 compiled_func,
                 result_buffer,
-                A_buffer,
-                B_buffer,
+                a_input,
+                b_input,
                 Int64(output_size),
                 epsilon,
                 grid_dim=num_blocks,
@@ -786,13 +809,21 @@ struct BinaryKernel[dtype: DType = DType.float32](
                         op_code, Self.dtype, simdwidth, 2 * simdwidth
                     ],
                 ]()
+                # A reads linearly: sub-buffer at its offset. B is
+                # last-dim strided: thread its offset into the kernel.
+                var a_input_ld = A_buffer
+                if A_layout.offset != 0:
+                    a_input_ld = A_buffer.create_sub_buffer[
+                        DeviceState[Self.dtype].datatype
+                    ](A_layout.offset, output_size)
                 device_context.enqueue_function(
                     compiled_func,
                     result_buffer,
-                    A_buffer,
+                    a_input_ld,
                     B_buffer,
                     Int64(broadcast_shape[rank - 1]),
                     Int64(output_size),
+                    Int64(B_layout.offset),
                     epsilon,
                     grid_dim=num_blocks,
                     block_dim=threads_per_block,
@@ -803,15 +834,23 @@ struct BinaryKernel[dtype: DType = DType.float32](
                         op_code, Self.dtype, simdwidth, 2 * simdwidth
                     ],
                 ]()
+                # A reads linearly: sub-buffer at its offset. B is
+                # strided: thread its offset into the kernel.
+                var a_input = A_buffer
+                if A_layout.offset != 0:
+                    a_input = A_buffer.create_sub_buffer[
+                        DeviceState[Self.dtype].datatype
+                    ](A_layout.offset, output_size)
                 device_context.enqueue_function(
                     compiled_func,
                     result_buffer,
-                    A_buffer,
+                    a_input,
                     B_buffer,
                     broadcast_shape.array(),
                     B_broadcast_strides.array(),
                     Int64(output_size),
                     Int64(rank),
+                    Int64(B_layout.offset),
                     epsilon,
                     grid_dim=num_blocks,
                     block_dim=threads_per_block,
@@ -828,15 +867,24 @@ struct BinaryKernel[dtype: DType = DType.float32](
                     op_code, Self.dtype, simdwidth, 2 * simdwidth
                 ],
             ]()
+            # B reads linearly (exactly output_size elements): sub-buffer
+            # at its offset. A is strided: thread its offset into the
+            # kernel.
+            var b_input = B_buffer
+            if B_layout.offset != 0:
+                b_input = B_buffer.create_sub_buffer[
+                    DeviceState[Self.dtype].datatype
+                ](B_layout.offset, output_size)
             device_context.enqueue_function(
                 compiled_func,
                 result_buffer,
                 A_buffer,
-                B_buffer,
+                b_input,
                 broadcast_shape.array(),
                 A_broadcast_strides.array(),
                 Int64(output_size),
                 Int64(rank),
+                Int64(A_layout.offset),
                 epsilon,
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
@@ -863,6 +911,8 @@ struct BinaryKernel[dtype: DType = DType.float32](
                 B_broadcast_strides.array(),
                 Int64(output_size),
                 Int64(rank),
+                Int64(A_layout.offset),
+                Int64(B_layout.offset),
                 epsilon,
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
@@ -888,6 +938,8 @@ struct BinaryKernel[dtype: DType = DType.float32](
             B_broadcast_strides.array(),
             Int64(output_size),
             Int64(rank),
+            Int64(A_layout.offset),
+            Int64(B_layout.offset),
             epsilon,
             grid_dim=num_blocks,
             block_dim=threads_per_block,

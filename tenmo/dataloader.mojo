@@ -1,11 +1,14 @@
 from .tensor import Tensor
+from .gpu.device import CPU, Device, GPU
+from .kernels.gather_kernel import GatherKernel
+from .shared.intarray import IntArray
 from .shared.panic import panic
 from std.random import shuffle as reshuffle, random_si64
 from std.python import PythonObject
 from .numpy_interop import from_ndarray
 from std.memory import unsafe_memcpy, Pointer
 from .shared.shapes import Shape
-from std.sys import simd_width_of
+from std.sys import has_accelerator
 
 # MNIST
 comptime MNIST_MEAN = 0.1307
@@ -75,13 +78,42 @@ trait Dataset(Sized & Copyable):
         """Total number of elements per label."""
         ...
 
+    def device(ref self) -> Device:
+        """Device the bulk data lives on. Defaults to CPU.
+
+        Overridden by conformers that hold device-resident tensors.
+        Loaders allocate their batch buffers here and dispatch their
+        gather here.
+        """
+        return CPU().into()
+
+    def get_features(ref self) -> Tensor[Self._sample_dtype]:
+        """Borrow the bulk feature tensor (aliases storage; zero-copy).
+
+        Default panics: only tensor-backed datasets (whose bulk data can
+        live on a device) implement this. List-backed datasets
+        (`LLMDataset`, `RandomSlidingWindowDataset`) are always host-side
+        and are served by the flat-pointer contract instead.
+        """
+        panic(
+            "Dataset.get_features: no tensor-backed bulk storage; the"
+            " flat host pointer contract applies."
+        )
+        return Tensor[Self._sample_dtype].zeros(Shape(0))
+
+    def get_labels(ref self) -> Tensor[Self._label_dtype]:
+        """Borrow the bulk label tensor (aliases storage; zero-copy)."""
+        panic(
+            "Dataset.get_labels: no tensor-backed bulk storage; the flat"
+            " host pointer contract applies."
+        )
+        return Tensor[Self._label_dtype].zeros(Shape(0))
+
     def into_loader(
         ref self,
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
-        normalize_mean: Optional[Scalar[Self._sample_dtype]] = None,
-        normalize_std: Optional[Scalar[Self._sample_dtype]] = None,
     ) -> NativeLoader[Self, origin_of(self)]:
         ...
 
@@ -97,7 +129,13 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
     ImplicitlyCopyable & Sized & Iterator
 ):
     """Zero-copy batched data loading over a `Dataset` trait source.
-    (Mojo-native; not directly Python-bound)."""
+    (Mojo-native; not directly Python-bound).
+
+    On a device-resident source, sequential batches are view slices that
+    alias the dataset (like `DataLoader`); shuffled batches fill the
+    persistent device buffers in place. The loader is single-mode
+    (`shuffle` is fixed at construction), so the two never mix.
+    """
 
     var dataset: Pointer[Self.DatasetSource, Self.origin]
     var batch_size: Int
@@ -124,9 +162,9 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
     ]
     var _last_batch_size: Int
 
-    # Optional normalization (mean/std applied after batch fill)
-    var _normalize_mean: Optional[Scalar[Self.DatasetSource._sample_dtype]]
-    var _normalize_std: Optional[Scalar[Self.DatasetSource._sample_dtype]]
+    # NOTE: no normalization lives here. Datasets are normalized once,
+    # eagerly, via Dataset.normalized() before into_loader — per-batch
+    # (x - mean) / std recompute was removed (normalization hoist).
 
     def __init__(out self, *, copy: Self):
         self.dataset = copy.dataset
@@ -143,8 +181,6 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
         self._batch = copy._batch
         self._last_batch = copy._last_batch
         self._last_batch_size = copy._last_batch_size
-        self._normalize_mean = copy._normalize_mean
-        self._normalize_std = copy._normalize_std
 
     def __init__(
         out self,
@@ -152,20 +188,12 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
-        normalize_mean: Optional[
-            Scalar[Self.DatasetSource._sample_dtype]
-        ] = None,
-        normalize_std: Optional[
-            Scalar[Self.DatasetSource._sample_dtype]
-        ] = None,
     ):
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle_data = shuffle
         self.drop_last = drop_last
         self._current_idx = 0
-        self._normalize_mean = normalize_mean
-        self._normalize_std = normalize_std
 
         var total_samples = len(self.dataset[])
         self._indices = List[Int](capacity=total_samples)
@@ -200,12 +228,12 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
         for i in range(self._label_shape.rank()):
             batch_label_dims.append(self._label_shape[i])
 
-        # Allocate full-size batch
+        # Allocate full-size batch on the dataset's device
         var batch_features = Tensor[Self.DatasetSource._sample_dtype].zeros(
-            Shape(batch_feature_dims)
+            Shape(batch_feature_dims), device=dataset_ref.device()
         )
         var batch_labels = Tensor[Self.DatasetSource._label_dtype].zeros(
-            Shape(batch_label_dims)
+            Shape(batch_label_dims), device=dataset_ref.device()
         )
 
         self._batch = Batch[
@@ -234,9 +262,11 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
 
                 var last_features = Tensor[
                     Self.DatasetSource._sample_dtype
-                ].zeros(Shape(last_feature_dims))
+                ].zeros(
+                    Shape(last_feature_dims), device=dataset_ref.device()
+                )
                 var last_labels = Tensor[Self.DatasetSource._label_dtype].zeros(
-                    Shape(last_label_dims)
+                    Shape(last_label_dims), device=dataset_ref.device()
                 )
 
                 self._last_batch = Batch[
@@ -291,10 +321,27 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
 
         var is_last_batch = actual_batch_size < self.batch_size
         ref dataset_ref = self.dataset[]
+        var on_gpu = dataset_ref.device().is_gpu()
 
-        # Choose appropriate batch
+        # Choose appropriate batch. __next__ raises StopIteration only, so
+        # device errors (OOM, transfer failure) panic with context instead
+        # of widening the iterator protocol. The device branch is also
+        # comptime-guarded: it instantiates GPU kernels, which have no
+        # target architecture on a CPU-only build.
         if is_last_batch and self._last_batch:
             ref current_batch = self._last_batch.value()
+            comptime if has_accelerator():
+                if on_gpu:
+                    try:
+                        self._next_batch_device(
+                            True, start_idx, actual_batch_size, dataset_ref
+                        )
+                    except e:
+                        panic(
+                            "NativeLoader: device batch failed: ", String(e)
+                        )
+                    self._current_idx = end_idx
+                    return current_batch
             self._fill_batch(
                 current_batch, start_idx, actual_batch_size, dataset_ref
             )
@@ -302,11 +349,101 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
             return current_batch
         else:
             ref current_batch = self._batch
+            comptime if has_accelerator():
+                if on_gpu:
+                    try:
+                        self._next_batch_device(
+                            False, start_idx, actual_batch_size, dataset_ref
+                        )
+                    except e:
+                        panic(
+                            "NativeLoader: device batch failed: ", String(e)
+                        )
+                    self._current_idx = end_idx
+                    return current_batch
             self._fill_batch(
                 current_batch, start_idx, actual_batch_size, dataset_ref
             )
             self._current_idx = end_idx
             return current_batch
+
+    def _next_batch_device(
+        mut self,
+        is_last_batch: Bool,
+        start_idx: Int,
+        actual_batch_size: Int,
+        ref dataset_ref: Self.DatasetSource,
+    ) raises:
+        """Device-resident batch: sequential binds views, shuffled gathers.
+
+        Sequential batches become view slices aliasing the dataset (the
+        `DataLoader` shape); shuffled batches gather rows in place into
+        the persistent device buffers. No host transfers either way.
+        """
+        var feats = dataset_ref.get_features()
+        var labs = dataset_ref.get_labels()
+        var end_idx = start_idx + actual_batch_size
+
+        if not self.shuffle_data:
+            var fx = feats.slice(
+                start=start_idx, end=end_idx, step=1, axis=0
+            )
+            var ly = labs.slice(
+                start=start_idx, end=end_idx, step=1, axis=0
+            )
+            if is_last_batch and self._last_batch:
+                ref last_batch = self._last_batch.value()
+                last_batch.features = fx
+                last_batch.labels = ly
+            else:
+                self._batch.features = fx
+                self._batch.labels = ly
+        else:
+            if is_last_batch and self._last_batch:
+                self._fill_batch_device(
+                    self._last_batch.value(),
+                    start_idx,
+                    actual_batch_size,
+                    dataset_ref,
+                )
+            else:
+                self._fill_batch_device(
+                    self._batch, start_idx, actual_batch_size, dataset_ref
+                )
+
+    def _fill_batch_device(
+        self,
+        batch: Batch[
+            Self.DatasetSource._sample_dtype, Self.DatasetSource._label_dtype
+        ],
+        start_idx: Int,
+        actual_batch_size: Int,
+        ref dataset_ref: Self.DatasetSource,
+    ) raises:
+        """Gather rows `_indices[start_idx:start_idx+bs]` in place on device.
+
+        Fills the preallocated device batch buffers; the only host→device
+        traffic is the batch's index list. Bulk data stays resident.
+        """
+        var feats = dataset_ref.get_features()
+        var labs = dataset_ref.get_labels()
+        var idx = IntArray.with_capacity(actual_batch_size)
+        for k in range(actual_batch_size):
+            idx.append(self._indices[start_idx + k])
+        GatherKernel[Self.DatasetSource._sample_dtype].gather_rows_2d_into(
+            feats.buffer.layout(),
+            feats.buffer.device_state.value(),
+            idx,
+            batch.features.buffer.layout(),
+            batch.features.buffer.device_state.value(),
+        )
+        GatherKernel[Self.DatasetSource._label_dtype].gather_rows_2d_into(
+            labs.buffer.layout(),
+            labs.buffer.device_state.value(),
+            idx,
+            batch.labels.buffer.layout(),
+            batch.labels.buffer.device_state.value(),
+        )
 
     def _fill_batch(
         self,
@@ -379,32 +516,6 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
                     src=dataset_labels_ptr.unsafe_offset(src_label_offset),
                     count=self._labels_per_sample,
                 )
-
-        # Apply normalization after fill (SIMD)
-        if self._normalize_mean and self._normalize_std:
-            var mean = self._normalize_mean.value()
-            var inv_std = (
-                Scalar[Self.DatasetSource._sample_dtype](1)
-                / self._normalize_std.value()
-            )
-
-            comptime simd_width = simd_width_of[
-                Scalar[Self.DatasetSource._sample_dtype]
-            ]()
-            var i = 0
-            for i in range(
-                0, total_feature_elements - simd_width + 1, simd_width
-            ):
-                var vec = batch_features_ptr.unsafe_load[width=simd_width](i)
-                vec = (vec - mean) * inv_std
-                batch_features_ptr.unsafe_store[width=simd_width](i, vec)
-            for i in range(
-                total_feature_elements - simd_width + 1,
-                total_feature_elements,
-            ):
-                batch_features_ptr[unsafe_offset=i] = (
-                    batch_features_ptr[unsafe_offset=i] - mean
-                ) * inv_std
 
     def __has_next__(self) -> Bool:
         if self.drop_last:
@@ -499,14 +610,71 @@ struct NumpyDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
     def __len__(self) -> Int:
         return self._size
 
+    def device(ref self) -> Device:
+        return self._features.device()
+
+    def to_gpu(
+        ref self, gpu: Optional[GPU] = None, sync: Bool = True
+    ) raises -> Self:
+        """Return a dataset whose bulk data is resident on `gpu`.
+
+        The returned dataset owns its tensors; the receiver is unchanged.
+        """
+        var target = gpu.or_else(GPU())
+        var f = self._features.to_gpu(target, sync=sync)
+        var y = self._labels.to_gpu(target, sync=sync)
+        return Self(f, y)
+
+    def to_cpu(ref self, sync: Bool = True) raises -> Self:
+        """Return a dataset whose bulk data is resident on the host."""
+        return Self(
+            self._features.to_cpu(sync=sync),
+            self._labels.to_cpu(sync=sync),
+        )
+
+    def normalized(
+        ref self, mean: Scalar[Self.sample_dtype], std: Scalar[Self.sample_dtype]
+    ) raises -> Self:
+        """Return a dataset with `(features - mean) / std`, computed once.
+
+        The transform runs wherever the bulk data currently lives (host
+        SIMD or device kernels — no transfers), so call this after
+        `to_gpu()` for device residency. Features are newly allocated;
+        label storage is shared with the receiver. `track_grad=False`:
+        dataset bulk is data, not a differentiable leaf.
+        """
+        var inv_std = Scalar[Self.sample_dtype](1) / std
+        var normed = self._features.__sub__[track_grad=False](
+            mean
+        ).__mul__[track_grad=False](inv_std)
+        return Self(normed, self._labels)
+
+    def get_features(ref self) -> Tensor[Self.sample_dtype]:
+        return self._features
+
+    def get_labels(ref self) -> Tensor[Self.label_dtype]:
+        return self._labels
+
     def get_features_ptr(
         ref self,
     ) -> Pointer[Scalar[Self.sample_dtype], ImmutAnyOrigin]:
+        if self.device().is_gpu():
+            panic(
+                "NumpyDataset.get_features_ptr: bulk data is device-resident;"
+                " the flat host pointer contract does not apply. Use the"
+                " loader's tensor-level path or .to_cpu() first."
+            )
         return self._features.data_ptr().as_imm()
 
     def get_labels_ptr(
         ref self,
     ) -> Pointer[Scalar[Self.label_dtype], ImmutAnyOrigin]:
+        if self.device().is_gpu():
+            panic(
+                "NumpyDataset.get_labels_ptr: bulk data is device-resident;"
+                " the flat host pointer contract does not apply. Use the"
+                " loader's tensor-level path or .to_cpu() first."
+            )
         return self._labels.data_ptr().as_imm()
 
     def get_feature_shape(self) -> Shape:
@@ -528,11 +696,13 @@ struct NumpyDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
         if idx < 0 or idx >= self._size:
             panic("NumpyDataset: index out of bounds")
 
-        # Create tensors with proper shape
+        # Create tensors with proper shape, on the dataset's device
         var sample_feature = Tensor[Self.sample_dtype].zeros(
-            self._feature_shape
+            self._feature_shape, device=self._features.device()
         )
-        var sample_label = Tensor[Self.label_dtype].zeros(self._label_shape)
+        var sample_label = Tensor[Self.label_dtype].zeros(
+            self._label_shape, device=self._features.device()
+        )
 
         var dataset_features_ptr = self.get_features_ptr()
         var dataset_labels_ptr = self.get_labels_ptr()
@@ -578,16 +748,12 @@ struct NumpyDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
-        normalize_mean: Optional[Scalar[Self._sample_dtype]] = None,
-        normalize_std: Optional[Scalar[Self._sample_dtype]] = None,
     ) -> NativeLoader[Self, origin_of(self)]:
         return NativeLoader(
             Pointer(to=self),
             batch_size,
             shuffle,
             drop_last,
-            normalize_mean=normalize_mean,
-            normalize_std=normalize_std,
         )
 
 
@@ -664,14 +830,70 @@ struct TensorDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
     def __len__(self) -> Int:
         return self._size
 
+    def device(ref self) -> Device:
+        return self._features.device()
+
+    def to_gpu(
+        ref self, gpu: Optional[GPU] = None, sync: Bool = True
+    ) raises -> Self:
+        """Return a dataset whose bulk data is resident on `gpu`.
+
+        The returned dataset owns its tensors; the receiver is unchanged.
+        """
+        var target = gpu.or_else(GPU())
+        var f = self._features.to_gpu(target, sync=sync)
+        var y = self._labels.to_gpu(target, sync=sync)
+        return Self(f, y)
+
+    def to_cpu(ref self, sync: Bool = True) raises -> Self:
+        """Return a dataset whose bulk data is resident on the host."""
+        return Self(
+            self._features.to_cpu(sync=sync),
+            self._labels.to_cpu(sync=sync),
+        )
+
+    def normalized(
+        ref self, mean: Scalar[Self.sample_dtype], std: Scalar[Self.sample_dtype]
+    ) raises -> Self:
+        """Return a dataset with `(features - mean) / std`, computed once.
+
+        Runs wherever the bulk data lives (no transfers); call after
+        `to_gpu()` for device residency. Features are newly allocated,
+        label storage is shared. `track_grad=False`: bulk is data, not a
+        differentiable leaf.
+        """
+        var inv_std = Scalar[Self.sample_dtype](1) / std
+        var normed = self._features.__sub__[track_grad=False](
+            mean
+        ).__mul__[track_grad=False](inv_std)
+        return Self(normed, self._labels)
+
+    def get_features(ref self) -> Tensor[Self.sample_dtype]:
+        return self._features
+
+    def get_labels(ref self) -> Tensor[Self.label_dtype]:
+        return self._labels
+
     def get_features_ptr(
         ref self,
     ) -> Pointer[Scalar[Self.sample_dtype], ImmutAnyOrigin]:
+        if self.device().is_gpu():
+            panic(
+                "TensorDataset.get_features_ptr: bulk data is device-resident;"
+                " the flat host pointer contract does not apply. Use the"
+                " loader's tensor-level path or .to_cpu() first."
+            )
         return self._features.data_ptr().as_imm()
 
     def get_labels_ptr(
         ref self,
     ) -> Pointer[Scalar[Self.label_dtype], ImmutAnyOrigin]:
+        if self.device().is_gpu():
+            panic(
+                "TensorDataset.get_labels_ptr: bulk data is device-resident;"
+                " the flat host pointer contract does not apply. Use the"
+                " loader's tensor-level path or .to_cpu() first."
+            )
         return self._labels.data_ptr().as_imm()
 
     # New API methods (required by updated Dataset trait)
@@ -713,11 +935,13 @@ struct TensorDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
         if idx < 0 or idx >= self._size:
             panic("TensorDataset: index out of bounds")
 
-        # Create tensors with proper shape
+        # Create tensors with proper shape, on the dataset's device
         var sample_feature = Tensor[Self.sample_dtype].zeros(
-            self._feature_shape
+            self._feature_shape, device=self._features.device()
         )
-        var sample_label = Tensor[Self.label_dtype].zeros(self._label_shape)
+        var sample_label = Tensor[Self.label_dtype].zeros(
+            self._label_shape, device=self._features.device()
+        )
 
         var dataset_features_ptr = self.get_features_ptr()
         var dataset_labels_ptr = self.get_labels_ptr()
@@ -764,16 +988,12 @@ struct TensorDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
-        normalize_mean: Optional[Scalar[Self._sample_dtype]] = None,
-        normalize_std: Optional[Scalar[Self._sample_dtype]] = None,
     ) -> NativeLoader[Self, origin_of(self)]:
         return NativeLoader(
             Pointer(to=self),
             batch_size,
             shuffle,
             drop_last,
-            normalize_mean=normalize_mean,
-            normalize_std=normalize_std,
         )
 
 
@@ -879,6 +1099,14 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
 
         self.features = src_f^
         self.labels = src_l^
+        # Derive-the-device (§4.5): batch buffers live where the sources
+        # live. Mixed-device sources are a caller bug — fail loudly rather
+        # than silently building half-CPU batches.
+        if self.features.device() != self.labels.device():
+            panic(
+                "DataLoader: features and labels must live on the same"
+                " device. Move both with .to_gpu()/.to_cpu() first."
+            )
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.drop_last = drop_last
@@ -931,8 +1159,12 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
         for i in range(1, lshape0.rank()):
             blabel.append(lshape0.dims[i])
         self._batch = Batch[Self.sample_dtype, Self.label_dtype](
-            Tensor[Self.sample_dtype].zeros(Shape(bfeat)),
-            Tensor[Self.label_dtype].zeros(Shape(blabel)),
+            Tensor[Self.sample_dtype].zeros(
+                Shape(bfeat), device=self.features.device()
+            ),
+            Tensor[Self.label_dtype].zeros(
+                Shape(blabel), device=self.features.device()
+            ),
         )
         self._last_batch_size = 0
         self._last_batch = None
@@ -951,8 +1183,12 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
                 self._last_batch = Batch[
                     Self.sample_dtype, Self.label_dtype
                 ](
-                    Tensor[Self.sample_dtype].zeros(Shape(lfeat)),
-                    Tensor[Self.label_dtype].zeros(Shape(llabel)),
+                    Tensor[Self.sample_dtype].zeros(
+                        Shape(lfeat), device=self.features.device()
+                    ),
+                    Tensor[Self.label_dtype].zeros(
+                        Shape(llabel), device=self.features.device()
+                    ),
                 )
         self._buffers_owned = True
 
@@ -985,8 +1221,12 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
         var full_batch = Batch[
             Self.sample_dtype, Self.label_dtype
         ](
-            Tensor[Self.sample_dtype].zeros(Shape(bfeat)),
-            Tensor[Self.label_dtype].zeros(Shape(blabel)),
+            Tensor[Self.sample_dtype].zeros(
+                Shape(bfeat), device=self.features.device()
+            ),
+            Tensor[Self.label_dtype].zeros(
+                Shape(blabel), device=self.features.device()
+            ),
         )
 
         var last_batch: Optional[
@@ -1010,11 +1250,48 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
                 last_batch = Batch[
                     Self.sample_dtype, Self.label_dtype
                 ](
-                    Tensor[Self.sample_dtype].zeros(Shape(lfeat)),
-                    Tensor[Self.label_dtype].zeros(Shape(llabel)),
+                    Tensor[Self.sample_dtype].zeros(
+                        Shape(lfeat), device=self.features.device()
+                    ),
+                    Tensor[Self.label_dtype].zeros(
+                        Shape(llabel), device=self.features.device()
+                    ),
                 )
 
         return (full_batch, last_batch, last_batch_size)
+
+    def to_gpu(mut self, gpu: Optional[GPU] = None) raises:
+        """Move sources to the GPU and rebuild batch buffers there.
+
+        Derive-the-device (§4.5): buffers always follow the sources via
+        `_make_buffers`, so no stored device can drift. Transfers stay
+        visible at the call site; call once before training.
+        """
+        comptime if has_accelerator():
+            self.features = self.features.to_gpu(gpu)
+            self.labels = self.labels.to_gpu(gpu)
+        else:
+            raise Error("DataLoader.to_gpu: no accelerator on this system")
+        var buffers = self._make_buffers()
+        var (batch0, last_batch0, last_batch_size0) = buffers
+        self._batch = batch0
+        self._last_batch = last_batch0
+        self._last_batch_size = last_batch_size0
+        self._buffers_owned = True
+
+    def to_cpu(mut self) raises:
+        """Move sources to the CPU and rebuild batch buffers there."""
+        comptime if has_accelerator():
+            if self.features.is_on_gpu():
+                self.features = self.features.to_cpu()
+            if self.labels.is_on_gpu():
+                self.labels = self.labels.to_cpu()
+        var buffers = self._make_buffers()
+        var (batch0, last_batch0, last_batch_size0) = buffers
+        self._batch = batch0
+        self._last_batch = last_batch0
+        self._last_batch_size = last_batch_size0
+        self._buffers_owned = True
 
     def __len__(self) -> Int:
         return self._num_batches
@@ -1089,22 +1366,31 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
             self._buffers_owned = False
             if is_last and self._last_batch:
                 ref last_batch = self._last_batch.value()
-                last_batch.features = fx^
-                last_batch.labels = ly^
+                last_batch.features = fx
+                last_batch.labels = ly
                 return last_batch
             else:
-                self._batch.features = fx^
-                self._batch.labels = ly^
+                self._batch.features = fx
+                self._batch.labels = ly
                 return self._batch
         else:
             # Shuffled (train): row-gather into the persistent buffer.
+            # __next__ raises StopIteration only, so device errors panic
+            # with context instead of widening the iterator protocol
+            # (same policy as NativeLoader.__next__).
             if is_last and self._last_batch:
                 ref current_batch = self._last_batch.value()
-                self._fill_batch(current_batch, start, bs)
+                try:
+                    self._fill_batch(current_batch, start, bs)
+                except e:
+                    panic("DataLoader: batch gather failed: ", String(e))
                 return current_batch
             else:
                 ref current_batch = self._batch
-                self._fill_batch(current_batch, start, bs)
+                try:
+                    self._fill_batch(current_batch, start, bs)
+                except e:
+                    panic("DataLoader: batch gather failed: ", String(e))
                 return current_batch
 
     def _fill_batch(
@@ -1112,8 +1398,39 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
         batch: Batch[Self.sample_dtype, Self.label_dtype],
         start: Int,
         bs: Int,
-    ):
-        """Gather rows `_indices[start:start+bs]` into a batch buffer."""
+    ) raises:
+        """Gather rows `_indices[start:start+bs]` into a batch buffer.
+
+        Device branch dispatches `gather_rows_2d_into` (5a kernel) with
+        only the index list crossing host→device; bulk data stays
+        resident. Sources are owned offset-0 contiguous by construction
+        (`__init__` always materializes), satisfying the kernel contract.
+        """
+        # Comptime-guarded: the gather path instantiates GPU kernels,
+        # which have no target architecture on a CPU-only build (same
+        # policy as NativeLoader.__next__).
+        comptime if has_accelerator():
+            if self.features.is_on_gpu():
+                var feats = self.features
+                var labs = self.labels
+                var idx = IntArray.with_capacity(bs)
+                for k in range(bs):
+                    idx.append(self._indices[start + k])
+                GatherKernel[Self.sample_dtype].gather_rows_2d_into(
+                    feats.buffer.layout(),
+                    feats.buffer.device_state.value(),
+                    idx,
+                    batch.features.buffer.layout(),
+                    batch.features.buffer.device_state.value(),
+                )
+                GatherKernel[Self.label_dtype].gather_rows_2d_into(
+                    labs.buffer.layout(),
+                    labs.buffer.device_state.value(),
+                    idx,
+                    batch.labels.buffer.layout(),
+                    batch.labels.buffer.device_state.value(),
+                )
+                return
         var batch_features_ptr = (
             batch.features.data_ptr()
             .unsafe_mut_cast[True]()

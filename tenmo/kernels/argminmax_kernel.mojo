@@ -25,6 +25,7 @@ def reduce_argminmax[
     reduction_axis_: Int64,
     total_output_: Int64,
     reduced_volume_: Int64,
+    offset_: Int64,
 ):
     comptime assert (
         max_block_size.is_power_of_two() and max_block_size < 1024
@@ -49,7 +50,7 @@ def reduce_argminmax[
         return
 
     var remaining = out_idx
-    var input_base = 0
+    var input_base = Int(offset_)  # GPU offset fix: seed base with view offset
     var rank = len(in_shape)
 
     for k in reversed(range(rank)):
@@ -154,6 +155,7 @@ struct ArgMinMaxKernel[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             Int64(ax),
             Int64(total_output),
             Int64(reduced_volume),
+            Int64(A_layout.offset),  # GPU offset fix
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )

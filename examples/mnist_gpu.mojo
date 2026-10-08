@@ -69,6 +69,10 @@ def train_mnist() raises:
     print("  y_test:", y_test.shape(), "\n")
 
     # ========== DataLoaders ==========
+    # Device-resident bulk: one upload + one eager normalization, then
+    # the loader serves aliasing views (sequential) / in-place gathers
+    # (shuffled) with zero per-batch transfers.
+    var gpu = GPU()
     var train_batch_size = 64
     var test_batch_size = 64
 
@@ -77,19 +81,23 @@ def train_mnist() raises:
     )
     var test_dataset = NumpyDataset[FEATURE_DTYPE, LABEL_DTYPE](X_test, y_test)
 
+    # Upload once, normalize once (on-device, no transfers).
+    train_dataset = train_dataset.to_gpu(gpu).normalized(
+        Float32(MNIST_MEAN), Float32(MNIST_STD)
+    )
+    test_dataset = test_dataset.to_gpu(gpu).normalized(
+        Float32(MNIST_MEAN), Float32(MNIST_STD)
+    )
+
     var train_loader = train_dataset.into_loader(
         batch_size=train_batch_size,
         shuffle=True,
         drop_last=False,
-        normalize_mean=Float32(MNIST_MEAN),
-        normalize_std=Float32(MNIST_STD),
     )
     var test_loader = test_dataset.into_loader(
         batch_size=test_batch_size,
         shuffle=False,
         drop_last=False,
-        normalize_mean=Float32(MNIST_MEAN),
-        normalize_std=Float32(MNIST_STD),
     )
 
     print("DataLoaders:")
@@ -128,7 +136,6 @@ def train_mnist() raises:
     # Gradients accumulate on GPU and never cross back to CPU
     # during the training loop — only transferred back once at the end.
     print("Transferring model parameters to GPU...")
-    var gpu = GPU()
     model = model.to_gpu(gpu, stop_grad=True)
     print("  Model is now resident on GPU\n")
 
@@ -171,13 +178,10 @@ def train_mnist() raises:
         while train_loader.__has_next__():
             ref batch = train_loader.__next__()
 
-            # Async data transfer — GPU queues the copy, returns immediately.
-            # Forward ops queue after the copy on the GPU execution stream.
-            var features_gpu = batch.features.to_gpu(gpu, sync=False)
-            var labels_gpu = batch.labels.to_gpu(gpu, sync=False)
-
-            var pred = model(features_gpu)
-            var loss = criterion(pred, labels_gpu)
+            # Batches are already device-resident (views / in-place
+            # gathers over the resident dataset) — no transfer.
+            var pred = model(batch.features)
+            var loss = criterion(pred, batch.labels)
 
             optimizer.zero_grad()
             loss.backward()
@@ -186,8 +190,8 @@ def train_mnist() raises:
             # loss.item() syncs GPU (reads scalar value back)
             train_loss += loss.item() * Float32(batch.batch_size)
             train_correct += Accuracy[FEATURE_DTYPE].compute(
-                pred, labels_gpu, sync=True
-            ) * Float64(labels_gpu.shape()[0])
+                pred, batch.labels, sync=True
+            ) * Float64(batch.labels.shape()[0])
             train_total += batch.batch_size
 
         # --- Validation Phase ---
@@ -201,16 +205,13 @@ def train_mnist() raises:
         while test_loader.__has_next__():
             ref batch = test_loader.__next__()
 
-            var features_gpu = batch.features.to_gpu(gpu, sync=False)
-            var labels_gpu = batch.labels.to_gpu(gpu, sync=False)
-
-            var pred = model(features_gpu)
-            var loss = criterion(pred, labels_gpu)
+            var pred = model(batch.features)
+            var loss = criterion(pred, batch.labels)
 
             val_loss += loss.item() * Float32(batch.batch_size)
             val_correct += Accuracy[FEATURE_DTYPE].compute(
-                pred, labels_gpu, sync=True
-            ) * Float64(labels_gpu.shape()[0])
+                pred, batch.labels, sync=True
+            ) * Float64(batch.labels.shape()[0])
             val_total += batch.batch_size
 
         # --- Epoch Report ---

@@ -1,6 +1,8 @@
 from tenmo.tensor import Tensor
 from tenmo.shared.shapes import Shape
 from tenmo.shared.mnemonics import mv
+from tenmo.shared.mnemonics import vm
+from std.sys import has_accelerator
 from std.testing import assert_true, TestSuite
 from tenmo.shared.strides import Strides
 
@@ -9,6 +11,48 @@ from tenmo.shared.strides import Strides
 
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
+
+
+# ============================================================================
+# Z5. Matvec / vecmat on offset views (regression)
+# ============================================================================
+# MatrixVectorKernel / VectorMatmulKernel launches ignored Layout.offset
+# (M_base / v_base started at 0). Row r of the pattern maps to 40*r + 30.
+
+
+def test_matvec_offset_rows_gpu() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var M = Tensor[dtype](Shape(6, 4))
+        for r in range(6):
+            for c in range(4):
+                M[r, c] = Scalar[dtype](r * 4 + c)
+        var v = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])
+        var gM = M.to_gpu().slice(start=2, end=5, step=1, axis=0)
+        var r = gM.matmul[mode=mv](v.to_gpu())
+        var eM = M.slice(start=2, end=5, step=1, axis=0)
+        assert_true(r.to_cpu().all_close(eM.matmul[mode=mv](v)))
+        assert_true(r.to_cpu().all_close(Tensor[dtype].d1([100.0, 140.0, 180.0])))
+
+
+def test_vecmat_offset_batch_gpu() raises:
+    comptime if has_accelerator():
+        comptime dtype = DType.float32
+        var M = Tensor[dtype](Shape(2, 3, 2))
+        var v = Tensor[dtype](Shape(2, 3))
+        for b in range(2):
+            for k in range(3):
+                v[b, k] = Scalar[dtype](b * 10 + k + 1)
+                for n in range(2):
+                    M[b, k, n] = Scalar[dtype](b * 100 + k * 10 + n)
+        var gM = M.to_gpu().slice(start=1, end=2, step=1, axis=0)
+        var gv = v.to_gpu().slice(start=1, end=2, step=1, axis=0)
+        var r = gv.matmul[mode=vm](gM)
+        var eM = M.slice(start=1, end=2, step=1, axis=0)
+        var ev = v.slice(start=1, end=2, step=1, axis=0)
+        assert_true(r.to_cpu().all_close(ev.matmul[mode=vm](eM)))
+        # Batch 1: v = [11,12,13] against rows [100,101],[110,111],[120,121].
+        assert_true(r.to_cpu().all_close(Tensor[dtype].d2([[3980.0, 4016.0]])))
 
 
 def test_matrix_vector_no_batch() raises:

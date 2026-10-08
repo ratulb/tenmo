@@ -185,6 +185,17 @@ struct DeviceState[dtype: DType](
         ],  # accepts datatype (uint8 for bool)
         gpu: GPU,
     ) raises:
+        """Adopt a buffer already in storage dtype (no sub-buffer wrap).
+
+        `special` is an overload-resolution tag only — its VALUE is never
+        read (every call site passes `True`; `[False]` would select this
+        same overload). The tag exists because for non-bool dtypes the
+        storage-dtype and logical-dtype buffer types are identical, so the
+        two buffer-adopting overloads would otherwise be ambiguous — and
+        for `bool`, `DeviceBuffer[bool]` is unsupported on GPU, making this
+        the only viable adoption path (cf. `CastKernel`, compare kernels,
+        whose bool outputs must come through here).
+        """
         self.buffer = buffer
         self.gpu = gpu
 
