@@ -17,13 +17,17 @@ source:
 build:
   number: 0
   script:
-    - mojo precompile tenmo -o $PREFIX/lib/mojo/tenmo.mojoc
+    # Host prefix holds max.mojoc + bpe.mojoc; -I is the compiler's module
+    # search path (there is no MOJO_PATH env equivalent).
+    - mojo precompile -I "$PREFIX/lib/mojo" tenmo -o "$PREFIX/lib/mojo/tenmo.mojoc"
 
 requirements:
   build:
     - mojo-compiler =1.1.0
   host:
     - mojo-compiler =1.1.0
+    # tenmo imports max.* (parallelize, gpu.host) throughout.
+    - max >=26.5,<=26.6
     # tenmo/tenmo/nlp/ imports bpe.*, so mbpe must be present to precompile.
     - mbpe >=0.1.1,<0.2
   run:
