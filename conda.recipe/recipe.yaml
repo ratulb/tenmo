@@ -1,0 +1,51 @@
+schema_version: 1
+
+context:
+  version: "0.1.0"
+
+package:
+  name: tenmo
+  version: ${{ version }}
+
+source:
+  # Local dev: path relative to recipe directory
+  path: ..
+  # CI (submit to modular-community): uncomment + update rev after commit
+  # - git: https://github.com/ratulb/tenmo.git
+  #   rev: <replace-with-actual-sha-after-commit>
+
+build:
+  number: 0
+  script:
+    - mojo precompile tenmo -o $PREFIX/lib/mojo/tenmo.mojoc
+
+requirements:
+  build:
+    - mojo-compiler =1.1.0
+  host:
+    - mojo-compiler =1.1.0
+    # tenmo/tenmo/nlp/ imports bpe.*, so mbpe must be present to precompile.
+    - mbpe >=0.1.1,<0.2
+  run:
+    - ${{ pin_compatible('mojo-compiler') }}
+    - mbpe >=0.1.1,<0.2
+
+tests:
+  - script:
+      - if: unix
+        then:
+          - mojo run test_import.mojo
+    files:
+      recipe:
+        - test_import.mojo
+
+about:
+  homepage: https://github.com/ratulb/tenmo
+  license: MIT
+  license_file: LICENSE
+  summary: A tensor library and neural network framework in Mojo.
+  repository: https://github.com/ratulb/tenmo
+
+extra:
+  maintainers:
+    - ratulb

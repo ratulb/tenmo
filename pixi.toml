@@ -5,6 +5,19 @@ platforms = ["linux-64"]
 version = "0.1.0"
 preview = ["pixi-build"]
 
+# Makes this repo consumable as a pixi source dependency
+# (e.g. `tenmo = { git = "https://github.com/ratulb/tenmo", rev = "<sha>" }`).
+# Mirrors the mbpe packaging. Keep version in sync with conda.recipe.
+[package]
+name = "tenmo"
+version = "0.1.0"
+
+[package.build]
+backend = { name = "pixi-build-rattler-build", version = "*" }
+
+[package.build.config]
+recipe = "conda.recipe/recipe.yaml"
+
 [dependencies]
 python = ">=3.14.6,<3.15"
 mojo = "==1.1.0"
