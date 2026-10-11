@@ -53,7 +53,7 @@ struct PositionalEmbedding[
         n_embd: Int,
         init_seed: Optional[Int] = None,
         init_method: String = "xavier",
-        unsafe_freeze: Bool = False,
+        frozen: Bool = False,
     ):
         """Create a positional embedding table.
 
@@ -62,7 +62,7 @@ struct PositionalEmbedding[
             n_embd:     Embedding dimension (cols).
             init_seed:  Random seed for weight init.
             init_method: Weight init strategy (passed to Embedding).
-            unsafe_freeze: If True, requires_grad=False — no gradient.
+            frozen: If True, requires_grad=False — no gradient.
         """
         if n_ctx < 1 or n_embd < 1:
             panic(
@@ -78,7 +78,7 @@ struct PositionalEmbedding[
             embedding_dim=n_embd,
             init_seed=init_seed,
             init_method=init_method,
-            unsafe_freeze=unsafe_freeze,
+            frozen=frozen,
         )
 
     def __call__(

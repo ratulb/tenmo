@@ -73,10 +73,10 @@ def test_emb_cpu_init_zero() raises:
     assert_true(emb.weight.all_close(Tensor[dtype].zeros(Shape(10, 4))))
 
 
-def test_emb_cpu_init_unsafe_freeze() raises:
+def test_emb_cpu_init_freeze() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
-        num_embeddings=10, embedding_dim=4, unsafe_freeze=True
+        num_embeddings=10, embedding_dim=4, frozen=True
     )
     assert_false(emb.weight.requires_grad)
 
@@ -414,7 +414,7 @@ def test_emb_cpu_bwd_frozen_no_grad() raises:
     var emb = Embedding[dtype](
         num_embeddings=5,
         embedding_dim=3,
-        unsafe_freeze=True,
+        frozen=True,
         init_method="normal",
         init_seed=1,
     )
@@ -452,17 +452,17 @@ def test_emb_cpu_bwd_chained_linear() raises:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SECTION 4 — CPU · Freeze / ununsafe_freeze / from_pretrained
+# SECTION 4 — CPU · Freeze / unfreeze / from_pretrained
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def test_emb_cpu_unsafe_freeze_ununsafe_freeze() raises:
+def test_emb_cpu_freeze_unfreeze() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](num_embeddings=5, embedding_dim=3)
     assert_true(emb.weight.requires_grad)
-    emb.unsafe_freeze()
+    emb.freeze()
     assert_false(emb.weight.requires_grad)
-    emb.ununsafe_freeze()
+    emb.unfreeze()
     assert_true(emb.weight.requires_grad)
 
 
@@ -490,7 +490,7 @@ def test_emb_cpu_from_pretrained_frozen_by_default() raises:
 def test_emb_cpu_from_pretrained_unfrozen() raises:
     comptime dtype = DType.float32
     var pretrained = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
-    var emb = Embedding[dtype].from_pretrained(pretrained, unsafe_freeze=False)
+    var emb = Embedding[dtype].from_pretrained(pretrained, frozen=False)
     assert_true(emb.weight.requires_grad)
 
 
@@ -522,7 +522,7 @@ def test_emb_cpu_parameters_not_empty_when_grad() raises:
 def test_emb_cpu_parameters_empty_when_frozen() raises:
     comptime dtype = DType.float32
     var emb = Embedding[dtype](
-        num_embeddings=5, embedding_dim=3, unsafe_freeze=True
+        num_embeddings=5, embedding_dim=3, frozen=True
     )
     var params = emb.parameters()
     assert_true(len(params) == 0)
@@ -588,7 +588,7 @@ def test_emb_gpu_fwd_basic_lookup() raises:
             ]
         )
         var emb_gpu = Embedding[dtype].from_pretrained(
-            weights, unsafe_freeze=False
+            weights, frozen=False
         )
         emb_gpu = emb_gpu.to_gpu()
         var result = emb_gpu([0, 2, 4])
@@ -616,7 +616,7 @@ def test_emb_gpu_fwd_repeated_index() raises:
             ]
         )
         var emb = Embedding[dtype].from_pretrained(
-            weights, unsafe_freeze=False
+            weights, frozen=False
         )
         emb = emb.to_gpu()
         var result = emb([0, 0, 1])
@@ -646,7 +646,7 @@ def test_emb_gpu_fwd_fuse_sum() raises:
         )
         var emb = Embedding[dtype].from_pretrained(
             weights,
-            unsafe_freeze=False,
+            frozen=False,
             reduction=Reduction(1),
         )
         emb = emb.to_gpu()
@@ -662,7 +662,7 @@ def test_emb_gpu_fwd_eval_no_grad() raises:
         comptime dtype = DType.float32
         var weights = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
         var emb = Embedding[dtype].from_pretrained(
-            weights, unsafe_freeze=False
+            weights, frozen=False
         )
         emb = emb.to_gpu()
         emb.eval()
@@ -691,7 +691,7 @@ def test_emb_gpu_fwd_padding_idx_zeros() raises:
             ]
         )
         var emb = Embedding[dtype].from_pretrained(
-            weights, padding_idx=0, unsafe_freeze=False
+            weights, padding_idx=0, frozen=False
         )
         emb = emb.to_gpu()
         var result = emb([0])
@@ -716,7 +716,7 @@ def test_emb_gpu_bwd_basic() raises:
             ]
         )
         var emb = Embedding[dtype].from_pretrained(
-            weights, unsafe_freeze=False
+            weights, frozen=False
         )
         emb = emb.to_gpu()
         var result = emb([1, 3])
@@ -752,7 +752,7 @@ def test_emb_gpu_bwd_repeated_index_accumulates() raises:
             ]
         )
         var emb = Embedding[dtype].from_pretrained(
-            weights, unsafe_freeze=False
+            weights, frozen=False
         )
         emb = emb.to_gpu()
         var result = emb([0, 0])
@@ -779,7 +779,7 @@ def test_emb_gpu_bwd_fuse_sum() raises:
         )
         var emb = Embedding[dtype].from_pretrained(
             weights,
-            unsafe_freeze=False,
+            frozen=False,
             reduction=Reduction(1),
         )
         emb = emb.to_gpu()
@@ -820,7 +820,7 @@ def test_emb_gpu_fwd_fuse_mean() raises:
         )
         var emb = Embedding[dtype].from_pretrained(
             weights,
-            unsafe_freeze=False,
+            frozen=False,
             reduction=Reduction(0),
         )
         emb = emb.to_gpu()
@@ -843,7 +843,7 @@ def test_emb_gpu_bwd_fuse_mean() raises:
         )
         var emb = Embedding[dtype].from_pretrained(
             weights,
-            unsafe_freeze=False,
+            frozen=False,
             reduction=Reduction(0),
         )
         emb = emb.to_gpu()
@@ -878,7 +878,7 @@ def test_emb_gpu_bwd_padding_idx_no_grad() raises:
             ]
         )
         var emb = Embedding[dtype].from_pretrained(
-            weights, padding_idx=0, unsafe_freeze=False
+            weights, padding_idx=0, frozen=False
         )
         emb = emb.to_gpu()
         var result = emb([0, 1])
@@ -911,7 +911,7 @@ def test_emb_gpu_bwd_chained() raises:
         )
         var emb = Embedding[dtype].from_pretrained(
             weights,
-            unsafe_freeze=False,
+            frozen=False,
             reduction=Reduction(1),
         )
         emb = emb.to_gpu()

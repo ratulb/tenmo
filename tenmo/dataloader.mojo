@@ -3,7 +3,7 @@ from .gpu.device import CPU, Device, GPU
 from .kernels.gather_kernel import GatherKernel
 from .shared.intarray import IntArray
 from .shared.panic import panic
-from std.random import shuffle as reshuffle, random_si64
+from std.random import shuffle as reshuffle, random_si64, seed as seed_random
 from std.python import PythonObject
 from .numpy_interop import from_ndarray
 from std.memory import unsafe_memcpy, Pointer
@@ -114,6 +114,7 @@ trait Dataset(Sized & Copyable):
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
+        seed: Int = -1,
     ) -> NativeLoader[Self, origin_of(self)]:
         ...
 
@@ -141,6 +142,8 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
     var batch_size: Int
     var shuffle_data: Bool
     var drop_last: Bool
+    var seed: Int
+    var _epoch: Int
     var _current_idx: Int
     var _indices: List[Int]
     var _num_batches: Int
@@ -171,6 +174,8 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
         self.batch_size = copy.batch_size
         self.shuffle_data = copy.shuffle_data
         self.drop_last = copy.drop_last
+        self.seed = copy.seed
+        self._epoch = copy._epoch
         self._current_idx = copy._current_idx
         self._indices = copy._indices.copy()
         self._num_batches = copy._num_batches
@@ -188,11 +193,14 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
+        seed: Int = -1,
     ):
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle_data = shuffle
         self.drop_last = drop_last
+        self.seed = seed
+        self._epoch = 0
         self._current_idx = 0
 
         var total_samples = len(self.dataset[])
@@ -292,6 +300,15 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
     def __iter__(mut self) -> ref[self] Self.IteratorType[origin_of(self)]:
         self._current_idx = 0
         if self.shuffle_data:
+            if self.seed >= 0:
+                # Reset to identity first: a seeded shuffle must start from
+                # the same arrangement every time, not wherever the last
+                # epoch left the permutation. Epochs advance the stream so
+                # they differ from each other yet repeat across runs.
+                for k in range(len(self._indices)):
+                    self._indices[k] = k
+                seed_random(self.seed + self._epoch)
+                self._epoch += 1
             reshuffle(self._indices)
         return self
 
@@ -530,6 +547,15 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
         """Reset for new epoch."""
         self._current_idx = 0
         if self.shuffle_data:
+            if self.seed >= 0:
+                # Reset to identity first: a seeded shuffle must start from
+                # the same arrangement every time, not wherever the last
+                # epoch left the permutation. Epochs advance the stream so
+                # they differ from each other yet repeat across runs.
+                for k in range(len(self._indices)):
+                    self._indices[k] = k
+                seed_random(self.seed + self._epoch)
+                self._epoch += 1
             reshuffle(self._indices)
 
 
@@ -748,12 +774,14 @@ struct NumpyDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
+        seed: Int = -1,
     ) -> NativeLoader[Self, origin_of(self)]:
         return NativeLoader(
             Pointer(to=self),
             batch_size,
             shuffle,
             drop_last,
+            seed,
         )
 
 
@@ -988,12 +1016,14 @@ struct TensorDataset[sample_dtype: DType, label_dtype: DType = sample_dtype](
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
+        seed: Int = -1,
     ) -> NativeLoader[Self, origin_of(self)]:
         return NativeLoader(
             Pointer(to=self),
             batch_size,
             shuffle,
             drop_last,
+            seed,
         )
 
 
@@ -1029,8 +1059,8 @@ struct DataLoader[sample_dtype: DType, label_dtype: DType](
       * per batch:    zero allocations (persistent buffers reused)
     The shuffle permutation is re-permuted per epoch via `std.random.shuffle`
     (the same source as the trait-generic `NativeLoader`), so both engines
-    share one shuffling behavior. Runs are not reproducible, so no seed
-    parameter is offered.
+    share one shuffling behavior. `NativeLoader` and `WindowLoader` accept
+    `seed` (a non-negative `Int`) to make shuffled runs reproducible.
     Contract: a shuffled batch aliases the loader's reused buffer and is valid
     ONLY until the next `__next__()` call. Sequential batches view the
     immutable source tensors and stay valid. Batches are read-only training
@@ -1611,6 +1641,7 @@ struct SlidingWindowDataset[dtype: DType = DType.int64](Sized):
         shuffle: Bool = True,
         drop_last: Bool = False,
         random_offsets: Bool = False,
+        seed: Int = -1,
     ) -> WindowLoader[Self.dtype]:
         """Build a `WindowLoader` over this dataset's stream.
 
@@ -1625,6 +1656,7 @@ struct SlidingWindowDataset[dtype: DType = DType.int64](Sized):
             shuffle,
             drop_last,
             random_offsets,
+            seed,
         )
 
     def sample(
@@ -1707,6 +1739,8 @@ struct WindowLoader[dtype: DType = DType.int64](
     var shuffle: Bool
     var drop_last: Bool
     var random_offsets: Bool
+    var seed: Int
+    var _epoch: Int
     var _num_samples: Int
     var _num_valid_offsets: Int
     var _offsets: List[Int]
@@ -1725,6 +1759,8 @@ struct WindowLoader[dtype: DType = DType.int64](
         self.shuffle = copy.shuffle
         self.drop_last = copy.drop_last
         self.random_offsets = copy.random_offsets
+        self.seed = copy.seed
+        self._epoch = copy._epoch
         self._num_samples = copy._num_samples
         self._num_valid_offsets = copy._num_valid_offsets
         self._offsets = copy._offsets.copy()
@@ -1744,6 +1780,7 @@ struct WindowLoader[dtype: DType = DType.int64](
         shuffle: Bool = True,
         drop_last: Bool = False,
         random_offsets: Bool = False,
+        seed: Int = -1,
     ):
         if seq_length < 1:
             panic(
@@ -1776,6 +1813,8 @@ struct WindowLoader[dtype: DType = DType.int64](
         self.shuffle = shuffle
         self.drop_last = drop_last
         self.random_offsets = random_offsets
+        self.seed = seed
+        self._epoch = 0
         self._current_idx = 0
 
         var n = len(self.tokens)
@@ -1883,6 +1922,15 @@ struct WindowLoader[dtype: DType = DType.int64](
     def __iter__(mut self) -> ref[self] Self.IteratorType[origin_of(self)]:
         self._current_idx = 0
         if self.shuffle:
+            if self.seed >= 0:
+                # Reset to identity first: a seeded shuffle must start from
+                # the same arrangement every time, not wherever the last
+                # epoch left the permutation. Epochs advance the stream so
+                # they differ from each other yet repeat across runs.
+                for k in range(self._num_samples):
+                    self._offsets[k] = k * self.stride
+                seed_random(self.seed + self._epoch)
+                self._epoch += 1
             reshuffle(self._offsets)
         return self
 
@@ -1982,6 +2030,15 @@ struct WindowLoader[dtype: DType = DType.int64](
         """Start a new epoch: re-shuffle the offset permutation if shuffling."""
         self._current_idx = 0
         if self.shuffle:
+            if self.seed >= 0:
+                # Reset to identity first: a seeded shuffle must start from
+                # the same arrangement every time, not wherever the last
+                # epoch left the permutation. Epochs advance the stream so
+                # they differ from each other yet repeat across runs.
+                for k in range(self._num_samples):
+                    self._offsets[k] = k * self.stride
+                seed_random(self.seed + self._epoch)
+                self._epoch += 1
             reshuffle(self._offsets)
 
     def set_shuffle(mut self, shuffle: Bool):

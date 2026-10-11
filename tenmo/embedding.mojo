@@ -50,7 +50,7 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
         norm_type: Float64 = 2.0,
         init_seed: Optional[Int] = None,
         init_method: String = "normal",
-        unsafe_freeze: Bool = False,
+        frozen: Bool = False,
         reduction: Reduction = Reduction(2),
     ):
         """
@@ -65,7 +65,7 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             init_seed:      Random seed.
             init_method:    Weight init strategy (see Weights.initialize):
                             "normal", "uniform", "xavier", "kaiming"/"he", "zero"
-            unsafe_freeze:         If True, requires_grad=False — no gradient.
+            frozen:         If True, requires_grad=False — no gradient.
             reduction:      How to reduce gathered rows (NONE=2, SUM=1, MEAN=0).
                             Default NONE preserves standard gather behavior.
                             Set to Reduction(1) for bag-of-words sum.
@@ -78,7 +78,7 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
         self.training = True
         self.reduction = reduction
 
-        var grad_required = not unsafe_freeze
+        var grad_required = not frozen
         self.weight, _ = Weights[Self.dtype].initialize(
             num_embeddings,
             embedding_dim,
@@ -215,12 +215,12 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
                 if norm > mn:
                     result.fill(row * Scalar[Self.dtype](mn / norm), i(k), s())
 
-    def unsafe_freeze(mut self):
+    def freeze(mut self):
         """Freeze all embeddings — no gradient computed."""
         self.weight.requires_grad = False
 
-    def ununsafe_freeze(mut self):
-        """Ununsafe_freeze embeddings — gradient computed."""
+    def unfreeze(mut self):
+        """Unfreeze embeddings — gradient computed."""
         self.weight.requires_grad = True
         if self.padding_idx:
             # padding row must stay frozen even when rest is unfrozen
@@ -235,7 +235,7 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
         padding_idx: Optional[Int] = None,
         max_norm: Optional[Float64] = None,
         norm_type: Float64 = 2.0,
-        unsafe_freeze: Bool = True,  # frozen by default — PyTorch convention
+        frozen: Bool = True,  # frozen by default
         reduction: Reduction = Reduction(2),
     ) -> Embedding[Self.dtype]:
         """Load pretrained embeddings (GloVe, fastText, word2vec etc.).
@@ -245,7 +245,7 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             padding_idx: Row to keep zeroed.
             max_norm:    Renormalisation threshold.
             norm_type:   Type of norm to use (default: 2.0).
-            unsafe_freeze:      If True (default), embeddings are not updated during training.
+            frozen:      If True (default), embeddings are not updated during training.
                          Set False to fine-tune pretrained embeddings.
             reduction:   How to reduce gathered rows (NONE/SUM/MEAN).
 
@@ -263,7 +263,7 @@ struct Embedding[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             max_norm=max_norm,
             norm_type=norm_type,
             init_method="zero",  # allocate, then overwrite
-            unsafe_freeze=unsafe_freeze,
+            frozen=frozen,
             reduction=reduction,
         )
         # Copy pretrained weights in

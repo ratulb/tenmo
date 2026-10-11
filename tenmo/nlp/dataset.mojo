@@ -119,12 +119,14 @@ struct LLMDataset[
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
+        seed: Int = -1,
     ) -> NativeLoader[Self, origin_of(self)]:
         return NativeLoader(
             Pointer(to=self),
             batch_size,
             shuffle,
             drop_last,
+            seed,
         )
 
 
@@ -230,10 +232,12 @@ struct RandomSlidingWindowDataset[
         batch_size: Int,
         shuffle: Bool = True,
         drop_last: Bool = False,
+        seed: Int = -1,
     ) -> NativeLoader[Self, origin_of(self)]:
         return NativeLoader(
             Pointer(to=self),
             batch_size,
             shuffle,
             drop_last,
+            seed,
         )

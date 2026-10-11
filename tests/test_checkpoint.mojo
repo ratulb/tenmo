@@ -60,8 +60,8 @@ def test_named_params_embedding() raises:
 
 
 def test_named_params_embedding_frozen() raises:
-    """Embedding with unsafe_freeze=True has no trainable parameters."""
-    var emb = Embedding[DType.float32](10, 64, unsafe_freeze=True)
+    """Embedding with frozen=True has no trainable parameters."""
+    var emb = Embedding[DType.float32](10, 64, frozen=True)
     var params = emb.named_parameters("")
     assert_equal(len(params), 0)
 
