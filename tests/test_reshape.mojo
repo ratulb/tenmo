@@ -1133,3 +1133,176 @@ def test_gpu_grad_stays_on_cpu() raises:
         assert_true(
             a.grad().all_close(Tensor[dtype].d2([[8.0, 8.0], [8.0, 8.0]]))
         )
+
+
+# ─────────────────────────────────────────────
+#  Strided reshape views (spike/strided-reshape)
+# ─────────────────────────────────────────────
+
+
+def test_slice_reshape_is_view() raises:
+    # The attention Q/K/V pattern: column slice of a fused row, reshaped
+    # to heads. Stride-compatible, so no copy: strides (12, 2, 1).
+    var wide = Tensor[DType.float32].d2(
+        [
+            [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0],
+            [20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0, 27.0, 28.0, 29.0, 30.0, 31.0],
+        ]
+    )
+    var qh = wide.slice(0, 4, axis=1).reshape(2, 2, 2)
+    assert_true(qh.shape() == Shape(2, 2, 2))
+    assert_true(qh.strides() == Strides(12, 2, 1))
+    assert_true(
+        qh.all_close(
+            Tensor[DType.float32]
+            .d2([[0.0, 1.0, 2.0, 3.0], [20.0, 21.0, 22.0, 23.0]])
+            .reshape(2, 2, 2)
+        )
+    )
+    qh[0, 0, 0] = 77.0
+    assert_true(wide[0, 0] == 77.0)
+
+
+def test_contiguous_reshape_strides_unchanged() raises:
+    # The old fast path, pinned: contiguous in, default strides out.
+    var base = Tensor[DType.float32].d2(
+        [[0.0, 1.0, 2.0, 3.0], [10.0, 11.0, 12.0, 13.0]]
+    )
+    var rview = base.reshape(4, 2)
+    assert_true(rview.strides() == Strides(2, 1))
+    rview[0, 1] = 99.0
+    assert_true(base[0, 1] == 99.0)
+
+
+def test_permute_reshape_copies() raises:
+    # The merge pattern: permuted order 0,2,1,3 fits no constant stride,
+    # so the copy stays — but the logical order must be exact.
+    var pm = Tensor[DType.float32].d2([[0.0, 1.0], [2.0, 3.0]])
+    var flat = pm.permute([1, 0]).reshape(4)
+    assert_true(flat.shape() == Shape(4))
+    assert_true(flat.all_close(Tensor[DType.float32].d1([0.0, 2.0, 1.0, 3.0])))
+    flat[0] = 55.0
+    assert_true(pm[0, 0] == 0.0)
+
+
+def test_same_shape_strided_is_view() raises:
+    # Same-shape reshape of a strided tensor keeps identical strides.
+    var pm = Tensor[DType.float32].d2([[0.0, 1.0], [2.0, 3.0]])
+    var same = pm.permute([1, 0]).reshape(2, 2)
+    assert_true(same.strides() == Strides(1, 2))
+    same[0, 0] = 42.0
+    assert_true(pm[0, 0] == 42.0)
+
+
+def test_slice_reshape_backward_scatters() raises:
+    # Gradients through a strided view land on the right base elements.
+    var wide = Tensor[DType.float32].d2(
+        [
+            [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0],
+            [20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0, 27.0, 28.0, 29.0, 30.0, 31.0],
+        ],
+        requires_grad=True,
+    )
+    var qh = wide.slice(0, 4, axis=1).reshape(2, 2, 2)
+    var loss = (qh * 2.0).sum()
+    loss.backward()
+    assert_true(
+        wide.grad().all_close(
+            Tensor[DType.float32].d2(
+                [
+                    [2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    [2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                ]
+            )
+        )
+    )
+
+
+def test_fused_split_backward() raises:
+    # The full attention pattern: fused (1, 2, 12) into three slices,
+    # each reshaped to (1, 2, 2, 2). Every fused element must get grad 1.0.
+    var fused = Tensor[DType.float32].d3(
+        [
+            [
+                [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0],
+                [13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0],
+            ]
+        ],
+        requires_grad=True,
+    )
+    var fq = fused.slice(0, 4, axis=2).reshape(Shape(1, 2, 2, 2))
+    var fk = fused.slice(4, 8, axis=2).reshape(Shape(1, 2, 2, 2))
+    var fv = fused.slice(8, 12, axis=2).reshape(Shape(1, 2, 2, 2))
+    assert_true(fq.strides() == Strides(1, 12, 2, 1))
+    assert_true(fk.strides() == Strides(1, 12, 2, 1))
+    var loss = fq.sum() + fk.sum() + fv.sum()
+    loss.backward()
+    assert_true(
+        fused.grad().all_close(
+            Tensor[DType.float32].d3(
+                [
+                    [
+                        [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                        [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                    ]
+                ]
+            )
+        )
+    )
+
+
+def _square_sum_strided_view(x: Tensor[DType.float32]) -> Tensor[DType.float32]:
+    var s = x.slice[track_grad=True](0, 4, axis=1)
+    var r = s.reshape[track_grad=True](2, 2, 2)
+    return (r * r).sum()
+
+
+def test_slice_reshape_grad_finite_difference() raises:
+    # Analytic grad through a strided view against central differences.
+    # d(x^2)/dx at wide[1, 2] = 22 is 44.
+    var wide = Tensor[DType.float32].d2(
+        [
+            [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0],
+            [20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0, 27.0, 28.0, 29.0, 30.0, 31.0],
+        ],
+        requires_grad=True,
+    )
+    var eps = Scalar[DType.float32](1e-2)
+    var orig = wide[1, 2]
+    wide[1, 2] = orig + eps
+    var lp = _square_sum_strided_view(wide.copy()).item()
+    wide[1, 2] = orig - eps
+    var lm = _square_sum_strided_view(wide.copy()).item()
+    wide[1, 2] = orig
+    var num = (lp - lm) / (2.0 * eps)
+    var g = wide.copy()
+    g.requires_grad_(True)
+    var l3 = _square_sum_strided_view(g)
+    l3.backward()
+    var an = g.grad()[1, 2]
+    assert_true(abs(an - 44.0) < 1e-2)
+    var rel = abs(an - num) / (abs(an) + abs(num) + 1e-8)
+    assert_true(rel < 1e-2)
+
+
+def test_permute_reshape_backward() raises:
+    # The merge (copy) path backward: uniform scale reaches every element.
+    var pm = Tensor[DType.float32].d2([[0.0, 1.0], [2.0, 3.0]], requires_grad=True)
+    var flat = pm.permute([1, 0]).reshape(4)
+    var loss = (flat * 3.0).sum()
+    loss.backward()
+    assert_true(
+        pm.grad().all_close(Tensor[DType.float32].d2([[3.0, 3.0], [3.0, 3.0]]))
+    )
+
+
+def test_trailing_singleton_stride() raises:
+    # Trailing size-1 new dims address one element each: stride 1, a view.
+    var base = Tensor[DType.float32].d2(
+        [[0.0, 1.0, 2.0], [10.0, 11.0, 12.0]]
+    )
+    var wider = base.reshape(2, 3, 1)
+    assert_true(wider.shape() == Shape(2, 3, 1))
+    assert_true(wider.strides() == Strides(3, 1, 1))
+    wider[1, 2, 0] = 42.0
+    assert_true(base[1, 2] == 42.0)

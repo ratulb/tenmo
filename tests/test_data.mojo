@@ -2767,7 +2767,7 @@ def test_data_loader_device_gpu_shuffled_covers_all() raises:
             not loader.features.is_on_gpu(), "to_cpu moves sources back"
         )
         var count = 0
-        for batch in loader:
+        for _batch in loader:
             count += 1
         assert_true(count == 3, "CPU loader iterates after round trip")
 

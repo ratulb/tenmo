@@ -46,7 +46,7 @@ def gradcheck_param(
 
         var n = len(p.buffer)
         for i in range(n):
-            orig = p.buffer[i]
+            var orig = p.buffer[i]
 
             # f(x + eps)
             p.buffer[i] = orig + eps
@@ -59,10 +59,10 @@ def gradcheck_param(
             # restore
             p.buffer[i] = orig
 
-            grad_num = (lp - lm) / (2.0 * eps)
-            grad_an = p.gradbox[].buffer()[i]
+            var grad_num = (lp - lm) / (2.0 * eps)
+            var grad_an = p.gradbox[].buffer()[i]
 
-            rel_err = abs(grad_an - grad_num) / (
+            var rel_err = abs(grad_an - grad_num) / (
                 abs(grad_an) + abs(grad_num) + 1e-8
             )
 
