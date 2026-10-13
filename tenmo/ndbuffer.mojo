@@ -78,6 +78,8 @@ from .shared.mnemonics import (
 
 comptime TILE_SIZE = 32
 
+comptime MAX_PRINT_SIZE = 100_000_000
+
 
 struct NDBuffer[dtype: DType](
     ImplicitlyCopyable & Equatable & Writable & Sized
@@ -1205,10 +1207,15 @@ struct NDBuffer[dtype: DType](
         s += "]"
         return s
 
-    def print(self, num_first: Int = 10, num_last: Int = 10) raises:
+    def print(
+        self,
+        num_first: Int = 10,
+        num_last: Int = 10,
+        max_size: Int = MAX_PRINT_SIZE,
+    ) raises:
         print(
             "\n",
-            String(self),
+            self.__str__(),
             end="\n",
         )
         var empty = List[Int]()
@@ -1218,13 +1225,23 @@ struct NDBuffer[dtype: DType](
             1,
             num_first=num_first,
             num_last=num_last,
+            max_size=max_size,
         )
 
     def __repr__(self) -> String:
         return self.__str__()
 
     def write_to[W: Writer](self, mut writer: W):
-        writer.write(self.__str__())
+        writer.write("\n", self.__str__(), "\n")
+        var empty = List[Int]()
+        write_buffer(
+            writer,
+            self,
+            empty,
+            1,
+            num_first=self.numels(),
+            num_last=0,
+        )
 
     @always_inline
     def data_buffer(ref self) -> ref[self.buffer] Buffer[Self.dtype]:
@@ -3430,19 +3447,23 @@ def print_buffer[
     level: Int,
     num_first: Int = 10,
     num_last: Int = 10,
+    max_size: Int = MAX_PRINT_SIZE,
 ) raises:
     """Pretty-print an NDBuffer with elision.
 
     Recursively prints each dimension, showing the first `num_first` and
-    last `num_last` elements along each axis. GPU buffers are transferred
-    to host first. Moved here from tenmo/common_utils.mojo so
-    common_utils stops importing NDBuffer — breaks the `common_utils ⇄
-    ndbuffer` two-cycle.
+    last `num_last` elements along each axis. `max_size` guards against
+    corrupt dimension sizes; a dimension larger than `max_size` is reported
+    instead of being traversed. GPU buffers are transferred to host first.
+    Moved here from tenmo/common_utils.mojo so common_utils stops importing
+    NDBuffer — breaks the `common_utils ⇄ ndbuffer` two-cycle.
     """
     comptime if has_accelerator():
         if buffer.is_on_gpu():
             var cpu_buffer = buffer.to_cpu()
-            print_buffer(cpu_buffer, indices, level, num_first, num_last)
+            print_buffer(
+                cpu_buffer, indices, level, num_first, num_last, max_size
+            )
             return
     if buffer.buffer.size == 0 and buffer.device_state == None:
         print("  Empty")
@@ -3465,7 +3486,7 @@ def print_buffer[
 
     var size = buffer.shape[current_dim]
 
-    if size < 0 or size > 100_000_000:
+    if size < 0 or size > max_size:
         print(
             "ERROR: suspicious size: ",
             size,
@@ -3502,13 +3523,17 @@ def print_buffer[
         for i in range(size):
             if i < num_first:
                 indices.append(i)
-                print_buffer(buffer, indices, level + 1, num_first, num_last)
+                print_buffer(
+                    buffer, indices, level + 1, num_first, num_last, max_size
+                )
                 _ = indices.pop()
             elif i == num_first and size > num_first + num_last:
                 print(indent + "  ...,")
             elif i >= size - num_last:
                 indices.append(i)
-                print_buffer(buffer, indices, level + 1, num_first, num_last)
+                print_buffer(
+                    buffer, indices, level + 1, num_first, num_last, max_size
+                )
                 _ = indices.pop()
 
             # Print comma and newline for all but last element
@@ -3519,6 +3544,138 @@ def print_buffer[
                 print()  # Newline before closing bracket
 
         print(indent + "]", end="")
+
+
+def write_buffer[
+    dtype: DType,
+    W: Writer,
+](
+    mut writer: W,
+    imm buffer: NDBuffer[dtype],
+    mut indices: List[Int],
+    level: Int,
+    num_first: Int = 10,
+    num_last: Int = 10,
+    max_size: Int = MAX_PRINT_SIZE,
+):
+    """Write an NDBuffer to a `Writer` with elision.
+
+    Writer-based twin of `print_buffer`, used by `Writable.write_to` so
+    `print(tensor)` shows the full contents instead of metadata only.
+    `max_size` guards against corrupt dimension sizes; a dimension larger
+    than `max_size` is reported instead of being traversed.
+    Non-raising: GPU buffers are transferred to host inside a try/except so
+    printing keeps working outside a `raises` context.
+    """
+    comptime if has_accelerator():
+        if buffer.is_on_gpu():
+            try:
+                var cpu_buffer = buffer.to_cpu()
+                write_buffer(
+                    writer,
+                    cpu_buffer,
+                    indices,
+                    level,
+                    num_first,
+                    num_last,
+                    max_size,
+                )
+            except e:
+                writer.write("  <GPU readback failed: ", String(e), ">", "\n")
+            return
+    if buffer.buffer.size == 0 and buffer.device_state == None:
+        writer.write("  Empty", "\n")
+        return
+    if buffer.rank() == 0:  # Tensor with Shape ()
+        writer.write(buffer[[]], "\n")
+        return
+    var current_dim = len(indices)
+    var indent = " " * (level * 2)
+
+    if current_dim >= buffer.rank():
+        writer.write(
+            "ERROR: current_dim (",
+            current_dim,
+            ") >= ndim (",
+            buffer.rank(),
+            ")",
+            "\n",
+        )
+        return
+
+    var size = buffer.shape[current_dim]
+
+    if size < 0 or size > max_size:
+        writer.write(
+            "ERROR: suspicious size: ",
+            size,
+            "at dim ",
+            current_dim,
+            String(buffer.shape),
+            "\n",
+        )
+        return
+
+    # Base case: last dimension (write actual elements)
+    if current_dim == buffer.rank() - 1:
+        writer.write(indent + "[")
+
+        for i in range(size):
+            if i < num_first:
+                indices.append(i)
+                writer.write(buffer[indices])
+                _ = indices.pop()
+                if i != size - 1:
+                    writer.write(", ")
+            elif i == num_first and size > num_first + num_last:
+                writer.write("..., ")
+            elif i >= size - num_last:
+                indices.append(i)
+                writer.write(buffer[indices])
+                _ = indices.pop()
+                if i != size - 1:
+                    writer.write(", ")
+
+        writer.write("]")
+
+    else:
+        writer.write(indent + "[", "\n")
+        for i in range(size):
+            if i < num_first:
+                indices.append(i)
+                write_buffer(
+                    writer,
+                    buffer,
+                    indices,
+                    level + 1,
+                    num_first,
+                    num_last,
+                    max_size,
+                )
+                _ = indices.pop()
+            elif i == num_first and size > num_first + num_last:
+                writer.write(indent + "  ...,", "\n")
+            elif i >= size - num_last:
+                indices.append(i)
+                write_buffer(
+                    writer,
+                    buffer,
+                    indices,
+                    level + 1,
+                    num_first,
+                    num_last,
+                    max_size,
+                )
+                _ = indices.pop()
+
+            # Write comma and newline for all but last element
+            if i != size - 1 and (i < num_first or i >= size - num_last):
+                writer.write(",", "\n")
+            # Special case: last element needs newline before closing bracket
+            elif i == size - 1:
+                writer.write("\n")  # Newline before closing bracket
+
+        writer.write(indent + "]")
 
 
 struct NDBufferLite[dtype: DType](ImplicitlyCopyable):

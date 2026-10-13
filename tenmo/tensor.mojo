@@ -42,7 +42,13 @@ from std.collections import Set, Deque
 from .gradbox import Gradbox
 from .shared.intarray import IntArray
 from .shared.broadcasthelper import ShapeBroadcaster
-from .ndbuffer import NDBuffer, print_buffer, NDBufferLite
+from .ndbuffer import (
+    NDBuffer,
+    print_buffer,
+    NDBufferLite,
+    write_buffer,
+    MAX_PRINT_SIZE,
+)
 from max.gpu.host import DeviceBuffer, DeviceContext
 from .gpu.device import Device, CPU, GPU
 from .shared import Reduction
@@ -737,7 +743,16 @@ struct Tensor[dtype: DType](
 
     @no_inline
     def write_to[W: Writer](self, mut writer: W):
-        writer.write(self.__str__())
+        writer.write("\n", self.__str__(), "\n")
+        var empty = List[Int]()
+        write_buffer(
+            writer,
+            self.buffer,
+            empty,
+            1,
+            num_first=self.buffer.numels(),
+            num_last=0,
+        )
 
     @no_inline
     def write_repr_to[W: Writer](self, mut writer: W):
@@ -3108,16 +3123,23 @@ struct Tensor[dtype: DType](
             )
         self.buffer.inplace_scalar_ops[Divide](scalar, sync=sync)
 
-    def print(self, num_first: Int = 10, num_last: Int = 10) raises:
+    def print(
+        self,
+        num_first: Int = 10,
+        num_last: Int = 10,
+        max_size: Int = MAX_PRINT_SIZE,
+    ) raises:
         """Print the tensor's metadata and data preview.
 
         Args:
             num_first: Number of elements to print from the start.
             num_last: Number of elements to print from the end.
+            max_size: Maximum per-dimension size the printer will traverse;
+                larger dimensions are reported instead.
         """
         print(
             "\n",
-            String(self),
+            self.__str__(),
             end="\n",
         )
         var empty = List[Int]()
@@ -3127,6 +3149,7 @@ struct Tensor[dtype: DType](
             1,
             num_first=num_first,
             num_last=num_last,
+            max_size=max_size,
         )
 
     def __deinit__(deinit self):
