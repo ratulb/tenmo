@@ -199,6 +199,14 @@ struct PositionalEmbedding[
         self.training = False
         self.emb.eval()
 
+    def freeze(mut self):
+        """Freeze embeddings — no gradient computed."""
+        self.emb.freeze()
+
+    def unfreeze(mut self):
+        """Unfreeze embeddings — gradient computed."""
+        self.emb.unfreeze()
+
     def to_gpu(
         self,
         gpu: Optional[GPU] = None,

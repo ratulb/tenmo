@@ -466,6 +466,16 @@ struct SelfAttention[dtype: DType](LayerTrait):
         self.c_attn.eval()
         self.c_proj.eval()
 
+    def freeze(mut self):
+        """Freeze both Linears — no gradient computed."""
+        self.c_attn.freeze()
+        self.c_proj.freeze()
+
+    def unfreeze(mut self):
+        """Unfreeze both Linears — gradient computed."""
+        self.c_attn.unfreeze()
+        self.c_proj.unfreeze()
+
     def to_gpu(
         self, gpu: Optional[GPU] = None
     ) raises -> SelfAttention[Self.dtype]:

@@ -702,6 +702,18 @@ struct LayerNorm[dtype: DType](LayerTrait):
         """Set to evaluation mode — no gradient tracking."""
         self.training = False
 
+    def freeze(mut self):
+        """Freeze parameters — no gradient computed."""
+        var ps = self.parameters()
+        for i in range(len(ps)):
+            ps[i][].requires_grad = False
+
+    def unfreeze(mut self):
+        """Unfreeze parameters — gradient computed."""
+        var ps = self.parameters()
+        for i in range(len(ps)):
+            ps[i][].requires_grad = True
+
     def to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
         """Move gamma and beta to GPU as permanent GPU leaves."""
         var out = self

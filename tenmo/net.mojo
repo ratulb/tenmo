@@ -193,6 +193,18 @@ struct Linear[dtype: DType, mode: Int = mm](LayerTrait & Writable):
         """Set to evaluation mode - disables gradient tracking."""
         self.training = False
 
+    def freeze(mut self):
+        """Freeze parameters — no gradient computed."""
+        var ps = self.parameters()
+        for i in range(len(ps)):
+            ps[i][].requires_grad = False
+
+    def unfreeze(mut self):
+        """Unfreeze parameters — gradient computed."""
+        var ps = self.parameters()
+        for i in range(len(ps)):
+            ps[i][].requires_grad = True
+
     def into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self))
 
@@ -460,6 +472,18 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable):
     def eval(mut self):
         """Set to evaluation mode - disables gradient tracking."""
         self.training = False
+
+    def freeze(mut self):
+        """Freeze parameters — no gradient computed."""
+        var ps = self.parameters()
+        for i in range(len(ps)):
+            ps[i][].requires_grad = False
+
+    def unfreeze(mut self):
+        """Unfreeze parameters — gradient computed."""
+        var ps = self.parameters()
+        for i in range(len(ps)):
+            ps[i][].requires_grad = True
 
     def into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self))

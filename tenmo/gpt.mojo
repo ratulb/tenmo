@@ -144,6 +144,16 @@ struct MLP[dtype: DType](LayerTrait):
         self.c_proj.eval()
         self.drop.eval()
 
+    def freeze(mut self):
+        """Freeze both Linears — no gradient computed."""
+        self.c_fc.freeze()
+        self.c_proj.freeze()
+
+    def unfreeze(mut self):
+        """Unfreeze both Linears — gradient computed."""
+        self.c_fc.unfreeze()
+        self.c_proj.unfreeze()
+
     def to_gpu(self, gpu: Optional[GPU] = None) raises -> MLP[Self.dtype]:
         var out = self
         out.c_fc = self.c_fc.to_gpu(gpu=gpu)
@@ -326,6 +336,20 @@ struct TransformerBlock[dtype: DType](LayerTrait):
         self.attn.eval()
         self.ln_2.eval()
         self.mlp.eval()
+
+    def freeze(mut self):
+        """Freeze the whole block — no gradient computed."""
+        self.ln_1.freeze()
+        self.attn.freeze()
+        self.ln_2.freeze()
+        self.mlp.freeze()
+
+    def unfreeze(mut self):
+        """Unfreeze the whole block — gradient computed."""
+        self.ln_1.unfreeze()
+        self.attn.unfreeze()
+        self.ln_2.unfreeze()
+        self.mlp.unfreeze()
 
     def to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
         var out = self
@@ -530,6 +554,16 @@ struct GPTEmbedding[
         self.wte.eval()
         self.wpe.eval()
         self.drop.eval()
+
+    def freeze(mut self):
+        """Freeze both tables — no gradient computed."""
+        self.wte.freeze()
+        self.wpe.freeze()
+
+    def unfreeze(mut self):
+        """Unfreeze both tables — gradient computed."""
+        self.wte.unfreeze()
+        self.wpe.unfreeze()
 
     def to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
         var out = self
@@ -864,6 +898,28 @@ struct GPTModel[
         if not self.tie_weights:
             ref head = self.lm_head.value()
             head.eval()
+
+    def freeze(mut self):
+        """Freeze the whole model — no gradient computed anywhere."""
+        self.wte_wpe.freeze()
+        for i in range(len(self.h)):
+            ref block = self.h[i]
+            block.freeze()
+        self.ln_f.freeze()
+        if not self.tie_weights:
+            ref head = self.lm_head.value()
+            head.freeze()
+
+    def unfreeze(mut self):
+        """Unfreeze the whole model — gradient computed everywhere."""
+        self.wte_wpe.unfreeze()
+        for i in range(len(self.h)):
+            ref block = self.h[i]
+            block.unfreeze()
+        self.ln_f.unfreeze()
+        if not self.tie_weights:
+            ref head = self.lm_head.value()
+            head.unfreeze()
 
     def to_gpu(
         self, gpu: Optional[GPU] = None
