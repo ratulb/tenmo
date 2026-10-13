@@ -3,7 +3,13 @@ from .shared.mnemonics import *
 from .validators import Validator
 from .tensor import Tensor
 from .shared.intarray import IntArray
-from .ndbuffer import NDBuffer, NDBufferLite, print_buffer
+from .ndbuffer import (
+    NDBuffer,
+    NDBufferLite,
+    print_buffer,
+    write_buffer,
+    MAX_PRINT_SIZE,
+)
 from .shared.broadcasthelper import ShapeBroadcaster
 from .shared.strides import Strides
 from std.sys import simd_width_of, has_accelerator
@@ -881,7 +887,16 @@ struct Gradbox[dtype: DType](
         Args:
             writer: The writer to write to.
         """
-        writer.write(self.__str__())
+        writer.write("\n", self.__str__(), "\n")
+        var empty = List[Int]()
+        write_buffer(
+            writer,
+            self.buffer(),
+            empty,
+            1,
+            num_first=self.shape().num_elements(),
+            num_last=0,
+        )
 
     @always_inline
     def seed_grad(self, value: Scalar[Self.dtype]):
@@ -1377,16 +1392,23 @@ struct Gradbox[dtype: DType](
             )
         return self.buffer().compare[Equal](tensor.buffer).buffer.all_true()
 
-    def print(self, num_first: Int = 10, num_last: Int = 10) raises:
+    def print(
+        self,
+        num_first: Int = 10,
+        num_last: Int = 10,
+        max_size: Int = MAX_PRINT_SIZE,
+    ) raises:
         """Print the Gradbox contents.
 
         Args:
             num_first: Number of elements to print from the start.
             num_last: Number of elements to print from the end.
+            max_size: Maximum per-dimension size the printer will traverse;
+                larger dimensions are reported instead.
         """
         print(
             "\n",
-            String(self),
+            self.__str__(),
             end="\n",
         )
         var empty = List[Int]()
@@ -1396,6 +1418,7 @@ struct Gradbox[dtype: DType](
             1,
             num_first=num_first,
             num_last=num_last,
+            max_size=max_size,
         )
 
     def data_ptr(ref self) -> Pointer[Scalar[Self.dtype], MutAnyOrigin]:
