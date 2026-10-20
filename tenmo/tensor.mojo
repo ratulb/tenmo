@@ -3128,6 +3128,7 @@ struct Tensor[dtype: DType](
         num_first: Int = 10,
         num_last: Int = 10,
         max_size: Int = MAX_PRINT_SIZE,
+        header: Bool = True,
     ) raises:
         """Print the tensor's metadata and data preview.
 
@@ -3136,12 +3137,14 @@ struct Tensor[dtype: DType](
             num_last: Number of elements to print from the end.
             max_size: Maximum per-dimension size the printer will traverse;
                 larger dimensions are reported instead.
+            header: Whether to print headers.
         """
-        print(
-            "\n",
-            self.__str__(),
-            end="\n",
-        )
+        if header:
+            print(
+                "\n",
+                self.__str__(),
+                end="\n",
+            )
         var empty = List[Int]()
         print_buffer(
             self.buffer,
@@ -4246,7 +4249,7 @@ struct Tensor[dtype: DType](
     ](
         pred: Tensor[Self.dtype],
         target: Tensor[Self.dtype],
-        epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9),
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
         reduction: Reduction = Reduction("mean"),
         sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
