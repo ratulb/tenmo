@@ -110,7 +110,7 @@ environments:
       - conda: https://conda.modular.com/max/noarch/mblack-26.6.0-release.conda
       - conda: https://conda.modular.com/max/noarch/mojo-python-1.1.0-release.conda
       - conda: https://repo.prefix.dev/modular-community/linux-64/mbpe-0.1.1-hb0f4dca_6.conda
-      - conda_source: mojodoc[b2b10669] @ git+https://github.com/ratulb/mojodoc?branch=main#f6f25bc0376cac6e0df5de91f123adbf21ece8db
+      - conda_source: mojodoc[8ce65061] @ git+https://github.com/ratulb/mojodoc?branch=main#f6f25bc0376cac6e0df5de91f123adbf21ece8db
       - pypi: https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/4b/f9/d8ac11ddbd5d506e7c6be71b8a33698c73fd9dc108f6c9e0595f7cd60619/pure_cifar_10-0.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl
@@ -222,7 +222,7 @@ environments:
       - conda: https://conda.modular.com/max/noarch/mblack-26.6.0-release.conda
       - conda: https://conda.modular.com/max/noarch/mojo-python-1.1.0-release.conda
       - conda: https://repo.prefix.dev/modular-community/linux-64/mbpe-0.1.1-hb0f4dca_6.conda
-      - conda_source: mojodoc[b2b10669] @ git+https://github.com/ratulb/mojodoc?branch=main#f6f25bc0376cac6e0df5de91f123adbf21ece8db
+      - conda_source: mojodoc[8ce65061] @ git+https://github.com/ratulb/mojodoc?branch=main#f6f25bc0376cac6e0df5de91f123adbf21ece8db
       - pypi: https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/4b/f9/d8ac11ddbd5d506e7c6be71b8a33698c73fd9dc108f6c9e0595f7cd60619/pure_cifar_10-0.1.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl
@@ -1090,7 +1090,8 @@ packages:
   depends:
   - python >=3.14
   license: BSD-3-Clause AND MIT AND EPL-2.0
-  purls: []
+  purls:
+  - pkg:pypi/backports-zstd?source=compressed-mapping
   run_exports: {}
   size: 7539
   timestamp: 1788491291925
@@ -1626,7 +1627,7 @@ packages:
   run_exports: {}
   size: 3018570
   timestamp: 1789860205881
-- conda_source: mojodoc[b2b10669] @ git+https://github.com/ratulb/mojodoc?branch=main#f6f25bc0376cac6e0df5de91f123adbf21ece8db
+- conda_source: mojodoc[8ce65061] @ git+https://github.com/ratulb/mojodoc?branch=main#f6f25bc0376cac6e0df5de91f123adbf21ece8db
   version: 0.0.1
   build: hb0f4dca_0
   subdir: linux-64
