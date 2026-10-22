@@ -167,6 +167,7 @@ declare -a ALL_TESTS_IN_ORDER=(
   "logarithm|tests/test_logarithm.mojo"
   "logarithm_gpu|tests/test_logarithm_gpu.mojo"
   "concat|tests/test_concat.mojo"
+  "cat|tests/test_cat.mojo"
   "variance|tests/test_variance.mojo"
   "variance_and_std|tests/test_variance_and_std.mojo"
   "utils|tests/test_utils.mojo"
@@ -730,6 +731,10 @@ run_test_by_name() {
       ;;
     concat)
       run_test "concat" "tests/test_concat.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    cat)
+      run_test "cat" "tests/test_cat.mojo" "$MOJO_FLAGS"
       exit_code=$?
       ;;
     variance)

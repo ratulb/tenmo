@@ -4416,6 +4416,20 @@ struct Tensor[dtype: DType](
         )
 
     @staticmethod
+    def cat[*Ts: ImplicitlyCopyable & Writable](
+        tensors: Tuple[*Ts],
+        axis: Int = 0,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype]:
+        var lst = List[Tensor[Self.dtype]]()
+        comptime for i in range(len(Ts)):
+            lst.append(rebind[Tensor[Self.dtype]](tensors[i]))
+        return Self.concat(
+            lst, axis=axis, requires_grad=requires_grad, sync=sync
+        )
+
+    @staticmethod
     def stack[
         track_grad: Bool = True,
     ](
