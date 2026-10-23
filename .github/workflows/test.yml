@@ -46,6 +46,12 @@ jobs:
           - negative_indexing
           - ellipsis
           - indexing_grad
+          - scatter_basic
+          - scatter_grad
+          - masked_select
+          - masked_select_grad
+          - gather_points
+          - setitem_extension
           - contiguous
           - count_unique
           - cumsum
@@ -310,6 +316,12 @@ jobs:
           - negative_indexing
           - ellipsis
           - indexing_grad
+          - scatter_basic
+          - scatter_grad
+          - masked_select
+          - masked_select_grad
+          - gather_points
+          - setitem_extension
           - std_variance
           - variance
           - pad

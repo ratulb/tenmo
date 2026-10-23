@@ -173,6 +173,7 @@ declare -a ALL_TESTS_IN_ORDER=(
   "masked_select|tests/test_masked_select.mojo"
   "scatter_basic|tests/test_scatter_basic.mojo"
   "indexing_grad|tests/test_indexing_grad.mojo"
+  "setitem_extension|tests/test_setitem_extension.mojo"
   "ellipsis|tests/test_ellipsis.mojo"
   "negative_indexing|tests/test_negative_indexing.mojo"
   "cat|tests/test_cat.mojo"
@@ -749,14 +750,6 @@ run_test_by_name() {
       run_test "masked_select_grad" "tests/test_masked_select_grad.mojo" "$MOJO_FLAGS"
       exit_code=$?
       ;;
-    masked_select_grad)
-      run_test "masked_select_grad" "tests/test_masked_select_grad.mojo" "$MOJO_FLAGS"
-      exit_code=$?
-      ;;
-    scatter_grad)
-      run_test "scatter_grad" "tests/test_scatter_grad.mojo" "$MOJO_FLAGS"
-      exit_code=$?
-      ;;
     scatter_grad)
       run_test "scatter_grad" "tests/test_scatter_grad.mojo" "$MOJO_FLAGS"
       exit_code=$?
@@ -767,6 +760,10 @@ run_test_by_name() {
       ;;
     scatter_basic)
       run_test "scatter_basic" "tests/test_scatter_basic.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    setitem_extension)
+      run_test "setitem_extension" "tests/test_setitem_extension.mojo" "$MOJO_FLAGS"
       exit_code=$?
       ;;
     indexing_grad)
