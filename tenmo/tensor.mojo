@@ -118,6 +118,39 @@ struct ScatterBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable, Registe
         grad_output.zero_grad()
 
 
+
+@fieldwise_init
+struct MaskArg(ArgumentType):
+    var indices: IntArray
+
+
+@fieldwise_init
+struct MaskBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable, RegisterPassable):
+    comptime datatype = Self.dtype
+
+    @staticmethod
+    def backward(
+        var output: Ancestor[Self.dtype],
+        mut parent_ids: List[UInt],
+    ):
+        var arg = output.ancestry().backward_fn().get[MaskArg]()
+        var indices = arg.indices.copy()
+        ref grad_output = output.gradients()
+
+        if len(output.ancestry()) > 0:
+            ref parent = output.ancestry().get(0)
+            if parent.requires_grad:
+                var grad_base = Gradbox[Self.dtype].zeros(parent.shape())
+                for k in range(len(indices)):
+                    var idx = indices[k]
+                    if idx >= 0 and idx < grad_base.shape()[0]:
+                        grad_base[idx] = grad_output[k]
+                parent.update_grad(grad_base^, AddTensor, None)
+            parent_ids.append(parent._id)
+
+        grad_output.zero_grad()
+
+
 struct Tensor[dtype: DType](
     ImplicitlyCopyable & Sized & Writable & Absable & Equatable & Iterable
 ):
@@ -577,7 +610,13 @@ struct Tensor[dtype: DType](
 
         return out^
 
-    def masked_select(self, mask: Tensor[DType.bool]) -> Tensor[Self.dtype]:
+    def masked_select[
+        track_grad: Bool = True,
+    ](
+        self,
+        mask: Tensor[DType.bool],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
         """Select elements where mask is True (returns 1D)."""
         var idx_list = List[Int]()
         for i in range(mask.numels()):
@@ -586,6 +625,19 @@ struct Tensor[dtype: DType](
         var out = Tensor[Self.dtype].zeros(max(1, len(idx_list)))
         for k in range(len(idx_list)):
             out[k] = self[idx_list[k]]
+
+        comptime if track_grad:
+            var grad_required = requires_grad.or_else(self.requires_grad)
+            if grad_required:
+                out.requires_grad_(True)
+                var idx_array = IntArray()
+                for i in range(len(idx_list)):
+                    idx_array.append(idx_list[i])
+                var arg = MaskArg(indices=idx_array)
+                var backwardFn = BackwardFn(arg^, MaskBackward[Self.dtype]())
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, self)
+
         return out^
 
     def chunk(

@@ -167,6 +167,7 @@ declare -a ALL_TESTS_IN_ORDER=(
   "logarithm|tests/test_logarithm.mojo"
   "logarithm_gpu|tests/test_logarithm_gpu.mojo"
   "concat|tests/test_concat.mojo"
+  "masked_select_grad|tests/test_masked_select_grad.mojo"
   "scatter_grad|tests/test_scatter_grad.mojo"
   "masked_select|tests/test_masked_select.mojo"
   "scatter_basic|tests/test_scatter_basic.mojo"
@@ -737,6 +738,14 @@ run_test_by_name() {
       ;;
     concat)
       run_test "concat" "tests/test_concat.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    masked_select_grad)
+      run_test "masked_select_grad" "tests/test_masked_select_grad.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    masked_select_grad)
+      run_test "masked_select_grad" "tests/test_masked_select_grad.mojo" "$MOJO_FLAGS"
       exit_code=$?
       ;;
     scatter_grad)
