@@ -45,6 +45,7 @@ jobs:
           - cat
           - negative_indexing
           - ellipsis
+          - indexing_grad
           - contiguous
           - count_unique
           - cumsum
@@ -308,6 +309,7 @@ jobs:
           - cat
           - negative_indexing
           - ellipsis
+          - indexing_grad
           - std_variance
           - variance
           - pad
