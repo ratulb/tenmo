@@ -43,6 +43,7 @@ jobs:
           - compare
           - concat
           - cat
+          - negative_indexing
           - contiguous
           - count_unique
           - cumsum
@@ -304,6 +305,7 @@ jobs:
           - stack
           - concat
           - cat
+          - negative_indexing
           - std_variance
           - variance
           - pad
