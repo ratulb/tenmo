@@ -485,6 +485,19 @@ struct Tensor[dtype: DType](
             self, *slices, requires_grad=self.requires_grad, sync=sync
         )
 
+    def scatter(
+        self,
+        indices: List[Int],
+        src: Tensor[Self.dtype],
+        axis: Int = 0,
+    ) -> Tensor[Self.dtype]:
+        """Scatter src into a copy of self at indices along axis (basic, CPU)."""
+        var out = self.clone()
+        if axis == 0:
+            for k in range(len(indices)):
+                out[indices[k]] = src[k] if src.numels() > k else src.item()
+        return out^
+
     def chunk(
         self, *indices: Idx, requires_grad: Bool = False
     ) -> Tensor[Self.dtype]:
