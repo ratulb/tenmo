@@ -1371,6 +1371,7 @@ struct Tensor[dtype: DType](
     def all_close[
         rtol: Scalar[Self.dtype] = CloseTol[Self.dtype].rtol(),
         atol: Scalar[Self.dtype] = CloseTol[Self.dtype].atol(),
+        treat_nan_equal: Bool = False,
     ](self, other: Self,) -> Bool:
         """Check if two tensors are element-wise close within tolerance.
 
@@ -1380,7 +1381,7 @@ struct Tensor[dtype: DType](
         Returns:
             True if all elements are within tolerance, False otherwise.
         """
-        return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
+        return self.buffer.all_close[rtol=rtol, atol=atol, treat_nan_equal=treat_nan_equal](other.buffer)
 
     def all(self, pred: def(Scalar[Self.dtype]) thin -> Bool) -> Bool:
         """Returns True if pred holds for all elements.

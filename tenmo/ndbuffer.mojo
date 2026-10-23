@@ -3168,6 +3168,7 @@ struct NDBuffer[dtype: DType](
     def all_close[
         rtol: Scalar[Self.dtype] = CloseTol[Self.dtype].rtol(),
         atol: Scalar[Self.dtype] = CloseTol[Self.dtype].atol(),
+        treat_nan_equal: Bool = False,
     ](self, other: Self, sync: Bool = False) -> Bool:
         comptime assert (
             Self.dtype.is_floating_point()
@@ -3185,7 +3186,7 @@ struct NDBuffer[dtype: DType](
         comptime if has_accelerator():
             if self.is_on_gpu() and other.is_on_gpu():
                 try:
-                    result = AllClose[Self.dtype].launch[rtol=rtol, atol=atol](
+                    result = AllClose[Self.dtype].launch[rtol=rtol, atol=atol, treat_nan_equal=treat_nan_equal](
                         self.layout(),
                         self.device_state.value(),
                         other.layout(),
@@ -3200,7 +3201,7 @@ struct NDBuffer[dtype: DType](
                 try:
                     var cpu_self = self.to_cpu()
                     result = cpu_self.contiguous_buffer().all_close[
-                        rtol=rtol, atol=atol
+                        rtol=rtol, atol=atol, treat_nan_equal=treat_nan_equal
                     ](other.contiguous_buffer())
                 except e:
                     print(e)
@@ -3210,7 +3211,7 @@ struct NDBuffer[dtype: DType](
                 try:
                     var cpu_other = other.to_cpu()
                     result = self.contiguous_buffer().all_close[
-                        rtol=rtol, atol=atol
+                        rtol=rtol, atol=atol, treat_nan_equal=treat_nan_equal
                     ](cpu_other.contiguous_buffer())
                 except e:
                     print(e)
@@ -3218,10 +3219,10 @@ struct NDBuffer[dtype: DType](
                     result = False
             else:
                 result = self.contiguous_buffer().all_close[
-                    rtol=rtol, atol=atol
+                    rtol=rtol, atol=atol, treat_nan_equal=treat_nan_equal
                 ](other.contiguous_buffer())
         else:
-            result = self.contiguous_buffer().all_close[rtol=rtol, atol=atol](
+            result = self.contiguous_buffer().all_close[rtol=rtol, atol=atol, treat_nan_equal=treat_nan_equal](
                 other.contiguous_buffer()
             )
 

@@ -1290,6 +1290,7 @@ struct Gradbox[dtype: DType](
         rtol: Scalar[Self.dtype] = Scalar[Self.dtype](1e-5),
         atol: Scalar[Self.dtype] = Scalar[Self.dtype](1e-8) if Self.dtype
         == DType.float64 else Scalar[Self.dtype](1e-5),
+        treat_nan_equal: Bool = False,
     ](self, other: Self) -> Bool:
         """Check if all elements are close to another Gradbox.
 
@@ -1310,11 +1311,12 @@ struct Gradbox[dtype: DType](
                 + String(other.shape())
             )
 
-        return self.buffer().all_close[rtol=rtol, atol=atol](other.buffer())
+        return self.buffer().all_close[rtol=rtol, atol=atol, treat_nan_equal=treat_nan_equal](other.buffer())
 
     def all_close[
         rtol: Scalar[Self.dtype] = CloseTol[Self.dtype].rtol(),
         atol: Scalar[Self.dtype] = CloseTol[Self.dtype].atol(),
+        treat_nan_equal: Bool = False,
     ](self, other: Tensor[Self.dtype]) -> Bool:
         """Check if all elements are close to a Tensor.
 
@@ -1335,7 +1337,7 @@ struct Gradbox[dtype: DType](
                 + String(other.shape())
             )
 
-        return self.buffer().all_close[rtol=rtol, atol=atol](other.buffer)
+        return self.buffer().all_close[rtol=rtol, atol=atol, treat_nan_equal=treat_nan_equal](other.buffer)
 
     @always_inline
     def reshape(self) -> Gradbox[Self.dtype]:

@@ -42,6 +42,7 @@ jobs:
           - cnn
           - compare
           - concat
+          - all_close
           - cat
           - negative_indexing
           - ellipsis
@@ -312,6 +313,7 @@ jobs:
           - dropout
           - stack
           - concat
+          - all_close
           - cat
           - negative_indexing
           - ellipsis

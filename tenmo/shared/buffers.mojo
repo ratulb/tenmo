@@ -1,7 +1,7 @@
 from std.sys import simd_width_of, size_of
 from std.memory import unsafe_memset_zero, unsafe_memcpy
 from std.memory.alloc import unsafe_alloc
-from std.math import exp, log, ceil, tanh, sqrt
+from std.math import exp, log, ceil, tanh, sqrt, isnan, isinf
 from max.algorithm import parallelize
 from std.sys.info import num_physical_cores
 from .logging import log_debug
@@ -2058,6 +2058,7 @@ struct Buffer[dtype: DType = DType.float32](
     def all_close[
         rtol: Scalar[Self.dtype] = CloseTol[Self.dtype].rtol(),
         atol: Scalar[Self.dtype] = CloseTol[Self.dtype].atol(),
+        treat_nan_equal: Bool = False,
     ](self: Buffer[Self.dtype], other: Buffer[Self.dtype],) -> Bool:
         """Check if all elements are close within tolerance: |a - b| <= atol + rtol * |b|.
         """
@@ -2068,27 +2069,17 @@ struct Buffer[dtype: DType = DType.float32](
         if self.size != other.size:
             return False
 
-        if self.size == 0:
-            return True
-
-        def check_close[smdwidth: Int](idx: Int) {imm} -> Bool:
-            var vec1 = self.load[simdwidth=smdwidth](idx)
-            var vec2 = other.load[simdwidth=smdwidth](idx)
-            var diff = abs(vec1 - vec2)
-            var tolerance = atol + rtol * abs(vec2)
-            return diff.le(tolerance).reduce_and()
-
-        comptime simd_width = simd_width_of[Self.dtype]()
-        var num_elems = self.size
-        var simd_blocks = num_elems // simd_width
-
-        for i in range(simd_blocks):
-            if not check_close[simd_width](i * simd_width):
-                return False
-
-        # Handle tail
-        for k in range(simd_blocks * simd_width, num_elems):
-            if abs(self[k] - other[k]) > atol + rtol * abs(other[k]):
+        for k in range(self.size):
+            var a_val = self[k]
+            var b_val = other[k]
+            var ok: Bool
+            if isnan(a_val) or isnan(b_val):
+                ok = treat_nan_equal and isnan(a_val) and isnan(b_val)
+            elif isinf(a_val) or isinf(b_val):
+                ok = a_val == b_val
+            else:
+                ok = abs(a_val - b_val) <= atol + rtol * abs(b_val)
+            if not ok:
                 return False
 
         return True
