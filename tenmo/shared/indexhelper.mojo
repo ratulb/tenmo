@@ -655,10 +655,21 @@ struct LayoutIndexIterator[layout_origin: ImmOrigin](
 struct NewAxis(ImplicitlyCopyable):  # Empty struct as a sentinel
     pass
 
+@fieldwise_init
+struct Ellipsis(ImplicitlyCopyable):  # Empty struct as a sentinel
+    pass
 
-comptime Idx = Variant[Int, IntArray, Slice, NewAxis]
+
+comptime Idx = Variant[Int, IntArray, Slice, NewAxis, Ellipsis]
 
 comptime newaxis = Idx(NewAxis())
+
+comptime ellipsis = Idx(Ellipsis())
+
+
+@always_inline("nodebug")
+def e() -> Idx:
+    return Idx(Ellipsis())
 
 
 @always_inline("nodebug")

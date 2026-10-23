@@ -167,6 +167,15 @@ declare -a ALL_TESTS_IN_ORDER=(
   "logarithm|tests/test_logarithm.mojo"
   "logarithm_gpu|tests/test_logarithm_gpu.mojo"
   "concat|tests/test_concat.mojo"
+  "gather_points|tests/test_gather_points.mojo"
+  "masked_select_grad|tests/test_masked_select_grad.mojo"
+  "scatter_grad|tests/test_scatter_grad.mojo"
+  "masked_select|tests/test_masked_select.mojo"
+  "scatter_basic|tests/test_scatter_basic.mojo"
+  "indexing_grad|tests/test_indexing_grad.mojo"
+  "setitem_extension|tests/test_setitem_extension.mojo"
+  "ellipsis|tests/test_ellipsis.mojo"
+  "negative_indexing|tests/test_negative_indexing.mojo"
   "cat|tests/test_cat.mojo"
   "variance|tests/test_variance.mojo"
   "variance_and_std|tests/test_variance_and_std.mojo"
@@ -731,6 +740,42 @@ run_test_by_name() {
       ;;
     concat)
       run_test "concat" "tests/test_concat.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    gather_points)
+      run_test "gather_points" "tests/test_gather_points.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    masked_select_grad)
+      run_test "masked_select_grad" "tests/test_masked_select_grad.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    scatter_grad)
+      run_test "scatter_grad" "tests/test_scatter_grad.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    masked_select)
+      run_test "masked_select" "tests/test_masked_select.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    scatter_basic)
+      run_test "scatter_basic" "tests/test_scatter_basic.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    setitem_extension)
+      run_test "setitem_extension" "tests/test_setitem_extension.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    indexing_grad)
+      run_test "indexing_grad" "tests/test_indexing_grad.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    ellipsis)
+      run_test "ellipsis" "tests/test_ellipsis.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    negative_indexing)
+      run_test "negative_indexing" "tests/test_negative_indexing.mojo" "$MOJO_FLAGS"
       exit_code=$?
       ;;
     cat)

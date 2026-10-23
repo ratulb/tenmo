@@ -32,7 +32,7 @@ from .shared.logging import log_warning
 from .shared.panic import panic
 from .shared.timing import now
 from .shared.indexhelper import IndexIterator
-from .backpropagation import Backward, BackwardFn
+from .backpropagation import Backward, BackwardFn, ArgumentType, BackwardFnType
 from .cast import ToDtypeBackward
 
 from .forwards import *
@@ -56,6 +56,99 @@ from .sum_mean_reduction import SumMeanReduction
 from std.sys.info import has_accelerator
 
 from .shared import mnemonics
+
+
+
+@fieldwise_init
+struct ScatterArg(ArgumentType):
+    var indices: IntArray
+    var axis: Int
+
+
+@fieldwise_init
+struct ScatterBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable, RegisterPassable):
+    comptime datatype = Self.dtype
+
+    @staticmethod
+    def backward(
+        var output: Ancestor[Self.dtype],
+        mut parent_ids: List[UInt],
+    ):
+        var arg = output.ancestry().backward_fn().get[ScatterArg]()
+        var axis = arg.axis
+        var indices = arg.indices.copy()
+        ref grad_output = output.gradients()
+
+        # parent 0 = base, parent 1 = src
+        # grad_src = grad_output.gather(indices, axis)
+        # grad_base = grad_output with zeros at scattered positions
+        var count = len(output.ancestry())
+        # base grad
+        if count > 0:
+            ref base_parent = output.ancestry().get(0)
+            if base_parent.requires_grad:
+                var grad_base = Gradbox[Self.dtype].zeros(base_parent.shape())
+                # copy grad_output then zero scattered positions
+                # For axis=0 1D only for now
+                if axis == 0:
+                    # copy all
+                    for i in range(grad_output.numels()):
+                        grad_base[i] = grad_output[i]
+                    for k in range(len(indices)):
+                        var idx = indices[k]
+                        if idx >= 0 and idx < grad_base.shape()[0]:
+                            grad_base[idx] = Scalar[Self.dtype](0.0)
+                base_parent.update_grad(grad_base^, AddTensor, None)
+            parent_ids.append(base_parent._id)
+
+        if count > 1:
+            ref src_parent = output.ancestry().get(1)
+            if src_parent.requires_grad:
+                # gather grad_output at indices
+                var grad_src_shape = src_parent.shape()
+                var grad_src = Gradbox[Self.dtype].zeros(grad_src_shape)
+                if axis == 0:
+                    for k in range(len(indices)):
+                        var idx = indices[k]
+                        if idx >= 0 and idx < grad_output.shape()[0]:
+                            grad_src[k] = grad_output[idx]
+                src_parent.update_grad(grad_src^, AddTensor, None)
+            parent_ids.append(src_parent._id)
+
+        grad_output.zero_grad()
+
+
+
+@fieldwise_init
+struct MaskArg(ArgumentType):
+    var indices: IntArray
+
+
+@fieldwise_init
+struct MaskBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable, RegisterPassable):
+    comptime datatype = Self.dtype
+
+    @staticmethod
+    def backward(
+        var output: Ancestor[Self.dtype],
+        mut parent_ids: List[UInt],
+    ):
+        var arg = output.ancestry().backward_fn().get[MaskArg]()
+        var indices = arg.indices.copy()
+        ref grad_output = output.gradients()
+
+        if len(output.ancestry()) > 0:
+            ref parent = output.ancestry().get(0)
+            if parent.requires_grad:
+                var grad_base = Gradbox[Self.dtype].zeros(parent.shape())
+                for k in range(len(indices)):
+                    var idx = indices[k]
+                    if idx >= 0 and idx < grad_base.shape()[0]:
+                        grad_base[idx] = grad_output[k]
+                parent.update_grad(grad_base^, AddTensor, None)
+            parent_ids.append(parent._id)
+
+        grad_output.zero_grad()
 
 
 struct Tensor[dtype: DType](
@@ -485,6 +578,86 @@ struct Tensor[dtype: DType](
             self, *slices, requires_grad=self.requires_grad, sync=sync
         )
 
+    def scatter[
+        track_grad: Bool = True,
+    ](
+        self,
+        indices: List[Int],
+        src: Tensor[Self.dtype],
+        axis: Int = 0,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
+    ) -> Tensor[Self.dtype]:
+        """Scatter src into a copy of self at indices along axis (CPU)."""
+        var out = self.clone()
+        if axis == 0:
+            for k in range(len(indices)):
+                out[indices[k]] = src[k] if src.numels() > k else src.item()
+
+        comptime if track_grad:
+            var grad_required = requires_grad.or_else(
+                self.requires_grad or src.requires_grad
+            )
+            if grad_required:
+                out.requires_grad_(True)
+                var idx_array = IntArray()
+                for i in range(len(indices)):
+                    idx_array.append(indices[i])
+                var arg = ScatterArg(indices=idx_array, axis=axis)
+                var backwardFn = BackwardFn(arg^, ScatterBackward[Self.dtype]())
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, self, src)
+
+        return out^
+
+    def masked_select[
+        track_grad: Bool = True,
+    ](
+        self,
+        mask: Tensor[DType.bool],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        """Select elements where mask is True (returns 1D)."""
+        var idx_list = List[Int]()
+        for i in range(mask.numels()):
+            if mask[i]:
+                idx_list.append(i)
+        var out = Tensor[Self.dtype].zeros(max(1, len(idx_list)))
+        for k in range(len(idx_list)):
+            out[k] = self[idx_list[k]]
+
+        comptime if track_grad:
+            var grad_required = requires_grad.or_else(self.requires_grad)
+            if grad_required:
+                out.requires_grad_(True)
+                var idx_array = IntArray()
+                for i in range(len(idx_list)):
+                    idx_array.append(idx_list[i])
+                var arg = MaskArg(indices=idx_array)
+                var backwardFn = BackwardFn(arg^, MaskBackward[Self.dtype]())
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, self)
+
+        return out^
+
+    def gather_points(
+        self,
+        indices: List[List[Int]],
+    ) -> Tensor[Self.dtype]:
+        """Gather values at coordinate points (each inner list is a coordinate)."""
+        var out = Tensor[Self.dtype].zeros(max(1, len(indices)))
+        for k in range(len(indices)):
+            var coord = indices[k].copy()
+            var flat = 0
+            var mult = 1
+            var ndim = self.rank()
+            for d in range(ndim - 1, -1, -1):
+                flat += coord[d] * mult
+                mult *= self.shape()[d]
+            var flat_t = self.reshape(Shape(self.numels()))
+            out[k] = flat_t[flat]
+        return out^
+
     def chunk(
         self, *indices: Idx, requires_grad: Bool = False
     ) -> Tensor[Self.dtype]:
@@ -633,6 +806,27 @@ struct Tensor[dtype: DType](
         self.buffer[indices] = value
 
     @always_inline
+    def __setitem__(self, *indices: Idx, value: Scalar[Self.dtype]):
+        """Set a scalar value over an advanced-indexed region.
+
+        Args:
+            indices: Idx objects (integers or slices) defining the region.
+            value: Scalar value to write.
+        """
+        self.fill(value, *indices)
+
+    @always_inline
+    def __setitem__(self, *indices: Idx, value: Tensor[Self.dtype]):
+        """Copy a tensor into an advanced-indexed region.
+
+        Args:
+            indices: Idx objects (integers or slices) defining the region.
+            value: Source tensor to copy from.
+        """
+        self.fill(value, *indices)
+
+
+    @always_inline
     def __setitem__(self, indices: List[Int], value: Scalar[Self.dtype]):
         """Set a scalar value at given coordinates.
 
@@ -750,8 +944,8 @@ struct Tensor[dtype: DType](
             self.buffer,
             empty,
             1,
-            num_first=self.buffer.numels(),
-            num_last=0,
+            num_first=10,
+            num_last=10,
         )
 
     @no_inline

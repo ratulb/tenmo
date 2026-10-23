@@ -1,6 +1,6 @@
 from .shared.shapes import Shape
 from .shared.strides import Strides
-from .shared.indexhelper import Idx, NewAxis, Slicer, i, il, newaxis, s
+from .shared.indexhelper import Idx, NewAxis, Ellipsis, Slicer, i, il, newaxis, ellipsis, e, s
 from .shared.logging import log_warning
 from .shared.panic import panic
 from .shared.intarray import IntArray
@@ -539,6 +539,7 @@ struct Validator:
         # Validate rank vs non-newaxis indices count
         # Count required rank: Int contributes 1; IntArray contributes len(list); Slice contributes 1; NewAxis contributes 0
         var required_rank = 0
+        var ellipsis_count = 0
 
         for idx in indices:
             if idx.isa[NewAxis]():
@@ -549,6 +550,20 @@ struct Validator:
                 required_rank += len(idx[IntArray])
             elif idx.isa[Slice]():
                 required_rank += 1
+            elif idx.isa[Ellipsis]():
+                ellipsis_count += 1
+
+        if ellipsis_count > 1:
+            panic("Tensor indexing: at most one Ellipsis allowed")
+
+        var ellipsis_expand = 0
+        if ellipsis_count == 1:
+            ellipsis_expand = original_shape.rank() - required_rank
+            if ellipsis_expand < 0:
+                panic(
+                    "Tensor indexing: too many indices for Ellipsis expansion"
+                )
+            required_rank += ellipsis_expand
 
         if required_rank != original_shape.rank():
             panic(
@@ -569,6 +584,13 @@ struct Validator:
                 # Case 1: NewAxis insertion
                 new_shape.append(1)
                 new_strides.append(0)
+            elif idx.isa[Ellipsis]():
+                for _ in range(ellipsis_expand):
+                    var shape_dim = original_shape[dim_counter]
+                    var stride_dim = original_strides[dim_counter]
+                    dim_counter += 1
+                    new_shape.append(shape_dim)
+                    new_strides.append(stride_dim)
             elif idx.isa[Int]():
                 # Case 2: Integer indexing (dimension reduction)
                 var axis = idx[Int]
@@ -652,16 +674,32 @@ struct Validator:
         Python bindings to pass a runtime-determined lane list.
         """
         # Validate rank vs non-newaxis indices count
-        # Count required rank: Int contributes 1; Slice contributes 1; NewAxis contributes 0
         var required_rank = 0
+        var ellipsis_count = 0
 
         for idx in indices:
             if idx.isa[NewAxis]():
                 continue
             elif idx.isa[Int]():
                 required_rank += 1
+            elif idx.isa[IntArray]():
+                required_rank += len(idx[IntArray])
             elif idx.isa[Slice]():
                 required_rank += 1
+            elif idx.isa[Ellipsis]():
+                ellipsis_count += 1
+
+        if ellipsis_count > 1:
+            panic("Tensor indexing: at most one Ellipsis allowed")
+
+        var ellipsis_expand = 0
+        if ellipsis_count == 1:
+            ellipsis_expand = original_shape.rank() - required_rank
+            if ellipsis_expand < 0:
+                panic(
+                    "Tensor indexing: too many indices for Ellipsis expansion"
+                )
+            required_rank += ellipsis_expand
 
         if required_rank != original_shape.rank():
             panic(
@@ -682,6 +720,13 @@ struct Validator:
                 # Case 1: NewAxis insertion
                 new_shape.append(1)
                 new_strides.append(0)
+            elif idx.isa[Ellipsis]():
+                for _ in range(ellipsis_expand):
+                    var shape_dim = original_shape[dim_counter]
+                    var stride_dim = original_strides[dim_counter]
+                    dim_counter += 1
+                    new_shape.append(shape_dim)
+                    new_strides.append(stride_dim)
             elif idx.isa[Int]():
                 # Case 2: Integer indexing (dimension reduction)
                 var axis = idx[Int]
@@ -699,6 +744,25 @@ struct Validator:
                     )
                 offset += axis * stride_dim
                 # No shape/strides append (reduces rank)
+            elif idx.isa[IntArray]():
+                var list = idx[IntArray]
+                for t in range(len(list)):
+                    var shape_dim = original_shape[dim_counter]
+                    var stride_dim = original_strides[dim_counter]
+                    dim_counter += 1
+
+                    var ai = list[t]
+                    if ai < 0:
+                        ai += shape_dim
+                    if not 0 <= ai < shape_dim:
+                        panic(
+                            "Index ",
+                            String(ai),
+                            " out of bounds for dim ",
+                            String(shape_dim),
+                        )
+
+                    offset += ai * stride_dim
             elif idx.isa[Slice]():
                 # Case 3: Slicing
                 var s = idx[Slice]

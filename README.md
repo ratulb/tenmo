@@ -4,7 +4,7 @@
 ![Last Commit](https://img.shields.io/github/last-commit/ratulb/tenmo)
 ![License](https://img.shields.io/github/license/ratulb/tenmo)
 ![Language](https://img.shields.io/badge/language-Mojo-orange)
-![Open Issues](https://img.shields.io/github/issues/ratulb/tenmo)
+[![Open Issues](https://img.shields.io/github/issues/ratulb/tenmo)](https://github.com/ratulb/tenmo/issues)
 
 **A light tensor library and neural network framework in Mojo — from SIMD kernels to transformers.**
 

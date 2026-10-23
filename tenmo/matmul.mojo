@@ -48,6 +48,30 @@ def _blas_eligible[dtype: DType](
     )
 
 
+
+def _blas_or_native[dtype: DType](
+    A: NDBuffer[dtype],
+    B: NDBuffer[dtype],
+    transpose_A: Bool = False,
+    transpose_B: Bool = False,
+    sync: Bool = False,
+) -> NDBuffer[dtype]:
+    """CPU-only BLAS path guarded so non-float dtypes never instantiate
+    blas_matmul (which is float-only). Falls back to native matmul_2d."""
+    comptime if dtype == DType.float32 or dtype == DType.float64:
+        if _blas_eligible(A, B):
+            return blas_matmul[dtype](
+                A, B, transpose_A=transpose_A, transpose_B=transpose_B, sync=sync
+            )
+    var a = A
+    var b = B
+    if transpose_A:
+        a = a.transpose(IntArray(-1, -2))
+    if transpose_B:
+        b = b.transpose(IntArray(-1, -2))
+    return a.matmul_2d(b, sync=sync)
+
+
 @fieldwise_init
 struct Matmul2dBackward[dtype: DType](
     BackwardFnType, ImplicitlyCopyable, RegisterPassable
@@ -69,14 +93,9 @@ struct Matmul2dBackward[dtype: DType](
         if A.requires_grad:
             var B_buffer = B.buffer()
             var ndb: NDBuffer[Self.dtype]
-            if _blas_eligible(grad_out.buffer(), B_buffer):
-                ndb = blas_matmul[Self.dtype](
-                    grad_out.buffer(), B_buffer, transpose_B=True
-                )
-            else:
-                ndb = grad_out.buffer().matmul_2d(
-                    B_buffer.transpose(IntArray(-1, -2))
-                )
+            ndb = _blas_or_native[Self.dtype](
+                grad_out.buffer(), B_buffer, transpose_B=True
+            )
             var grad_A = Gradbox[Self.dtype](ndb^)
 
             A.update_grad(grad_A^, AddTensor, None)
@@ -86,13 +105,9 @@ struct Matmul2dBackward[dtype: DType](
         if B.requires_grad:
             var A_buffer = A.buffer()
             var ndb: NDBuffer[Self.dtype]
-            if _blas_eligible(A_buffer, grad_out.buffer()):
-                ndb = blas_matmul[Self.dtype](
-                    A_buffer, grad_out.buffer(), transpose_A=True
-                )
-            else:
-                var A_buffer_transposed = A_buffer.transpose(IntArray(-1, -2))
-                ndb = A_buffer_transposed.matmul_2d(grad_out.buffer())
+            ndb = _blas_or_native[Self.dtype](
+                A_buffer, grad_out.buffer(), transpose_A=True
+            )
             var grad_B = Gradbox[Self.dtype](ndb^)
 
             B.update_grad(grad_B^, AddTensor, None)
@@ -110,10 +125,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         A: Tensor[Self.dtype], B: Tensor[Self.dtype], sync: Bool = True
     ) -> Tensor[Self.dtype]:
         var ndb: NDBuffer[Self.dtype]
-        if _blas_eligible(A.buffer, B.buffer):
-            ndb = blas_matmul[Self.dtype](A.buffer, B.buffer, sync=sync)
-        else:
-            ndb = A.buffer.matmul_2d(B.buffer, sync=sync)
+        ndb = _blas_or_native[Self.dtype](A.buffer, B.buffer, sync=sync)
         var C = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         comptime if track_grad:
@@ -134,10 +146,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         var ndb: NDBuffer[Self.dtype]
-        if _blas_eligible(A.buffer, B.buffer()):
-            ndb = blas_matmul[Self.dtype](A.buffer, B.buffer())
-        else:
-            ndb = A.buffer.matmul_2d(B.buffer())
+        ndb = _blas_or_native[Self.dtype](A.buffer, B.buffer())
         var C = Gradbox[Self.dtype](ndb^)
         return C^
 
@@ -147,10 +156,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         A: Gradbox[Self.dtype], B: Tensor[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         var ndb: NDBuffer[Self.dtype]
-        if _blas_eligible(A.buffer(), B.buffer):
-            ndb = blas_matmul[Self.dtype](A.buffer(), B.buffer)
-        else:
-            ndb = A.buffer().matmul_2d(B.buffer)
+        ndb = _blas_or_native[Self.dtype](A.buffer(), B.buffer)
         var C = Gradbox[Self.dtype](ndb^)
         return C^
 
