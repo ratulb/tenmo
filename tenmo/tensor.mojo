@@ -640,6 +640,24 @@ struct Tensor[dtype: DType](
 
         return out^
 
+    def gather_points(
+        self,
+        indices: List[List[Int]],
+    ) -> Tensor[Self.dtype]:
+        """Gather values at coordinate points (each inner list is a coordinate)."""
+        var out = Tensor[Self.dtype].zeros(max(1, len(indices)))
+        for k in range(len(indices)):
+            var coord = indices[k].copy()
+            var flat = 0
+            var mult = 1
+            var ndim = self.rank()
+            for d in range(ndim - 1, -1, -1):
+                flat += coord[d] * mult
+                mult *= self.shape()[d]
+            var flat_t = self.reshape(Shape(self.numels()))
+            out[k] = flat_t[flat]
+        return out^
+
     def chunk(
         self, *indices: Idx, requires_grad: Bool = False
     ) -> Tensor[Self.dtype]:
