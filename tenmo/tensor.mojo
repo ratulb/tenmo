@@ -32,7 +32,7 @@ from .shared.logging import log_warning
 from .shared.panic import panic
 from .shared.timing import now
 from .shared.indexhelper import IndexIterator
-from .backpropagation import Backward, BackwardFn
+from .backpropagation import Backward, BackwardFn, ArgumentType, BackwardFnType
 from .cast import ToDtypeBackward
 
 from .forwards import *
@@ -56,6 +56,66 @@ from .sum_mean_reduction import SumMeanReduction
 from std.sys.info import has_accelerator
 
 from .shared import mnemonics
+
+
+
+@fieldwise_init
+struct ScatterArg(ArgumentType):
+    var indices: IntArray
+    var axis: Int
+
+
+@fieldwise_init
+struct ScatterBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable, RegisterPassable):
+    comptime datatype = Self.dtype
+
+    @staticmethod
+    def backward(
+        var output: Ancestor[Self.dtype],
+        mut parent_ids: List[UInt],
+    ):
+        var arg = output.ancestry().backward_fn().get[ScatterArg]()
+        var axis = arg.axis
+        var indices = arg.indices.copy()
+        ref grad_output = output.gradients()
+
+        # parent 0 = base, parent 1 = src
+        # grad_src = grad_output.gather(indices, axis)
+        # grad_base = grad_output with zeros at scattered positions
+        var count = len(output.ancestry())
+        # base grad
+        if count > 0:
+            ref base_parent = output.ancestry().get(0)
+            if base_parent.requires_grad:
+                var grad_base = Gradbox[Self.dtype].zeros(base_parent.shape())
+                # copy grad_output then zero scattered positions
+                # For axis=0 1D only for now
+                if axis == 0:
+                    # copy all
+                    for i in range(grad_output.numels()):
+                        grad_base[i] = grad_output[i]
+                    for k in range(len(indices)):
+                        var idx = indices[k]
+                        if idx >= 0 and idx < grad_base.shape()[0]:
+                            grad_base[idx] = Scalar[Self.dtype](0.0)
+                base_parent.update_grad(grad_base^, AddTensor, None)
+            parent_ids.append(base_parent._id)
+
+        if count > 1:
+            ref src_parent = output.ancestry().get(1)
+            if src_parent.requires_grad:
+                # gather grad_output at indices
+                var grad_src_shape = src_parent.shape()
+                var grad_src = Gradbox[Self.dtype].zeros(grad_src_shape)
+                if axis == 0:
+                    for k in range(len(indices)):
+                        var idx = indices[k]
+                        if idx >= 0 and idx < grad_output.shape()[0]:
+                            grad_src[k] = grad_output[idx]
+                src_parent.update_grad(grad_src^, AddTensor, None)
+            parent_ids.append(src_parent._id)
+
+        grad_output.zero_grad()
 
 
 struct Tensor[dtype: DType](
@@ -485,17 +545,36 @@ struct Tensor[dtype: DType](
             self, *slices, requires_grad=self.requires_grad, sync=sync
         )
 
-    def scatter(
+    def scatter[
+        track_grad: Bool = True,
+    ](
         self,
         indices: List[Int],
         src: Tensor[Self.dtype],
         axis: Int = 0,
+        requires_grad: Optional[Bool] = None,
+        sync: Bool = True,
     ) -> Tensor[Self.dtype]:
-        """Scatter src into a copy of self at indices along axis (basic, CPU)."""
+        """Scatter src into a copy of self at indices along axis (CPU)."""
         var out = self.clone()
         if axis == 0:
             for k in range(len(indices)):
                 out[indices[k]] = src[k] if src.numels() > k else src.item()
+
+        comptime if track_grad:
+            var grad_required = requires_grad.or_else(
+                self.requires_grad or src.requires_grad
+            )
+            if grad_required:
+                out.requires_grad_(True)
+                var idx_array = IntArray()
+                for i in range(len(indices)):
+                    idx_array.append(indices[i])
+                var arg = ScatterArg(indices=idx_array, axis=axis)
+                var backwardFn = BackwardFn(arg^, ScatterBackward[Self.dtype]())
+                backwardFn.needs_parent_data = True
+                out.add_ancestry(backwardFn^, self, src)
+
         return out^
 
     def masked_select(self, mask: Tensor[DType.bool]) -> Tensor[Self.dtype]:
