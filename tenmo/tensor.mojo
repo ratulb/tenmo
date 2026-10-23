@@ -498,6 +498,17 @@ struct Tensor[dtype: DType](
                 out[indices[k]] = src[k] if src.numels() > k else src.item()
         return out^
 
+    def masked_select(self, mask: Tensor[DType.bool]) -> Tensor[Self.dtype]:
+        """Select elements where mask is True (returns 1D)."""
+        var idx_list = List[Int]()
+        for i in range(mask.numels()):
+            if mask[i]:
+                idx_list.append(i)
+        var out = Tensor[Self.dtype].zeros(max(1, len(idx_list)))
+        for k in range(len(idx_list)):
+            out[k] = self[idx_list[k]]
+        return out^
+
     def chunk(
         self, *indices: Idx, requires_grad: Bool = False
     ) -> Tensor[Self.dtype]:
