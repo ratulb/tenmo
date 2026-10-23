@@ -944,8 +944,8 @@ struct Tensor[dtype: DType](
             self.buffer,
             empty,
             1,
-            num_first=self.buffer.numels(),
-            num_last=0,
+            num_first=10,
+            num_last=10,
         )
 
     @no_inline

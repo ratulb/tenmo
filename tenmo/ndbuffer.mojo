@@ -1239,8 +1239,8 @@ struct NDBuffer[dtype: DType](
             self,
             empty,
             1,
-            num_first=self.numels(),
-            num_last=0,
+            num_first=10,
+            num_last=10,
         )
 
     @always_inline

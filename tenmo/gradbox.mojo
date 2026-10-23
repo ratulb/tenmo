@@ -894,8 +894,8 @@ struct Gradbox[dtype: DType](
             self.buffer(),
             empty,
             1,
-            num_first=self.shape().num_elements(),
-            num_last=0,
+            num_first=10,
+            num_last=10,
         )
 
     @always_inline
