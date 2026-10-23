@@ -646,6 +646,27 @@ struct Tensor[dtype: DType](
         self.buffer[indices] = value
 
     @always_inline
+    def __setitem__(self, *indices: Idx, value: Scalar[Self.dtype]):
+        """Set a scalar value over an advanced-indexed region.
+
+        Args:
+            indices: Idx objects (integers or slices) defining the region.
+            value: Scalar value to write.
+        """
+        self.fill(value, *indices)
+
+    @always_inline
+    def __setitem__(self, *indices: Idx, value: Tensor[Self.dtype]):
+        """Copy a tensor into an advanced-indexed region.
+
+        Args:
+            indices: Idx objects (integers or slices) defining the region.
+            value: Source tensor to copy from.
+        """
+        self.fill(value, *indices)
+
+
+    @always_inline
     def __setitem__(self, indices: List[Int], value: Scalar[Self.dtype]):
         """Set a scalar value at given coordinates.
 
