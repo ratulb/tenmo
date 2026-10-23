@@ -42,6 +42,7 @@ jobs:
           - cnn
           - compare
           - concat
+          - cat
           - contiguous
           - count_unique
           - cumsum
@@ -302,6 +303,7 @@ jobs:
           - dropout
           - stack
           - concat
+          - cat
           - std_variance
           - variance
           - pad
