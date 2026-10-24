@@ -11,7 +11,7 @@ restores `train()` on exit (same contract as `eval_epoch`).
 from std.utils.numerics import neg_inf
 from .gpt import GPTModel, KVCache
 from .tensor import Tensor
-
+from .shared.shapes import Shape
 
 def sample[dtype: DType](
     logits: Tensor[dtype],
@@ -22,44 +22,75 @@ def sample[dtype: DType](
     """Draw one token id from 1-D `logits` (V,).
 
     - `temperature <= 0` or `top_k == 1` → greedy argmax (deterministic).
-    - Otherwise: scale by `1/τ`, keep the top-`k` entries (`0 < k < V`;
-      `k <= 0` or `k >= V` disables the mask), softmax, single
+    - Otherwise: keep the top-`k` entries (`0 < k < V`; `k <= 0` or `k >= V`
+      disables the mask), scale the survivors by `1/τ`, softmax, single
       `multinomial` draw. `init_seed` pins the draw for tests.
+
+    Scaling by positive `1/τ` is monotonic, so it commutes with top-k
+    selection: we select on raw logits and scale only the survivors.
     """
     var V = logits.numels()
     if V == 0:
         raise Error("sample: empty logits")
 
+    # ---- Greedy shortcuts -------------------------------------------------
+    # τ <= 0 means "no randomness"; top_k == 1 means "only one candidate".
     if temperature <= 0.0 or top_k == 1:
         return Int(logits.argmax(axis=0).item())
 
-    var work = logits.clone()
-    if temperature != 1.0:
-        work = work / Scalar[dtype](temperature)
+    # Precompute 1/τ once; applied only to survivors (or to all V when
+    # truncation is disabled).
+    var inv_tau = Scalar[dtype](1.0) / Scalar[dtype](temperature)
+
+    # Softmax normalizes along the only axis of a 1-D tensor.
+    var axes = List[Int]()
+    axes.append(0)
 
     var probs: Tensor[dtype]
+
     if top_k > 1 and top_k < V:
+        # ---- Top-k truncation --------------------------------------------
+        # Manual selection: repeatedly take the current max and mask it with
+        # -inf so the next argmax finds the runner-up. O(top_k * V) total.
+        # At k=50, V=256 that is ~12.8k comparisons — negligible. If V or k
+        # grows, swap this for a min-heap (O(V log k)) or quickselect
+        # (O(V) avg). Selection runs on raw logits (see docstring) and we
+        # snapshot the *scaled* value at pick time, so logits is never
+        # re-read and no full-V division pass is needed.
+        var work = logits.clone()
         var kept = List[Int](capacity=top_k)
+        var kept_values = List[Scalar[dtype]](capacity=top_k)
         for _ in range(top_k):
             var m = Int(work.argmax(axis=0).item())
             kept.append(m)
+            kept_values.append(work[m] * inv_tau)
             work[m] = neg_inf[dtype]()
-        var masked = Tensor[dtype].zeros(V) + neg_inf[dtype]()
-        for k in range(top_k):
-            masked[kept[k]] = logits[kept[k]] / Scalar[dtype](temperature) if temperature != 1.0 else logits[kept[k]]
-        var axes = List[Int]()
-        axes.append(0)
+
+        # Build the masked logit vector: -inf everywhere, scaled survivors
+        # in their original positions. exp(-inf) == 0, so softmax gives the
+        # masked entries exactly zero probability.
+        var masked = Tensor[dtype].full(Shape(V), neg_inf[dtype]())
+        for i in range(top_k):
+            masked[kept[i]] = kept_values[i]
+
         probs = masked.softmax[track_grad=False](axes)
     else:
-        var axes = List[Int]()
-        axes.append(0)
-        probs = work.softmax[track_grad=False](axes)
+        # ---- No truncation -----------------------------------------------
+        # top_k <= 1 is handled above; top_k >= V means "keep everything".
+        if temperature != 1.0:
+            var scaled = logits.clone() * inv_tau
+            probs = scaled.softmax[track_grad=False](axes)
+        else:
+            # τ == 1 is a no-op; skip the clone and softmax the input directly.
+            probs = logits.softmax[track_grad=False](axes)
 
+    # ---- Single draw ------------------------------------------------------
+    # Exactly one sample, so `replacement` is inert here but kept for callers
+    # who later bump num_samples. `init_seed` makes the draw reproducible.
     var drawn = probs.multinomial(
         num_samples=1, replacement=False, init_seed=init_seed
     )
     return Int(drawn.item())
-
 
 def generate[OutT: DType](
     mut model: GPTModel[OutT],
