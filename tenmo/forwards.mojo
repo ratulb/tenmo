@@ -46,6 +46,7 @@ from .subtraction import SubtractFromScalar, SubtractScalar, Subtractor
 from .sum_reduction import Summer
 from .tanh import Tanh
 from .tiles import Tile
+from .topk import TopK
 from .transpose import Transpose
 from .tril import Tril
 from .triu import Triu
