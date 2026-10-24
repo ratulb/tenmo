@@ -202,6 +202,7 @@ declare -a ALL_TESTS_IN_ORDER=(
   "tiles|tests/test_tiles.mojo"
   "linspace|tests/test_linspace.mojo"
   "argminmax|tests/test_argminmax.mojo"
+  "topk|tests/test_topk.mojo"
   "minmax|tests/test_minmax.mojo"
   "welford|tests/test_welford.mojo"
   "relu|tests/test_relu.mojo"
@@ -295,6 +296,7 @@ declare -a GPU_TESTS=(
   "tanh_gpu|tests/test_tanh_gpu.mojo"
   "softmax|tests/test_softmax.mojo"
   "argminmax|tests/test_argminmax.mojo"
+  "topk|tests/test_topk.mojo"
   "minmax|tests/test_minmax.mojo"
   "welford|tests/test_welford.mojo"
   "relu|tests/test_relu.mojo"
@@ -917,6 +919,10 @@ run_test_by_name() {
       ;;
     argminmax)
       run_test "argminmax" "tests/test_argminmax.mojo" "$MOJO_FLAGS"
+      exit_code=$?
+      ;;
+    topk)
+      run_test "topk" "tests/test_topk.mojo" "$MOJO_FLAGS"
       exit_code=$?
       ;;
     minmax)

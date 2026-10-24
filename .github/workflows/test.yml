@@ -141,6 +141,7 @@ jobs:
           - tanh_gpu
           - tensors
           - tiles
+          - topk
           - transmute
           - transpose
           - tril
