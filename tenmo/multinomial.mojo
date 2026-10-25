@@ -5,6 +5,7 @@ from .shared.shapes import Shape
 from std.sys import has_accelerator
 from std.math import log
 from std.random.philox import Random as PhiloxRandom
+from std.random import random_ui64
 from std.utils.numerics import neg_inf
 from std.sys.info import num_physical_cores
 from max.algorithm import parallelize
@@ -22,6 +23,9 @@ struct Multinomial[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:
         temperature: Scalar[Self.dtype] = 1.0,
         init_seed: Optional[Int] = None,
     ) raises -> Tensor[Self.index_dtype] where Self.dtype.is_floating_point():
+        # if init_seed == None, a fresh full-width seed is drawn per call
+        # (random_ui64(0, UInt64.MAX)); pass an explicit value for
+        # reproducibility
         var rank = probs.rank()
         var N = probs.shape()[-1]
 
@@ -48,14 +52,15 @@ struct Multinomial[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:
         p = p / p.sum[track_grad=False](last_axis, keepdims=True)
 
         var B = 1 if rank == 1 else probs.shape()[0]
+        var seed_val: UInt64
+        if init_seed:
+            seed_val = UInt64(init_seed.value())
+        else:
+            seed_val = random_ui64(0, UInt64.MAX)
 
         # GPU path
         comptime if has_accelerator():
             if p.buffer.is_on_gpu():
-                var seed_val: UInt64 = 42
-                if init_seed:
-                    seed_val = UInt64(init_seed.value())
-
                 # Pre-compute log-probabilities on GPU (single existing kernel
                 # launch via NDBuffer unary_ops dispatch).
                 var p_log = p.log[track_grad=False]()
@@ -88,10 +93,6 @@ struct Multinomial[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE]:
         var p_log = p.log[track_grad=False]()
         var plog_buf = p_log.buffer.data_buffer()
         var out_buf = Buffer[Self.index_dtype](B * num_samples)
-        var seed_val: UInt64 = 42
-        if init_seed:
-            seed_val = UInt64(init_seed.value())
-
         var n_threads = num_physical_cores()
 
         def sample_row(b: Int) {imm}:
