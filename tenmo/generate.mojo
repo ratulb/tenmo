@@ -127,7 +127,7 @@ def generate[OutT: DType](
     var made = 0
     while made < max_new_tokens:
         var total = len(ids)
-        var T = total if total < model.n_ctx else model.n_ctx
+        var T = min(total, model.n_ctx)
         var window = List[Scalar[DType.int64]](capacity=T)
         for i in range(total - T, total):
             window.append(Scalar[DType.int64](ids[i]))
