@@ -123,7 +123,7 @@ def generate[OutT: DType](
         ids.append(v)
 
     var base_seed = init_seed.value() if init_seed else 0
-    var have_seed = True if init_seed else False
+    var have_seed = init_seed != None
     var made = 0
     while made < max_new_tokens:
         var total = len(ids)
