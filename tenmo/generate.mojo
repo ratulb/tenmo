@@ -24,7 +24,12 @@ def sample[dtype: DType](
     - `temperature <= 0` or `top_k == 1` → greedy argmax (deterministic).
     - Otherwise: keep the top-`k` entries (`0 < k < V`; `k <= 0` or `k >= V`
       disables the mask), scale the survivors by `1/τ`, softmax, single
-      `multinomial` draw. `init_seed` pins the draw for tests.
+      `multinomial` draw.
+
+    Seeding:
+    - `init_seed == None` → `multinomial` draws fresh entropy per call, so
+      repeated calls are (almost surely) different. This is the default.
+    - `init_seed == Some(s)` → the draw is reproducible for a given `s`.
 
     Scaling by positive `1/τ` is monotonic, so it commutes with top-k
     selection: we select on raw logits and scale only the survivors.
@@ -85,8 +90,9 @@ def sample[dtype: DType](
             probs = logits.softmax[track_grad=False](axes)
 
     # ---- Single draw ------------------------------------------------------
-    # Exactly one sample, so `replacement` is inert here but kept for callers
-    # who later bump num_samples. `init_seed` makes the draw reproducible.
+    # One sample, so `replacement` is inert here; kept for callers who later
+    # bump num_samples. `init_seed == None` → fresh entropy inside
+    # `multinomial`; `init_seed != None` → reproducible draw.
     var drawn = probs.multinomial(
         num_samples=1, replacement=False, init_seed=init_seed
     )
@@ -104,8 +110,16 @@ def generate[OutT: DType](
     """Uncached autoregressive generation: prompt + up to `max_new_tokens`.
 
     Each step runs the full model over the last-`n_ctx` window, samples the
-    final position, appends. Stops early on `end_id` (>= 0). Per-step seeds
-    derive from `init_seed + step` (a fixed seed must still vary the draws).
+    final position, appends. Stops early on `end_id` (>= 0).
+
+    Seeding:
+    - `init_seed == None` → every step passes `None` to `sample`, so each
+      step (and each whole run) draws fresh entropy. Non-reproducible; the
+      default.
+    - `init_seed == Some(s)` → step `m` uses seed `s + m`, so a whole run is
+      reproducible while each step's Gumbel noise is independent. `s + m`
+      must not overflow `Int` (i.e. `s + max_new_tokens` must fit).
+
     Returns the 1-D id stream (prompt prefix intact).
     """
     if prompt.numels() == 0:
@@ -122,6 +136,8 @@ def generate[OutT: DType](
             raise Error("generate: negative prompt id")
         ids.append(v)
 
+    # `base_seed` is only read when `have_seed` is true; the `else 0` is a
+    # placeholder so the variable is always initialized.
     var base_seed = init_seed.value() if init_seed else 0
     var have_seed = init_seed != None
     var made = 0
@@ -139,6 +155,10 @@ def generate[OutT: DType](
         var last = logits.slice(T - 1, T, 1, axis=1)  # (1, 1, V) view
         var last_1d = last.reshape(V)
 
+        # Seeded run: step m uses `base_seed + m` so each step's Gumbel
+        # noise is independent while the whole run stays reproducible.
+        # Unseeded run: pass None through, so `multinomial` draws fresh
+        # entropy per step.
         var step_seed = Optional[Int](None)
         if have_seed:
             step_seed = Optional[Int](base_seed + made)
@@ -155,7 +175,6 @@ def generate[OutT: DType](
     for i in range(len(ids)):
         out.append(Scalar[DType.int64](ids[i]))
     return Tensor[DType.int64].from_list[DType.int64](out^)
-
 
 def generate_cached[OutT: DType](
     mut model: GPTModel[OutT],
