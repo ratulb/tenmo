@@ -152,7 +152,7 @@ struct ReshapeBackward[dtype: DType](
         var ancestor = output.ancestry().get(0)
         var reshaped = gradbox.reshape(ancestor.shape())
         if ancestor.requires_grad:
-            ancestor.update_grad(reshaped^, AddTensor, None)
+            ancestor.update_grad(reshaped, AddTensor, None)
         parent_ids.append(ancestor._id)
         # View conduit: grad already forwarded to base above; always cleared.
         gradbox.zero_grad()

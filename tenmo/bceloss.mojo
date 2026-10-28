@@ -1458,7 +1458,7 @@ struct BCEWithLogitsBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
                     sigmoid, target, gradbox.buffer(), sync=False
                 )
                 var grad_parent = Gradbox[Self.dtype](grad_ndb^)
-                parent.update_grad(grad_parent^, AddTensor, None)
+                parent.update_grad(grad_parent, AddTensor, None)
             else:
                 var multiplier = gradbox.item()
                 if bwd_arg.reduction.is_mean():
@@ -1469,7 +1469,7 @@ struct BCEWithLogitsBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
                     sigmoid, target, multiplier, sync=False
                 )
                 var grad_parent = Gradbox[Self.dtype](grad_ndb^)
-                parent.update_grad(grad_parent^, AddTensor, None)
+                parent.update_grad(grad_parent, AddTensor, None)
             parent_ids.append(parent._id)
             gradbox.zero_grad()
         else:
@@ -1499,7 +1499,7 @@ struct BCELossBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
                     safe, target, gradbox.buffer(), sync=False
                 )
                 var grad_parent = Gradbox[Self.dtype](grad_ndb^)
-                parent.update_grad(grad_parent^, AddTensor, None)
+                parent.update_grad(grad_parent, AddTensor, None)
             else:
                 var multiplier = gradbox.item()
                 if bwd_arg.reduction.is_mean():
@@ -1508,7 +1508,7 @@ struct BCELossBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
                     safe, target, multiplier, sync=False
                 )
                 var grad_parent = Gradbox[Self.dtype](grad_ndb^)
-                parent.update_grad(grad_parent^, AddTensor, None)
+                parent.update_grad(grad_parent, AddTensor, None)
             parent_ids.append(parent._id)
             gradbox.zero_grad()
         else:

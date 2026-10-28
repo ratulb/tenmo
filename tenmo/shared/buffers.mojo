@@ -1361,7 +1361,7 @@ struct Buffer[dtype: DType = DType.float32](
         if len(data) == 0:
             panic("Buffer → arange: computed arange size is zero")
 
-        return Buffer[Self.dtype](data^)
+        return Buffer[Self.dtype](data)
 
     @staticmethod
     @always_inline

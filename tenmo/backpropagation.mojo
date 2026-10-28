@@ -233,7 +233,8 @@ struct BackwardFn(ImplicitlyCopyable):
 
 @fieldwise_init
 struct NullArg(ArgumentType):
-    """Argument Payload Types
+    """Argument payload types.
+
     NullArg: Empty payload (ops with no extra arguments)
     Boolean: Bool (used by DROPOUT-style ops)
     ScalarArg: Scalar value (used by *_SCALAR ops)

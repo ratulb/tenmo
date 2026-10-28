@@ -20,10 +20,10 @@ recipe = "conda.recipe/recipe.yaml"
 
 [dependencies]
 python = ">=3.14.6,<3.15"
-mojo = "==1.1.0"
+mojo = "==1.2.0"
 tiktoken = "==0.12.0"
 openblas = ">=0.3.33,<0.4"
-max = ">=26.5,<=26.6"
+max = ">=26.7,<26.8"
 mbpe = ">=0.1.1,<0.2"
 [pypi-dependencies]
 mnist-datasets = ">=0.15, <0.16"

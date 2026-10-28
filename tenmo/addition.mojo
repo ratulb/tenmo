@@ -129,7 +129,7 @@ struct AddBackward[dtype: DType](
 
         if count == 1:
             var ancestor = output.ancestry().get(0)
-            ancestor.update_grad(gradbox^, AddTensor, None)
+            ancestor.update_grad(gradbox, AddTensor, None)
             parent_ids.append(ancestor._id)
         else:
             var ancestor_lhs = output.ancestry().get(0)

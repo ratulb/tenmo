@@ -162,7 +162,7 @@ struct ArgMinMaxKernel[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
         if sync:
             device_context.synchronize()
 
-        var out_state = DeviceState[Self.index_dtype](out_device_buf^, gpu)
+        var out_state = DeviceState[Self.index_dtype](out_device_buf, gpu)
         return (
             Layout(out_shape),
             out_state^,

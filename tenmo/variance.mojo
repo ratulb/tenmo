@@ -88,7 +88,7 @@ struct VarianceBackward[dtype: DType](
             gradbox_ancestor = gradbox
 
         gradbox_ancestor = local_grad * gradbox_ancestor
-        parent.update_grad(gradbox_ancestor^, AddTensor, None)
+        parent.update_grad(gradbox_ancestor, AddTensor, None)
         parent_ids.append(parent._id)
 
         gradbox.zero_grad()

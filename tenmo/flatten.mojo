@@ -21,7 +21,7 @@ struct FlattenBackward[dtype: DType](
         var ancestor_shape = ancestor.shape()
         var reshaped_grad = gradbox.reshape(ancestor_shape)
         if ancestor.requires_grad:
-            ancestor.update_grad(reshaped_grad^, AddTensor, None)
+            ancestor.update_grad(reshaped_grad, AddTensor, None)
         parent_ids.append(ancestor._id)
         gradbox.zero_grad()
 

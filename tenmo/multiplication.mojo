@@ -29,7 +29,7 @@ struct MultiplyBackwardScalar[dtype: DType](
         ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
         var scaled_gradbox = gradbox * factor
-        ancestor.update_grad(scaled_gradbox^, AddTensor, None)
+        ancestor.update_grad(scaled_gradbox, AddTensor, None)
         parent_ids.append(ancestor._id)
         gradbox.zero_grad()
 
@@ -54,7 +54,7 @@ struct MultiplyBackward[dtype: DType](
                 Gradbox[Self.dtype](ancestor_lhs.buffer()) * gradbox
             )
             gradbox_prod = gradbox_prod * Scalar[Self.dtype](2)
-            ancestor_lhs.update_grad(gradbox_prod^, AddTensor, None)
+            ancestor_lhs.update_grad(gradbox_prod, AddTensor, None)
             parent_ids.append(ancestor_lhs._id)
             gradbox.zero_grad()
             return
@@ -65,7 +65,7 @@ struct MultiplyBackward[dtype: DType](
             var gradbox_prod = gradbox * Gradbox[Self.dtype](
                 ancestor_rhs.buffer(),
             )
-            ancestor_lhs.update_grad(gradbox_prod^, AddTensor, None)
+            ancestor_lhs.update_grad(gradbox_prod, AddTensor, None)
         # Always appended: parent_ids is the engine's fanin-completion
         # signal (appended set must equal ancestry set); update_grad
         # no-ops internally for untracked parents.
@@ -75,7 +75,7 @@ struct MultiplyBackward[dtype: DType](
             var gradbox_prod = gradbox * Gradbox[Self.dtype](
                 ancestor_lhs.buffer(),
             )
-            ancestor_rhs.update_grad(gradbox_prod^, AddTensor, None)
+            ancestor_rhs.update_grad(gradbox_prod, AddTensor, None)
         parent_ids.append(ancestor_rhs._id)
         gradbox.zero_grad()
 

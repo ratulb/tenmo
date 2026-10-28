@@ -107,7 +107,7 @@ struct StdBackward[dtype: DType](
         # Pass 2: multiply by upstream
         gradbox_ancestor = local_grad * gradbox_ancestor
 
-        parent.update_grad(gradbox_ancestor^, AddTensor, None)
+        parent.update_grad(gradbox_ancestor, AddTensor, None)
         parent_ids.append(parent._id)
 
         gradbox.zero_grad()

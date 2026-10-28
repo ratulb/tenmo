@@ -276,13 +276,13 @@ struct MinMaxKernel[dtype: DType = DType.float32](
         if sync:
             device_context.synchronize()
 
-        var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var result_state = DeviceState[Self.dtype](result_buffer, gpu)
         var result_pair = (
             Layout(output_shape),
             result_state^,
         )
 
-        var mask_state = DeviceState[Self.dtype](mask_buffer^, gpu)
+        var mask_state = DeviceState[Self.dtype](mask_buffer, gpu)
         var mask_pair = (
             Layout(shape_A),
             mask_state^,

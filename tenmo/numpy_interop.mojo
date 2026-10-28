@@ -239,7 +239,7 @@ def from_ndarray[
         # memory — writes through a view mutate the NumPy array.
         var data_ptr = ndarray_ptr[dtype](contiguous)
         return Tensor[dtype](
-            data_ptr, shape^, requires_grad=requires_grad, copy=False
+            data_ptr, shape, requires_grad=requires_grad, copy=False
         )
 
 

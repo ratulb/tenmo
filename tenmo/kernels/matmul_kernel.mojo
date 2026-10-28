@@ -26,6 +26,7 @@ def matmul_2d_tiled[
     B_col_stride_: Int64,
 ):
     """2D Tiled Core Kernel.
+
     Computes C = A @ B for a batch of 2D matrix multiplications.
     Launch config (set by host):
       grid_dim.x  = ceil(n / TILE_SIZE)   — tiles across output columns
@@ -280,7 +281,7 @@ struct MatmulKernel[dtype: DType = DType.float32](
         if sync:
             device_context.synchronize()
 
-        var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var device_state = DeviceState[Self.dtype](result_buffer, gpu)
         return (Layout(out_shape), device_state^)
 
     @staticmethod

@@ -479,7 +479,7 @@ struct ConvTt[dtype: DType](ImplicitlyCopyable):
         if sync:
             device_context.synchronize()
         var out_state = DeviceState[Self.dtype].__init__[True](
-            out_buffer^, gpu
+            out_buffer, gpu
         )
         return (Layout(Shape(N, C_out, H_out, W_out)), out_state^)
 
@@ -687,13 +687,13 @@ struct ConvTt[dtype: DType](ImplicitlyCopyable):
         if sync:
             device_context.synchronize()
         var gi_state = DeviceState[Self.dtype].__init__[True](
-            gi_buffer^, gpu
+            gi_buffer, gpu
         )
         var gk_state = DeviceState[Self.dtype].__init__[True](
-            gk_buffer^, gpu
+            gk_buffer, gpu
         )
         var gb_state = DeviceState[Self.dtype].__init__[True](
-            gb_buffer^, gpu
+            gb_buffer, gpu
         )
         return (
             Layout(Shape(N, C_in, H_in, W_in)),

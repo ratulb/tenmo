@@ -67,7 +67,7 @@ struct WhereBackward[dtype: DType](
                     grad_a = grad_a.sum(axes=axes, keepdims=True)
                     if grad_a.shape() != bwd_arg.a_shape:
                         grad_a = grad_a.reshape(bwd_arg.a_shape)
-                parent.update_grad(grad_a^, AddTensor, None)
+                parent.update_grad(grad_a, AddTensor, None)
             parent_ids.append(parent._id)
             ancestor_index += 1
 
@@ -80,7 +80,7 @@ struct WhereBackward[dtype: DType](
                     Scalar[Self.dtype](1.0), sync=False
                 )
                 var grad_b_ndb = grad_ndb.arithmetic_ops[Multiply](
-                    one_minus_cond^
+                    one_minus_cond
                 )
                 var grad_b = Gradbox[Self.dtype](grad_b_ndb^)
                 # Un-broadcast (see a-branch above).
@@ -91,7 +91,7 @@ struct WhereBackward[dtype: DType](
                     grad_b = grad_b.sum(axes=axes_b, keepdims=True)
                     if grad_b.shape() != bwd_arg.b_shape:
                         grad_b = grad_b.reshape(bwd_arg.b_shape)
-                parent.update_grad(grad_b^, AddTensor, None)
+                parent.update_grad(grad_b, AddTensor, None)
             parent_ids.append(parent._id)
 
         gradbox.zero_grad()

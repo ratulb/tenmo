@@ -83,7 +83,7 @@ Recent work prioritizes correctness, safety, and GPU support — and builds two 
 
 **BLAS opt-in** — matmul-only OpenBLAS routing via `LinearBLAS`/`SequentialBLAS`; native kernels remain the default (see [BLAS Integration](#blas-integration)).
 
-**Toolchain** — Mojo 1.1.0 + MAX 26.5–26.6 (linux-64), `max.gpu.host` device API, zero-warning `mojo precompile`.
+**Toolchain** — Mojo 1.2.0 + MAX 26.7 (linux-64), `max.gpu.host` device API, zero-warning `mojo precompile`.
 
 > **Deep dive**: for a complete explanation of forward and backward pass mechanics, see [`README_AUTOGRAD.md`](README_AUTOGRAD.md).
 
@@ -398,7 +398,7 @@ This architecture keeps the system **explicit, predictable, and close to the met
 ## Examples
 
 ### Prerequisites
-- Mojo `1.1.0` (linux-64 only)
+- Mojo `1.2.0` (linux-64 only)
 - Python 3.14 (for NumPy interop in examples)
 
 ### Setup

@@ -147,11 +147,11 @@ def variance_backward_normalize[
       mean_buffer: Per-row mean (*, 1) contiguous.
       in_shape:    Shape of x as RankArray.
       in_strides:  Strides of x as RankArray.
-      in_offset:   Base offset of x in its buffer.
+      in_offset_:  Base offset of x in its buffer.
       reduction_axes: Axes being reduced (last axis) as RankArray.
       scale:       2 / divisor — uniform scalar.
-      D:           Last dimension size.
-      outer_size:  Number of rows.
+      D_:          Last dimension size.
+      outer_size_: Number of rows.
     """
     comptime assert (
         max_block_size.is_power_of_two() and max_block_size < 1024
@@ -226,10 +226,10 @@ def std_backward_normalize[
       denom_buffer: Per-row denominator (*, 1) contiguous — (std+eps)*divisor.
       in_shape:     Shape of x as RankArray.
       in_strides:   Strides of x as RankArray.
-      in_offset:    Base offset of x in its buffer.
+      in_offset_:   Base offset of x in its buffer.
       reduction_axes: Axes being reduced (last axis) as RankArray.
-      D:            Last dimension size.
-      outer_size:   Number of rows.
+      D_:           Last dimension size.
+      outer_size_:  Number of rows.
     """
     comptime assert (
         max_block_size.is_power_of_two() and max_block_size < 1024
@@ -350,7 +350,7 @@ struct StdVarianceBackwardKernel[dtype: DType](
         if sync:
             device_context.synchronize()
 
-        var out_state = DeviceState[Self.dtype](out_buffer^, gpu)
+        var out_state = DeviceState[Self.dtype](out_buffer, gpu)
         return (
             Layout(out_shape),
             out_state^,
@@ -433,7 +433,7 @@ struct StdVarianceBackwardKernel[dtype: DType](
         if sync:
             device_context.synchronize()
 
-        var out_state = DeviceState[Self.dtype](out_buffer^, gpu)
+        var out_state = DeviceState[Self.dtype](out_buffer, gpu)
         return (
             Layout(out_shape),
             out_state^,

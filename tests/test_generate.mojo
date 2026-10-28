@@ -32,7 +32,7 @@ def _prompt(vals: List[Int]) -> Tensor[DType.int64]:
     var s = List[Scalar[DType.int64]](capacity=len(vals))
     for i in range(len(vals)):
         s.append(Scalar[DType.int64](vals[i]))
-    return Tensor[DType.int64].from_list[DType.int64](s^)
+    return Tensor[DType.int64].from_list[DType.int64](s)
 
 
 def test_sample_greedy_is_argmax() raises:
@@ -69,7 +69,7 @@ def test_generate_prefix_length_and_stop() raises:
     vals.append(2)
     vals.append(3)
     vals.append(4)
-    var prompt = _prompt(vals^)
+    var prompt = _prompt(vals)
 
     var out = generate(
         model, prompt, max_new_tokens=3, temperature=0.0, top_k=50
@@ -101,7 +101,7 @@ def test_generate_slides_window_and_repeats() raises:
     var vals = List[Int](capacity=10)
     for i in range(10):
         vals.append((i * 3 + 1) % 32)
-    var prompt = _prompt(vals^)
+    var prompt = _prompt(vals)
 
     var a = generate(
         model,
@@ -134,7 +134,7 @@ def test_cached_logits_match_uncached() raises:
     var prow = List[Scalar[DType.int64]](capacity=6)
     for i in range(6):
         prow.append(Scalar[DType.int64]((i * 7 + 2) % 32))
-    var batch = Tensor[DType.int64].from_list[DType.int64](prow^).reshape(
+    var batch = Tensor[DType.int64].from_list[DType.int64](prow).reshape(
         1, 6
     )
     var ref_logits = model(batch)  # (1, 6, 32)
@@ -144,7 +144,7 @@ def test_cached_logits_match_uncached() raises:
     for p in range(6):
         var one = List[Scalar[DType.int64]](capacity=1)
         one.append(Scalar[DType.int64]((p * 7 + 2) % 32))
-        var x_1 = Tensor[DType.int64].from_list[DType.int64](one^).reshape(
+        var x_1 = Tensor[DType.int64].from_list[DType.int64](one).reshape(
             1, 1
         )
         var step = model.forward_step(x_1, p, cache)  # (1, 1, 32)
@@ -168,7 +168,7 @@ def test_cached_stream_matches_uncached() raises:
     vals.append(17)
     vals.append(9)
     vals.append(23)
-    var prompt = _prompt(vals^)
+    var prompt = _prompt(vals)
 
     var g = generate(
         model, prompt, max_new_tokens=4, temperature=0.0, top_k=50
@@ -203,7 +203,7 @@ def test_cached_stream_matches_uncached() raises:
     var long_vals = List[Int](capacity=7)
     for i in range(7):
         long_vals.append(i)
-    var long_prompt = _prompt(long_vals^)
+    var long_prompt = _prompt(long_vals)
     with assert_raises():
         _ = generate_cached(
             model, long_prompt, max_new_tokens=3, temperature=0.0

@@ -26,7 +26,7 @@ struct TanhBackward[dtype: DType](
         var ndb = out_ndb.arithmetic_ops[TANH_BACKWARD](gradbox.buffer())
         var gradbox_ancestor = Gradbox[Self.dtype](ndb^)
 
-        parent.update_grad(gradbox_ancestor^, AddTensor, None)
+        parent.update_grad(gradbox_ancestor, AddTensor, None)
 
         parent_ids.append(parent._id)
         gradbox.zero_grad()
@@ -52,7 +52,7 @@ struct Tanh[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.requires_grad_(True)
                 var out_ndb = out.buffer.copy()
                 var backwardFn = BackwardFn.from_ndbuffer[Self.dtype](
-                    out_ndb^, TanhBackward[Self.dtype]()
+                    out_ndb, TanhBackward[Self.dtype]()
                 )
                 out.add_ancestry(backwardFn^, self)
 

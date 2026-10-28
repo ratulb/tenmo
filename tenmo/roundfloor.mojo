@@ -15,7 +15,7 @@ bare leaf and register no ancestry, following `argmax`/`argmin`
 GPU kernel shipped 2026-10-03: device tensors route through
 `UnaryKernel[ROUND|FLOOR]` (float dtypes only, half-to-even ties for round).
 
-Semantics verified on this toolchain (Mojo 1.1.0):
+Semantics verified on this toolchain (Mojo 1.2.0):
 
 - `round` is **half-to-even** (banker's rounding), not C's
   half-away-from-zero: `round(2.5)=2`, `round(3.5)=4`, `round(-2.5)=-2`,

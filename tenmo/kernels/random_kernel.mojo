@@ -157,7 +157,7 @@ struct RandomKernel[dtype: DType](ImplicitlyCopyable):
 
         ctx.synchronize()
 
-        var state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var state = DeviceState[Self.dtype](result_buffer, gpu)
         return (
             Layout(shape),
             state^,
@@ -201,7 +201,7 @@ struct RandomKernel[dtype: DType](ImplicitlyCopyable):
 
         ctx.synchronize()
 
-        var state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var state = DeviceState[Self.dtype](result_buffer, gpu)
         return (
             Layout(shape),
             state^,

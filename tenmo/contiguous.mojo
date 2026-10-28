@@ -30,12 +30,12 @@ struct ContiguousBackward[dtype: DType](
                     gradbox.item(),
                     device=gradbox.device(),
                 )
-                parent.update_grad(parent_gradbox^, AddTensor, None)
+                parent.update_grad(parent_gradbox, AddTensor, None)
             elif gradbox.shape() == parent_shape:
                 # Same logical contents, both contiguous: single bulk
                 # clone instead of per-coordinate get/set.
                 var parent_gradbox = gradbox.clone()
-                parent.update_grad(parent_gradbox^, AddTensor, None)
+                parent.update_grad(parent_gradbox, AddTensor, None)
             else:
                 # Unreachable: forward preserves logical shape exactly, so
                 # the output gradbox always matches the parent shape (scalar

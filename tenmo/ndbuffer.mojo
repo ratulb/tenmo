@@ -471,7 +471,7 @@ struct NDBuffer[dtype: DType](
         else:
             comptime if has_accelerator():
                 try:
-                    var (_, result) = ndb^.to_device(device)
+                    var (_, result) = ndb.to_device(device)
                     return result^
                 except e:
                     print(e)
@@ -609,7 +609,7 @@ struct NDBuffer[dtype: DType](
             var viewed = flat_cpu.share(self.shape, self.strides, self.offset)
             # Step 3: materialise into contiguous CPU buffer
             var result = NDBuffer[Self.dtype](self.shape)
-            result.copy_from_alike[overwrite=True, validate=False](viewed^)
+            result.copy_from_alike[overwrite=True, validate=False](viewed)
             return 0, result^
 
     def is_on_gpu(ref self) -> Bool:
@@ -646,7 +646,7 @@ struct NDBuffer[dtype: DType](
         else:
             comptime if has_accelerator():
                 try:
-                    var (_, result) = ndb^.to_device(device, sync=sync)
+                    var (_, result) = ndb.to_device(device, sync=sync)
                     return result^
                 except e:
                     print(e)
@@ -825,7 +825,7 @@ struct NDBuffer[dtype: DType](
             return ndb^
         comptime if has_accelerator():
             try:
-                var (_, result) = ndb^.to_device(device, sync=sync)
+                var (_, result) = ndb.to_device(device, sync=sync)
                 return result^
             except e:
                 print(e)
@@ -856,7 +856,7 @@ struct NDBuffer[dtype: DType](
             return ndb^
         comptime if has_accelerator():
             try:
-                var (_, result) = ndb^.to_device(device, sync=sync)
+                var (_, result) = ndb.to_device(device, sync=sync)
                 return result^
             except e:
                 print(e)
@@ -998,13 +998,16 @@ struct NDBuffer[dtype: DType](
         `index_iterator()` or `flatten_index(..., offset)`. Prefer `get`
         for logical indexing.
 
-        Args:
+        Parameters:
             checked: When True (default), wrap negatives and panic on
                 out-of-range addresses. Pass `checked=False` only when the
                 caller guarantees a non-negative in-range storage address
                 (e.g. offsets from `index_iterator()`, pre-validated
                 indices) — the min/max recomputation and branches are
                 skipped entirely.
+
+        Args:
+            index: Storage address to read.
         """
         var idx = index
         comptime if checked:
@@ -1036,10 +1039,14 @@ struct NDBuffer[dtype: DType](
     ):
         """Raw storage write (mirror of `storage_get`).
 
-        Args:
+        Parameters:
             checked: When True (default), wrap negatives and panic on
                 out-of-range addresses. Pass `checked=False` only when the
                 caller guarantees a non-negative in-range storage address.
+
+        Args:
+            index: Storage address to write.
+            value: Value to store.
         """
         var idx = index
         comptime if checked:
@@ -2112,7 +2119,7 @@ struct NDBuffer[dtype: DType](
                         distincts.append(elem)
                     var unique_shape = Shape(len(distincts))
                     return NDBuffer[Self.dtype](
-                        Buffer[Self.dtype](distincts^), unique_shape
+                        Buffer[Self.dtype](distincts), unique_shape
                     )
                 except e:
                     panic("NDBuffer unique GPU failed: " + String(e))
@@ -2139,7 +2146,7 @@ struct NDBuffer[dtype: DType](
             distincts.append(elem)
         var unique_shape = Shape(len(distincts))
         return NDBuffer[Self.dtype](
-            Buffer[Self.dtype](distincts^), unique_shape
+            Buffer[Self.dtype](distincts), unique_shape
         )
 
     def copy_from_alike[

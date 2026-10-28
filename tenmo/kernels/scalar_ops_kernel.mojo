@@ -323,7 +323,7 @@ struct ScalarKernel[dtype: DType](ImplicitlyCopyable):
 
         if sync:
             device_context.synchronize()
-        var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var device_state = DeviceState[Self.dtype](result_buffer, gpu)
         return (Layout(A_layout.shape), device_state^)
 
     @staticmethod
@@ -377,7 +377,7 @@ struct ScalarKernel[dtype: DType](ImplicitlyCopyable):
 
         if sync:
             device_context.synchronize()
-        var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var device_state = DeviceState[Self.dtype](result_buffer, gpu)
         return (Layout(A_layout.shape), device_state^)
 
     @staticmethod

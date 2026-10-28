@@ -24,7 +24,7 @@ struct UnsqueezeBackward[dtype: DType](
 
         var ancestor = output.ancestry().get(0)
         if ancestor.requires_grad:
-            ancestor.update_grad(squeezed_gradbox^, AddTensor, None)
+            ancestor.update_grad(squeezed_gradbox, AddTensor, None)
         parent_ids.append(ancestor._id)
         # View conduit: always cleared.
         gradbox.zero_grad()

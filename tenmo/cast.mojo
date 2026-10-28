@@ -41,7 +41,7 @@ struct ToDtypeBackward[
             var ndb = gradbox.buffer().to_dtype[Self.src]()
             var gradbox_parent = Gradbox[Self.src](ndb^)
 
-            parent.update_grad(gradbox_parent^, AddTensor, None)
+            parent.update_grad(gradbox_parent, AddTensor, None)
 
             parent_ids.append(parent._id)
 

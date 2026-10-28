@@ -69,7 +69,7 @@ struct BLASMatmul2dBackward[dtype: DType](
                     B, grad_out, transpose_A=True, transpose_B=True
                 )
 
-            A_ancestor.update_grad(grad_A^, AddTensor, None)
+            A_ancestor.update_grad(grad_A, AddTensor, None)
             parent_ids.append(A_ancestor._id)
 
         if B.requires_grad:
@@ -97,7 +97,7 @@ struct BLASMatmul2dBackward[dtype: DType](
                     grad_out, A, transpose_A=True, transpose_B=True
                 )
 
-            B_ancestor.update_grad(grad_B^, AddTensor, None)
+            B_ancestor.update_grad(grad_B, AddTensor, None)
             parent_ids.append(B_ancestor._id)
 
         grad_out.zero_grad()

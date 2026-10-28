@@ -41,7 +41,7 @@ struct TileBackward[dtype: DType](
                 total_grad,
                 device=grad_out.device(),
             )
-            parent.update_grad(gradbox_parent^, AddTensor, None)
+            parent.update_grad(gradbox_parent, AddTensor, None)
             parent_ids.append(parent._id)
             grad_out.zero_grad()
             return
@@ -71,7 +71,7 @@ struct TileBackward[dtype: DType](
         if gradbox_parent.shape() != parent_shape:
             gradbox_parent = gradbox_parent.reshape(parent_shape)
 
-        parent.update_grad(gradbox_parent^, AddTensor, None)
+        parent.update_grad(gradbox_parent, AddTensor, None)
         parent_ids.append(parent._id)
         grad_out.zero_grad()
 

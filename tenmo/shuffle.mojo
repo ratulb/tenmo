@@ -61,7 +61,7 @@ struct ShuffleBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
                     gradbox_parent = Gradbox[Self.dtype].zeros(
                         shape,
                     )
-                parent.update_grad(gradbox_parent^, AddTensor, None)
+                parent.update_grad(gradbox_parent, AddTensor, None)
                 parent_ids.append(parent._id)
                 # Mirror the CPU leg: clear the consumed grad unless the
                 # caller retains intermediates, else repeat backward()
@@ -81,7 +81,7 @@ struct ShuffleBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
             parent_coord[axis] = permutation[grad_coord[axis]]
             gradbox_parent[parent_coord] = gradbox[grad_coord]
 
-        parent.update_grad(gradbox_parent^, AddTensor, None)
+        parent.update_grad(gradbox_parent, AddTensor, None)
         parent_ids.append(parent._id)
         gradbox.zero_grad()
 

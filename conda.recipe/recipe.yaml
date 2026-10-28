@@ -23,11 +23,11 @@ build:
 
 requirements:
   build:
-    - mojo-compiler =1.1.0
+    - mojo-compiler =1.2.0
   host:
-    - mojo-compiler =1.1.0
+    - mojo-compiler =1.2.0
     # tenmo imports max.* (parallelize, gpu.host) throughout.
-    - max >=26.5,<=26.6
+    - max >=26.7,<26.8
     # tenmo/tenmo/nlp/ imports bpe.*, so mbpe must be present to precompile.
     - mbpe >=0.1.1,<0.2
   run:

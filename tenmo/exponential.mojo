@@ -52,7 +52,7 @@ struct Exponential[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.requires_grad_(True)
                 var out_ndb = out.buffer.copy()
                 var backwardFn = BackwardFn.from_ndbuffer[Self.dtype](
-                    out_ndb^,
+                    out_ndb,
                     ExponentialBackward[Self.dtype](),
                 )
                 out.add_ancestry(backwardFn^, tensor)

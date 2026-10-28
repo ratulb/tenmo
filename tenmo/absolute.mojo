@@ -22,7 +22,7 @@ struct AbsBackward[dtype: DType](
         var ndb = parent.buffer().arithmetic_ops[ABS_BACKWARD](gradbox.buffer())
         var gradbox_ancestor = Gradbox[Self.dtype](ndb^)
 
-        parent.update_grad(gradbox_ancestor^, AddTensor, None)
+        parent.update_grad(gradbox_ancestor, AddTensor, None)
 
         parent_ids.append(parent._id)
 

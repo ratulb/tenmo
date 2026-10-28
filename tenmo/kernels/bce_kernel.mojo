@@ -34,7 +34,8 @@ def bce_with_logits_forward_kernel[
     size_: Int64,
     epsilon: Scalar[dtype],
 ) where dtype.is_floating_point():
-    """BCEWithLogits Forward Kernel
+    """BCEWithLogits Forward Kernel.
+
     Computes loss_per_element AND sigmoid(logits) in one pass.
     For each element i:
       sig_i = 1 / (1 + exp(-logits_i))
@@ -192,7 +193,8 @@ def bce_forward_kernel[
     size_: Int64,
     epsilon: Scalar[dtype],
 ) where dtype.is_floating_point():
-    """BCELoss Forward Kernel (probabilities input, not logits)
+    """BCELoss Forward Kernel (probabilities input, not logits).
+
     For each element i:
       safe  = clip(p_i, eps, 1-eps)
       loss  = -[y_i * log(safe) + (1-y_i) * log(1-safe)]
@@ -335,7 +337,8 @@ def bce_with_logits_backward_kernel[
     grad_output: Pointer[Scalar[dtype], ImmutAnyOrigin],
     size_: Int64,
 ):
-    """BCEWithLogits Backward Kernel
+    """BCEWithLogits Backward Kernel.
+
     For each element i:
       grad[i] = (sigmoid[i] - target[i]) * grad_output[i]
     """
@@ -416,7 +419,8 @@ def bce_backward_kernel[
     grad_output: Pointer[Scalar[dtype], ImmutAnyOrigin],
     size_: Int64,
 ):
-    """BCELoss Backward Kernel
+    """BCELoss Backward Kernel.
+
     For each element i:
       grad[i] = -(target[i]/safe[i] - (1-target[i])/(1-safe[i])) * grad_output[i]
     """
@@ -567,9 +571,9 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable):
         if sync:
             device_context.synchronize()
 
-        var loss_state = DeviceState[Self.dtype](loss_buffer^, gpu)
+        var loss_state = DeviceState[Self.dtype](loss_buffer, gpu)
         var sigmoid_state = DeviceState[Self.dtype](
-            sigmoid_buffer^, gpu
+            sigmoid_buffer, gpu
         )
 
         return (
@@ -647,7 +651,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable):
             device_context.synchronize()
 
         var scalar_state = DeviceState[Self.dtype](
-            scalar_buffer^, gpu
+            scalar_buffer, gpu
         )
 
         if is_mean:
@@ -656,7 +660,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable):
                 host_buff[0] = host_buff[0] / divisor
 
         var sigmoid_state = DeviceState[Self.dtype](
-            sigmoid_buffer^, gpu
+            sigmoid_buffer, gpu
         )
 
         return (
@@ -729,8 +733,8 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable):
         if sync:
             device_context.synchronize()
 
-        var loss_state = DeviceState[Self.dtype](loss_buffer^, gpu)
-        var safe_state = DeviceState[Self.dtype](safe_buffer^, gpu)
+        var loss_state = DeviceState[Self.dtype](loss_buffer, gpu)
+        var safe_state = DeviceState[Self.dtype](safe_buffer, gpu)
 
         return (
             (
@@ -807,7 +811,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable):
             device_context.synchronize()
 
         var scalar_state = DeviceState[Self.dtype](
-            scalar_buffer^, gpu
+            scalar_buffer, gpu
         )
 
         if is_mean:
@@ -815,7 +819,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable):
             with scalar_state.buffer.map_to_host() as host_ptr:
                 host_ptr[0] = host_ptr[0] / divisor
 
-        var safe_state = DeviceState[Self.dtype](safe_buffer^, gpu)
+        var safe_state = DeviceState[Self.dtype](safe_buffer, gpu)
 
         return (
             (
@@ -887,7 +891,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable):
             device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
-            result_buffer^, gpu
+            result_buffer, gpu
         )
 
         return (
@@ -951,7 +955,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable):
             device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
-            result_buffer^, gpu
+            result_buffer, gpu
         )
 
         return (
@@ -1018,7 +1022,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable):
             device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
-            result_buffer^, gpu
+            result_buffer, gpu
         )
 
         return (
@@ -1082,7 +1086,7 @@ struct BceKernel[dtype: DType](ImplicitlyCopyable):
             device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
-            result_buffer^, gpu
+            result_buffer, gpu
         )
 
         return (

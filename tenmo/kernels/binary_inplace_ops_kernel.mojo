@@ -204,6 +204,7 @@ def arithmetic_ops_B_contiguous[
     a_offset_: Int64,
 ):
     """KERNEL for PATH 3 — A strided; B contiguous, no broadcasting.
+
     OPTIMIZATION vs original scalar-per-lane version:
       B is contiguous and same shape as A → B.load[width=simd_width](i) is
       already a single SIMD load — unchanged from original.
@@ -352,6 +353,7 @@ def arithmetic_ops_both_strided[
     b_offset_: Int64,
 ):
     """KERNEL for PATH 4 — Both strided / A strided + B needs broadcasting.
+
     OPTIMIZATION vs original scalar-per-lane version:
       Both A and B outer bases computed ONCE per vector.
       Per lane, only ONE multiply per operand for the innermost dimension:

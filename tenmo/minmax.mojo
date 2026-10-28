@@ -49,7 +49,7 @@ struct MinMaxBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
             # without it dx is always 1 (e.g. (2*x.max()).sum() must give
             # dx=2). Mirrors the main path's grad_expanded * mask_grad.
             var grad_contrib = gradbox * mask_grad
-            ancestor.update_grad(grad_contrib^, AddTensor, None)
+            ancestor.update_grad(grad_contrib, AddTensor, None)
             parent_ids.append(ancestor._id)
             # Mirror the main path: clear the consumed grad unless the
             # caller retains intermediates, else stale grad persists on
@@ -70,7 +70,7 @@ struct MinMaxBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
             grad_expanded = gradbox.broadcast_to(shape)
 
         var grad_contrib = grad_expanded * mask_grad
-        ancestor.update_grad(grad_contrib^, AddTensor, None)
+        ancestor.update_grad(grad_contrib, AddTensor, None)
         parent_ids.append(ancestor._id)
         gradbox.zero_grad()
 

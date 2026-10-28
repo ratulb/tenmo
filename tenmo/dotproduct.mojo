@@ -38,7 +38,7 @@ struct DotBackward[dtype: DType](
                 scalar_grad_value
             )
             var gradbox_lhs = grad_tensor^.as_gradbox(contiguous=False)
-            tensor_lhs_ref.update_grad(gradbox_lhs^, AddTensor, None)
+            tensor_lhs_ref.update_grad(gradbox_lhs, AddTensor, None)
         # Always appended: parent_ids is the engine's fanin-completion
         # signal (appended set must equal ancestry set).
         parent_ids.append(tensor_lhs_ref._id)
@@ -48,7 +48,7 @@ struct DotBackward[dtype: DType](
                 scalar_grad_value
             )
             var gradbox_rhs = grad_tensor^.as_gradbox(contiguous=False)
-            tensor_rhs_ref.update_grad(gradbox_rhs^, AddTensor, None)
+            tensor_rhs_ref.update_grad(gradbox_rhs, AddTensor, None)
         parent_ids.append(tensor_rhs_ref._id)
         gradbox.zero_grad()
 

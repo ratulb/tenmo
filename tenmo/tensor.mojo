@@ -99,7 +99,7 @@ struct ScatterBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable, Registe
                         var idx = indices[k]
                         if idx >= 0 and idx < grad_base.shape()[0]:
                             grad_base[idx] = Scalar[Self.dtype](0.0)
-                base_parent.update_grad(grad_base^, AddTensor, None)
+                base_parent.update_grad(grad_base, AddTensor, None)
             parent_ids.append(base_parent._id)
 
         if count > 1:
@@ -113,7 +113,7 @@ struct ScatterBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable, Registe
                         var idx = indices[k]
                         if idx >= 0 and idx < grad_output.shape()[0]:
                             grad_src[k] = grad_output[idx]
-                src_parent.update_grad(grad_src^, AddTensor, None)
+                src_parent.update_grad(grad_src, AddTensor, None)
             parent_ids.append(src_parent._id)
 
         grad_output.zero_grad()
@@ -146,7 +146,7 @@ struct MaskBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable, RegisterPa
                     var idx = indices[k]
                     if idx >= 0 and idx < grad_base.shape()[0]:
                         grad_base[idx] = grad_output[k]
-                parent.update_grad(grad_base^, AddTensor, None)
+                parent.update_grad(grad_base, AddTensor, None)
             parent_ids.append(parent._id)
 
         grad_output.zero_grad()
@@ -254,9 +254,9 @@ struct Tensor[dtype: DType](
             A Gradbox containing the tensor's data.
         """
         if contiguous:
-            return Gradbox[Self.dtype](self^.buffer.contiguous())
+            return Gradbox[Self.dtype](self.buffer.contiguous())
         else:
-            return Gradbox[Self.dtype](self^.buffer^)
+            return Gradbox[Self.dtype](self.buffer^)
 
     def tolist(self) raises -> List[Scalar[Self.dtype]]:
         """Copy tensor data into a Mojo List.
@@ -1496,7 +1496,7 @@ struct Tensor[dtype: DType](
         """
         var shape = like.shape()
         return Tensor[Self.dtype].full(
-            shape^,
+            shape,
             value,
             requires_grad=requires_grad,
             device=device.or_else(like.device()),
@@ -1750,7 +1750,7 @@ struct Tensor[dtype: DType](
         device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
         var shape = Shape(axes_spans)
-        return Self.zeros(shape^, requires_grad, device)
+        return Self.zeros(shape, requires_grad, device)
 
     @staticmethod
     def zeros(
@@ -1769,7 +1769,7 @@ struct Tensor[dtype: DType](
             A tensor of given shape filled with zeros.
         """
         var shape = Shape(axes_spans)
-        return Self.zeros(shape^, requires_grad=requires_grad, device=device)
+        return Self.zeros(shape, requires_grad=requires_grad, device=device)
 
     @staticmethod
     def zeros_like(
@@ -1905,7 +1905,7 @@ struct Tensor[dtype: DType](
         var row_list = List[Scalar[Self.dtype]]()
         for v in row:
             row_list.append(v)
-        return Tensor[Self.dtype].d1(row_list^)
+        return Tensor[Self.dtype].d1(row_list)
 
     @staticmethod
     def d1(row: Self.Row, requires_grad: Bool = False) -> Tensor[Self.dtype]:

@@ -65,7 +65,7 @@ struct ViewBackward[dtype: DType](
 
         if parent_ref.requires_grad:
             var parent_gradbox = Self.parent_gradbox_cpu(output)
-            parent_ref.update_grad(parent_gradbox^, AddTensor, None)
+            parent_ref.update_grad(parent_gradbox, AddTensor, None)
         parent_ids.append(parent_ref._id)
 
     @staticmethod
@@ -149,7 +149,7 @@ struct ViewBackward[dtype: DType](
             final_gradbox = parent_gradbox^
 
         if parent_ref.requires_grad:
-            parent_ref.update_grad(final_gradbox^, AddTensor, None)
+            parent_ref.update_grad(final_gradbox, AddTensor, None)
         parent_ids.append(parent_ref._id)
 
     @staticmethod

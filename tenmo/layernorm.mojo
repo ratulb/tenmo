@@ -461,11 +461,11 @@ struct LayerNormBackward[dtype: DType](
         var d_gamma = Gradbox[Self.dtype](d_gamma_ndb)
         var d_beta = Gradbox[Self.dtype](d_beta_ndb)
 
-        input_ancestor.update_grad(d_input^, AddTensor, None)
+        input_ancestor.update_grad(d_input, AddTensor, None)
         parent_ids.append(input_ancestor._id)
-        gamma_ancestor.update_grad(d_gamma^, AddTensor, None)
+        gamma_ancestor.update_grad(d_gamma, AddTensor, None)
         parent_ids.append(gamma_ancestor._id)
-        beta_ancestor.update_grad(d_beta^, AddTensor, None)
+        beta_ancestor.update_grad(d_beta, AddTensor, None)
         parent_ids.append(beta_ancestor._id)
 
         gradbox.zero_grad()

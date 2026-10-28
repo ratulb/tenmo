@@ -64,7 +64,8 @@ def rdiv_scalar_backward_kernel[
     scalar: Scalar[dtype],
     size_: Int64,
 ):
-    """rdiv_scalar_backward Kernel
+    """Right-division scalar backward kernel.
+
     For each element i:
       result[i] = scalar * grad_output[i] / (divisor[i] * divisor[i])
     """
@@ -107,7 +108,8 @@ def divide_backward_kernel[
     y: Pointer[Scalar[dtype], ImmutAnyOrigin],
     size_: Int64,
 ):
-    """divide_backward Kernel
+    """Divide backward kernel.
+
     For each element i:
       grad_x[i] = grad_output[i] / y[i]
       grad_y[i] = grad_output[i] * x[i] / (y[i] * y[i])
@@ -208,7 +210,7 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable):
         # NOTE: special=True not needed here — result_buffer uses Self.dtype (plain ctor works)
         # var result_state = DeviceState[Self.dtype].__init__[True](
         var result_state = DeviceState[Self.dtype](
-            result_buffer^, gpu
+            result_buffer, gpu
         )
 
         return (
@@ -289,10 +291,10 @@ struct DivisionKernel[dtype: DType](ImplicitlyCopyable):
             device_context.synchronize()
 
         var grad_x_state = DeviceState[Self.dtype](
-            grad_x_buffer^, gpu
+            grad_x_buffer, gpu
         )
         var grad_y_state = DeviceState[Self.dtype](
-            grad_y_buffer^, gpu
+            grad_y_buffer, gpu
         )
 
         var grad_x_pair = (

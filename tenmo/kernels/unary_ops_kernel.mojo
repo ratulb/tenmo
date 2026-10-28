@@ -208,7 +208,7 @@ struct UnaryKernel[dtype: DType](ImplicitlyCopyable):
 
         # bool-as-uint8: skip sub-buffer creation (buffer dtype != Self.dtype when bool)
         var result_state = DeviceState[Self.dtype].__init__[True](
-            result_buffer^, gpu
+            result_buffer, gpu
         )
         return (Layout(A_layout.shape), result_state^)
 
@@ -318,8 +318,8 @@ struct UnaryKernel[dtype: DType](ImplicitlyCopyable):
         if sync:
             device_context.synchronize()
 
-        var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
-        var mask_state = DeviceState[Self.dtype](mask_buffer^, gpu)
+        var result_state = DeviceState[Self.dtype](result_buffer, gpu)
+        var mask_state = DeviceState[Self.dtype](mask_buffer, gpu)
 
         var out_layout = Layout(A_layout.shape)
 

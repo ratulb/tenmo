@@ -41,7 +41,7 @@ struct ExponentiationBackward[dtype: DType](
 
         var parent_gradbox = Gradbox[Self.dtype](grad_result^)
 
-        ancestor.update_grad(parent_gradbox^, AddTensor, None)
+        ancestor.update_grad(parent_gradbox, AddTensor, None)
 
         parent_ids.append(ancestor._id)
         gradbox.zero_grad()

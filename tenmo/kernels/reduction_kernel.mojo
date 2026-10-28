@@ -154,6 +154,7 @@ def reduce[
         reduction_axes:  Axes being reduced as RankArray.
         total_output_:   Number of output elements (== grid_dim).
         reduced_volume_: Number of elements reduced per output element.
+        offset_:         Base offset of the input view in its buffer.
 
     SECTION 2 — reduce kernel: SUM and MEAN
     op_code replaces the old mean: Bool flag.
@@ -256,6 +257,7 @@ def product_reduce[
         reduction_axes:     Axes being reduced.
         total_output_:     Number of output elements.
         reduced_volume_:   Elements reduced per output element.
+        offset_:         Base offset of the input view in its buffer.
 
     SECTION 3 — product_reduce kernel
     Handles PRODUCT for ALL numeric dtypes without a floating point constraint
@@ -417,6 +419,7 @@ def excl_product_kernel[
         reduction_axes: Axes being reduced.
         total_output_:  Number of output elements (== number of slices).
         reduced_volume_: Elements per slice.
+        offset_:         Base offset of the input view in its buffer.
 
     SECTION 4 — excl_product_kernel (for backward)
     Computes the "product of all others" for each element in the input,
@@ -752,6 +755,7 @@ def welford_reduce[
         reduction_axes:  Axes being reduced as RankArray.
         total_output_:   Number of output elements (== grid_dim).
         reduced_volume_: Number of elements reduced per output element.
+        offset_:         Base offset of the input view in its buffer.
 
     DESIGN NOTES
     Welford online algorithm — single pass, numerically stable:
@@ -882,7 +886,8 @@ def welford_reduce[
 struct ReductionKernel[dtype: DType = DType.float32](
     ImplicitlyCopyable, RegisterPassable
 ):
-    """SECTION 8 — Reduction launcher
+    """Launcher for SUM, MEAN, PRODUCT, and log-sum-exp reductions.
+
     Unified launcher for SUM, MEAN, PRODUCT via op_code.
     launch[op_code]  → (Layout, Storage)  (SUM / MEAN — result only)
     launch_product   → (out_pair, zero_pair, excl_optional_pair)  (PRODUCT)
@@ -975,7 +980,7 @@ struct ReductionKernel[dtype: DType = DType.float32](
 
         if sync:
             device_context.synchronize()
-        var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var device_state = DeviceState[Self.dtype](result_buffer, gpu)
         return (
             Layout(output_shape),
             device_state^,
@@ -1088,13 +1093,13 @@ struct ReductionKernel[dtype: DType = DType.float32](
         if sync:
             device_context.synchronize()
 
-        var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var result_state = DeviceState[Self.dtype](result_buffer, gpu)
         var out_pair = (
             Layout(output_shape),
             result_state^,
         )
 
-        var zero_state = DeviceState[DType.int32](zero_counts_buffer^, gpu)
+        var zero_state = DeviceState[DType.int32](zero_counts_buffer, gpu)
         var zero_pair = (
             Layout(output_shape),
             zero_state^,
@@ -1134,7 +1139,7 @@ struct ReductionKernel[dtype: DType = DType.float32](
             if sync:
                 device_context.synchronize()
 
-            var excl_state = DeviceState[Self.dtype](excl_buffer^, gpu)
+            var excl_state = DeviceState[Self.dtype](excl_buffer, gpu)
             excl_optional = Optional(
                 (
                     Layout(shape_A),
@@ -1205,7 +1210,7 @@ struct ReductionKernel[dtype: DType = DType.float32](
         if sync:
             device_context.synchronize()
 
-        var excl_state = DeviceState[Self.dtype](excl_buffer^, gpu)
+        var excl_state = DeviceState[Self.dtype](excl_buffer, gpu)
         return (
             Layout(shape_A),
             excl_state^,
@@ -1301,7 +1306,7 @@ struct ReductionKernel[dtype: DType = DType.float32](
 
         if sync:
             device_context.synchronize()
-        var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var device_state = DeviceState[Self.dtype](result_buffer, gpu)
         return (
             Layout(output_shape),
             device_state^,
@@ -1393,8 +1398,8 @@ struct ReductionKernel[dtype: DType = DType.float32](
         if sync:
             device_context.synchronize()
 
-        var mean_state = DeviceState[Self.dtype](mean_buffer^, gpu)
-        var M2_state = DeviceState[Self.dtype](M2_buffer^, gpu)
+        var mean_state = DeviceState[Self.dtype](mean_buffer, gpu)
+        var M2_state = DeviceState[Self.dtype](M2_buffer, gpu)
 
         return (
             (

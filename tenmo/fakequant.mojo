@@ -150,7 +150,7 @@ struct FakeQuantBackward[dtype: DType](
             d_scale_owner = d_scale
         var d_scale_gradbox = Gradbox[Self.dtype](d_scale_owner.buffer)
 
-        scale_ancestor.update_grad(d_scale_gradbox^, AddTensor, None)
+        scale_ancestor.update_grad(d_scale_gradbox, AddTensor, None)
         parent_ids.append(scale_ancestor._id)
 
         gradbox.zero_grad()
@@ -172,7 +172,7 @@ struct FakeQuant[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         requires_grad: Optional[Bool] = None,
         sync: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-        """out = scale * clamp(round(self / scale), qmin, qmax).
+        """Out = scale * clamp(round(self / scale), qmin, qmax).
 
         `round` and the clip are deliberately NOT grad-carrying (see
         `tenmo/roundfloor.mojo`): the true derivative is 0 a.e. and the STE

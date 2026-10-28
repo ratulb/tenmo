@@ -134,7 +134,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](
                                     grad_out_val * v_val
                                 )
 
-            M_ref.update_grad(grad_M^, AddTensor, None)
+            M_ref.update_grad(grad_M, AddTensor, None)
             parent_ids.append(M_ref._id)
 
         # Gradient for v: dv[k] = M^T[k, m] @ grad_out[m]
@@ -192,7 +192,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](
                     var grad_v_addr = grad_v_base + j * grad_v_stride
                     grad_v_data[unsafe_offset=grad_v_addr] += accumulator
 
-            v_ref.update_grad(grad_v^, AddTensor, None)
+            v_ref.update_grad(grad_v, AddTensor, None)
             parent_ids.append(v_ref._id)
         grad_out.zero_grad()
 

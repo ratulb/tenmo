@@ -6,7 +6,7 @@ asymmetric padding, output dims from the same formula. Anything else panics —
 the CPU core's fail-loud layout contract, repeated here so a GPU launch can
 never silently misread a view.
 
-Handshake (official pattern — stable v26.6 "Using TileTensor"): the launcher
+Handshake (official pattern — stable v26.7 "Using TileTensor"): the launcher
 builds host-side `TileTensor`s over the contiguous `DeviceBuffer`s with
 runtime row-major layouts and passes them WHOLE as kernel args. Geometry rides
 inside the tensors (`dim[i]()` on device); only stride/dilation/pad cross as
@@ -223,6 +223,6 @@ struct ConvGpu[dtype: DType](ImplicitlyCopyable):
         if sync:
             device_context.synchronize()
         var result_state = DeviceState[Self.dtype].__init__[True](
-            result_buffer^, gpu
+            result_buffer, gpu
         )
         return (Layout(Shape(N, C_out, H_out, W_out)), result_state^)

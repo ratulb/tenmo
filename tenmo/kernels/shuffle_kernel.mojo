@@ -131,7 +131,7 @@ struct ShuffleKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if sync:
             device_context.synchronize()
 
-        var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var result_state = DeviceState[Self.dtype](result_buffer, gpu)
         return (
             Layout(shape),
             result_state^,
@@ -187,7 +187,7 @@ struct ShuffleKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if sync:
             device_context.synchronize()
 
-        var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var result_state = DeviceState[Self.dtype](result_buffer, gpu)
         return (
             Layout(shape),
             result_state^,

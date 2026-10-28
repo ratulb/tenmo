@@ -42,7 +42,7 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
                     incoming_grad.buffer(),
                 )
 
-            left_parent.update_grad(left_parent_grad^, Self.lhs_op, None)
+            left_parent.update_grad(left_parent_grad, Self.lhs_op, None)
         parent_ids.append(left_parent._id)
 
         # For right parent: compute its gradient if needed (id always
@@ -61,7 +61,7 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
                     incoming_grad.buffer(),
                 )
 
-            right_parent.update_grad(right_parent_grad^, Self.rhs_op, None)
+            right_parent.update_grad(right_parent_grad, Self.rhs_op, None)
         parent_ids.append(right_parent._id)
         incoming_grad.zero_grad()
 
@@ -152,7 +152,7 @@ struct BroadcastToBackward[dtype: DType](
             if grad.shape() != parent.shape():
                 grad = grad.reshape(parent.shape())
 
-        parent.update_grad(grad^, AddTensor, None)
+        parent.update_grad(grad, AddTensor, None)
         parent_ids.append(parent._id)
         incoming_grad.zero_grad()
 

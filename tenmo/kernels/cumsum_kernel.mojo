@@ -133,7 +133,7 @@ struct CumsumKernel[dtype: DType](ImplicitlyCopyable):
 
         # bool-as-uint8: skip sub-buffer creation (buffer dtype != Self.dtype when bool)
         var result_state = DeviceState[Self.dtype].__init__[True](
-            result_buffer^, gpu
+            result_buffer, gpu
         )
 
         return (
@@ -188,7 +188,7 @@ struct CumsumKernel[dtype: DType](ImplicitlyCopyable):
 
         # bool-as-uint8: skip sub-buffer creation (buffer dtype != Self.dtype when bool)
         var result_state = DeviceState[Self.dtype].__init__[True](
-            result_buffer^, gpu
+            result_buffer, gpu
         )
 
         return (

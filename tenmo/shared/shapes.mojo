@@ -377,7 +377,7 @@ struct Shape(
             Shape(2, 3) + Shape(4, 5) -> Shape(2, 3, 4, 5).
         """
         var dims = self.dims + other.dims
-        return Shape(dims^)
+        return Shape(dims)
 
     @always_inline("nodebug")
     def __add__(self, other: List[Int]) -> Shape:
@@ -390,7 +390,7 @@ struct Shape(
             New Shape with dimensions from both combined.
         """
         var dims = self.dims + other
-        return Shape(dims^)
+        return Shape(dims)
 
     @always_inline("nodebug")
     def __add__[
@@ -405,7 +405,7 @@ struct Shape(
             New Shape with dimensions from both combined.
         """
         var dims = self.dims + other
-        return Shape(dims^)
+        return Shape(dims)
 
     @always_inline("nodebug")
     def __radd__(self, other: List[Int]) -> Shape:
@@ -419,7 +419,7 @@ struct Shape(
         """
         var from_list = IntArray(other)
         var dims = from_list + self.dims
-        return Shape(dims^)
+        return Shape(dims)
 
     @always_inline("nodebug")
     def __radd__[
@@ -435,7 +435,7 @@ struct Shape(
         """
         var from_span = IntArray(other)
         var dims = from_span + self.dims
-        return Shape(dims^)
+        return Shape(dims)
 
     @always_inline("nodebug")
     def __mul__(self, factor: Int) -> Shape:

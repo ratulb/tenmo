@@ -21,11 +21,11 @@ struct TransposeBackward[dtype: DType](
         var axes = output.ancestry().backward_fn().get[IntArrayArg]().array
         ref gradbox = output.gradients()
         var ancestor = output.ancestry().get(0)
-        var inverted_axes = IntArray.invert_permutation(axes^)
-        var gradbox_transposed_contiguous = gradbox.transpose(inverted_axes^)
+        var inverted_axes = IntArray.invert_permutation(axes)
+        var gradbox_transposed_contiguous = gradbox.transpose(inverted_axes)
         if ancestor.requires_grad:
             ancestor.update_grad(
-                gradbox_transposed_contiguous^, AddTensor, None
+                gradbox_transposed_contiguous, AddTensor, None
             )
         parent_ids.append(ancestor._id)
         # View conduit: always cleared.

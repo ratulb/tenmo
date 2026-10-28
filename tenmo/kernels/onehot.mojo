@@ -80,7 +80,7 @@ struct OnehotKernel[dtype: DType, target_dtype: DType = DEFAULT_INDEX_DTYPE]:
             block_dim=1,
         )
 
-        var st = DeviceState[Self.dtype](out^, gpu)
+        var st = DeviceState[Self.dtype](out, gpu)
         if sync:
             ctx.synchronize()
         return (Layout(shape + [num_classes]), st^)

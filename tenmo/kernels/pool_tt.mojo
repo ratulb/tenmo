@@ -246,9 +246,9 @@ struct PoolTt[dtype: DType](ImplicitlyCopyable):
         if sync:
             device_context.synchronize()
         var out_state = DeviceState[Self.dtype].__init__[True](
-            out_buffer^, gpu
+            out_buffer, gpu
         )
-        var mask_state = DeviceState[DType.int64](mask_buffer^, gpu)
+        var mask_state = DeviceState[DType.int64](mask_buffer, gpu)
         return (Layout(Shape(N, C, H_out, W_out)), out_state^, mask_state^)
 
     @staticmethod
@@ -321,6 +321,6 @@ struct PoolTt[dtype: DType](ImplicitlyCopyable):
         if sync:
             device_context.synchronize()
         var gin_state = DeviceState[Self.dtype].__init__[True](
-            gin_buffer^, gpu
+            gin_buffer, gpu
         )
         return (Layout(Shape(N, C, H_in, W_in)), gin_state^)

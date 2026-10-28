@@ -134,9 +134,9 @@ def materialize_batch(
         lengths.append(Scalar[DType.int64](true_len))
         flat_labels.append(Scalar[DType.int64](labels[r]))
     return (
-        Tensor[DType.int64].d2(rows^),
-        Tensor[DType.int64].d1(flat_labels^),
-        Tensor[DType.int64].d1(lengths^),
+        Tensor[DType.int64].d2(rows),
+        Tensor[DType.int64].d1(flat_labels),
+        Tensor[DType.int64].d1(lengths),
     )
 
 
@@ -162,7 +162,7 @@ def lengths_of(xb: Tensor[DType.int64]) -> Tensor[DType.int64]:
             if Int(xb[b, t]) != IMDB_PAD_ID:
                 L += 1
         out.append(Scalar[DType.int64](L))
-    return Tensor[DType.int64].d1(out^)
+    return Tensor[DType.int64].d1(out)
 
 
 def ensure_aclImdb() raises:
@@ -184,7 +184,7 @@ def ensure_aclImdb() raises:
         args.append(
             "https://huggingface.co/datasets/NolanChai/aclImdb_v1/resolve/main/aclImdb_v1.tar.gz"
         )
-        _ = Process.run("wget", args^)
+        _ = Process.run("wget", args)
     print("extracting aclImdb...")
     _ = Process.run("tar", ["-xzf", "/tmp/aclImdb_v1.tar.gz", "-C", "/tmp"])
 

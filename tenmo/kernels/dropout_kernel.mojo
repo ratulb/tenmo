@@ -182,9 +182,9 @@ struct DropoutKernel[dtype: DType](ImplicitlyCopyable):
             device_context.synchronize()
 
         var result_state = DeviceState[Self.dtype](
-            result_buffer^, gpu
+            result_buffer, gpu
         )
-        var mask_state = DeviceState[Self.dtype](mask_buffer^, gpu)
+        var mask_state = DeviceState[Self.dtype](mask_buffer, gpu)
 
         var out_pair = (
             Layout(A_layout.shape),

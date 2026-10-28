@@ -215,7 +215,7 @@ struct DotProductKernel[dtype: DType](ImplicitlyCopyable):
         if sync:
             device_context.synchronize()
         var device_state = DeviceState[Self.dtype](
-            result_buffer^, A_device_state.get_gpu()
+            result_buffer, A_device_state.get_gpu()
         )
         return (
             Layout(Shape()),

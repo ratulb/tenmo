@@ -339,7 +339,7 @@ struct TrueDivBackwardScalar[dtype: DType](
         var ancestor = output.ancestry().get(0)
         # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
         var divided = gradbox / scalar
-        ancestor.update_grad(divided^, AddTensor, None)
+        ancestor.update_grad(divided, AddTensor, None)
         parent_ids.append(ancestor._id)
         gradbox.zero_grad()
 
@@ -365,7 +365,7 @@ struct RightTrueDivBackwardScalar[dtype: DType](
             gradbox.buffer(), ancestor.buffer(), scalar, sync=False
         )
         var grad_parent = Gradbox[Self.dtype](grad_ndb^)
-        ancestor.update_grad(grad_parent^, SubtractTensor, None)
+        ancestor.update_grad(grad_parent, SubtractTensor, None)
         parent_ids.append(ancestor._id)
         gradbox.zero_grad()
 

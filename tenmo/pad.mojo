@@ -97,7 +97,7 @@ struct PadBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
                                 pad,
                             )
                             ancestor_ref.update_grad(
-                                grad_parent^, AddTensor, None
+                                grad_parent, AddTensor, None
                             )
                     except e:
                         panic("PadBackward GPU backward failed: " + String(e))
@@ -136,7 +136,7 @@ struct PadBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
             elif mode == "reflect":
                 Self._extract_reflect(grad_out, grad_parent, pad, parent_shape)
 
-            ancestor_ref.update_grad(grad_parent^, AddTensor, None)
+            ancestor_ref.update_grad(grad_parent, AddTensor, None)
 
         # Always appended: parent_ids is the engine's fanin-completion
         # signal (appended set must equal ancestry set); update_grad
@@ -834,7 +834,7 @@ struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var outer_dims = IntArray()
             for d in range(ndim - 1):
                 outer_dims.append(result_shape[d])
-            outer_shape = Shape(outer_dims^)
+            outer_shape = Shape(outer_dims)
 
         def pad_row(r: Int) {imm}:
             var src_base = x_base

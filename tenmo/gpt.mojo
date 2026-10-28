@@ -469,7 +469,7 @@ struct GPTEmbedding[
             ids.append(Scalar[Self.index_dtype](pos))
         var pos_batch = Tensor[Self.index_dtype].from_list[
             Self.index_dtype
-        ](ids^).reshape(B, 1)
+        ](ids).reshape(B, 1)
         var tok = self.wte(x_1, sync=sync)
         var p = self.wpe(pos_batch, sync=sync)
         var summed = tok.__add__[track_grad=False](p)

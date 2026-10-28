@@ -34,9 +34,9 @@ struct PermuteBackward[dtype: DType](
         var inverted = IntArray.invert_permutation(permutation)
 
         # Apply inverse permutation — GPU safe via NDBuffer.permute
-        var parent_gradbox = gradbox.permute(inverted^)
+        var parent_gradbox = gradbox.permute(inverted)
         if parent.requires_grad:
-            parent.update_grad(parent_gradbox^, AddTensor, None)
+            parent.update_grad(parent_gradbox, AddTensor, None)
         parent_ids.append(parent._id)
         # View conduit: grad already forwarded to base above; always cleared.
         gradbox.zero_grad()

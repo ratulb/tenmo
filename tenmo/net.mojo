@@ -119,7 +119,7 @@ struct Linear[dtype: DType, mode: Int = mm](LayerTrait & Writable):
             ](x, self.weight, sync=sync)
             if self.bias:
                 result = Adder[Self.dtype].forward[track_grad=True](
-                    matmul_out^, self.bias.value(), sync=sync
+                    matmul_out, self.bias.value(), sync=sync
                 )
             else:
                 result = matmul_out^
@@ -130,7 +130,7 @@ struct Linear[dtype: DType, mode: Int = mm](LayerTrait & Writable):
             ](x, self.weight, sync=sync)
             if self.bias:
                 result = Adder[Self.dtype].forward[track_grad=False](
-                    matmul_out^, self.bias.value(), sync=sync
+                    matmul_out, self.bias.value(), sync=sync
                 )
             else:
                 result = matmul_out^
@@ -361,7 +361,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable):
             ](xs, self.weight, sync=sync)
             if self.bias:
                 result = Adder[Self.dtype].forward[track_grad=True](
-                    matmul_out^, self.bias.value(), sync=sync
+                    matmul_out, self.bias.value(), sync=sync
                 )
             else:
                 result = matmul_out^
@@ -372,7 +372,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable):
             ](xs, self.weight, sync=sync)
             if self.bias:
                 result = Adder[Self.dtype].forward[track_grad=False](
-                    matmul_out^, self.bias.value(), sync=sync
+                    matmul_out, self.bias.value(), sync=sync
                 )
             else:
                 result = matmul_out^
@@ -395,7 +395,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable):
             )
             if self.bias:
                 result = Adder[Self.dtype].forward[track_grad=True](
-                    matmul_out^, self.bias.value(), sync=sync
+                    matmul_out, self.bias.value(), sync=sync
                 )
             else:
                 result = matmul_out^
@@ -410,7 +410,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable):
             )
             if self.bias:
                 result = Adder[Self.dtype].forward[track_grad=False](
-                    matmul_out^, self.bias.value(), sync=sync
+                    matmul_out, self.bias.value(), sync=sync
                 )
             else:
                 result = matmul_out^
@@ -1196,7 +1196,7 @@ struct SequentialBLAS[dtype: DType](Copyable):
             if BLASCache.is_available() and m.layer.isa[LinearBLAS[Self.dtype]]():
                 var linear = m.layer[LinearBLAS[Self.dtype, mm]]
                 linear.blas_lite = BLASHandleLite[Self.dtype].from_cache()
-                self.modules.append(linear^.into())
+                self.modules.append(linear.into())
                 continue
 
             self.modules.append(m)
@@ -1786,7 +1786,7 @@ def _boundary_hop[
     var ip = in_ptr.unsafe_bitcast[TI]()
     var xc = ip[].to_dtype[M.InputDType]()
     var mp = m_ptr.unsafe_bitcast[M]()
-    var y = mp[].__call__(xc^, sync=sync)
+    var y = mp[].__call__(xc, sync=sync)
     ip.unsafe_deinit_pointee()
     ip.unsafe_free()
     var op = unsafe_alloc[TO](1)

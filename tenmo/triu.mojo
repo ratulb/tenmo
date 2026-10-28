@@ -67,7 +67,7 @@ struct TriuBackward[dtype: DType](
         var gradbox_ancestor = Gradbox[Self.dtype](grad_ndb^)
 
         if parent.requires_grad:
-            parent.update_grad(gradbox_ancestor^, AddTensor, None)
+            parent.update_grad(gradbox_ancestor, AddTensor, None)
         # Unconditional: parent_ids is the engine's fanin-completion
         # signal (appended set must equal ancestry set).
         parent_ids.append(parent._id)

@@ -56,9 +56,10 @@ struct GatherArg(ArgumentType):
 struct GatherBackward[dtype: DType](
     BackwardFnType, ImplicitlyCopyable, RegisterPassable
 ):
-    """padding_idx zeroing happens in engine's ScatterAddTensor branch
-    by reading GatherArg.padding_idx.
-    MEAN reduction: backward divides gradient by len(indices).
+    """Zero padding-index gradients in the engine's ScatterAddTensor branch.
+
+    Reads GatherArg.padding_idx. MEAN reduction divides the gradient by
+    len(indices).
     """
     comptime datatype = Self.dtype
 

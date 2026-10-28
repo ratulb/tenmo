@@ -122,7 +122,7 @@ struct ClipBackward[dtype: DType](
                     else:
                         parent_gradbox[coord] = Scalar[Self.dtype](0)
 
-        parent.update_grad(parent_gradbox^, AddTensor, None)
+        parent.update_grad(parent_gradbox, AddTensor, None)
         parent_ids.append(parent._id)
         grad_output.zero_grad()
 

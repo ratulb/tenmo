@@ -64,7 +64,7 @@ struct CumsumBackward[dtype: DType](
         var gradbox_ancestor = Gradbox[Self.dtype](grad_ndb^)
 
         if parent.requires_grad:
-            parent.update_grad(gradbox_ancestor^, AddTensor, None)
+            parent.update_grad(gradbox_ancestor, AddTensor, None)
         parent_ids.append(parent._id)
 
         gradbox.zero_grad()

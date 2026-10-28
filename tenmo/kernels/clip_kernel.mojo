@@ -67,7 +67,7 @@ def clip_backward_kernel[
     min_val: Scalar[dtype],
     max_val: Scalar[dtype],
 ):
-    """grad_in[i] = grad_out[i] where min <= parent[i] <= max else 0."""
+    """Gradient: grad_in[i] = grad_out[i] where min <= parent[i] <= max else 0."""
     var size = Int(size_)
     var tid = thread_idx.x
     var gtid = tid + block_dim.x * block_idx.x
@@ -147,7 +147,7 @@ struct ClipKernel[dtype: DType](ImplicitlyCopyable):
         if sync:
             device_context.synchronize()
 
-        var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var result_state = DeviceState[Self.dtype](result_buffer, gpu)
         return (Layout(A_layout.shape), result_state^)
 
     @staticmethod
@@ -200,5 +200,5 @@ struct ClipKernel[dtype: DType](ImplicitlyCopyable):
         if sync:
             device_context.synchronize()
 
-        var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var result_state = DeviceState[Self.dtype](result_buffer, gpu)
         return (Layout(grad_output_layout.shape), result_state^)

@@ -147,7 +147,7 @@ def generate[OutT: DType](
         var window = List[Scalar[DType.int64]](capacity=T)
         for i in range(total - T, total):
             window.append(Scalar[DType.int64](ids[i]))
-        var batch = Tensor[DType.int64].from_list[DType.int64](window^)
+        var batch = Tensor[DType.int64].from_list[DType.int64](window)
         var flat = batch.reshape(1, T)
 
         var logits = model(flat)  # (1, T, V), grad-free under eval()
@@ -174,7 +174,7 @@ def generate[OutT: DType](
     var out = List[Scalar[DType.int64]](capacity=len(ids))
     for i in range(len(ids)):
         out.append(Scalar[DType.int64](ids[i]))
-    return Tensor[DType.int64].from_list[DType.int64](out^)
+    return Tensor[DType.int64].from_list[DType.int64](out)
 
 def generate_cached[OutT: DType](
     mut model: GPTModel[OutT],
@@ -228,14 +228,14 @@ def generate_cached[OutT: DType](
     for p in range(len(ids) - 1):
         var one = List[Scalar[DType.int64]](capacity=1)
         one.append(Scalar[DType.int64](ids[p]))
-        var x_1 = Tensor[DType.int64].from_list[DType.int64](one^).reshape(
+        var x_1 = Tensor[DType.int64].from_list[DType.int64](one).reshape(
             1, 1
         )
         _ = model.forward_step(x_1, p, cache)
     var last_one = List[Scalar[DType.int64]](capacity=1)
     last_one.append(Scalar[DType.int64](ids[len(ids) - 1]))
     var x_last = Tensor[DType.int64].from_list[DType.int64](
-        last_one^
+        last_one
     ).reshape(1, 1)
     var prefill_last = model.forward_step(x_last, len(ids) - 1, cache)
 
@@ -257,7 +257,7 @@ def generate_cached[OutT: DType](
             var one = List[Scalar[DType.int64]](capacity=1)
             one.append(Scalar[DType.int64](ids[len(ids) - 1]))
             var x_1 = Tensor[DType.int64].from_list[DType.int64](
-                one^
+                one
             ).reshape(1, 1)
             var logits = model.forward_step(
                 x_1, len(ids) - 1, cache
@@ -279,4 +279,4 @@ def generate_cached[OutT: DType](
     var out = List[Scalar[DType.int64]](capacity=len(ids))
     for i in range(len(ids)):
         out.append(Scalar[DType.int64](ids[i]))
-    return Tensor[DType.int64].from_list[DType.int64](out^)
+    return Tensor[DType.int64].from_list[DType.int64](out)

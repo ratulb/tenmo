@@ -50,7 +50,7 @@ struct SumBackward[dtype: DType](
                 grad_contrib = gradbox.broadcast_to(shape)
 
         if ancestor.requires_grad:
-            ancestor.update_grad(grad_contrib^, AddTensor, None)
+            ancestor.update_grad(grad_contrib, AddTensor, None)
 
         parent_ids.append(ancestor._id)
         gradbox.zero_grad()

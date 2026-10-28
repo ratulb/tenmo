@@ -432,7 +432,7 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
             local_grad_ndb = softmax_out.arithmetic_ops[Multiply](grad_diff)
 
         var local_grad = Gradbox[Self.dtype](local_grad_ndb^)
-        ancestor.update_grad(local_grad^, AddTensor, None)
+        ancestor.update_grad(local_grad, AddTensor, None)
         parent_ids.append(ancestor._id)
         gradbox.zero_grad()
 

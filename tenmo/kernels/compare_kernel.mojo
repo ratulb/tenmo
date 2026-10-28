@@ -408,7 +408,7 @@ struct Compare[dtype: DType = DType.float32](
 
         # bool-as-uint8: skip sub-buffer creation (buffer dtype != Self.dtype when bool)
         var device_state = DeviceState[DType.bool].__init__[True](
-            result_buffer^, gpu
+            result_buffer, gpu
         )
         return (Layout(output_shape), device_state^)
 
@@ -428,8 +428,9 @@ def compare_scalar[
     scalar: Scalar[dtype],
     size_: Int64,
 ):
-    """compare_scalar kernel
-    Same pattern as compare — uint8 output, wrapped in DeviceState[DType.bool]
+    """Compare with a scalar kernel.
+
+    Same pattern as compare — uint8 output, wrapped in DeviceState[DType.bool].
     """
     var size = Int(size_)
     var tid = thread_idx.x
@@ -566,7 +567,7 @@ struct CompareScalar[dtype: DType = DType.float32](ImplicitlyCopyable):
 
         # bool-as-uint8: skip sub-buffer creation (buffer dtype != Self.dtype when bool)
         var device_state = DeviceState[DType.bool].__init__[True](
-            result_buffer^, gpu
+            result_buffer, gpu
         )
         return (Layout(A_layout.shape), device_state^)
 

@@ -246,7 +246,7 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
 
         self._batch = Batch[
             Self.DatasetSource._sample_dtype, Self.DatasetSource._label_dtype
-        ](batch_features^, batch_labels^)
+        ](batch_features, batch_labels)
 
         # Allocate last batch if needed
         if not drop_last:
@@ -280,7 +280,7 @@ struct NativeLoader[DatasetSource: Dataset, origin: ImmOrigin](
                 self._last_batch = Batch[
                     Self.DatasetSource._sample_dtype,
                     Self.DatasetSource._label_dtype,
-                ](last_features^, last_labels^)
+                ](last_features, last_labels)
             else:
                 self._last_batch_size = 0
                 self._last_batch = None

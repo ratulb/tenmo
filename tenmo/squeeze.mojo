@@ -32,7 +32,7 @@ struct SqueezeBackward[dtype: DType](
                 )
             else:
                 ancestor_gradbox = gradbox.reshape(original_shape)
-            ancestor.update_grad(ancestor_gradbox^, AddTensor, None)
+            ancestor.update_grad(ancestor_gradbox, AddTensor, None)
         parent_ids.append(ancestor._id)
         # View conduit: always cleared.
         gradbox.zero_grad()

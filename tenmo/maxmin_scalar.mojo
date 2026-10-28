@@ -62,7 +62,7 @@ struct MaxBackwardScalar[dtype: DType](
             mask.arithmetic_ops[Multiply](gradbox.buffer()),
         )
 
-        parent_ref.update_grad(grad_input^, AddTensor, None)
+        parent_ref.update_grad(grad_input, AddTensor, None)
         parent_ids.append(parent_ref._id)
 
         gradbox.zero_grad()
@@ -113,7 +113,7 @@ struct MinBackwardScalar[dtype: DType](
         var grad_input = Gradbox[Self.dtype](
             mask.arithmetic_ops[Multiply](gradbox.buffer()),
         )
-        parent_ref.update_grad(grad_input^, AddTensor, None)
+        parent_ref.update_grad(grad_input, AddTensor, None)
         parent_ids.append(parent_ref._id)
 
         gradbox.zero_grad()

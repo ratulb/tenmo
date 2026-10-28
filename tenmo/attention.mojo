@@ -366,13 +366,13 @@ struct SelfAttention[dtype: DType](LayerTrait):
             k_pair.append(k_prev.value())
             k_pair.append(k_new)
             k_full = Tensor[Self.dtype].concat[track_grad=False](
-                k_pair^, axis=2, sync=sync
+                k_pair, axis=2, sync=sync
             )
             var v_pair = List[Tensor[Self.dtype]]()
             v_pair.append(v_prev.value())
             v_pair.append(v_new)
             v_full = Tensor[Self.dtype].concat[track_grad=False](
-                v_pair^, axis=2, sync=sync
+                v_pair, axis=2, sync=sync
             )
 
         var kT = k_full.permute[track_grad=False]([0, 1, 3, 2], sync=sync)

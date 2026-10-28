@@ -42,7 +42,7 @@ struct Buffer[dtype: DType = DType.float32]:
     var external: Bool
 ```
 
-A `Buffer` has two modes. **Unshared**: borrowed external memory (`external=True`) that the Buffer never frees. **Shared**: every owned allocation is `[refcount: Atomic(UInt64)] | [data array]` from birth — `Buffer(size)` mallocs the combined block, sets the refcount to 1, and points `data` past it (Mojo 1.1.0 spelling):
+A `Buffer` has two modes. **Unshared**: borrowed external memory (`external=True`) that the Buffer never frees. **Shared**: every owned allocation is `[refcount: Atomic(UInt64)] | [data array]` from birth — `Buffer(size)` mallocs the combined block, sets the refcount to 1, and points `data` past it (Mojo 1.2.0 spelling):
 
 ```mojo
 var refcount_size = size_of[Atomic[UInt64]]()

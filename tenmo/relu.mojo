@@ -40,7 +40,7 @@ struct ReLUBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
             result_ndb = NDBuffer[Self.dtype](result_buf^, shape)
 
         var ancestor_gbx = Gradbox[Self.dtype](result_ndb^)
-        ancestor.update_grad(ancestor_gbx^, AddTensor, None)
+        ancestor.update_grad(ancestor_gbx, AddTensor, None)
 
         parent_ids.append(ancestor._id)
         gradbox.zero_grad()
@@ -84,7 +84,7 @@ struct ReLU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
                 if self.buffer.is_on_gpu():
                     backwardFn = BackwardFn.from_ndbuffer[Self.dtype](
-                        mask_ndb^,
+                        mask_ndb,
                         ReLUBackward[Self.dtype](),
                     )
                 else:

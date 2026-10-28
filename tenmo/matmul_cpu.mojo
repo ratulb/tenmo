@@ -35,8 +35,9 @@ comptime matmulFn[dtype: DType] = def(
 ) thin -> Tuple[Layout, Buffer[dtype]]
 
 trait MatmulCpu:
-    """ MatmulCpu trait.
-     Common interface for CPU matmul implementations. Both 2D (MmCpu2d) and
+    """MatmulCpu trait.
+
+    Common interface for CPU matmul implementations. Both 2D (MmCpu2d) and
      ND-batched (MmCpuNd) implement this trait. The per-shape tile-size
      dispatch — 3 × 2 × 3 = 18 (TILE_M, TILE_N, TILE_P) combinations — lives
      here ONCE in mm_fn(); each concrete struct only supplies:

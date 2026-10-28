@@ -180,7 +180,7 @@ struct StackBackward[dtype: DType](
                             ]
                             elem_idx += 1
 
-                ancestor_ref.update_grad(grad_input^, AddTensor, None)
+                ancestor_ref.update_grad(grad_input, AddTensor, None)
             parent_ids.append(ancestor_ref._id)
 
         grad_output.zero_grad()
@@ -249,7 +249,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # 3. CONCATENATE: Along the new dimension
         var result = Concate[Self.dtype].forward[track_grad=False](
-            expanded_tensors^, axis=stack_axis, requires_grad=False
+            expanded_tensors, axis=stack_axis, requires_grad=False
         )
 
         # 4. SETUP AUTOGRAD
@@ -319,7 +319,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 reshaped.append(reshaped_tensor^)
 
             var result = Concate[Self.dtype].forward[track_grad=False](
-                reshaped^, axis=0, requires_grad=False, sync=sync
+                reshaped, axis=0, requires_grad=False, sync=sync
             )
 
             comptime if track_grad:

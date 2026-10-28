@@ -96,6 +96,6 @@ struct CastKernel(ImplicitlyCopyable, RegisterPassable):
 
         # bool-as-uint8: skip sub-buffer creation (buffer dtype != logical dtype when bool)
         var result_state = DeviceState[dst_dtype].__init__[True](
-            result_buffer^, gpu
+            result_buffer, gpu
         )
         return (Layout(src_layout.shape), result_state^)

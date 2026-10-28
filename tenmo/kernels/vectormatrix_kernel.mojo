@@ -172,7 +172,7 @@ struct VectorMatmulKernel[dtype: DType = DType.float32](
         if sync:
             device_context.synchronize()
 
-        var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var device_state = DeviceState[Self.dtype](result_buffer, gpu)
         return (
             Layout(out_shape),
             device_state^,

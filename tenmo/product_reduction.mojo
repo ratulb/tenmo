@@ -636,6 +636,6 @@ struct ProductBackward[dtype: DType](
         )
 
         var gradbox_ancestor = Gradbox[Self.dtype](grad_input^)
-        ancestor.update_grad(gradbox_ancestor^, AddTensor, None)
+        ancestor.update_grad(gradbox_ancestor, AddTensor, None)
         parent_ids.append(ancestor._id)
         gradbox.zero_grad()

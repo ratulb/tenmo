@@ -77,7 +77,7 @@ struct GPURegistry(RegisterPassable):
             return reg[key].copy()
         var ctx = DeviceContext(device_id)
         var canonical = RegisteredGPU(
-            ctx^, key, IDGen.generate_id["_TENMO_GPU_ID_COUNTER"]()
+            ctx, key, IDGen.generate_id["_TENMO_GPU_ID_COUNTER"]()
         )
         reg[key] = canonical.copy()
         return canonical^
@@ -87,5 +87,5 @@ struct GPURegistry(RegisterPassable):
         """Build a fresh, untracked GPU state (the `force=True` path)."""
         var ctx = DeviceContext(device_id)
         return RegisteredGPU(
-            ctx^, Int64(device_id), IDGen.generate_id["_TENMO_GPU_ID_COUNTER"]()
+            ctx, Int64(device_id), IDGen.generate_id["_TENMO_GPU_ID_COUNTER"]()
         )

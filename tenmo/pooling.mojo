@@ -138,7 +138,7 @@ struct MaxPool2dBackward[dtype: DType](BackwardFnType, ImplicitlyCopyable):
                             ] += grad_val
 
             parallelize(scatter_gradients_optimized, N * C)
-            input_tensor_ref.update_grad(grad_input^, AddTensor, None)
+            input_tensor_ref.update_grad(grad_input, AddTensor, None)
         parent_ids.append(input_tensor_ref._id)
 
         grad_output.zero_grad()

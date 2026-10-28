@@ -28,7 +28,7 @@ struct LogBackward[dtype: DType](
         )
         var parent_gradbox = Gradbox[Self.dtype](result_ndb^)
 
-        parent.update_grad(parent_gradbox^, AddTensor, None)
+        parent.update_grad(parent_gradbox, AddTensor, None)
 
         parent_ids.append(parent._id)
         gradbox.zero_grad()

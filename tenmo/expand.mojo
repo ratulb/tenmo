@@ -26,7 +26,7 @@ struct ExpandBackward[dtype: DType](
         var parent_shape = ancestor.shape()
         var gradbox_contracted = gradbox.sum_over_broadcasted_axes(parent_shape)
 
-        ancestor.update_grad(gradbox_contracted^, AddTensor, None)
+        ancestor.update_grad(gradbox_contracted, AddTensor, None)
 
         parent_ids.append(ancestor._id)
         # View conduit: grad already forwarded to base above; always cleared.

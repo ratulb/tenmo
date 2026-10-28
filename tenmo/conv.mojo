@@ -106,9 +106,9 @@ struct ConvBackward[dtype: DType](
                     var img_cpu = image.buffer().to_cpu(sync=True)
                     var kern_cpu = kernel.buffer().to_cpu(sync=True)
                     var grads = Self._cpu_gradients(
-                        dy_cpu^,
-                        img_cpu^,
-                        kern_cpu^,
+                        dy_cpu,
+                        img_cpu,
+                        kern_cpu,
                         N,
                         C_in,
                         H_in,
@@ -131,21 +131,21 @@ struct ConvBackward[dtype: DType](
                         var gk_gpu = Gradbox[Self.dtype](
                             gk.buffer().to_gpu(gpu)
                         )
-                        kernel.update_grad(gk_gpu^, AddTensor, None)
+                        kernel.update_grad(gk_gpu, AddTensor, None)
                     parent_ids.append(kernel._id)
                     if image.requires_grad:
                         var gi = grads[1]
                         var gi_gpu = Gradbox[Self.dtype](
                             gi.buffer().to_gpu(gpu)
                         )
-                        image.update_grad(gi_gpu^, AddTensor, None)
+                        image.update_grad(gi_gpu, AddTensor, None)
                     parent_ids.append(image._id)
                     if bias.requires_grad:
                         var gb = grads[2]
                         var gb_gpu = Gradbox[Self.dtype](
                             gb.buffer().to_gpu(gpu)
                         )
-                        bias.update_grad(gb_gpu^, AddTensor, None)
+                        bias.update_grad(gb_gpu, AddTensor, None)
                     parent_ids.append(bias._id)
                     output.gradients().zero_grad()
                 except e:
@@ -290,7 +290,7 @@ struct ConvBackward[dtype: DType](
             )
             var B_layout = Layout(Shape(M, K))
             var C_buf = MmCpu2d[Self.dtype].tiled_matmul(
-                A_layout, P_buf.copy(), B_layout, cols_buf^
+                A_layout, P_buf.copy(), B_layout, cols_buf
             )[1]
             # C (C_out, K) C-order reinterprets directly as
             # (C_out, C_in, KH, KW) — identical memory order, zero copy.
@@ -310,7 +310,7 @@ struct ConvBackward[dtype: DType](
                 A_layout, P_buf.copy(), B_layout, kern_shadow.buffer.copy()
             )[1]
             var dx_buf = Conv[Self.dtype].col2im(
-                dcols_buf^,
+                dcols_buf,
                 M,
                 K,
                 N,
@@ -484,13 +484,13 @@ struct Conv[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var A_layout = Layout(Shape(M, K))
         var B_layout = Layout(Shape(K, C_out))
         var result = MmCpu2d[Self.dtype].tiled_matmul(
-            A_layout, cols_buf^, B_layout, kern_buf^
+            A_layout, cols_buf, B_layout, kern_buf
         )
         var C_buf = result[1]
 
         # 4. Repack C (M, C_out) → (N, C_out, H_out, W_out) + fused bias.
         var out_buf = Self.repack_output_bias(
-            C_buf^,
+            C_buf,
             bias.buffer,
             N,
             C_out,

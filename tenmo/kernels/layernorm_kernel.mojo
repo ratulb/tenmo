@@ -214,9 +214,9 @@ struct LayerNormKernel[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         # rstd shape is (*, 1) — same as mean/var from Welford
         var rstd_shape = out_shape[0:-1] + [1]
 
-        var out_state = DeviceState[Self.dtype](out_buffer^, gpu)
-        var x_hat_state = DeviceState[Self.dtype](x_hat_buffer^, gpu)
-        var rstd_state = DeviceState[Self.dtype](rstd_buffer^, gpu)
+        var out_state = DeviceState[Self.dtype](out_buffer, gpu)
+        var x_hat_state = DeviceState[Self.dtype](x_hat_buffer, gpu)
+        var rstd_state = DeviceState[Self.dtype](rstd_buffer, gpu)
 
         var out_pair = (
             Layout(out_shape),

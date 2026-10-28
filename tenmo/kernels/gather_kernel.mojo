@@ -268,7 +268,7 @@ struct GatherKernel[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             var out_shape = Shape(in_cols)
             # bool-as-uint8: skip sub-buffer creation (buffer dtype != Self.dtype when bool)
             var result_state = DeviceState[Self.dtype].__init__[special=True](
-                out_dev^, gpu
+                out_dev, gpu
             )
             return (
                 Layout(out_shape),
@@ -330,7 +330,7 @@ struct GatherKernel[dtype: DType, index_dtype: DType = DEFAULT_INDEX_DTYPE](
             ctx.synchronize()
         # bool-as-uint8: skip sub-buffer creation (buffer dtype != Self.dtype when bool)
         var result_state = DeviceState[Self.dtype].__init__[special=True](
-            out_dev^, gpu
+            out_dev, gpu
         )
         return (
             Layout(out_shape),

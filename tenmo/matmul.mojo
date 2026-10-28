@@ -98,7 +98,7 @@ struct Matmul2dBackward[dtype: DType](
             )
             var grad_A = Gradbox[Self.dtype](ndb^)
 
-            A.update_grad(grad_A^, AddTensor, None)
+            A.update_grad(grad_A, AddTensor, None)
         parent_ids.append(A._id)
 
         # GRADIENT FOR B: dL/dB = A^T × grad_out (same contract).
@@ -110,7 +110,7 @@ struct Matmul2dBackward[dtype: DType](
             )
             var grad_B = Gradbox[Self.dtype](ndb^)
 
-            B.update_grad(grad_B^, AddTensor, None)
+            B.update_grad(grad_B, AddTensor, None)
         parent_ids.append(B._id)
         grad_out.zero_grad()
 
@@ -187,9 +187,9 @@ struct MatmulNdBackward[dtype: DType](
             var A_batch_grad = MatmulNd[Self.dtype].forward(
                 grad_out, Tensor[Self.dtype](B_transposed^, requires_grad=False)
             )
-            var final_grad_A = A_batch_grad^.sum_over_broadcasted_axes(A_shape)
+            var final_grad_A = A_batch_grad.sum_over_broadcasted_axes(A_shape)
 
-            A.update_grad(final_grad_A^, AddTensor, None)
+            A.update_grad(final_grad_A, AddTensor, None)
         parent_ids.append(A._id)
 
         if B.requires_grad:
@@ -198,9 +198,9 @@ struct MatmulNdBackward[dtype: DType](
                 Tensor[Self.dtype](A_transposed^, requires_grad=False), grad_out
             )
 
-            var final_grad_B = B_batch_grad^.sum_over_broadcasted_axes(B_shape)
+            var final_grad_B = B_batch_grad.sum_over_broadcasted_axes(B_shape)
 
-            B.update_grad(final_grad_B^, AddTensor, None)
+            B.update_grad(final_grad_B, AddTensor, None)
         parent_ids.append(B._id)
         grad_out.zero_grad()
 

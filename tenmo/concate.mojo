@@ -66,7 +66,7 @@ struct ConcatBackward[dtype: DType](
                                 offset,
                             )
 
-                            parent.update_grad(grad_input^, AddTensor, None)
+                            parent.update_grad(grad_input, AddTensor, None)
                         parent_ids.append(parent._id)
 
                         offset += parent_shape[axis]
@@ -96,7 +96,7 @@ struct ConcatBackward[dtype: DType](
                         src=grad_data.unsafe_offset(src_offset),
                         count=num_elements,
                     )
-                    parent.update_grad(grad_input^, AddTensor, None)
+                    parent.update_grad(grad_input, AddTensor, None)
                 # Always appended (engine fanin-completion contract).
                 parent_ids.append(parent._id)
                 src_offset += num_elements
@@ -130,7 +130,7 @@ struct ConcatBackward[dtype: DType](
                     ]
                     elem_idx += 1
 
-                parent.update_grad(grad_input^, AddTensor, None)
+                parent.update_grad(grad_input, AddTensor, None)
             parent_ids.append(parent._id)
 
             offset += parent_shape[axis]

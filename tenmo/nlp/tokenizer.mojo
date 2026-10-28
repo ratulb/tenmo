@@ -146,7 +146,7 @@ struct SimpleTokenizer[
             var lines = List[String]()
             for line in content.splitlines():
                 lines.append(String(line))
-            return Self.from_text_lines(lines^, text_cleaner, min_freq, max_n)
+            return Self.from_text_lines(lines, text_cleaner, min_freq, max_n)
         except e:
             print(e)
             raise e^
@@ -161,11 +161,11 @@ struct SimpleTokenizer[
         try:
             var urllib = Python.import_module("urllib.request")
             var response = urllib.urlopen(url)
-            var content = String(response^.read().decode("utf-8"))
+            var content = String(response.read().decode("utf-8"))
             var lines = List[String]()
             for line in content.splitlines():
                 lines.append(String(line))
-            return Self.from_text_lines(lines^, text_cleaner, min_freq, max_n)
+            return Self.from_text_lines(lines, text_cleaner, min_freq, max_n)
         except e:
             print(e)
             raise e^
@@ -186,7 +186,7 @@ struct SimpleTokenizer[
         var text = " ".join([self.int_to_str[id] for id in token_ids])
         text = String(
             self.regex_parser.sub(
-                Self.substitution[0], Self.substitution[1], text^
+                Self.substitution[0], Self.substitution[1], text
             )
         )
         return text^

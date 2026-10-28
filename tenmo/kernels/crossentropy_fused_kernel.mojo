@@ -347,10 +347,10 @@ struct CrossEntropyFusedKernel[
 
         # Read back scalar_loss and valid_count from GPU
         var scalar_state = DeviceState[Self.dtype](
-            scalar_buffer^, gpu
+            scalar_buffer, gpu
         )
         var valid_state = DeviceState[DType.int32](
-            valid_buffer^, gpu
+            valid_buffer, gpu
         )
 
         var scalar_val: Scalar[Self.dtype]
@@ -362,9 +362,9 @@ struct CrossEntropyFusedKernel[
 
         # Wrap results as (Layout, Storage) pairs
         var softmax_state = DeviceState[Self.dtype](
-            softmax_buffer^, gpu
+            softmax_buffer, gpu
         )
-        var loss_state = DeviceState[Self.dtype](loss_buffer^, gpu)
+        var loss_state = DeviceState[Self.dtype](loss_buffer, gpu)
 
         var softmax_pair = (
             Layout(logits_2d_layout.shape),
@@ -480,7 +480,7 @@ struct CrossEntropyFusedKernel[
             )
 
         var result_state = DeviceState[Self.dtype](
-            result_buffer^, gpu
+            result_buffer, gpu
         )
         return (
             Layout(Shape(M, C)),

@@ -20,6 +20,7 @@ from .ancestry import Ancestor
 @fieldwise_init
 struct ArgDropout[dtype: DType](ArgumentType):
     """ArgDropout.
+
     Packed argument struct for BackwardFn
     Stored in ArgumentType. Carries everything DropoutBackward needs:
       mask_cpu  — CPU Buffer mask (set when tensor is on CPU, else empty)
@@ -64,7 +65,7 @@ struct DropoutBackward[dtype: DType](
 
         var gradbox_ancestor = Gradbox[Self.dtype](result_ndb^)
         if ancestor.requires_grad:
-            ancestor.update_grad(gradbox_ancestor^, AddTensor, None)
+            ancestor.update_grad(gradbox_ancestor, AddTensor, None)
         parent_ids.append(ancestor._id)
 
         gradbox.zero_grad()

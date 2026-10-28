@@ -86,6 +86,7 @@ def arithmetic_ops_both_contiguous_broadcast[
     epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ):
     """KERNEL 2 — Both contiguous, shapes differ — broadcast expansion needed.
+
     Preconditions (enforced by launcher):
       A.is_contiguous() and B.is_contiguous()
       A_shape != B_shape
@@ -271,6 +272,7 @@ def arithmetic_ops_A_contiguous[
     epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ):
     """KERNEL 3 — A contiguous and fills broadcast shape; B strided/broadcast.
+
     Preconditions (enforced by launcher):
       A.is_contiguous() and A_shape == broadcast_shape
     Strategy:
@@ -776,7 +778,7 @@ struct BinaryKernel[dtype: DType = DType.float32](
             )
             if sync:
                 device_context.synchronize()
-            var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+            var device_state = DeviceState[Self.dtype](result_buffer, gpu)
             return (Layout(broadcast_shape), device_state^)
 
         # Broadcast strides for the remaining mixed and fully-strided paths.
@@ -857,7 +859,7 @@ struct BinaryKernel[dtype: DType = DType.float32](
                 )
             if sync:
                 device_context.synchronize()
-            var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+            var device_state = DeviceState[Self.dtype](result_buffer, gpu)
             return (Layout(broadcast_shape), device_state^)
 
         # PATH 4: B contiguous and fills broadcast shape; A strided/broadcast.
@@ -891,7 +893,7 @@ struct BinaryKernel[dtype: DType = DType.float32](
             )
             if sync:
                 device_context.synchronize()
-            var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+            var device_state = DeviceState[Self.dtype](result_buffer, gpu)
             return (Layout(broadcast_shape), device_state^)
 
         # PATH 2: Both contiguous, shapes differ — broadcast expansion.
@@ -919,7 +921,7 @@ struct BinaryKernel[dtype: DType = DType.float32](
             )
             if sync:
                 device_context.synchronize()
-            var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+            var device_state = DeviceState[Self.dtype](result_buffer, gpu)
             return (Layout(broadcast_shape), device_state^)
 
         # PATH 5: General fallback — both strided or complex broadcast.
@@ -946,7 +948,7 @@ struct BinaryKernel[dtype: DType = DType.float32](
         )
         if sync:
             device_context.synchronize()
-        var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var device_state = DeviceState[Self.dtype](result_buffer, gpu)
         return (Layout(broadcast_shape), device_state^)
 
     @staticmethod
