@@ -248,7 +248,7 @@ def race_steps_to_bar(use_adamw: Bool) raises -> Int:
     var criterion = CrossEntropyLoss[dtype](reduction="mean")
     criterion.train()
     if use_adamw:
-        var opt = AdamW[dtype](params^, lr=0.05, weight_decay=0.0)
+        var opt = AdamW[dtype](params, lr=0.05, weight_decay=0.0)
         for step in range(60):
             var logits = model(tokens).permute([0, 2, 1])
             var loss = criterion(logits, targets)
@@ -260,7 +260,7 @@ def race_steps_to_bar(use_adamw: Bool) raises -> Int:
                 return step + 1
         return 61
     else:
-        var sgd = SGD[dtype](params^, lr=0.5)
+        var sgd = SGD[dtype](params, lr=0.5)
         for step in range(60):
             var logits = model(tokens).permute([0, 2, 1])
             var loss = criterion(logits, targets)

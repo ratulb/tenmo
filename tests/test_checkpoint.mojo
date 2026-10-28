@@ -281,7 +281,7 @@ def test_sgd_state_dict_no_momentum() raises:
     var param = Tensor[DType.float32].ones(Shape(2, 2), requires_grad=True)
     var params = List[Pointer[Tensor[DType.float32], MutAnyOrigin]]()
     params.append(Pointer(to=param).unsafe_origin_cast[MutAnyOrigin]())
-    var opt = SGD[DType.float32](params^, lr=0.1)
+    var opt = SGD[DType.float32](params, lr=0.1)
     var state = opt.state_dict()
     assert_true(state.__contains__("type"))
     assert_true(state["type"] == "SGD")
@@ -296,7 +296,7 @@ def test_sgd_state_dict_with_momentum() raises:
     var param = Tensor[DType.float32].ones(Shape(2, 2), requires_grad=True)
     var params = List[Pointer[Tensor[DType.float32], MutAnyOrigin]]()
     params.append(Pointer(to=param).unsafe_origin_cast[MutAnyOrigin]())
-    var opt = SGD[DType.float32](params^, lr=0.1, momentum=0.9)
+    var opt = SGD[DType.float32](params, lr=0.1, momentum=0.9)
     var state = opt.state_dict()
     assert_true(state.__contains__("velocities"))
     assert_equal(len(state["velocities"]), 1)
@@ -308,7 +308,7 @@ def test_sgd_load_state_dict_full() raises:
     var params = List[Pointer[Tensor[DType.float32], MutAnyOrigin]]()
     params.append(Pointer(to=param).unsafe_origin_cast[MutAnyOrigin]())
     var opt = SGD[DType.float32](
-        params^,
+        params,
         lr=0.01,
         momentum=0.9,
         weight_decay=1e-4,
@@ -321,7 +321,7 @@ def test_sgd_load_state_dict_full() raises:
     params2.append(
         Pointer(to=param_copy).unsafe_origin_cast[MutAnyOrigin]()
     )
-    var restored = SGD[DType.float32].load_state_dict(state, params2^)
+    var restored = SGD[DType.float32].load_state_dict(state, params2)
     var restored_state = restored.state_dict()
     assert_true(
         ndarray_ptr[DType.float64](state["lr"]).unsafe_load()
@@ -354,7 +354,7 @@ def test_sgd_velocity_values_preserved() raises:
     var param = Tensor[DType.float32].ones(Shape(2, 2), requires_grad=True)
     var params = List[Pointer[Tensor[DType.float32], MutAnyOrigin]]()
     params.append(Pointer(to=param).unsafe_origin_cast[MutAnyOrigin]())
-    var opt = SGD[DType.float32](params^, lr=0.1, momentum=0.9)
+    var opt = SGD[DType.float32](params, lr=0.1, momentum=0.9)
     param.seed_grad(Scalar[DType.float32](1.0))
     opt.step()
     var state = opt.state_dict()
@@ -363,7 +363,7 @@ def test_sgd_velocity_values_preserved() raises:
     params2.append(
         Pointer(to=param_copy).unsafe_origin_cast[MutAnyOrigin]()
     )
-    var restored = SGD[DType.float32].load_state_dict(state, params2^)
+    var restored = SGD[DType.float32].load_state_dict(state, params2)
     var orig_vel = to_ndarray(opt.velocities[0])
     var loaded_vel = to_ndarray(restored.velocities[0])
     var np = Python.import_module("numpy")
@@ -376,7 +376,7 @@ def test_sgd_state_dict_defaults() raises:
     var params = List[Pointer[Tensor[DType.float32], MutAnyOrigin]]()
     params.append(Pointer(to=param).unsafe_origin_cast[MutAnyOrigin]())
     var opt = SGD[DType.float32](
-        params^, lr=0.01, weight_decay=0.0, clip_norm=0.0, clip_value=0.0
+        params, lr=0.01, weight_decay=0.0, clip_norm=0.0, clip_value=0.0
     )
     var state = opt.state_dict()
     var params2 = List[Pointer[Tensor[DType.float32], MutAnyOrigin]]()
@@ -384,7 +384,7 @@ def test_sgd_state_dict_defaults() raises:
     params2.append(
         Pointer(to=param_copy).unsafe_origin_cast[MutAnyOrigin]()
     )
-    var restored = SGD[DType.float32].load_state_dict(state, params2^)
+    var restored = SGD[DType.float32].load_state_dict(state, params2)
     var restored_state = restored.state_dict()
     assert_true(
         ndarray_ptr[DType.float64](state["lr"]).unsafe_load()
@@ -442,7 +442,7 @@ def test_save_state_with_optimizer() raises:
     var model = Sequential[DType.float32]()
     model.append(Linear[DType.float32](4, 3).into())
     var params = model.parameters()
-    var opt = SGD[DType.float32](params^, lr=0.01, momentum=0.9)
+    var opt = SGD[DType.float32](params, lr=0.01, momentum=0.9)
     var tmp_path = "/tmp/test_save_state_with_optimizer.npy"
     var ckpt = save_state(tmp_path, model, opt, {})
     assert_true(ckpt.optimizer_state.__contains__("type"))
@@ -625,7 +625,7 @@ def test_save_state_with_optimizer_no_momentum() raises:
     var model = Sequential[DType.float32]()
     model.append(Linear[DType.float32](4, 3).into())
     var params = model.parameters()
-    var opt = SGD[DType.float32](params^, lr=0.01)
+    var opt = SGD[DType.float32](params, lr=0.01)
     var tmp_path = "/tmp/test_save_state_opt_nomom.npy"
     var ckpt = save_state(tmp_path, model, opt, {})
     assert_true(ckpt.optimizer_state.__contains__("type"))
@@ -710,7 +710,7 @@ def test_save_best_if_improved_with_optimizer() raises:
     var model = Sequential[DType.float32]()
     model.append(Linear[DType.float32](4, 3).into())
     var params = model.parameters()
-    var opt = SGD[DType.float32](params^, lr=0.01, momentum=0.9)
+    var opt = SGD[DType.float32](params, lr=0.01, momentum=0.9)
     var prefix = "/tmp/test_best_with_opt"
     var _ = save_best_if_improved(
         prefix, model, opt, Float64(0.3), Float64(1.0), {}
@@ -742,7 +742,7 @@ def test_save_step_checkpoint_with_optimizer() raises:
     var model = Sequential[DType.float32]()
     model.append(Linear[DType.float32](4, 3).into())
     var params = model.parameters()
-    var opt = SGD[DType.float32](params^, lr=0.01, momentum=0.9)
+    var opt = SGD[DType.float32](params, lr=0.01, momentum=0.9)
     save_step_checkpoint("/tmp/test_step_with_opt", 99, model, opt, {})
     var np = Python.import_module("numpy")
     var data = np.load(
@@ -775,7 +775,7 @@ def test_gpt_save_load_roundtrip() raises:
     var model = _tied_gpt()
     var params = model.parameters()
     var opt = AdamW[dtype](
-        params^,
+        params,
         lr=Scalar[dtype](3e-4),
         clip_norm=Scalar[dtype](1),
         clip_value=Scalar[dtype](0.5),

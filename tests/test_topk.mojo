@@ -55,7 +55,7 @@ def test_topk_axis_negative() raises:
     print("test_topk_axis_negative")
     comptime dtype = DType.float32
     var t = Tensor[dtype].d2([[1.0, 5.0, 3.0], [7.0, 2.0, 8.0]])
-    var (vals, idxs) = t.topk(1, axis=-1)
+    var (vals, _) = t.topk(1, axis=-1)
     assert_true(vals.shape() == Shape(2, 1))
     assert_true(vals == Tensor[dtype].d2([[5.0], [8.0]]))
     print("Passed")
