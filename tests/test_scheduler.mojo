@@ -140,7 +140,7 @@ def test_scheduler_integration() raises:
     var w = Tensor[dtype].ones(Shape(2, 2), requires_grad=True)
     var params = List[Pointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(Pointer(to=w).unsafe_origin_cast[MutAnyOrigin]())
-    var opt = SGD[dtype](params^, lr=0.1)
+    var opt = SGD[dtype](params, lr=0.1)
     var milestones = _int_list(3)
     var sched = MultiStepLR[dtype](
         base_lr=Scalar[dtype](0.1),

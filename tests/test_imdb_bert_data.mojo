@@ -115,7 +115,7 @@ def test_bert_materialize_batch_shapes() raises:
     var r1 = encode_review(tok, "dull story indeed", T)
     rows.append(r1[0].copy())
     labels.append(0)
-    var batch = materialize_batch(rows^, labels^, T)
+    var batch = materialize_batch(rows, labels^, T)
     ref x = batch[0]
     ref y = batch[1]
     ref lens = batch[2]
@@ -143,7 +143,7 @@ def test_bert_materialize_rejects_ragged() raises:
     labels.append(0)
     var raised = False
     try:
-        _ = materialize_batch(rows^, labels^, 12)
+        _ = materialize_batch(rows, labels, 12)
     except:
         raised = True
     assert_true(raised)
@@ -165,7 +165,7 @@ def test_bert_mask_integration() raises:
     var r1 = encode_review(tok, "a boring dull story indeed", T)
     rows.append(r1[0].copy())
     labels.append(0)
-    var batch = materialize_batch(rows^, labels^, T)
+    var batch = materialize_batch(rows, labels, T)
     ref lens_only = batch[2]
     var mask = make_padding_mask(lens_only, T)
     # Rebuild expectation from the raw rows (independent path).

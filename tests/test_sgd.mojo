@@ -16,7 +16,7 @@ def test_sgd_basic() raises:
     var params = List[Pointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(Pointer(to=param).unsafe_origin_cast[MutAnyOrigin]())
 
-    var optimizer = SGD[dtype](parameters=params^, lr=0.1)
+    var optimizer = SGD[dtype](parameters=params, lr=0.1)
 
     # Set gradient
     param.seed_grad(Scalar[dtype](1.0))
@@ -36,7 +36,7 @@ def test_sgd_momentum() raises:
     var params = List[Pointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(Pointer(to=param).unsafe_origin_cast[MutAnyOrigin]())
 
-    var optimizer = SGD[dtype](parameters=params^, lr=0.1, momentum=0.9)
+    var optimizer = SGD[dtype](parameters=params, lr=0.1, momentum=0.9)
 
     # First step
     param.seed_grad(Scalar[dtype](1.0))
@@ -63,7 +63,7 @@ def test_sgd_weight_decay() raises:
     var params = List[Pointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(Pointer(to=param).unsafe_origin_cast[MutAnyOrigin]())
 
-    var optimizer = SGD[dtype](parameters=params^, lr=0.1, weight_decay=0.01)
+    var optimizer = SGD[dtype](parameters=params, lr=0.1, weight_decay=0.01)
 
     param.seed_grad(Scalar[dtype](1.0))
     optimizer.step()
@@ -81,7 +81,7 @@ def test_sgd_grad_norm_clipping() raises:
     var params = List[Pointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(Pointer(to=param).unsafe_origin_cast[MutAnyOrigin]())
 
-    var optimizer = SGD[dtype](parameters=params^, lr=0.1, clip_norm=1.0)
+    var optimizer = SGD[dtype](parameters=params, lr=0.1, clip_norm=1.0)
 
     # Set large gradient
     param.seed_grad(Scalar[dtype](10.0))
@@ -102,7 +102,7 @@ def test_sgd_value_clipping() raises:
     var params = List[Pointer[Tensor[dtype], MutAnyOrigin]]()
     params.append(Pointer(to=param).unsafe_origin_cast[MutAnyOrigin]())
 
-    var optimizer = SGD[dtype](parameters=params^, lr=0.1, clip_value=0.5)
+    var optimizer = SGD[dtype](parameters=params, lr=0.1, clip_value=0.5)
 
     param.seed_grad(Scalar[dtype](10.0))
     optimizer.step()
